@@ -314,6 +314,8 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         
         self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
         self.reset_shortcut.activated.connect(self.slot_resetConsole)
+        
+        self.custom_page_control = QtWidgets.QPlainTextEdit()
 
         ScipyenConfigurable.__init__(self)
         
@@ -380,6 +382,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             value = QtCore.Qt.LayoutDirectionAuto
                 
         self._control.setLayoutDirection(value)
+        self.custom_page_control.setLayoutDirection(value) # doesn't work !
         
     @property
     def fontFamily(self):
@@ -438,6 +441,15 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         style = self._console_pygment
         
         self.set_pygment(style, val)
+        
+    # def _create_page_control(self): # doesn't work!
+    #     """Overrides the method in qtconsole.ConsoleWidget
+    # Keeps the scrollbar position consistent with the terminal console.
+    # """
+    #     control = super()._create_page_control()
+    #     sbPos = self.scrollBarPosition
+    #     control.setLayoutDirection(sbPos)
+    #     return control
         
     def _set_console_colors(self, colors):
         """Used as a slot for colors menu actions
@@ -518,6 +530,15 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             'nocolor'
             
         """
+        # TODO/FIXME: 2023-06-04 10:23:24
+        # figure out how the ?/?? system works, and apply better terminal colors
+        #   for dark backgrounds, to it; in fact, apply the curren terminal colors
+        #   to the displayed help text as well 
+        #   also, figure out how to alter the placement
+        #   of the scrollbar when the console is showing the message from ?/??
+        #   system -> check out _create_page_control in qtconsole/console_widget.py
+        # might have to look at the page and console submodules in IPython/jupyter
+        # but requires deep digging into their code
         import pkg_resources
         #print("ConsoleWidget.set_pygment scheme:", scheme, "colors:", colors)
         if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):

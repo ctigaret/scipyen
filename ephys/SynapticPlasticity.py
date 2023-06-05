@@ -1,3 +1,6 @@
+"""GUI for synaptic plasticity experiments
+"""
+
 #### BEGIN core python modules
 import sys, traceback, inspect, numbers
 import warnings
@@ -62,7 +65,6 @@ from ephys.ltp import PathwayType, SynapticPathway
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-#__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"))
 __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too

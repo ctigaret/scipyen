@@ -14,6 +14,7 @@ from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import numpy as np
 import pandas as pd
 import quantities as pq
+# from quantities.decorators import with_doc
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import neo
@@ -31,7 +32,6 @@ import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.datatypes as dt
 from core.datatypes import (Episode, Schedule, TypeEnum)
-from core.quantities import units_convertible
 import plots.plots as plots
 import core.models as models
 import core.neoutils as neoutils
@@ -50,7 +50,7 @@ from core.triggerprotocols import (TriggerProtocol,
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter)
+from core.prog import (safeWrapper, AttributeAdapter, with_doc)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -63,13 +63,15 @@ from core.quantities import(arbitrary_unit,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
                             unit_quantity_from_name_or_symbol,
-                            check_time_units)
+                            check_time_units,
+                            units_convertible)
 
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
                             get_index_for_seq, 
                             sp_set_loc,
-                            normalized_index)
+                            normalized_index,
+                            GeneralIndexType)
 
 #### END pict.core modules
 
@@ -107,6 +109,8 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
+class SynapticPathway: pass # forward declaration for PathwayEpisode; redefined below
+
 class PathwayType(TypeEnum):
     """
     Synaptic pathway type.
@@ -117,144 +121,385 @@ class PathwayType(TypeEnum):
     # a mapping detailing the order of the cross-stimulation
     
     Null = 0
-    Test = 1
-    Control = 2
-    Type1 = 4
-    Type2 = 8
-    Type3 = 16
-    Type4 = 32
-    Type5 = 64
-    Type6 = 128
+    # NOTE: 2023-06-02 15:41:59 
+    # In synaptic plasticity experiments, Tracing and Induction pathways are
+    #   recorded FROM THE SAME CELL, in SEPARATE SWEEPS, ONE PER PATHWAY.
+    #
+    #   Each sweep contains an instance of synaptic response on the corresponding
+    #   pathway.
+    #
+    #   When more than one pathway is recorded, tracking the synaptic responses 
+    #   must use the same pattern of activity in all pathways. This ensures
+    #   equal treament of all pathways. The only exception to this rule is during 
+    #   plasticity induction, where only a subset of pathways are exposed to the
+    #   induction protocol (the "Test" pathways), whereas the others ("Control"
+    #   pathways) are left unperturbed.
+    #
+    # Theoretically, this can be achieved either:
+    #
+    # • in INTERLEAVED mode (typical) ⇒ the number of neo.Segment objects 
+    #   (a.k.a 'sweeps') in the neo.Block (a.k.a, the 'trial') is expected to be
+    #   an integer multiple of the TOTAL number of pathways; THE ORDER of the 
+    #   pathway-specific sweeps IS THE SAME IN ALL trials.
+    #
+    #   NOTE: in Clampex, a 'trial' may consist of:
+    #   ∘ several 'runs', meaning that the stored trial data contains AN AVERAGE
+    #       of the corresponding individual sweeps across several runs in the trial.
+    #       The result is like a "running" average across as many runs that were 
+    #       recorded per total duration of the trial - see Clampex protocol editor
+    #       for details. 
+    #
+    #       In the most typical scenario (for two pathways):
+    #       ⋆ 'trials' are repeated every minute
+    #       ⋆ each 'trial' contains six 'runs' repeated every 10 s
+    #       ⋆ each 'run' contains two sweeps, at 5 s delay (so that the pathway 
+    #       responses are evoked with similar delays) and sweeps last 1 s
+    #
+    #           In these conditions, Clampex records a synaptic response from
+    #       each pathway every 10 s for six times, then saves their (minute)
+    #       average on disk.
+    #
+    #   ∘ a single 'run' ⇒ there is no distinction between 'run' and 'trial'. 
+    #       However, a single 'run' per 'trial' means that each 'sweep' in the 
+    #       save file contains just one instance of the synaptic response, NOT an
+    #       average! As we are usually interested in the minute-averaged responses
+    #       the 'runs' are executed several times per minute at a fixed interval
+    #       (e.g, six runs per minute every 10 s). Data will need to be averaged
+    #       off-line.
+    #
+    #
+    # • in contiguous mode (atypical)
+    #       A 'trial' contains responses recorded from a single pathway; when
+    #       there are more pathways, responses on distinct pathways are recorded
+    #       in distinct 'trials' or 'runs' - this is unwieldy, and may result in 
+    #       patterns of activity that are distinct between pathways
+    #
     
+    Tracking = 1 # used for tracking synaptic responses
+    Control = Tracking # alias; this is the "normal" case where no induction is applied 
+    Induction = 2 # used for induction of plasicity (i.e. application of the induction protocol)
+    Test = Tracking | Induction # the Tracking pathway where Induction was applied
+    # auxiliary pathways can be:
+    # • present along the tracking pathway, during tracking only
+    # • present along the induction pathway, during induction only
+    # • present throughout
+    Auxiliary = 4 # e.g. ripple, etc
+    Type1 = 8
+    Type2 = 16
+    Type3 = 32
+    Type4 = 64
+    Type5 = 128
+    CrossTalk = 65536
+    
+@with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class PathwayEpisode(Episode):
     """
-    Specification of an episode in a synaptic pathway.
-    
-    An "episode" is a series of sweeps recorded during a specific set of 
-    experimental conditions -- possibly, a subset of a larger experiment where
-    several conditions were applied in sequence.
-    
-    All sweeps in the episode must have been recorded during the same conditions.
-    
-    NOTE: A Pathway Episode does NOT store any data; it only stored indices into
-    segments (a.k.a sweeps) of a neo.Block object containing the data.
-    
-    Examples:
-    =========
-    
-    1) A response recorded without drug, followed by a response recorded in the 
-    presence of a drug, then followed by a drug wash-out are all three distinct 
-    "episodes".
-    
-    2) Segments recorded while testing for cross-talk between synaptic pathways, 
-    (and therefore, where the paired pulses are crossed between pathways) is a
-    distinct episode from one where each segment contains responses from the 
-    same synaptic pathway
-    
-    The sweeps in PathwayEpisode are a sequence of neo.Segment objects, where 
-    objects where each synaptic pathway has contributed data for a neo.Segment
-    inside the Block.
-    
-    Fields (constructor parameters):
-    ================================
-    • name:str - mandatory, name of the episode
-    • blocks: the source of the data.
-        This may be:
-        ∘ a single neo.Block, generated by contatenating the source neo.Blocks
-            beforehand 
-        ∘ a sequence of neo.Block objects TO BE CONCATENATED  o  each block has recording sweeps 
-        (i.e., neo.Segment objects) with data from possibily more than one
-        real-world synaptic pathway, and where each pathway provides data for 
-        the same sweep index in the block.
-    
-        When synaptic responses are recorded from more than one pathway (typically
-        two), the pathways are usually interleaved. For example, two pathways
-        where synaptic responses are evoked interlaved would be organized like
-        this:
-    
-            block 0 - segment 0 → pathway 0
-            block 0 - segment 1 → pathway 1
-        
-            block 1 - segment 0 → pathway 0
-            block 1 - segment 1 → pathway 1
-        
-            ⋮
-        
-            etc
-    
-    
-    The PathwayEpisode only stores references to the data sweeps.
-    
-    The other fields indicate optional indices into the data segments and signals
-    inside the actual data stored inside a SynapticPathway object:
-    
-    • response : int or str - respectively, the index or the name of the
-        analog signal in each sweep, containing the pathway-specific synaptic
-        response
-        
-    • analogCommand : int or str - index or name of the analog signal containing
-        voltage- or current-clamp command signal (or None); such a signal is 
-        typically recorded - when available - by feeding the secondary output of
-        the amplifier into an ADC input in the acquisition board.
-        
-    • digitalCommand: int or str - index or name of the analog signal containing
-        a recorded version of the triggers for extracellular stimulation.
-        
-        When available, these are triggers sent to stimulus isolation boxes to 
-        elicit an extracellular stimulus.
-        
-        The triggers themselves are typically TTL signals, either taken directly
-        from the acquisition board digital output, or "emulated" by an analog
-        (DAC) output containing a rectangulare wave of 5 V amplitude.
-        
-        In either case, these triggers can be routed into an ADC input of the
-        acquisition board, for recording (e.g., using a BNC "tee" splitter).
-        
-    • segments : an indexing object¹ into each block's sweeps (or segments)
-        belonging to the the same pathway; typically, each pathway contributes 
-        to exactly one segment in each block.
-        
-    • analogsignals, irregularlysampledsignals, imagesequences, spiketrains,
-        epochs, events: indexing objects into the corresponding segments attributes
-        used to select a subset of the data.
-    
-        Although these are optional (with the default being None) it is recommended
-    that at least the analogsignals contain a sequence of the indices given in
-    response, analogCommand and digitalCommand.
-    
-    ---
-    
-    ¹ An indexing object is an int, range, slice, str, sequence of int, or 
-        sequence of str -- see documentation for the normalized_index() function
-        in Scipyen module "utilities".
-    
-    
-    
-    """
-    def __init__(self, name:str, data=None, 
-                 response=None, analogCommand=None, digitalCommand=None,
-                 segments=None, analogsignals=None, irregularlysampledsignals=None,
-                 imagesequences=None, spiketrains=None, epochs=None,events=None):
-        
-        self.name=name
-        if isinstance(data, (tuple, list)) and len(data) and all(isinstance(b, neo.Block) in data):
-            self._data_ = neoutils.concatenate_blocks()
-    
+Specification of an episode in a synaptic pathway.
 
+An "episode" is a series of sweeps recorded during a specific set of 
+experimental conditions -- possibly, a subset of a larger experiment where
+several conditions were applied in sequence.
+
+All sweeps in the episode must have been recorded during the same conditions.
+
+NOTE: A Pathway Episode does NOT store any data; it only stores indices into
+segments (a.k.a sweeps) of a neo.Block object containing the data.
+
+It can be used to create a new such Block object from source neo.Blocks - 
+i.e., passing it to the neoutils.concatenate_blocks(...) function.
+
+
+Examples:
+=========
+
+1) A response recorded without drug, followed by a response recorded in the 
+presence of a drug, then followed by a drug wash-out are all three distinct 
+"episodes".
+
+2) Segments recorded while testing for cross-talk between synaptic pathways, 
+(and therefore, where the paired pulses are crossed between pathways) is a
+distinct episode from one where each segment contains responses from the 
+same synaptic pathway
+
+The sweeps in PathwayEpisode are a sequence of neo.Segment objects, where 
+objects where each synaptic pathway has contributed data for a neo.Segment
+inside the Block.
+
+Fields (constructor parameters):
+================================
+• name:str - mandatory, name of the episode
+
+The PathwayEpisode only stores arguments needed to (re)create a new neo.Block
+by concatenating several source neo.Block data.
+
+The other fields indicate optional indices into the data segments and signals
+of the source data.
+
+• response : int or str - respectively, the index or the name of the
+    analog signal in each sweep, containing the pathway-specific synaptic
+    response
+    
+    NOTE: During an experiment, the recording may switch between episodes with
+    different clamping modes, or electrode modes (see below). This results in 
+    episodes with different response and command signals. Therefore we attach
+    this information here, instead of the SynapticPathway instance to which this
+    episode belongs to.`
+    
+• analogStimulus : int or str - index or name of the analog signal containing
+    voltage- or current-clamp command signal (or None); such a signal is 
+    typically recorded - when available - by feeding the secondary output of
+    the amplifier into an ADC input in the acquisition board.
+    
+• digitalStimulus: int or str - index or name of the analog signal containing
+    a recorded version of the triggers for extracellular stimulation.
+    
+    When available, these are triggers sent to stimulus isolation boxes to 
+    elicit an extracellular stimulus.
+    
+    The triggers themselves are typically TTL signals, either taken directly
+    from the acquisition board digital output, or "emulated" by an analog
+    (DAC) output containing a rectangulare wave of 5 V amplitude.
+    
+    In either case, these triggers can be routed into an ADC input of the
+    acquisition board, for recording (e.g., using a BNC "tee" splitter).
+    
+•   electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.Field)
+    
+    NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
+    using the same electrode during an experiment (i.e. either Field, *Patch, or
+    or Sharp). 
+
+    This attribute allows for episodes with distinct electrode 'mode' for the 
+    same pathway.
+    
+• clampMode: ephys.ClampMode (default is ClampMode.NoClamp)
+    The recording "mode" - no clamping, voltage clamp or current clamp.
+    
+    NOTE: Even though a pathway may have been recorded with the same electrode 
+    mode throughout an experiment, one may switch between different clamping modes, 
+    where it makes sense, e.g., voltage clamp during tracking and current clamp 
+    during conditioning.
+    
+    This attribute helps distinguish episodes with different clamping modes.
+    
+• xtalk: optional, a list of SynapticPathways or None (default); can also be an 
+    empty list (same as if it was None)
+    
+    Only used for 'virtual' synaptic pathways where the recording tests for
+    the cross-talk between two 'real' pathways using paired-pulse stimulation.
+    
+    Indicates the order in which each pathway was stimulated during the 
+    paired-pulse.
+    
+• pathways: optional, a list of SynapticPathways or None (default); can also be 
+    an empty list (same as if it was None).
+    
+    Indicates the SynapticPathways to which this episode applies. Typically,
+    an episode applied to a single pathway. However, there are situations where 
+    an episode involving more pathways is meaningful, e.g., where additional
+    pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
+    test, or during conditioning in order to test for 'associativity')
+    
+---
+
+¹Exceptions are possible:
+    ∘ 'repatching' the cell (e.g. in order to dialyse with a drug, etc) see, e.g.
+        Oren et al, (2009) J. Neurosci 29(4):939
+        Maier et al, (2011) Neuron, DOI 10.1016/j.neuron.2011.08.016
+    ∘ switch between field recording and patch clamp or sharp electrode recordings
+     (theoretically possible, but then one may also think of this as being two 
+    distinct pathways)
+    
+"""
+    @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
+    def __init__(self, name:str, /, *args,
+                 segments:typing.Optional[GeneralIndexType] = None,
+                 response:typing.Optional[typing.Union[str, int]] = None, 
+                 analogStimulus:typing.Optional[typing.Union[str, int]] = None, 
+                 digitalStimulus:typing.Optional[typing.Union[str, int]] = None, 
+                 electrodeMode:ElectrodeMode = ElectrodeMode.Field,
+                 clampMode:ClampMode = ClampMode.NoClamp,
+                 xtalk:typing.Optional[typing.List[SynapticPathway]] = None,
+                 pathways:typing.Optional[typing.List[SynapticPathway]] = None,
+                 sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
+                 ascending:typing.Optional[bool] = None,
+                 glob:bool = True,
+                 **kwargs):
+        """Constructor for PathwayEpisode.
+Mandatory parameters:
+--------------------
+name:str - the name of this episode
+
+Var-positional parameters (args):
+--------------------------------
+neo.Blocks, or a sequence of neo.Blocks, a str, or a sequence of str
+    When a str or a sequence of str, these are (a) symbol(s) in the workspace,
+    bound to neo.Blocks
+
+    When a str, if it contains the '*' character then the str is interpreted as 
+    a global search string (a 'glob'). See neoutils.concatenate_blocks(…) for 
+    details.
+
+    NOTE: args represent the source data to which this episode applies to, but
+is NOT stored in the PathwayEpisode instance. The only use of the data is to
+assign values to the 'begin', 'end', 'beginFrame', 'endFrame' attributes of the 
+episode.
+
+Named parameters:
+------------------
+These are the attributes of the instance (see the class documentation), PLUS
+the parameters 'segments', 'glob', 'sortby' and 'ascending' with the same types
+and semantincs as for the function neoutils.concatenate_blocks(…).
+
+NOTE: Data is NOT concatenated here, but these two parameers are used for 
+        temporarily ordering the source neo.Block objects in args.
+
+Var-keyword parameters (kwargs)
+-------------------------------
+These are passed directly to the datatypes.Episode superclass (see documentation
+for Episode)
+
+See also the class documentation.
+    """
+        if not isinstance(name, str):
+            name = ""
+        super().__init__(name, **kwargs)
+        
+        self.response=response
+        self.analogStimulus = analogStimulus
+        self.digitalStimulus = digitalStimulus
+        
+        if not isinstance(electrodeMode, ElectrodeMode):
+            electrodeMode = ElectrodeMode.Field
+        
+        self.electrodeMode = electrodeMode
+        
+        if not isinstance(clampMode, ClampMode):
+            clampMode = ClampMode.NoClamp
+            
+        self.clampMode = clampMode
+        
+        if isinstance(pathways, (tuple, list)):
+            if len(pathways):
+                if not all(isinstance(v, SynapticPathway) for v in pathways):
+                    raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
+            self.pathways = pathways
+        else:
+            self.pathways = []
+        
+        if isinstance(xtalk, (tuple, list)):
+            if len(xtalk):
+                if not all(isinstance(v, SynapticPathway) for v in xtalk):
+                    raise TypeError(f"'xtalk' must contain only SynapticPatwhay instances")
+                
+            self.xtalk = xtalk
+            
+        else:
+            self.xtalk = []
+                
+        sort = sortby is not None
+        
+        reverse = not ascending
+        
+        if len(args): 
+            if all(isinstance(v, neo.Block) for v in args):
+                source = args
+                
+            elif all(isinstance(v, str) for v in args):
+                source = wf.getvars(*args, var_type = (neo.Block,),
+                               sort=sort, sortkey = sortby, reverse = reverse)
+                
+            elif len(args) == 1:
+                if isinstance(args[0], (tuple, list)) :
+                    if all(isinstance(v, neo.Block) for v in args[0]):
+                        source = args[0]
+                        
+                    elif all(isinstance(v, str) for v in args[0]):
+                        source = wf.getvars(args[0], var_type = (neo.Block,),
+                                          sort=sort, sortkey = sortby, reverse=reverse)
+                
+            else:
+                raise TypeError(f"Bad source arguments")
+        else:
+            source = []
+        
+        if len(source):
+            self.begin = source[0].rec_datetime
+            self.end = source[-1].rec_datetime
+            if segments is not None:
+                seg_ndx = [normalized_index(b.segments, index=segments) for b in source]
+                nsegs = sum(len(n) for n in seg_ndx)
+            else:
+                nsegs = sum(len(b.segments) for b in source)
+            self.beginFrame = 0
+            self.endFrame = nsegs-1 if nsegs > 0 else 0
+        
+    def _repr_pretty_(self, p, cycle):
+        supertxt = super().__repr__() + " with :"
+    
+        if cycle:
+            p.text(supertxt)
+        else:
+            p.text(supertxt)
+            p.breakable()
+            attr_repr = [" "]
+            attr_repr += [f"{a}: {getattr(self,a).__repr__()}" for a in ("response", "analogStimulus",
+                                                         "digitalStimulus",
+                                                         "electrodeMode",
+                                                         "clampMode")]
+            
+            with p.group(4 ,"(",")"):
+                for t in attr_repr:
+                    p.text(t)
+                    p.breakable()
+                p.text("\n")
+                
+            p.text("\n")
+                
+            p.text("Pathways:")
+            p.breakable()
+            
+            if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
+                with p.group(4, "(",")"):
+                    for pth in self.pathways:
+                        p.text(pth.name)
+                        p.breakable()
+                    p.text("\n")
+                
+            if isinstance(self.xtalk, (tuple, list)) and len(self.xtalk):
+                link = " \u2192 "
+                p.text(f"Test for independence: {link.join([pth.name for pth in self.xtalk])}")
+                p.breakable()
+                p.text("\n")
+                
+            p.breakable()
+        
+@with_doc(BaseScipyenData, use_header=True)
 class SynapticPathway(BaseScipyenData):
     """Encapsulates a logical stimulus-response relationship between signals.
 
-    Signals are identified by name or their index in the collection of a sweep's
-    analogsignals (the `analgosignals` attribute of a neo.Segment object).
+    Signals are identified by name or their integer index in the collection of a 
+    neo.Segment (sweep) analogsignals. They are NOT stored in the SynapticPathway
+    instance.
 
-    The signals are:
-    • response (analog, regularly sampled)
-    • analogCommand (analog signal) - command waveform
-    • digitalCommand - TTL waveform
-
-    In most circumstances, the command signals are, respectively, records of the
-    command signal from the amplifier and of the TTL signal sent out by the 
-    DAC/ADC board, and fed back into the ADC board's auxiliary inupt ports.
+    These signals are:
+    • response (analog, regularly sampled): recorded synaptic responses
+    
+    • analogStimulus (analog, regularly sampled): the recorded command waveform;
+        typically, this is a record of the secondary output of the amplifier, 
+        when available, that has been fed into an auxiliary analog input port of
+        the acquisition device; this signal carries the amplifier "command", e.g. 
+        the voltage command in voltage clamp, or injected current, in current clamp.
+    
+    • digitalStimulus (analog, regularly sampled): the TTL (a.k.a the "digital")
+        output signal from the acquisition board, typically recorded by feeding this 
+        output into an analog input port, when available.
+    
+    Of these, only the first ("response") is required, whereas the others can be
+    None. When present, these command signals are analysed to determine the 
+    protocol used (i.e., the clamping voltage, and the timings of the presynaptic
+    stimulation). Otherwise, these parameters need to be entered manually for 
+    further analysis.
 
     In addition, the synaptic pathway has a pathwayType attribute which specifies
     the pathway's role in a synaptic plasticity experiment.
@@ -269,38 +514,91 @@ class SynapticPathway(BaseScipyenData):
         ("responseSignal", (str, int), 0),
         ("analogCommandSignal", (str, int), 1),
         ("digitalCommandSignal", (str, int), 2),
-        ("schedule", Schedule, Schedule()),
+        ("schedule", Schedule, Schedule()),         # one or more PathwayEpisode objects
         )
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
     
-    def __init__(self, data:neo.Block=neo.Block(), pathwayType:PathwayType = PathwayType.Test, 
+    @with_doc(concatenate_blocks, use_header = True)
+    def __init__(self, *args, data:typing.Optional[neo.Block] = None, 
+                 pathwayType:PathwayType = PathwayType.Test, 
                  name:typing.Optional[str]=None, 
+                 index:int = 0,
+                 segments:GeneralIndexType=0,
                  response:typing.Optional[typing.Union[str, int]]=None, 
-                 analogCommand:typing.Union[typing.Union[str, int]] = None, 
-                 digitalCommand:typing.Optional[typing.Union[str, int]] = None, 
-                 schedule:typing.Optional[Schedule] = None, **kwargs):
-        """
-        Named parameters:
-        ----------------
-        data: recorded sweeps belonging to the pathway (neo.Block) or None
-    
-        pathwayType: the role of the pathway in a synaptic plasticity experiment
-                        (Test, Control, Other)
-    
-        name: name of the pathway (by default is the name of the pathwayType)
-    
-        response: name or index¹ of the analog signal containing the synaptic response
-    
-        analogCommand: name or index¹ of the analog signal containing the analog
-                command signal
-    
-        digitalCommand: name or index¹ of the analog signal containing the digital
-                command signal
-        
-        """
-        super().__init__(**kwargs)
+                 analogStimulus:typing.Union[typing.Union[str, int]] = None, 
+                 digitalStimulus:typing.Optional[typing.Union[str, int]] = None, 
+                 schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[PathwayEpisode]]] = None, 
+                 **kwargs):
+        """SynapticPathway constructor.
 
+Var-positional parameters (may be empty)
+-----------------------------------------
+When present, they specify source neo.Block objects wthat will need to be 
+    concatenated to create the underlying data.
+
+Named parameters:
+-----------------
+data: A neo.Block obtained from concatenating several source neo.Blocks (see the
+    function neoutils.concatenate_blocks(…) for details). Optional, default is 
+    None.
+    
+    When specified, the values in *args will be ignored.
+    
+pathwayType: PathwayType
+    The role of the pathway in a synaptic plasticity experiment
+                (Test, Control, Other)
+
+name: str
+     Name of the pathway (by default is the name of the pathwayType)
+    
+index: int
+    The index of the Pathway ( >= 0); default is 0
+    
+segments: GeneralIndexType¹
+    The index of the segments in the source data in *args.
+    
+    Used only when 'data' is constructed by concatenating the neo.Blocks in *args
+
+response: GeneralIndexType
+    The index of the analog signal(s) containing the synaptic response.
+    Default is None.
+    
+    NOTE: This is also used when 'data'is constructed from *args. Therefore, it
+    should typically resolve to subset of signals distinct from those indicated 
+    by the 'analogStimulus' and 'digitalStimulus' parameters (see next)
+    
+
+analogStimulus: GeneralIndexType
+    Index of the analog signal(s) containing the clamping command, or None.
+    NOTE: Also used to construct the data from *args.
+
+digitalStimulus: GeneralIndexType
+    Index of the analog signal(s) containing the digital command, or None (default)
+    NOTE: Also used to construct the data from *args.
+    
+schedule: a Schedule, or a sequence (tuple, list) of PathwayEpisodes; 
+        optional, default is None.
+    
+    CAUTION: Currently, the episodes (whether packed in a Schedule or given as a
+    sequence) are NOT checked for consistency with the number and recording time 
+    stamps of the segments in the 'data' parameter.
+    
+Var-keyword parameters (kwargs):
+--------------------------------
+These are passed directly to the superclass constructor (BaseScipyenData).
+    
+Notes:
+-----
+¹see core.utilities.GeneralIndexType
+    
+    """
+        super().__init__(**kwargs)
+        
+        # if not isinstance(data, neo.Block):
+        #     if len(args):
+        #         data = concatenate_blocks(*args, segments=segments)
+        
     @staticmethod
     def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
                    *episodeSpecs:typing.Sequence[PathwayEpisode]):
@@ -345,7 +643,7 @@ class SynapticPathway(BaseScipyenData):
         # Because we want to concatenate all segments in a single neo.Block for
         # this pathway (associated with the 'data' field) we store references
         # to the start frame & end frame in the episode
-        startFrame = 0
+        beginFrame = 0
         
         for episodeName, blocks, in episodeSpecs.items():
             bb = sorted(blocks, key = lambda x: x.rec_datetime)
@@ -375,12 +673,12 @@ class SynapticPathway(BaseScipyenData):
             episodes.append(Episode(episodeName, 
                               begin=datetime_start,
                               end=datetime_end,
-                              startFrame=startFrame,
-                              endFrame=startFrame + sum(len(b.segments) for b in bb)-1))
+                              beginFrame=beginFrame,
+                              endFrame=beginFrame + sum(len(b.segments) for b in bb)-1))
             
             # episodeBlocks.append(episodeBlock)
             
-            startFrame += len(episodeBlock.segments)
+            beginFrame += len(episodeBlock.segments)
             
         data = concatenate_blocks(*episodeBlocks) # no data subset selection here
         
@@ -389,8 +687,8 @@ class SynapticPathway(BaseScipyenData):
         return SynapticPathway(data=data, name=pathName,
                                pathwayType=pathwayType,
                                response=response,
-                               analogCommand=analogCommand,
-                               digitalCommand=digitalCommand,
+                               analogStimulus=analogStimulus,
+                               digitalStimulus=digitalStimulus,
                                schedule=schedule)
         
         
@@ -430,6 +728,95 @@ class SynapticPlasticityData(BaseScipyenData):
         
     # def __reduce__(self): # TODO
     #     pass
+    
+def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
+    """Helper function for the SynapticPathway factory function
+    args: list of neo.Blocks
+    name: str, default is ""
+    pathways: list of SynapticPathways, default is []
+    xtalk: list of SynapticPathways, default is []
+    
+"""
+    name = kwargs.pop("name", "")
+    
+    if not isinstance(name, str):
+        name = ""
+        
+    ret = PathwayEpisode(name)
+    
+    if len(args): 
+        if all(isinstance(v, neo.Block) for v in args):
+            source = args
+            
+        elif len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(v, neo.Block) for v in args[0]):
+            source = args[0]
+            
+        else:
+            raise TypeError(f"Bad source arguments")
+    else:
+        source = []
+    
+    pathways = kwargs.pop("pathways", [])
+    if isinstance(pathways, (tuple, list)):
+        if len(pathways):
+            if not all(isinstance(v, SynapticPathway) for v in pathways):
+                raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
+        ret.pathways = pathways
+    else:
+        ret.pathways = []
+        
+    xtalk = kwargs.pop("xtalk", [])
+    
+    if isinstance(xtalk, (tuple, list)):
+        if len(xtalk):
+            if not all(isinstance(v, SynapticPathway) for v in xtalk):
+                raise TypeError(f"'xtalk' must contain only SynapticPatwhay instances")
+            
+            ret.xtalk = xtalk
+            
+        else:
+            ret.xtalk = []
+            
+    if len(source):
+        ret.begin = source[0].rec_datetime
+        ret.end = source[-1].rec_datetime
+        nsegs = sum(len(b.segments) for b in source)
+        ret.beginFrame = 0
+        ret.endFrame = nsegs-1 if nsegs > 0 else 0
+        
+    clampMode = kwargs.pop("clampMode", ClampMode.NoClamp)
+    if not isinstance(clampMode, ClampMode):
+        clampMode = ClampMode.NoClamp
+        
+    ret.clampMode = clampMode
+    
+    electrodeMode = kwargs.pop("electrodeMode", ElectrodeMode.Field)
+    if not isinstance(electrodeMode, ElectrodeMode):
+        electrodeMode = ElectrodeMode.Field
+        
+    ret.electrodeMode = electrodeMode
+            
+    return ret
+    
+def makeSynapticPathway(**kwargs):
+    """Factory for a SynapticPathway
+        Var-keyword parameters only:
+        ---------------------------
+        segments
+        response
+        analogStimulus
+        digitalStimulus
+        pathwayType
+        episodes: list of episodeDicts:
+            name
+            source: list of blocks
+            pathways: list of SynapticPathway or empty
+            xtalk: list of SynapticPathway or empty
+            
+"""
+    name = kwargs.pop("name", "")
+    
+    
     
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.

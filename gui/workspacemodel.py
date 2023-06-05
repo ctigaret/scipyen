@@ -984,6 +984,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     # 
     #     self.workingDir.emit(current_dir)
 
+    def preRunCell(self, info):
+        """For debugging"""
+        print(f"{self.__class__.__name__}.preRunCell info = {info}")
+
     def postRunCell(self, result):
         # print(f"{self.__class__.__name__}.postRunCell result = {result}")
         if hasattr(result, "success") and result.success:
