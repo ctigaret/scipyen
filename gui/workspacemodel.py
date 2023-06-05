@@ -98,6 +98,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.deleted_vars = dict()
         self.user_ns_hidden = dict(user_ns_hidden)
         self.mpl_figs = dict()
+        # cache of the 'result' field in an ExecutionResult
+        # used by postRunCell + _updateModel_
+        self.lastExecutionResult = None 
 
         # NOTE: 2023-05-23 16:58:37
         # temporary cache of notified observer changes
@@ -114,7 +117,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.internalVariablesMonitor = DataBag(allow_none=True, mutable_types=True)
         self.internalVariablesMonitor.verbose = True
         self.internalVariablesMonitor.observe(self.internalVariablesListenerCB)
-        # self.internalVariablesMonitor.observe(self._slot_internalVariableChanged_)
 
         # NOTE: 2021-01-28 17:47:36 TODO to complete observables here
         # management of workspaces in external kernels
@@ -156,7 +158,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                                        WorkspaceVarChange.Removed:  partial(self.__class__.removeRowForVariable2, self, self.shell.user_ns)}
 
         self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
-        self.sig_startAsyncUpdate.connect(self._slot_updateModelAsync_, QtCore.Qt.QueuedConnection)
+        self.sig_startAsyncUpdate.connect(self._slot_updateModelAsync_)# , QtCore.Qt.QueuedConnection)
 
     def _foreignNamespacesCountChanged_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -743,11 +745,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:   # for legacy (traitlets.TraitType-style) notifications
                 # that lack 'change_type' attribute
             self.__changes__[name] = WorkspaceVarChange.Modified
+            
+        print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
 
     @pyqtSlot(dict)
     def _slot_internalVariableChanged_(self, change):
         """Connected (and triggered by) self.internalVariableChanged Qt signal.
-        Launches ann UI update for each workspace model in a loop, which is
+        Launches an UI update for each workspace model in a loop, which is
         executed asynchronously inside a QRunnable.
         """
         name = change.name
@@ -985,13 +989,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #     self.workingDir.emit(current_dir)
 
     def preRunCell(self, info):
-        """For debugging"""
-        print(f"{self.__class__.__name__}.preRunCell info = {info}")
+        """Use this function EXCLUSIVELY for debugging"""
+        print(f"\n{self.__class__.__name__}.preRunCell info = {info}")
 
     def postRunCell(self, result):
-        # print(f"{self.__class__.__name__}.postRunCell result = {result}")
+        # print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
+        if hasattr(result, "result"):
+            self.lastExecutionResult = result.result
+            
         if hasattr(result, "success") and result.success:
             self._updateModel_(self.shell.user_ns)
+        else:
+            self.lastExecutionResult = None
+            
 
     def _updateModel_(self, ns: dict):
         """Determines what workspace variables have been removed/added/modified.
@@ -1034,7 +1044,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # reported as having been modified
         #
         # try this:
-        
+        # print(f"\n{self.__class__.__name__}._updateModel_ last execution result: {self.lastExecutionResult}")
         try:
             self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
         except:
@@ -1063,6 +1073,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #
         current_mpl_figs = set(
             fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+        
+        # print(f"\n{self.__class__.__name__}._updateModel_ current_mpl_figs={current_mpl_figs}")
 
         #
         # 1.2 figure out which currently cached reference to matplotlib figures
@@ -1073,6 +1085,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #   called at the console; otherwise, it is the MainWindow's responsibility - TODO/FIXME
         #
         deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
+        # print(f"\n{self.__class__.__name__}._updateModel_ deleted_mpl_figs={deleted_mpl_figs}")
 
         #
         # 1.3 now, remove the figs in the deleted_mpl_figs
@@ -1094,6 +1107,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #   these are registered with Gcf, but not referenced in the workspace cached ones
         #
         new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
+        # print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs={new_mpl_figs}")
 
         # NOTE: 2023-05-24 16:37:06
         # in addition, these may have been placed directly in the workspace upon
@@ -1102,9 +1116,23 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #
         for k, v in ns.items():
             if isinstance(v, mpl.figure.Figure):
-                if v not in self.cached_mpl_figs:
+                # NOTE: 2023-06-05 20:39:14
+                # The problem here is that any return values which aren't assigned
+                # to a workspace symbol in the cell code get automatically bound
+                # assigned the "_1" symbol (or any other symbols beginnig with "_")
+                # and thus they will reassign the variables in cached_mp_figs, 
+                # or other caches (when the varibale is nto an mpl figure.
+                # 
+                # Hence, simply checing for inclusion in self.cached_mpl_figs
+                # will always lead to noop, below.
+                #
+                # Instead, we shoupd also check if v is the lastExecutionResult
+                # if v not in self.cached_mpl_figs:
+                if v not in self.cached_mpl_figs or v is self.lastExecutionResult:
                     new_mpl_figs.add(v)
 
+        # print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs not in cached_mpl_figs = {new_mpl_figs}")
+        # print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs = {new_mpl_figs}")
         #
         # 1.5 finally, add these new figures
         #   • make sure they are managed by pyplot
@@ -1129,21 +1157,36 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
             # see if there are any figs in the workspace
             # cached_figs = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
-            cached_figs = [v for v in ns.values(
-            ) if isinstance(v, mpl.figure.Figure)]
+            
+            # NOTE: 2023-06-05 20:48:39
+            # this has been check already ?!? - see NOTE: 2023-06-05 20:39:14
+            # cached_figs = [v for v in ns.values(
+            # ) if isinstance(v, mpl.figure.Figure)]
 
-            # only add the figure if not already present
-            if fig not in cached_figs:
-                # adjust variable name to avoid clashes
-                if fig_var_name in ns:
-                    fig_var_name = validate_varname(fig_var_name, ws=ns)
-                    
-                # print(f"\n adding fig_var_name {fig_var_name}")
-                ns[fig_var_name] = fig
+            # adjust variable name to avoid clashes
+            if fig_var_name in ns:
+                fig_var_name = validate_varname(fig_var_name, ws=ns)
                 
-                # this SHOULD notify hence populate the ns
-                self.internalVariablesMonitor[fig_var_name] = fig
-                # self.shell.user_ns[fig_var_name] = fig
+            # print(f"\n{self.__class__.__name__}._updateModel_ new figure {fig_var_name} ↦ {fig} ")
+                
+            # print(f"\n adding fig_var_name {fig_var_name}")
+            ns[fig_var_name] = fig
+            
+            # this SHOULD notify hence populate the ns
+            self.internalVariablesMonitor[fig_var_name] = fig
+            
+            # only add the figure if not already present
+#             if fig not in cached_figs:
+#                 # adjust variable name to avoid clashes
+#                 if fig_var_name in ns:
+#                     fig_var_name = validate_varname(fig_var_name, ws=ns)
+#                     
+#                 # print(f"\n adding fig_var_name {fig_var_name}")
+#                 ns[fig_var_name] = fig
+#                 
+#                 # this SHOULD notify hence populate the ns
+#                 self.internalVariablesMonitor[fig_var_name] = fig
+#                 # self.shell.user_ns[fig_var_name] = fig
 
         # ###
         # 2. deal with Scipyen viewer windows
@@ -1213,6 +1256,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             traceback.print_exc()
         self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
         
+        # NOTE: 2023-06-05 20:59:00
+        # connection to self._slot_updateModelAsync_
         self.sig_startAsyncUpdate.emit(self.shell.user_ns)
         
 
@@ -1478,6 +1523,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def addRowForVariable2(self, ns: dict, dataname: str, ns_name: typing.Optional[str] = None):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
+        print(f"\n{self.__class__.__name__}.addRowForVariable2 for {dataname}")
         if isinstance(ns_name, str):
             if len(ns_name.strip()) == 0:
                 ns_name = "Internal"
@@ -1487,6 +1533,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         if dataname not in ns:
             return
+        
         
         data = ns[dataname]
         # print(f"{self.__class__.__name__}.addRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
@@ -1643,6 +1690,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def _slot_updateModelAsync_(self, namespace:dict):
         """Triggered by self.sig_startAsyncUpdate emitted by self.update2()
         """
+        print(f"\n{self.__class__.__name__}._slot_updateModelAsync_ self.__changes__ = {self.__changes__}")
         if len(self.__changes__) == 0:
             return
         
