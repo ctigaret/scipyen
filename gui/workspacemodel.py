@@ -15,6 +15,7 @@ event handlers preExecute() and post_execute().
 # filter/finder in workspace viewer
 #
 import contextlib
+import itertools
 import seaborn as sb
 import numpy as np
 import matplotlib as mpl
@@ -39,7 +40,10 @@ from core.traitcontainers import DataBag
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test,
+                            reverse_mapping_lookup,
                             )
+from core.strutils import (is_cached_output_varname, is_cached_input_varname)
+
 from core.prog import (safeWrapper, timefunc, processtimefunc, timeblock)
 from core.datatypes import TypeEnum
 # from jupyter_core.paths import jupyter_runtime_dir
@@ -102,7 +106,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.new_vars = dict()
         self.deleted_vars = dict()
         self.user_ns_hidden = dict(user_ns_hidden)
-        self.mpl_figs = dict()
+        self.cached_mpl_figs_in_internal = set()
+        self.gcf_figs = set()
         # cache of the 'result' field in an ExecutionResult
         # used by postRunCell + _updateModel_
         self.lastExecutionResult = None 
@@ -632,13 +637,62 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.user_ns_hidden.clear()
         self.internalVariablesMonitor.clear()
 
-    def isUserVariable(self, name, val):
-        """Check if symbol ↦ value binding is not hidden from the user.
+    def isDisplayable(self, ns, name, val):
+        """Check if the name ↦ value binding is in the ns and should be shown in the viewer.
+        
+        A visible symbol ↦ value should be visible to the user IF name is a
+        symbol in the Scipyen Console namespace, AND
+        • is not one of the IPython symbols for cached input variables
+        • is not one of the IPython symbols for cached output variables
+        • is not among the symbols for the "hidden" objects.
+        
+            The 'hidden' variables are set up at Scipyen's initialization 
+            and include loaded modules and variables set up BEFORE the 
+            Scipyen Console is alive. These are available to the user at the
+            Scipyen Console, but not shown inside the workspace viewer, in 
+            order to avoid clutter.
+        
+        All of the above can, of course, be listed with the 'dir' command.
+        
+        WARNING: A variable returned by code execution (but NOT bound to a symbol
+        through an assignment statement in the code) is automatically bound by 
+        IPython to the symbol '_' which is reserved for the most recent output.
+        
         """
-        if name in self.user_ns_hidden:
-            return val is not self.user_ns_hidden[name]
-        else:
-            return not name.startswith("_")
+        if name not in ns:
+            return False
+        
+        # rule out IPython cached inputs
+        if is_cached_input_varname(name):
+            return False
+        
+        # rule out IPython cached outputs
+        if is_cached_output_varname(name):
+            return False
+        
+        if name in self.user_ns_hidden.keys():
+            return False
+        
+        return True
+        
+#         if name not in ns:
+#             if val in ns.values():
+#                 return True
+#         
+#         ns_keys = [n for n in ns.keys() if not is_cached_output_varname(n) and n not in self.user_ns_hidden]
+#         
+#         return name in ns_keys
+        
+#         return len()
+#         
+#         if is_cached_output_varname(name):
+#             return  val is not sel.
+#         
+#         if name in self.user_ns_hidden:
+#             return val is not self.user_ns_hidden[name]
+        # else:
+        #     return not is_cached_output_varname(name) and not is_cached_input_varname(name)
+            # return not name.startswith("_")
 
         return True
     
@@ -826,26 +880,39 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # ones like the ones used by ipython internally)
         # NOTE: 2023-01-28 13:27:40
         # we take a snapshot of the current user_ns HERE:
+        # self.cached_vars = dict([item for item in self.shell.user_ns.items(
+        # ) if not item[0].startswith("_") and self.isDisplayable(item[0], item[1])])
+        
         self.cached_vars = dict([item for item in self.shell.user_ns.items(
-        ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
+        ) if self.isDisplayable(self.shell.user_ns, *item)])
 
         # NOTE: 2023-01-28 13:27:47
         # we also take a snapshot of the mpl figures
         # first, capture those registered in pyplot/pylab
         # REMEMBER Gcf holds references to instances of FigureManager concrete subclasses
-        self.cached_mpl_figs = set(
+        # self.cached_mpl_figs_in_internal = set(
+        #     fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+        self.gcf_figs.clear()
+        self.gcf_figs.update(
             fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
 
         # NOTE: 2023-01-29 23:30:32
         # all figures created outside pyplot are now adopted for management under
         # pyplot (see mainwindow.WindowManager._adopt_mpl_figure() method, called
         # by code inside post_execute, below)
-        for v in self.cached_vars.values():
-            if isinstance(v, mpl.figure.Figure):
-                # self.cached_mpl_figs is a set so duplicates won't be added
-                self.cached_mpl_figs.add(v)
+        
+        self.cached_mpl_figs_in_internal.clear()
+        self.cached_mpl_figs_in_internal.update(v[1] for v in self.cached_vars.items() 
+                                                if isinstance(v[1], mpl.figure.Figure)
+                                                and self.isDisplayable(self.shell.user_ns, *v))
+        
+        # for v in self.cached_vars.values():
+        #     if isinstance(v, mpl.figure.Figure):
+        #         # self.cached_mpl_figs_in_internal is a set so duplicates won't be added
+        #         print(f"\n{self.__class__.__name__}.preExecute fig in cached vars: {v}")
+        #         self.cached_mpl_figs_in_internal.add(v)
 
-        # print(f"\npreExecute cached figs {self.cached_mpl_figs}")
+        # print(f"\npreExecute cached figs {self.cached_mpl_figs_in_internal}")
 
         # need to withhold notifications here
         with self.internalVariablesMonitor.observer.hold_trait_notifications():
@@ -894,7 +961,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     # 
     #     from core.workspacefunctions import validate_varname
     # 
-    #     # print(f"\npost_execute cached figs {self.cached_mpl_figs}")
+    #     # print(f"\npost_execute cached figs {self.cached_mpl_figs_in_internal}")
     # 
     #     # print(f"\npost_execute Gcf figs {Gcf.figs}")
     # 
@@ -902,12 +969,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #     # capture the figures referenced in Gcf
     #     # these should be ALL mpl figures Scipyen knows about, see NOTE: 2023-01-29 23:30:32
     #     #
-    #     current_mpl_figs = set(
+    #     current_gcf_figs = set(
     #         fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
     # 
-    #     # print(f"\npost_execute current figs {current_mpl_figs}")
+    #     # print(f"\npost_execute current figs {current_gcf_figs}")
     # 
-    #     deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
+    #     deleted_mpl_figs = self.cached_mpl_figs_in_internal - current_gcf_figs
     # 
     #     # print(f"\npost_execute deleted_mpl_figs = {deleted_mpl_figs}")
     # 
@@ -920,16 +987,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #                 if n in self.internalVariablesMonitor.keys():
     #                     self.internalVariablesMonitor.pop(n, None)
     # 
-    #     new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
+    #     new_mpl_figs_from_gcf = current_gcf_figs - self.cached_mpl_figs_in_internal
     # 
     #     for k, v in self.shell.user_ns.items():
     #         if isinstance(v, mpl.figure.Figure):
-    #             if v not in self.cached_mpl_figs:
-    #                 new_mpl_figs.add(v)
+    #             if v not in self.cached_mpl_figs_in_internal:
+    #                 new_mpl_figs_from_gcf.add(v)
     # 
-    #     # print(f"\npost_execute new_mpl_figs = {new_mpl_figs}")
+    #     # print(f"\npost_execute new_mpl_figs_from_gcf = {new_mpl_figs_from_gcf}")
     # 
-    #     for fig in new_mpl_figs:
+    #     for fig in new_mpl_figs_from_gcf:
     #         fig_var_name = "Figure"
     #         # NOTE: 2023-01-29 23:34:00
     #         # make sure all new figures are managed by pyplot (see NOTE: 2023-01-29 23:30:32)
@@ -977,7 +1044,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #     #     # observed_varnames = set(self.internalVariablesMonitor.keys())
     #     #     # del_vars = observed_varnames - current_user_varnames
     #     #     # self.internalVariablesMonitor.remove_members(*list(del_vars))
-    #     #     # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
+    #     #     # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.isDisplayable(item[0], item[1])])
     #     #     # self.internalVariablesMonitor.update(current_vars)
     #     #     # just update the model directly
     #     #     # QtCore.QTimer.singleShot(0, self.update)
@@ -1008,12 +1075,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def postRunCell(self, result):
         # print(f"\n{self.__class__.__name__}.postRunCell result = {result}")
         if hasattr(result, "result"):
+            # NOTE: 2023-06-06 12:56:44
+            # this is bound to the symbol "_" in the internal namespace, by IPython
             self.lastExecutionResult = result.result
+        else:
+            self.lastExecutionResult = None
             
         if hasattr(result, "success") and result.success:
             self._updateModel_(self.shell.user_ns)
-        else:
-            self.lastExecutionResult = None
+        # else:
+        #     self.lastExecutionResult = None
             
 
     def _updateModel_(self, ns: dict):
@@ -1079,27 +1150,145 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # ###
         # 1. deal with matplotlib figures
         #
+        
+        if len(self.gcf_figs):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs in gcf since preExecute = {[(i, i.number) for i in self.gcf_figs]}")
+            
+        
+        # if len(self.cached_mpl_figs_in_internal):
+        #     print(f"\n{self.__class__.__name__}._updateModel_ cached_mpl_figs_in_internal = {[(i, i.number) for i in self.cached_mpl_figs_in_internal]}")
 
         # NOTE: 2023-01-29 23:32:44
         #
-        # 1.1 capture the figures referenced in Gcf
+        # 1.1 capture the figures currently referenced in Gcf
         #   these should be ALL mpl figures Scipyen knows about, see NOTE: 2023-01-29 23:30:32
         #
-        current_mpl_figs = set(
+        current_gcf_figs = set(
             fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
         
-        # print(f"\n{self.__class__.__name__}._updateModel_ current_mpl_figs={current_mpl_figs}")
+        if len(current_gcf_figs):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs currently in gcf = {[(i, i.number) for i in current_gcf_figs]}")
+            
+        new_figs_from_gcf = set(f for f in current_gcf_figs if f not in self.gcf_figs)
+        
+        if len(new_figs_from_gcf):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs created in gcf = {[(i, i.number) for i in new_figs_from_gcf]}")
+            
+        # NOTE: 2023-06-06 15:20:45
+        # these may not be captured if the fig window is closed via its gui
+        # because they're closed directly by Gcf before preExecute gets called !
+        # o the other hand, this will capture figs closed using pyplot API
+        gcf_closed_figs = set(f for f in self.gcf_figs if f not in current_gcf_figs)
+        
+        if len(gcf_closed_figs):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs closed in gcf = {[(i, i.number) for i in gcf_closed_figs]}")
+            
+            
+        ns_figs_dict = dict(i for i in ns.items() if isinstance(i[1], mpl.figure.Figure))
+        
+        if len(ns_figs_dict):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs in ns = {[(n, i, i.number, self.isDisplayable(ns, n,i)) for n,i in ns_figs_dict.items()]}")
+            
+        ns_figs = set(i[1] for i in ns_figs_dict.items() if self.isDisplayable(ns, *i))
+        
+        if len(ns_figs):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs in ns = {[(i, i.number) for i in ns_figs]}")
+            
+        # NOTE: 2023-06-06 15:23:08
+        # from NOTE 2023-06-06 15:20:45 it follows that there may be figures in
+        # the ns that Gcf doesn't manage anymore
+        # now, some of these MAY be displayable, and some may not (i.e. they have 
+        # worked their way up the cached output chain in IPython)
+        #
+        # If they are displayable, then they should be made so
+        # otherwise, they should be removed from the viewer
+        
+        # What are we removing from the monitor (and indirectly from the viewer)?
+        # 1) figures still present and displayable in the ns, IF they do not exist
+        # in the Gcf - absent in cached gcf from preExecute, because they were closed
+        #   by their gui close button, so that preExecute was never called.
+        # 2) figures still present and displayable in the ns but closed by the Gcf
+        #   AFTER the executed code (like plt.close(...)) - hence present in the 
+        #   cached gcf figures in preExecute
 
+
+        # So, what are we adding to the monitor (and indirectly, to the viewer)?
+        # 1) new figures coming from gcf from but not present in the ns as displayable (i.e., inside ns_figs)
+        #   UNLESS they are the lastExecutionResult
+        # 2) figure NOT in gcf but present in the ns as displayable (i.e., inside ns figs)
+        
+        mpl_figs_to_add = dict()
+        
+        mpl_figs_to_remove = dict()
+        
+        mpl_figs_modified = dict()
+        
+        
+        if len(ns_figs) and len(new_figs_from_gcf):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are new in gcf = {[(i, i.number) for i in (ns_figs & new_figs_from_gcf)]}")
+            
+        if len(ns_figs) and len(gcf_closed_figs):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are now closed in gcf  = {[(i, i.number) for i in (ns_figs & new_figs_from_gcf)]}")
+            
+        ns_figs_not_in_gcf = set(f for f in ns_figs if f not in current_gcf_figs)
+        
+        if len(ns_figs_not_in_gcf): # potentially closed before preExecute()
+            # must distinguish between those that were closed using their own
+            # gui close button (hence removed from Gcf before preExecute)
+            # and those created by ways other than via Gcf (i.e. pyplot API)
+            print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are not currently in gcf  = {[(i, i.number) for i in ns_figs_not_in_gcf]}")
+            
+            # the ones closed by code calling pyplot API wil be present in gcf_closed_figs
+            pyplot_closed = set(f for f in ns_figs_not_in_gcf if f in gcf_closed_figs)
+            # ⇒ get their symbol names in ns
+            
+#             names_ = list(itertools.chain.from_iterable(
+#                 [self.getDisplayableVarnamesForVar(ns, f) for f in pyplot_closed]))
+#             
+#             print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are pyplot_closed  = {[(i, i.number) for i in pyplot_closed]} with var names = {names_}")
+            
+            for f in pyplot_closed:
+                name_ = self.getDisplayableVarnamesForVar(ns, f)
+                if len(name_) == 1:
+                    mpl_figs_to_remove[name_[0]] = f
+                    
+            # the ones closed by gui action will NOT be present in gcf_closed_figs,
+            # yet still present in the ns
+            # but so will be the ones created by code?
+            gui_closed = set(f for f in ns_figs_not_in_gcf if f not in gcf_closed_figs)
+            
+            for f in gui_closed:
+                name_ = self.getDisplayableVarnamesForVar(ns, f)
+                if len(name_) == 1:
+                    mpl_figs_to_remove[name_[0]] = f
+                    
+        print(f"\n{self.__class__.__name__}._updateModel_ mpl_figs_to_remove  = {[(i[0], i[1], i[1].number) for i in mpl_figs_to_remove.items()]}")
+            
+            
+        
+        # if len(new_figs_from_gcf):
+        #     print(f"\n{self.__class__.__name__}._updateModel_ new_figs_from_gcf = {[(i, i.number) for i in new_figs_from_gcf]}")
+            
+        new_mpl_figs_in_ns = set(i for i in ns.items() if (isinstance(i[1], mpl.figure.Figure)
+                                                           and (self.isDisplayable(ns, *i) or i[1] == self.lastExecutionResult)))
+        
+        # if len(new_mpl_figs_in_ns):
+        #     print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs_in_ns = {[(i, i.number) for i in new_figs_from_gcf]}")
+
+
+        
         #
         # 1.2 figure out which currently cached reference to matplotlib figures
         #   were actually removed from Gcf - if they still esixt in the workspace
         #   we need to remove them ⇒ deleted_mpl_figs
         #
-        # NOTE: cached_mpl_figs is populated/updated at preExecute when code is
+        # NOTE: cached_mpl_figs_in_internal is populated/updated at preExecute when code is
         #   called at the console; otherwise, it is the MainWindow's responsibility - TODO/FIXME
         #
-        deleted_mpl_figs = self.cached_mpl_figs - current_mpl_figs
-        # print(f"\n{self.__class__.__name__}._updateModel_ deleted_mpl_figs={deleted_mpl_figs}")
+        deleted_mpl_figs = self.cached_mpl_figs_in_internal - current_gcf_figs
+        
+        # if len(deleted_mpl_figs):
+        #     print(f"\n{self.__class__.__name__}._updateModel_ deleted_mpl_figs={[(i, i.number) for i in deleted_mpl_figs]}")
 
         #
         # 1.3 now, remove the figs in the deleted_mpl_figs
@@ -1117,52 +1306,58 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                         self.internalVariablesMonitor.pop(n, None)
 
         #
-        # 1.4 figure out if there are new matplpotlib figures around ⇒ collect in new_mpl_figs
+        # 1.4 figure out if there are new matplpotlib figures around ⇒ collect in new_mpl_figs_from_gcf
         #   these are registered with Gcf, but not referenced in the workspace cached ones
         #
-        new_mpl_figs = current_mpl_figs - self.cached_mpl_figs
-        # print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs={new_mpl_figs}")
+        new_mpl_figs_from_gcf = current_gcf_figs - self.cached_mpl_figs_in_internal
+        # if len(new_mpl_figs_from_gcf):
+        #     print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs_from_gcf={[(i, i.number) for i in new_mpl_figs_from_gcf]}")
 
         # NOTE: 2023-05-24 16:37:06
         # in addition, these may have been placed directly in the workspace upon
-        # return by code called at the console - add these to new_mpl_figs as well
+        # return by code called at the console - add these to new_mpl_figs_from_gcf as well
         # CAUTION: we may end up with duplicate references !
-        #
+        # NOTE: these may have been assigned to a symbol by the call that was run
+        # otherwise ipython will assign them to the last result!
         for k, v in ns.items():
             if isinstance(v, mpl.figure.Figure):
                 # NOTE: 2023-06-05 20:39:14
                 # The problem here is that any return values which aren't assigned
                 # to a workspace symbol in the cell code get automatically bound
                 # assigned the "_1" symbol (or any other symbols beginnig with "_")
-                # and thus they will reassign the variables in cached_mp_figs, 
+                # and thus they will reassign the variables in cached_mpl_figs_in_internal, 
                 # or other caches (when the varibale is nto an mpl figure.
                 # 
-                # Hence, simply checking for inclusion in self.cached_mpl_figs
+                # Hence, simply checking for inclusion in self.cached_mpl_figs_in_internal
                 # will always lead to noop, below.
                 #
                 # Instead, we should also check if v is the lastExecutionResult
-                # if v not in self.cached_mpl_figs:
+                # if v not in self.cached_mpl_figs_in_internal:
                 # print(f"\n{self.__class__.__name__}._updateModel_: fig is last execution result: { v == self.lastExecutionResult}")
                 # if v == self.lastExecutionResult:
-                #     new_mpl_figs.add(v)
-                # elif v not in self.cached_mpl_figs:
-                #     new_mpl_figs.add(v)
-                if v not in self.cached_mpl_figs or v == self.lastExecutionResult:
-                    new_mpl_figs.add(v)
+                #     new_mpl_figs_from_gcf.add(v)
+                # elif v not in self.cached_mpl_figs_in_internal:
+                #     new_mpl_figs_from_gcf.add(v)
+                if v not in self.cached_mpl_figs_in_internal or v == self.lastExecutionResult:
+                    # suspend this for now; reinstate after debugging
+                    # if getattr(v.canvas, "manager", None) is None:
+                    #     v = self.parent()._adopt_mpl_figure(v)
+                    new_mpl_figs_from_gcf.add(v)
 
-        # print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs not in cached_mpl_figs = {new_mpl_figs}")
-        # print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs = {new_mpl_figs}")
+        # if len(new_mpl_figs_from_gcf):
+        #     print(f"\n{self.__class__.__name__}._updateModel_ new_mpl_figs_from_gcf={[(i, i.number) for i in new_mpl_figs_from_gcf]}")
+
         #
         # 1.5 finally, add these new figures
         #   • make sure they are managed by pyplot
         #   • assign variable names avoiding clashes
-        for fig in new_mpl_figs:
+        for fig in new_mpl_figs_from_gcf:
             # NOTE: 2023-01-29 23:34:00 • make sure they are managed by pyplot
             # (see NOTE: 2023-01-29 23:30:32)
             # We need to call this early because we need a fig.number to avoid
             # complicatons in fig variable name management!
-            if getattr(fig.canvas, "manager", None) is None:
-                fig = self.parent()._adopt_mpl_figure(fig)  # , integrate_in_pyplot=False)
+            # if getattr(fig.canvas, "manager", None) is None:
+            #     fig = self.parent()._adopt_mpl_figure(fig)  # , integrate_in_pyplot=False)
 
             # NOTE: 2023-05-24 16:45:11 • assign variable names avoiding clashes
             # set up a reasonable variable name
@@ -1178,7 +1373,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # cached_figs = [v for v in self.cached_vars.values() if isinstance(v, mpl.figure.Figure)]
             
             # NOTE: 2023-06-05 20:48:39
-            # this has been check already ?!? - see NOTE: 2023-06-05 20:39:14
+            # this has been checked already ?!? - see NOTE: 2023-06-05 20:39:14
             # cached_figs = [v for v in ns.values(
             # ) if isinstance(v, mpl.figure.Figure)]
 
@@ -1251,9 +1446,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # observed variables.
         #
 
-        # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
+        # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.isDisplayable(item[0], item[1])])
         current_vars = dict([item for item in ns.items() if not item[0].startswith(
-            "_") and self.isUserVariable(item[0], item[1])])
+            "_") and self.isDisplayable(ns, *item)])
 
         # NOTE: 2023-05-24 16:22:58
         # this SHOULD also notify the observers - Works OK when adding new symbols
@@ -1279,7 +1474,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # connection to self._slot_updateModelAsync_
         self.sig_startAsyncUpdate.emit(self.shell.user_ns)
         
-
+        self.lastExecutionResult = None
+        
         # NOTE: 2023-05-28 01:31:53
         # the next two signal a change directory command issued at the console
         current_dir = os.getcwd()
@@ -1587,7 +1783,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 # 
 #         # current variable names in the namespace, which should be available to
 #         # the user - this ain't faster
-#         current_vars = dict(filter(lambda x: not x[0].startswith("_") and self.isUserVariable(*x), self.shell.user_ns.items()))
+#         current_vars = dict(filter(lambda x: not x[0].startswith("_") and self.isDisplayable(*x), self.shell.user_ns.items()))
 #         
 #         # names of variables in user namespace
 #         current_user_varnames = set(current_vars.keys())
@@ -1602,7 +1798,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 #         # current variable names in the namespace, which should be available to
 #         # the user - CAUTION this scales with 𝒪(n) !
 #         # current_vars = dict([item for item in self.shell.user_ns.items(
-#         # ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
+#         # ) if not item[0].startswith("_") and self.isDisplayable(item[0], item[1])])
 # 
 #         self.internalVariablesMonitor.delete(*list(del_vars))
 # 
@@ -1629,7 +1825,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # current variable names in the namespace, which should be available to
         # the user - is this faster?
-        current_vars = dict(filter(lambda x: not x[0].startswith("_") and self.isUserVariable(*x), self.shell.user_ns.items()))
+        current_vars = dict(filter(lambda x: not x[0].startswith("_") and self.isDisplayable(self.shell.user_ns, *x), self.shell.user_ns.items()))
         
         # names of variables in user namespace
         current_user_varnames = set(current_vars.keys())
@@ -1644,7 +1840,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # current variable names in the namespace, which should be available to
         # the user - CAUTION this scales with 𝒪(n) !
         # current_vars = dict([item for item in self.shell.user_ns.items(
-        # ) if not item[0].startswith("_") and self.isUserVariable(item[0], item[1])])
+        # ) if not item[0].startswith("_") and self.isDisplayable(item[0], item[1])])
         
         new_vars = dict(filter(lambda x: not x[0] in displayed_var_names, current_vars.items()))
         
@@ -2042,6 +2238,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             row, typecol) for row in range(self.rowCount()) if self.item(row, wscol).text() == ws]
 
         return ret
+    
+    def getDisplayableVarnamesForVar(self, ns:dict, value:typing.Any) -> list:
+        varnames = reverse_mapping_lookup(ns, value)
+        
+        if isinstance(varnames, (tuple, list)) and all(isinstance(v, str) for v in varnames):
+            return list(filter(lambda x: self.isDisplayable(ns, x, value), varnames))
+        
+        if isinstance(varnames, str) and self.isDisplayable(ns, varnames, value):
+            return [varnames]
+        
+        return []
+            
 
     def getDisplayedVariableNames(self, asStrings=True, ws="Internal"):
         '''Returns names of variables in the internal workspace, registered with the model.
