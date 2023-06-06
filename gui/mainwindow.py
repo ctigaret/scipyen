@@ -1862,18 +1862,22 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         # NOTE:2023-06-06 15:30:21
         # the figure must have a "number" - hence it should be manager by Gcf
-        fig_number = evt.canvas.figure.number
+        # fig_number = evt.canvas.figure.number
         # fig_varname = "Figure%d" % fig_number
-        fig_varname = f"Figure{fig_number}"
+        # fig_varname = f"Figure{fig_number}"
         
         # NOTE: 2023-06-06 15:31:07
         # this removes the figure from Gcf
-        plt.close(evt.canvas.figure)
+        # plt.close(evt.canvas.figure)
         # NOTE: 2020-02-05 00:53:51
         # this also closes the figure window and removes it from self.currentViewers
         # NOTE: 2023-01-27 13:46:51
         # but only if autoRemoveViewers is True
         if self.autoRemoveViewers:
+            fig_number = evt.canvas.figure.number
+            fig_varname = f"Figure{fig_number}"
+            plt.close(evt.canvas.figure)
+        # if self.autoRemoveViewers:
             # does not remove symbol from workspace
             self.deRegisterWindow(evt.canvas.figure)
             # super().deRegisterWindow(evt.canvas.figure)
@@ -1884,6 +1888,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             for ns_fig in ns_fig_names_objs:
                 self.sig_windowRemoved.emit(ns_fig)
+                
+        else:
+            evt.canvas.close()
 
     @safeWrapper
     def newViewer(self, winClass, *args, **kwargs):
@@ -1976,7 +1983,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # , integrate_in_pyplot:bool=True):
     def _adopt_mpl_figure(self, fig: mpl.figure.Figure):
         """Gives a FigureCanvasQTAgg to fig.
-        To be used only with mpl Figure created directly from their c'tor.
+        To be used only with mpl Figure created directly from their c'tor, i.e.,
+        lacking the "manager" or a "number" atributes.
+        
+        NOTE: This will also 'register' them with the Gcf
+        
         """
         # NOTE: 2023-01-29 16:14:04
         # for mpl figures created manually
@@ -1993,7 +2004,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
         if getattr(fig.canvas, "manager", None) is None:
             new_figure_manager = getattr(backend_mod, "new_figure_manager", None)
-
 
             if new_figure_manager is None:
                 # only try to get the canvas class if have opted into the new scheme
@@ -2016,7 +2026,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 backend_mod.new_figure_manager = new_figure_manager
                 backend_mod.draw_if_interactive = draw_if_interactive
 
-            # fig.set_canvas(backend_mod.FigureCanvasQTAgg())
             plt_fig_nums = list(Gcf.figs.keys())
             num = 1
             if len(plt_fig_nums) > 0:
@@ -2031,8 +2040,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 num, fig)
             
             Gcf._set_new_active_manager(fig.canvas.manager)
-            # fig.canvas.manager = fig.canvas.new_manager(fig, num)
-            # fig.canvas.manager.number = num
             fig.number = num
             Gcf.figs[num] = fig.canvas.manager
 
@@ -3879,7 +3886,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
                     if isinstance(obj, mpl.figure.Figure):
                         # also removes obj.number from plt.get_fignums()
-                        plt.close(obj)
+                        if self.autoRemoveViewers and hasattr(obj, "manager") or hasattr(obj "number"):
+                            plt.close(obj)
+                        # if hasattr(obj, "manager") or hasattr(obj "number"):
+                        #     plt.close(obj)
 
                     else:
                         obj.close()
