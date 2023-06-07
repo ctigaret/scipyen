@@ -3024,7 +3024,75 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return varname
 
-    def assignToWorkspace(self, name: str, val: object):
+    def assignToWorkspace(self, name: str, val: object, check_name:bool = True):
+        """This will potentially overwrite bindings that already exist.
+    Use with CAUTION.
+    """
+        # if name in self.workspaceModel.user_ns_hidden.keys():
+#         if name in self.workspace.keys():
+#             ret = self.questionMessage("Assign object in workspace", f"An object named {name} already exists in the workspace (it may be hidden). Do you wish to overwrite?")
+#             
+#             if ret != QtWidgets.QMessageBox.Yes:
+#                 return
+        
+        if check_name is True:
+            newVarNameOK = validate_varname(name, self.workspace)
+            
+            if newVarNameOK != name:
+                qbox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
+                                             "Assign object in workspace",
+                                            f"An object named '{name}' exists in the workspace\n(although it may be hidden).\nDo you wish to rename, overwrite or cancel?",
+                                             QtWidgets.QMessageBox.StandardButtons(QtWidgets.QMessageBox.Cancel),
+                                             parent = self)
+                qbox.addButton("Rename", QtWidgets.QMessageBox.YesRole) # → returns 0
+                qbox.addButton("Overwrite", QtWidgets.QMessageBox.AcceptRole) # → returns 1
+                qbox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
+                
+                btn = qbox.exec()
+                
+                if btn == 0: # ⇒ should rename
+                    dlg = qd.QuickDialog(self, "Rename object")
+                    dlg.addLabel(f"Rename {name}")
+                    pw = qd.StringInput(dlg, "To :")
+                    pw.variable.undoAvailable = True
+                    pw.variable.redoAvailable = True
+                    pw.variable.setClearButtonEnabled(True)
+                    pw.setText(newVarNameOK)
+                    dlg.addWidget(pw)
+                    
+                    if dlg.exec() == 0: # this is rejection ; we were asked to rename the object; if dlg is rejected then goodbyeif it d
+                        return
+                        # name = pw.text()
+                        # name = newVarNameOK
+                    else:
+                        name = pw.text()
+                        
+                elif btn != 1: # → 1 is OK to overwrite, anything else returns
+                    return
+                    
+                
+#                 btn = QtWidgets.QMessageBox.question(
+#                     self, "Assign object in workspace", 
+#                     f"An object named {name} already exists in the workspace\n(although it may be hidden).\nDo you wish to rename {name} to suggested {newVarNameOK}?",
+#                     )
+# 
+#                 if btn == QtWidgets.QMessageBox.No:
+#                     return
+#                 
+#                 dlg = qd.QuickDialog(self, "Rename variable")
+#                 dlg.addLabel(f"Rename {name}")
+#                 pw = qd.StringInput(dlg, "To :")
+#                 pw.variable.undoAvailable = True
+#                 pw.variable.redoAvailable = True
+#                 pw.variable.setClearButtonEnabled(True)
+#                 pw.setText(newVarNameOK)
+#                 dlg.addWidget(pw)
+#                 
+#                 if dlg.exec() == 0:
+#                     name = newVarNameOK
+#                 else:
+#                     name = pw.text()
+        
         self.workspaceModel.bindObjectInNamespace(name, val)
 
     @pyqtSlot()
