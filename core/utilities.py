@@ -2541,7 +2541,7 @@ def reverse_dict(x:dict) -> dict:
         
     return ret
 
-def reverse_mapping_lookup(x:dict, y:typing.Any):
+def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union[typing.Any, typing.Sequence[typing.Any]]]:
     """Looks up the key mapped to value y in the x mapping (dict)
     Parameters:
     ===========

@@ -25,6 +25,10 @@ __translation_table_to_identifier = str.maketrans(dict([(c_, "_") for c_ in stri
 
 __translation_table_to_R_identifier = str.maketrans(dict([(c_, ".") for c_ in string.punctuation + string.whitespace]))
 
+__output_cache_regexp__ = _re.compile("^(_o)|(_+)(h|\d*)$")
+
+__input_cache_regexp__ = _re.compile("^_i+(h|\d*)$")
+
 import errno, os
 def is_sequence(s:str) -> bool:
     """Return True if the s is a string representation of a tuple or list"""
@@ -49,6 +53,14 @@ def is_sequence(s:str) -> bool:
                 return True
             
     return False
+
+def is_cached_output_varname(s:str) -> bool:
+    """Returns True if s is an IPython cached output variable"""
+    return __output_cache_regexp__.match(s) is not None
+
+def is_cached_input_varname(s:str) -> bool:
+    """Returns True if s is an IPython cached input variable"""
+    return __input_cache_regexp__.match(s) is not None
             
 def is_glob(s:str) -> bool:
     """Returns True if s is a string containing the '*' character"""
