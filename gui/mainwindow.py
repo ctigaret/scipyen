@@ -1859,39 +1859,22 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def handle_mpl_figure_close(self, evt):
         """Removes the figure from the workspace and updates the workspace table.
+        Triggered by closing the figure window by clicking its close button
         """
-        # NOTE:2023-06-06 15:30:21
-        # the figure must have a "number" - hence it should be manager by Gcf
-        # fig_number = evt.canvas.figure.number
-        # fig_varname = "Figure%d" % fig_number
-        # fig_varname = f"Figure{fig_number}"
+        # NOTE: FIXME/BUG 2023-06-07 09:00:40
+        # because of troubles/issues related to the double-management of mpl figs
+        # (here and in Gcf) the general phylosophy SHOULD be to register all figs
+        # with the Gcf, then remove them on closing, regardless of the autoRemoveViewers
+        # settings
+        fig = evt.canvas.figure
+        plt.close(fig) # this removes fig from Gcf.figs
+        self.deRegisterWindow(fig) # this just removes the reference to figure in self.viewers and self.currentViewers
         
-        # NOTE: 2023-06-06 15:31:07
-        # this removes the figure from Gcf
-        # plt.close(evt.canvas.figure)
-        # NOTE: 2020-02-05 00:53:51
-        # this also closes the figure window and removes it from self.currentViewers
-        # NOTE: 2023-01-27 13:46:51
-        # but only if autoRemoveViewers is True
-        if self.autoRemoveViewers:
-            fig_number = evt.canvas.figure.number
-            fig_varname = f"Figure{fig_number}"
-            plt.close(evt.canvas.figure)
-        # if self.autoRemoveViewers:
-            # does not remove symbol from workspace
-            self.deRegisterWindow(evt.canvas.figure)
-            # super().deRegisterWindow(evt.canvas.figure)
-
-            # NOTE: now remove the figure variable name from user workspace
-            ns_fig_names_objs = [x for x in self.shell.user_ns.items() if isinstance(
-                x[1], mpl.figure.Figure) and x[1] is evt.canvas.figure]
-
-            for ns_fig in ns_fig_names_objs:
-                self.sig_windowRemoved.emit(ns_fig)
+        fig_var_name = self.workspaceModel.getDisplayableVarnamesForVar(self.workspace, fig)
+        if len(fig_var_name):
+            for name in fig_var_name:
+                self.workspaceModel.unbindObjectInNamespace(name)
                 
-        else:
-            evt.canvas.close()
-
     @safeWrapper
     def newViewer(self, winClass, *args, **kwargs):
         """Factory method for a GUI Viewer or matplotlib figure.
@@ -2118,6 +2101,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.viewers[winClass].append(win)
             
         self.currentViewers[winClass] = win
+        
+        return win
 
     @safeWrapper
     def deRegisterWindow(self, win):
@@ -2147,7 +2132,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # print(f"{self.__class__.__name__}.deRegisterWindow: {win} found in self.viewers[{viewer_type.__name__}]")
                 old_viewer_index = self.viewers[viewer_type].index(win)
                 # print(f"{self.__class__.__name__}.deRegisterWindow: old_viewer_index = {old_viewer_index}")
-                # del self.viewers[viewer_type][old_viewer_index]
                 self.viewers[viewer_type].remove(win)
 
         # print(f"{self.__class__.__name__}.deRegisterWindow: viewers left: {len(self.viewers[viewer_type])}")
@@ -2999,39 +2983,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             expensive updates of the workspace viewer after each variable.
 
         """
-        # if isinstance(value, str) and by_name:
-        # print(f"{self.__class__.__name__}.removeFromWorkspace")
         if by_name:
             if isinstance(value, str):
                 r = self.workspace.unbindObjectInNamespace(value) # one-shot
-            # r = self.workspace.pop(value, None)
-            # if r is not None:
-            #     self.workspaceModel.removeRowForVariable(value)
         else:
-            # NOTE: 2022-10-13 18:33:44
-            # the approach below is WRONG - why remove ALL references (symbol)
-            # to a variable?
-            # inverse lookup the key mapped to this value - will remove ALL
-            # references to value that exist in the workspace
             objects = [(name, obj)
                        for (name, obj) in self.workspace.items() if obj is value]
             
             if len(objects):
-                # rowIndices = [self.workspaceModel.getRowIndexForVarname(
-                #     o[0]) for o in objects]
-#                 for o in objects:
-#                     self.workspace.pop(o[0], None)
-#                 
-#                 self.workspaceModel.update()
-                
                 for o in objects:
                     self.workspaceModel.unbindObjectInNamespace(o[0])
-                    # r = self.workspace.pop(o[0], None)
-                    # if r is not None:
-                    #     self.workspaceModel.removeRowForVariable(o[0])
-
-        # if update:
-        #     self.workspaceModel.update()
 
         self.workspaceModel.currentItem = None
 
@@ -3061,8 +3022,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     def assignToWorkspace(self, name: str, val: object):
         self.workspaceModel.bindObjectInNamespace(name, val)
-        # self.workspace[name] = val
-        # self.workspaceModel.update()
 
     @pyqtSlot()
     @safeWrapper
@@ -3886,7 +3845,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
                     if isinstance(obj, mpl.figure.Figure):
                         # also removes obj.number from plt.get_fignums()
-                        if self.autoRemoveViewers and hasattr(obj, "manager") or hasattr(obj "number"):
+                        if self.autoRemoveViewers and hasattr(obj, "manager") or hasattr(obj, "number"):
                             plt.close(obj)
                         # if hasattr(obj, "manager") or hasattr(obj "number"):
                         #     plt.close(obj)
@@ -3900,11 +3859,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 self.removeWorkspaceSymbol(n)
 
-            # self.workspaceModel.currentItem = None
             self.currentVarItem = None
             self.currentVarItemName = None
 
-            self.workspaceModel.update()
+            # self.workspaceModel.update() # is this still required?
         else:
             varName = self.workspaceModel.getVarName(indexList[0])
 
@@ -3935,7 +3893,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 # does not remove its symbol for workspace - this has already been removed by delete action
                 self.deRegisterWindow(obj)
-                # super().deRegisterWindow(obj)
         
             self.workspaceModel.unbindObjectInNamespace(varName) # single shot
 

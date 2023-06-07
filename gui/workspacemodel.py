@@ -745,6 +745,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         if hidden: 
             self.user_ns_hidden[varname] = data
             
+        # NOTE: 2023-06-07 08:34:57
+        # emulates a console execution
         self.preExecute()
         namespace[varname] = data
         self.postRunCell(Bunch(success=True))
@@ -764,6 +766,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         if varname in namespace:
             if varname not in self.user_ns_hidden:
+                # NOTE: 2023-06-07 08:34:57
+                # emulates a console execution
                 self.preExecute()
                 obj = namespace.pop(varname)
                 self.postRunCell(Bunch(success=True))
@@ -874,7 +878,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             self.modelContentsChanged.emit()
 
     def preExecute(self):
-        """Updates internalVariablesMonitor DataBag
+        """Updates internalVariablesMonitor DataBag.
+        
+    Used as a callback (hence, called) by IPython after entering a python 
+    command at the Scipyen console, but BEFORE executing the code contained 
+    in the command.
+        
+    In order for the workspace viewer to be updated dyamically, this method
+    should also be called when code outside the Scipyen console adds, removes
+    or modifies workspace variables, followed by calling postRunCell.
+        
+    For GUI components, the best way to deal with this is via calling 
+    'bindObjectInNamespace' and 'unbindObjectInNamespace' methods of the
+    WorkspaceModel instance.
         """
         # ensure we observe only "user" variables in user_ns (i.e. excluding the "hidden"
         # ones like the ones used by ipython internally)
@@ -895,6 +911,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.gcf_figs.clear()
         self.gcf_figs.update(
             fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+        
+        # print(f"\n{self.__class__.__name__}.preExecute figs in Gcf = {self.gcf_figs}")
 
         # NOTE: 2023-01-29 23:30:32
         # all figures created outside pyplot are now adopted for management under
@@ -914,7 +932,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # print(f"\npreExecute cached figs {self.cached_mpl_figs_in_internal}")
 
-        # need to withhold notifications here
+        # NOTE: 2023-06-07 08:39:15
+        # at this stage there may be variables not cached but still monitored
+        # we need to remove then from the monitor, but withhold notifications
         with self.internalVariablesMonitor.observer.hold_trait_notifications():
             observed_set = set(self.internalVariablesMonitor.keys())
             cached_set = set(self.cached_vars)
@@ -1183,7 +1203,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         ns_mpl_figs_to_monitor = dict() # already bound to a displayable symbol in ns; just add to the monitor
         
-        nameless_figs_to_add = set() # to bound to a symbol and place in ns and monitor
+        unbound_figs_to_add = set() # to bound to a symbol and place in ns and monitor
         
         mpl_figs_to_remove_from_ns = dict() # closed or otherwise deleted
         
@@ -1202,12 +1222,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #     print(f"\n{self.__class__.__name__}._updateModel_ displayable figs in ns = {[(i, getattr(i, 'number', None)) for i in ns_displayable_figs]}")
             
         
-        # below, these are figs deleted from ns via the del command yet still present
-        # in the Gcf? (the case where they are not present in Gcf is trivial?
-        # if their reference count goes to 0 they will be garbage-collected)
-        #
+        # these below are figs deleted from ns via the del command yet still 
+        # present in the Gcf (the case where they are not present in Gcf is trivial?
+        # if their reference count goes to 0 they will be garbage-collected);
         # these should be still present in cached_vars since preExecution
-        # which is guaranteed to be called before exec'ing the del command
+        # which is guaranteed to be called after entering the del command but 
+        # before exec'ing it
         deled_mpl_figs = dict(item for item in self.cached_vars.items() 
                               if isinstance(item[1], mpl.figure.Figure) 
                               and item[1] not in ns_displayable_figs)
@@ -1242,18 +1262,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             if f in ns_displayable_figs:
                 # it should already be bound to a user-defined symbol, in the ns
                 # but check nevertheless (less efficient but maybe clerarer)
-                f = self.parent()._adopt_mpl_figure(f) # to install event filters & callbacks
+                # f = self.parent()._adopt_mpl_figure(f) # to install event filters & callbacks
+                f = self.parent().registerWindow(f) # to install event filters & callbacks
                 name_ = self.getDisplayableVarnamesForVar(ns, f)
                 if len(name_) == 0: # not bound (impossible, here)
                     if f is self.lastExecutionResult:
-                        nameless_figs_to_add.add(f)
+                        unbound_figs_to_add.add(f)
                 if len(name_) == 1: # guaranteed to happen
                     ns_mpl_figs_to_monitor[name_[0]] = f
                     
             else:
                 if f is self.lastExecutionResult:
                     f = self.parent()._adopt_mpl_figure(f) # to install event filters & callbacks
-                    nameless_figs_to_add.add(f)
+                    unbound_figs_to_add.add(f)
                     
             # NOTE: 2023-06-06 23:22:52
             # figs added via pyplot but NOT bound to the ns in any way are skipped
@@ -1284,7 +1305,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2023-06-06 22:19:55
         # since they were created by pyplot API they have a number attribute
         # we add them to the ns AND to the monitor, via nameless figs to add
-        nameless_figs_to_add |= gcf_figs_not_in_ns
+        unbound_figs_to_add |= gcf_figs_not_in_ns
         
         # below, these are figs currently in ns, but not in gcf - maybe they are former
         # gcf figure now closed (via pyplot API or their own gui), or maybe they
@@ -1311,7 +1332,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     # check if it is the lastExecutionResult
                     if f is self.lastExecutionResult: # case a.b.2
                         # it is the lastExecutionResult ⇒ cache them to bind them later to a non-clashing name
-                        nameless_figs_to_add.add(f)
+                        unbound_figs_to_add.add(f)
                         
                 if len(name_) == 1: # guaranteed to happen 
                     # the fig IS bound to a symbol in the ns → case a.b.1 
@@ -1326,11 +1347,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             #     [self.getDisplayableVarnamesForVar(ns, f) for f in pyplot_closed]))
             # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are pyplot_closed  = {[(i, getattr(i, 'number', None)) for i in pyplot_closed]} with var names = {names_}")
             
-            for f in pyplot_closed:
-                name_ = self.getDisplayableVarnamesForVar(ns, f)
-                if len(name_) == 1:
-                    mpl_figs_to_remove_from_ns[name_[0]] = f
-                    
             # the ones closed by gui action (window close button) will NOT be present in gcf_closed_figs,
             # yet still present in the ns
             # having been in the gcf at some point, these also have a number attribute
@@ -1339,11 +1355,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             #     [self.getDisplayableVarnamesForVar(ns, f) for f in gui_closed]))
             # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are gui_closed  = {[(i, getattr(i, 'number', None)) for i in gui_closed]} with var names = {names_}")
             
-            for f in gui_closed:
+            for f in pyplot_closed | gui_closed:
+                # NOTE: 2023-06-07 09:03:51
+                # we will ALWAYS remove these from the ns
+                # see NOTE: FIXME/BUG 2023-06-07 09:00:40 in mainwindow.py
                 name_ = self.getDisplayableVarnamesForVar(ns, f)
                 if len(name_) == 1:
                     mpl_figs_to_remove_from_ns[name_[0]] = f
-                    
+                
         # print(f"\n{self.__class__.__name__}._updateModel_ mpl_figs_to_remove_from_ns  = {[(i[0], i[1], getattr(i[1], 'number', None)) for i in mpl_figs_to_remove_from_ns.items()]}")
             
         # OK, now, remove mpl_figs_to_remove_from_ns from both the ns and from the internalVariablesMonitor:
@@ -1360,21 +1379,34 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # finally, make bindings for orphan figs
         
-        for f in nameless_figs_to_add:
+        for f in unbound_figs_to_add:
+            f = self.parent()._adopt_mpl_figure(f)
             if hasattr(f.canvas, "manager"):
                 fig_var_name = f"Figure{f.canvas.manager.num}"
             elif hasattr(f, "number"):
                 fig_var_name = f"Figure{f.number}"
             else:
                 fig_var_name = "Figure"
+            # print(f"\n{self.__class__.__name__}._updateModel_ new symbol = {fig_var_name}")
             fig_var_name = validate_varname(fig_var_name, ws=ns)
+            # print(f"\n{self.__class__.__name__}._updateModel_ new symbol after validation = {fig_var_name}")
             ns[fig_var_name] = f
             self.internalVariablesMonitor[fig_var_name] = f
             
             # if there are any from Gcf they would always have a number
 
         # ###
-        # 2. deal with Scipyen viewer windows
+        # 2. deal with Scipyen viewer windows - NOTE: 2023-06-07 09:10:08
+        # dealt with from main window (Scipyen's main window) (see 'registerWindow'
+        # and 'deRegisterWindow' methods, there)
+        #
+        # Here, any QMainWindow-based viewer, other than matplotlib Figure, that
+        # created by commands at the console using its default constructor will 
+        # have some limited functionality (especially, no parent() widget) and will
+        # not interact with Scipyen's main window and workspace unless the main
+        # window is specified at the constructor.
+        #
+        # Best is to handle these viewers via the gui (for now)
         #
         # if isinstance(self.parent(), QtWidgets.QMainWindow) and type(self.parent()).__name__ == "ScipyenWindow":
         #     # cached_viewers = [(wname, win) for (wname, win) in self.shell.user_ns.items() if isinstance(

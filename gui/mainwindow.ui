@@ -1056,7 +1056,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>Auto-delete viewers</string>
    </property>
    <property name="toolTip">
-    <string>Remove viewer when closed</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove viewer when closed&lt;/p&gt;&lt;p&gt;(does not apply to matplotlib figures)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="statusTip">
     <string>Remove viewer when closed</string>
