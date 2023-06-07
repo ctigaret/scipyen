@@ -1409,6 +1409,8 @@ def auto_define_trigger_events(src, event_type, analog_index,
         raise TypeError("src expected to be a neo.Block, neo.Segment or a sequence of neo.Block or neo.Segment objects; got %s instead" % type(src).__name__)
     
     if isinstance(times, pq.Quantity):
+        # simply construct TriggerEvents based on the supplied time stamps
+        # NO SIGNAL PARSING is performed
         if not check_time_units(times):  # event times passed at function call -- no detection is performed
             raise TypeError("times expected to have time units; it has %s instead" % times.units)
 
@@ -1612,15 +1614,28 @@ def detect_trigger_events(x, event_type,
     
     
 @safeWrapper
-def detect_trigger_times(x):
+def detect_trigger_times(x, thr:typing.Optional[float] = 1.):
     """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
     
     The signal must undergo at least one transition between two distinct states 
     ("low" and "high").
     
+    The states are detected using the kmeans algorithm (scipy.cluster.vq.kmeans)
+    
+    Optionally the float parameter thr specifies the minimum difference between
+    signal's clusters for it to be considered as containing embedded TTL-like
+    waveforms. By default, this is 1.0
+    
     The function is useful in detecting the ACTUAL time of a trigger (be it 
     "emulated" in the ADC command current/voltage or in the digital output "DIG") 
     when this differs from what was intended in the protocol (e.g. in Clampex)
+    
+    Returns:
+    ========
+    A tuple of times for the lo → hi and for the hi → lo transitions
+    or (None, None) when no such transition were found (e.g. when the cluster 
+    distance is < thr)`
+    
     """
     from scipy import cluster
     from scipy import signal
@@ -1633,6 +1648,9 @@ def detect_trigger_times(x):
     
     try:
         cbook, dist = cluster.vq.kmeans(x, 2)
+        
+        if float(np.abs(np.diff(cbook,axis=0))) < thr:
+            return (None, None)
             
         code, cdist = cluster.vq.vq(x, sorted(cbook))
         
@@ -2356,6 +2374,14 @@ def auto_detect_trigger_protocols(data: neo.Block,
     =======
     When protocols is True, returns a list of trigger protocols; otherwise, 
     returns None
+        
+    CAUTION: When there is no TTL-like waveform, a large number of false-positive
+        events will be "detected" - likely due to noise in the signal.
+        
+    WARNING: if running this is a loop iterated over the segments of a block,
+        caling this function for each segment individually will assign the 
+        'segment' index to 0 in the detected trigger protocol. Make sure you
+        correct for that, accordingly.
         
     """
     # NOTE: 2021-01-06 11:28:23 NEW: introduced "up" parameter - to use the
