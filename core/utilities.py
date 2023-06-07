@@ -891,6 +891,7 @@ def similar_strings(a:str, b:str) -> bool:
 
 @safeWrapper
 def safe_identity_test2(x, y) -> bool:
+    """Uses SafeComparator object"""
     return SafeComparator(comp=eq)(x, y)
 
 @safeWrapper
@@ -2560,8 +2561,15 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     #from .traitcontainers import (DataBag, Bunch, )
     #from collections import OrderedDict
     
-    if y in x.values():
-        ret = [name for name, val in x.items() if y == val]
+    vals = list(x.values()) # bypass the errors raise when comparing np.arrays
+    
+    if any(isinstance(v, np.ndarray) for v in vals) or isinstance(y, np.ndarray):
+        testincluded = any(safe_identity_test(y,v) for v in vals)
+    else:
+        testincluded = y in x.values()
+    
+    if testincluded:
+        ret = [name for name, val in x.items() if (np.all(y == val) if (isinstance(y, np.ndarray) or isinstance(val, np.ndarray)) else y == val)]
         
         if len(ret) == 1:
             return ret[0]

@@ -2368,7 +2368,7 @@ class with_doc:
                 else:
                     docs = header
                     
-                docs += [self.indent_lines(f"{k}) {m.__name__}: \n{m.__doc__}" if m.__doc__ else f"{m.__name__}:") for k, m in enumerate(self.method)]
+                docs += [self.indent_lines(f"{k}) {m.__name__}: \n{m.__doc__} \n------\n" if m.__doc__ else f"{m.__name__}\n------\n") for k, m in enumerate(self.method)]
                 new_doc =  "\n".join(docs)
                 
                 new_method.__doc__ = new_doc
