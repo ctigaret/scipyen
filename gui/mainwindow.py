@@ -2814,9 +2814,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.slot_updateWorkspaceView(); in turn this will sort column 0
         # and resize its contents.
         # This is because workspaceModel doesn't "know" anything about workspaceView.
-        timer = QtCore.QTimer()
-        timer.timeout.connect(self.workspaceModel.update)
-        timer.start(0)
+        
+        self.workspaceModel.preExecute()
+        self.workspaceModel.postRunCell(Bunch(success=True))
+        
+        # timer = QtCore.QTimer()
+        # timer.timeout.connect(self.workspaceModel.update)
+        # timer.start(0)
 
     @pyqtSlot()
     def slot_updateCwd(self):
@@ -6622,8 +6626,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 cmd = "run -i -n -t '%s'" % fname
 
                 try:
+                    self.workspaceModel.preExecute()
                     self.console.centralWidget()._flush_pending_stream()
                     self.console.execute(cmd, hidden=True, interactive=True)
+                    self.workspaceModel.postRunCell(Bunch(success=True))
 
                 except:
                     traceback.print_exc()
@@ -6635,6 +6641,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # issued during the execution of code, which would have dissapeared after
                 # <Esc> key press - and THAT'S A GOOD THING
                 self.console.centralWidget()._show_interpreter_prompt()
+                
+                # self.slot_updateWorkspaceModel()
 
         self.statusbar.showMessage("Done!")
 
