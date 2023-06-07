@@ -61,7 +61,7 @@ def getABFEpochsTable(x:pyabf.ABF, as_dataFrame:bool=False, allTables:bool=False
     return etables
     # return [e for e in etables if len(e.epochs)]
 
-def epochTable2DF(x:pyabf.ABF, abf:typing.Optional[pyabf.ABF] = None):
+def epochTable2DF(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None):
     """Returns a pandas.DataFrame with the data from the epoch table 'x'
     """
     if not isinstance(x, pyabf.waveform.EpochTable):
@@ -101,15 +101,20 @@ def epochTable2DF(x:pyabf.ABF, abf:typing.Optional[pyabf.ABF] = None):
             dacLevel = epoch.level*spq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.level
             dacLevelDelta = epoch.levelDelta*spq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.levelDelta
 
-            epValues = np.array([epoch.epochTypeStr,                              
-                              dacLevel, dacLevelDelta,
-                              epoch.duration, epoch.durationDelta,
-                              epoch.duration/x.sampleRateHz * 1000 * pq.ms, 
-                              epoch.durationDelta/x.sampleRateHz * 1000 * pq.ms,
-                              epoch.digitalPattern[:4], epoch.digitalPattern[4:],
-                              epoch.pulsePeriod, epoch.pulseWidth,
-                              epoch.pulsePeriod/x.sampleRateHz * 1000 * pq.ms,
-                              epoch.pulseWidth/x.sampleRateHz * 1000 * pq.ms], dtype=object)
+            epValues = np.array([epoch.epochTypeStr,    # str description of epoch type (as per Clampex e.g Step, Pulse, etc)                            
+                              dacLevel,                 # "first" DAC level -> quantity; CAUTION units depen on Clampex and whether its telegraphs were OK
+                              dacLevelDelta,            # "delta" DAC level: level change with each sweep in the run; quantity, see above
+                              epoch.duration,           # "first" duration (samples)
+                              epoch.durationDelta,      # "delta" duration (samples)
+                              epoch.duration/x.sampleRateHz * 1000 * pq.ms, # first duration (time units)
+                              epoch.durationDelta/x.sampleRateHz * 1000 * pq.ms, # delta duration (time units)
+                              epoch.digitalPattern[:4], # first 4 digital channels
+                              epoch.digitalPattern[4:], # last 4 digital channels
+                              epoch.pulsePeriod,        # train period (samples`)
+                              epoch.pulseWidth,         # pulse width (samples)
+                              epoch.pulsePeriod/x.sampleRateHz * 1000 * pq.ms, # train period (time units)
+                              epoch.pulseWidth/x.sampleRateHz * 1000 * pq.ms], # pulse width (time units)
+                              dtype=object)
             
             epochData[epoch.epochLetter] = epValues
             
