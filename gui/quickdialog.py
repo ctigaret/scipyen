@@ -263,6 +263,25 @@ class StringInput(OptionalStringInput):
             QtWidgets.QMessageBox.critical(None, "Error","Field '%s' empty" % (self.label.text()))
             return False
         return True
+    
+# class ConstrainedStringInput(OptionalStringInput):
+#     def __init__(self, parent, label:str, constraints:typing.Collection[str]):
+#         OptionalStringInput.__init__(self, parent, label)
+#         self.constraints = constraints
+#         
+#     def validate(self):
+#         from core.utilities import counter_suffix
+#         if self.text() == "":
+#             QtWidgets.QMessageBox.critical(None, "Error","Field '%s' empty" % (self.label.text()))
+#             return False
+#         else:
+#             if isinstance(self.constraints, None):
+#                 return True
+#             
+#             elif isinstance(self.constraints, (tuple, list, set)) and len(self.constraints) > 0 and all(isinstance(s, str) for s in self.constraints):
+                
+                
+            
 
 OutputVariable = StringInput
 InputVariable = StringInput
