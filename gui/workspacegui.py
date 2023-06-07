@@ -733,6 +733,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             else:
                 return
 
+        if not isinstance(title, str) or len(title.strip()) == 0:
+            title = "Export data to workspace"
+            
         newVarName = validate_varname(newVarName, ws = scipyenWindow.workspace)
         
         dlg = qd.QuickDialog(self, title)
@@ -748,7 +751,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             newVarName = namePrompt.text()
             # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
             if newVarName in scipyenWindow.workspace:
-                accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                accept = self.questionMessage(title, f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                # accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
                 if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
                     return
                 

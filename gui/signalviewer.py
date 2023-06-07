@@ -3728,13 +3728,13 @@ anything else       anything else       ❌
                     if dlg.exec() == QtWidgets.QDialog.Accepted:
                         newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                         
-                        self._scipyenWindow_.assignToWorkspace(newVarName, values[0])
+                        self._scipyenWindow_.assignToWorkspace(newVarName, values[0], check_name=False)
                         
                         
                 else:
                     for name, value in zip(item_paths, values):
                         newVarName = validate_varname(name, self._scipyenWindow_.workspace)
-                        self._scipyenWindow_.assignToWorkspace(newVarName, value)
+                        self._scipyenWindow_.assignToWorkspace(newVarName, value, check_name=False)
         
         
     @pyqtSlot()
@@ -4384,11 +4384,11 @@ anything else       anything else       ❌
     def slot_editSelectedCursor(self):
         if isinstance(self.selectedDataCursor, SignalCursor):
             self.slot_editCursor(crsId=self.selectedDataCursor.ID, choose=False)
-    
-    def testGlobalsFcn(self, workspace):
-        """workspace is a dict as returned by globals() 
-        """
-        exec("a=np.eye(3)", workspace)
+#     
+#     def testGlobalsFcn(self, workspace):
+#         """workspace is a dict as returned by globals() 
+#         """
+#         exec("a=np.eye(3)", workspace)
         
         
     @pyqtSlot()
