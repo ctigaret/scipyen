@@ -1890,10 +1890,26 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
     else:
         # NOTE: 2020-09-30 09:56:30
         # Vin - Vbase is the test pulse amplitude
-        Vbase = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])) # where Idc is measured
+        
+        vm_signal = s.analogsignals[signal_index_Vm]
+        
+        if not units_convertible(vm_signal, pq.V):
+            warnings.warn(f"The Vm signal has wrong units ({vm_signal.units}); expecting electrical potential units")
+            warnings.warn(f"The Vm signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+            
+            vm_signal = neo.AnalogSignal(vm_signal.magnitude, units = pq.mV, 
+                                         t_start = vm_signal.t_start, sampling_rate = vm_signal.sampling_rate,
+                                         name=vm_signal.name)
+        
+        # vm_signal = s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])
+        # vm_signal = vm_signal.time_slice(t[0][0], t[0][1])
+        
+        Vbase = np.mean(vm_signal.time_slice(t[0][0], t[0][1])) # where Idc is measured
+        # Vbase = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])) # where Idc is measured
         #print("Vbase", Vbase)
 
-        Vss   = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        Vss   = np.mean(vm_signal.time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        # Vss   = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[2][0], t[2][1])) # where Rin is calculated
         #print("Vss", Vss)
         
         testVm  = Vss - Vbase
