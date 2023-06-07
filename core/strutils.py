@@ -225,14 +225,24 @@ def get_int_sfx(s:str, sep:str = "_") -> typing.Tuple[str, int]:
     
     
     """
-    parts = s.split(sep)
-    
-    if len(parts) <= 1:
-        return s, None
-        #return s, 0
-    
-    sfx = parts[-1]
-    base = sep.join(parts[0:-1])
+    if not isinstance(sep, str) or len(sep.strip()) == 0:
+        regexp = _re.compile("^(\D+)*(\d*)$")
+        re_match = regexp.match(s)
+        if re_match is not None and len(re_match.groups()) > 1:
+            try:
+                base, sfx = re_match.group(1,2)
+            except:
+                base, sfx = s, '0'
+                
+    else:
+        parts = s.split(sep)
+        
+        if len(parts) <= 1:
+            return s, None
+            #return s, 0
+        
+        sfx = parts[-1]
+        base = sep.join(parts[0:-1])
     
     try:
         sfx = int(sfx)

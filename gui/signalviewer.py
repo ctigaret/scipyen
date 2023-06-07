@@ -4132,6 +4132,8 @@ anything else       anything else       ❌
     @pyqtSlot(bool)
     @safeWrapper
     def slot_editCursor(self, crsId=None, choose=False):
+        from core.utilities import counter_suffix
+        
         if len(self._data_cursors_) == 0:
             return
         
@@ -4255,10 +4257,31 @@ anything else       anything else       ❌
             if cursor is None: # bail out
                 return
             
-            name = d.namePrompt.text() # whe a name change is desired this would be different from the cursor's id
+            name = d.namePrompt.text() # when a name change is desired this would be different from the cursor's id
             
             if initialID is not None:
                 if name is not None and len(name.strip()) > 0 and name != initialID: # change cursor id if new name not empty
+                    cursorNames = [c.ID for c in self.cursors]
+                    if name in cursorNames:
+                        newName = counter_suffix(name, cursorNames, "")
+                        
+                        namedlg = qd.QuickDialog(self, f"A cursors named {name} already exists")
+                        namedlg.addLabel(f"Rename {name}")
+                        pw = qd.StringInput(namedlg, "To: ")
+                        pw.variable.undoAvailable = True
+                        pw.variable.redoAvailable = True
+                        pw.variable.setClearButtonEnabled(True)
+                        pw.setText(newName)
+                        namedlg.addWidget(pw)
+                        
+                        if namedlg.exec() == 0:
+                            return
+                        else:
+                            name = pw.text()
+                            if name in cursorNames and name != initialID:
+                                self.errorMessage("Edit cursor", f"Cursors must have unique names; reverting to the original ('{initialID}')")
+                                name = initialID
+                            
                     cursor.ID = name
                     
                     if cursor.isVertical:
