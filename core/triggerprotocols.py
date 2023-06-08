@@ -2236,7 +2236,7 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     
     return protocols
 
-def auto_detect_trigger_protocols(data: neo.Block, 
+def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Block], typing.Union[neo.Segment]], 
                                   presynaptic:tuple=(), 
                                   postsynaptic:tuple=(), 
                                   photostimulation:tuple=(), 
@@ -2304,9 +2304,8 @@ def auto_detect_trigger_protocols(data: neo.Block,
             of rectangular pulses with polarity (upward or downward) specified 
             by the 'up' parameter, which emulate a TTL signal.
             
-            Currently, thei functions supports only the "up" logic i.e., 
+            Currently, the functions supports only the "up" logic i.e., 
             upward-going TTL-like waveforms.
-            
         
         label: str = a label to be assigned to the detected event
         

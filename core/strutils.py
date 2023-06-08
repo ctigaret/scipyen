@@ -250,6 +250,9 @@ def get_int_sfx(s:str, sep:str = "_") -> typing.Tuple[str, int]:
         sfx = None
         
     return base, sfx
+
+def pluralize(s:str, n:int) -> str:
+    return InflectEngine.plural(s, n)
     
 def str2symbol(s:str) -> str:
     """Returns a string that can be used as valid Python symbol (a.k.a variable name).
