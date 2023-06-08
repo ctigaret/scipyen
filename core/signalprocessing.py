@@ -2419,3 +2419,75 @@ def correlate(in1, in2, **kwargs):
 
     else:
         return corr
+
+@safeWrapper
+def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal], 
+                  thr:typing.Optional[float] = 1., return_levels:bool=False):
+    """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
+    
+    The signal must undergo at least one transition between two distinct states 
+    ("low" and "high").
+    
+    The states are detected using the kmeans algorithm (scipy.cluster.vq.kmeans)
+    
+    Optionally the float parameter thr specifies the minimum difference between
+    signal's clusters for it to be considered as containing embedded TTL-like
+    waveforms. By default, this is 1.0
+    
+    The function is useful in detecting the ACTUAL time of a trigger (be it 
+    "emulated" in the ADC command current/voltage or in the digital output "DIG") 
+    when this differs from what was intended in the protocol (e.g. in Clampex,
+    there is a padding before and after the actual signal, and the size of the 
+    padding is about 
+    
+    Returns:
+    ========
+    A tuple of times for the lo → hi and for the hi → lo transitions
+    or (None, None) when no such transition were found (e.g. when the cluster 
+    distance is < thr)`
+    
+    """
+    from scipy import cluster
+    from scipy import signal
+    
+    if not isinstance(x, neo.AnalogSignal):
+        raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
+    
+    
+    # WARNING: algorithm fails for noisy signals with no TTL waveform
+    
+    try:
+        cbook, dist = cluster.vq.kmeans(x, 2)
+        
+        if float(np.abs(np.diff(cbook,axis=0))) < thr:
+            return (None, None, None) if return_levels else (None, None)
+            
+        code, cdist = cluster.vq.vq(x, sorted(cbook))
+        
+        diffcode = np.diff(code)
+        
+        ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
+        ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
+        
+        if ndx_lo_hi.size:
+            times_lo_hi = [x.times[k] for k in ndx_lo_hi]
+            
+        #else:
+            #times_lo_hi = None
+            
+        if ndx_hi_lo.size:
+            times_hi_lo = [x.times[k] for k in ndx_hi_lo]
+            
+        #else:
+            #times_hi_lo = None
+
+    except Exception as e:
+        #traceback.print_exc()
+        times_lo_hi = None
+        times_hi_lo = None
+        cbook = None
+        
+    if return_levels:
+        return times_lo_hi, times_hi_lo, cbook
+    
+    return times_lo_hi, times_hi_lo

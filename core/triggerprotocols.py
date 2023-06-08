@@ -15,7 +15,6 @@ I. Module-level functions for the management of trigger events and protocols
 auto_define_trigger_events
 auto_detect_trigger_protocols
 detect_trigger_events
-detect_trigger_times
 embed_trigger_event
 embed_trigger_protocol
 get_trigger_events
@@ -60,6 +59,7 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
 from core.prog import (safeWrapper, WithDescriptors, with_doc)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.traitcontainers import DataBag
+from core.signalprocessing import detect_boxcar
 
 #### BEGIN module-level default options
 DEFAULTS = DataBag()
@@ -1275,6 +1275,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
 
 #### BEGIN Module-level functions
 
+# @with_doc(detect_trigger_events, use_header=True)
 @safeWrapper
 def auto_define_trigger_events(src, event_type, analog_index, 
                                times=None, label=None, name=None, 
@@ -1528,14 +1529,13 @@ def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence
         
     return get_events(*src, triggers=triggers, as_dict=as_dict, flat=flat, match=match)
 
+# @with_doc(detect_boxcar, use_header=True)
 @safeWrapper
 def detect_trigger_events(x, event_type, 
                           use_lo_hi=True, 
                           label=None, 
                           name=None):
     """Creates a datatypes.TriggerEvent object (array) of specified type.
-    
-    Calls detect_trigger_times(x) to detect the time stamps.
     
     Parameters:
     ===========
@@ -1586,7 +1586,7 @@ def detect_trigger_events(x, event_type,
     if not isinstance(use_lo_hi, bool):
         raise TypeError("'use_lo_hi' parameter expected to be a boolean; got %s instead" % type(use_lo_hi).__name__)
     
-    [lo_hi, hi_lo] = detect_trigger_times(x)
+    [lo_hi, hi_lo] = detect_boxcar(x)
     
     if all([v is None for v in (lo_hi, hi_lo)]):
         return
@@ -1613,70 +1613,70 @@ def detect_trigger_events(x, event_type,
     return trig
     
     
-@safeWrapper
-def detect_trigger_times(x, thr:typing.Optional[float] = 1.):
-    """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
-    
-    The signal must undergo at least one transition between two distinct states 
-    ("low" and "high").
-    
-    The states are detected using the kmeans algorithm (scipy.cluster.vq.kmeans)
-    
-    Optionally the float parameter thr specifies the minimum difference between
-    signal's clusters for it to be considered as containing embedded TTL-like
-    waveforms. By default, this is 1.0
-    
-    The function is useful in detecting the ACTUAL time of a trigger (be it 
-    "emulated" in the ADC command current/voltage or in the digital output "DIG") 
-    when this differs from what was intended in the protocol (e.g. in Clampex)
-    
-    Returns:
-    ========
-    A tuple of times for the lo → hi and for the hi → lo transitions
-    or (None, None) when no such transition were found (e.g. when the cluster 
-    distance is < thr)`
-    
-    """
-    from scipy import cluster
-    from scipy import signal
-    
-    if not isinstance(x, neo.AnalogSignal):
-        raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
-    
-    
-    # WARNING: algorithm fails for noisy signals with no TTL waveform
-    
-    try:
-        cbook, dist = cluster.vq.kmeans(x, 2)
-        
-        if float(np.abs(np.diff(cbook,axis=0))) < thr:
-            return (None, None)
-            
-        code, cdist = cluster.vq.vq(x, sorted(cbook))
-        
-        diffcode = np.diff(code)
-        
-        ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
-        ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
-        
-        if ndx_lo_hi.size:
-            times_lo_hi = [x.times[k] for k in ndx_lo_hi]
-            
-        #else:
-            #times_lo_hi = None
-            
-        if ndx_hi_lo.size:
-            times_hi_lo = [x.times[k] for k in ndx_hi_lo]
-            
-        #else:
-            #times_hi_lo = None
-
-    except Exception as e:
-        #traceback.print_exc()
-        times_lo_hi = None
-        times_hi_lo = None
-        
-    return times_lo_hi, times_hi_lo
+# @safeWrapper
+# def detect_boxcar(x, thr:typing.Optional[float] = 1.):
+#     """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
+#     
+#     The signal must undergo at least one transition between two distinct states 
+#     ("low" and "high").
+#     
+#     The states are detected using the kmeans algorithm (scipy.cluster.vq.kmeans)
+#     
+#     Optionally the float parameter thr specifies the minimum difference between
+#     signal's clusters for it to be considered as containing embedded TTL-like
+#     waveforms. By default, this is 1.0
+#     
+#     The function is useful in detecting the ACTUAL time of a trigger (be it 
+#     "emulated" in the ADC command current/voltage or in the digital output "DIG") 
+#     when this differs from what was intended in the protocol (e.g. in Clampex)
+#     
+#     Returns:
+#     ========
+#     A tuple of times for the lo → hi and for the hi → lo transitions
+#     or (None, None) when no such transition were found (e.g. when the cluster 
+#     distance is < thr)`
+#     
+#     """
+#     from scipy import cluster
+#     from scipy import signal
+#     
+#     if not isinstance(x, neo.AnalogSignal):
+#         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
+#     
+#     
+#     # WARNING: algorithm fails for noisy signals with no TTL waveform
+#     
+#     try:
+#         cbook, dist = cluster.vq.kmeans(x, 2)
+#         
+#         if float(np.abs(np.diff(cbook,axis=0))) < thr:
+#             return (None, None)
+#             
+#         code, cdist = cluster.vq.vq(x, sorted(cbook))
+#         
+#         diffcode = np.diff(code)
+#         
+#         ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
+#         ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
+#         
+#         if ndx_lo_hi.size:
+#             times_lo_hi = [x.times[k] for k in ndx_lo_hi]
+#             
+#         #else:
+#             #times_lo_hi = None
+#             
+#         if ndx_hi_lo.size:
+#             times_hi_lo = [x.times[k] for k in ndx_hi_lo]
+#             
+#         #else:
+#             #times_hi_lo = None
+# 
+#     except Exception as e:
+#         #traceback.print_exc()
+#         times_lo_hi = None
+#         times_hi_lo = None
+#         
+#     return times_lo_hi, times_hi_lo
 
 
 def remove_trigger_protocol(protocol, block):
@@ -2028,7 +2028,7 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     Individual TriggerEvent objects can be manually appended to the events 
         list of each neo.Segment.
     
-    Alternatively, the function detect_trigger_times() can help generate 
+    Alternatively, the function detect_boxcar() can help generate 
     TriggerEvent objects from specific neo.AnalogSignal arrays containing 
     trigger-like data (i.e., signals with transitions between a low and 
     a high state, e.g. rectangular pulses, or step functions).
@@ -2236,6 +2236,7 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     
     return protocols
 
+# @with_doc(auto_define_trigger_events, use_header=True)
 def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Block], typing.Union[neo.Segment]], 
                                   presynaptic:tuple=(), 
                                   postsynaptic:tuple=(), 
@@ -2289,7 +2290,7 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
         where imaging is synchronized with electrophysiology.
         
         Their values are passed along to the auto_define_trigger_events,
-        detect_trigger_events, and detect_trigger_times functions.
+        detect_trigger_events, and detect_boxcar functions.
 
         When empty, no events of the specified type will be constructed.
         

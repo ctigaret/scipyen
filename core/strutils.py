@@ -202,7 +202,7 @@ def is_pathname_valid(pathname: str) -> bool:
     #
     # Did we mention this should be shipped with Python already?
 
-def get_int_sfx(s:str, sep:str = "_") -> typing.Tuple[str, int]:
+def get_int_sfx(s:str, sep:str = "_", use_re:bool=False) -> typing.Tuple[str, int]:
     """Parses an integral suffix from the string.
     
     The suffix needs to be delimited by the sep string.
@@ -225,29 +225,36 @@ def get_int_sfx(s:str, sep:str = "_") -> typing.Tuple[str, int]:
     
     
     """
-    if not isinstance(sep, str) or len(sep.strip()) == 0:
+    if not isinstance(sep, str) or len(sep) == 0 or use_re:
         regexp = _re.compile("^(\D+)*(\d*)$")
         re_match = regexp.match(s)
         if re_match is not None and len(re_match.groups()) > 1:
             try:
                 base, sfx = re_match.group(1,2)
             except:
-                base, sfx = s, '0'
+                base, sfx = s, 0
+                # base, sfx = s, None
+                
+        else:
+            base, sfx = s, 0
+            # base, sfx = s, None
                 
     else:
         parts = s.split(sep)
         
-        if len(parts) <= 1:
-            return s, None
-            #return s, 0
+        # if len(parts) <= 1:
+        if len(parts) < 2:
+            return s, 0
+            # return s, None
         
         sfx = parts[-1]
-        base = sep.join(parts[0:-1])
+        base = sep.join(parts[-1])
     
     try:
         sfx = int(sfx)
     except:
-        sfx = None
+        # sfx = None
+        sfx = 0
         
     return base, sfx
 

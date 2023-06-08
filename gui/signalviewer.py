@@ -1977,7 +1977,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
             base, ctr = get_int_sfx(entry_name, sep = " ")
             
-            if isinstance(ctr, int):
+            if isinstance(ctr, int) and ctr > 0:
                 entry_name = " ".join([base, f"({ctr})"])
                 
             mapping[entry_name] = x
