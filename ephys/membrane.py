@@ -6193,6 +6193,162 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     
     return AHP, ret, params
 
+def measure_membrane_RsRin(im_signal:neo.AnalogSignal, 
+                           testVm:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity],
+                           intervals:tuple
+                           ):
+    """Calculates Rs and Rin from a membrane test in voltage-clamp
+    
+    Parameters:
+    ===========
+    im_signal: neo.AnalogSignal or DataSignal.
+
+        The recorded membrane current, with appropriate units (e.g. pq.pA).
+    
+    testVm: this can be either:
+    
+        • a neo.AnalogSignal or DataSignal
+    
+        The recorded command potential signal, containing a boxcar waveform
+        representing the step changes to and from the test potential, and will
+        be used to determine the membrane potential levels and timings of the 
+        membrane test.
+    
+        • scalar Quantity with units of membrane potential (e.g. pq.mV)
+    
+        The absolute value of the membrane potential change during the membrane 
+            test.
+     
+    intervals: a tuple of six elements
+
+        dc_start, dc_end, rs_start, rs_end, rin_start, rin_end 
+
+        where:
+    
+        dc_start, dc_stop: scalar floats or pq.Quantities with units of time 
+            (e.g. pq.s) for the DC interval.
+            
+            This is the im_signal interval where the baseline (or 'DC') current
+            is measured (typically, a few ms BEFORE the start of the membrane
+            test potential).
+    
+        rs_start, rs_stop: as above, for the Rs interval.
+
+            This is the im_signal interval that CONTAINS the first capacitive 
+            transient recorded during the test - i.e., the transient that occurs
+            upon the step change in the membrane potential - and is used to 
+            calculate the series (or access) resistance (Rs).
+    
+        rin_start, rin_stop: as above, for the Rin interval.
+
+            This is the im_signal interval where the membrane current has settled
+            to a steady-state during the test (typically, a few ms BEFORE the 
+            last capacitive transient, which occurs at the end of the membrane 
+            test potential). This is used to calculate the input resistance (Rin)
+    
+        NOTE: Prerequisites:
+
+            • the values must be in ascending order, pairwise, i.e.:
+    
+                dc_start < dc_stop, rs_start < rs_stop, rin_start < rin_stop
+    
+            • all values must fall within the im_signal domain i.e., they must be
+                >= im_signal.t-start
+                < im_signal.t_stop
+    
+"""
+    if not isinstance(im_signal, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo signal-like object; instead, got a {type(im_signal).__name__}")
+    
+    domain_units = im_signal.times.units
+    
+    if not units_convertible(im_signal, pq.A):
+        warnings.warn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
+        
+        klass = type(im_signal)
+        im_signal = klass(im_signal.magnitude, units = pq.pA, 
+                          t_start = im_signal.t_start, 
+                          sampling_rate = im_signal.sampling_rate,
+                          name = im_signal.name)
+        
+        domain_units = im_signal.times.units
+        
+    if isinstance(testVm, (neo.AnalogSignal, DataSignal, pq.Quantity)):
+        if not units_convertible(testVm, pq.V):
+            warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nA new signal will be generated with units of mV. Be careful how you interpret the results")
+    
+            if isinstance(testVm, neo.base.basesignal.BaseSignal):
+                klass = type(testVm)
+                testVm = klass(testVm.magnitude, units = pq.mV, 
+                               t_start = testVm.t_start, 
+                               sampling_rate = testVm.sampling_rate,
+                               name = testVm.name)
+            
+        test_start, test_stop, test_levels = sigp.detect_boxcar(testVm, return_levels=True)
+        
+        if any(v is None for v in (test_start, test_stop, test_levels)):
+            raise ValueError(f"The testVm signal does not seem to contain an appropriate test command. Please enter the paarmeters for the membrane test manually")
+        
+        Vbase, Vss = (test_levels*testVm.units).flatten()
+        
+        Vchange = np.abs(Vss - Vbase)
+        
+    elif isinstance(testVm, pq.Quantity):
+        if not units_convertible(testVm, pq.V):
+            raise TypeError(f"Expecting a quantity in units of electrical potential; got {testVm.units} instead")
+        
+        if testVm.size != 1:
+            raise ValueError(f"Expecting testVm to be a scalar")
+        
+        Vchange = testVm
+        
+    else:
+        raise TypeError(f"Expecting testVm to be a neo.AnalogSignal, a DataSignal, or a Quantity scalar, with units of electrical potential; instead, got {type(testVm).__name__}")
+    
+    
+    if not isinstance(intervals, (tuple, list)) or len(intervals) != 6:
+        raise TypeError(f"'intervals' expected to be a 6-tuple")
+    
+    if all(isinstance(v, float) for v in intervals):
+        intervals = tuple(v * domain_units for v in intervals)
+        
+    elif all(isinstance(v, pq.Quantity) for v in intervals):
+        if any(v.size != 1 for v in intervals):
+            raise ValueError(f"'intervals' must be scalar quantities")
+        
+        if any(not units_convertible(v, domain_units) for v in intervals):
+            raise ValueError(f"All 'intervals' elements must have same units as the im_signal domain")
+        
+        else:
+            intervals = tuple(v.rescale(domain_units) if v.units != domain_units else v for v in intervals)
+            
+    if any(v < im_signal.t_start or v >= im_signal.t-stop for v in intervals):
+        raise ValueError(f"All values in the interval must fall within the im_signal domain (t_start = {im_signal.t_start}, t_stop = {im_signal.t-stop})")
+    
+    dc_start, dc_stop, rs_start, rs_stop, rin_start, rin_stop = intervals
+    
+    if dc_stop <= dc_start:
+        raise ValueError(f"DC interval ends ({dc_stop}) before, or is simultaneous with, its start ({dc_start})")
+    
+    if rs_stop <= rs_start:
+        raise ValueError(f" Rs intervals ends ({rs_stop}) before, or is simultaneous with, its start ({ rs_start})")
+    
+    if rin_stop <= rin_start:
+        raise ValueError(f" Rin intervals ends ({rin_stop}) before, or is simultaneous with, its start ({ rin_start})")
+    
+    Idc    = np.mean(im_signal.time_slice(dc_start, dc_stop)
+    
+    Irs    = np.max(im_signal.time_slice(rs_start, rs_stop) 
+    
+    Irin   = np.mean(im_signal.time_slice(rin_start, rin_stop)
+    
+    
+        
+        
+        
+        
+    
+
         
 def measure_AHP(signal):
     """Returns the peak and its integral (Simpson)
