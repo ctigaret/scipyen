@@ -194,7 +194,7 @@ from . import utilities
 from core.utilities import (normalized_index, name_lookup, GeneralIndexType,
                             elements_types, index_of, isclose, similar_strings)
 
-from core.strutils import InflectEngine
+from core.strutils import (InflectEngine, pluralize)
 
 # from iolib.pictio import getABF
 # from core.pyabfbridge import getABFProtocolEpochs
@@ -1702,32 +1702,47 @@ def normalized_signal_index(src: neo.core.container.Container, index: typing.Uni
         raise TypeError("Invalid indexing: %s" % index)
     
 #@safeWrapper
-def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
+def get_index_of_named_signal(src, names, 
+                              stype=neo.AnalogSignal, silent=False) -> typing.Sequence:
     """Returns a list of indices of signals named as specified by 'names', 
     and contained in src.
     
     Positional parameters:
     ----------------------
+    NOTE: below, by 'sequence' it is understood a list or a tuple
     
-    Src: a neo.Block or a neo.Segment, or a list of signal-like objects
+    src: object of one of the types below:
+        • neo.Block
+        • neo.Segment, 
+        • a sequence of neo.Segments
+        • a sequence of neo signal-like objects¹
+        • a seuence of sequences of neo signal-like objects¹
     
+    ¹These are types derived from neo.core.dataobject.DataObject, 
+    see the documentation of the 'stype' keyword parameter, below.
     
     names: a string, or a list or tuple of strings
     
     Keyword parameters:
     -------------------
     
-    stype:  a type (python class ) of signal; optional, default is neo.AnalogSignal
-                other valid types are:
-                DataSignal
+    stype:  the type (Python class ) of signal-like object to be looked up, or; 
+            or a tuple of types, e.g. (neo.AnalogSignal, datatypes.DataSignal)
+    
+            Acceptable types are:
+                neo.AnalogSignal
                 neo.IrregularlySampledSignal
                 neo.SpikeTrain
                 neo.Event
                 neo.Epoch
             
-            or the tuple (neo.AnalogSignal, datatypes.DataSignal)
+            and the Scipyen's extended types:
+                DataSignal
+                IrregularlySampledDataSignal
+                DataMark
+                TriggerEvent
+                DataZone
             
-            TODO: or a tuple of types as above # TODO
             
     silent: boolean (optional, default is False): when True, the function returns
         'None' for each signal name not found; otherwise it will raise an exception
@@ -1756,6 +1771,10 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
         if 'names' is a sequence of str, then the function returns a list of indices
             as above (one integer index for each element of 'names')
     
+    If 'src' is a list of signals:
+        • the signals must be of the type specified by stype
+        • 
+    
     NOTE:
     When a signal with the specified name is not found:
         If 'silent' is True, then the function places a None in the list of indices.
@@ -1763,7 +1782,7 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
     
     ATTENTION:
     1) The function presumes that, when 'src' is a Block, it has at least one segment
-    where the 'analogsignals' attribute a list) is not empty. Likewise, when 
+    where the 'analogsignals' attribute (a list) is not empty. Likewise, when 
     'src' is a Segment, its attribute 'analogsignals' (a list) is not empty.
     
     2) iT IS ASSUMED THAT ALL SIGNALS HAVE A NAME ATTRIBUTE THAT IS NOT None
@@ -1771,12 +1790,43 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
     
     Such signals will be skipped / missed!
     """
-    signal_collection = "%ss" % stype.__name__.lower()
+    # signal_collection = "%ss" % stype.__name__.lower()
+    signal_collection = pluralize(stype.__name__.lower(), 2)
     
     if signal_collection == "datasignals":
         signal_collection = "analogsignals"
+        
+    elif signal_collection == "irregularlysampleddatasignals":
+        signal_collection = "irregularlysampledsignals"
+        
+    elif signal_collection == "datazones":
+        signal_collection = "epochs"
+        
+    elif signal_collection in ("datamarks", "triggerevents"):
+        signal_collection  = "events"
+        
+    is_block = isinstance(src, neo.Block)
     
-    if isinstance(src, neo.core.Block) or (isinstance(src, (tuple, list)) and all([isinstance(s, neo.Segment) for s in src])):
+    is_segment = isinstance(src, neo.Segment)
+    
+    is_segments_list = False
+    
+    is_signals_list = False
+    
+    is_signals_collections = False
+    
+    if isinstance(src, (tuple, list)):
+        if all(isinstance(s, neo.Segment) for s in src):
+            is_segments_list = True
+            
+        elif all(isinstance(s, neo.core.dataobject.DataObject) for s in src):
+            is_signals_list = True
+            
+        elif all(isinstance(s, (tuple, list)) and all(isinstance(s_, neo.core.dataobject.DataObject) for s_ in s) for s in src):
+            is_signals_collections = True
+    
+    # if isinstance(src, neo.core.Block) or (isinstance(src, (tuple, list)) and all([isinstance(s, neo.Segment) for s in src])):
+    if is_block or is_segments_list:
         # construct a list of indices (or list of lists of indices) of the named
         # signal(s) in each of the Block's segments
         
@@ -1803,8 +1853,12 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
                 
                 return [[[i.name for i in getattr(j, signal_collection)].index(k) for k in names ] for j in data]
                 
-    elif isinstance(src, neo.core.Segment):
-        objectList = getattr(src, signal_collection)
+    # elif isinstance(src, neo.core.Segment):
+    elif is_segment or is_signals_list:
+        if is_segment:
+            objectList = getattr(src, signal_collection)
+        else:
+            objectList = src
         
         if isinstance(names, str):
             if silent:
@@ -1822,6 +1876,19 @@ def get_index_of_named_signal(src, names, stype=neo.AnalogSignal, silent=False):
         else:
             raise TypeError("Invalid indexing")
         
+    elif is_signals_collections:
+        if isinstance(names, str):
+            if silent:
+                return [utilities.silentindex([i.name for i in objectList], names, multiple=False) for objectList in src]
+            
+            return [[i.name for i in objectList].index(names) for objectList in src]
+        
+        elif isinstance(names, (tuple, list)):
+            if np.all([isinstance(i, str) for i in names]):
+                if silent:
+                    return [[utilities.silentindex([i.name for i in objectList], k, multiple=False) for k in names] for objectList in src]
+                
+                return [[[i.name for i in objectList].index(k) for k in names] for objectList in src]
     else:
         raise TypeError("First argument must be a neo.Block object, a list of neo.Segment objects, or a neo.Segment object; got %s instead" % type(src).__name__)
 

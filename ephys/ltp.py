@@ -1825,7 +1825,8 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         
         return int(w)
         
-    mandatory_intervals = [b"Rbase", b"Rs", b"Rin", b"EPSC0Base", b"EPSC0Peak"]
+    membrane_test_intervals = [b"Rbase", b"Rs", b"Rin"]
+    mandatory_intervals = [b"EPSC0Base", b"EPSC0Peak"]
     optional_intervals = [b"EPSC1Base", b"EPSC1Peak"]
     
     if epoch is None:
@@ -1838,7 +1839,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
             raise ValueError("Segment seems to have no LTP epoch defined, and no external epoch has been defined either")
         
         elif len(ltp_epochs) > 1:
-            warnings.warn("Theres eem to be more than one LTP epoch defined in the segment; only the FIRST one will be used")
+            warnings.warn("There seem to be more than one LTP epoch defined in the segment; only the FIRST one will be used")
         
         epoch = ltp_epochs[0]
         
@@ -1848,30 +1849,23 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
     if epoch.labels.size == 0 or epoch.labels.size != epoch.size:
         raise ValueError("Mismatch between epoch size and number of labels in the epoch")
     
+    membrane_test_intervals_ndx = [__interval_index__(epoch.labels, l) for l in membrane_test_intervals]
     mandatory_intervals_ndx = [__interval_index__(epoch.labels, l) for l in mandatory_intervals]
     optional_intervals_ndx = [__interval_index__(epoch.labels, l) for l in optional_intervals]
     
-    # [Rbase, Rs, Rin, EPSC0Base, EPSC0Peak]
+    
+    # [Rbase, Rs, Rin]
+    t_test = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in membrane_test_intervals_ndx]
+    
+    
+    # [EPSC0Base, EPSC0Peak]
     t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in mandatory_intervals_ndx]
     
-    #print("t", t)
-    
-    Idc    = np.mean(s.analogsignals[signal_index_Im].time_slice(t[0][0], t[0][1]))
+    Idc    = np.mean(s.analogsignals[signal_index_Im].time_slice(t_test[0][0], t_test[0][1]))
     
     Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
     
     Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t[2][0], t[2][1]))
-    
-    #print("Idc", Idc, "Irin", Irin, "Irs", Irs)
-    
-    #t0 = epoch.times # t0: [Rbase, Rs, Rin, EPSC0Base, EPSC0Peak, EPSC1Base, EPSC1Peak]
-    #t1 = epoch.times + epoch.durations
-
-    #Idc = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[0], t1[0]))
-    
-    #Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t0[1], t1[1])) 
-    
-    #Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[2], t1[2]))
     
     if signal_index_Vm is None:
         if isinstance(testVm, numbers.Number):
@@ -1896,8 +1890,8 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         if not units_convertible(vm_signal, pq.V):
             warnings.warn(f"The Vm signal has wrong units ({vm_signal.units}); expecting electrical potential units")
             warnings.warn(f"The Vm signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
-            
-            vm_signal = neo.AnalogSignal(vm_signal.magnitude, units = pq.mV, 
+            klass = type(vm_signal)
+            vm_signal = klass(vm_signal.magnitude, units = pq.mV, 
                                          t_start = vm_signal.t_start, sampling_rate = vm_signal.sampling_rate,
                                          name=vm_signal.name)
         
