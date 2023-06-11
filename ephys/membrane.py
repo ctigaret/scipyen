@@ -6336,11 +6336,11 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
     if rin_stop <= rin_start:
         raise ValueError(f" Rin intervals ends ({rin_stop}) before, or is simultaneous with, its start ({ rin_start})")
     
-    Idc    = np.mean(im_signal.time_slice(dc_start, dc_stop)
+    Idc    = np.mean(im_signal.time_slice(dc_start, dc_stop))
     
-    Irs    = np.max(im_signal.time_slice(rs_start, rs_stop) 
+    Irs    = np.max(im_signal.time_slice(rs_start, rs_stop))
     
-    Irin   = np.mean(im_signal.time_slice(rin_start, rin_stop)
+    Irin   = np.mean(im_signal.time_slice(rin_start, rin_stop))
     
     
         
