@@ -48,6 +48,8 @@ from core.triggerprotocols import (TriggerProtocol,
                                    remove_trigger_protocol,)
 
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.datazone import DataZone
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import (safeWrapper, AttributeAdapter, with_doc)
@@ -1599,7 +1601,15 @@ def segment_synplast_params_i_clamp(s: neo.Segment,
         
         return chord_slopes
     
-def synplast_measures(signal, command, trigger, epoch, rm_epoch):
+def synplast_measures(signal:typing.Union[neo.AnalogSignal, DataSignal], 
+                      command:typing.Union[neo.AnalogSignal, DataSignal], 
+                      intervalsFcns:typing.Union[tuple, list], 
+                      rm_intervals:typing.Union[tuple, list]):
+    
+    """
+    intervalFcns: sequence of 
+    """
+    
     pass
         
 def segment_synplast_params_v_clamp_new(s: neo.Segment, 
@@ -1608,7 +1618,7 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
                                     trigger_signal_index: typing.Optional[int] = None,
                                     testVm: typing.Union[float, pq.Quantity, None]=None,
                                     epoch: typing.Optional[neo.Epoch]=None,
-                                    rm_epoch: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]]=None
+                                    rm_epoch: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]]=None,
                                     stim: typing.Optional[TriggerEvent]=None,
                                     isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
     """
@@ -1871,7 +1881,7 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
                 
             else:
                 if len(rm_epochs) > 1:
-                    warnings.warn(f"{len(rm_epochs})} membrane test epochs were found; only the first one will be used ")
+                    warnings.warn(f"{len(rm_epochs)} membrane test epochs were found; only the first one will be used ")
 
                 rm_epoch = rm_epochs[0] # get the first one, discard the rest
                 
@@ -1933,7 +1943,7 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
     if calculate_RsRin:
         if isinstance(rm_epoch, neo.Epoch):
             rm_result = membrane.epoch_Rs_Rin()
-        Rs, Rin, Idc = 
+        # Rs, Rin, Idc = 
     
     # [Rbase, Rs, Rin]
     t_test = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in membrane_test_intervals_ndx]
