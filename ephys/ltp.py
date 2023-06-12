@@ -85,6 +85,7 @@ from gui.itemslistdialog import ItemsListDialog
 import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
+from gui.cursors import SignalCursor
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -1604,6 +1605,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
                                        trigger_signal_index: typing.Optional[int] = None,
                                        testVm: typing.Union[float, pq.Quantity, None]=None,
                                        epoch: typing.Optional[neo.Epoch]=None,
+                                       rm_epoch: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]]=None
                                        stim: typing.Optional[TriggerEvent]=None,
                                        isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
     """
@@ -1804,26 +1806,26 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
     
     
     """
-    def __interval_index__(labels, label):
-        #print("__interval_index__ labels:", labels, "label:", label, "label type:", type(label))
-        if labels.size == 0:
-            raise ValueError("Expecting a non-empty labels array")
-        
-        if isinstance(label, str):
-            w = np.where(labels == label)[0]
-        elif isinstance(label, bytes):
-            w = np.where(labels == label.decode())[0]
-            
-        else:
-            raise TypeError("'label' expected to be str or bytes; got %s instead" % type(label).__name__)
-        
-        if w.size == 0:
-            raise IndexError("Interval %s not found" % label.decode())
-        
-        if w.size > 1:
-            warnings.warn("Several intervals named %s were found; will return the index of the first one and discard the rest" % label.decode())
-        
-        return int(w)
+#     def __interval_index__(labels, label):
+#         #print("__interval_index__ labels:", labels, "label:", label, "label type:", type(label))
+#         if labels.size == 0:
+#             raise ValueError("Expecting a non-empty labels array")
+#         
+#         if isinstance(label, str):
+#             w = np.where(labels == label)[0]
+#         elif isinstance(label, bytes):
+#             w = np.where(labels == label.decode())[0]
+#             
+#         else:
+#             raise TypeError("'label' expected to be str or bytes; got %s instead" % type(label).__name__)
+#         
+#         if w.size == 0:
+#             raise IndexError("Interval %s not found" % label.decode())
+#         
+#         if w.size > 1:
+#             warnings.warn("Several intervals named %s were found; will return the index of the first one and discard the rest" % label.decode())
+#         
+#         return int(w)
         
     membrane_test_intervals = [b"Rbase", b"Rs", b"Rin"]
     mandatory_intervals = [b"EPSC0Base", b"EPSC0Peak"]
@@ -1843,16 +1845,82 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         
         epoch = ltp_epochs[0]
         
-    if epoch.size != 5 and epoch.size != 7:
-        raise ValueError("The LTP epoch (either supplied or embedded in the segment) has incorrect length; expected to contain 5 or 7 intervals")
+    # NOTE: 2023-06-12 17:47:19
+    # Allow for Rm epoch to by specified independently or not at all.
+    # This means that the length of the LTP epoch can be 2, 4 (no Rm intervals), 5, or 7 (with rm intervals)
+    # (rm intervals are always three: Rbase, Rs and Rin)
     
     if epoch.labels.size == 0 or epoch.labels.size != epoch.size:
         raise ValueError("Mismatch between epoch size and number of labels in the epoch")
+    
+    calculate_RsRin = True
+    returnIdc = True
+        
+    if epoch.size in (2,4):
+        # likely no Rm intervals ⇒
+        # check that rm_epoch has been specified
+        if rm_epoch is None:
+            # no rm_epoch given ⇒ check if there is an rm epoch in the segment
+            rm_epochs = [e for e in epochs if (e.size == 3 or (isinstance(e.name, str) and e.name.strip().lower() == "rm")) and all(neoutils.epoch_has_interval(l) for l in membrane_test_intervals)]
+            
+            if len(rm_epochs) == 0:
+                calculate_RsRin = False
+                
+            else:
+                if len(rm_epochs) > 1:
+                    warnings.warn(f"{len(rm_epochs})} membrane test epochs were found; only the first one will be used ")
+
+
+                rm_epoch = rm_epochs[0] # get the first one, discard the rest
+                
+        elif isinstance(rm_epoch, (tuple, list)) and len(rm_epoch) == 3 and all(isinstance(i, SignalCursor) for i in rm_epoch):
+            calculate_RsRin = True
+            returnIdc = True
+            
+        elif isinstance(rm_epoch, neo.Epoch): # pass trhu to delegated function; will raise if wrong
+            calculate_RsRin = True
+            returnIdc = True
+            
+        else:
+            warnings.warn(f"'rm_epoch' cannot be used to calculate Rs and Rin")
+            calculate_RsRin = False
+            returnIdc = False
+            
+        # now check that the 2 or 4 intervals are the right ones
+        
+        if epoch.size == 2: 
+            if not all(neoutils.epoch_has_interval(epoch, l) for l in mandatory_intervals):
+                raise ValueError(f"The epoch is missing the intervals {mandatory_intervals}")
+            
+        elif epoch.size == 4:
+            intvl = mandatory_intervals + optional_intervals
+            if not all(neoutils.epoch_has_interval(epoch, l) for l in intvl):
+                raise ValueError(f"The epoch is missing the intervals {intvl}")
+            
+    elif epoch.size in (5, 7): # this should include the Rm intervals - if not just skip the RsRin calculations
+        if epoch.size == 5:
+            intvl = mandatory_intervals
+        else:
+            intvl = optional_intervals
+            
+        if not all(neoutils.epoch_has_interval(epoch, l) for l in intvl):
+            raise ValueError(f"The epoch is missing the intervals {intvl}")
+        
+        if not all(neoutils.epoch_has_interval(epoch, l) for l in membrane_test_intervals):
+            calculate_RsRin = False
+            returnIdc = False
+                
+        
+    # if epoch.size != 5 and epoch.size != 7:
+    else:
+        raise ValueError("The LTP epoch (either supplied or embedded in the segment) has incorrect length; expected to contain 2, 4, 5 or 7 intervals")
     
     membrane_test_intervals_ndx = [__interval_index__(epoch.labels, l) for l in membrane_test_intervals]
     mandatory_intervals_ndx = [__interval_index__(epoch.labels, l) for l in mandatory_intervals]
     optional_intervals_ndx = [__interval_index__(epoch.labels, l) for l in optional_intervals]
     
+    if calculate_RsRin:
+        Rs, Rin, Idc = 
     
     # [Rbase, Rs, Rin]
     t_test = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in membrane_test_intervals_ndx]

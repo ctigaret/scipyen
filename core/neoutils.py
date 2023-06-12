@@ -1892,9 +1892,27 @@ def get_index_of_named_signal(src, names,
     else:
         raise TypeError("First argument must be a neo.Block object, a list of neo.Segment objects, or a neo.Segment object; got %s instead" % type(src).__name__)
 
+def epoch_has_interval(epoch:typing.Union[neo.Epoch, DataZone],
+                       interval_name:typing.Union[str, np.str_, bytes]) -> bool:
+    if not isinstance(epoch, (neo.Epoch, DataZone)):
+        raise TypeError(f"'epoch' expected to be a neo.Epoch or DataZone; got {type(epoch).__name__} instead")
+    
+    if isinstance(interval_name, bytes):
+        interval_name = interval_name.decode()
+        
+    elif not isinstance(interval_name, (str, np.str_)):
+        raise TypeError(f"'interval_name' expected a str, np.str_ or bytes; got {type(interval_name).__name__} instead")
+    
+    return interval_name in epoch.labels
+
 @safeWrapper
-def get_epoch_interval(epoch: neo.Epoch, index: typing.Union[str, bytes, np.str_, int], duration:bool=False):
-    """Returns a tuple of time quantities for a specific epoch interval
+def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone], 
+                       index: typing.Union[str, bytes, np.str_, int], 
+                       duration:bool=False) -> tuple:
+    """Returns the time stamps for an epoch interval.
+    
+    These are the (time, duration) or (time, time+duration), depending on the 
+    'duration' flag.
     
     Parameters:
     ----------
@@ -1939,18 +1957,25 @@ def get_epoch_interval(epoch: neo.Epoch, index: typing.Union[str, bytes, np.str_
     of neo-style data arrays
     
     """
-    if not isinstance(epoch, neo.Epoch):
+    if not isinstance(epoch, (neo.Epoch, DataZone)):
         raise TypeError(f"'epoch' expected to be a neo.Epoch; got {type(epoch).__name__} instead")
     
-    if isinstance(index, (str, bytes, np.str_)):
-        # if len(index.strip()) == 0:
-        #     raise ValueError("'index' is empty!")
-    
+    if isinstance(index, (str, np.str_)):
         if index not in epoch.labels:
             raise ValueError(f"Interval label {index} not found")
-        
     
         ndx = int(np.where(epoch.labels == index)[0])
+        
+    elif isinstance(index, bytes):
+        w = np.where(epoch.labels == index.decode())[0]
+        if w.size == 0:
+            raise ValueError(f"Interval label {index.decode()} not found")
+        
+        if w.size > 1:
+            warnings.warn(f"Several intervals named {label.decode()} were found; will return the index of the first one and discard the rest")
+            w = w[0]
+            
+        ndx = int(w)
         
     elif isinstance(index, int):
         if index not in range(-len(epoch), len(epoch)):
