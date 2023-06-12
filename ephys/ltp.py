@@ -2080,6 +2080,406 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
 
     return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
 
+def segment_synplast_params_v_clamp(s: neo.Segment, 
+                                       signal_index_Im: int,
+                                       signal_index_Vm: typing.Optional[int]=None,
+                                       trigger_signal_index: typing.Optional[int] = None,
+                                       testVm: typing.Union[float, pq.Quantity, None]=None,
+                                       epoch: typing.Optional[neo.Epoch]=None,
+                                       stim: typing.Optional[TriggerEvent]=None,
+                                       isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
+    """
+    Calculates several signal measures in a synaptic plasticity experiment.
+    
+    See NOTE further below, for details about these parameters.
+    
+    Parameters:
+    ----------
+    s:neo.Segment
+        The segment must contain one analog signal with the recording of the
+        membrane current.
+        
+        Optionally, the segment may also contain:
+        
+        1) An analog signal containing the recorded membrane potential (in 
+            Axon amplifiers this is usually the secondary output of the recording
+            channel, in voltage-clamp configuration).
+        
+            When present, this is used to determine the amplitude of the 
+            depolarizing test pulse, which is used to calculate Rs and Rin.
+        
+            WARNING 
+            The function expects such a test pulse to be present in every sweep
+            (segment), delivered shortly after the sweep onset, and typically 
+            BEFORE the synaptic stimulus. This test pulse can also be delivered 
+            towards the end of the sweep, after the synaptic responses. 
+            
+            Rs and Rin are calculated based on three mandatory intervals ("Rbase",
+            "Rs" and "Rin") with their onset times set to fall before, and 
+            during the test pulse defined inside the epoch parameter (or embedded in 
+            the segment, see below).  The onset times for these intervals should
+            be within the test pulse.
+            
+            The test puIf a depolarizing test pulse is absent, the calculated
+        Rs and Rin values will make no sense.
+        
+        When absent, then the amplitude of such a test pulse MUST be given as a
+        separate parameter ("testVm") see below.
+        
+        1) a neo.Epoch named "LTP" (case-insensitive) with intervals as defined
+            in the NOTE further below - used to determine the regions of the 
+            membrane current signal where measurements are made.
+        
+            When such an Epoch is missing, then it must be supplied as an 
+            addtional parameter.
+        
+    signal_index_Im: int 
+        Index into the segment's "analogsignals" collection, for the signal
+        containing the membrane current.
+        
+    signal_index_Vm: int 
+        Optional (default is None).
+        Index into the segment's "analogsignals" collection, for the signal
+        containing the recorded membrane potential
+        
+        ATTENTION: Either signal_index_Vm, or Vm (see below) must be specified and
+            not None.
+        
+    trigger_signal_index: int
+        Optional (default is None)
+        Index of the signal containing the triggers for synaptic stimulation.
+        Useful to determine the time of the synaptic stimulus and the inter-stimulus
+        interval (when appropriate).
+    
+    testVm: scalar float or Python Quantity with units of membrane potential 
+        (V, mV, etc)
+        Optional (default is None).
+        The amplitude of the Vm test pulse.
+        
+        ATTENTION: Either signal_index_Vm, or Vm must be specified and not None.
+        
+    stim: TriggerEvent 
+        Optional, default is None.
+        
+        This must be a presynaptic trigger event (i.e. stim.event_type equals
+        TriggerEventType.presynaptic) with one or two elements, corresponding to
+        the first and, optionally, the second synaptic stimulus trigger.
+        
+        When present, it will be used to determine the inter-stimulus interval.
+        
+        When absent, the interstimulus interval can be manually specified ("isi"
+        parameter, below) or detected from a trigger signal (specified using the
+        "trigger_signal_index" parameter, see above).
+        
+    epoch: neo.Epoch
+        Optional (default is None).
+        When present, indicates the segments of the membrane current signal 
+        where the measures are determined -- see NOTE, below, for details.
+        
+        ATTENTION: When None, the neo.Segment "s" is expected to contain a
+        neo.Epoch with intervals defined in the NOTE below.
+        
+    isi: scalar float or Python Quantity, or None.
+        Optional (default is None).
+        When None but either trigger_signal_index or stim parameters are specified
+        then inter-stimulius interval is determined from these.
+        
+        
+    Returns:
+    --------
+    
+    A tuple of scalars (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI) where:
+    
+    Idc: scalar Quantity = the baseline (DC) current (measured at the Rbase epoch
+            interval, see below)
+    
+    Rs: scalar Quantity = Series (access) resistance
+    
+    Rin: scalar Quantity = Input resistance
+    
+    EPSC0: scalar Quantity = Amplitude of first synaptic response.
+    
+    EPSC1: scalar Quantity = Amplitude of second synaptic response in
+            paired-pulse experiments,
+            
+            or np.nan in the case of single-pulse experiments
+            
+            In either case the value has membrane current units.
+            
+    PPR: float scalar = Paired-pulse ratio (EPSC0 / EPSC1, for paired-pulse experiments)
+            or np.nan (single-pulse experiments)
+            
+    ISI: scalar Quantity;
+        This is either the value explicitly given in the "isi" parameter or it
+        is calculated from the "stim" parameter, or is determined from a trigger
+        signal specified with "trigger_signal_index".
+        
+        When neither "isi", "stim" or "trigger_signal_index" are specified, then
+        ISI is returned as NaN * time units associated with the membrane current
+        signal.
+        
+        
+    NOTE:
+    There are two groups of signal measures:
+    
+    a) Mandatory measures:
+        The series resistance (Rs), the input resistance (Rin), and the amplitude
+        of the (first) synaptic response (EPSC0)
+    
+    b) Optional measures - only for paired-pulse experiments:
+        The amplitude of the second synaptic response (EPSC1) and the paired-pulse
+        ratio (PPR = EPSC1/EPSC0)
+        
+    The distinction between single- and paired-pulse stimulation is obtained 
+    from the parameter "epoch", which must contain the following intervals or
+    regions of the Im signal:
+    
+    Interval        Mandatory/  Time onset                  Measurement:
+    #   label:      Optional:
+    ============================================================================
+    1   Rbase       Mandatory   Before the depolarizing     Baseline membrane current
+                                test pulse.                 to calculate Rs & Rin.
+                                                        
+    2   Rs          Mandatory   Just before the peak of     The capacitive current
+                                the capacitive current      at the onset of the
+                                and after the onset of      depolarizing test pulse.
+                                the depolarizing test       (to calculate series 
+                                pulse.                      resistance).
+                                                    
+    3   Rin         Mandatory   Towards the end of the      Steady-state current
+                                depolarizing pulse.         during the depilarizing
+                                                            tets pulse (to calculate
+                                                            input resistance).
+                                
+    4   EPSC0Base   Mandatory   Before the stimulus         Im baseline before  
+                                artifact of the first       the first synaptic
+                                presynaptic stimulus.       response (to calculate
+                                                            amplitude of the first 
+                                                            EPSC)
+                                
+        
+    5   EPSC0Peak   Mandatory   At the "peak" (or, rather   Peak of the (first)  
+                                "trough") of the first      EPSC (to calculate
+                                EPSC                        EPSC amplitude).
+                                
+    6   EPSC1Base   Optional    Before the stimulus         Im baseline before  
+                                artifact of the second      the second synaptic
+                                presynaptic stimulus.       response (to calculate
+                                                            amplitude of the 2nd 
+                                                            EPSC and PPR)
+        
+    7   EPSC1Peak   Optional    At the "peak" (or, rather   Peak of the 2nd  
+                                "trough") of the 2nd        EPSC (to calculate
+                                EPSC                        2nd EPSC amplitude
+                                                            and PPR).
+    
+    The labels are used to locate the appropriate signal regions for each 
+    measurement and are case-sensitive.
+    
+    Epochs with 5 intervals are considered to belong to a single-pulse experiment.
+    A paired-pulse experiment is represented by an epoch with 7 intervals.
+    
+    The intervals (and the epoch) can be constructed manually, or visually using
+    vertical cursors in Scipyen's SignalViewer. In the latter case, the cursors
+    should be labelled accordingly, then an epoch embedded in the segment can be 
+    generated with the appropriate menu function in SignalViewer window.
+    
+    
+    """
+    def __interval_index__(labels, label):
+        #print("__interval_index__ labels:", labels, "label:", label, "label type:", type(label))
+        if labels.size == 0:
+            raise ValueError("Expecting a non-empty labels array")
+        
+        if isinstance(label, str):
+            w = np.where(labels == label)[0]
+        elif isinstance(label, bytes):
+            w = np.where(labels == label.decode())[0]
+            
+        else:
+            raise TypeError("'label' expected to be str or bytes; got %s instead" % type(label).__name__)
+        
+        if w.size == 0:
+            raise IndexError("Interval %s not found" % label.decode())
+        
+        if w.size > 1:
+            warnings.warn("Several intervals named %s were found; will return the index of the first one and discard the rest" % label.decode())
+        
+        return int(w)
+        
+    membrane_test_intervals = [b"Rbase", b"Rs", b"Rin"]
+    mandatory_intervals = [b"EPSC0Base", b"EPSC0Peak"]
+    optional_intervals = [b"EPSC1Base", b"EPSC1Peak"]
+    
+    if epoch is None:
+        if len(s.epochs) == 0:
+            raise ValueError("Segment has no epochs, and no external epoch has been defined either")
+        
+        ltp_epochs = [e for e in s.epochs if (isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
+        
+        if len(ltp_epochs) == 0:
+            raise ValueError("Segment seems to have no LTP epoch defined, and no external epoch has been defined either")
+        
+        elif len(ltp_epochs) > 1:
+            warnings.warn("There seem to be more than one LTP epoch defined in the segment; only the FIRST one will be used")
+        
+        epoch = ltp_epochs[0]
+        
+    if epoch.size != 5 and epoch.size != 7:
+        raise ValueError("The LTP epoch (either supplied or embedded in the segment) has incorrect length; expected to contain 5 or 7 intervals")
+    
+    if epoch.labels.size == 0 or epoch.labels.size != epoch.size:
+        raise ValueError("Mismatch between epoch size and number of labels in the epoch")
+    
+    membrane_test_intervals_ndx = [__interval_index__(epoch.labels, l) for l in membrane_test_intervals]
+    mandatory_intervals_ndx = [__interval_index__(epoch.labels, l) for l in mandatory_intervals]
+    optional_intervals_ndx = [__interval_index__(epoch.labels, l) for l in optional_intervals]
+    
+    
+    # [Rbase, Rs, Rin]
+    t_test = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in membrane_test_intervals_ndx]
+    
+    
+    # [EPSC0Base, EPSC0Peak]
+    t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in mandatory_intervals_ndx]
+    
+    Idc    = np.mean(s.analogsignals[signal_index_Im].time_slice(t_test[0][0], t_test[0][1]))
+    
+    Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
+    
+    Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t[2][0], t[2][1]))
+    
+    if signal_index_Vm is None:
+        if isinstance(testVm, numbers.Number):
+            testVm = testVm * pq.mV
+            
+        elif isinstance(testVm, pq.Quantity):
+            if not units_convertible(testVm, pq.V):
+                raise TypeError("When a quantity, testVm must have voltage units; got %s instead" % testVm.dimensionality)
+            
+            if testVm.size != 1:
+                raise ValueError("testVm must be a scalar; got %s instead" % testVm)
+            
+        else:
+            raise TypeError("When signal_index_Vm is None, testVm is expected to be specified as a scalar float or Python Quantity, ; got %s instead" % type(testVm).__name__)
+
+    else:
+        # NOTE: 2020-09-30 09:56:30
+        # Vin - Vbase is the test pulse amplitude
+        
+        vm_signal = s.analogsignals[signal_index_Vm]
+        
+        if not units_convertible(vm_signal, pq.V):
+            warnings.warn(f"The Vm signal has wrong units ({vm_signal.units}); expecting electrical potential units")
+            warnings.warn(f"The Vm signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+            klass = type(vm_signal)
+            vm_signal = klass(vm_signal.magnitude, units = pq.mV, 
+                                         t_start = vm_signal.t_start, sampling_rate = vm_signal.sampling_rate,
+                                         name=vm_signal.name)
+        
+        # vm_signal = s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])
+        # vm_signal = vm_signal.time_slice(t[0][0], t[0][1])
+        
+        Vbase = np.mean(vm_signal.time_slice(t[0][0], t[0][1])) # where Idc is measured
+        # Vbase = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])) # where Idc is measured
+        #print("Vbase", Vbase)
+
+        Vss   = np.mean(vm_signal.time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        # Vss   = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        #print("Vss", Vss)
+        
+        testVm  = Vss - Vbase
+
+    #print("testVm", testVm)
+    
+    Rs     = (testVm / (Irs - Idc)).rescale(pq.Mohm)
+    Rin    = (testVm / (Irin - Idc)).rescale(pq.Mohm)
+        
+    #print("dIRs", (Irs-Idc), "dIRin", (Irin-Idc), "Rs", Rs, "Rin", Rin)
+        
+    Iepsc0base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[3][0], t[3][1])) 
+    
+    Iepsc0peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[4][0], t[4][1])) 
+
+    EPSC0 = Iepsc0peak - Iepsc0base
+    
+    if len(epoch) == 7 and len(optional_intervals_ndx) == 2:
+        
+        # [EPSC1Base, EPSC1Peak]
+        t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in optional_intervals_ndx]
+        
+        Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[0][0], t[0][1])) 
+        
+        Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
+        
+        #Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[5], t1[5])) 
+        
+        #Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[6], t1[6])) 
+        
+        EPSC1 = Iepsc1peak - Iepsc1base
+        PPR = (EPSC1 / EPSC0).magnitude.flatten()[0] # because it's dimensionless
+        
+    else:
+        EPSC1 = np.nan * pq.mV
+        PPR = np.nan
+            
+    ISI = np.nan * s.analogsignals[signal_index_Im].times.units
+    
+    event = None
+    
+    if isinstance(isi, float):
+        warnings.warn("Inter-stimulus interval explicitly given: %s" % isi)
+        ISI = isi * s.analogsignals[signal_index_Im].times.units
+        
+    elif isinstance(isi, pq.Quantity):
+        if isi.size != 1:
+            raise ValueError("ISI given explicitly must be a scalar; got %s instead" % isi)
+            
+        if not units_convertible(isi, s.analogsignals[signal_index_Im].times):
+            raise ValueError("ISI given explicitly has units %s which are incompatible with the time axis" % isi.units)
+            
+        warnings.warn("Inter-stimulus interval is explicitly given: %s" % isi)
+        
+        ISI = isi
+        
+    else:
+        if isinstance(stim, TriggerEvent): # check for presyn stim event param
+            if stim.event_type != TriggerEventType.presynaptic:
+                raise TypeError("'stim' expected to be a presynaptic TriggerEvent; got %s instead" % stim.event_type.name)
+            
+            if stim.size < 1 or stim.size > 2:
+                raise ValueError("'stim' expected to contain one or two triggers; got %s instead" % stim.size)
+            
+            event = stim
+            
+        elif len(s.events): # check for presyn stim event embedded in segment
+            ltp_events = [e for e in s.events if (isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
+            
+            if len(ltp_events):
+                if len(ltp_events)>1:
+                    warnings.warn("More than one LTP event array was found; taking the first and discarding the rest")
+                    
+                event = ltp_events[0]
+                    
+                
+        if event is None: # none of the above => try to determine from trigger signal if given
+            if isinstance(trigger_signal_index, (str)):
+                trigger_signal_index = ephys.get_index_of_named_signal(s, trigger_signal_index)
+                
+            elif isinstance(trigger_signal_index, int):
+                if trigger_signal_index < 0 or trigger_signal_index > len(s.analogsignals):
+                    raise ValueError("invalid index for trigger signal; expected  0 <= index < %s; got %d instead" % (len(s.analogsignals), trigger_signal_index))
+                
+                event = tp.detect_trigger_events(s.analogsignals[trigger_signal_index], "presynaptic", name="LTP")
+                
+            elif not isinstance(trigger_signal_index, (int, type(None))):
+                raise TypeError("trigger_signal_index expected to be a str, int or None; got %s instead" % type(trigger_signal_index).__name__)
+
+            
+        if isinstance(event, TriggerEvent) and event.size == 2:
+            ISI = np.diff(event.times)[0]
+
+    return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
                  
 def analyse_LTP_in_pathway(baseline_block: neo.Block, 
                            chase_block: neo.Block, 
