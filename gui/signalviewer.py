@@ -1121,7 +1121,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @cursorLabelPrecision.setter
     def cursorLabelPrecision(self, val:typing.Union[int, str]):
         if isinstance(val, str) and val=="auto":
-            pi_precisions = [self.get_axis_xData_precision(ax) for ax in self.plotItems]
+            pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
             val = min(pi_precisions)
         
         if not isinstance(val, int) or val < 0:
@@ -3395,7 +3395,18 @@ anything else       anything else       ❌
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits[traitname] = name
         
-    def _addCursor_(self, cursor_type: typing.Union[str, SignalCursorTypes], x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, ywindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, xBounds: typing.Union[tuple, type(None)] = None, yBounds: typing.Union[tuple, type(None)] = None, axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, label:typing.Optional[str] = None, follows_mouse: bool = False, precision:typing.Optional[int]=None, **kwargs):
+    def _addCursor_(self, cursor_type: typing.Union[str, SignalCursorTypes], 
+                    x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
+                    y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, 
+                    xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
+                    ywindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, 
+                    xBounds: typing.Union[tuple, type(None)] = None,
+                    yBounds: typing.Union[tuple, type(None)] = None,
+                    axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None,
+                    label:typing.Optional[str] = None, 
+                    follows_mouse: bool = False, 
+                    precision:typing.Optional[int]=None, 
+                    **kwargs) -> str:
         """Common landing zone for signal cursor creation methods.
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
         """
@@ -3452,7 +3463,8 @@ anything else       anything else       ❌
             if axis not in self.signalsLayout.items:
                 return
             
-            view_range = guiutils.getPlotItemDataBoundaries(axis)
+            data_range = guiutils.getPlotItemDataBoundaries(axis)
+            view_range = axis.viewRange()
             
             if x is None:
                 x = view_range[0][0] + (view_range[0][1] - view_range[0][0])/2
@@ -3464,7 +3476,8 @@ anything else       anything else       ❌
                 raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
             
             if xBounds is None:
-                xBounds = view_range[0]
+                xBounds = data_range[0]
+                # xBounds = view_range[0]
                 
             if y is None:
                 y = view_range[1][0] + (view_range[1][1] - view_range[1][0])/2
@@ -3476,7 +3489,8 @@ anything else       anything else       ❌
                 raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__ )
             
             if yBounds is None:
-                yBounds = view_range[1]
+                yBounds = data_range[1]
+                # yBounds = view_range[1]
                 
             # print(f"{self.__class__.__name__}._addCursor_ single-axis x = {x}")
             
@@ -3589,11 +3603,11 @@ anything else       anything else       ❌
             
         if precision is None:
             if isinstance(axis, pg.PlotItem):
-                precision = self.get_axis_xData_precision(axis)
+                precision = self.getAxis_xDataPrecision(axis)
                     
             else:
                 if len(self.plotItems):
-                    pi_precisions = [self.get_axis_xData_precision(ax) for ax in self.plotItems]
+                    pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                     precision = min(pi_precisions)
             
         cursorDict[crsId] = SignalCursor(axis, 
@@ -3620,7 +3634,7 @@ anything else       anything else       ❌
         
         return crsId
     
-    def get_axis_xData_precision(self, axis):
+    def getAxis_xDataPrecision(self, axis):
         #pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
         pXData = (i.xData[~np.isnan(i.xData) & ~np.isinf(i.xData)] for i in axis.items if isinstance(i, pg.PlotDataItem) and sgp.nansize(i.xData) > 1)
         
@@ -3905,7 +3919,7 @@ anything else       anything else       ❌
                 
                 xbounds = [min_point.x(), max_point.x()]
 
-                pi_precisions = [self.get_axis_xData_precision(ax) for ax in self.plotItems]
+                pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                 precision = min(pi_precisions)
             return self._addCursor_("vertical", axis=self.signalsLayout.scene(), 
                                     label=label, follows_mouse=dynamic, xBounds=xbounds,
@@ -7049,12 +7063,18 @@ signals in the signal collection.
             
         return ret
     
-    def getDataCursors(self, cursorType:typing.Union[str, SignalCursorTypes]):
+    def getDataCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]=None):
+        """Returns the dictioniary of cursors with the specified type.
+        All cursors with the same cursor type are stored in the same dictionary
+        regardless whether they are atatched to a specific axis or not.
+        Hence, no two cursors of the same type can have the same ID.
+    """
         if cursorType is None:
             return self.cursors
         
         if isinstance(cursorType, str):
             cursorType = SignalCursorTypes.getType(cursorType)
+            
         elif not isinstance(cursorType, SignalCursorTypes):
             raise TypeError(f"Expecting a SignalCursorTypes value or a SignalCursorTypes name (str); instead, got {type(cursorType).__name__}")
         
@@ -7062,9 +7082,63 @@ signals in the signal collection.
         
         return getattr(self, attr, dict())
     
-    def getSignalCursors(self, cursorType:typing.Union[str, SignalCursorTypes]):
+    def getSignalCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]):
         """ Alias to self.getDataCursors """
         return self.getDataCursors(cursorType)
+    
+    def registerCursor(self, cursor, cursorDict:typing.Optional[dict]=None, **kwargs):
+        """Register externally-created cursors.
+    """
+        # TODO: 2023-06-12 23:11:50
+        # Use for internally created cursors as well (to call from _addCursor_)
+        if not isinstance(cursorDict, dict):
+            cursorDict = self.getDataCursors(cursor.cursorType)
+            
+        crsId = cursor.ID
+        if crsId in cursorDict:
+            warnings.warn(f"A {cursor.cursorType.name} cursor named {crsId} already exists")
+            return
+        
+        if cursor in cursorDict.values():
+            ndx = list(cursorDict.values()).index(cursor)
+            existing = list(cursorDict.keys())[ndx]
+            warnings.warn(f"This {cursor.cursorType.name} cursor is already registered as {existing} ")
+            return
+            
+        pen = kwargs.get("pen", None)
+        if isinstance(pen, QtGui.QPen):
+            cursor.pen = pen
+            
+        hoverPen = kwargs.get("hoverPen", None)
+        if isinstance(hoverPen, QtGui.QPen):
+            cursor.hoverPen = hoverPen
+            
+        linkedPen = kwargs.get("linkedPen", None)
+        if isinstance(linkedPen, QtGui.QPen):
+            cursor.linkedPen = linkedPen
+            
+        showValue = kwargs.get("showValue", None)
+        precision = kwargs.get("precision", None)
+        
+        if showValue:
+            if isinstance(precision, int) and precision > 0:
+                cursor.setShowValue(self._cursorsShowValue_, precision)
+                
+            else:
+                cursor.setShowValue(self._cursorsShowValue_, self._cursorLabelPrecision_)
+        else:
+            if isinstance(precision, int) and precision > 0:
+                cursor.precision = precision
+            
+        cursorDict[crsId] = cursor
+        cursorDict[crsId].sig_cursorSelected[str].connect(self.slot_selectCursor)
+        cursorDict[crsId].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
+        cursorDict[crsId].sig_doubleClicked[str].connect(self.slot_editCursor)
+        cursorDict[crsId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
+        cursorDict[crsId].sig_editMe[str].connect(self.slot_editCursor)
+        
+        
+        
         
     
     @property

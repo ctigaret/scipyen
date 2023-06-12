@@ -618,6 +618,26 @@ class SignalCursor(QtCore.QObject):
                     else:
                         l.label.setFormat(self._cursorId_)
                         
+    def _repr_pretty_(self, p, cycle):
+        name=self.name if isinstance(self.name, str) and len(self.name.strip()) else "<unnamed>"
+        typename = self.cursorType.name
+        
+        if cycle:
+            p.text(f"{self.__class__.__name__}: {typename} cursor {name}")
+        else:
+            p.text(f"{self.__class__.__name__}: {typename} cursor {name}")
+            p.breakable()
+            with p.group(4, "(",")"):
+                if self.cursorType in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
+                    p.text(f"x = {self.x} ± {self.xwindow/2}")
+                    p.breakable()
+                
+                if self.cursorType in (SignalCursorTypes.horizontal, SignalCursorTypes.crosshair):
+                    p.text(f"y = {self.y} ± {self.ywindow/2}")
+                    p.breakable()
+            p.breakable()
+        
+                        
     def update(self):
         for l in (self._hl_, self._vl_):
             if isinstance(l, pg.InfiniteLine):

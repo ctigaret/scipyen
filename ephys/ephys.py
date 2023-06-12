@@ -170,6 +170,7 @@ import pyabf
 import matplotlib as mpl
 # import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
+from PyQt5 import QtGui, QtCore
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -583,7 +584,10 @@ def cursors2intervals(*args, **kwargs):
     
 
 @safeWrapper
-def epoch_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typing.Union[neo.Epoch, tuple], channel: typing.Optional[int] = None):
+def epoch_reduce(func:types.FunctionType, 
+                 signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                 epoch: typing.Union[neo.Epoch, tuple], 
+                 channel: typing.Optional[int] = None):
     """
     The maximum value of a signal across an Epoch or a (t0, duration) interval.
     
@@ -1017,9 +1021,13 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typi
     return data_index
 
 @safeWrapper
-def cursors_measure(func, data, *cursors, segment_index: int = None, analog: typing.Optional[typing.Union[int, str]] = None, irregular: typing.Optional[typing.Union[int, str]] = None, **kwargs):
+def cursors_measure(func, data, *cursors, 
+                    segment_index: int = None, 
+                    analog: typing.Optional[typing.Union[int, str]] = None, 
+                    irregular: typing.Optional[typing.Union[int, str]] = None, 
+                    **kwargs):
     """
-    data: a neo.AnalogSignal or datatypes.DataSignal
+    data: a neo.AnalogSignal or DataSignal
     """
     from gui.signalviewer import SignalCursor as SignalCursor
 
@@ -1060,16 +1068,16 @@ def cursors_measure(func, data, *cursors, segment_index: int = None, analog: typ
             raise TypeError("Analog signal index must be specified")
         
     elif isinstance(data, neo.Block):
-        # iterate through segments
+        # iterate through segments # TODO 2023-06-12 23:17:33
         pass
     
     elif isinstance(data, (tuple, list)):
         if all([isinstance(s, (neo.AnalogSignal, DataSignal)) for s in data]):
-            # treat as a segment's signal collection
+            # treat as a segment's signal collection # TODO 2023-06-12 23:17:33
             pass
         
         elif all([isinstance(d, neo.Segment) for d in data]):
-            # iterate through segments as for block
+            # iterate through segments as for block # TODO 2023-06-12 23:17:33
             pass
             
         
@@ -1077,7 +1085,10 @@ def cursors_measure(func, data, *cursors, segment_index: int = None, analog: typ
 
     
 @safeWrapper
-def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                       cursor0: typing.Union[SignalCursor, tuple], 
+                       cursor1: typing.Union[SignalCursor, tuple], 
+                       channel: typing.Optional[int] = None) -> pq.Quantity:
     """Calculates the signal amplitude between two notional vertical cursors.
     
     amplitude = y1 - y0
@@ -1099,7 +1110,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], curso
     (1, ) when channel is specified.
         
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    from gui.cursors import SignalCursor as SignalCursor
 
     y0 = cursor_average(signal, cursor0, channel=channel)
     y1 = cursor_average(signal, cursor1, channel=channel)
@@ -1242,7 +1253,9 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], curs
     return (y1-y0)/(t1-t0)
     
 @safeWrapper
-def epoch2cursors(epoch: neo.Epoch, axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, **kwargs):
+def epoch2cursors(epoch: neo.Epoch, 
+                  axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
+                  **kwargs):
     """Creates vertical signal cursors from a neo.Epoch.
     
     Parameters:
@@ -1265,7 +1278,13 @@ def epoch2cursors(epoch: neo.Epoch, axis: typing.Optional[typing.Union[pg.PlotIt
     Other keyword parameters are passed to the cursor constructors:
     parent, follower, xBounds, yBounds, pen, linkedPen, hoverPen
     
-    See the documentation of signalviewer.SignalCursor.__init__ for details.
+    See the documentation of gui.cursors.SignalCursor.__init__ for details.
+    
+    signal_viewer:SignalViewer instance, or None (the default)
+        When given, the cursors will also be registered with the signal viewer
+        instance that owns the axis.
+    
+        Prerequisite: the axis must be owned by the signal viewer instance.
     
     Returns:
     --------
@@ -1285,7 +1304,8 @@ def epoch2cursors(epoch: neo.Epoch, axis: typing.Optional[typing.Union[pg.PlotIt
     When axis is not None, the cursors are added to the PlotItem or GraphicsScene
     specified by the 'axis' parameter.
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    from gui.cursors import SignalCursor as SignalCursor
+    from gui.signalviewer import SignalViewer
 
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
@@ -1296,14 +1316,50 @@ def epoch2cursors(epoch: neo.Epoch, axis: typing.Optional[typing.Union[pg.PlotIt
         
     else:
         ret = [(t + d/2., d, l) for (t, d, l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
+        
+    signal_viewer = kwargs.pop("signal_viewer", None)
     
     if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
         # NOTE: 2020-03-10 18:23:03
         # cursor constructor accepts python Quantity objects for its numeric
         # parameters x, y, xwindow, ywindow, xBounds and yBounds
+        # NOTE: below, parent MUST be set to axis, else there will be duplicate
+        # cursor lines when registering with signal viewer instance
         cursors = [SignalCursor(axis, x=t, xwindow=d,
                                 cursor_type=SignalCursorTypes.vertical,
-                                cursorID=l) for (t,d,l) in ret]
+                                cursorID=l, parent=axis) for (t,d,l) in ret]
+        
+        if isinstance(signal_viewer, SignalViewer):
+            if isinstance(axis, pg.PlotItem):
+                if axis not in signal_viewer.axes:
+                    return cursors
+                
+            elif isinstance(axis, pg.GraphicsScene):
+                if axis is not signal_viewer.signalsLayout.scene():
+                    return cursors
+                
+            cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
+            cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            cursorPen.setCosmetic(True)
+            hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
+            hoverPen.setCosmetic(True)
+            linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            linkedPen.setCosmetic(True)
+            if isinstance(axis, pg.PlotItem):
+                cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
+            elif isinstance(axis, pg.GraphicsScene):
+                pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+                cursorPrecision = min(pi_precisions)
+                
+            else: 
+                cursorPrecision = None
+               
+            for c in cursors:
+                signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
+                                             linkedPen=linkedPen,
+                                             precision=cursorPrecision,
+                                             showValue = signal_viewer.cursorsShowValue)
+        
         return cursors
     
     return ret
@@ -1320,7 +1376,8 @@ def intervals2cursors(*args, **kwargs):
     each specifying an interval
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    from gui.cursors import SignalCursor
+    signal_viewer = kwargs.pop("signal_viewer", None)
 
     axis = kwargs.pop("axis", None)
     if not isinstance(axis, (int, pg.PlotItem, type(None))):
@@ -1413,12 +1470,46 @@ def intervals2cursors(*args, **kwargs):
             cursors = [SignalCursor(axis, x=p[0], xwindow=p[1], cursorID=p[2], 
                                     cursor_type=SignalCursorTypes.vertical) for p in xwl]
                 
+        if isinstance(signal_viewer, SignalViewer):
+            if isinstance(axis, pg.PlotItem):
+                if axis not in signal_viewer.axes:
+                    return cursors
+                
+            elif isinstance(axis, pg.GraphicsScene):
+                if axis is not signal_viewer.signalsLayout.scene():
+                    return cursors
+                
+            cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
+            cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            cursorPen.setCosmetic(True)
+            hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
+            hoverPen.setCosmetic(True)
+            linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            linkedPen.setCosmetic(True)
+            if isinstance(axis, pg.PlotItem):
+                cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
+            elif isinstance(axis, pg.GraphicsScene):
+                pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+                cursorPrecision = min(pi_precisions)
+                
+            else: 
+                cursorPrecision = None
+               
+            for c in cursors:
+                signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
+                                             linkedPen=linkedPen,
+                                             precision=cursorPrecision,
+                                             showValue = signal_viewer.cursorsShowValue)
+        
             return cursors
         
         return xwl
 
 @safeWrapper
-def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: neo.Epoch, channel: typing.Optional[int] = None):
+def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
+                  epoch: neo.Epoch, 
+                  intervals: typing.Optional[typing.Union[int, str, typing.Sequence[int], typing.Sequence[str], range, slice]] = None,
+                  channel: typing.Optional[int] = None):
     """Signal average across an epoch's intervals.
     
     Parameters:
@@ -1427,24 +1518,40 @@ def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: neo
     
     epoch: neo.Epoch
     
+    intervals: optional - when present, specified which epoch intervals to use
+        This can be:
+        • int (interval index)
+        • str (interval name)
+        • sequence of int (interval indices)
+        • sequence of str (interval names)
+        • a range
+        • a slice
+    
     channel: int or None (default)
     
     Returns:
     --------
     
     A list of python Quantity objects with as many elements as there
-    are times,durations pairs in the epoch.
+    are times, durations pairs (i.e., intervals) in the epoch.
     
     For multi-channel signals, the Quantity are arrays of size that equals the
     number of channels.
     
     """
-    
-    t0 = epoch.times
-    t1 = epoch.times + epoch.durations
-    
-    ret = [signal.time_slice(t0_, t1_).mean(axis=0) for (t0_, t1_) in zip(t0,t1)]
-    
+    if intervals is None:
+        t0 = epoch.times
+        t1 = epoch.times + epoch.durations
+        ret = [signal.time_slice(t0_, t1_).mean(axis=0) for (t0_, t1_) in zip(t0,t1)]
+        
+    elif isinstance(intervals, (int, str)):
+        t0, t1 = neoutils.get_epoch_interval(epoch, intervals, duration=False)
+        ret = [signal.time_slice(t0, t1).mean(axis=0)]
+        
+    elif isinstance(intervals, (tuple, list)) and all(isinstance(i, (int, str)) for i in intervals):
+       t0t1 = [neoutils.get_epoch_interval(epoch, i, duration=False) for i in intervals] 
+       ret = [signal.time_slice(t0, t1).mean(axis=0) for (t0,t1) in t0t1]
+        
     if isinstance(channel, int):
         ret = [r[channel].flatten() for r in ret]
         

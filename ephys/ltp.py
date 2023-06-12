@@ -109,7 +109,7 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
-
+IntervalParams = collections.namedtuple("IntervalParams", ("func", "t0", "t1"))
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
@@ -1607,7 +1607,7 @@ def synplast_measures(signal:typing.Union[neo.AnalogSignal, DataSignal],
                       rm_intervals:typing.Union[tuple, list]):
     
     """
-    intervalFcns: sequence of 
+    intervalFcns: sequence of ...
     """
     
     pass
