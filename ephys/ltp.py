@@ -94,6 +94,7 @@ import iolib.pictio as pio
 
 import ephys.ephys as ephys
 from ephys.ephys import ClampMode, ElectrodeMode
+from ephys import membrane
 
 
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
@@ -1597,17 +1598,19 @@ def segment_synplast_params_i_clamp(s: neo.Segment,
         chord_slopes = [((sig.max()-sig.min())/d_t).rescale(pq.V/pq.s) for (sig, d_t) in zip(epsp_rises, dt)]
         
         return chord_slopes
+    
+def synplast_measures(signal, command, trigger, epoch, rm_epoch):
+    pass
         
-        
-def segment_synplast_params_v_clamp(s: neo.Segment, 
-                                       signal_index_Im: int,
-                                       signal_index_Vm: typing.Optional[int]=None,
-                                       trigger_signal_index: typing.Optional[int] = None,
-                                       testVm: typing.Union[float, pq.Quantity, None]=None,
-                                       epoch: typing.Optional[neo.Epoch]=None,
-                                       rm_epoch: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]]=None
-                                       stim: typing.Optional[TriggerEvent]=None,
-                                       isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
+def segment_synplast_params_v_clamp_new(s: neo.Segment, 
+                                    signal_index_Im: int,
+                                    signal_index_Vm: typing.Optional[int]=None,
+                                    trigger_signal_index: typing.Optional[int] = None,
+                                    testVm: typing.Union[float, pq.Quantity, None]=None,
+                                    epoch: typing.Optional[neo.Epoch]=None,
+                                    rm_epoch: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]]=None
+                                    stim: typing.Optional[TriggerEvent]=None,
+                                    isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
     """
     Calculates several signal measures in a synaptic plasticity experiment.
     
@@ -1870,7 +1873,6 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
                 if len(rm_epochs) > 1:
                     warnings.warn(f"{len(rm_epochs})} membrane test epochs were found; only the first one will be used ")
 
-
                 rm_epoch = rm_epochs[0] # get the first one, discard the rest
                 
         elif isinstance(rm_epoch, (tuple, list)) and len(rm_epoch) == 3 and all(isinstance(i, SignalCursor) for i in rm_epoch):
@@ -1909,17 +1911,28 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         if not all(neoutils.epoch_has_interval(epoch, l) for l in membrane_test_intervals):
             calculate_RsRin = False
             returnIdc = False
+            
+        else:
+            rm_epoch = epoch # we can use this to calculate RsRin as well (just using the Rm intervals in it)
+            calculate_RsRin = True
+            returnIdc = True
                 
         
     # if epoch.size != 5 and epoch.size != 7:
     else:
         raise ValueError("The LTP epoch (either supplied or embedded in the segment) has incorrect length; expected to contain 2, 4, 5 or 7 intervals")
     
+    
     membrane_test_intervals_ndx = [__interval_index__(epoch.labels, l) for l in membrane_test_intervals]
     mandatory_intervals_ndx = [__interval_index__(epoch.labels, l) for l in mandatory_intervals]
     optional_intervals_ndx = [__interval_index__(epoch.labels, l) for l in optional_intervals]
     
+    # Now, check Im and Vm
+    
+    
     if calculate_RsRin:
+        if isinstance(rm_epoch, neo.Epoch):
+            rm_result = membrane.epoch_Rs_Rin()
         Rs, Rin, Idc = 
     
     # [Rbase, Rs, Rin]
