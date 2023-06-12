@@ -641,7 +641,46 @@ def epoch_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal,
     
     return ret
 
-def cursor_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
+                  cursor: typing.Union[SignalCursor, tuple]) -> typing.Union[neo.AnalogSignal, DataSignal]:
+    """Returns a slice of the signal corresponding to a cursor's window"""
+    
+    if isinstance(cursor, SignalCursor):
+        t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
+        t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
+        
+    elif isinstance(cursor, tuple) and len(cursor) == 2:
+        t0, t1 = cursor
+        
+        if not isinstance(t0, pq.Quantity):
+            t0 *= signal.times.units
+            
+        else:
+            if not units_convertible(t0, signal.times.units):
+                raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
+    
+        if not isinstance(t1, pq.Quantity):
+            t1 *= signal.times.units
+    
+        else:
+            if not units_convertible(t1, signal.times.units):
+                raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
+        
+    else:
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor or a 2-tuple of scalars; got {cursors} instead")
+    
+    if t0 == t1:
+        ret = signal[signal.time_index(t0),:]
+        
+    else:
+        ret = signal.time_slice(t0,t1)
+    
+    return ret
+
+def cursor_reduce(func:types.FunctionType, 
+                  signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                  cursor: typing.Union[SignalCursor, tuple], 
+                  channel: typing.Optional[int] = None):
     """Reduced signal value (e.g. min, max, median etc) across a cursor's window.
     
     The reduced signal value is the value calculated by the `func` parameter
@@ -718,7 +757,8 @@ def cursor_reduce(func:types.FunctionType, signal: typing.Union[neo.AnalogSignal
         
     else:
         # ret = signal.time_slice(t0,t1).max(axis=0).flatten()
-        ret = func(signal.time_slice(t0,t1), axis=0).flatten()
+        # ret = func(signal.time_slice(t0,t1), axis=0).flatten()
+        ret = func(signal.time_slice(t0,t1), axis=0)
     
     if isinstance(channel, int):
         return ret[channel].flatten()
@@ -829,7 +869,9 @@ def cursor_argminmax(signal, cursor, channel):
     return cursor_reduce(sigp.argminmax, signal, cursor, channel)
 
 @safeWrapper
-def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int]=None):
+def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                   cursor: typing.Union[tuple, SignalCursor], 
+                   channel: typing.Optional[int]=None):
     """Average of signal samples across the window of a vertical cursor.
     Calls cursor_reduce with np.mean as `func` parameter
     
@@ -862,7 +904,9 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: t
 cursor_mean = cursor_average
 
 @safeWrapper
-def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple], channel: typing.Optional[int] = None):
+def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], 
+                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple], 
+                 channel: typing.Optional[int] = None):
     """Value of signal at the vertical cursor's time coordinate.
     
     Signal sample values are NOT averaged across the cursor's window.

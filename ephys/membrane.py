@@ -63,7 +63,7 @@ from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, 
 #import imaging.scandata
 from imaging.scandata import ScanData
 
-from core.prog import safeWrapper
+from core.prog import safeWrapper, with_doc
 #from core.patchneo import *
 
 #### END pict.core modules
@@ -85,7 +85,10 @@ import ephys.ephys as ephys
 
 
 @safeWrapper
-def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.Union[str, int, pq.Quantity, float], regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, channel: typing.Optional[int] = None):
+def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], 
+                   Vm: typing.Union[str, int, pq.Quantity, float], 
+                   regions: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, 
+                   channel: typing.Optional[int] = None):
     """Calculates the series (Rs) and input (Rin) resistances in voltage-clamp.
     
     Parameters:
@@ -123,10 +126,10 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         signal) are used to calculate Rs and Rin.
         
         When a neo.Epoch: this is expected to contain three intervals
-        (i.e., len(epoch) == 3 is True), with the following labels (NOTE, these
+        (i.e., len(epoch) >= 3 is True), with the following labels (NOTE, these
         are CASE-SENSITIVE):
 
-             "baseline", "Rs" and "Rin".
+             "Rbase", "Rs" and "Rin".
         
         These intervals define a baseline region, a region containing the peak 
         of the outward capacitance transient curent, and a region in the
@@ -145,9 +148,10 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
         
     channel: int or None (default)
     
-        For multi-channel signals, the index of the signal's channel. When None
-        (default) the values returned will be arrays with size equal to the 
-        number of channels in the signals.
+        For multi-channel signals, the index of the signal's channel (WARNING:
+        this is neither a device, nor the index of a signal in the segment). 
+        When None (default) the values returned will be arrays with size equal 
+        to the number of channels in the signals.
         
         WARNING: Both Im and Vm signals should have the same number of channels
         (i.e., have identical array shapes)
@@ -158,78 +162,6 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
     if not isinstance(segment, neo.Segment):
         raise TypeError("Expecting a neo.Segment, for 'segment'; got %s instead" % type(segment).__name__)
     
-    #  determine the signals interval boundaries for baseline, Rs, and Rin
-    rm_epoch = None
-    
-    baseline_interval = None
-    irs_interval = None
-    irin_interval = None
-    
-    if regions is None:
-        if len(segment.epochs) == 0:
-            raise TypeError("When no region has been specified, the segment must contain epochs")
-        
-        rm_epochs = [e for e in segment.epochs if e.name == "Rm"]
-        
-        if len(rm_epochs) == 0:
-            raise TypeError("No appropriate Rm epoch found in segment")
-        
-        rm_epoch = rm_epochs[0]
-        
-    elif isinstance(regions, neo.Epoch):
-        rm_epoch = regions
-        
-    elif isinstance(regions, (tuple, list)) and len(regions) == 3:
-        if all([isinstance(r, SignalCursor) and (r.cursorType is SignalCursorTypes.vertical or r.cursorType is SignalCursorTypes.crosshair) for r in regions]):
-            cIDs = [c.ID for c in regions]
-            
-            if any([n not in cIDs for n in ["baseline", "Rs", "Rin"]]):
-                raise ValueError("Inappropriate cursor IDs")
-            
-            base_ndx = regions[cIDs.index("baseline")]
-            irs_ndx = regions[cIDs.index("Rs")]
-            irin_ndx = regions[cIDs.index("Rin")]
-            
-            baseline_interval = [(regions[base_ndx].x - regions[base_ndx].xwindow/2) * pq.s, 
-                                 (regions[base_ndx].x + regions[base_ndx].xwindow/2) * pq.s]
-        
-            irs_interval = [(regions[irs_ndx].x - regions[irs_ndx].xwindow/2) * pq.s, 
-                            (regions[irs_ndx].x + regions[irs_ndx].xwindow/2) * pq.s]
-        
-            irin_interval = [(regions[irin_ndx].x - regions[irin_ndx].xwindow/2) * pq.s, 
-                             (regions[irin_ndx].x + regions[irin_ndx].xwindow/2) * pq.s]
-            
-        else:
-            raise TypeError("'regions' tuple must contain vertical SignalCursors")
-        
-    else:
-        raise TypeError("Inappropriate type for 'regions' parameter: %s" % type(region).__name__)
-    
-    if isinstance(rm_epoch, neo.Epoch):
-        if len(rm_epoch) != 3:
-            raise TypeError("Rm epoch must have three intervals; got %s instead" % len(rm_epoch))
-        
-        region_labels = list(rm_epoch.labels)
-        
-        if len(region_labels) == 0 or not all([s in region_labels for s in ["baseline", "Rs", "Rin"]]):
-            raise ValueError(f"Cannot use epoch {rm_epoch.name} with inappropriate interval labels {region_labels}")
-        
-        base_ndx = region_labels.index("baseline")
-        irs_ndx = region_labels.index("Rs")
-        irin_ndx = region_labels.index("Rin")
-        
-        baseline_interval = [rm_epoch.times[base_ndx],
-                             rm_epoch.times[base_ndx] + rm_epoch.durations[base_ndx]]
-        
-        irs_interval = [rm_epoch.times[irs_ndx],
-                        rm_epoch.times[irs_ndx] + rm_epoch.durations[irs_ndx]]
-        
-        irin_interval = [rm_epoch.times[irin_ndx],
-                         rm_epoch.times[irin_ndx] + rm_epoch.durations[irin_ndx]]
-        
-    if any([i is None for i in [baseline_interval, irs_interval, irin_interval]]):
-        raise RuntimeError("Cannot determine signal interval boundaries")
-        
     if isinstance(Im, str):
         Im = neoutils.get_index_of_named_signal(segment, Im)
         
@@ -238,60 +170,118 @@ def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], Vm: typing.
     
     Im_signal = segment.analogsignals[Im]
     
-    if isinstance(Vm, pq.Quantity):
-        if not units_convertible(Vm, pq.V):
-            raise TypeError("Wrong units for Vm quantity: %s" % Vm.units)
-        
-        if Vm.size != 1:
-            raise TypeError("Vm must be a scalar")
-        
-        vstep = Vm
-        
-        if vstep.ndim == 0:
-            vstep = vstep.flatten()
-    
-    elif isinstance(Vm, float):
-        vstep = (Vm * pq.mV).flatten()
-        
-    else:
-        # get the vm signal and measure vstep based on the specified regions:
-        # use Irin region and Ibase region to determine the amplitude of vstep.
-        if isinstance(Vm, str):
-            Vm = neoutils.get_index_of_named_signal(segment, Vm)
-        
-        elif not isinstance(Vm, int):
-            raise TypeError("Vm expected to be a str or int; got %s instead" % type(Vm).__name__)
-        
+    if isinstance(Vm, str):
+        Vm = neoutils.get_index_of_named_signal(segment, Vm)
         Vm_signal = segment.analogsignals[Vm]
         
-        vrin = Vm_signal.time_slice(irin_interval[0], irin_interval[1]).mean(axis=0)
-        vbase= Vm_signal.time_slice(baseline_interval[0], baseline_interval[1]).mean(axis=0)
+    elif isinstance(Vm, int):
+        Vm_signal = segment.analogsignals[Vm]
         
-        vstep = vrin - vbase
-                
-        if isinstance(channel, int):
-            vstep = vstep[channel].flatten()
+    else: # pass directly to delegated functions below
+        Vm_signal = Vm 
+
+    if isinstance(regions, (tuple, list)) and len(regions) == 3:
+        if all([isinstance(r, SignalCursor) and (r.cursorType is SignalCursorTypes.vertical or r.cursorType is SignalCursorTypes.crosshair) for r in regions]):
+            cIDs = [c.ID for c in regions]
             
-    Ibase = Im_signal.time_slice(baseline_interval[0], baseline_interval[1]).mean(axis=0)
-    
-    # Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).mean(axis=0)
-    Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).max(axis=0)
-    
-    Irin = Im_signal.time_slice(irin_interval[0], irin_interval[1]).mean(axis=0)
-    
-    if isinstance(channel, int):
-        Ibase = Ibase[channel].flatten()
-        Irs = Irs[channel].flatten()
-        Irin = Irin[channel].flatten()
+            if any([n not in cIDs for n in ["Rbase", "Rs", "Rin"]]):
+                raise ValueError("Inappropriate cursor IDs; expecting 'Rbase', 'Rs', and 'Rin'")
+            
+            Rbase_cursor = regions[cIDs.index("Rbase")]
+            Rs_cursor = regions[cIDs.index("Rs")]
+            Rin_cursor = regions[cIDs.index("Rin")]
+            
+            return cursors_Rs_Rin(Im_signal, Vm_signal, Rbase_cursor, Rs_cursor, Rin_cursor, channel=channel)
+            
+        elif len(regions) == 6: # pass directly to measure_Rs_Rin and let that deal with it
+            return measure_Rs_Rin(Im_signal, Vm_signal, regions, channel=channel)
         
-    Rin = vstep / (Irin - Ibase)
+        else:
+            raise TypeError("'regions' tuple must contain three vertical SignalCursors, or six time stamps")
+        
+    elif isinstance(regions, neo.Epoch):
+        if len(regions) >= 3 and all(l in regions.labels for l in ("Rbase", "Rs", "Rin")):
+            return epoch_Rs_Rin(Im_signal, Vm_signal, regions, channel=channel)
+            
+        else:
+            raise ValueError("Supplied epochs is not appropriate; needs at least three intervals labeled 'Rbase', 'Rs' and 'Rin'")
+        
+    elif regions is None:
+        # 1) try to see if segment has appropriate epochs
+        if len(segment.epochs) == 0:
+            raise TypeError("When no region has been specified, the segment must contain epochs")
+        
+        # NOTE: 2023-06-12 14:22:27
+        # has a Rm epoch been set up specifically?
+        rm_epochs = [e for e in segment.epochs if e.name == "Rm"]
+        
+        if len(rm_epochs) == 0:
+            # maybe there is an epoch with three intervals named "Rbase", "Rs", and "Rin"
+            
+            other_epochs = [e for e in segment.epochs if len(e >= 3) and all(l in e.labels for l in ("Rbase", "Rs", "Rin"))]
+            if len(other_epochs) == 0:
+                raise TypeError("No appropriate epoch was found in the segment")
+            
+            rm_epoch = other_epochs[0]
+            
+        else:
+            rm_epoch = rm_epochs[0]
+            
+        return epoch_Rs_Rin(Im_signal, Vm_signal, rm_epoch, channel=channel)
+                
+    else:
+        raise TypeError("Inappropriate type for 'regions' parameter: %s" % type(region).__name__)
     
-    Rs = vstep / (Irs - Ibase)
-    
-    return (np.array([Rs, Rin]) * Rin.units).rescale(pq.MOhm)
+#     if isinstance(rm_epoch, neo.Epoch):
+#         if len(rm_epoch) < 3:
+#             raise TypeError("Rm epoch must have at least three intervals; got %s instead" % len(rm_epoch))
+#         
+#         region_labels = list(rm_epoch.labels)
+#         
+#         if len(region_labels) == 0 or not all([s in region_labels for s in ["Rbase", "Rs", "Rin"]]):
+#             raise ValueError(f"Cannot use epoch {rm_epoch.name} with inappropriate interval labels {region_labels}")
+#         
+#         base_ndx = region_labels.index("Rbase")
+#         irs_ndx = region_labels.index("Rs")
+#         irin_ndx = region_labels.index("Rin")
+#         
+#         baseline_interval = [rm_epoch.times[base_ndx],
+#                              rm_epoch.times[base_ndx] + rm_epoch.durations[base_ndx]]
+#         
+#         irs_interval = [rm_epoch.times[irs_ndx],
+#                         rm_epoch.times[irs_ndx] + rm_epoch.durations[irs_ndx]]
+#         
+#         irin_interval = [rm_epoch.times[irin_ndx],
+#                          rm_epoch.times[irin_ndx] + rm_epoch.durations[irin_ndx]]
+#         
+#     if any([i is None for i in [baseline_interval, irs_interval, irin_interval]]):
+#         raise RuntimeError("Cannot determine signal interval boundaries")
+        
+            
+#     Ibase = Im_signal.time_slice(baseline_interval[0], baseline_interval[1]).mean(axis=0)
+#     
+#     # Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).mean(axis=0)
+#     Irs = Im_signal.time_slice(irs_interval[0], irs_interval[1]).max(axis=0)
+#     
+#     Irin = Im_signal.time_slice(irin_interval[0], irin_interval[1]).mean(axis=0)
+#     
+#     if isinstance(channel, int):
+#         Ibase = Ibase[channel].flatten()
+#         Irs = Irs[channel].flatten()
+#         Irin = Irin[channel].flatten()
+#         
+#     Rin = vstep / (Irin - Ibase)
+#     
+#     Rs = vstep / (Irs - Ibase)
+#     
+#     return (np.array([Rs, Rin]) * Rin.units).rescale(pq.MOhm)
 
 @safeWrapper
-def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]], Im:typing.Union[str, int], Vm:typing.Union[str, int, pq.Quantity, float], regions:typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, channel: typing.Optional[int] = None, name:typing.Optional[str] = None):
+def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]], 
+                 Im:typing.Union[str, int], 
+                 Vm:typing.Union[str, int, pq.Quantity, float], 
+                 regions:typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]] = None, 
+                 channel: typing.Optional[int] = None, name:typing.Optional[str] = None):
     """Calls segment_Rs_Rin for all segments in data.
     
     Parameters:
@@ -316,8 +306,10 @@ def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]], Im:t
     Returns:
     ========
     
-    Two neo.IrregularlySampledSignal objects with the time-course of the series
-    resistance (Rs) and input resistance (Rin)
+    Three neo.IrregularlySampledSignal objects with the time-course of:
+    • the series resistance (Rs)
+    • the input resistance (Rin)
+    • the DC (i.e., holding) current
     
     """
     if isinstance(data, neo.Block):
@@ -328,31 +320,55 @@ def block_Rs_Rin(data:typing.Union[neo.Block,typing.Sequence[neo.Segment]], Im:t
     else:
         raise TypeError(f"Expecting a neo.Block, or a sequence of neo.Segments; got {type(data).__name__} instead")
     
-    trsrin = [(s.t_start, segment_Rs_Rin(s, Im=Im, Vm=Vm, regions=regions, channel=channel)) for s in segments]
+    trsrinidc = [(s.rec_datetime, segment_Rs_Rin(s, Im=Im, Vm=Vm, regions=regions, channel=channel)) for s in segments]
     
-    times, rsrin = zip(*trsrin) # split into a times and a RsRin tuple
+    rec_times, rsrinidc = zip(*trsrinidc) # split into a times and a RsRinIdc tuple
     
-    t_vec = np.array(times) * times[0].units
-    rarray = np.concatenate(rsrin, axis=1) * rsrin[0].units
+    rel_times = [0]
+    rel_times.extend([(rec_times[k+1]-rec_times[k]).total_seconds() for k in range(len(rec_times)-1)])
+    
+    times = np.cumsum(rel_times)
+    
+    # convert to minutes; do away with fractinal delays  
+    # BUG/FIXME 2023-06-12 15:52:07
+    # this may be revelant for very long recordings!!
+    if np.any(times > 60):
+        t_vec  = np.round(times / 60) * pq.min
+        
+    else:
+        t_vec *= pq.s
+        
+    rarray = np.concatenate(rsrinidc, axis=1) # dimensionless !
     
     if not isinstance(name, str) or len(name.strip())==0:
         name = data.name if isinstance(data, neo.Block) and len(data.name.strip()) else "data"
         
-    Rs  = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[0,:], units = rarray.units, time_units = t_vec.units, name=f"{name}_Rs")
-    Rin = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[1,:], units = rarray.units, time_units = t_vec.units, name=f"{name}_Rin")
+    Rs  = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[0,:], units = rsrinidc[0][0].units, time_units = t_vec.units, name=f"{name}_Rs")
+    Rin = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[1,:], units = rsrinidc[0][1].units, time_units = t_vec.units, name=f"{name}_Rin")
+    Idc = neo.IrregularlySampledSignal(times=t_vec, signal = rarray[2,:], units = rsrinidc[0][2].units, time_units = t_vec.units, name=f"{name}_Idc")
     
-    return Rs, Rin
+    return Rs, Rin, Idc
     
 @safeWrapper
-def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], baseline: typing.Union[SignalCursor, tuple], rs: typing.Union[SignalCursor, tuple], rin: typing.Union[SignalCursor, tuple], vstep: typing.Union[float, pq.Quantity], channel: typing.Optional[int] = None):
+def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                   vstep: typing.Union[float, pq.Quantity], 
+                   baseline: typing.Union[SignalCursor, tuple], 
+                   rs: typing.Union[SignalCursor, tuple], 
+                   rin: typing.Union[SignalCursor, tuple], 
+                   channel: typing.Optional[int] = None):
     """Calculates series and input resistance from voltage-clamp recording.
     
-    Applies to voltage-clamp recordings (membrane current signal)
+    Applies to voltage-clamp recordings (membrane current signal).
     
     Parameters:
     ----------
     
     signal: neo.AnalogSignal or DataSignal = the recorded membrane current
+    
+    vstep: scalar float or python Quantity, or neo.AnalogSignal/DataSignal: the size of the membrane depolarization 
+        step.
+        
+        When a Quantity it must be in units convertible to mV.
     
     baseline: signalviewer.SignalCursor of type "vertical", or tuple (t, w), 
         representing a notional vertical signal cursors with window "w" 
@@ -368,10 +384,6 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], baseline:
         "baseline" parameter, above).
         Set the signal region where Rs and Rin, respectively, will be calculated.
         
-    vstep: float or python Quantity: the size of the membrane depolarization 
-        step.
-        
-        When a Quantity it must be in units convertible to mV.
         
     channel: int or None (default)
     
@@ -382,30 +394,94 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], baseline:
     Returns:
     -------
     
-    (Rs, Rin): tuple of python Quantity objects in vstep.units / signal.units
+    Rs, Rin, Idc
     
     """
-    if isinstance(vstep, float):
-        vstep *= pq.mV
+    if not isinstance(signal, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo signal-like object; instead, got a {type(signal).__name__}")
+    
+    domain_units = signal.times.units
+    
+    if not units_convertible(signal, pq.A):
+        warnings.warn(f"'signal' expected to have units of membrane current, not {signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
+        
+        klass = type(signal)
+        signal = klass(signal.magnitude, units = pq.pA, 
+                          t_start = signal.t_start, 
+                          sampling_rate = signal.sampling_rate,
+                          name = signal.name)
+        
+        domain_units = signal.times.units
+        
+    if isinstance(vstep, (neo.AnalogSignal, DataSignal, pq.Quantity)):
+        if not units_convertible(vstep, pq.V):
+            warnings.warn(f"'vstep' signal is expected to have units of membrane potential, not {vstep.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
+    
+            if isinstance(vstep, neo.base.basesignal.BaseSignal):
+                klass = type(vstep)
+                vstep = klass(vstep.magnitude, units = pq.mV, 
+                               t_start = vstep.t_start, 
+                               sampling_rate = vstep.sampling_rate,
+                               name = vstep.name)
+                
+        test_start, test_stop, test_levels = sigp.detect_boxcar(vstep, return_levels=True)
+        
+        if any(v is None for v in (test_start, test_stop, test_levels)):
+            raise ValueError(f"The vstep signal does not seem to contain an appropriate test command. Please enter the paarmeters for the membrane test manually")
+        
+        Vbase, Vss = (test_levels*vstep.units).flatten()
+        
+        Vchange = Vss - Vbase
+        # Vchange = np.abs(Vss - Vbase)
         
     elif isinstance(vstep, pq.Quantity):
-        if not units_convertible(vstep, pq.mV):
-            raise TypeError("Wrong units for vstep quantity (%s)" % vstep.units)
+        if not units_convertible(vstep, pq.V):
+            raise TypeError(f"Expecting a quantity in units of electrical potential; got {vstep.units} instead")
+        
+        if vstep.size != 1:
+            raise ValueError(f"Expecting vstep to be a scalar")
+        
+        Vchange = vstep
+        
+    elif isinstance(vstep, number.Number):
+        Vchange = vstep * pq.mV
         
     else:
-        raise TypeError("vstep expected to be a float or a python Quantity; got %s instead" % type(vstep).__name__)
+        raise TypeError(f"Expecting vstep to be a neo.AnalogSignal, a DataSignal, or a Quantity scalar, with units of electrical potential; instead, got {type(vstep).__name__}")
     
+    
+    # NOTE: 2023-06-12 14:09:26
+    # allow both polarities of the test
+    # see also  NOTE: 2023-06-12 14:01:21 in measure_Rs_Rin 
     Ibase   = ephys.cursor_average(signal, baseline, channel=channel)
-    IRs     = ephys.cursor_max(signal, rs, channel=channel)
+    
+    # see NOTE: 2023-06-12 14:11:57
+    up = Ibase < ephys.cursor_average(signal, rs, channel=channel)
+    
+    # but this means an extra computation, see NOTE: 2023-06-12 14:10:14
+    mxIrs   = ephys.cursor_max(signal, rs, channel=channel)
+    mnIrs   = ephys.cursor_max(signal, rs, channel=channel)
+    
+    
+    IRs     = np.full_like(Ibase, np.nan) # pA automatically given (__array_finalize__?)
+    IRs[up] = mxIrs[up]
+    IRs[~up]= mnIrs[~up]
+    # IRs     = ephys.cursor_max(signal, rs, channel=channel)
     IRin    = ephys.cursor_average(signal, rin, channel=channel)
     
-    Rs  = vstep / (IRs  - Ibase)
-    Rin = vstep / (IRin - Ibase)
+    Rs  = np.abs((Vchange / (IRs  - Ibase)).rescale(pq.Mohm))
+    Rin = np.abs((Vchange / (IRin - Ibase)).rescale(pq.Mohm))
+#     
+    return Rs, Rin, Ibase
     
-    return np.array([Rs, Rin]) * Rin.units
+    # return np.array([Rs, Rin]) * Rin.units
 
+@with_doc(measure_Rs_Rin, use_header=True)
 @safeWrapper
-def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typing.Union[neo.Epoch, tuple], vstep: typing.Union[float, pq.Quantity], channel: typing.Optional[int] = None):
+def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                 vstep: typing.Union[float, pq.Quantity], 
+                 epoch: typing.Union[neo.Epoch, tuple], 
+                 channel: typing.Optional[int] = None):
     """Calculates series and input resistance based on epochs.
     
     The baseline, Rs and Rin are calculated across the time intervals defined in
@@ -414,10 +490,17 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typi
     
     Parameters:
     -----------
-    signal: neo.AnalogSignal or DataSignal
+    signal: neo.AnalogSignal or DataSignal - membrane current
     
-    epoch: neo.Epoch with three time intervals with the following roles:
-        1) baseline → the baseline current BEFORE the depolarizing test voltage
+    vstep: scalar float or Quantity in mV, or neo.AnalogSignal or DataSignal, 
+            When a scalar, it represents the size (amplitude) of the test voltage.
+    
+            When a signal, it is expected to contain a boxcar waveform with the
+            test voltage.
+    
+    epoch: neo.Epoch with at least three time intervals with the following roles
+        (and labeled as such):
+        1) Rbase    → the baseline current BEFORE the depolarizing test voltage
     
         2) Rs       → contains the peak of the first capacitive transient 
                         (at start of depolarizing test)
@@ -426,11 +509,10 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typi
                         depolarizing text voltage, AND just before the repolarizing
                         capacitive transient
     
-    vstep: scalar float or Quantity in mV, the size (amplitude) of the depolarizing
-            test voltage
+        NOTE: it is assumed the first three intervals are used for 
     
     channel: int or None (default). When given, it is the index of the signal
-        channel (for multi-channel signals).
+        channel (only used for multi-channel signals).
     
         NOTE: AnalogSignal objects typically have just ONE channel (i.e., they 
                 are numpy array-like with shape (n,1) where n is the number of 
@@ -441,6 +523,10 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typi
                 `channel` will result in two arrays (Rs and Rin) with as many
                 elements as channels.
     
+    Returns:
+    -------
+    Rs, Rin, Idc
+    
     """
     if not isinstance(signal, (neo.AnalogSignal, DataSignal)):
         raise TypeError("signal expected to be a neo.AnalogSignal or DataSignal; got %s instead" % type(signal).__name__)
@@ -448,26 +534,25 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal], epoch: typi
     if not isinstance(epoch, neo.Epoch):
         raise TypeError("epoch expected to be a neo.Epoch; got %s instead" % type(epoch).__name__)
     
-    if len(epoch) != 3:
-        raise TypeError("epoch must have three intervals; got %d instead" % len(epoch))
+    if len(epoch) < 3:
+        raise TypeError("epoch must have at least three intervals; got %d instead" % len(epoch))
     
-    if isinstance(vstep, float):
-        vstep *= pq.mV
+    if not all(l in epoch.labels for l in ("Rbase", "Rs", "Rin")):
+        raise ValueError("The epoch does not have the exepected intervals labeled 'Rbase', 'Rs', 'Rin'")
+    
+    # if isinstance(vstep, float):
+    #     vstep *= pq.mV
+    
+    elabels = list(epoch.labels)
+    epoch_elements = [epoch[elabels.index(l)] for l in ("Rbase", "Rs", "Rin")]
+    
+    intervals = tuple(itertools.chain.from_iterable(((e.times, e.times + e.durations) for e in epoch_elements)))
+    # intervals = tuple(itertools.chain.from_iterable(((epoch[k].times, epoch[k].times + epoch[k].durations) for k in range(len(epoch)))))
+    
+    Rs, Rin, Idc = measure_Rs_Rin(signal, vstep, intervals, channel=channel)
+    
+    return Rs, Rin, Idc
         
-    Ibase = signal.time_slice(epoch[0].times, epoch[0].times + epoch[0].durations).mean(axis=0)
-    IRs   = signal.time_slice(epoch[1].times, epoch[1].times + epoch[1].durations).max(axis=0)
-    IRin  = signal.time_slice(epoch[2].times, epoch[2].times + epoch[2].durations).mean(axis=0)
-    
-    Rs  = vstep / (IRs  - Ibase)
-    Rin = vstep / (IRin - Ibase)
-    
-    if channel is not None:
-        Rs = Rs[channel].flatten()
-        Rin = Rin[channel].flatten()
-    
-    return np.array([Rs, Rin]) * Rin.units
-    
-
 @safeWrapper
 def v_Nernst(x_out, x_in, z, temp):
     """Calculates Nernst potential for an ionic species X.
@@ -6193,10 +6278,11 @@ def auto_extract_AHPs(Iinj, Vm_index, Iinj_index, name_prefix, *data_blocks):
     
     return AHP, ret, params
 
-def measure_membrane_RsRin(im_signal:neo.AnalogSignal, 
+def measure_Rs_Rin(im_signal:neo.AnalogSignal, 
                            testVm:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity],
-                           intervals:tuple
-                           ):
+                           intervals:tuple,
+                           channel:typing.Optional[int] = None
+                           ) -> tuple:
     """Calculates Rs and Rin from a membrane test in voltage-clamp
     
     Parameters:
@@ -6205,19 +6291,82 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
 
         The recorded membrane current, with appropriate units (e.g. pq.pA).
     
-    testVm: this can be either:
+    testVm: a neo.AnalogSignal or DataSignal, or a scalar python Quantity, or a float
+
+        The absolute value of the membrane potential change during the membrane 
+            test.
     
-        • a neo.AnalogSignal or DataSignal
     
-        The recorded command potential signal, containing a boxcar waveform
-        representing the step changes to and from the test potential, and will
-        be used to determine the membrane potential levels and timings of the 
-        membrane test.
+        • When a neo.AnalogSignal or DataSignal, 'testVm' is typically the recorded
+            command potential signal, containing a boxcar waveform that represents
+            two step changes from holding potential to the test potential and back
+            
+            The waveform will be used to determine the timing and the amount of
+            membrane potential change during the membrane test.
+    
+            This signal can also be 'reconstructed' dynamically from the protocol
+            embedded in the abf file BEFORE PASSING it to this function, as shown
+            in the example below.
+    
+            Let base_0001.abf an ABF file containing one 'trial' saved by Clampex.
+    
+            In Scipyen, this is normally loaded as a neo.Block 'base_0001'.
+    
+            The following lines create an ABF object from the "file origin" of 
+            base_0001, which we then use to retrieve the command potential waveform
+    
+            # import module containing functions that delegate to pyabf API
+            from core import pyabfbridge as pab 
+            
+            # import module containing function complement Python quantities module
+            from core import quantities as scq 
+    
+            # create an 'ABF' object:
+            base_0001_abf = pab.getABF(base_0001) 
+    
+            # alternatively, pass the abf file name directly:
+            # base_0001_abf = pab.getABF("base_0001.abf")
+    
+            # Now, select the first sweep (a.k.a segment) in the ABF object:
+            # NOTE: the optional 'channel' parameter below, represents the ADC
+            #       channel!!! Hence if you pass channel = 1 and there is
+            #       NO command signal associated with it, the sweepC property 
+            #       will be an empty signal (all zeroes);
+            #       The ADC channel associates a correspondng DAC channel, as 
+            #       set up in the Clampex lab bench
+            base_0001_abf.setSweep(0, channel=0) 
+    
+            # finally, plot the command waveform:
+            plt.plot(base_0001_abf.sweepX, base_0001_abf.sweepC)
+    
+            # We retrieve the units for the channel of interest (here, 0) as a str
+            base_0001_abf.sweepUnitsC # ⇒ 'mV'
+    
+            # We can do better, and create a Python Quantity object straight away:
+            vmUnits = scq.unit_quantity_from_name_or_symbol(base_0001_abf.sweepUnitsC)
+    
+            vmUnits # ⇒ UnitQuantity('millivolt', 0.001 * V, 'mV')
+    
+            # Similarly we obtain the time units:
+            time_units = scq.unit_quantity_from_name_or_symbol(base_0001_abf.sweepUnitsX)
+    
+            # Finally, create a neo.AnalogSignal (NOTE the channel number in dacNames
+            #   below refers to the DAC output channel):
+            commandSignal = neo.AnalogSignal(base_0001_abf.sweepC, units = vmUnits,
+                                            t_start=base_0001_abf.sweepX[0] * time_units,
+                                            sampling_rate=base_0001_abf.sampleRate * pq.Hz,
+                                            name=base_0001_abf.dacNames[0],
+                                            description=base_0001_abf.sweepLabelC)
+    
     
         • scalar Quantity with units of membrane potential (e.g. pq.mV)
     
-        The absolute value of the membrane potential change during the membrane 
-            test.
+        • scalar float (assumed to represent potential in mV !!!)
+    
+        In either case, 'testVm' should have units of electrical potential
+        (usually, mV, but V or any other scaled unit are acceptable)
+    
+        
      
     intervals: a tuple of six elements
 
@@ -6256,6 +6405,13 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
                 >= im_signal.t-start
                 < im_signal.t_stop
     
+    Returns:
+    ========
+    
+    The tuple: Rs, Rin, Idc where:
+        • Rs, Rin are the series and input resistance, in MΩ
+        • Idc is the baseline membrane current (before the membrane test) in pA
+    
 """
     if not isinstance(im_signal, (neo.AnalogSignal, DataSignal)):
         raise TypeError(f"Expecting a neo signal-like object; instead, got a {type(im_signal).__name__}")
@@ -6275,7 +6431,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         
     if isinstance(testVm, (neo.AnalogSignal, DataSignal, pq.Quantity)):
         if not units_convertible(testVm, pq.V):
-            warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nA new signal will be generated with units of mV. Be careful how you interpret the results")
+            warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
     
             if isinstance(testVm, neo.base.basesignal.BaseSignal):
                 klass = type(testVm)
@@ -6283,7 +6439,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
                                t_start = testVm.t_start, 
                                sampling_rate = testVm.sampling_rate,
                                name = testVm.name)
-            
+                
         test_start, test_stop, test_levels = sigp.detect_boxcar(testVm, return_levels=True)
         
         if any(v is None for v in (test_start, test_stop, test_levels)):
@@ -6291,7 +6447,8 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         
         Vbase, Vss = (test_levels*testVm.units).flatten()
         
-        Vchange = np.abs(Vss - Vbase)
+        Vchange = Vss - Vbase
+        # Vchange = np.abs(Vss - Vbase)
         
     elif isinstance(testVm, pq.Quantity):
         if not units_convertible(testVm, pq.V):
@@ -6301,6 +6458,9 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
             raise ValueError(f"Expecting testVm to be a scalar")
         
         Vchange = testVm
+        
+    elif isinstance(testVm, number.Number):
+        Vchange = testVm * pq.mV
         
     else:
         raise TypeError(f"Expecting testVm to be a neo.AnalogSignal, a DataSignal, or a Quantity scalar, with units of electrical potential; instead, got {type(testVm).__name__}")
@@ -6322,7 +6482,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         else:
             intervals = tuple(v.rescale(domain_units) if v.units != domain_units else v for v in intervals)
             
-    if any(v < im_signal.t_start or v >= im_signal.t-stop for v in intervals):
+    if any(v < im_signal.t_start or v >= im_signal.t_stop for v in intervals):
         raise ValueError(f"All values in the interval must fall within the im_signal domain (t_start = {im_signal.t_start}, t_stop = {im_signal.t-stop})")
     
     dc_start, dc_stop, rs_start, rs_stop, rin_start, rin_stop = intervals
@@ -6336,20 +6496,51 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
     if rin_stop <= rin_start:
         raise ValueError(f" Rin intervals ends ({rin_stop}) before, or is simultaneous with, its start ({ rin_start})")
     
-    Idc    = np.mean(im_signal.time_slice(dc_start, dc_stop)
+    Idc    = im_signal.time_slice(dc_start, dc_stop).mean(axis=0)
     
-    Irs    = np.max(im_signal.time_slice(rs_start, rs_stop) 
+    # NOTE: 2023-06-12 14:01:21
+    # allow for both polarities here: the membrane test MAY involve hyperpolarization
+    # instead of depolarization ⇒ the transient may be downward !!!
+    #
+    # So, what we do is compare the average signal around the transient local
+    # extremum (peak or trough) to the average of signal BEFORE the transient 
+    # (i.e. Idc); an upward transient has average around its extremum > Idc
+    # Of course this is predicated on the interval around the transient extremum
+    # to be narrow enough so that there is no confusion/overlap with the DC part.
+    Irs_ = im_signal.time_slice(rs_start, rs_stop)
     
-    Irin   = np.mean(im_signal.time_slice(rin_start, rin_stop)
+    # NOTE: 2023-06-12 14:11:57
+    # The comparison to determine direction of Vm change is here
+    up = Idc < Irs_.mean(axis=0)
+    
+    Irs = np.full_like(Idc, np.nan) # pA automatically given (__array_finalize__?)
+    
+    # NOTE: 2023-06-12 14:10:14
+    # We then get the minima and maxima separately, then choose between them
+    # according to the comparison above, in 'up';
+    # unfortunately this means one extra computation, unless there is a cleaner
+    # way to choose which method to use (i.e. array.min vs array.max) for each
+    # sample along the other axes (NOTE: for a 2D signal with shape[1] > 1 either
+    # min or max will generate an array with one-less dimensions)
+    mxIrs = Irs_.max(axis=0)
+    mnIrs = Irs_.min(axis=0)
+    
+    Irs[up] = mxIrs[up]
+    Irs[~up]= mnIrs[~up]
+    
+    Irin   = im_signal.time_slice(rin_start, rin_stop).mean(axis=0)
+    
+    Rs = np.abs((Vchange / (Irs - Idc)).rescale(pq.Mohm))
+    Rin = np.abs((Vchange / (Irin - Idc)).rescale(pq.Mohm))
+    
+    if isinstance(channel, int):
+        Rs = Rs[channel].flatten()
+        Rin = Rin[channel].flatten()
+        Idc = Idc[channel]
+    
+    return Rs, Rin, Idc
     
     
-        
-        
-        
-        
-    
-
-        
 def measure_AHP(signal):
     """Returns the peak and its integral (Simpson)
     Signal = neo.AnalogSignal with t_start at 0 s and units of mV with one data channel
