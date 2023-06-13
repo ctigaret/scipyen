@@ -174,7 +174,7 @@ from PyQt5 import QtGui, QtCore
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, with_doc)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
@@ -305,19 +305,21 @@ def cursors2epoch(*args, **kwargs):
     """Constructs a neo.Epoch from a sequence of SignalCursor objects.
     
     Each cursor contributes an interval in the Epoch, corresponding to the 
-    cursor's horizontal (x) window. In other words, the interval's (start) time
+    cursor's horizontal (x) window. In other words, the interval's start time
     equals the cursor's x coordinate - ½ cursor's x window, and the duration of
     the interval equals the cursor's x window.
     
-    NOTE: For DataSignals, the result is a DataZone.
+    Optionally, the function can be used to construct only the intervals that 
+    make up a neo.Epoch or a DataZone. This behaviour is turned when by the
+    keyword 'intervals' set to True.
     
-    SignalCursor objects are defined in the signalviewer module; this function
-    expects vertical and crosshair cursors (i.e., with cursorType one of
-    SignalCursorTypes.vertical, 
-    SignalCursorTypes.horizontal). 
+    SignalCursor objects are defined in the gui.cursors module; this function
+    expects only vertical and crosshair cursors (i.e., with their 'cursorType' 
+    property being one of SignalCursorTypes.vertical, SignalCursorTypes.crosshair). 
     
-    SignalCursors can also be represented by tuples of cursor  "parameters" 
-    (see below), although tuples and cursor objects cannot be mixed.
+    SignalCursors can also be represented by tuples of cursor  "parameters" as
+    "notional" cursors (see below), although tuples and cursor objects cannot be
+    mixed.
     
     Variadic parameters:
     --------------------
@@ -325,32 +327,50 @@ def cursors2epoch(*args, **kwargs):
     
         • SignalCursor objects - all of either 'vertical' or 'crosshair' type.
         
-        • SignalCursor parameter tuples (2, 3 or 5 elements):
+        • tuple of "notional" cursor parameters (containing 2-5 scalars):
         
             ∘ 2-tuples are interpreted as (time, window) pairs of coordinates
                 for a notional vertical cursor
             
-            ∘ 3-tuples are interpreted as (time, window, label) triplets of 
-                parameters for a notional vertical cursor
+            ∘ 3-tuples are interpreted as (time, window, label) parameters for
+                a notional vertical cursor
+    
+            ∘ 4-tuples are interpreted as (x, xwindow, y, ywindow) parameters of
+                a notional vertical cursor
             
-            ∘ 5-tuples are interpreted as (x, xwindow, y, ywindow, label) tuples
-                 of parameters for a notional crosshair cursor; only the x, 
-                xwindow and label elements are used.
+            ∘ 5-tuples are interpreted as (x, xwindow, y, ywindow, label)
+                 of parameters for a notional crosshair cursor
+    
+        NOTE: Only the first two scalar coordinates and the label (when present)
+        are used
             
         NOTE: the following are NOT allowed:
             □ Mixing SignalCursor objects with parameter tuples.
-            □ Mixing parameter 2- 3- or 5-tuples is NOT allowed.
+            □ Mixing parameter tuples of different lengths.
         
     Var-keyword parameters:
     ----------------------
     
     units: python Quantity or None (default)
-        When not specified (i.e. units = None) the function assumes units of
-        quantities.s and will return a neo.Epoch object(*). 
-
-        When the specified units are NOT temporal, the result is a DataZone(*).
+        Specifies units for the cursors' cooridnates (by design, the cursors
+        coordinates are floating point scalars). By default, and when 'units'
+        is None, it is assumed to be the UnitQuantity pq.s (i.e., seconds).
     
-        (*) assuming `intervals` is False
+        If the 'units' are temporal, the function constructs a neo.Epoch, unless
+        'zone' keyword parameter is True, in which case it creates a DataZone 
+        object.
+    
+        In all other cases the function constructs a DataZone object.
+    
+        This is because neo.Epoch objects are defined only in the time domain, 
+        whereas Scipyen's DataZone objects are defined in any domain.
+    
+        When not specified (i.e. units = None) the function assumes units of
+        `pq.s` (seconds) and will return a neo.Epoch object¹. 
+
+        When the specified units are NOT temporal, the result is a DataZone¹.
+    
+        ¹assuming `intervals` is False
         
     name: str, default is "Epoch" or "Zone" (depending on `units`).
          When `intervals` is True, this parameter is not used (see below).
@@ -359,38 +379,56 @@ def cursors2epoch(*args, **kwargs):
         When True, the cursors, or their specifications, in *args are sorted by 
         their x coordinate.
         
-    intervals: bool, default is False.
-    
-        When True, the function returns triplets of (start, stop, label) quantities.
-        
-        Otherwise returns a neo.Epoch if `units` is quantities.s, or DataZone.
-        
     zone: bool, default is False; only used when intervals is False
             When True, returns a DataZone; else returns a neo.Epoch
     
+    intervals: bool, default is False.
+    
+        When False, the function constructs a neo.Epoch or DataZone object as
+        described above.
+    
+        When True, the function returns triplets of (start, stop, label) or
+        (start, duration, label), depending on the 'durations' keyword described 
+        below.
         
+    durations: bool, default is False.
+        Only used when 'intervals' is True, and indicates if the second element
+        of the interval tuples is a 'stop' time stamp (when False) or a duration
+        (when True)
+    
     Returns:
     -------
     
-    When intervals is False (default), returns a neo.Epoch (or DataZone) with 
-        intervals generated from the cursors' x coordinates and horizontal 
-        windows (`xwindow` properties):
+    When 'intervals' is False (default), returns a neo.Epoch (or DataZone) with 
+        their component intervals generated from the cursors' x coordinates and 
+        horizontal windows (`xwindow` attribute):
         
             times = cursor.x - cursor.xwindow/2
             durations = cursor.xwindow
             
-            By design, the epoch's units are time units (pq.s by default)
-            
-    When intervals is True, returns a list of triplets:
-            (start, stop, label)
-            
-            If units are provided, start and stop are python Quantity scalars,
-            otherwise they are floating point scalars.
+    When 'intervals' is True, returns a list of triplets with semantics 
+        according to the value of the 'durations' parameter:
     
-    ATTENTION: The numeric parameters are treated as cursor parameters; do NOT
-    calculate new time 'start' from these values! This function takes care of 
-    that!!!
-            
+        durations False (default) →  (start, stop, label)
+    
+        durations True            →  (start, duration, label)
+    
+        Where start, stop and duration are python Quantity scalars, having units
+        specified bny the 'units' keyword parameter.
+    
+        NOTE: 
+        • The first form is useful when the triplets are to be used for slicing
+          signals directly by passing the first two elements of the triplet to
+          to the signal's time_slice instance method, e.g.:
+    
+            signal.time_slice(*t[0:2])
+    
+        • The second form is useful to build neo.Epoch and/or DataZone objects
+          at a later time
+    
+        Of course, these forms can be used to reconstruct parameters for a notional
+        vertical cursor, but be aware of accumulating floating point errors.
+        
     Examples:
     ========
     
@@ -404,12 +442,12 @@ def cursors2epoch(*args, **kwargs):
          (0.1773754848365214,  0.001, 'v1'),
          (0.16775228528220001, 0.001, 'v0')]
          
-    The following examples are valid call syntax:
+    the following examples are valid:
 
-    >>> epoch = cursors2epoch(cursors)
+    >>> epoch  = cursors2epoch(cursors)
     >>> epoch1 = cursors2epoch(*cursors)
-    >>> epoch2 = ephys.cursors2epoch(params)
-    >>> epoch3 = ephys.cursors2epoch(*params)
+    >>> epoch2 = cursors2epoch(params)
+    >>> epoch3 = cursors2epoch(*params)
     
     >>> epoch == epoch1
     array([ True,  True,  True])
@@ -422,26 +460,28 @@ def cursors2epoch(*args, **kwargs):
     
     >>> epoch4 = ephys.cursors2epoch(*params, units=pq.um)
     >>> epoch4 == epoch3
-    array([False, False, False]) #  because units are different
+    array([False, False, False]) #  because units are different !
     
-    >>> interval = cursors2epoch(cursors, intervals=True)
+    >>> interval  = cursors2epoch(cursors,  intervals=True)
     >>> interval1 = cursors2epoch(*cursors, intervals=True)
     
     >>> interval == interval1
     True
     
-    >>> interval2 = ephys.cursors2epoch(params, intervals=True)
+    >>> interval2 = ephys.cursors2epoch(params,  intervals=True)
     >>> interval3 = ephys.cursors2epoch(*params, intervals=True)
     
     >>> interval2 == interval3
     True
     
-    >> interval == interval2
+    >>> interval == interval2
     True
     """
     # from gui.signalviewer import SignalCursor as SignalCursor
 
     intervals = kwargs.get("intervals", False)
+    
+    durations = kwargs.get("durations", False)
     
     units = kwargs.get("units", pq.s)
     
@@ -464,11 +504,26 @@ def cursors2epoch(*args, **kwargs):
     if not isinstance(sort, bool):
         raise TypeError("sort must be a boolean")
     
-    zone = kwargsp.pop("zone", False)
+    zone = kwargs.pop("zone", False)
     if not isinstance(zone, bool):
         raise TypeError("zone must be a boolean")
     
     def __parse_cursors_tuples__(*values):
+        # NOTE: 2023-06-13 21:42:25
+        # reminder: 
+        # 2-tuple ⇒ x, xwindow
+        # 3-tuple ⇒ x, xwindow, label
+        # 4-tuple ⇒ x, xwindow, y, ywindow
+        # 5-tuple ⇒ x, xwindow, y, ywindow, label
+        #
+        # pseudocode for the case of 2-tuple (easily extrapolated):
+        # if not intervals ⇒ return (start, duration), where:
+        #   start = x - xwindow/2; duration = xwindow     ⇒ use_durations=True
+        # else ⇒ return:
+        #   (start, duration) as above, if durations == True ⇒ use_durations=durations
+        #   (start, stop) othwerise, where:                  ⇒ use_durations=durations
+        #   start = x - xwindow/2; stop = x + xwindow/2
+        
         # check for dimensionality consistency
         #print(type(values))
         #print(len(values))
@@ -499,11 +554,27 @@ def cursors2epoch(*args, **kwargs):
         
         #print("values:", values)
         
-        if intervals:
-            return [(v[0]-v[1]/2., v[0]+v[1]/2., "%d"%k) if len(v) == 2 else (v[0]-v[1]/2., v[0]+v[1]/2., v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[0]+v[1]/2., v[4]) for k,v in enumerate(values)]
-            
+        # NOTE: 2023-06-13 21:30:34
+        # the durations parameter is used only when intervals is True
+        # however, when intervals is False, we need durations to construct
+        # Epoch or DataZone
+        if not intervals:
+            use_durations = True
         else:
-            return [(v[0]-v[1]/2., v[1],         "%d"%k) if len(v) == 2 else (v[0]-v[1]/2., v[1],         v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[1],         v[4]) for k,v in enumerate(values)]
+            use_durations = durations
+            
+        if use_durations:
+            return [(v[0]-v[1]/2., v[1],         f"{k}") if len(v) in (2,4) else (v[0]-v[1]/2., v[1],         v[-1]) for k,v in enumerate(values)]
+            # return [(v[0]-v[1]/2., v[1],         "%d"%k) if len(v) in (2,4) else (v[0]-v[1]/2., v[1],         v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[1],         v[4]) for k,v in enumerate(values)]
+        else:
+            return [(v[0]-v[1]/2., v[0]+v[1]/2., f"{k}") if len(v) in (2,4) else (v[0]-v[1]/2., v[0]+v[1]/2., v[-1]) for k,v in enumerate(values)]
+            # return [(v[0]-v[1]/2., v[0]+v[1]/2., "%d"%k) if len(v) in (2,4) else (v[0]-v[1]/2., v[0]+v[1]/2., v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[0]+v[1]/2., v[4]) for k,v in enumerate(values)]
+            
+#         if intervals:
+#             return [(v[0]-v[1]/2., v[0]+v[1]/2., "%d"%k) if len(v) == 2 else (v[0]-v[1]/2., v[0]+v[1]/2., v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[0]+v[1]/2., v[4]) for k,v in enumerate(values)]
+#             
+#         else:
+#             return [(v[0]-v[1]/2., v[1],         "%d"%k) if len(v) == 2 else (v[0]-v[1]/2., v[1],         v[2]) if len(v) == 3 else (v[0]-v[1]/2., v[1],         v[4]) for k,v in enumerate(values)]
         
     if len(args) == 0:
         raise ValueError("Expecting at least one argument")
@@ -570,17 +641,40 @@ def cursors2epoch(*args, **kwargs):
         
         return klass(times=t, durations=d, labels=i, units=units, name=name)
     
+@with_doc(cursors2epoch, use_header=True)
 def cursors2intervals(*args, **kwargs):
-    """Calls cursors2epoch with intervals set to True
+    """Creates a sequence of intervals from a sequence of cursors.
     
-    Additional var-keyword parameters:
+    NOTE: In this context, an interval must not be confused with the arithmetic 
+    concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)
+
+    Returns intervals as tuples of 3 elements as follows:
+    
+    (start, stop, label)
+    
+    OR:
+    
+    (start, duration, label)
+    
+    where start, stop and duration are ALL python Quantities (by default with
+    units of seconds).
+    
+    The semantics of the intervals' elements is set by the 'durations' keyword
+    parameter (see below)
+    
+    See cursors2epochs(…) for details.
+    
+    Var-keyword parameters:
     --------------------------------
     unwrap: bool default True
         When False, calling the function with a single cursor (or cursor parameter
             tuple) will return a single interval tuple (t0, t1, label) wrapped in
             a list.
             
-        When True, the function returns the single interval tuple directly
+        When True, the function returns the single interval tuple directly.
+    
+    Other var-keyword parameters are as in cursors2epochs (NOTE: the 'intervals'
+    is forcibly set to True, here), see below.
     """
     kwargs.pop("intervals", True) # avoid double parameter specification
     
@@ -591,7 +685,44 @@ def cursors2intervals(*args, **kwargs):
     if unwrap and len(ret) == 1:
         return ret[0]
     
+    return ret
+    
+def epoch2intervals(epoch:typing.Union[neo.Epoch, DataZone],
+                    durations:bool=False) -> typing.Sequence[tuple]:
+    """Returns the intervals of a neo.Epoch or DataZone as tuples.
+    
+    The interval tuples are of the form:
+    
+    (start, stop, label) when durations is False (the default), OR
 
+    (start, duration, label) -- this is exactly the Epoch's intervals
+    
+    If the Epoch intervals are unlabeled, then the tuples are:
+    
+    (start, stop) or (start, duration), depending on the value of 'durations'
+    
+    'start', 'stop' and 'duration' are all puython Quantity scalars.
+    
+    When there is only one interval, this can be returned directly (instead of 
+    being wrapped in a one-element list) if the keyword parameter 'unwrap' is
+    set to True.
+    
+    NOTE: In this context, an interval must not be confused with the arithmetic 
+    concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)
+
+    See also cursors2intervals(…)
+    
+"""
+    unwrap = kwargs.pop("unwrap", True)
+    
+    if durations:
+        ret = list((x, y if y else 0*x.units, l) if l else (x,y if y else 0*x.units) for x,y,l in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels))
+    else:
+        ret = list([x, x+y if y else x , l] if l else (x, x+y if y else x) for x,y,l in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels))
+    
+    if len(ret) == 1 and unwrap:
+        return ret[0]
+    
 @safeWrapper
 def epoch_reduce(func:types.FunctionType, 
                  signal: typing.Union[neo.AnalogSignal, DataSignal], 
@@ -654,9 +785,43 @@ def epoch_reduce(func:types.FunctionType,
     
     return ret
 
+def interval_reduce(func:typing.Callable,
+                    signal: typing.Union[neo.AnalogSignal, DataSignal],
+                    interval:typing.Sequence[pq.Quantity],
+                    channel:typing.Optional[int] = None,
+                    duration:bool=False) -> pq.Quantity:
+    """As cursor_reduce, but using an interval instead.
+    The semantics of the interval is set by the 'duration' keyword parameters:
+        • True ⇒ interval is of the form (start, duration, …)
+        • False (default) ⇒ interval is of the form (start, stop, …)
+    
+    NOTE: In this context, an interval must not be confused with the arithmetic 
+    concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)
+"""
+    if not isinstance(func, types.FunctionType):
+        raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
+    
+    if duration:
+        t0 = interval[0]
+        t1 = np.sum(interval[0:2])
+    else:
+        t0, t1 = interval[0:2]
+        
+    if t0 == t1:
+        ret = signal[signal.time_index(t0),:]
+    else:
+        ret = func(signal.time_slice(t0,t1), axis=0)
+        
+    if isinstance(channel, int):
+        return ret[channel].flatten()
+    
+    return ret
+
+        
+
 def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[SignalCursor, tuple]) -> typing.Union[neo.AnalogSignal, DataSignal]:
-    """Returns a slice of the signal corresponding to a cursor's window"""
+    """Returns a slice of the signal corresponding to a cursor's xwindow"""
     
     if isinstance(cursor, SignalCursor):
         t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
@@ -693,8 +858,8 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
 def cursor_reduce(func:types.FunctionType, 
                   signal: typing.Union[neo.AnalogSignal, DataSignal], 
                   cursor: typing.Union[SignalCursor, tuple], 
-                  channel: typing.Optional[int] = None):
-    """Reduced signal value (e.g. min, max, median etc) across a cursor's window.
+                  channel: typing.Optional[int] = None) -> pq.Quantity:
+    """Calculates reduced signal values (e.g. min, max, median etc) across a cursor's window.
     
     The reduced signal value is the value calculated by the `func` parameter
     from a signal region defined by the cursor.
@@ -779,14 +944,18 @@ def cursor_reduce(func:types.FunctionType,
     return ret
 
 @safeWrapper
-def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+               cursor: typing.Union[SignalCursor, tuple], 
+               channel: typing.Optional[int] = None) -> typing.Union[float, pq.Quantity]:
     """The maximum value of the signal across the cursor's window.
     Calls cursor_reduce with np.max as `func` parameter.
     """
     return cursor_reduce(np.max, signal, cursor, channel)
 
 @safeWrapper
-def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+               cursor: typing.Union[SignalCursor, tuple], 
+               channel: typing.Optional[int] = None) -> typing.Union[float, pq.Quantity]:
     """The maximum value of the signal across the cursor's window.
     Calls cursor_reduce with np.min as `func` parameter.
     """
@@ -1342,11 +1511,13 @@ def epoch2cursors(epoch: neo.Epoch,
     if not isinstance(keep_units, bool):
         keep_units = False
         
+    epoch_name = epoch.name if isinstance(epoch.name, str) and len(epoch.name.strip()) else "i"
+        
     if keep_units:
-        ret = [(t + d/2., d, l) for (t, d, l) in zip(epoch.times, epoch.durations, epoch.labels)]
+        ret = [(t + d/2. if d else t, d if d else 0*t.units, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels, range(len(epoch)))]
         
     else:
-        ret = [(t + d/2., d, l) for (t, d, l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
+        ret = [(t + d/2. if d else t, d if d else 0, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
         
     signal_viewer = kwargs.pop("signal_viewer", None)
     
@@ -1395,10 +1566,75 @@ def epoch2cursors(epoch: neo.Epoch,
     
     return ret
 
+@safewrapper
+def intervals2epoch(*args, **kwargs):
+    """Construct a neo.Epoch or DataZone from a sequence of intervals.
+    All numeric values in the intervals must be python Quantities.
+    
+    TODO: 2023-06-13 23:48:09
+
+"""
+    duration = kwargs.pop("duration", False)
+    zone = kwargs.pop("zone", False)
+    
+    def __generate_epopch_params__(value):
+        pass
+    
+    if len(args) == 1:
+        if isinstance(args[0], (tuple, list)):
+            if len(args[0]) in (2,3):
+                if all(isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]):
+                    times = [args[0][0]]
+                    if not isinstance(times[0], pq.Quantity):
+                        times[0] *= pq.s
+                        
+                    if duration:
+                        durations = [args[0][1]] if isinstance(args[0][1], pq.Quantity) else [args[0][1] * pq.s]
+                        
+                    else:
+                        durations = [args[0][0] + args[0][1]]
+                        
+                    if not isinstance(durations[0], pq.Quantity):
+                        durations[0] *= pq.s
+                        
+                    if times[0].units != durations[0].units:
+                        if not units_convertible(times[0], durations[0]):
+                            raise TypeError(f"intervals contain incompatible Quantities")
+                        
+                        else:
+                            durations[0] = durations[0].rescale(times[0].units)
+                            
+                    if len(args[0]) == 3:
+                        labels = [args[0][2]]
+                        
+                    if not check_time_units(times[0]):
+                        klass = DataZone
+                    else:
+                        klass = DataZone if zone else neo.Epoch
+                        
+                    return klass(times, durations, labels)
+                else:
+                    raise TypeError(f"Incorrect interval spec")
+                
+            else:
+                raise TypeError(f"Incorrect interval spec")
+            
+        else:
+            raise TypeError(f"Incorrect interval spec")
+        
+    else:
+        
+                
+                        
+                        
+
 @safeWrapper
 def intervals2cursors(*args, **kwargs):
-    """Construct a neo.Epoch from a sequence of interval tuples or triplets.
+    """Construct a sequence of Signalcursor objects from a sequence of intervals.
     
+    NOTE: In this context, an interval must not be confused with the arithmetic 
+    concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)
+
     Variadic parameters:
     --------------------
     triplets (t0,t1,label), or a sequence of tuples or triplets
@@ -1418,12 +1654,13 @@ def intervals2cursors(*args, **kwargs):
         raise TypeError("sort must be a boolean")
     
     def __generate_cursor_params__(value):
+        # BUG 2023-06-13 23:47:28 what if no label?!?
         # start, stop, label
         if not isinstance(value, (tuple, list)) or len(value) != 3:
             raise TypeError("expecting a tuple of 3 elements")
         
         if not isinstance(value[2], str) or len(value[2].strip()) == 0:
-            raise ValueError("expecting a non-empty string as thirs element in the tuple")
+            raise ValueError("expecting a non-empty string as third element in the tuple")
         
         l = value[2]
         
@@ -1460,7 +1697,7 @@ def intervals2cursors(*args, **kwargs):
             if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
                 if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
                     # this can be an interval tuple
-                    xwl = [__generate_cursor_params__(args[0])]
+                    xwl = [__generate_cursor_params__(args[0])] # BUG 2023-06-13 23:47:28 what if no label?!?
                     
                 elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
                     # or a sequence of tuples -- feed this into __generate_cursor_params__
@@ -2199,8 +2436,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
 def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                                func:typing.Callable,
                                cursors:typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor]],
-                               channel:typing.Optional[int] = None, 
-                               ):
+                               channel:typing.Optional[int] = None) -> list:
     """
     Measures the amplitude of events(s) using "cursors".
     Use this for evoked events e.g. EPSC or IPSC
@@ -2260,7 +2496,25 @@ def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal]
 
 
     
-def cursors_measure(signal, func, cursors, channel=None):
+def cursors_measure(func: typing.Callable,
+                    signal:typing.Union[neo.AnalogSignal, DataSignal],
+                    cursors: typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor]],
+                    channel: typing.Optional[int]=None) -> list:
+    """Calculates a signal measure from signal data at cursors locations.
+    
+    Parameters:
+    ----------
+    func: a callable with signature f(signal, cursor, channel) -> scalar or array with signal.ndim-1 dimensions
+    
+    signal: neo.AnalogSignal or DataSignal
+    
+    cursors: sequence of SignalCursor (vertical or crosshair) or tuples of 
+        parameters for notional vertical or crosshair cursors.
+    
+    channel: int (optional, default is None): index of the signal channel
+        (i.e., along the signal's second axis)
+    
+"""
     return list(map(lambda x: func(signal, x, channel), cursors))
 
 
