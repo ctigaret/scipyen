@@ -1228,7 +1228,10 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], t0: typing.U
         return ret[channel].flatten() # so that it can accept array indexing
     
 @safeWrapper
-def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                        cursor0: typing.Union[SignalCursor, tuple], 
+                        cursor1: typing.Union[SignalCursor, tuple], 
+                        channel: typing.Optional[int] = None):
     """Signal chord slope between two vertical cursors.
     
     The function calculates the slope of a straight line connecting the 
@@ -1265,6 +1268,20 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], curs
     y1 = cursor_average(signal, cursor1, channel=channel)
     
     return (y1-y0)/(t1-t0)
+
+def cursor_chord_slope(signal, cursor, channel=None):
+    t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
+    t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
+    
+    if t1 == t0:
+        raise ValueError(f"Cursor xwindow is 0")
+    
+    v0, v1 = list(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
+    
+    return ((v1-v0) / (t1-t0)).simplified
+    
+    
+    
     
 @safeWrapper
 def epoch2cursors(epoch: neo.Epoch, 
@@ -2239,9 +2256,12 @@ def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal]
 
     # return peak - base
     
-    return list(map(lambda x: func(signal, x[1]) - func(signal, x[0]), zip(base_cursors, peak_cursors)))
+    return list(map(lambda x: func(signal, x[1], channel) - func(signal, x[0], channel), zip(base_cursors, peak_cursors)))
 
 
     
-    
+def cursors_measure(signal, func, cursors, channel=None):
+    return list(map(lambda x: func(signal, x, channel), cursors))
+
+
     

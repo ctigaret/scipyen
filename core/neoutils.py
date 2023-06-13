@@ -1988,7 +1988,7 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
     
     return (epoch.times[ndx], epoch.durations[ndx]) if duration else (epoch.times[ndx], epoch.times[ndx]+epoch.durations[ndx])
     
-def get_sample_at_time(data, t):
+def get_sample_at_time(data, t, channel=None):
     """Returns the signal sample value at (or around) time t.
     
     Returns np.nan * data.units if a value is not found (typically this happens 
@@ -2014,6 +2014,7 @@ def get_sample_at_time(data, t):
     data: neo.core.basesignal.BaseSignal
     t: scalar, or numpy array or Quantity with size of 1
     """
+    # TODO: Adapt for multi-channel signals
     u = data.times.units
     
     if isinstance(t, float):
