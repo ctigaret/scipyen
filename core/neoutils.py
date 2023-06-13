@@ -5464,7 +5464,7 @@ def merge_annotations(A, *Bs):
     logger.debug("Merging annotations: A=%s Bs=%s merged=%s", A, Bs, merged)
     return merged
 
-def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False):
+def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> tuple:
     """Generates a sequence of intervals as triplets (t_start, t_stop, label).
     
     Each interval coresponds to the epoch's interval.
@@ -5485,18 +5485,67 @@ def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False):
         return [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
     
 @safeWrapper
-def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch from a sequence of interval tuples or triplets.
+def intervals2epoch(*args, **kwargs) -> typing.Optional[typing.Union[neo.Epoch, DataZone]]:
+    """Construct a neo.Epoch or a DataZone obejct from a sequence of intervals.
+    
+    The intervals are specified as tuple of 2 or 3 elements (see below).
     
     Variadic parameters:
     --------------------
     tuples (t0,t1) or triplets (t0,t1,label), or a sequence of tuples or triplets
-    each specifying an interval
+    each specifying an epoch interval, where:
+    
+    • t0:scalar Python Quantity or Number = epoch interval time, 
+    • t1:scalar Python Quantity or Number = epoch interval duration (or interval 
+        stop time if "durations" is False, see below)
+    • label:str interval label
+    
+    NOTE: Both 't0' or 't1' must be either a scalar Quantity, or a number. When
+        Quantities, their units must be scalable to each other.
+    
+    Var-keyword parameters:
+    -----------------------
+    durations: bool, default is True.
+        When True, the 't1' element of the tuples is interpreted as interval
+        duration, and it must be > 0.
+    
+        When False, the 't1' elements of the tuples are interpreted as interval
+        stop-times (i.e., each interval will have a duration of t1 - t0) and
+        t1 > 0
+    
+        PREREQUISITES: 
+    
+        t1 > 0  when durations is True
+        t1 > t0 when durations is False
+    
+    units: scalar python Quanity or UnitQuantity; ignored when 't0' and t1' are 
+        python Quantity objects.
+        Default is None.
+    
+        WARNING: This MUST be specified when t0 and t1 are NOT python Quantity
+        objects.
+    
+    name:  str, default is 'Epoch' =  the name of the Epoch
+    
+    sort: bool, default is True ⇒ the intervals will be sorted in ascending order
+        by their start times ('t0')
+    
+    zone: bool, default is False;
+            When True, returns a DataZone; else returns a neo.Epoch
+    
+    Returns:
+    --------
+    A neo.Epoch or a DataZone when 'zone' is True, OR when the units are not time
+    units.
+    
+    By default, when the units are time units, returns a neo.Epoch.
     
     """
     units = kwargs.pop("units", pq.s)
     if not isinstance(units, pq.Quantity) or units.size > 1:
         raise TypeError("units expected to be a scalar python Quantity")
+    
+    durations = kwargs.pop("durations", True)
 
     name = kwargs.pop("name", "Epoch")
     if not isinstance(name, str):
@@ -5509,7 +5558,11 @@ def intervals2epoch(*args, **kwargs):
     if not isinstance(sort, bool):
         raise TypeError("sort must be a boolean")
     
-    def __generate_epoch_interval__(value):
+    zone = kwargsp.pop("zone", False)
+    if not isinstance(zone, bool):
+        raise TypeError("zone must be a boolean")
+    
+    def __generate_epoch_interval__(value) -> typing.Tuple[float, float, pq.Quantity, str]:
         if not isinstance(value, (tuple, list)) or len(value) not in (2,3):
             raise TypeError("expecting a tuple of 2 or 3 elements")
         
@@ -5529,13 +5582,13 @@ def intervals2epoch(*args, **kwargs):
         
         if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
             if any([v.size != 1 for v in value[0:2]]):
-                raise TypeError("interval boundaries must be scalar quantities")
+                raise TypeError("Intervals are not specified by scalar quantities")
             
             u = value[0].units #store the units
             
             if value[0].units != value[1].units:
                 if not units_convertible(value[0], value[1]):
-                    raise TypeError("interval boundaries must have compatible units")
+                    raise TypeError("Intervals are specified by incompatible units")
                 
                 else:
                     value = [float(value[0]), float(value[1].rescale(value[0].units))]
@@ -5543,14 +5596,17 @@ def intervals2epoch(*args, **kwargs):
             else:
                 value = [float(v) for v in value[0:2]]
             
-        t, d = (value[0], value[1] - value[0])
+        if duration:
+            t, d = (value[0], value[-1])
+        else:
+            t, d = (value[0], value[1] - value[0])
         
         if d < 0:
-            raise ValueError("interval cannot have negative duration")
+            raise ValueError("Intervals cannot have negative duration")
 
         return (t, d, u) if l is None else (t, d, u, l)
      
-    tdl = None
+    tdl = None # will store generated intervals
     
     if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
@@ -5593,16 +5649,20 @@ def intervals2epoch(*args, **kwargs):
         else:
             raise TypeError("expecting 2- or 3- tuples")
         
+    klass = DataZone if zone or not check_time_units(tdl[0][0]) else neo.Epoch
+        
     if tdl is not None:
         # all numeric elements in tdl are python quantities
         if all([len(v) == 4 for v in tdl]):
             times, durations, units, labels = [x_ for x_ in zip(*tdl)]
-            ret = neo.Epoch(times = times, durations = durations, units = units[0], labels=labels)
+            ret = klass(times = times, durations = durations, units = units[0], labels=labels)
         else:
             times, durations, units = [x_ for x_ in zip(*tdl)]
-            ret = neo.Epoch(times = times, durations = durations, units=units[0])
+            ret = klass(times = times, durations = durations, units=units[0])
                 
         return ret
+    else:
+        raise ValueError("I need some intervals...")
     
 @safeWrapper
 def irregularsignal2epoch(sig, name=None, labels=None):

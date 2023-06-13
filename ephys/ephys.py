@@ -365,6 +365,9 @@ def cursors2epoch(*args, **kwargs):
         
         Otherwise returns a neo.Epoch if `units` is quantities.s, or DataZone.
         
+    zone: bool, default is False; only used when intervals is False
+            When True, returns a DataZone; else returns a neo.Epoch
+    
         
     Returns:
     -------
@@ -461,6 +464,10 @@ def cursors2epoch(*args, **kwargs):
     if not isinstance(sort, bool):
         raise TypeError("sort must be a boolean")
     
+    zone = kwargsp.pop("zone", False)
+    if not isinstance(zone, bool):
+        raise TypeError("zone must be a boolean")
+    
     def __parse_cursors_tuples__(*values):
         # check for dimensionality consistency
         #print(type(values))
@@ -556,13 +563,15 @@ def cursors2epoch(*args, **kwargs):
         if isinstance(t[0], pq.Quantity):
             units = t[0].units
             
-        if not check_time_units(units):
-            return DataZone(times=t, durations=d, labels=i, units=units, name=name)
+        if zone or not check_time_units(units):
+            klass = DataZone
+        else:
+            klass = neo.Epoch
         
-        return neo.Epoch(times=t, durations=d, labels=i, units=units, name=name)
+        return klass(times=t, durations=d, labels=i, units=units, name=name)
     
 def cursors2intervals(*args, **kwargs):
-    """Calls cursors2epochs with intervals set to True
+    """Calls cursors2epoch with intervals set to True
     
     Additional var-keyword parameters:
     --------------------------------
@@ -809,7 +818,9 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: ty
     return cursor_reduce(np.argmax, signal, cursor, channel)
     
 @safeWrapper
-def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
+def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                  cursor: typing.Union[tuple, SignalCursor], 
+                  channel: typing.Optional[int] = None):
     """The index of minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -833,7 +844,9 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: ty
     return cursor_reduce(np.argmin, signal, cursor, channel)
 
 @safeWrapper
-def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
+def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                  cursor: typing.Union[tuple, SignalCursor], 
+                  channel: typing.Optional[int] = None):
     """The maximum and minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -859,17 +872,23 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: ty
     return cursor_reduce(sigp.maxmin, signal, cursor, channel)
 
 @safeWrapper
-def cursor_minmax(signal, cursor, channel):
+def cursor_minmax(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                  cursor: typing.Union[tuple, SignalCursor], 
+                  channel: typing.Optional[int]=None):
     return cursor_reduce(sigp.minmax, signal, cursor, channel)
 
 @safeWrapper
-def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[tuple, SignalCursor], channel: typing.Optional[int] = None):
+def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                     cursor: typing.Union[tuple, SignalCursor], 
+                     channel: typing.Optional[int] = None):
     """The indices of signal maximum and minimum across the cursor's window.
     """
     return cursor_reduce(sigp.argmaxmin, signal, cursor, channel)
 
 @safeWrapper
-def cursor_argminmax(signal, cursor, channel):
+def cursor_argminmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
+                     cursor: typing.Union[tuple, SignalCursor], 
+                     channel: typing.Optional[int]=None):
     return cursor_reduce(sigp.argminmax, signal, cursor, channel)
 
 @safeWrapper
@@ -1021,15 +1040,16 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typi
     return data_index
 
 @safeWrapper
-def cursors_measure(func, data, *cursors, 
+def cursors_measure_in_segment(func, data, *cursors, 
                     segment_index: int = None, 
                     analog: typing.Optional[typing.Union[int, str]] = None, 
                     irregular: typing.Optional[typing.Union[int, str]] = None, 
                     **kwargs):
     """
+    TODO/FIXME
     data: a neo.AnalogSignal or DataSignal
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    # from gui.signalviewer import SignalCursor as SignalCursor
 
     
     def __signal_measure__(f, x, *cursors, **kwargs):
@@ -1207,12 +1227,6 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], t0: typing.U
     else:
         return ret[channel].flatten() # so that it can accept array indexing
     
-#@safeWrapper
-#"def" epoch_chord_slope(signal,
-                      #epoch: neo.Epoch,
-                      #channel: typing.Optional[int] = None) -> pq.Quantity:
-    #pass
-    
 @safeWrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
     """Signal chord slope between two vertical cursors.
@@ -1363,8 +1377,6 @@ def epoch2cursors(epoch: neo.Epoch,
         return cursors
     
     return ret
-
-@safeWrapper
 
 @safeWrapper
 def intervals2cursors(*args, **kwargs):
@@ -2166,4 +2178,70 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
             return neo.AnalogSignal(y, **signalkwargs)
     
     return x, y
+    
+def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal], 
+                               func:typing.Callable,
+                               cursors:typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor]],
+                               channel:typing.Optional[int] = None, 
+                               ):
+    """
+    Measures the amplitude of events(s) using "cursors".
+    Use this for evoked events e.g. EPSC or IPSC
+    
+    Parameters:
+    ----------
+    
+    signal: a signal object where the event amplitude is measured
+    
+    func: callable with the signature 
+
+        f(signal, cursor, channel) -> scalar (numeric or python Quantity)
+    
+        the function to be applied to each cursor  See, e.g., cursors_measure(…)
+    
+    cursors: a sequence of SignalCursor objects (cursorType vertical) or notional 
+        cursors: tuples of (t, w) with the time coordinate and x window size.
+    
+        The sequence must contain an EVEN number of "cursors" (2 × the number of
+        events in the signal) such that the signal measure determined at each
+        cursor with EVEN index in the sequence (i.e. cursors 0, 2, etc) will be 
+        subtracted from the signal measure determined at the following cursor
+        (with ODD index in the sequence).
+    
+        E.g. for two E/IPSC events one would require four cursors:
+        base_0, peak_0, base_1, peak_1 placed, respectively, on the signal baseline
+        (just before the event - the "base" cursors) and on the event's "peak" 
+        (for upward events) or "nadir" (or "trough", for inward events).
+
+        The amplitude of the two events will be calculated as the difference 
+        between the signal measures¹ at peak_0, base_0 and peak_1, base_1, i.e.:
+    
+        peak_0 - base_0 
+        peak_1 - base_1
+        
+        ¹In this context, a signal measure is a scalar calculated from the signal
+        data faling inside the cursor's x window, using the callable in 'func''
+    
+    channel: int: index of the signal channel (i.e., index along axis 1 of the 
+        signal data array) or None
+    
+    
+    WARNING: The parameters aren't checked for type and consistency
+    """
+    if len(cursors) % 2 > 0:
+        raise ValueError(f"Expecting an even number of cursors; instead, got {len(cursors)}")
+    
+    if not isinstance(func, typing.Callable):
+        raise TypeError(f"'func' must be a callable")
+    
+    base_cursors = [cursors[k] for k in range(0, len(cursors), 2)]
+    peak_cursors = [cursors[k] for k in range(1, len(cursors), 2)]
+
+    # return peak - base
+    
+    return list(map(lambda x: func(signal, x[1]) - func(signal, x[0]), zip(base_cursors, peak_cursors)))
+
+
+    
+    
     
