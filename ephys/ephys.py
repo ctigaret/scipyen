@@ -1566,7 +1566,7 @@ def epoch2cursors(epoch: neo.Epoch,
     
     return ret
 
-@safewrapper
+@safeWrapper
 def intervals2epoch(*args, **kwargs):
     """Construct a neo.Epoch or DataZone from a sequence of intervals.
     All numeric values in the intervals must be python Quantities.
@@ -1623,7 +1623,7 @@ def intervals2epoch(*args, **kwargs):
             raise TypeError(f"Incorrect interval spec")
         
     else:
-        
+        pass
                 
                         
                         
