@@ -675,27 +675,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         return True
         
-#         if name not in ns:
-#             if val in ns.values():
-#                 return True
-#         
-#         ns_keys = [n for n in ns.keys() if not is_cached_output_varname(n) and n not in self.user_ns_hidden]
-#         
-#         return name in ns_keys
-        
-#         return len()
-#         
-#         if is_cached_output_varname(name):
-#             return  val is not sel.
-#         
-#         if name in self.user_ns_hidden:
-#             return val is not self.user_ns_hidden[name]
-        # else:
-        #     return not is_cached_output_varname(name) and not is_cached_input_varname(name)
-            # return not name.startswith("_")
-
-        return True
-    
     def bindObjectInNamespace(self, varname:str, data:typing.Any, hidden:bool=False,
                 namespace:typing.Optional[dict] = None):
         """Binds an object to a symbol, in the specified namespace.
@@ -824,6 +803,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """Connected (and triggered by) self.internalVariableChanged Qt signal.
         Launches an UI update for each workspace model in a loop, which is
         executed asynchronously inside a QRunnable.
+        DEPRECATED
         """
         name = change.name
         # print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change.name}: {change.change_type})")
@@ -1144,6 +1124,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         from core.workspacefunctions import validate_varname
         
+        # NOTE: 2023-06-14 08:37:57
+        # whenever  None is bound to a signal thus must always be shown
+        
         # ATTENTION 2023-05-24 17:04:36
         #
         # I assume all changes to the workspace have already taken place.
@@ -1452,6 +1435,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # current_vars = dict([item for item in self.shell.user_ns.items() if not item[0].startswith("_") and self.isDisplayable(item[0], item[1])])
         current_vars = dict([item for item in ns.items() if not item[0].startswith(
             "_") and self.isDisplayable(ns, *item)])
+        
+        # print(f"{self.__class__.__name__}._updateModel_ current_vars = {current_vars}")
 
         # NOTE: 2023-05-24 16:22:58
         # this SHOULD also notify the observers - Works OK when adding new symbols

@@ -687,8 +687,7 @@ def cursors2intervals(*args, **kwargs):
     
     return ret
     
-def epoch2intervals(epoch:typing.Union[neo.Epoch, DataZone],
-                    durations:bool=False) -> typing.Sequence[tuple]:
+def epoch2intervals(epoch:typing.Union[neo.Epoch, DataZone], **kwargs) -> typing.Sequence[tuple]:
     """Returns the intervals of a neo.Epoch or DataZone as tuples.
     
     The interval tuples are of the form:
@@ -712,8 +711,14 @@ def epoch2intervals(epoch:typing.Union[neo.Epoch, DataZone],
 
     See also cursors2intervals(…)
     
+    Var-keyword parameters:
+    -----------------------
+    durations:bool (default False)
+    unwrap:bool (default True)
+    
 """
     unwrap = kwargs.pop("unwrap", True)
+    durations = kwargs.pop("durations", False)
     
     if durations:
         ret = list((x, y if y else 0*x.units, l) if l else (x,y if y else 0*x.units) for x,y,l in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels))
@@ -722,6 +727,8 @@ def epoch2intervals(epoch:typing.Union[neo.Epoch, DataZone],
     
     if len(ret) == 1 and unwrap:
         return ret[0]
+    
+    return ret
     
 @safeWrapper
 def epoch_reduce(func:types.FunctionType, 
@@ -792,8 +799,8 @@ def interval_reduce(func:typing.Callable,
                     duration:bool=False) -> pq.Quantity:
     """As cursor_reduce, but using an interval instead.
     The semantics of the interval is set by the 'duration' keyword parameters:
-        • True ⇒ interval is of the form (start, duration, …)
-        • False (default) ⇒ interval is of the form (start, stop, …)
+        • True ⇒ the interval tuple contains (start, duration, …)
+        • False (default) ⇒ the interval tuple contains (start, stop, …)
     
     NOTE: In this context, an interval must not be confused with the arithmetic 
     concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)
@@ -803,7 +810,7 @@ def interval_reduce(func:typing.Callable,
     
     if duration:
         t0 = interval[0]
-        t1 = np.sum(interval[0:2])
+        t1 = interval[0] + interval[1] # preserves units!
     else:
         t0, t1 = interval[0:2]
         
@@ -1576,12 +1583,28 @@ def intervals2epoch(*args, **kwargs):
 """
     duration = kwargs.pop("duration", False)
     zone = kwargs.pop("zone", False)
+    prefix = kwargs.pop("prefix", "interval")
     
-    def __generate_epopch_params__(value):
-        pass
+    def __generate_epopch_interval_params__(value):
+        if len(value) in (2,3):
+            if all(isinstance(v, number.Number) for v in value[0:2]):
+                times = value[0] * pq.s
+                durations = value[1] * pq.s if duration else (value[1] - value[0]) * pq.s
+                
+            elif all(isinstance(v, pq.Quantity) and v.size==1 for v in value[0:2]):
+                times = value[0]
+                durations = value[1] if duration else value[1]-value[0] # will raise if units not convertible!
+                
+            else:
+                raise TypeError("First two elements in an interval tuple must be numeric or quantity scalars")
+
+        return times, durations
+    
+    
     
     if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
+            
             if len(args[0]) in (2,3):
                 if all(isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]):
                     times = [args[0][0]]
