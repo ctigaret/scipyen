@@ -2490,6 +2490,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
             ISI = np.diff(event.times)[0]
 
     return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
+
                  
 def analyse_LTP_in_pathway(baseline_block: neo.Block, 
                            chase_block: neo.Block, 
