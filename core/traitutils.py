@@ -104,7 +104,17 @@ def traitlet_set(instance, obj, value):
         silent = False
         change_type = "new"
     
-    if new_value is None and old_value is None:
+    # NOTE: 2023-06-14 08:49:55
+    # always notify here - this is relevan, because:
+    # a) notifies when an existing trait is set to None
+    # b) notifies when a new trait with nderlying value of None is set 
+    # therefore this will enable e.g., showing up symbols bound to None, in
+    # any monitored mappings (such as the workspace)
+    if new_value is None: # and old_value is None:
+        change_type = "modified" # don't EVER use new 'cause will trigger duplications in some listeners
+        obj._trait_values[instance.name] = new_value
+        obj._notify_trait(instance.name, old_value, new_value, 
+                          change_type = change_type)
         return
     
     try:
