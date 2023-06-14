@@ -157,6 +157,7 @@ import numbers
 import inspect
 import itertools
 import functools
+from functools import singledispatch
 import warnings
 import typing, types
 from enum import Enum, IntEnum
@@ -734,6 +735,7 @@ def epoch2intervals(epoch:typing.Union[neo.Epoch, DataZone], **kwargs) -> typing
 def epoch_reduce(func:types.FunctionType, 
                  signal: typing.Union[neo.AnalogSignal, DataSignal], 
                  epoch: typing.Union[neo.Epoch, tuple], 
+                 index: typing.Optional[typing.Union[int, str]] = None,
                  channel: typing.Optional[int] = None):
     """
     The maximum value of a signal across an Epoch or a (t0, duration) interval.
@@ -745,19 +747,39 @@ def epoch_reduce(func:types.FunctionType,
     interval coordinates (t0, duration) of the Epoch.
     
     Example:
-    epoch_max(signal, (epoch.times[0], epoch.durations[0]))
+    interval_reduce(func, signal, (epoch.times[0], epoch.durations[0]))
     
     Parameters:
     ----------
     signal: neo.AnalogSignal, DataSignal
-    epoch: tuple (t0, duration) or neo.Epoch
+
+    epoch: neo.Epoch, DataZone, interval tuple (t0, duration <, label>)
+        where terms in angle brackets are optional;
+
+        NOTE: the use of intervals here is DEPRECATED; instead, please use 
+        interval_reduce(…)
+
+    index: int or str, a sequence of int or str; optional, default is None; 
+        used when the Epoch or DataZone contains more then one interval, to 
+        restrict be used to restrict the calculation to specific interval(s)
+
+        See neoutils.get_epoch_interval for details.
+
+        When index is 
+        an int → this is the index of the interval with the given index (0-based)
+        a str  → this is the label of the interval where the calculation is to
+                be performed (the intervals MUST be labeled and there must be an
+                interval with this name)
+        
+
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
         0 <= channel < signal.shape[1]
     
     """
     
-    if isinstance(epoch, tuple) and len(epoch) == 2:
+    if isinstance(epoch, tuple) and len(epoch) in (2,3) and (all(isinstance(v, pq.Quantity) for v in epoch) or all (isinstance(v, numbers.Number) for v in epoch)):
+        # NOTE: 2023-06-14 12:08:27 - this branch is DEPRECATED by interval functions
         t0, duration = epoch
         if not isinstance(t0, pq.Quantity):
             t0 *= signal.times.units
@@ -772,14 +794,20 @@ def epoch_reduce(func:types.FunctionType,
             if not units_convertible(duration, signal.times.units):
                 raise ValueError(f"epoch duration units ({duration.units}) are incompatible with the signal's domain ({signal.times.units})")
 
-    elif isinstance(epoch, neo.Epoch):
-        t0 = epochs.times.min()
-        duration = np.sum(epoch.durations)
+    elif isinstance(epoch, (neo.Epoch, DataZone)):
+        if isinstance(index, int) and len(epoch) > 1:
+            t0 = t0[index]
+            durations = durations[index]
+        else:
+            
+            t0 = epoch.times.min()               # ⇒ array of quantities
+            durations = np.sum(epoch.durations)  # ⇒ array of quantities
+        
         
     else:
         raise TypeError(f"epoch expected to be a tuple (t0, duration) or a neo.Epoch; got {epoch} instead")
     
-    t1 = t0 + duration
+    t1 = t0 + durations
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -794,7 +822,7 @@ def epoch_reduce(func:types.FunctionType,
 
 def interval_reduce(func:typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal],
-                    interval:typing.Sequence[pq.Quantity],
+                    interval:typing.Sequence[typing.Union[numbers.Number, pq.Quantity]],
                     channel:typing.Optional[int] = None,
                     duration:bool=False) -> pq.Quantity:
     """As cursor_reduce, but using an interval instead.
@@ -1119,7 +1147,9 @@ def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
 
 @safeWrapper
-def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                  cursor: typing.Union[SignalCursor, tuple], 
+                  channel: typing.Optional[int] = None):
     """The index of maximum value of the signal across the cursor's window.
 
     Parameters:
@@ -1603,7 +1633,9 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     return (y1-y0)/(t1-t0).simlified
 
-def cursor_chord_slope(signal, cursor, channel=None):
+def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal], 
+                       cursor:SignalCursor, 
+                       channel:typing.Optional[int]=None):
     t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
     t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
     
@@ -1621,7 +1653,7 @@ def cursor_chord_slope(signal, cursor, channel=None):
     
     
 @safeWrapper
-def epoch2cursors(epoch: neo.Epoch, 
+def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone], 
                   axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
                   **kwargs):
     """Creates vertical signal cursors from a neo.Epoch.
@@ -2709,5 +2741,32 @@ def cursors_measure(func: typing.Callable,
 """
     return list(map(lambda x: func(signal, x, channel), cursors))
 
+# NOTE: 2023-06-14 14:38:31
+# migrating to single dispatch paradigm (dispatcjheson the locator type, which
+# can be a cursor, an epoch, or an interval)
+@singledispatch
+def reduce(locator, func:typing.Callable, 
+           signal:typing.Union[neo.AnalogSignal, DataSignal],
+           channel:typing.Optional[int]=True, 
+           duration:bool=False,
+           loatorIndex:typing.Optional[int] = None):
+    raise NotImplementedError(f"Function does not support {type(locator).__name__} locators")
 
-    
+@reduce.register(SignalCursor)
+def _(locator, func, signal, channel:int=None, 
+      duration:bool=False, locatorIndex:int=None):
+    return cursor_reduce(func, signal, locator, channel=channel)
+
+@reduce.register(tuple)
+def _(locator, func, signal, channel:int=None,
+      duration=False, locatorIndex:int=None):
+    return interval_reduce(func, signal, locator,channel=channel, duration=duration)
+
+@reduce.register(neo.Epoch)
+@reduce.register(DataZone)
+def _(locator, func, signal, channel=None,
+      duration=False, locatorIndex:int=None):
+    return epoch_reduce(func, signal, locator, 
+                        index=locatorIndex, channel=channel)
+
+
