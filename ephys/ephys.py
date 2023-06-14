@@ -763,14 +763,14 @@ def epoch_reduce(func:types.FunctionType,
         used when the Epoch or DataZone contains more then one interval, to 
         restrict be used to restrict the calculation to specific interval(s)
 
-        See neoutils.get_epoch_interval for details.
+        See neoutils.get_epoch_interval(…) for details.
 
-        When index is 
-        an int → this is the index of the interval with the given index (0-based)
-        a str  → this is the label of the interval where the calculation is to
-                be performed (the intervals MUST be labeled and there must be an
-                interval with this name)
-        
+        In addition, when index is dataclasses.MISSING, then the reducing function
+        is applied to the signal slices inside each interval of the epoch
+
+        Finally, when index is None, the reduction is applied to the signal within
+        a virtual interval starting with the frst real interval of the epoch,
+        and ending with the end of the last interval of the epoch (thu)
 
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
@@ -795,9 +795,14 @@ def epoch_reduce(func:types.FunctionType,
                 raise ValueError(f"epoch duration units ({duration.units}) are incompatible with the signal's domain ({signal.times.units})")
 
     elif isinstance(epoch, (neo.Epoch, DataZone)):
-        if isinstance(index, int) and len(epoch) > 1:
-            t0 = t0[index]
-            durations = durations[index]
+        if len(epoch) > 1:
+            if index is None:
+                intervals = [neoutils.get_epoch_interval(epoch, i) for i in range(len(epoch))]
+                
+            if isinstance(index, int):
+                t0 = t0[index]
+                durations = durations[index]
+            # elif isinstance()
         else:
             
             t0 = epoch.times.min()               # ⇒ array of quantities

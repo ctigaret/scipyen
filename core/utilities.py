@@ -22,6 +22,7 @@ import collections.abc
 from collections import deque, OrderedDict
 from dataclasses import MISSING
 import numpy as np
+import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
 import pandas as pd
@@ -40,6 +41,7 @@ from .prog import safeWrapper, deprecation, with_doc
 
 from .strutils import get_int_sfx
 from .quantities import units_convertible
+from .datazone import DataZone
 
 # NOTE: 2021-07-24 15:03:53
 # moved TO core.datatypes
@@ -2918,7 +2920,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
     """Alternative to list.index(), such that a missing value returns None
-    of raising an Exception.
+    instead of raising an Exception.
     DEPRECATED
     Use prog.filter_attr
     """
@@ -3453,9 +3455,9 @@ def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
         raise TypeError(f"Invalid types for index merging: {type(not_missing[0]).__name__}")
     
 @with_doc(prog.filter_attr, use_header = True)
-def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], 
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series, neo.Epoch, DataZone]], 
                      index: typing.Optional[GeneralIndexType] = None, 
-                     silent:bool=False) -> typing.Union[range, typing.Iterable[int]]:
+                     silent:bool=False, axis:typing.Optional[int] = None) -> typing.Union[range, typing.Iterable[int]]:
     """Transform various indexing objects to a range or an iterable of int indices.
     
 Also checks the validity of the index for an iterable, given its size.
@@ -3479,7 +3481,8 @@ index: GeneralIndexType: a typing alias for:
 
     int → selects only the element with the specified int index
 
-    str → selects only the element having 'name' attribute with the value
+    str → selects only the element having a 'name' or 'label' attribute with the 
+        value
 
     range → selects the elements with int indices in the specified range
 
@@ -3535,6 +3538,14 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         data_len = data
         data = None
         
+    elif isinstance(data, np.ndarray):
+        if isinstance(axis, int):
+            if axis not in range(-data.ndim, data.ndim):
+                raise ValueError(f"Invalid axis index {axis} for an array with {data.ndim} dimensions")
+            data_len = data.shape[axis]
+        else:
+            data_len = data.size
+        
     elif isinstance(data, collections.abc.Sequence):
         data_len = len(data)
         
@@ -3542,7 +3553,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         data_len = len(data)
         data = data.index
         
-    elif isinstance(data, pd.core.indexes.base.Index):
+    elif isinstance(data, (pd.core.indexes.base.Index, neo.Epoch, DataZone)):
         data_len = len(data)
         
     else:
@@ -3557,19 +3568,11 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         return range(0)
     
     # 3) index is an int ⇒ 
-    #   If data is a Pandas Index then get its element at index int, pack it in
-    #       a tuple then return this tuple
-    #   Else, pack the int in a tuple and return this tuple
-    #
-    #   In either case, check that the index is valid given the data lengh.
-    #   
-    #   The index can have a negative value, meaning it is counted backwards from
-    #   the end of the collection in 'data'.
     if isinstance(index, int):
         # NOTE: 2020-03-12 22:40:31
         # negative values ARE supported: they simply go backwards from the end of
         # the sequence
-        if index not in range(-data_len,data_len):
+        if index not in range(-data_len, data_len):
             if silent:
                 return None
             raise ValueError(f"Index {index} is invalid for {len(data)} elements")
@@ -3580,13 +3583,47 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         return (index,)
     
     # 4) index is a str ⇒
-    #   Check that elements in data have an attribute with name given in index.
+    #   Check that elements in data are either str, or have an attribute with 
+    #   name given in index.
     #   Requires that 'data' is an actual collection, not the length of a virtual
     #   collection.
-    if isinstance(index, str):
+    if isinstance(index, (str, np.str_, bytes)):
+        if isinstance(index, bytes):
+            index = index.decode()
+            
         if isinstance(data, (tuple, list)):
-            return tuple(prog.filter_attr(data, name=lambda x: x==index, indices_only=True))
-    
+            if all(isinstance(data, (str, np.str_, bytes))):
+                ret = tuple(filter(lambda x: x.decode() == index if isinstance(x, bytes) else x == index,
+                                   data))
+                if len(ret) == 0:
+                    if silent:
+                        return None
+                    raise ValueError(f"Index {index} not found in data")
+                return ret
+            else:
+                ret = tuple(prog.filter_attr(data, operator.or_, indices_only=True, 
+                                             name=lambda x: x==index, label=lambda x: x==index))
+                if len(ret) == 0:
+                    if silent:
+                        return None
+                    raise AttributeError(f"The objects have no attribute named 'name' or 'label' with the value {index}")
+                
+                return ret
+            
+        if isinstance(data, np.ndarray):
+            if index in data:
+                ret = np.where(data == index)[0]
+                if len(ret) == 1:
+                    ret = int(ret)
+                elif len(ret) > 1:
+                    ret = [int(r) for r in ret]
+                else:
+                    if silent:
+                        return None
+                    
+                    else:
+                        raise ValueError(f"Index {index} not found in data")
+                    
         if isinstance(data, (pd.core.indexes.base.Index)):
             if index in data:
                 return (index,)
@@ -3595,7 +3632,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             if not silent:
                 raise IndexError(f"Invalid 'index' specification {index}")
                 
-        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index")
+        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index, Series, or DataFrame, or a numpy array")
         
     # 5) index is an Iterable of objects of the same type!
     elif isinstance(index, collections.abc.Iterable):
@@ -3607,7 +3644,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             return index
         
         # 5.2) of str values
-        elif all(isinstance(v, str) for v in index):
+        elif all(isinstance(v, (str, np.str_, bytes) ) for v in index):
             if not isinstance(data, collections.abc.Iterable):
                 raise TypeError("When indexing by name attribute (str), data must be an iterable")
             

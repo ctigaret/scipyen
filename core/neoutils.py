@@ -1911,8 +1911,9 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
                        duration:bool=False) -> tuple:
     """Returns the time stamps for an epoch interval.
     
-    These are the (time, duration) or (time, time+duration), depending on the 
-    'duration' flag.
+    These are the (time, duration, <label>) or (time, time+duration, <label>),
+    depending on the 'duration' flag. The term in angle brackets is optional and 
+    is returned only when the epoch's intervals are labeled
     
     Parameters:
     ----------
@@ -1949,12 +1950,12 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
     A tuple of two Python Quantities with time units, that depending on the value
     of the 'duration' parameter, represent either:
     
-    (time, duration)
+    (time, duration, <label>) when duration is True
     
     or:
     
-    (time, time + duration) - i.e., a (t0, t1) time tuple useful for time slicing
-    of neo-style data arrays
+    (time, time + duration, <label>), when duration is False  - i.e., a (t0, t1) time 
+        tuple useful for time slicing of neo-style data arrays; 
     
     """
     if not isinstance(epoch, (neo.Epoch, DataZone)):
@@ -1985,8 +1986,24 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
     else:
         raise TypeError(f"Index expected to be a bytes, str, or int; got {type(index).__name__} instead")
             
+            
+    if duration:
+        return (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx]) if ndx in range(epoch.labels.size) else (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx])
+    return (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx]) if duration else (epoch.times[ndx], epoch.times[ndx]+epoch.durations[ndx])
+
+def get_epoch_interval_label(epoch:typing.Union[neo.Epoch, DataZone], index:int,
+                             default:str="interval"):
+    """Retrieves the label of a Epoch interval, or a default
+"""
+    # NOTE: 2023-06-14 20:23:44
+    # by definition, the length of labels is either 0 (empty) or the same as the
+    # number of intervals
+    if index not in range(-len(epoch), len(epoch)):
+        raise ValueError(f"Incorrect index {index} for a {type(epoch).__name__} object with {len(epoch)} intervals")
     
-    return (epoch.times[ndx], epoch.durations[ndx]) if duration else (epoch.times[ndx], epoch.times[ndx]+epoch.durations[ndx])
+    if epoch.labels.size == 0:
+        return f"default"
+        
     
 def get_sample_at_time(data, t, channel=None):
     """Returns the signal sample value at (or around) time t.

@@ -1070,11 +1070,12 @@ def filterfalse_attr(iterable:typing.Iterable, **kwargs):
                                                  #iterable) for n,f in kwargs.items()))
 
     
-def filter_attribute(iterable:typing.Iterable,attribute:str, value:typing.Any, \
-                     predicate:typing.Callable[...,bool]=lambda x,y: x==y, \
+def filter_attribute(iterable:typing.Iterable, attribute:str, value:typing.Any,
+                     predicate:typing.Callable[...,bool]=lambda x,y: x==y, 
                      silentfail:bool=True):
     """Iterates elements in 'iterable' for which 'attribute' satisfies 'predicate'.
-    DEPRECATED
+    
+    DEPRECATED. Use filter_attr instead
     
     Positional parameters:
     ======================
