@@ -946,8 +946,11 @@ def intervals_chord_slope(signal, interval0, interval1,
     
     return ret
     
-def event_amplitude_at_intervals(signal, func, intervals, channel=None, 
-                                 duration=False):
+def event_amplitude_at_intervals(signal:typing.Union[neo.AnalogSignal, DataSignal],
+                                 intervals:tuple, 
+                                 func:typing.Optional[typing.Callable]=None,
+                                 channel:typing.Optional[int]=None, 
+                                 duration:bool=False):
     """Similar to event_amplitude_at_cursors but using intervals.
 
     NOTE: when passed, 'func' must have the signature:
@@ -2621,8 +2624,8 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
     return x, y
     
 def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                               func:typing.Optional[typing.Callable] = None,
                                cursors:typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor]],
+                               func:typing.Optional[typing.Callable] = None,
                                channel:typing.Optional[int] = None) -> list:
     """
     Measures the amplitude of events(s) using "cursors".
