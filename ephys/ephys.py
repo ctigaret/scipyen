@@ -808,11 +808,16 @@ def interval_reduce(func:typing.Callable,
     if not isinstance(func, types.FunctionType):
         raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
     
+    t0, t1 = interval[0:2]
+    
+    if not isinstance(t0, pq.Quantity):
+        t0 *= signal.times.units
+    
+    if not isinstance(t1, pq.Quantity):
+        t1 *= signal.times.units
+        
     if duration:
-        t0 = interval[0]
-        t1 = interval[0] + interval[1] # preserves units!
-    else:
-        t0, t1 = interval[0:2]
+        t1 += t0
         
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -824,7 +829,148 @@ def interval_reduce(func:typing.Callable,
     
     return ret
 
+def interval_average(signal, interval, channel=None, duration=False):
+    return interval_reduce(np.mean, signal, interval, channel=channel, duration=duration)
+
+def interval_max(signal, interval, channel=None, duration=False):
+    return interval_reduce(np.max, signal, interval, channel=channel, duration=duration)
+    
+def interval_min(signal, interval, channel=None, duration=False):
+    return interval_reduce(np.min, signal, interval, channel=channel, duration=duration)
+    
+def interval_argmax(signal, interval, channel=None, duration=False):
+    return interval_reduce(np.argmax, signal, interval, channel=channel, duration=duration)
+    
+def interval_argmin(signal, interval, channel=None, duration=False):
+    return interval_reduce(np.argmin, signal, interval, channel=channel, duration=duration)
+    
+def interval_maxmin(signal, interval, channel=None, duration=False):
+    return interval_reduce(sigp.maxmin, signal, interval, channel=channel, duration=duration)
+    
+def interval_minmax(signal, interval, channel=None, duration=False):
+    return interval_reduce(sigp.minmax, signal, interval, channel=channel, duration=duration)
+    
+def interval_argmaxmin(signal, interval, channel=None, duration=False):
+    return interval_reduce(sigp.argmaxmin, signal, interval, channel=channel, duration=duration)
+    
+def interval_argminmax(signal, interval, channel=None, duration=False):
+    return interval_reduce(sigp.argminmax, signal, interval, channel=channel, duration=duration)
+    
+def interval_slice(signal, interval, duration=False):
+    t0, t1 = interval[0:2]
+    if not isinstance(t0, pq.Quantity):
+        t0 *= signal.times.units
+    
+    if not isinstance(t1, pq.Quantity):
+        t1 *= signal.times.units
         
+    if duration:
+        t1 += t0
+    
+    if t1 == t0:
+        return signal[signal.time_index(t0),:]
+    
+    return signal.time_slice(t0, t1)
+
+def interval_mid_point(interval:tuple, duration:bool=False):
+    """Calculated the mid-point of a interval tuple
+"""
+    i0, i1 = interval[0:2]
+    
+    return i0 + i1/2 if duration else i0 + (i1-i0)/2
+    
+        
+def interval_chord_slope(signal, interval, channel = None, duration = False):
+    t0, t1 = interval[0:2]
+    if not isinstance(t0, pq.Quantity):
+        t0 *= signal.times.units
+    
+    if not isinstance(t1, pq.Quantity):
+        t1 *= signal.times.units
+        
+    if duration:
+        t1 += t0
+        
+    if t1 == t0:
+        raise ValueError(f"Cannot calculate slope for a 0-length array between t0 = {t0} and t1 = {t1}")
+    
+    v0, v1 = list(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
+    
+    ret = ((v1-v0) / (t1-t0)).simplified
+    
+    if isinstance(channel, int):
+        return ret[channel]
+    
+    return ret
+
+def interval_index(signal, interval:tuple, duration:bool=False):
+    """Index of signal sample at the interval midpoint"""
+    x = interval_mid_point(interval, duration=duration)
+    
+    if not isinstance(x, pq.Quantity):
+        x *= signal.times.units
+        
+    elif x.units != signal.times.units:
+        if not units_convertible(x, signal.times):
+            raise TypeError(f"Interval units {x.units} are incompatible with the signal domain {signal.times.units}")
+        
+        x.rescale(signal.times.units)
+        
+    return signal.time_index(x)
+    
+
+def intervals_difference(signal, interval0, interval1, channel=None, duration=False):
+    y0, y1 = [interval_average(signal, i, channel=channel, duration=duration) for i in (interval0, interval1)]
+    
+    return y1 - y0
+
+def intervals_distance(signal, interval0, interval1, duration=False):
+    i0, i1 = [interval_index(signal, i, duration) for i in (interval0, interval1)]
+    return i1 - i0
+    
+    
+def intervals_chord_slope(signal, interval0, interval1, 
+                          channel:typing.Optional[int] = None,
+                          duration:bool=False):
+    """Signal chord slope between two intervals.
+        Similar to cursors_chord_slope but uses interval tuples
+"""
+    t0, t1 = [interval_mid_point(i, duration=duration) for i in (interval0, interval1)]
+    
+    y0, y1 = [interval_average(signal, i, channel=channel, duration = duration) for i in (interval0, interval1)]
+    
+    ret = ((y1-y0) / (t1-t0)).simplified
+    
+    if isinstance(channel, int):
+        return ret[channel]
+    
+    return ret
+    
+def event_amplitude_at_intervals(signal, func, intervals, channel=None, 
+                                 duration=False):
+    """Similar to event_amplitude_at_cursors but using intervals.
+
+    NOTE: when passed, 'func' must have the signature:
+    
+        f(signal, interval, channel:int, duration:bool)
+
+    See also interval_reduce(…)
+"""
+    
+    if len(intervals) % 2 > 0:
+        raise ValueError(f"Expecting an even number of cursors; instead, got {len(intervals)}")
+    
+    base_intervals = [intervals[k] for k in range(0, len(intervals), 2)]
+    peak_intervals = [intervals[k] for k in range(1, len(intervals), 2)]
+
+    if func is None:
+        return list(intervals_difference(signal, base_interval, peak_interval, channel=channel, duration=duration) for (base_interval, peak_interval) in zip(base_intervals, peak_intervals))
+    elif isinstance(func, typing.Callable):
+        # return peak - base
+        return list(map(lambda x: func(signal, x[1], channel, duration=duration) - func(signal, x[0], channel, duration=duration), zip(base_intervals, peak_intervals)))
+    else:
+        raise TypeError(f"'func' must be a callable")
+    
 
 def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[SignalCursor, tuple]) -> typing.Union[neo.AnalogSignal, DataSignal]:
@@ -1150,7 +1296,8 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     return ret[channel].flatten() # so that it can be indexed
 
 @safeWrapper
-def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]):
+def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], 
+                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]):
     """Index of signal sample at the vertical cursor's time coordinate.
     
     Parameters:
@@ -1314,7 +1461,10 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return y1-y0
 
 @safeWrapper
-def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0: typing.Union[SignalCursor, tuple], cursor1: typing.Union[SignalCursor, tuple], channel: typing.Optional[int] = None):
+def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                     cursor0: typing.Union[SignalCursor, tuple], 
+                     cursor1: typing.Union[SignalCursor, tuple], 
+                     channel: typing.Optional[int] = None):
     """Distance between two cursors, in signal samples.
     
     NOTE: The distance between two cursors in the signal domain is simply the
@@ -1326,7 +1476,12 @@ def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], cursor0
     return abs(ret[1]-ret[0])
 
 @safeWrapper
-def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], t0: typing.Union[float, pq.Quantity], t1: typing.Union[float, pq.Quantity], w0: typing.Optional[typing.Union[float, pq.Quantity]]=0.001*pq.s, w1: typing.Optional[typing.Union[float, pq.Quantity]] = None, channel: typing.Optional[int] = None):
+def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
+                t0: typing.Union[float, pq.Quantity], 
+                t1: typing.Union[float, pq.Quantity], 
+                w0: typing.Optional[typing.Union[float, pq.Quantity]] = 0.001*pq.s, 
+                w1: typing.Optional[typing.Union[float, pq.Quantity]] = None, 
+                channel: typing.Optional[int] = None):
     """Calculates the chord slope of a signal between two time points t0 and t1.
     
                     slope = (y1 - y0) / (t1 - t0)
@@ -1347,13 +1502,13 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], t0: typing.U
             
             Their units must be convertible to the signal's time units
     
-    w:  a scalar float or python Quantity = a window around the time points, 
+    w0:  a scalar float or python Quantity = a window around the time points, 
         across which the mean signal value is calculated (useful for noisy 
         signals).
         
         Default is 0.001 * pq.s (i.e. 1 ms)
         
-    w1: like w (optional default is None). When present, the windows w and w1
+    w1: like w (optional default is None). When present, the windows w0 and w1
     are used respectively, with the time points t0 and t1.
         
     channel: int or None (default). For multi-channel signals, it specifies the 
@@ -1411,12 +1566,12 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     """Signal chord slope between two vertical cursors.
     
     The function calculates the slope of a straight line connecting the 
-    intersection of the signal with two vertical cursors (of with the vertical
-    lines os two crosshair cursors).
+    intersection of the signal with two vertical cursors (or with the vertical
+    lines of two crosshair cursors).
     
     The signal value at each cursor is taken as the average of signal samples
-    across the cursor's horizontal window if non-zero, or the sample values at 
-    the cursor's coordinate.
+    across the cursor's horizontal window if the window it not zero, or the 
+    sample values at the cursor's coordinate.
     
     Parameters:
     ----------
@@ -1443,7 +1598,7 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
         
     y1 = cursor_average(signal, cursor1, channel=channel)
     
-    return (y1-y0)/(t1-t0)
+    return (y1-y0)/(t1-t0).simlified
 
 def cursor_chord_slope(signal, cursor, channel=None):
     t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
@@ -1454,9 +1609,12 @@ def cursor_chord_slope(signal, cursor, channel=None):
     
     v0, v1 = list(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
     
-    return ((v1-v0) / (t1-t0)).simplified
+    ret = ((v1-v0) / (t1-t0)).simplified
     
+    if isinstance(channel, int):
+        return ret[channel]
     
+    return ret
     
     
 @safeWrapper
@@ -1579,78 +1737,84 @@ def intervals2epoch(*args, **kwargs):
     All numeric values in the intervals must be python Quantities.
     
     TODO: 2023-06-13 23:48:09
+    
+    Var-positional parameters:
+    --------------------------
+    
+    Interval tuples with 2 or 3 elements, in the format:
+    
+    (number or quantity, number or quantity)        
+    
+    OR
+    
+    (number or quantity, number or quantity, str)
+    
+    NOTE: When args contains only one element, this can sequence of interval
+    tuples as above.
+    
+    WARNING: 
+    • The first two elements of the interval tuples, when quantities, MUST have
+        compatible units (i.e. units that can be inter-converted)
+    
+    • The structure of the interval tuples is NOT checked 
+    
+    Var-keyword parameters:
+    -----------------------
+    
+    duration:bool, default is False; flags the semantic of the second element in
+            the interval tuples in *args
+    
+        When True, the interval tuples in args are supposed to contain
+            (start, duration, …)
+    
+        When False, the tuples are supposed to contain (start, stop, …)
+    
+    zone:bool, default is False; flags whether to FORCE creation of a DataZone 
+        object (this is always True when the interval tuples are quantities with
+        units other than time units)
+    
+    prefix: str, default is 'interval'; the default prefix for interval names when the tuples 
+        contain only two elements
+    
+    name:str, default is "poech" or "zone", depending on that is returned; this 
+        is the name of the gerenated neo.Epoch or DataZone object
 
 """
     duration = kwargs.pop("duration", False)
     zone = kwargs.pop("zone", False)
     prefix = kwargs.pop("prefix", "interval")
     
-    def __generate_epopch_interval_params__(value):
-        if len(value) in (2,3):
-            if all(isinstance(v, number.Number) for v in value[0:2]):
-                times = value[0] * pq.s
-                durations = value[1] * pq.s if duration else (value[1] - value[0]) * pq.s
-                
-            elif all(isinstance(v, pq.Quantity) and v.size==1 for v in value[0:2]):
-                times = value[0]
-                durations = value[1] if duration else value[1]-value[0] # will raise if units not convertible!
-                
-            else:
-                raise TypeError("First two elements in an interval tuple must be numeric or quantity scalars")
+    if len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(v, (tuple, list)) for v in args[0]):
+        args = args[0]
+    
+    # NOTE: 2023-06-14 09:28:22
+    # this is something like
+    # (start, stop or duration, label) - all this does is to make tuple intervals
+    # consistent with this scheme
+    epoch_intervals = list(map(lambda x: (x[1][0], x[1][1], x[1][2] if len(x[1])==3 else f"{prefix}_{x[0]}"), enumerate(args)))
 
-        return times, durations
-    
-    
-    
-    if len(args) == 1:
-        if isinstance(args[0], (tuple, list)):
-            
-            if len(args[0]) in (2,3):
-                if all(isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]):
-                    times = [args[0][0]]
-                    if not isinstance(times[0], pq.Quantity):
-                        times[0] *= pq.s
-                        
-                    if duration:
-                        durations = [args[0][1]] if isinstance(args[0][1], pq.Quantity) else [args[0][1] * pq.s]
-                        
-                    else:
-                        durations = [args[0][0] + args[0][1]]
-                        
-                    if not isinstance(durations[0], pq.Quantity):
-                        durations[0] *= pq.s
-                        
-                    if times[0].units != durations[0].units:
-                        if not units_convertible(times[0], durations[0]):
-                            raise TypeError(f"intervals contain incompatible Quantities")
-                        
-                        else:
-                            durations[0] = durations[0].rescale(times[0].units)
-                            
-                    if len(args[0]) == 3:
-                        labels = [args[0][2]]
-                        
-                    if not check_time_units(times[0]):
-                        klass = DataZone
-                    else:
-                        klass = DataZone if zone else neo.Epoch
-                        
-                    return klass(times, durations, labels)
-                else:
-                    raise TypeError(f"Incorrect interval spec")
-                
-            else:
-                raise TypeError(f"Incorrect interval spec")
-            
-        else:
-            raise TypeError(f"Incorrect interval spec")
-        
+    # cache the units, because conversion froma list to a numpy array 'slices'
+    # them out
+    if isinstance(epoch_intervals[0][0], pq.Quantity):
+        units = epoch_intervals[0][0].units
     else:
-        pass
-                
-                        
-                        
+        units = pq.s
 
+    times = np.array([x[0] for x in epoch_intervals]) * units
+
+    durations = np.array([x[1] for x in epoch_intervals]) * units
+
+    if not duration:
+        durations -= times
+
+    labels = np.array([x[2] for x in epoch_intervals])
+    
+    klass = DataZone if zone or not check_time_units(units) else neo.Epoch
+    
+    name = kwargs.pop("name", klass.__name__)
+    
+    return klass(times, durations=durations, labels=labels, name=name)
+    
 @safeWrapper
 def intervals2cursors(*args, **kwargs):
     """Construct a sequence of Signalcursor objects from a sequence of intervals.
@@ -2457,7 +2621,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
     return x, y
     
 def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                               func:typing.Callable,
+                               func:typing.Optional[typing.Callable] = None,
                                cursors:typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor]],
                                channel:typing.Optional[int] = None) -> list:
     """
@@ -2469,11 +2633,14 @@ def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal]
     
     signal: a signal object where the event amplitude is measured
     
-    func: callable with the signature 
+    func: one (default) or callable with the signature 
 
         f(signal, cursor, channel) -> scalar (numeric or python Quantity)
     
         the function to be applied to each cursor  See, e.g., cursors_measure(…)
+    
+        When None, the function calls cursors_difference(…) on pairs of cursors
+        taken every two cursors (see below)
     
     cursors: a sequence of SignalCursor objects (cursorType vertical) or notional 
         cursors: tuples of (t, w) with the time coordinate and x window size.
@@ -2507,17 +2674,16 @@ def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal]
     if len(cursors) % 2 > 0:
         raise ValueError(f"Expecting an even number of cursors; instead, got {len(cursors)}")
     
-    if not isinstance(func, typing.Callable):
-        raise TypeError(f"'func' must be a callable")
-    
     base_cursors = [cursors[k] for k in range(0, len(cursors), 2)]
     peak_cursors = [cursors[k] for k in range(1, len(cursors), 2)]
 
-    # return peak - base
-    
-    return list(map(lambda x: func(signal, x[1], channel) - func(signal, x[0], channel), zip(base_cursors, peak_cursors)))
-
-
+    if func is None:
+        return list(cursors_difference(signal, base_cursor, peak_cursor, channel=channel) for (base_cursor, peak_cursor) in zip(base_cursors, peak_cursors))
+    elif isinstance(func, typing.Callable):
+        # return peak - base
+        return list(map(lambda x: func(signal, x[1], channel) - func(signal, x[0], channel), zip(base_cursors, peak_cursors)))
+    else:
+        raise TypeError(f"'func' must be a callable")
     
 def cursors_measure(func: typing.Callable,
                     signal:typing.Union[neo.AnalogSignal, DataSignal],
