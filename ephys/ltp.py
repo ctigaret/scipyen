@@ -2355,9 +2355,9 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
     
     Idc    = np.mean(s.analogsignals[signal_index_Im].time_slice(t_test[0][0], t_test[0][1]))
     
-    Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
+    Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t_test[1][0], t_test[1][1])) 
     
-    Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t[2][0], t[2][1]))
+    Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t_test[2][0], t_test[2][1]))
     
     if signal_index_Vm is None:
         if isinstance(testVm, numbers.Number):
@@ -2390,11 +2390,11 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         # vm_signal = s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])
         # vm_signal = vm_signal.time_slice(t[0][0], t[0][1])
         
-        Vbase = np.mean(vm_signal.time_slice(t[0][0], t[0][1])) # where Idc is measured
+        Vbase = np.mean(vm_signal.time_slice(t_test[0][0], t_test[0][1])) # where Idc is measured
         # Vbase = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])) # where Idc is measured
         #print("Vbase", Vbase)
 
-        Vss   = np.mean(vm_signal.time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        Vss   = np.mean(vm_signal.time_slice(t_test[2][0], t_test[2][1])) # where Rin is calculated
         # Vss   = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[2][0], t[2][1])) # where Rin is calculated
         #print("Vss", Vss)
         
@@ -2407,9 +2407,9 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         
     #print("dIRs", (Irs-Idc), "dIRin", (Irin-Idc), "Rs", Rs, "Rin", Rin)
         
-    Iepsc0base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[3][0], t[3][1])) 
+    Iepsc0base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[0][0], t[0][1])) 
     
-    Iepsc0peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[4][0], t[4][1])) 
+    Iepsc0peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
 
     EPSC0 = Iepsc0peak - Iepsc0base
     
