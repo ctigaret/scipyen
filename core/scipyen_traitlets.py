@@ -419,6 +419,45 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
     def make_dynamic_default(self):
         return np.array(self.default_value)
  
+    def set(self, obj, value):
+        new_value = self.validate(obj, value)
+        silent=True
+        change_type="modified"
+
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+        else:
+            old_value = self.default_value
+            silent = False
+            change_type = "new"
+        
+        if new_value is None and old_value is None:
+            return
+    
+        try:
+            #silent = new_value is old_value
+            if silent:
+                silent = bool(new_value.dtype == old_value.dtype)
+                
+            if silent:
+                silent = bool(new_value.ndim == old_value.ndim)
+                
+            if silent:
+                silent = bool(new_value.shape == old_value.shape)
+                
+            if silent:
+                silent = bool(np.all(new_value == old_value))
+                
+            obj._trait_values[self.name] = new_value
+            
+        except:
+            traceback.print_exc()
+            silent=False
+            
+        if not silent:
+            obj._notify_trait(self.name, old_value, new_value,
+                            change_type=change_type)
+                
 class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
     """Traitlet for BaseNeo objects
     """
