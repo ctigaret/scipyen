@@ -121,7 +121,7 @@ class SafeComparator(object):
             
             # NOTE: 2018-11-09 21:46:52
             # isn't this redundant after checking for shape?
-            # unless an object could have shape attribte but not ndim
+            # unless an object could have shape attribute but not ndim
             if hasattr(x, "ndim"):
                 ret &= x.ndim == y.ndim
             
@@ -3455,7 +3455,8 @@ def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
         raise TypeError(f"Invalid types for index merging: {type(not_missing[0]).__name__}")
     
 @with_doc(prog.filter_attr, use_header = True)
-def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series, neo.Epoch, DataZone]], 
+# @singledispatch
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series, np.ndarray]], 
                      index: typing.Optional[GeneralIndexType] = None, 
                      silent:bool=False, axis:typing.Optional[int] = None) -> typing.Union[range, typing.Iterable[int]]:
     """Transform various indexing objects to a range or an iterable of int indices.
@@ -3464,7 +3465,9 @@ Also checks the validity of the index for an iterable, given its size.
 
 Parameters:
 -----------
-data: Sequence or int; 
+data: collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, 
+        pd.Series, np.ndarray
+    
     When a Sequence, the index will be verified against len(data).
     
     When one of the pandas data types:
@@ -3473,16 +3476,18 @@ data: Sequence or int;
         
         pandas.core.indexes.base.Index: the index will be cheched against it
         (useful when passing the columns attribute of a DataFrame)
+    
+    For numpy arrays, return a flat index to be used with array.ravel()
         
     When an int, 'data' is the length of a virtual Sequence (hence data >= 0 is
     expected).
-
+    
 index: GeneralIndexType: a typing alias for:
 
     int → selects only the element with the specified int index
 
     str → selects only the element having a 'name' or 'label' attribute with the 
-        value
+        value; for numpy arrays, returns the index of elements equal to the index
 
     range → selects the elements with int indices in the specified range
 
@@ -3494,19 +3499,20 @@ index: GeneralIndexType: a typing alias for:
     collections.abc.Sequence[str] → selects the elements having a 'name'
             attribute with value in this parameter
 
-    1D np.ndarray with integer dtype (i.e., np.dtype(int)) →  Returns a list 
-        of the array's values (after validation for the 'data' parameter)
-        Prerequisite: 'index' must satisfy:
-        len(index) == len(data) (with 'data' a Sequence)
-        len(index) == data (whith 'data' an int)
-
+    1D np.ndarray with integer dtype (i.e., np.dtype(int)) →  behaved like a flat
+        array index (see online Numpy documentation)
+        
+        WARNING: This is simply converted to a tuple and returned (no checks 
+        against values)
     
+        ATTENTION: For array data, 1D int arrays should be used directly as flat
+        indices into ravelled arrays (see Numpy documentation)
     
     1D np.ndarray with logical dtype  (i.e., np.dtype(bool)) → Used as a 
-        'mask': returns the indices of the True values 
-        Prerequisite: 'index' must satisfy:
-        len(index) == len(data) (with 'data' a Sequence)
-        len(index) == data (whith 'data' an int)
+        'mask': returns the indices of the True values as a tuple of int
+    
+        ATTENTION: For array data, 1D logical arrays should be used directly as 
+        flat indices into ravelled arrays (see Numpy documentation)
 
     MISSING ⇒ select NO elements from the data (returns an empty range)
 
@@ -3520,6 +3526,10 @@ index: GeneralIndexType: a typing alias for:
         
     CAUTION: negative integral indices are valid and perform the reverse 
         indexing (going "backwards" in the iterable).
+    
+    axis: int (optional, default is None)
+        Used only for numpy array data; specifies the axis along which the 
+        "normalized" index is to be returned.
         
 Returns:
 --------
@@ -3538,14 +3548,6 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         data_len = data
         data = None
         
-    elif isinstance(data, np.ndarray):
-        if isinstance(axis, int):
-            if axis not in range(-data.ndim, data.ndim):
-                raise ValueError(f"Invalid axis index {axis} for an array with {data.ndim} dimensions")
-            data_len = data.shape[axis]
-        else:
-            data_len = data.size
-        
     elif isinstance(data, collections.abc.Sequence):
         data_len = len(data)
         
@@ -3555,6 +3557,14 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         
     elif isinstance(data, (pd.core.indexes.base.Index, neo.Epoch, DataZone)):
         data_len = len(data)
+        
+    elif isinstance(data, np.ndarray):
+        if isinstance(axis, int):
+            if axis not in range(-data.ndim, data.ndim):
+                raise ValueError(f"Invalid axis index {axis} for an array with {data.ndim} dimensions")
+            data_len = data.shape[axis]
+        else:
+            data_len = data.size
         
     else:
         raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
@@ -3610,20 +3620,6 @@ ret - an iterable object (range, or tuple of integer indices) that can be
                 
                 return ret
             
-        if isinstance(data, np.ndarray):
-            if index in data:
-                ret = np.where(data == index)[0]
-                if len(ret) == 1:
-                    ret = int(ret)
-                elif len(ret) > 1:
-                    ret = [int(r) for r in ret]
-                else:
-                    if silent:
-                        return None
-                    
-                    else:
-                        raise ValueError(f"Index {index} not found in data")
-                    
         if isinstance(data, (pd.core.indexes.base.Index)):
             if index in data:
                 return (index,)
@@ -3631,6 +3627,16 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             
             if not silent:
                 raise IndexError(f"Invalid 'index' specification {index}")
+            
+        if isinstance(data, np.ndarray):
+            if index in data:
+                ret = np.flatnonzero(data == index)
+            else:
+                if silent:
+                    return None
+                
+                else:
+                    raise ValueError(f"Index {index} not found in data array")
                 
         raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index, Series, or DataFrame, or a numpy array")
         
@@ -3701,6 +3707,11 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             
         # 8.1) of integer dtype
         if index.dtype.kind == "i": # index is an array of int
+            if np.any((index < 0) | (index >= data_len) ):
+                if silent:
+                    return None
+                raise ValueError(f"Indexing array out of bounds")
+            
             return tuple(index)
         
         # 8.2) of boolean dtype
@@ -3722,6 +3733,9 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         if silent:
             return
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
+    
+# @normalized_index.register(type(None))
+# def _(data, )
     
 def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.AxisInfo], index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
     """Calls normalized_index on a specific array axis.

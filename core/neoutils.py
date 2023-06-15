@@ -1935,8 +1935,6 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
         epoch[k] or epoch.times[k]  ⇾ start of the kᵗʰ interval
         epoch.durations[k]          ⇾ duration of the kᵗʰ interval
     
-            
-        
     duration: bool Optional (default is False)
         When True, returns the (time, duration) tuple for the specified interval
         (see above)
@@ -1954,30 +1952,22 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
     
     or:
     
-    (time, time + duration, <label>), when duration is False  - i.e., a (t0, t1) time 
-        tuple useful for time slicing of neo-style data arrays; 
+    (time, time + duration, <label>), when duration is False (the default)  - 
+        this tuple is useful for time slicing of neo-style data arrays; 
     
     """
     if not isinstance(epoch, (neo.Epoch, DataZone)):
         raise TypeError(f"'epoch' expected to be a neo.Epoch; got {type(epoch).__name__} instead")
     
-    if isinstance(index, (str, np.str_)):
+    if isinstance(index, (str, np.str_, bytes)):
+        if isinstance(index, bytes):
+            index = index.decode()
+            
         if index not in epoch.labels:
             raise ValueError(f"Interval label {index} not found")
+        
+        ndx = np.flatnonzero(epoch.labels == index)
     
-        ndx = int(np.where(epoch.labels == index)[0])
-        
-    elif isinstance(index, bytes):
-        w = np.where(epoch.labels == index.decode())[0]
-        if w.size == 0:
-            raise ValueError(f"Interval label {index.decode()} not found")
-        
-        if w.size > 1:
-            warnings.warn(f"Several intervals named {label.decode()} were found; will return the index of the first one and discard the rest")
-            w = w[0]
-            
-        ndx = int(w)
-        
     elif isinstance(index, int):
         if index not in range(-len(epoch), len(epoch)):
             raise ValueError(f"Invalid index {index} for an epoch with {len(epoch)} intervals")
@@ -1989,24 +1979,9 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
             
     if duration:
         return (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx]) if ndx in range(epoch.labels.size) else (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx])
+    
     return (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx]) if duration else (epoch.times[ndx], epoch.times[ndx]+epoch.durations[ndx])
 
-def get_epoch_interval_label(epoch:typing.Union[neo.Epoch, DataZone], index:int,
-                             default:str="interval"):
-    """Retrieves the label of a Epoch interval, or a default
-"""
-    # NOTE: 2023-06-14 20:23:44
-    # by definition, the length of labels is either 0 (empty) or the same as the
-    # number of intervals
-    if index not in range(-len(epoch), len(epoch)):
-        raise ValueError(f"Incorrect index {index} for a {type(epoch).__name__} object with {len(epoch)} intervals")
-    
-    if epoch.labels.size == 0:
-        return f"{default}"
-    
-    i = utilities.normalized_index(epoch.labels, index)
-        
-    
 def get_sample_at_time(data, t, channel=None):
     """Returns the signal sample value at (or around) time t.
     

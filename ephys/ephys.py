@@ -753,11 +753,7 @@ def epoch_reduce(func:types.FunctionType,
     ----------
     signal: neo.AnalogSignal, DataSignal
 
-    epoch: neo.Epoch, DataZone, interval tuple (t0, duration <, label>)
-        where terms in angle brackets are optional;
-
-        NOTE: the use of intervals here is DEPRECATED; instead, please use 
-        interval_reduce(…)
+    epoch: neo.Epoch, DataZone
 
     index: int or str, a sequence of int or str; optional, default is None; 
         used when the Epoch or DataZone contains more then one interval, to 
@@ -778,52 +774,65 @@ def epoch_reduce(func:types.FunctionType,
     
     """
     
-    if isinstance(epoch, tuple) and len(epoch) in (2,3) and (all(isinstance(v, pq.Quantity) for v in epoch) or all (isinstance(v, numbers.Number) for v in epoch)):
-        # NOTE: 2023-06-14 12:08:27 - this branch is DEPRECATED by interval functions
-        t0, duration = epoch
-        if not isinstance(t0, pq.Quantity):
-            t0 *= signal.times.units
-            
-        else:
-            if not units_convertible(t0, signal.times.units):
-                raise ValueError(f"epoch start units ({t0.units}) are incompatible with the signal's domain ({signal.times.units})")
-            
-        if not isinstance(duration, pq.Quantity):
-            duration *= signal.times.units
-        else:
-            if not units_convertible(duration, signal.times.units):
-                raise ValueError(f"epoch duration units ({duration.units}) are incompatible with the signal's domain ({signal.times.units})")
+#     if isinstance(epoch, tuple) and len(epoch) in (2,3) and (all(isinstance(v, pq.Quantity) for v in epoch) or all (isinstance(v, numbers.Number) for v in epoch)):
+#         # NOTE: 2023-06-14 12:08:27 - this branch is DEPRECATED by interval functions
+#         t0, duration = epoch
+#         if not isinstance(t0, pq.Quantity):
+#             t0 *= signal.times.units
+#             
+#         else:
+#             if not units_convertible(t0, signal.times.units):
+#                 raise ValueError(f"epoch start units ({t0.units}) are incompatible with the signal's domain ({signal.times.units})")
+#             
+#         if not isinstance(duration, pq.Quantity):
+#             duration *= signal.times.units
+#         else:
+#             if not units_convertible(duration, signal.times.units):
+#                 raise ValueError(f"epoch duration units ({duration.units}) are incompatible with the signal's domain ({signal.times.units})")
 
-    elif isinstance(epoch, (neo.Epoch, DataZone)):
+    if isinstance(epoch, (neo.Epoch, DataZone)):
         if len(epoch) > 1:
             if index is None:
                 intervals = [neoutils.get_epoch_interval(epoch, i) for i in range(len(epoch))]
                 
-            if isinstance(index, int):
-                t0 = t0[index]
-                durations = durations[index]
-            # elif isinstance()
-        else:
+            elif isinstance(index, (int, str, np.str_, bytes)):
+                intervals = [neoutils.get_epoch_interval(epoch, index)]
+                
+            else:
+                raise TypeError(f"Unexpected index type")
             
-            t0 = epoch.times.min()               # ⇒ array of quantities
-            durations = np.sum(epoch.durations)  # ⇒ array of quantities
-        
+        elif len(epoch) == 0:
+            return np.nan
+                
+        else:
+            intervals = [(epoch.times[0], epoch.times[0] + epoch.durations[0])]
         
     else:
         raise TypeError(f"epoch expected to be a tuple (t0, duration) or a neo.Epoch; got {epoch} instead")
     
-    t1 = t0 + durations
+    ret = [interval_reduce(func, signal, interval, channel=channel) for interval in intervals]
     
-    if t0 == t1:
-        ret = signal[signal.time_index(t0),:]
-        
-    else:
-        ret = signal.time_slice(t0,t1).max(axis=0).flatten()
+    if len(ret) > 1:
+        u = ret[0].units
+        return np.array(ret)*u
     
-    if isinstance(channel, int):
-        return ret[channel].flatten()
+    elif len(ret)== 1:
+        return ret[0]
     
     return ret
+    
+#     t1 = t0 + durations
+#     
+#     if t0 == t1:
+#         ret = signal[signal.time_index(t0),:]
+#         
+#     else:
+#         ret = signal.time_slice(t0,t1).max(axis=0).flatten()
+#     
+#     if isinstance(channel, int):
+#         return ret[channel].flatten()
+#     
+#     return ret
 
 def interval_reduce(func:typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal],
