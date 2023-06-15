@@ -1734,7 +1734,7 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
         # cursor lines when registering with signal viewer instance
         cursors = [SignalCursor(axis, x=t, xwindow=d,
                                 cursor_type=SignalCursorTypes.vertical,
-                                cursorID=l, parent=axis) for (t,d,l) in ret]
+                                cursorID=l, parent=axis, relative=True) for (t,d,l) in ret]
         
         if isinstance(signal_viewer, SignalViewer):
             if isinstance(axis, pg.PlotItem):

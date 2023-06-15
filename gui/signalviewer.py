@@ -7526,8 +7526,13 @@ signals in the signal collection.
         minX = min(x0)
         maxX = max(x1)
         
-        minDataX = min(xdata0)
-        maxDataX = max(xdata1)
+        # BUG/FIXME 2023-06-15 08:49:46 - occasionally (after reestablishing axes)
+        # TypeError: '<' not supported between instances of 'NoneType' and 'float'
+        # FIXED 2023-06-15 10:56:21
+        xdata0 = tuple(x for x in xdata0 if x is not None)
+        xdata1 = tuple(x for x in xdata1 if x is not None)
+        minDataX = min(xdata0) if len(xdata0) else None
+        maxDataX = max(xdata1) if len(xdata1) else None
         
         # print(f"{self.__class__.__name__}._align_X_range minX = {minX} ; maxX = {maxX}")
         # print(f"{self.__class__.__name__}._align_X_range minDataX = {minDataX} ; maxDataX = {maxDataX}")
@@ -7542,13 +7547,17 @@ signals in the signal collection.
                     # this will skip this branch and enable full auto-range
                     offset, scale = self._axes_X_view_states_[kax]
                     
-                    if offset is not None and scale is not None:
-                        # print(f"{self.__class__.__name__}._align_X_range :\n\toffset = {offset} ; scale = {scale}")
-                        newX0 = minDataX + offset
-                        newX1 = newX0 + (maxDataX - minDataX) * scale
+                    if minDataX is not None and axDataX is not None:
+                        if offset is not None and scale is not None:
+                            # print(f"{self.__class__.__name__}._align_X_range :\n\toffset = {offset} ; scale = {scale}")
+                            newX0 = minDataX + offset
+                            newX1 = newX0 + (maxDataX - minDataX) * scale
+                        else:
+                            newX0 = minDataX
+                            newX1 = maxDataX
                     else:
-                        newX0 = minDataX
-                        newX1 = maxDataX
+                        newX0 = min(x0)
+                        newX1 = max(x1)
                     # print(f"{self.__class__.__name__}._align_X_range : newX0 = {newX0}, newX1 = {newX1}")
                     ax.setXRange(newX0, newX1, padding)
                 
