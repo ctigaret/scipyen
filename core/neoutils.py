@@ -2002,7 +2002,9 @@ def get_epoch_interval_label(epoch:typing.Union[neo.Epoch, DataZone], index:int,
         raise ValueError(f"Incorrect index {index} for a {type(epoch).__name__} object with {len(epoch)} intervals")
     
     if epoch.labels.size == 0:
-        return f"default"
+        return f"{default}"
+    
+    i = utilities.normalized_index(epoch.labels, index)
         
     
 def get_sample_at_time(data, t, channel=None):

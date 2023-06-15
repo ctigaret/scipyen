@@ -2422,10 +2422,6 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         
         Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
         
-        #Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[5], t1[5])) 
-        
-        #Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[6], t1[6])) 
-        
         EPSC1 = Iepsc1peak - Iepsc1base
         PPR = (EPSC1 / EPSC0).magnitude.flatten()[0] # because it's dimensionless
         
