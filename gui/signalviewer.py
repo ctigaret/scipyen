@@ -7547,7 +7547,7 @@ signals in the signal collection.
                     # this will skip this branch and enable full auto-range
                     offset, scale = self._axes_X_view_states_[kax]
                     
-                    if minDataX is not None and axDataX is not None:
+                    if minDataX is not None and maxDataX is not None:
                         if offset is not None and scale is not None:
                             # print(f"{self.__class__.__name__}._align_X_range :\n\toffset = {offset} ; scale = {scale}")
                             newX0 = minDataX + offset
