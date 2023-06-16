@@ -109,8 +109,6 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
-IntervalParams = collections.namedtuple("IntervalParams", ("func", "t0", "t1"))
-
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
 class SynapticPathway: pass # forward declaration for PathwayEpisode; redefined below
@@ -1601,27 +1599,18 @@ def segment_synplast_params_i_clamp(s: neo.Segment,
         
         return chord_slopes
     
-def synplast_measures(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                      command:typing.Union[neo.AnalogSignal, DataSignal], 
-                      intervalsFcns:typing.Union[tuple, list], 
-                      rm_intervals:typing.Union[tuple, list]):
+
     
+def segment_synplast_params(s: neo.Segment, 
+                            signal: typing.Union[int, str],
+                            command_signal: typing.Optional[typing.Union[int, str]] = None,
+                            trigger_signal: typing.Optional[typing.Union[int, str]] = None,
+                            locations: typing.Optional[typing.Union[neo.Epoch, typing.Sequence[typing.Sequence[numbers.Number]], typing.Sequence[str], typing.Sequence[typing.Sequence[pq.Quantity]], typing.Sequence[SignalCursor]]]=None,
+                            membraneTest: typing.Optional[typing.Union[float, pq.Quantity, neo.Epoch, typing.Sequence[typing.Sequence[numbers.Number]], typing.Sequence[str], typing.Sequence[typing.Sequence[pq.Quantity]], typing.Sequence[SignalCursor]]]=None,
+                            stim: typing.Optional[TriggerEvent]=None,
+                            isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
     """
-    intervalFcns: sequence of ...
-    """
-    
-    pass
-        
-def segment_synplast_params_v_clamp_new(s: neo.Segment, 
-                                    signal_index_Im: int,
-                                    signal_index_Vm: typing.Optional[int]=None,
-                                    trigger_signal_index: typing.Optional[int] = None,
-                                    testVm: typing.Union[float, pq.Quantity, None]=None,
-                                    epoch: typing.Optional[neo.Epoch]=None,
-                                    rm_epoch: typing.Optional[typing.Union[neo.Epoch, typing.Tuple[SignalCursor, SignalCursor, SignalCursor]]]=None,
-                                    stim: typing.Optional[TriggerEvent]=None,
-                                    isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
-    """
+    TODO: 
     Calculates several signal measures in a synaptic plasticity experiment.
     
     See NOTE further below, for details about these parameters.
@@ -1629,7 +1618,7 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
     Parameters:
     ----------
     s:neo.Segment
-        The segment must contain one analog signal with the recording of the
+        The segment must contain an analog signal with the recording of the
         membrane current.
         
         Optionally, the segment may also contain:
@@ -1649,47 +1638,50 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
             
             Rs and Rin are calculated based on three mandatory intervals ("Rbase",
             "Rs" and "Rin") with their onset times set to fall before, and 
-            during the test pulse defined inside the epoch parameter (or embedded in 
+            during the test pulse defined inside the locations parameter (or embedded in 
             the segment, see below).  The onset times for these intervals should
             be within the test pulse.
             
-            The test puIf a depolarizing test pulse is absent, the calculated
-        Rs and Rin values will make no sense.
+            If a depolarizing test pulse is absent, the amplitude of such a test
+            pulse MUST be given as a separate parameter ("testVm") see below.
         
-        When absent, then the amplitude of such a test pulse MUST be given as a
-        separate parameter ("testVm") see below.
+        2) a neo.Epoch named "LTP" or having the 'name' attribute starting with
+            'LTP' (case-insensitive in both sitations) and with intervals as defined
+            in the NOTE below.
+            
+            This is used to determine the regions (or 'slices') of the membrane 
+            current signal where measurements are made.
         
-        1) a neo.Epoch named "LTP" (case-insensitive) with intervals as defined
-            in the NOTE further below - used to determine the regions of the 
-            membrane current signal where measurements are made.
+            When such an Epoch is missing, then the signal intervals where the 
+            measures are determined MUST be supplied by one of the keyword
+            parameters: 'locations', 'cursors', or 'intervals' (see below)
         
-            When such an Epoch is missing, then it must be supplied as an 
-            addtional parameter.
-        
-    signal_index_Im: int 
+    signal: int 
         Index into the segment's "analogsignals" collection, for the signal
         containing the membrane current.
         
-    signal_index_Vm: int 
+    command_signal: int 
         Optional (default is None).
         Index into the segment's "analogsignals" collection, for the signal
         containing the recorded membrane potential
         
-        ATTENTION: Either signal_index_Vm, or Vm (see below) must be specified and
-            not None.
+        ATTENTION: Either command_signal, or Vm (see below) must be specified.
         
-    trigger_signal_index: int
+    trigger_signal: int
         Optional (default is None)
-        Index of the signal containing the triggers for synaptic stimulation.
-        Useful to determine the time of the synaptic stimulus and the inter-stimulus
-        interval (when appropriate).
+        Index of the signal containing the triggers (i.e. TTL-like events) for 
+        synaptic stimulation. This is typically an analog signal copy of the 
+        digital output, that was fed back into an auxiliary analog input port of
+        the acquisition device.
+        This is useful to determine the timing of the synaptic stimulus and the
+        inter-stimulus interval (when appropriate).
     
     testVm: scalar float or Python Quantity with units of membrane potential 
         (V, mV, etc)
         Optional (default is None).
         The amplitude of the Vm test pulse.
         
-        ATTENTION: Either signal_index_Vm, or Vm must be specified and not None.
+        ATTENTION: When 'command_signal' is None, this MUST not be None.
         
     stim: TriggerEvent 
         Optional, default is None.
@@ -1702,9 +1694,9 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
         
         When absent, the interstimulus interval can be manually specified ("isi"
         parameter, below) or detected from a trigger signal (specified using the
-        "trigger_signal_index" parameter, see above).
+        "trigger_signal" parameter, see above).
         
-    epoch: neo.Epoch
+    locations: neo.Epoch
         Optional (default is None).
         When present, indicates the segments of the membrane current signal 
         where the measures are determined -- see NOTE, below, for details.
@@ -1714,7 +1706,7 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
         
     isi: scalar float or Python Quantity, or None.
         Optional (default is None).
-        When None but either trigger_signal_index or stim parameters are specified
+        When None but either trigger_signal or stim parameters are specified
         then inter-stimulius interval is determined from these.
         
         
@@ -1723,7 +1715,7 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
     
     A tuple of scalars (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI) where:
     
-    Idc: scalar Quantity = the baseline (DC) current (measured at the Rbase epoch
+    Idc: scalar Quantity = the baseline (DC) current (measured at the Rbase locations
             interval, see below)
     
     Rs: scalar Quantity = Series (access) resistance
@@ -1745,9 +1737,9 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
     ISI: scalar Quantity;
         This is either the value explicitly given in the "isi" parameter or it
         is calculated from the "stim" parameter, or is determined from a trigger
-        signal specified with "trigger_signal_index".
+        signal specified with "trigger_signal".
         
-        When neither "isi", "stim" or "trigger_signal_index" are specified, then
+        When neither "isi", "stim" or "trigger_signal" are specified, then
         ISI is returned as NaN * time units associated with the membrane current
         signal.
         
@@ -1764,7 +1756,7 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
         ratio (PPR = EPSC1/EPSC0)
         
     The distinction between single- and paired-pulse stimulation is obtained 
-    from the parameter "epoch", which must contain the following intervals or
+    from the parameter "locations", which must contain the following intervals or
     regions of the Im signal:
     
     Interval        Mandatory/  Time onset                  Measurement:
@@ -1810,45 +1802,27 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
     measurement and are case-sensitive.
     
     Epochs with 5 intervals are considered to belong to a single-pulse experiment.
-    A paired-pulse experiment is represented by an epoch with 7 intervals.
+    A paired-pulse experiment is represented by an locations with 7 intervals.
     
-    The intervals (and the epoch) can be constructed manually, or visually using
+    The intervals (and the locations) can be constructed manually, or visually using
     vertical cursors in Scipyen's SignalViewer. In the latter case, the cursors
-    should be labelled accordingly, then an epoch embedded in the segment can be 
+    should be labelled accordingly, then an locations embedded in the segment can be 
     generated with the appropriate menu function in SignalViewer window.
     
     
     """
-#     def __interval_index__(labels, label):
-#         #print("__interval_index__ labels:", labels, "label:", label, "label type:", type(label))
-#         if labels.size == 0:
-#             raise ValueError("Expecting a non-empty labels array")
-#         
-#         if isinstance(label, str):
-#             w = np.where(labels == label)[0]
-#         elif isinstance(label, bytes):
-#             w = np.where(labels == label.decode())[0]
-#             
-#         else:
-#             raise TypeError("'label' expected to be str or bytes; got %s instead" % type(label).__name__)
-#         
-#         if w.size == 0:
-#             raise IndexError("Interval %s not found" % label.decode())
-#         
-#         if w.size > 1:
-#             warnings.warn("Several intervals named %s were found; will return the index of the first one and discard the rest" % label.decode())
-#         
-#         return int(w)
-        
     membrane_test_intervals = [b"Rbase", b"Rs", b"Rin"]
     mandatory_intervals = [b"EPSC0Base", b"EPSC0Peak"]
     optional_intervals = [b"EPSC1Base", b"EPSC1Peak"]
     
-    if epoch is None:
+    if locations is None:
         if len(s.epochs) == 0:
-            raise ValueError("Segment has no epochs, and no external epoch has been defined either")
+            raise ValueError("Segment has no epochs, and no locations have been passed to this call.")
         
-        ltp_epochs = [e for e in s.epochs if (isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
+        # NOTE 2023-06-16 09:47:53
+        # allow more flexibility in epoch naming e.g. LTP_epoch, etc - acceptable
+        # epoch names are the ones beginning with "ltp" (case-insensitive)
+        ltp_epochs = [e for e in s.epochs if (isinstance(e.name, str) and e.name.strip().lower() == "ltp" or e.name.strip().lower().startswith("ltp"))]
         
         if len(ltp_epochs) == 0:
             raise ValueError("Segment seems to have no LTP epoch defined, and no external epoch has been defined either")
@@ -1856,7 +1830,13 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
         elif len(ltp_epochs) > 1:
             warnings.warn("There seem to be more than one LTP epoch defined in the segment; only the FIRST one will be used")
         
-        epoch = ltp_epochs[0]
+        if ltp_epochs.labels.size == 0 or ltp_epochs.labels.size != ltp_epochs.size:
+            raise ValueError("Mismatch between epoch size and number of labels in the ltp epoch")
+        
+        if ltp_epoch.size in (2,4): # def'ed only for event amplitudes (v clamp, )
+            pass
+        
+        locations = ltp_epochs[0]
         
     # NOTE: 2023-06-12 17:47:19
     # Allow for Rm epoch to by specified independently or not at all.
@@ -1952,13 +1932,13 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
     # [EPSC0Base, EPSC0Peak]
     t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in mandatory_intervals_ndx]
     
-    Idc    = np.mean(s.analogsignals[signal_index_Im].time_slice(t_test[0][0], t_test[0][1]))
+    Idc    = np.mean(s.analogsignals[signal].time_slice(t_test[0][0], t_test[0][1]))
     
-    Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
+    Irs    = np.max(s.analogsignals[signal].time_slice(t[1][0], t[1][1])) 
     
-    Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t[2][0], t[2][1]))
+    Irin   = np.mean(s.analogsignals[signal].time_slice(t[2][0], t[2][1]))
     
-    if signal_index_Vm is None:
+    if command_signal is None:
         if isinstance(testVm, numbers.Number):
             testVm = testVm * pq.mV
             
@@ -1970,13 +1950,13 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
                 raise ValueError("testVm must be a scalar; got %s instead" % testVm)
             
         else:
-            raise TypeError("When signal_index_Vm is None, testVm is expected to be specified as a scalar float or Python Quantity, ; got %s instead" % type(testVm).__name__)
+            raise TypeError("When command_signal is None, testVm is expected to be specified as a scalar float or Python Quantity, ; got %s instead" % type(testVm).__name__)
 
     else:
         # NOTE: 2020-09-30 09:56:30
         # Vin - Vbase is the test pulse amplitude
         
-        vm_signal = s.analogsignals[signal_index_Vm]
+        vm_signal = s.analogsignals[command_signal]
         
         if not units_convertible(vm_signal, pq.V):
             warnings.warn(f"The Vm signal has wrong units ({vm_signal.units}); expecting electrical potential units")
@@ -1986,15 +1966,15 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
                                          t_start = vm_signal.t_start, sampling_rate = vm_signal.sampling_rate,
                                          name=vm_signal.name)
         
-        # vm_signal = s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])
+        # vm_signal = s.analogsignals[command_signal].time_slice(t[0][0], t[0][1])
         # vm_signal = vm_signal.time_slice(t[0][0], t[0][1])
         
         Vbase = np.mean(vm_signal.time_slice(t[0][0], t[0][1])) # where Idc is measured
-        # Vbase = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])) # where Idc is measured
+        # Vbase = np.mean(s.analogsignals[command_signal].time_slice(t[0][0], t[0][1])) # where Idc is measured
         #print("Vbase", Vbase)
 
         Vss   = np.mean(vm_signal.time_slice(t[2][0], t[2][1])) # where Rin is calculated
-        # Vss   = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        # Vss   = np.mean(s.analogsignals[command_signal].time_slice(t[2][0], t[2][1])) # where Rin is calculated
         #print("Vss", Vss)
         
         testVm  = Vss - Vbase
@@ -2006,9 +1986,9 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
         
     #print("dIRs", (Irs-Idc), "dIRin", (Irin-Idc), "Rs", Rs, "Rin", Rin)
         
-    Iepsc0base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[3][0], t[3][1])) 
+    Iepsc0base = np.mean(s.analogsignals[signal].time_slice(t[3][0], t[3][1])) 
     
-    Iepsc0peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[4][0], t[4][1])) 
+    Iepsc0peak = np.mean(s.analogsignals[signal].time_slice(t[4][0], t[4][1])) 
 
     EPSC0 = Iepsc0peak - Iepsc0base
     
@@ -2017,13 +1997,13 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
         # [EPSC1Base, EPSC1Peak]
         t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in optional_intervals_ndx]
         
-        Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[0][0], t[0][1])) 
+        Iepsc1base = np.mean(s.analogsignals[signal].time_slice(t[0][0], t[0][1])) 
         
-        Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
+        Iepsc1peak = np.mean(s.analogsignals[signal].time_slice(t[1][0], t[1][1])) 
         
-        #Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[5], t1[5])) 
+        #Iepsc1base = np.mean(s.analogsignals[signal].time_slice(t0[5], t1[5])) 
         
-        #Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[6], t1[6])) 
+        #Iepsc1peak = np.mean(s.analogsignals[signal].time_slice(t0[6], t1[6])) 
         
         EPSC1 = Iepsc1peak - Iepsc1base
         PPR = (EPSC1 / EPSC0).magnitude.flatten()[0] # because it's dimensionless
@@ -2032,19 +2012,19 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
         EPSC1 = np.nan * pq.mV
         PPR = np.nan
             
-    ISI = np.nan * s.analogsignals[signal_index_Im].times.units
+    ISI = np.nan * s.analogsignals[signal].times.units
     
     event = None
     
     if isinstance(isi, float):
         warnings.warn("Inter-stimulus interval explicitly given: %s" % isi)
-        ISI = isi * s.analogsignals[signal_index_Im].times.units
+        ISI = isi * s.analogsignals[signal].times.units
         
     elif isinstance(isi, pq.Quantity):
         if isi.size != 1:
             raise ValueError("ISI given explicitly must be a scalar; got %s instead" % isi)
             
-        if not units_convertible(isi, s.analogsignals[signal_index_Im].times):
+        if not units_convertible(isi, s.analogsignals[signal].times):
             raise ValueError("ISI given explicitly has units %s which are incompatible with the time axis" % isi.units)
             
         warnings.warn("Inter-stimulus interval is explicitly given: %s" % isi)
@@ -2072,17 +2052,17 @@ def segment_synplast_params_v_clamp_new(s: neo.Segment,
                     
                 
         if event is None: # none of the above => try to determine from trigger signal if given
-            if isinstance(trigger_signal_index, (str)):
-                trigger_signal_index = ephys.get_index_of_named_signal(s, trigger_signal_index)
+            if isinstance(trigger_signal, (str)):
+                trigger_signal = ephys.get_index_of_named_signal(s, trigger_signal)
                 
-            elif isinstance(trigger_signal_index, int):
-                if trigger_signal_index < 0 or trigger_signal_index > len(s.analogsignals):
-                    raise ValueError("invalid index for trigger signal; expected  0 <= index < %s; got %d instead" % (len(s.analogsignals), trigger_signal_index))
+            elif isinstance(trigger_signal, int):
+                if trigger_signal < 0 or trigger_signal > len(s.analogsignals):
+                    raise ValueError("invalid index for trigger signal; expected  0 <= index < %s; got %d instead" % (len(s.analogsignals), trigger_signal))
                 
-                event = tp.detect_trigger_events(s.analogsignals[trigger_signal_index], "presynaptic", name="LTP")
+                event = tp.detect_trigger_events(s.analogsignals[trigger_signal], "presynaptic", name="LTP")
                 
-            elif not isinstance(trigger_signal_index, (int, type(None))):
-                raise TypeError("trigger_signal_index expected to be a str, int or None; got %s instead" % type(trigger_signal_index).__name__)
+            elif not isinstance(trigger_signal, (int, type(None))):
+                raise TypeError("trigger_signal expected to be a str, int or None; got %s instead" % type(trigger_signal).__name__)
 
             
         if isinstance(event, TriggerEvent) and event.size == 2:

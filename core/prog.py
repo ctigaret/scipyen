@@ -28,6 +28,13 @@ from traitlets import Bunch
 import numpy as np
 import neo, vigra
 import quantities as pq
+
+# try:
+#     import mypy
+# except:
+#     print("Please install mypy first")
+#     raise
+
 # from . import workspacefunctions
 # from .workspacefunctions import debug_scipyen
 from .strutils import InflectEngine
@@ -808,6 +815,42 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
     
 def deprecation(msg):
     warnings.warn(msg, DeprecationWarning, stacklevel=2)
+    
+def get_func_param_types(func:typing.Callable):
+    """Quick'n dirty parser of function parameter types
+    WARNING: does not support *args and **kwargs in func signature (yet)!
+    """
+    if isinstance(func, functools.partial):
+        fn = func.func
+        pargtypes = tuple(type(a) for a in func.args)
+    else:
+        pargtypes = ()
+        fn = func
+        
+    params = inspect.get_annotations(fn)
+    
+    
+    ret = dict()
+    
+    for name, ptype in params.items():
+        if isinstance(ptype, type):
+            t = ptype
+            
+        elif isinstance(ptype, (tuple, list)) and all(isinstance(t, type) for t in ptype):
+            t = tuple(ptype)
+            
+        elif type(ptype).__name__ in dir(typing):
+            t = typing.get_origin(ptype)
+            if t.__name__ in dir(typing):
+                t = typing.get_args(ptype)
+                
+        else:
+            warnings.warn(f"Cannot parse the type of {name} parameter")
+            
+        if (isinstance(t, (tuple, list)) and all(t_ not in pargtypes for t_ in t)) or (t not in pargtypes):
+            ret[name] = t
+        
+    return ret
     
 def iter_attribute(iterable:typing.Iterable, 
                    attribute:str, 
