@@ -212,7 +212,101 @@ if __debug__:
 
     __debug_count__ = 0
     
-IntervalParams = collections.namedtuple("IntervalParams", ("func", "t0", "t1"))
+class Interval(collections.namedtuple("Interval", ("t0", "t1", "name"))):
+    """Encapsulates a closed interval of a signal between landmarks.
+    The landmarks are in the signal's domain.
+"""
+    __slots__ = ()
+    
+    def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity], 
+                 t1: typing.Union[numbers.Number, pq.Quantity],
+                 name:str = "Interval"):
+        OK = all(isinstance(v, numbers.Number) for v in (t0,t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0,t1))
+        
+        if not OK:
+            raise TypeError(f"Expecting scalar numbers or quantities")
+        
+        if all(isinstance(v, pq.Quantity) for v in (t0,t1)):
+            if t0.units != t1.units:
+                if not units_convertible(t0,t1):
+                    raise TypeError(f"t0 units ({t0.units}) are incompatible with t1 units ({t1.units})")
+                
+                t1 = t1.rescale(t0)
+                
+        if t0 > t1:
+            raise ValueError(f"t0 comes after t1")
+        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = self.__class__.__name__
+
+        self.__init__()
+        
+    @classmethod
+    def from_epoch(cls:type, epoch: typing.Union[neo.Epoch, DataZone],  
+                           index: typing.Union[str, bytes, np.str_, int]):
+        interval = neoutils.get_epoch_interval(epoch, index, duration=False)
+        return cls(*interval)
+    
+class Extent(collections.namedtuple("Extent", ("t0", "t1", "name"))):
+    """Encapsulates a closed interval of a signal given a landmark and an extension.
+    The landmark and the extension are defined in the signal domain.
+"""
+    __slots__ = ()
+    
+    def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity], 
+                 t1: typing.Union[numbers.Number, pq.Quantity],
+                 name:str = "Extent"):
+        OK = all(isinstance(v, numbers.Number) for v in (t0,t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0,t1))
+        
+        if not OK:
+            raise TypeError(f"Expecting scalar numbers or quantities")
+        
+        if all(isinstance(v, pq.Quantity) for v in (t0,t1)):
+            if t1 < 0*t1.units:
+                raise ValueError(f"duration (t1) must be >= 0")
+            
+            if t0.units != t1.units:
+                if not units_convertible(t0,t1):
+                    raise TypeError(f"t0 units ({t0.units}) are incompatible with t1 units ({t1.units})")
+                
+                t1 = t1.rescale(t0)
+                
+            elif t1 <= 0:
+                raise ValueError(f"duration (t1) must be >= 0")
+                
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = self.__class__.__name__
+
+        self.__init__()
+        
+        
+
+class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "location"))):
+    __slots__ = ()
+    def __init__(func:typing.Union[types.FunctionType, typing.Callable], 
+                 location:typing.Union[SignalCursor, neo.Epoch, DataZone, Interval, Extent]):
+        params = get_func_param_types(func)
+        if len(params) == 0:
+            raise TypeError("'func' must be a function with annotated signature")
+        
+        plist = [(p, t) for p,t in params.items()]
+        sigpartype = plist[0][1]
+        locpartype = plist[1][1]
+        
+        
+        if isinstance(sigpartype, (tuple, list)):
+            if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
+                raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
+            
+        elif isinstance(sigpartype, type):
+            if sigpartype not in (neo.AnalogSignal, DataSignal):
+                raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
+            
+        if type(location) not in locpartype:
+            raise TypeError(f"Invalid location type {type(location).__name__} for the function {func}")
+        
+        super().__init__()
+        
 
 class SignalMeasureAtLocation(collections.namedtuple("SignalMeasureAtLocation", ("func", "location"))):
     """Functor to calculate a signal measure at a single location.
@@ -3175,4 +3269,345 @@ def _(locator, func, signal, channel=None,
     return epoch_reduce(func, signal, locator, 
                         index=locatorIndex, channel=channel)
 
+
+def signal_measures_in_segment(s: neo.Segment, 
+                            signal: typing.Union[int, str],
+                            command_signal: typing.Optional[typing.Union[int, str]] = None,
+                            trigger_signal: typing.Optional[typing.Union[int, str]] = None,
+                            locations: typing.Optional[typing.Union[neo.Epoch, typing.Sequence[typing.Sequence[numbers.Number]], typing.Sequence[str], typing.Sequence[typing.Sequence[pq.Quantity]], typing.Sequence[SignalCursor]]]=None,
+                            membraneTest: typing.Optional[typing.Union[float, pq.Quantity, neo.Epoch, typing.Sequence[typing.Sequence[numbers.Number]], typing.Sequence[str], typing.Sequence[typing.Sequence[pq.Quantity]], typing.Sequence[SignalCursor]]]=None,
+                            stim: typing.Optional[TriggerEvent]=None,
+                            isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
+    """
+    TODO: 
+    Calculates several signal measures in a synaptic plasticity experiment.
+    
+    Use location functors (SignalMeasureAtLocation and SignalMeasureAtMultipleLocations)
+    
+    You need:
+    
+    1) THE signal to measure - I am inclined to use its units as an indication of whether
+    the recording has been done in voltage clamp (⇒ signal has units of electrical
+    current) of current clamp / field recording (⇒ signal has units of electrical
+    potential).
+    
+    2) The command signal - optional. When present, this should help determine
+        command waveforms as follows:
+        • for voltage-clamp recordings, the boxcar voltage waveform for membrane
+            test
+        • for current-clamp recordings (patch or sharp electrode): 
+            ∘ the boxcar current waveform for membrane test
+            ∘ any further boxcar current waveforms for postsynaptic action potentials
+        (if any were used)
+    
+        NOTE: This is NOT needed for field recordings.
+    
+        When absent, and the recordings are done in voltage- or current clamp, then
+    the membrane test VALUES should be passed as a python Quantity in units of 
+    electrical potential (indicates Volatge-clamp) or units of current (indicating
+    current clamp).
+    
+        If no membrane test is passed then we shall refrain from any computations
+    in this respect.
+    
+    
+    Ultimately, this is up to the acquisition device to advertise this in the signal's
+    meta-data, but sometimes things can go wrong on that side as well.
+    
+    So it's good to add parameters to specify the recording mode as well.
+    
+    3) A triggers signal - analogsignal that embeds the digital outputs (usually
+recorded by feeding the digial output back into an auxiliary analog input port 
+on the acquisition device)
+    
+    This again is optional, and can be replaced by a parameter specifying the 
+    triggers (e.g a TriggerProtocol).
+    
+    This can be useful in order to:
+    • place cursors automatically (subject to some location constraints) BEFORE
+    any recording has been made
+    • when needed, calculate the inter-stimulus interval (e.g.when investigating
+    pre-synaptic release via paired-pulse stimulations)
+    • determine the latency of synaptic responses i.e. the time delay between the
+    trigger onset and the onset of the synaptic event
+    
+    4) a set of signal measures at locations along the signal
+    
+    This is the most tricky one: I need an abstract representation of that.
+    
+    ephys.SignalMeasureAtLocation and ephys.SignalMeasureAtMultipleLocations go
+    some way toward this goal, but they require prior knowledge of the locations
+    
+    This can be OK in principle, when the locations are pre-determined by, say,
+    a trigger protocol or a generic boxcar protocol; however, this may not always
+    be the case, especially when performing post-hoc (i.e. off-line) analysis
+    where the locations are typically set upmanually by the user (via SignalCursors
+    and Epochs).
+    
+    So maybe the way to fo is to use the classes 
+    
+    
+    
+    
+    
+    
+    """
+    membrane_test_intervals = [b"Rbase", b"Rs", b"Rin"]
+    mandatory_intervals = [b"EPSC0Base", b"EPSC0Peak"]
+    optional_intervals = [b"EPSC1Base", b"EPSC1Peak"]
+    
+    if locations is None:
+        if len(s.epochs) == 0:
+            raise ValueError("Segment has no epochs, and no locations have been passed to this call.")
+        
+        # NOTE 2023-06-16 09:47:53
+        # allow more flexibility in epoch naming e.g. LTP_epoch, etc - acceptable
+        # epoch names are the ones beginning with "ltp" (case-insensitive)
+        ltp_epochs = [e for e in s.epochs if (isinstance(e.name, str) and e.name.strip().lower() == "ltp" or e.name.strip().lower().startswith("ltp"))]
+        
+        if len(ltp_epochs) == 0:
+            raise ValueError("Segment seems to have no LTP epoch defined, and no external epoch has been defined either")
+        
+        elif len(ltp_epochs) > 1:
+            warnings.warn("There seem to be more than one LTP epoch defined in the segment; only the FIRST one will be used")
+        
+        if ltp_epochs.labels.size == 0 or ltp_epochs.labels.size != ltp_epochs.size:
+            raise ValueError("Mismatch between epoch size and number of labels in the ltp epoch")
+        
+        if ltp_epoch.size in (2,4): # def'ed only for event amplitudes (v clamp, )
+            pass
+        
+        locations = ltp_epochs[0]
+        
+    # NOTE: 2023-06-12 17:47:19
+    # Allow for Rm epoch to by specified independently or not at all.
+    # This means that the length of the LTP epoch can be 2, 4 (no Rm intervals), 5, or 7 (with rm intervals)
+    # (rm intervals are always three: Rbase, Rs and Rin)
+    
+    if epoch.labels.size == 0 or epoch.labels.size != epoch.size:
+        raise ValueError("Mismatch between epoch size and number of labels in the epoch")
+    
+    calculate_RsRin = True
+    returnIdc = True
+        
+    if epoch.size in (2,4):
+        # likely no Rm intervals ⇒
+        # check that rm_epoch has been specified
+        if rm_epoch is None:
+            # no rm_epoch given ⇒ check if there is an rm epoch in the segment
+            rm_epochs = [e for e in epochs if (e.size == 3 or (isinstance(e.name, str) and e.name.strip().lower() == "rm")) and all(neoutils.epoch_has_interval(l) for l in membrane_test_intervals)]
+            
+            if len(rm_epochs) == 0:
+                calculate_RsRin = False
+                
+            else:
+                if len(rm_epochs) > 1:
+                    warnings.warn(f"{len(rm_epochs)} membrane test epochs were found; only the first one will be used ")
+
+                rm_epoch = rm_epochs[0] # get the first one, discard the rest
+                
+        elif isinstance(rm_epoch, (tuple, list)) and len(rm_epoch) == 3 and all(isinstance(i, SignalCursor) for i in rm_epoch):
+            calculate_RsRin = True
+            returnIdc = True
+            
+        elif isinstance(rm_epoch, neo.Epoch): # pass trhu to delegated function; will raise if wrong
+            calculate_RsRin = True
+            returnIdc = True
+            
+        else:
+            warnings.warn(f"'rm_epoch' cannot be used to calculate Rs and Rin")
+            calculate_RsRin = False
+            returnIdc = False
+            
+        # now check that the 2 or 4 intervals are the right ones
+        
+        if epoch.size == 2: 
+            if not all(neoutils.epoch_has_interval(epoch, l) for l in mandatory_intervals):
+                raise ValueError(f"The epoch is missing the intervals {mandatory_intervals}")
+            
+        elif epoch.size == 4:
+            intvl = mandatory_intervals + optional_intervals
+            if not all(neoutils.epoch_has_interval(epoch, l) for l in intvl):
+                raise ValueError(f"The epoch is missing the intervals {intvl}")
+            
+    elif epoch.size in (5, 7): # this should include the Rm intervals - if not just skip the RsRin calculations
+        if epoch.size == 5:
+            intvl = mandatory_intervals
+        else:
+            intvl = optional_intervals
+            
+        if not all(neoutils.epoch_has_interval(epoch, l) for l in intvl):
+            raise ValueError(f"The epoch is missing the intervals {intvl}")
+        
+        if not all(neoutils.epoch_has_interval(epoch, l) for l in membrane_test_intervals):
+            calculate_RsRin = False
+            returnIdc = False
+            
+        else:
+            rm_epoch = epoch # we can use this to calculate RsRin as well (just using the Rm intervals in it)
+            calculate_RsRin = True
+            returnIdc = True
+                
+        
+    # if epoch.size != 5 and epoch.size != 7:
+    else:
+        raise ValueError("The LTP epoch (either supplied or embedded in the segment) has incorrect length; expected to contain 2, 4, 5 or 7 intervals")
+    
+    
+    membrane_test_intervals_ndx = [__interval_index__(epoch.labels, l) for l in membrane_test_intervals]
+    mandatory_intervals_ndx = [__interval_index__(epoch.labels, l) for l in mandatory_intervals]
+    optional_intervals_ndx = [__interval_index__(epoch.labels, l) for l in optional_intervals]
+    
+    # Now, check Im and Vm
+    
+    
+    if calculate_RsRin:
+        if isinstance(rm_epoch, neo.Epoch):
+            rm_result = membrane.epoch_Rs_Rin()
+        # Rs, Rin, Idc = 
+    
+    # [Rbase, Rs, Rin]
+    t_test = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in membrane_test_intervals_ndx]
+    
+    
+    # [EPSC0Base, EPSC0Peak]
+    t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in mandatory_intervals_ndx]
+    
+    Idc    = np.mean(s.analogsignals[signal].time_slice(t_test[0][0], t_test[0][1]))
+    
+    Irs    = np.max(s.analogsignals[signal].time_slice(t[1][0], t[1][1])) 
+    
+    Irin   = np.mean(s.analogsignals[signal].time_slice(t[2][0], t[2][1]))
+    
+    if command_signal is None:
+        if isinstance(testVm, numbers.Number):
+            testVm = testVm * pq.mV
+            
+        elif isinstance(testVm, pq.Quantity):
+            if not units_convertible(testVm, pq.V):
+                raise TypeError("When a quantity, testVm must have voltage units; got %s instead" % testVm.dimensionality)
+            
+            if testVm.size != 1:
+                raise ValueError("testVm must be a scalar; got %s instead" % testVm)
+            
+        else:
+            raise TypeError("When command_signal is None, testVm is expected to be specified as a scalar float or Python Quantity, ; got %s instead" % type(testVm).__name__)
+
+    else:
+        # NOTE: 2020-09-30 09:56:30
+        # Vin - Vbase is the test pulse amplitude
+        
+        vm_signal = s.analogsignals[command_signal]
+        
+        if not units_convertible(vm_signal, pq.V):
+            warnings.warn(f"The Vm signal has wrong units ({vm_signal.units}); expecting electrical potential units")
+            warnings.warn(f"The Vm signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+            klass = type(vm_signal)
+            vm_signal = klass(vm_signal.magnitude, units = pq.mV, 
+                                         t_start = vm_signal.t_start, sampling_rate = vm_signal.sampling_rate,
+                                         name=vm_signal.name)
+        
+        # vm_signal = s.analogsignals[command_signal].time_slice(t[0][0], t[0][1])
+        # vm_signal = vm_signal.time_slice(t[0][0], t[0][1])
+        
+        Vbase = np.mean(vm_signal.time_slice(t[0][0], t[0][1])) # where Idc is measured
+        # Vbase = np.mean(s.analogsignals[command_signal].time_slice(t[0][0], t[0][1])) # where Idc is measured
+        #print("Vbase", Vbase)
+
+        Vss   = np.mean(vm_signal.time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        # Vss   = np.mean(s.analogsignals[command_signal].time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        #print("Vss", Vss)
+        
+        testVm  = Vss - Vbase
+
+    #print("testVm", testVm)
+    
+    Rs     = (testVm / (Irs - Idc)).rescale(pq.Mohm)
+    Rin    = (testVm / (Irin - Idc)).rescale(pq.Mohm)
+        
+    #print("dIRs", (Irs-Idc), "dIRin", (Irin-Idc), "Rs", Rs, "Rin", Rin)
+        
+    Iepsc0base = np.mean(s.analogsignals[signal].time_slice(t[3][0], t[3][1])) 
+    
+    Iepsc0peak = np.mean(s.analogsignals[signal].time_slice(t[4][0], t[4][1])) 
+
+    EPSC0 = Iepsc0peak - Iepsc0base
+    
+    if len(epoch) == 7 and len(optional_intervals_ndx) == 2:
+        
+        # [EPSC1Base, EPSC1Peak]
+        t = [(epoch.times[k], epoch.times[k] + epoch.durations[k]) for k in optional_intervals_ndx]
+        
+        Iepsc1base = np.mean(s.analogsignals[signal].time_slice(t[0][0], t[0][1])) 
+        
+        Iepsc1peak = np.mean(s.analogsignals[signal].time_slice(t[1][0], t[1][1])) 
+        
+        #Iepsc1base = np.mean(s.analogsignals[signal].time_slice(t0[5], t1[5])) 
+        
+        #Iepsc1peak = np.mean(s.analogsignals[signal].time_slice(t0[6], t1[6])) 
+        
+        EPSC1 = Iepsc1peak - Iepsc1base
+        PPR = (EPSC1 / EPSC0).magnitude.flatten()[0] # because it's dimensionless
+        
+    else:
+        EPSC1 = np.nan * pq.mV
+        PPR = np.nan
+            
+    ISI = np.nan * s.analogsignals[signal].times.units
+    
+    event = None
+    
+    if isinstance(isi, float):
+        warnings.warn("Inter-stimulus interval explicitly given: %s" % isi)
+        ISI = isi * s.analogsignals[signal].times.units
+        
+    elif isinstance(isi, pq.Quantity):
+        if isi.size != 1:
+            raise ValueError("ISI given explicitly must be a scalar; got %s instead" % isi)
+            
+        if not units_convertible(isi, s.analogsignals[signal].times):
+            raise ValueError("ISI given explicitly has units %s which are incompatible with the time axis" % isi.units)
+            
+        warnings.warn("Inter-stimulus interval is explicitly given: %s" % isi)
+        
+        ISI = isi
+        
+    else:
+        if isinstance(stim, TriggerEvent): # check for presyn stim event param
+            if stim.event_type != TriggerEventType.presynaptic:
+                raise TypeError("'stim' expected to be a presynaptic TriggerEvent; got %s instead" % stim.event_type.name)
+            
+            if stim.size < 1 or stim.size > 2:
+                raise ValueError("'stim' expected to contain one or two triggers; got %s instead" % stim.size)
+            
+            event = stim
+            
+        elif len(s.events): # check for presyn stim event embedded in segment
+            ltp_events = [e for e in s.events if (isinstance(e, TriggerEvent) and e.event_type == TriggerEventType.presynaptic and isinstance(e.name, str) and e.name.strip().lower() == "ltp")]
+            
+            if len(ltp_events):
+                if len(ltp_events)>1:
+                    warnings.warn("More than one LTP event array was found; taking the first and discarding the rest")
+                    
+                event = ltp_events[0]
+                    
+                
+        if event is None: # none of the above => try to determine from trigger signal if given
+            if isinstance(trigger_signal, (str)):
+                trigger_signal = ephys.get_index_of_named_signal(s, trigger_signal)
+                
+            elif isinstance(trigger_signal, int):
+                if trigger_signal < 0 or trigger_signal > len(s.analogsignals):
+                    raise ValueError("invalid index for trigger signal; expected  0 <= index < %s; got %d instead" % (len(s.analogsignals), trigger_signal))
+                
+                event = tp.detect_trigger_events(s.analogsignals[trigger_signal], "presynaptic", name="LTP")
+                
+            elif not isinstance(trigger_signal, (int, type(None))):
+                raise TypeError("trigger_signal expected to be a str, int or None; got %s instead" % type(trigger_signal).__name__)
+
+            
+        if isinstance(event, TriggerEvent) and event.size == 2:
+            ISI = np.diff(event.times)[0]
+
+    return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
 
