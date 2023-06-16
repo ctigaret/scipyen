@@ -397,7 +397,7 @@ def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.
     FIXME: 2022-12-13 16:57:47 This is NOT nan-friendly!
     
     """
-    from core import datatypes as dt
+    from core import datatypes
     if x.ndim != 1:
         if x.ndim == 2:
             if min(x.shape) != 1:
@@ -1251,10 +1251,10 @@ def rms(x:np.ndarray, **kwargs):
     x: 1D numpy array
     
     """
-    from core import datatypes as dt
+    from core import datatypes
     if not isinstance(x, np.ndarray):
         raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
-    if not dt.is_vector(x):
+    if not  datatypes.is_vector(x):
         raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
     
     return np.sqrt(np.linalg.norm(x)/x.size)
@@ -1581,7 +1581,7 @@ def resample_pchip(sig, new_sampling_period, old_sampling_period = 1):
     # we replace these values wihtt he last signal sample value
     from scipy.interpolate import PchipInterpolator as pchip
     
-    from . import datatypes as dt
+    from . import datatypes
     
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         if isinstance(new_sampling_period, pq.Quantity):
@@ -2036,7 +2036,7 @@ def root_mean_square(x, axis = None):
     RMS = sqrt(mean(x^2))
     
     """
-    from . import datatypes as dt
+    from . import datatypes 
     
     if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
@@ -2087,7 +2087,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
         When True, the result is expressed in decibel (10*log10(...))
         
     """
-    from . import datatypes as dt
+    from . import datatypes  
 
     if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
@@ -2359,7 +2359,7 @@ def correlate(in1, in2, **kwargs):
     
     from scipy.signal import correlate
     
-    from . import datatypes as dt
+    from . import datatypes  
     
     name = kwargs.pop("name", "")
     

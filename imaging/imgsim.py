@@ -22,7 +22,7 @@ import neo
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from core import (datatypes as dt, signalprocessing as sgp, curvefitting as crvf,
+from core import (datatypes  , signalprocessing as sgp, curvefitting as crvf,
                   models, strutils, )
 
 # NOTE: 2020-10-08 09:45:31
@@ -342,7 +342,7 @@ def synthetic_EPSCaT_linescan(field_width, duration,
     if addChannelAxis and result.channelIndex == linescan.ndim:
         linescan = linescan.insertChannelAxis()
     
-    axiscal = dt.AxesCalibration(result)
+    axiscal =  datatypes.AxesCalibration(result)
     axiscal.setUnits(space_units, "x")
     axiscal.setResolution(spatial_resolution, "x")
     axiscal.setUnits(time_units, "t")

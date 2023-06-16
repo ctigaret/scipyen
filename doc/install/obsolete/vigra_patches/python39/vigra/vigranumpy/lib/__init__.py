@@ -2241,7 +2241,7 @@ def _genGraphSegmentationFunctions():
         dt = filters.distanceTransform3D(mask)
         dtInv = filters.distanceTransform3D(mask, background=False)
         dtInv[dtInv>0] -= 1
-        dtSigned = dt.max() - dt + dtInv
+        dtSigned =  datatypes.max() - dt + dtInv
 
         dtSignedSmoothMinima = filters.gaussianSmoothing(dtSigned, sigmaMinima)
         dtSignedSmoothWeights = filters.gaussianSmoothing(dtSigned, sigmaWeights)

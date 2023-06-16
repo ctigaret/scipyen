@@ -36,7 +36,7 @@ import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from core import datatypes as dt
+from core import datatypes  
 from imaging import vigrautils as vu
 from gui import (scipyen_colormaps, guiutils)
 #### END pict.core modules

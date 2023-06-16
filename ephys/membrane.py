@@ -49,7 +49,7 @@ import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
-import core.datatypes as dt
+import core.datatypes  
 import plots.plots as plots
 import core.datasignal as datasignal
 
@@ -2692,8 +2692,8 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         thr *= pq.V/pq.s
         
     elif isinstance(thr, pq.Quantity):
-        if not units_convertible(thr, dsdt.units):
-            raise TypeError("'thr' expected to have %s units; got %s instead" % (dsdt.units.dimensionality, thr.units.dimensionality))
+        if not units_convertible(thr, dsdtnits):
+            raise TypeError("'thr' expected to have %s units; got %s instead" % (dsdtnits.dimensionality, thr.units.dimensionality))
         
         thr = thr.rescale(pq.V/pq.s)
 
@@ -3161,7 +3161,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     #
     # b) d2Vm/dt2 > 0 (dVm/dt is MONOTONICALLY INCREASING)
     #
-    #fast_rise_starts = (dsdt.magnitude >= dsdt_thr) & (d2sdt2.magnitude > (0 + atol))
+    #fast_rise_starts = (ds datatypes.magnitude >= dsdt_thr) & (d2sdt2.magnitude > (0 + atol))
     #fast_rise_start_flags = np.ediff1d(np.asfarray(fast_rise_starts), to_begin = 0) == 1 
     
     #fast_rise_start_times = s.times[fast_rise_start_flags]
@@ -3178,7 +3178,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     ## curve does NOT cross zero (become negative) until the next detected rise
     #t1 = fast_rise_start_times[1] if len(fast_rise_start_times) > 1 else s.t_stop
     
-    #if np.all(dsdt.time_slice(t0, t1).magnitude > 0):
+    #if np.all(ds datatypes.time_slice(t0, t1).magnitude > 0):
         ## reject t0 as it is likely to come from a rising Vm without AP
         
         #if len(fast_rise_start_times) == 1: # nothing detected
@@ -3258,9 +3258,6 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     # to met simultaneously met at several time points along the waveforms meaning
     # we'll have to pick the only first of such occurrence, which involves more CPU work
     peak_times              = np.full_like(fast_rise_start_times, np.nan)
-    
-    #print("detect_AP_rises signal t_start=%s, t_stop=%s" % (s.t_start, s.t_stop))
-    #print("detect_AP_rises dsdt t_start=%s, t_stop=%s" % (dsdt.t_start, dsdt.t_stop))
     
     for k, t in enumerate(fast_rise_start_times):
         #print("detect_AP_rises k: %s,  t=%s" % (k,t))
@@ -4587,7 +4584,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             [lo, hi], _, _, _ = sigp.state_levels(ap)
             _,_,_, decay_time, decay_value, decay_slope = ap_waveform_roots(ap, lo, interpolate=interpolate)
             
-    ret = dt.DataBag()
+    ret =  datatypes.DataBag()
     
     ret.duration = decay_time - rise_time
     ret.value_rise = rise_value
@@ -4732,7 +4729,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
     
     ap_fast_rise_end_time = np.array([vm.times[fast_rise_stop_index]]).flatten() * vm.times.units
     
-    result = dt.DataBag()
+    result =  datatypes.DataBag()
     
     result.amplitude = ap_amplitude
     result.onset = ap_onset_vm
@@ -6720,7 +6717,7 @@ def detect_Events_CBsliding(x:typing.Union[neo.AnalogSignal, DataSignal], wavefo
         raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
 
     if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
-        if not dt.is_vector(waveform):
+        if not  datatypes.is_vector(waveform):
             raise TypeError("waveform expected to be a vector")
     
     elif isinstance(waveform, (tuple, list)):
@@ -7321,7 +7318,7 @@ def detect_Events(x:typing.Union[neo.AnalogSignal, DataSignal], waveform:typing.
         raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal; got a {type(x).__name__} instead")
 
     if isinstance(waveform, (np.ndarray,neo.core.basesignal.BaseSignal)):
-        if not dt.is_vector(waveform):
+        if not  datatypes.is_vector(waveform):
             raise TypeError("waveform expected to be a vector")
     
     elif isinstance(waveform, (tuple, list)):
@@ -7980,7 +7977,7 @@ def prep_for_nsfa(data):
             data = np.concatenate([v.magnitude for v in data], axis=1)
             
         else:
-            if not all(dt.is_vector(v) for v in data):
+            if not all( datatypes.is_vector(v) for v in data):
                 raise ValueError(f"All elements in the data collection must be vectors")
             data = np.concatenate(data, axis=1)
             

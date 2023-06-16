@@ -117,7 +117,7 @@ import core.tiwt as tiwt
 import core.xmlutils as xmlutils
 import core.desktoputils as desktoputils
 from core import neoutils
-from core import datatypes as dt
+from core import datatypes
 from plots import plots as plots
 from core.scipyen_config import scipyen_config as scipyen_settings
 from core import scipyen_config as scipyenconf

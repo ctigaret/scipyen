@@ -3945,7 +3945,7 @@ def sp_get_loc(x, index, columns):
     
     # Save the original sparse format for reuse later
     
-    # NOTE: dt.dtypes returns a Series!!! 
+    # NOTE:  datatypes.dtypes returns a Series!!! 
     # NOTE: it is 'dtypes' not 'dtype'!
     spdtypes = x.dtypes[columns] # this is a pd.Series with column names as row index
     

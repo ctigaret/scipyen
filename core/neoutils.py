@@ -181,7 +181,7 @@ from .prog import (safeWrapper, deprecation,
                    )#SignatureDict)
 
 from .datatypes import (is_string, is_vector,
-                        RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
+                        RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN, Interval)
 
 from .quantities import (units_convertible, check_time_units, name_from_unit)
 from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
@@ -192,7 +192,8 @@ from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
 from core.utilities import (normalized_index, name_lookup, GeneralIndexType,
-                            elements_types, index_of, isclose, similar_strings)
+                            elements_types, index_of, isclose, similar_strings,
+                            counter_suffix)
 
 from core.strutils import (InflectEngine, pluralize)
 
@@ -1945,8 +1946,7 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
     Returns:
     --------
     
-    A tuple of two Python Quantities with time units, that depending on the value
-    of the 'duration' parameter, represent either:
+    A tuple:
     
     (time, duration, <label>) when duration is True
     
@@ -1954,6 +1954,9 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
     
     (time, time + duration, <label>), when duration is False (the default)  - 
         this tuple is useful for time slicing of neo-style data arrays; 
+    
+    NOTE: <label> is optional, and is included ONLY when the epoch.labels is 
+    non-empty.
     
     """
     if not isinstance(epoch, (neo.Epoch, DataZone)):
@@ -1978,9 +1981,11 @@ def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone],
             
             
     if duration:
-        return (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx]) if ndx in range(epoch.labels.size) else (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx])
+        intvl = (epoch.times[ndx].flatten()[0], epoch.durations[ndx].flatten()[0], epoch.labels[ndx].flatten()[0]) if ndx in range(epoch.labels.size) else (epoch.times[ndx].flatten()[0], epoch.durations[ndx].flatten()[0], epoch.labels[ndx])
+    else:
+        intvl = (epoch.times[ndx].flatten()[0], epoch.times[ndx].flatten()[0]+epoch.durations[ndx].flatten()[0], epoch.labels[ndx].flatten()[0]) if ndx in range(epoch.labels.size) else (epoch.times[ndx].flatten()[0], epoch.times[ndx],flatten()[0]+epoch.durations[ndx].flatten()[0])
     
-    return (epoch.times[ndx], epoch.durations[ndx], epoch.labels[ndx]) if duration else (epoch.times[ndx], epoch.times[ndx]+epoch.durations[ndx])
+    return Interval(*intvl, extent=duration)
 
 def get_sample_at_time(data, t, channel=None):
     """Returns the signal sample value at (or around) time t.
@@ -5459,8 +5464,9 @@ def merge_annotations(A, *Bs):
     logger.debug("Merging annotations: A=%s Bs=%s merged=%s", A, Bs, merged)
     return merged
 
-def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> tuple:
-    """Generates a sequence of intervals as triplets (t_start, t_stop, label).
+def epoch2intervals(epoch: neo.Epoch, keep_units:bool = True,
+                    duration:bool=True) -> typing.List[Interval]:
+    """Generates a sequence of datatypes.Interval objects
     
     Each interval coresponds to the epoch's interval.
     
@@ -5473,191 +5479,101 @@ def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False) -> tuple:
         Quantity objects (units borrowed from the epoch)
     
     """
+    if (epoch.labels.size) > 0:
+        labels = epoch.labels
+    else:
+        labels = [f"Interval_{k}" for k in range(len(epoch))]
+        
     if keep_units:
-        return [(t, t+d, l) for (t,d,l) in zip(epoch.times, epoch.durations, epoch.labels)]
+        return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times, epoch.durations, labels)]
         
     else:
-        return [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
+        return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, labels)]
     
 @safeWrapper
-def intervals2epoch(*args, **kwargs) -> typing.Optional[typing.Union[neo.Epoch, DataZone]]:
-    """Construct a neo.Epoch or a DataZone obejct from a sequence of intervals.
+def intervals2epoch(*args, **kwargs):
+    """Construct a neo.Epoch or DataZone from a sequence of intervals.
+    All numeric values in the intervals must be python Quantities.
     
-    The intervals are specified as tuple of 2 or 3 elements (see below).
+    TODO: 2023-06-13 23:48:09
     
-    Variadic parameters:
-    --------------------
-    tuples (t0,t1) or triplets (t0,t1,label), or a sequence of tuples or triplets
-    each specifying an epoch interval, where:
+    Var-positional parameters:
+    --------------------------
     
-    • t0:scalar Python Quantity or Number = epoch interval time, 
-    • t1:scalar Python Quantity or Number = epoch interval duration (or interval 
-        stop time if "durations" is False, see below)
-    • label:str interval label
+    datatypes.Interval objects
     
-    NOTE: Both 't0' or 't1' must be either a scalar Quantity, or a number. When
-        Quantities, their units must be scalable to each other.
+    NOTE: When args contains only one element, this can sequence of interval
+    tuples as above.
+    
+    WARNING: 
+    • The first two elements of the interval tuples, when quantities, MUST have
+        compatible units (i.e. units that can be inter-converted)
+    
+    • The structure of the interval tuples is NOT checked 
     
     Var-keyword parameters:
     -----------------------
-    durations: bool, default is True.
-        When True, the 't1' element of the tuples is interpreted as interval
-        duration, and it must be > 0.
     
-        When False, the 't1' elements of the tuples are interpreted as interval
-        stop-times (i.e., each interval will have a duration of t1 - t0) and
-        t1 > 0
+    duration:bool, default is False; flags the semantic of the second element in
+            the interval tuples in *args
     
-        PREREQUISITES: 
+        When True, the interval tuples in args are supposed to contain
+            (start, duration, …)
     
-        t1 > 0  when durations is True
-        t1 > t0 when durations is False
+        When False, the tuples are supposed to contain (start, stop, …)
     
-    units: scalar python Quanity or UnitQuantity; ignored when 't0' and t1' are 
-        python Quantity objects.
-        Default is None.
+    zone:bool, default is False; flags whether to FORCE creation of a DataZone 
+        object (this is always True when the interval tuples are quantities with
+        units other than time units)
     
-        WARNING: This MUST be specified when t0 and t1 are NOT python Quantity
-        objects.
+    prefix: str, default is 'interval'; the default prefix for interval names when the tuples 
+        contain only two elements
     
-    name:  str, default is 'Epoch' =  the name of the Epoch
-    
-    sort: bool, default is True ⇒ the intervals will be sorted in ascending order
-        by their start times ('t0')
-    
-    zone: bool, default is False;
-            When True, returns a DataZone; else returns a neo.Epoch
-    
-    Returns:
-    --------
-    A neo.Epoch or a DataZone when 'zone' is True, OR when the units are not time
-    units.
-    
-    By default, when the units are time units, returns a neo.Epoch.
-    
-    """
-    units = kwargs.pop("units", pq.s)
-    if not isinstance(units, pq.Quantity) or units.size > 1:
-        raise TypeError("units expected to be a scalar python Quantity")
-    
-    durations = kwargs.pop("durations", True)
+    name:str, default is "epoch" or "zone", depending on that is returned; this 
+        is the name of the gerenated neo.Epoch or DataZone object
 
-    name = kwargs.pop("name", "Epoch")
-    if not isinstance(name, str):
-        raise TypeError("name expected to be a string")
-    
-    if len(name.strip())==0:
-        raise ValueError("name must not be empty")
-    
-    sort = kwargs.pop("sort", True)
-    if not isinstance(sort, bool):
-        raise TypeError("sort must be a boolean")
-    
-    zone = kwargsp.pop("zone", False)
-    if not isinstance(zone, bool):
-        raise TypeError("zone must be a boolean")
-    
-    def __generate_epoch_interval__(value) -> typing.Tuple[float, float, pq.Quantity, str]:
-        if not isinstance(value, (tuple, list)) or len(value) not in (2,3):
-            raise TypeError("expecting a tuple of 2 or 3 elements")
+"""
+    def __make_label_unique__(label, collection):
+        if label in collection:
+            label = counter_suffix(label, collection)
         
-        if len(value) == 3:
-            if not isinstance(value[2], str) or len(value[2].strip()) == 0:
-                raise ValueError("expecting a non-empty string as thirs element in the tuple")
-            
-            l = value[2]
-                
-        else:
-            l = None
-            
-        u = units # by default if boundaries are scalars
-        
-        if not all([isinstance(v, (pq.Quantity, numbers.Number)) for v in value[0:2]]):
-            raise TypeError("interval boundaries must be scalar numbers or quantities")
-        
-        if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
-            if any([v.size != 1 for v in value[0:2]]):
-                raise TypeError("Intervals are not specified by scalar quantities")
-            
-            u = value[0].units #store the units
-            
-            if value[0].units != value[1].units:
-                if not units_convertible(value[0], value[1]):
-                    raise TypeError("Intervals are specified by incompatible units")
-                
-                else:
-                    value = [float(value[0]), float(value[1].rescale(value[0].units))]
-                    
-            else:
-                value = [float(v) for v in value[0:2]]
-            
-        if duration:
-            t, d = (value[0], value[-1])
-        else:
-            t, d = (value[0], value[1] - value[0])
-        
-        if d < 0:
-            raise ValueError("Intervals cannot have negative duration")
+        collection.append(label)
+        return label
+    
+    # duration = kwargs.pop("duration", False)
+    zone = kwargs.pop("zone", False)
+    prefix = kwargs.pop("prefix", "interval")
+    
+    if len(args) == 1 and isinstance(args[0], (tuple, list)) and not isinstance(args[0], Interval):
+        args = args[0]
+    
+    if not all(isinstance(a, Interval) for a in args):
+        raise TypeError(f"Expecting a sequence of Interval objects")
+    
+    # also takes care of getting durations right, for "true" intervals
+    interval_labels = []
+    # TODO TODO TODO 2023-06-16 23:15:44 check labels uniqueness
+    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_label_unique__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_label_unique__(x.name, interval_labels)), args))
 
-        return (t, d, u) if l is None else (t, d, u, l)
-     
-    tdl = None # will store generated intervals
-    
-    if len(args) == 1:
-        if isinstance(args[0], (tuple, list)):
-            if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
-                if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
-                    # this can be an interval tuple
-                    tdl = [__generate_epoch_interval__(args[0])]
-                    
-                elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-                    # or a sequence of tuples -- feed this into __generate_epoch_interval__
-                    # and hope for the best
-                    if sort:
-                        tdl = [__generate_epoch_interval__(v) for v in sorted(args[0], key=lambda x: x[0])]
-                        
-                    else:
-                        tdl = [__generate_epoch_interval__(v) for v in args[0]]
-                    
-                else:
-                    raise TypeError("incorrect syntax")
-                
-            else:
-                if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-                    if sort:
-                        tdl = [__generate_epoch_interval__(v) for v in sorted(args[0], key=lambda x: x[0])]
-                    else:
-                        tdl = [__generate_epoch_interval__(v) for v in args[0]]
-
-        else:
-            raise TypeError("expecting a sequence of tuples, or a 2- or 3- tuple")
-        
+    # cache the units, because conversion from a list to a numpy array 'slices'
+    # them out
+    if isinstance(epoch_intervals[0][0], pq.Quantity):
+        units = epoch_intervals[0][0].units
     else:
-        # sequence of 2- or 3- tuples
-        if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args]):
-            if sort:
-                tdl = [__generate_epoch_interval__(v) for v in sorted(args, key=lambda x: x[0])]
-                
-            else:
-                tdl = [__generate_epoch_interval__(v) for v in args]
-        
-        else:
-            raise TypeError("expecting 2- or 3- tuples")
-        
-    klass = DataZone if zone or not check_time_units(tdl[0][0]) else neo.Epoch
-        
-    if tdl is not None:
-        # all numeric elements in tdl are python quantities
-        if all([len(v) == 4 for v in tdl]):
-            times, durations, units, labels = [x_ for x_ in zip(*tdl)]
-            ret = klass(times = times, durations = durations, units = units[0], labels=labels)
-        else:
-            times, durations, units = [x_ for x_ in zip(*tdl)]
-            ret = klass(times = times, durations = durations, units=units[0])
-                
-        return ret
-    else:
-        raise ValueError("I need some intervals...")
+        units = pq.s
+
+    # convert the above into numpy arrays, apply the units 
+    times = np.array([x[0] for x in epoch_intervals]) * units
+
+    durations = np.array([x[1] for x in epoch_intervals]) * units
+    
+    labels = np.array([x[2] for x in epoch_intervals])
+    
+    klass = DataZone if zone or not check_time_units(units) else neo.Epoch
+    
+    name = kwargs.pop("name", klass.__name__)
+    
+    return klass(times, durations=durations, labels=labels, name=name)
     
 @safeWrapper
 def irregularsignal2epoch(sig, name=None, labels=None):
@@ -5679,7 +5595,7 @@ def irregularsignal2epoch(sig, name=None, labels=None):
         When an array it must have the same length as sig.
     
     """
-    from . import datatypes as dt
+    from . import datatypes
     
     if not isinstance(sig, neo.IrregularlySampledSignal):
         raise TypeError("Expecting a neo.IrregularlySampledSignal; got %s instead" % type(sig).__name__)
@@ -5691,7 +5607,7 @@ def irregularsignal2epoch(sig, name=None, labels=None):
         labels = np.array([label] * sig.times.size)
         
     elif isinstance(labels, np.ndarray):
-        if not dt.is_string(labels):
+        if not  datatypes.is_string(labels):
             raise TypeError("'labels' array has wrong dtype: %s" % labels.dtype)
         
         if labels.shape != sig.times.shape:
@@ -5766,7 +5682,7 @@ def aggregate_signals(*args, name_prefix:str, collectSD:bool=True, collectSEM:bo
     Returns a dict
     
     """
-    from . import datatypes as dt
+    from . import datatypes
     
     if len(args) == 0:
         return
@@ -5908,7 +5824,7 @@ def average_segments_old(*args, **kwargs):
         
     
     """
-    from core import datatypes as dt
+    from core import datatypes
     
     def __resample_add__(signal, new_signal):
         if new_signal.sampling_rate != signal.sampling_rate:
@@ -6827,7 +6743,7 @@ def average_segments(*args, **kwargs):
         
     TODO: simplify to average all signal with same index across segments
     """
-    from core import datatypes as dt
+    from core import datatypes
     
     
     #print(args)

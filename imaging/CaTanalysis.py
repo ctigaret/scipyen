@@ -76,7 +76,7 @@ TODO:
 #
 #           pack units of measurement:
 #
-#           units = (dt.arbitrary_units, pq.s)
+#           units = ( datatypes.arbitrary_units, pq.s)
 #
 #       CaT = CaTanalysis.computeLSCaT(spanX, spanY, fluo5, alexa, sampling, units, \
 #               name="some_name", description="some_description")
@@ -164,7 +164,7 @@ import vigra
 
 #### BEGIN pict.core modules
 import core.tiwt as tiwt
-import core.datatypes as dt
+import core.datatypes  
 #from core.patchneo import neo
 import core.strutils as strutils
 import core.curvefitting as crvf

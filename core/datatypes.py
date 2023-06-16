@@ -12,7 +12,7 @@ from __future__ import print_function
 
 #### BEGIN core python modules
 import collections 
-from collections import deque
+from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod)
 import datetime
 from enum import (Enum, IntEnum, EnumMeta)
@@ -50,6 +50,7 @@ from core import quantities as scq
 from . import xmlutils
 from . import strutils
 from .prog import safeWrapper, is_hashable, is_type_or_subclass, ImmutableDescriptor
+from core.datazone import DataZone
 
 #### END pict.core.modules
 
@@ -977,6 +978,69 @@ class AdministrationRoute(TypeEnum):
     sc = subcutaneous
     tc = transcutaneous
     gavage = peros
+    
+class Interval(collections.namedtuple("Interval", ("t0", "t1", "name", "extent"))):
+    """Encapsulates an interval of a signal.
+This can be specified by two landmarks, or by a landmark and an extent
+(or duration) - in this case is similar to a neo.Epoch or DataZone, except that
+if specifies an unique interval.
+
+This class is intended to be a light-weight, and volatile tool for accessing a
+signal subset (region or slice) used in common by neo.Epoch, DataZone and 
+SignalCursor.
+Both landmarks and the extent are defined in the signal's domain.
+        
+WARNING: the class is immutable, hence any of its instance attribute values 
+    (t0, t1, name, extent) cannot be changed.
+        
+"""
+    __slots__ = ()
+    # t0: typing.Union[numbers.Number, pq.Quantity]
+    # t1: typing.Union[numbers.Number, pq.Quantity]
+    # name: str = "Interval"
+    # extent: bool = False
+    
+    def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],
+                 t1: typing.Union[numbers.Number, pq.Quantity],
+                 name: str = "Interval", extent:bool=False):
+        OK = all(isinstance(v, numbers.Number) for v in (t0, t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0, t1))
+        
+        if not OK:
+            raise TypeError(f"Expecting scalar numbers or quantities")
+        
+        if all(isinstance(v, pq.Quantity) for v in (t0,t1)):
+            if t0.units != t1.units:
+                if not units_convertible(t0, t1):
+                    raise TypeError(f"t0 units ({t0.units}) are incompatible with t1 units ({t1.units})")
+                
+                t1 = t1.rescale(t0)
+                
+        if extent:
+            if t1 < 0:
+                raise ValueError(f"extent {t1} must be > = 0)")
+        else:
+            if t0 > t1:
+                raise ValueError(f"t0 ({t0}) should precede t1 ({t1})")
+        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = self.__class__.__name__
+
+        super().__init__()
+        
+    @classmethod
+    def from_epoch(cls:type, epoch: typing.Union[neo.Epoch, DataZone],  
+                           index: typing.Union[str, bytes, np.str_, int],
+                           duration: bool = False):
+        interval = neoutils.get_epoch_interval(epoch, index, duration=False)
+        if len(interval) == 2: # empty labels
+            if isinstance(epoch.name, str) and len(epoch.name.strip()):
+                name = epoch.name
+            else:
+                name = "Interval"
+            interval = tuple([*interval] + [name])
+            
+        return cls(*interval, extent=duration)
+
     
 @dataclass
 class Procedure:

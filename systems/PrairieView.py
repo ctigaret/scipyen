@@ -37,7 +37,7 @@ from core.neoutils import (concatenate_blocks, concatenate_signals,)
 
 import core.xmlutils as xmlutils
 import core.strutils as strutils
-import core.datatypes as dt
+import core.datatypes  
 
 import iolib.pictio as pio
 

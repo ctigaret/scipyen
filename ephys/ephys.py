@@ -161,7 +161,7 @@ from functools import singledispatch
 import warnings
 import typing, types
 from enum import Enum, IntEnum
-from dataclasses import MISSING
+from dataclasses import (dataclass, MISSING)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -187,8 +187,8 @@ from core.datazone import DataZone
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
-from core import datatypes as dt
-from core.datatypes import TypeEnum
+from core import datatypes
+from core.datatypes import TypeEnum, Interval
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
@@ -212,79 +212,13 @@ if __debug__:
 
     __debug_count__ = 0
     
-class Interval(collections.namedtuple("Interval", ("t0", "t1", "name"))):
-    """Encapsulates a closed interval of a signal between landmarks.
-    The landmarks are in the signal's domain.
-"""
-    __slots__ = ()
+# class Interval(typing.NamedTuple):
     
-    def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity], 
-                 t1: typing.Union[numbers.Number, pq.Quantity],
-                 name:str = "Interval"):
-        OK = all(isinstance(v, numbers.Number) for v in (t0,t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0,t1))
-        
-        if not OK:
-            raise TypeError(f"Expecting scalar numbers or quantities")
-        
-        if all(isinstance(v, pq.Quantity) for v in (t0,t1)):
-            if t0.units != t1.units:
-                if not units_convertible(t0,t1):
-                    raise TypeError(f"t0 units ({t0.units}) are incompatible with t1 units ({t1.units})")
-                
-                t1 = t1.rescale(t0)
-                
-        if t0 > t1:
-            raise ValueError(f"t0 comes after t1")
-        
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            name = self.__class__.__name__
-
-        self.__init__()
-        
-    @classmethod
-    def from_epoch(cls:type, epoch: typing.Union[neo.Epoch, DataZone],  
-                           index: typing.Union[str, bytes, np.str_, int]):
-        interval = neoutils.get_epoch_interval(epoch, index, duration=False)
-        return cls(*interval)
-    
-class Extent(collections.namedtuple("Extent", ("t0", "t1", "name"))):
-    """Encapsulates a closed interval of a signal given a landmark and an extension.
-    The landmark and the extension are defined in the signal domain.
-"""
-    __slots__ = ()
-    
-    def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity], 
-                 t1: typing.Union[numbers.Number, pq.Quantity],
-                 name:str = "Extent"):
-        OK = all(isinstance(v, numbers.Number) for v in (t0,t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0,t1))
-        
-        if not OK:
-            raise TypeError(f"Expecting scalar numbers or quantities")
-        
-        if all(isinstance(v, pq.Quantity) for v in (t0,t1)):
-            if t1 < 0*t1.units:
-                raise ValueError(f"duration (t1) must be >= 0")
-            
-            if t0.units != t1.units:
-                if not units_convertible(t0,t1):
-                    raise TypeError(f"t0 units ({t0.units}) are incompatible with t1 units ({t1.units})")
-                
-                t1 = t1.rescale(t0)
-                
-            elif t1 <= 0:
-                raise ValueError(f"duration (t1) must be >= 0")
-                
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            name = self.__class__.__name__
-
-        self.__init__()
-        
-        
-
-class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "location"))):
+class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "location", "name"))):
     __slots__ = ()
     def __init__(func:typing.Union[types.FunctionType, typing.Callable], 
-                 location:typing.Union[SignalCursor, neo.Epoch, DataZone, Interval, Extent]):
+                 location:typing.Union[SignalCursor, neo.Epoch, DataZone, Interval, type(MISSING)],
+                 name:str):
         params = get_func_param_types(func)
         if len(params) == 0:
             raise TypeError("'func' must be a function with annotated signature")
@@ -292,7 +226,6 @@ class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locati
         plist = [(p, t) for p,t in params.items()]
         sigpartype = plist[0][1]
         locpartype = plist[1][1]
-        
         
         if isinstance(sigpartype, (tuple, list)):
             if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
@@ -307,8 +240,15 @@ class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locati
         
         super().__init__()
         
-
-class SignalMeasureAtLocation(collections.namedtuple("SignalMeasureAtLocation", ("func", "location"))):
+    def __call__(signal:typing.Union[neo.AnalogSignal, DataSignal],
+                 channel:typing.Union[int]=None):
+        
+        if isinstance(self.location, (neo.Epoch, DataZone)):
+            kwargs["intervals"] = MISSING
+            
+        return self.func(signal, self.location, **kwargs)
+        
+class SignalMeasureAtLocation(LocationMeasure):
     """Functor to calculate a signal measure at a single location.
     'func' is the actual function that calculates the measure.
     'locator' is a SignalCursor, a neo.Epoch, a DataZone, or an interval.
@@ -338,27 +278,27 @@ class SignalMeasureAtLocation(collections.namedtuple("SignalMeasureAtLocation", 
     __slots__ = ()
     
     def __init__(self, func, location):
-        params = get_func_param_types(func)
-        if len(params) == 0:
-            raise TypeError("'func' must be a function with annotated signature")
+#         params = get_func_param_types(func)
+#         if len(params) == 0:
+#             raise TypeError("'func' must be a function with annotated signature")
+#         
+#         plist = [(p, t) for p,t in params.items()]
+#         sigpartype = plist[0][1]
+#         locpartype = plist[1][1]
+#         
+#         
+#         if isinstance(sigpartype, (tuple, list)):
+#             if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
+#                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
+#             
+#         elif isinstance(sigpartype, type):
+#             if sigpartype not in (neo.AnalogSignal, DataSignal):
+#                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
+#             
+#         if type(location) not in locpartype:
+#             raise TypeError(f"Invalid location type {type(location).__name__} for the function {func}")
         
-        plist = [(p, t) for p,t in params.items()]
-        sigpartype = plist[0][1]
-        locpartype = plist[1][1]
-        
-        
-        if isinstance(sigpartype, (tuple, list)):
-            if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
-                raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-            
-        elif isinstance(sigpartype, type):
-            if sigpartype not in (neo.AnalogSignal, DataSignal):
-                raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-            
-        if type(location) not in locpartype:
-            raise TypeError(f"Invalid location type {type(location).__name__} for the function {func}")
-        
-        super().__init__()
+        super().__init__(func, location)
     
     def __call__(self, signal: typing.Union[neo.AnalogSignal, DataSignal],
                  **kwargs):
@@ -1006,8 +946,8 @@ def epoch_reduce(func:types.FunctionType,
                 
         if len(epoch) > 1:
             if intervals is None or isinstance(intervals, type(MISSING)):
-                intervals = [neoutils.get_epoch_interval(epoch, i) for i in range(len(epoch))]
                 if isinstance(intervals, type(MISSING)):
+                    intervals = [neoutils.get_epoch_interval(epoch, i) for i in range(len(epoch))]
                     # get all signal slices
                     slice_times = [(i[0][0] if i[0].ndim > 0 else i[0], i[1][0] if i[1].ndim > 0 else i[1]) for i in intervals]
                     slices = [signal.time_slice(*t) for t in slice_times]
@@ -2257,90 +2197,6 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     return ret
 
 @safeWrapper
-def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch or DataZone from a sequence of intervals.
-    All numeric values in the intervals must be python Quantities.
-    
-    TODO: 2023-06-13 23:48:09
-    
-    Var-positional parameters:
-    --------------------------
-    
-    Interval tuples with 2 or 3 elements, in the format:
-    
-    (number or quantity, number or quantity)        
-    
-    OR
-    
-    (number or quantity, number or quantity, str)
-    
-    NOTE: When args contains only one element, this can sequence of interval
-    tuples as above.
-    
-    WARNING: 
-    • The first two elements of the interval tuples, when quantities, MUST have
-        compatible units (i.e. units that can be inter-converted)
-    
-    • The structure of the interval tuples is NOT checked 
-    
-    Var-keyword parameters:
-    -----------------------
-    
-    duration:bool, default is False; flags the semantic of the second element in
-            the interval tuples in *args
-    
-        When True, the interval tuples in args are supposed to contain
-            (start, duration, …)
-    
-        When False, the tuples are supposed to contain (start, stop, …)
-    
-    zone:bool, default is False; flags whether to FORCE creation of a DataZone 
-        object (this is always True when the interval tuples are quantities with
-        units other than time units)
-    
-    prefix: str, default is 'interval'; the default prefix for interval names when the tuples 
-        contain only two elements
-    
-    name:str, default is "poech" or "zone", depending on that is returned; this 
-        is the name of the gerenated neo.Epoch or DataZone object
-
-"""
-    duration = kwargs.pop("duration", False)
-    zone = kwargs.pop("zone", False)
-    prefix = kwargs.pop("prefix", "interval")
-    
-    if len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(v, (tuple, list)) for v in args[0]):
-        args = args[0]
-    
-    # NOTE: 2023-06-14 09:28:22
-    # this is something like
-    # (start, stop or duration, label) - all this does is to make tuple intervals
-    # consistent with this scheme
-    epoch_intervals = list(map(lambda x: (x[1][0], x[1][1], x[1][2] if len(x[1])==3 else f"{prefix}_{x[0]}"), enumerate(args)))
-
-    # cache the units, because conversion froma list to a numpy array 'slices'
-    # them out
-    if isinstance(epoch_intervals[0][0], pq.Quantity):
-        units = epoch_intervals[0][0].units
-    else:
-        units = pq.s
-
-    times = np.array([x[0] for x in epoch_intervals]) * units
-
-    durations = np.array([x[1] for x in epoch_intervals]) * units
-
-    if not duration:
-        durations -= times
-
-    labels = np.array([x[2] for x in epoch_intervals])
-    
-    klass = DataZone if zone or not check_time_units(units) else neo.Epoch
-    
-    name = kwargs.pop("name", klass.__name__)
-    
-    return klass(times, durations=durations, labels=labels, name=name)
-    
-@safeWrapper
 def intervals2cursors(*args, **kwargs):
     """Construct a sequence of Signalcursor objects from a sequence of intervals.
     
@@ -3141,7 +2997,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
 
         if returnDataSignal:
             origin = 0*domain_units
-            return dt.DataSignal(y, origin=origin, **signalkwargs)
+            return  datatypes.DataSignal(y, origin=origin, **signalkwargs)
             
         else:
             return neo.AnalogSignal(y, **signalkwargs)
@@ -3280,7 +3136,7 @@ def signal_measures_in_segment(s: neo.Segment,
                             isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
     """
     TODO: 
-    Calculates several signal measures in a synaptic plasticity experiment.
+    Calculates several signal measures on a signal contained in a neo.Segment.
     
     Use location functors (SignalMeasureAtLocation and SignalMeasureAtMultipleLocations)
     
@@ -3344,7 +3200,7 @@ on the acquisition device)
     where the locations are typically set upmanually by the user (via SignalCursors
     and Epochs).
     
-    So maybe the way to fo is to use the classes 
+    So maybe the way to go is to use LocationMeasure and subclasses.
     
     
     
