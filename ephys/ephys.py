@@ -150,9 +150,9 @@ waveform_signal
 """
 
 #### BEGIN core python modules
+import collections
 import traceback
 import datetime
-import collections
 import numbers
 import inspect
 import itertools
@@ -212,11 +212,43 @@ if __debug__:
 
     __debug_count__ = 0
     
-# class Interval(typing.NamedTuple):
-    
 class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "location", "name"))):
+    """Functor to calculate a signal measure at a single location.
+    'func' is the actual function that calculates the measure.
+    'location' is one of the following types (let's call them 'locator types'):
+        • SignalCursor
+        • neo.Epoch
+        • DataZone
+        • Interval
+        or a sequence of locator types
+
+    NOTE: When locator is an Epoch or DataZone, the 'intervals' is set to MISSING. 
+    (see, e.g., epoch_reduce for what this means).
+    
+    To calculate the measure at EVERY interval in the epoch, please use the 
+    SignalMeasureAtMultipleLocations functor.
+
+    To use just one EPoch or DataZone interval, extract that interval using
+    e,g, neoutils.get_epoch_interval(…) and pass that to the constructor.
+
+    PREREQUISITES: 
+
+    1) the function passed as 'func' must acept a signal type as the first 
+    parameter (one can use a more generic functor e.g. cursor_reduce etc by using
+    a functool.partial)
+
+    2) When 'func' expects several location (passed as individual parameters,
+    or as varioadic parameters) 'location' MUST be a sequence of locators, the 'func' should also expect a sequence
+    of locations; the 'location' will be passed 'unwrapped'
+
+    2) the type and number of the location(s) should be consistent with the 
+    function passed to the constructor of this functor
+
+
+
+"""
     __slots__ = ()
-    def __init__(func:typing.Union[types.FunctionType, typing.Callable], 
+    def __init__(self, func:typing.Union[types.FunctionType, typing.Callable], 
                  location:typing.Union[SignalCursor, neo.Epoch, DataZone, Interval, type(MISSING)],
                  name:str):
         params = get_func_param_types(func)
@@ -240,51 +272,113 @@ class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locati
         
         super().__init__()
         
-    def __call__(signal:typing.Union[neo.AnalogSignal, DataSignal],
-                 channel:typing.Union[int]=None):
+    def __call__(self, signal:typing.Union[neo.AnalogSignal, DataSignal],
+                 channel:typing.Union[int]=None, **kwargs):
         
         if isinstance(self.location, (neo.Epoch, DataZone)):
-            kwargs["intervals"] = MISSING
+            kwargs["intervals"] = MISSING   
+            
+        if isinstance(self.location, (tuple, list)):
+            return self.func(signal, *self.location, **kwargs)
             
         return self.func(signal, self.location, **kwargs)
         
-class SignalMeasureAtLocation(LocationMeasure):
-    """Functor to calculate a signal measure at a single location.
-    'func' is the actual function that calculates the measure.
-    'locator' is a SignalCursor, a neo.Epoch, a DataZone, or an interval.
-
-    NOTE: When locator is an Epoch or DataZone, the 'intervals' is set to MISSING. 
-    (see, e.g., epoch_reduce for what this means).
-    
-    To calculate the measure at EVERY interval in the epoch, please use the 
-    SignalMeasureAtMultipleLocations functor.
-
-    To use just one EPoch or DataZone interval, extract that interval using
-    e,g, neoutils.get_epoch_interval(…) and pass that to the constructor.
-
-    PREREQUISITES: 
-
-    1) the function passed as func must acept a signal type as the first 
-    parameter (one can use a more geenric functor e.g. cursor_reduce etc by 
-    by creating a partial function, e.g. using functools.partial)
-
-    2) the type of location should be consistent with the function that
-    is wrapped by this functor, i.e.,, do NOT pass a cursors to an interval
-    or epoch function, etc.
-
-
-"""
-
-    __slots__ = ()
-    
-    def __init__(self, func, location):
+# class SignalMeasureAtLocation(LocationMeasure):
+#     """Functor to calculate a signal measure at a single location.
+#     'func' is the actual function that calculates the measure.
+#     'locator' is a SignalCursor, a neo.Epoch, a DataZone, or an interval.
+# 
+#     NOTE: When locator is an Epoch or DataZone, the 'intervals' is set to MISSING. 
+#     (see, e.g., epoch_reduce for what this means).
+#     
+#     To calculate the measure at EVERY interval in the epoch, please use the 
+#     SignalMeasureAtMultipleLocations functor.
+# 
+#     To use just one EPoch or DataZone interval, extract that interval using
+#     e,g, neoutils.get_epoch_interval(…) and pass that to the constructor.
+# 
+#     PREREQUISITES: 
+# 
+#     1) the function passed as func must acept a signal type as the first 
+#     parameter (one can use a more geenric functor e.g. cursor_reduce etc by 
+#     by creating a partial function, e.g. using functools.partial)
+# 
+#     2) the type of location should be consistent with the function that
+#     is wrapped by this functor, i.e.,, do NOT pass a cursors to an interval
+#     or epoch function, etc.
+# 
+# 
+# """
+# 
+#     __slots__ = ()
+#     
+#     def __init__(self, func, location):
+# #         params = get_func_param_types(func)
+# #         if len(params) == 0:
+# #             raise TypeError("'func' must be a function with annotated signature")
+# #         
+# #         plist = [(p, t) for p,t in params.items()]
+# #         sigpartype = plist[0][1]
+# #         locpartype = plist[1][1]
+# #         
+# #         
+# #         if isinstance(sigpartype, (tuple, list)):
+# #             if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
+# #                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
+# #             
+# #         elif isinstance(sigpartype, type):
+# #             if sigpartype not in (neo.AnalogSignal, DataSignal):
+# #                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
+# #             
+# #         if type(location) not in locpartype:
+# #             raise TypeError(f"Invalid location type {type(location).__name__} for the function {func}")
+#         
+#         super().__init__(func, location)
+#     
+#     def __call__(self, signal: typing.Union[neo.AnalogSignal, DataSignal],
+#                  **kwargs):
+#         """Applies this functor to the signal.
+#     Additional arugments to the called function are passed via **kwargs.
+#     Please see the class docstring for how the intervals of an Epoch or DataZone
+#     are handled.
+#     """
+#         if isinstance(self.location, (neo.Epoch, DataZone)):
+#             kwargs["intervals"] = MISSING
+#             
+#         return self.func(signal, self.location, **kwargs)
+# 
+# class SignalMeasureAtMultipleLocations(collections.namedtuple("SignalMeasureAtMultipleLocations", ("func", "locations"))):
+#     """functor to calculate a signal measure at several locations.
+#     'func' is the actual function that calculates the measure.
+#     'locator' is a sequence of SignalCursor or intervals, OR a neo.Epoch or DataZone.
+#     
+#     NOTE: a sequence of Epoch or DataZone is NOT supported (these objects already
+#     encapsulate a sequence of locations).
+#     
+#     To use just ONE Epoch or DataZone interval, use SignalMeasureAtLocation
+#     with just the one interval (although this can also be passed here, wrapped in 
+#     a sequence).
+#     
+#     PREREQUISITES: 
+# 
+#     1) the function passed as func must acept a signal type as the first 
+#     parameter (one can use a more geenric functor e.g. cursor_reduce etc by 
+#     by creating a partial function, e.g. using functools.partial)
+# 
+#     2) the type of locations should be consistent with the function that
+#     is wrapped by this functor, i.e.,, do NOT pass cursors to an intervals
+#     or epoch function, etc. WARNING: this is not checked !.
+# 
+# """
+#     __slots__ = ()
+#     
+#     def __init__(self, func, location):
 #         params = get_func_param_types(func)
 #         if len(params) == 0:
 #             raise TypeError("'func' must be a function with annotated signature")
 #         
 #         plist = [(p, t) for p,t in params.items()]
 #         sigpartype = plist[0][1]
-#         locpartype = plist[1][1]
 #         
 #         
 #         if isinstance(sigpartype, (tuple, list)):
@@ -295,74 +389,15 @@ class SignalMeasureAtLocation(LocationMeasure):
 #             if sigpartype not in (neo.AnalogSignal, DataSignal):
 #                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
 #             
-#         if type(location) not in locpartype:
-#             raise TypeError(f"Invalid location type {type(location).__name__} for the function {func}")
-        
-        super().__init__(func, location)
-    
-    def __call__(self, signal: typing.Union[neo.AnalogSignal, DataSignal],
-                 **kwargs):
-        """Applies this functor to the signal.
-    Additional arugments to the called function are passed via **kwargs.
-    Please see the class docstring for how the intervals of an Epoch or DataZone
-    are handled.
-    """
-        if isinstance(self.location, (neo.Epoch, DataZone)):
-            kwargs["intervals"] = MISSING
-            
-        return self.func(signal, self.location, **kwargs)
-
-class SignalMeasureAtMultipleLocations(collections.namedtuple("SignalMeasureAtMultipleLocations", ("func", "locations"))):
-    """functor to calculate a signal measure at several locations.
-    'func' is the actual function that calculates the measure.
-    'locator' is a sequence of SignalCursor or intervals, OR a neo.Epoch or DataZone.
-    
-    NOTE: a sequence of Epoch or DataZone is NOT supported (these objects already
-    encapsulate a sequence of locations).
-    
-    To use just ONE Epoch or DataZone interval, use SignalMeasureAtLocation
-    with just the one interval (although this can also be passed here, wrapped in 
-    a sequence).
-    
-    PREREQUISITES: 
-
-    1) the function passed as func must acept a signal type as the first 
-    parameter (one can use a more geenric functor e.g. cursor_reduce etc by 
-    by creating a partial function, e.g. using functools.partial)
-
-    2) the type of locations should be consistent with the function that
-    is wrapped by this functor, i.e.,, do NOT pass cursors to an intervals
-    or epoch function, etc. WARNING: this is not checked !.
-
-"""
-    __slots__ = ()
-    
-    def __init__(self, func, location):
-        params = get_func_param_types(func)
-        if len(params) == 0:
-            raise TypeError("'func' must be a function with annotated signature")
-        
-        plist = [(p, t) for p,t in params.items()]
-        sigpartype = plist[0][1]
-        
-        
-        if isinstance(sigpartype, (tuple, list)):
-            if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
-                raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-            
-        elif isinstance(sigpartype, type):
-            if sigpartype not in (neo.AnalogSignal, DataSignal):
-                raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-            
-        super().__init__()
-    
-    def __call__(self, signal: typing.Union[neo.AnalogSignal, DataSignal],
-                 **kwargs):
-        """Applies this functor to the signal.
-    Additional arugments to the called function are passed via **kwargs.
-    """
-        
-        return self.func(signal, *self.locations, **kwargs)
+#         super().__init__()
+#     
+#     def __call__(self, signal: typing.Union[neo.AnalogSignal, DataSignal],
+#                  **kwargs):
+#         """Applies this functor to the signal.
+#     Additional arugments to the called function are passed via **kwargs.
+#     """
+#         
+#         return self.func(signal, *self.locations, **kwargs)
 
 
     
@@ -1494,9 +1529,12 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
         When None, the function returns a subdiensional array if the signal is 
         a multi-channel signal (i.e. has more than one trace)
     
-    subfun: types.FunctionType. A function which takes a numpy array and returns 
-            a value(*).
+    subfun: types.FunctionType. 
+        A function which takes a numpy array and returns a value(*).
     
+        Used when 'func' itself is a functor (i.e. takes a function as parameter) 
+        and represents the function passed to the call of 'func'.
+            
         Such functions include those in the numpy package `np.min`, `np.max`,
         `np.mean`, `np.median`, `np.std`, `np.var`, (and their 'nan' versions),
         and functions defined in Scipyen's core.signalprocessing module (e.g.,
@@ -1511,6 +1549,10 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
         parameter is ALWAYS 0 (i.e. we use the 'domain' axis of the signals).
 
         (*) This value can be a scalar, or a tuple of scalars (e.g. sigp.maxmin)
+    
+        NOTE: Alternatively, one can wrap a functor in a functools.partial by
+        fixing its function parameter to the 'subfunction', and pass this
+        partial as 'func' parameter here.
             
     Returns:
     -------
@@ -2676,7 +2718,9 @@ def signal_measures_in_segment(s: neo.Segment,
                             signal: typing.Union[int, str],
                             command_signal: typing.Optional[typing.Union[int, str]] = None,
                             trigger_signal: typing.Optional[typing.Union[int, str]] = None,
-                            locations: typing.Optional[typing.Union[neo.Epoch, typing.Sequence[typing.Sequence[numbers.Number]], typing.Sequence[str], typing.Sequence[typing.Sequence[pq.Quantity]], typing.Sequence[SignalCursor]]]=None,
+                            locations: typing.Optional[typing.Union[neo.Epoch, SignalCursor, Interval, 
+                                                                    typing.Sequence[SignalCursor],
+                                                                    typing.Sequence[Interval]]]=None,
                             membraneTest: typing.Optional[typing.Union[float, pq.Quantity, neo.Epoch, typing.Sequence[typing.Sequence[numbers.Number]], typing.Sequence[str], typing.Sequence[typing.Sequence[pq.Quantity]], typing.Sequence[SignalCursor]]]=None,
                             stim: typing.Optional[TriggerEvent]=None,
                             isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
