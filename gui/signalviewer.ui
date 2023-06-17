@@ -168,6 +168,7 @@
     <addaction name="actionShow_Legends"/>
     <addaction name="actionIgnore_empty_spike_trains"/>
     <addaction name="actionLink_X_axes"/>
+    <addaction name="actionShow_Cursor_Edit_Dialog_When_Created"/>
    </widget>
    <widget class="QMenu" name="cursorsMenu">
     <property name="title">
@@ -223,6 +224,7 @@
     <addaction name="addCursorsMenu"/>
     <addaction name="editCursorsMenu"/>
     <addaction name="removeCursorsMenu"/>
+    <addaction name="actionVerticalCursorsFromEpoch"/>
     <addaction name="separator"/>
     <addaction name="setCursorsShowValue"/>
     <addaction name="setCursorsLabelPrecisionAction"/>
@@ -576,6 +578,29 @@
    </property>
    <property name="toolTip">
     <string>Unlink all X axes</string>
+   </property>
+  </action>
+  <action name="actionShow_Cursor_Edit_Dialog_When_Created">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="settings-configure">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Edit Cursor At Creation</string>
+   </property>
+   <property name="toolTip">
+    <string>Show Cursor Editing Dialog When Created</string>
+   </property>
+  </action>
+  <action name="actionVerticalCursorsFromEpoch">
+   <property name="text">
+    <string>From Epoch...</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Vertical Cursors From Epoch</string>
    </property>
   </action>
  </widget>

@@ -182,11 +182,11 @@ from .prog import (safeWrapper, deprecation,
                    )#SignatureDict)
 
 from .datatypes import (is_string, is_vector,
-                        RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN, Interval)
+                        RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
 from .quantities import (units_convertible, check_time_units, name_from_unit)
 from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from .datazone import DataZone
+from .datazone import (DataZone, Interval)
 from .triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
 from . import workspacefunctions

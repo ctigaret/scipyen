@@ -183,12 +183,12 @@ from PyQt5 import QtGui, QtCore
 #### BEGIN pict.core modules
 from core.prog import (safeWrapper, with_doc, get_func_param_types)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-from core.datazone import DataZone
+from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes
-from core.datatypes import TypeEnum, Interval
+from core.datatypes import TypeEnum
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
@@ -1742,148 +1742,148 @@ def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     
 
-@safeWrapper
-def intervals2cursors(*args, **kwargs):
-    """Construct a sequence of Signalcursor objects from a sequence of intervals.
-    
-    NOTE: In this context, an interval must not be confused with the arithmetic 
-    concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)
-
-    Variadic parameters:
-    --------------------
-    triplets (t0,t1,label), or a sequence of tuples or triplets
-    each specifying an interval
-    
-    """
-    from gui.cursors import SignalCursor
-    signal_viewer = kwargs.pop("signal_viewer", None)
-
-    axis = kwargs.pop("axis", None)
-    if not isinstance(axis, (int, pg.PlotItem, type(None))):
-        raise TypeError("axis expected to be an int, a PlotItem or None; got %s instead" % type(axis).__name__)
-
-    sort = kwargs.pop("sort", True)
-    
-    if not isinstance(sort, bool):
-        raise TypeError("sort must be a boolean")
-    
-    def __generate_cursor_params__(value):
-        # BUG 2023-06-13 23:47:28 what if no label?!?
-        # start, stop, label
-        if not isinstance(value, (tuple, list)) or len(value) != 3:
-            raise TypeError("expecting a tuple of 3 elements")
-        
-        if not isinstance(value[2], str) or len(value[2].strip()) == 0:
-            raise ValueError("expecting a non-empty string as third element in the tuple")
-        
-        l = value[2]
-        
-        if not all([isinstance(v, (pq.Quantity, numbers.Number)) for v in value[0:2]]):
-            raise TypeError("interval boundaries must be scalar numbers or quantities")
-        
-        if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
-            if any([v.size != 1 for v in value[0:2]]):
-                raise TypeError("interval boundaries must be scalar quantities")
-            
-            if value[0].units != value[1].units:
-                if not units_convertible(value[0], value[1]):
-                    raise TypeError("interval boundaries must have compatible units")
-                
-                else:
-                    value = [float(value[0]), float(value[1].rescale(value[0].units)), value[2]]
-                    
-            else:
-                value = [float(v) for v in value[0:2]] + [value[2]]
-            
-        x, xwindow = (value[0], value[1]-value[0])
-        
-        if xwindow < 0:
-            raise ValueError("interval cannot have negative duration")
-        
-        x += xwindow/2. 
-        
-        return (x, xwindow, l)
-     
-    xwl = None
-    
-    if len(args) == 1:
-        if isinstance(args[0], (tuple, list)):
-            if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
-                if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
-                    # this can be an interval tuple
-                    xwl = [__generate_cursor_params__(args[0])] # BUG 2023-06-13 23:47:28 what if no label?!?
-                    
-                elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-                    # or a sequence of tuples -- feed this into __generate_cursor_params__
-                    # and hope for the best
-                    if sort:
-                        xwl = [__generate_cursor_params__(v) for v in sorted(args[0], key=lambda x: x[0])]
-                    
-                    else:
-                        xwl = [__generate_cursor_params__(v) for v in args[0]]
-                    
-                else:
-                    raise TypeError("incorrect syntax")
-                
-            else:
-                if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-                    if sort:
-                        xwl = [__generate_cursor_params__(v) for v in sorted(args[0], key=lambda x: x[0])]
-
-        else:
-            raise TypeError("expecting a sequence of tuples, or a 2- or 3- tuple")
-        
-    else:
-        # sequence of 2- or 3- tuples
-        if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args]):
-            if sort:
-                xwl = [__generate_cursor_params__(v) for v in sorted(args, key=lambda x: x[0])]
-            
-            else:
-                xwl = [__generate_cursor_params__(v) for v in args]
-        
-        else:
-            raise TypeError("expecting 2- or 3- tuples")
-        
-    if xwl is not None:
-        if axis is not None:
-            cursors = [SignalCursor(axis, x=p[0], xwindow=p[1], cursorID=p[2], 
-                                    cursor_type=SignalCursorTypes.vertical) for p in xwl]
-                
-        if isinstance(signal_viewer, SignalViewer):
-            if isinstance(axis, pg.PlotItem):
-                if axis not in signal_viewer.axes:
-                    return cursors
-                
-            elif isinstance(axis, pg.GraphicsScene):
-                if axis is not signal_viewer.signalsLayout.scene():
-                    return cursors
-                
-            cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
-            cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-            cursorPen.setCosmetic(True)
-            hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
-            hoverPen.setCosmetic(True)
-            linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-            linkedPen.setCosmetic(True)
-            if isinstance(axis, pg.PlotItem):
-                cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
-            elif isinstance(axis, pg.GraphicsScene):
-                pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
-                cursorPrecision = min(pi_precisions)
-                
-            else: 
-                cursorPrecision = None
-               
-            for c in cursors:
-                signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
-                                             linkedPen=linkedPen,
-                                             precision=cursorPrecision,
-                                             showValue = signal_viewer.cursorsShowValue)
-        
-            return cursors
-        
-        return xwl
+# @safeWrapper
+# def intervals2cursors(*args, **kwargs):
+#     """Construct a sequence of Signalcursor objects from a sequence of intervals.
+#     
+#     NOTE: In this context, an interval must not be confused with the arithmetic 
+#     concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)
+# 
+#     Variadic parameters:
+#     --------------------
+#     triplets (t0,t1,label), or a sequence of tuples or triplets
+#     each specifying an interval
+#     
+#     """
+#     from gui.cursors import SignalCursor
+#     signal_viewer = kwargs.pop("signal_viewer", None)
+# 
+#     axis = kwargs.pop("axis", None)
+#     if not isinstance(axis, (int, pg.PlotItem, type(None))):
+#         raise TypeError("axis expected to be an int, a PlotItem or None; got %s instead" % type(axis).__name__)
+# 
+#     sort = kwargs.pop("sort", True)
+#     
+#     if not isinstance(sort, bool):
+#         raise TypeError("sort must be a boolean")
+#     
+#     def __generate_cursor_params__(value):
+#         # BUG 2023-06-13 23:47:28 what if no label?!?
+#         # start, stop, label
+#         if not isinstance(value, (tuple, list)) or len(value) != 3:
+#             raise TypeError("expecting a tuple of 3 elements")
+#         
+#         if not isinstance(value[2], str) or len(value[2].strip()) == 0:
+#             raise ValueError("expecting a non-empty string as third element in the tuple")
+#         
+#         l = value[2]
+#         
+#         if not all([isinstance(v, (pq.Quantity, numbers.Number)) for v in value[0:2]]):
+#             raise TypeError("interval boundaries must be scalar numbers or quantities")
+#         
+#         if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
+#             if any([v.size != 1 for v in value[0:2]]):
+#                 raise TypeError("interval boundaries must be scalar quantities")
+#             
+#             if value[0].units != value[1].units:
+#                 if not units_convertible(value[0], value[1]):
+#                     raise TypeError("interval boundaries must have compatible units")
+#                 
+#                 else:
+#                     value = [float(value[0]), float(value[1].rescale(value[0].units)), value[2]]
+#                     
+#             else:
+#                 value = [float(v) for v in value[0:2]] + [value[2]]
+#             
+#         x, xwindow = (value[0], value[1]-value[0])
+#         
+#         if xwindow < 0:
+#             raise ValueError("interval cannot have negative duration")
+#         
+#         x += xwindow/2. 
+#         
+#         return (x, xwindow, l)
+#      
+#     xwl = None
+#     
+#     if len(args) == 1:
+#         if isinstance(args[0], (tuple, list)):
+#             if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
+#                 if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
+#                     # this can be an interval tuple
+#                     xwl = [__generate_cursor_params__(args[0])] # BUG 2023-06-13 23:47:28 what if no label?!?
+#                     
+#                 elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
+#                     # or a sequence of tuples -- feed this into __generate_cursor_params__
+#                     # and hope for the best
+#                     if sort:
+#                         xwl = [__generate_cursor_params__(v) for v in sorted(args[0], key=lambda x: x[0])]
+#                     
+#                     else:
+#                         xwl = [__generate_cursor_params__(v) for v in args[0]]
+#                     
+#                 else:
+#                     raise TypeError("incorrect syntax")
+#                 
+#             else:
+#                 if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
+#                     if sort:
+#                         xwl = [__generate_cursor_params__(v) for v in sorted(args[0], key=lambda x: x[0])]
+# 
+#         else:
+#             raise TypeError("expecting a sequence of tuples, or a 2- or 3- tuple")
+#         
+#     else:
+#         # sequence of 2- or 3- tuples
+#         if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args]):
+#             if sort:
+#                 xwl = [__generate_cursor_params__(v) for v in sorted(args, key=lambda x: x[0])]
+#             
+#             else:
+#                 xwl = [__generate_cursor_params__(v) for v in args]
+#         
+#         else:
+#             raise TypeError("expecting 2- or 3- tuples")
+#         
+#     if xwl is not None:
+#         if axis is not None:
+#             cursors = [SignalCursor(axis, x=p[0], xwindow=p[1], cursorID=p[2], 
+#                                     cursor_type=SignalCursorTypes.vertical) for p in xwl]
+#                 
+#         if isinstance(signal_viewer, SignalViewer):
+#             if isinstance(axis, pg.PlotItem):
+#                 if axis not in signal_viewer.axes:
+#                     return cursors
+#                 
+#             elif isinstance(axis, pg.GraphicsScene):
+#                 if axis is not signal_viewer.signalsLayout.scene():
+#                     return cursors
+#                 
+#             cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
+#             cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+#             cursorPen.setCosmetic(True)
+#             hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
+#             hoverPen.setCosmetic(True)
+#             linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+#             linkedPen.setCosmetic(True)
+#             if isinstance(axis, pg.PlotItem):
+#                 cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
+#             elif isinstance(axis, pg.GraphicsScene):
+#                 pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+#                 cursorPrecision = min(pi_precisions)
+#                 
+#             else: 
+#                 cursorPrecision = None
+#                
+#             for c in cursors:
+#                 signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
+#                                              linkedPen=linkedPen,
+#                                              precision=cursorPrecision,
+#                                              showValue = signal_viewer.cursorsShowValue)
+#         
+#             return cursors
+#         
+#         return xwl
 
 @safeWrapper
 def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],

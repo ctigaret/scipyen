@@ -1,12 +1,15 @@
+import collections, numbers, typing, itertools
 from copy import deepcopy, copy
 
 import numpy as np
 import quantities as pq
-
+import neo
 from neo.core.baseneo import BaseNeo, merge_annotations
 from neo.core.dataobject import DataObject, ArrayDict
+import pyqtgraph as pg
 
 from core import quantities as cq
+from .prog import (safeWrapper, with_doc)
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,
@@ -525,14 +528,6 @@ def intervals2epoch(*args, **kwargs):
     Var-keyword parameters:
     -----------------------
     
-    duration:bool, default is False; flags the semantic of the second element in
-            the interval tuples in *args
-    
-        When True, the interval tuples in args are supposed to contain
-            (start, duration, …)
-    
-        When False, the tuples are supposed to contain (start, stop, …)
-    
     zone:bool, default is False; flags whether to FORCE creation of a DataZone 
         object (this is always True when the interval tuples are quantities with
         units other than time units)
@@ -561,7 +556,7 @@ def intervals2epoch(*args, **kwargs):
     if not all(isinstance(a, Interval) for a in args):
         raise TypeError(f"Expecting a sequence of Interval objects")
     
-    # also takes care of getting durations right, for "true" intervals, and
+    # takes care of getting durations right, for "true" intervals, and also
     # checks interval labels uniqueness
     interval_labels = [] # used in the comprehension below,via __make_unique_label__
     epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_unique_label__(x.name, interval_labels)), args))
@@ -640,7 +635,8 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     """
     
     from gui.signalviewer import SignalViewer
-    from gui.cursors import SignalCursor
+    from gui.cursors import SignalCursor, SignalCursorTypes
+    from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
@@ -705,20 +701,58 @@ def intervals2cursors(*args,
                       axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
                       **kwargs):
     from gui.signalviewer import SignalViewer
-    from gui.cursors import SignalCursor
+    from gui.cursors import SignalCursor, SignalCursorTypes
+    from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
+    
     if not isinstance(keep_units, bool):
         keep_units = False
         
-    ret = [(i.t0+i.t1/2 if i.extent else i.t0 + (i.t1 - i.t0)/2, i.t1 if t.extent else i.t1-it0, i.label)]
+    def __strip_units__(v):
+        return float(v.magnitude) if (isinstance(v, pq.Quantity) and not keep_units) else v
+        
+    ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip__units__(i.t0 + (i.t1 - i.t0)/2), __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0), i.name) for i in args]
+
+    signal_viewer = kwargs.pop("signal_viewer", None)
     
-    if not keep_units:
-        pass
-    if keep_units:
-        ret = [(t + d/2. if d else t, d if d else 0*t.units, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels, range(len(epoch)))]
+    if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
+        cursors = [SignalCursor(axis, x = t, window = d, cursorID=l,
+                                cursor_type=SignalCursorTypes.vertical,
+                                parent=axis, relative=True) for (t,d,l) in ret]
         
-    else:
-        ret = [(t + d/2. if d else t, d if d else 0, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
+        if isinstance(signal_viewer, SignalViewer):
+            if isinstance(axis, pg.PlotItem):
+                if axis not in signal_viewer.axes:
+                    return cursors
+                
+            elif isinstance(axis, pg.GraphicsScene):
+                if axis is not signal_viewer.signalsLayout.scene():
+                    return cursors
+                
+            cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
+            cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            cursorPen.setCosmetic(True)
+            hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
+            hoverPen.setCosmetic(True)
+            linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            linkedPen.setCosmetic(True)
+            if isinstance(axis, pg.PlotItem):
+                cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
+            elif isinstance(axis, pg.GraphicsScene):
+                pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+                cursorPrecision = min(pi_precisions)
+                
+            else: 
+                cursorPrecision = None
+               
+            for c in cursors:
+                signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
+                                             linkedPen=linkedPen,
+                                             precision=cursorPrecision,
+                                             showValue = signal_viewer.cursorsShowValue)
         
+        return cursors
+    
+    return ret
     

@@ -13,8 +13,10 @@ from gui import guiutils as guiutils
 
 import numpy as np
 import quantities as pq
+import neo
 
 from core.prog import (safeWrapper, with_doc)
+from core.quantities import check_time_units
 
 class SignalCursorTypes(enum.Enum):
     """Enumeration of signal cursor types.
@@ -1984,7 +1986,7 @@ def cursors2epoch(*args, **kwargs):
         values_ = []
         
         for k,c in enumerate(values):
-            p = c.params
+            p = c.parameters
             if all([isinstance(v, pq.Quantity) for v in p[0:2]]):
                 if p[0].units != p[1].units:
                     if not units_convertible(p[0], p[1]):
@@ -2011,11 +2013,11 @@ def cursors2epoch(*args, **kwargs):
         else:
             use_durations = True # to generate neo.Epoch or DataZone
         
-        # if use_durations:
-        if durations:
-            return [(v[0]-v[1]/2., v[1],         f"{k}") if len(v) in (2,4) else (v[0]-v[1]/2., v[1],         v[-1]) for k,v in enumerate(values)]
+        # if durations:
+        if use_durations:
+            return [(v[0]-v[1]/2., v[1],         f"{k}") if len(p) in (2,4) else (v[0]-v[1]/2., v[1],         v[-1]) for k,v in enumerate(values_)]
         else:
-            return [(v[0]-v[1]/2., v[0]+v[1]/2., f"{k}") if len(v) in (2,4) else (v[0]-v[1]/2., v[0]+v[1]/2., v[-1]) for k,v in enumerate(values)]
+            return [(v[0]-v[1]/2., v[0]+v[1]/2., f"{k}") if len(p) in (2,4) else (v[0]-v[1]/2., v[0]+v[1]/2., v[-1]) for k,v in enumerate(values_)]
             
     #### END __parse_cursors_params__
     
@@ -2027,7 +2029,6 @@ def cursors2epoch(*args, **kwargs):
         if isinstance(args[0], (tuple, list)):
             if all ([isinstance(c, SignalCursor) for c in args[0]]):
                 if all([c.cursorTypeName in ("vertical", "crosshair")  for c in args[0]]):
-                    # t_d_i = __parse_cursors_params__(*[c.parameters for c in args[0]])                    
                     t_d_i = __parse_cursors_params__(*args[0])                    
                 else:
                     raise TypeError("Expecting only vertical or crosshair cursors")
@@ -2035,13 +2036,6 @@ def cursors2epoch(*args, **kwargs):
             else:
                 raise TypeError("Expecting a sequence of SignalCursor objects")
                 
-#             elif all([isinstance(c, (tuple, list)) for c in args[0]]):
-#                 if all([len(c) in (2,3,5) for c in args[0]]):
-#                     t_d_i = __parse_cursors_params__(args[0])
-#                     
-#                 else:
-#                     raise TypeError("All cursor parameter tuples must have two or three elements")
-#                          
         elif isinstance(args[0], SignalCursor):
             if args[0].cursorType is SignalCursorTypes.horizontal:
                 raise TypeError("Expecting a vertical or crosshair cursor")
@@ -2051,12 +2045,6 @@ def cursors2epoch(*args, **kwargs):
         else:
             raise TypeError(f"Expecting a SignalCursor; instead, got {type(args[0]).__name__}")
             
-#         elif len(args[0] == 3):
-#             t_d_i = __parse_cursors_params__([args[0]])
-#             
-#         else:
-#             raise TypeError("Unexpected argument type %s" % type(args[0]).__name__)
-        
     else:
         if all([isinstance(c, SignalCursor) for c in args]):
             if all ([c.cursorTypeName in ("vertical", "crosshair") for c in args]):

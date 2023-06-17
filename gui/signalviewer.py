@@ -153,7 +153,7 @@ from core.triggerprotocols import TriggerProtocol
 # NOTE: 2021-11-13 16:27:30
 # new types: DataMark and DataZone
 from core.triggerevent import (TriggerEvent, TriggerEventType, DataMark)
-from core.datazone import DataZone
+from core.datazone import (DataZone, Interval, intervals2epoch, epoch2cursors)
 from core.workspacefunctions import validate_varname
 from core.scipyen_config import markConfigurable
 from core.traitcontainers import DataBag
@@ -164,7 +164,7 @@ from core.strutils import (InflectEngine, get_int_sfx)
 from imaging.vigrautils import kernel2array
 
 from ephys import ephys as ephys
-from ephys.ephys import cursors2epoch
+# from ephys.ephys import cursors2epoch
 
 #from core.patchneo import *
 
@@ -179,7 +179,7 @@ from gui import scipyen_colormaps as colormaps
 
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from gui.dictviewer import (InteractiveTreeWidget, DataViewer,)
-from gui.cursors import (SignalCursor, SignalCursorTypes)
+from gui.cursors import (SignalCursor, SignalCursorTypes, cursors2epoch)
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import GuiWorker
 from gui.itemslistdialog import ItemsListDialog
@@ -506,6 +506,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self._cursorWindowSizeX_ = self.defaultCursorWindowSizeX
         self._cursorWindowSizeY_ = self.defaultCursorWindowSizeY
+        
+        self._editCursorOnCreation_ = False
         
         self._crosshairSignalCursors_ = dict() # a dict of SignalCursors mapping str name to cursor object
         self._verticalSignalCursors_ = dict()
@@ -892,6 +894,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.horizontalCursorColorsAction.triggered.connect(self._slot_setHorizontalCursorColors)
         self.crosshairCursorColorsAction.triggered.connect(self._slot_setCrosshairCursorColors)
         self.cursorHoverColorAction.triggered.connect(self._slot_setCursorHoverColor)
+        self.actionShow_Cursor_Edit_Dialog_When_Created.toggled.connect(self._slot_setEditCursorWhenCreated)
+        self.actionVerticalCursorsFromEpoch.triggered.connect(self._slot_makeVerticalCursorsFromEpoch)
         #### END Cursor actions
         
         #### BEGIN Epoch actions
@@ -1066,6 +1070,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def commonAxesXPadding(self, value:float):
         self._common_axes_X_padding_ = value
         # self._align_X_range()
+        
+    @property
+    def editCursorUponCreation(self):
+        return self._editCursorOnCreation_
+    
+    @markConfigurable("EditCursorWhenCreated", "qt")
+    @editCursorUponCreation.setter
+    def editCursorUponCreation(self, value:bool):
+        self._editCursorOnCreation_ = True
     
     @property
     def visibleDocks(self):
@@ -2563,6 +2576,8 @@ anything else       anything else       ❌
         labels  = kwargs.pop("labels",  None)
         axis    = kwargs.pop("axis",    None)
         
+        showEditor = kwargs.pop("editFirst", False)
+        
         if len(self.plotItems) == 0:
             axis = self.signalsLayout.scene()
 
@@ -2650,7 +2665,8 @@ anything else       anything else       ❌
                        xwindow=xwindow, ywindow=ywindow,
                        label=labels, 
                        show_value = self.setCursorsShowValue.isChecked(),
-                       axis = axis)
+                       axis = axis, 
+                       editFirst = showEditor)
         
     
     def addCursor(self, cursorType: typing.Union[str, SignalCursorTypes] = "c", 
@@ -2663,6 +2679,7 @@ anything else       anything else       ❌
                   label: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None, 
                   follows_mouse: bool = False, 
                   axis: typing.Optional[int] = None, 
+                  editFirst: bool=False,
                   **kwargs):
         """ Add a cursor to the selected axes in the signal viewer window.
 
@@ -2721,6 +2738,7 @@ anything else       anything else       ❌
                                 axis = axis, label=label,
                                 follows_mouse=follows_mouse,
                                 precision = self.cursorLabelPrecision,
+                                editFirst = editFirst,
                                 **kwargs)
         
         self.slot_selectCursor(crsID)
@@ -3378,7 +3396,6 @@ anything else       anything else       ❌
         
         #print(f"_set_cursors_color for {cursortype}: name {name} color {color}; traitname {traitname}")
         
-        
         for cursor in cursors:
             if cursortype == "hover":
                 pen = cursor.hoverPen
@@ -3405,7 +3422,8 @@ anything else       anything else       ❌
                     axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None,
                     label:typing.Optional[str] = None, 
                     follows_mouse: bool = False, 
-                    precision:typing.Optional[int]=None, 
+                    precision:typing.Optional[int] = None, 
+                    editFirst: bool = False,
                     **kwargs) -> str:
         """Common landing zone for signal cursor creation methods.
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
@@ -3609,8 +3627,8 @@ anything else       anything else       ❌
                 if len(self.plotItems):
                     pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                     precision = min(pi_precisions)
-            
-        cursorDict[crsId] = SignalCursor(axis, 
+                    
+        cursor = SignalCursor(axis, 
                                    x = x, y = y, xwindow=xwindow, ywindow=ywindow,
                                    cursor_type = cursor_type,
                                    cursorID = crsId,
@@ -3626,13 +3644,208 @@ anything else       anything else       ❌
                                    precision = precision,
                                    **kwargs)
         
+        cursorDict[crsId] = cursor
+        
         cursorDict[crsId].sig_cursorSelected[str].connect(self.slot_selectCursor)
         cursorDict[crsId].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
         cursorDict[crsId].sig_doubleClicked[str].connect(self.slot_editCursor)
         cursorDict[crsId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
         cursorDict[crsId].sig_editMe[str].connect(self.slot_editCursor)
         
+        if editFirst:
+            crsId = self._editCursor_(crsId=crsId)
+        
         return crsId
+    
+    def _editCursor_(self, crsId=None, choose=False):
+        from core.utilities import counter_suffix
+        
+        if len(self._data_cursors_) == 0:
+            return
+        
+        cursor = None
+        
+        if crsId is None:
+            cursor = self.selectedDataCursor # get the selected cursor if no ID given
+                
+        else:
+            cursor = self.dataCursor(crsId) # otherwise try to get cursor with given ID
+            
+        # if neither returned a valid cursor, then 
+        if cursor is None:
+            if not choose:
+                cursor = self.sender() # use the sender() only when not choosing
+            
+            if not isinstance(cursor, SignalCursor): # but if sender is not a cursor then force making a choice
+                cursor = None
+                choose = True
+        
+        if cursor is not None: # we actually did get a cursor in the end, 
+            if crsId is None:
+                crsId = cursor.ID # make sure we also have its id
+                
+        initialID = crsId
+                
+        if choose:
+            d = qd.QuickDialog(self, "Edit cursor")
+            cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
+            cursorComboBox.setItems([c for c in self._data_cursors_])
+            
+            d.cursorComboBox = cursorComboBox
+            
+            d.cursorComboBox.connectIndexChanged(partial(self._slot_updateCursorEditorDlg_, d=d))
+        
+        else:
+            d = qd.QuickDialog(self, "Edit cursor %s" % crsId)
+        
+        namePrompt = qd.StringInput(d, "Name:")
+        namePrompt.variable.setClearButtonEnabled(True)
+        namePrompt.variable.redoAvailable=True
+        namePrompt.variable.undoAvailable=True
+        
+        d.namePrompt = namePrompt
+       
+        if cursor is not None:
+            if cursor.cursorTypeName in ("vertical", "crosshair"):
+                promptX = qd.FloatInput(d, "X coordinate:")
+                promptX.variable.setClearButtonEnabled(True)
+                promptX.variable.redoAvailable=True
+                promptX.variable.undoAvailable=True
+
+                d.promptX = promptX
+            
+                promptXWindow = qd.FloatInput(d, "Horizontal window size:")
+                promptXWindow.variable.setClearButtonEnabled(True)
+                promptXWindow.variable.redoAvailable=True
+                promptXWindow.variable.undoAvailable=True
+
+                d.promptXWindow = promptXWindow
+            
+            if cursor.cursorTypeName in ("horizontal", "crosshair"):
+                promptY = qd.FloatInput(d, "Y coordinate:")
+                promptY.variable.setClearButtonEnabled(True)
+                promptY.variable.redoAvailable=True
+                promptY.variable.undoAvailable=True
+
+                d.promptY = promptY
+            
+                promptYWindow = qd.FloatInput(d, "Vertical window size:")
+                promptYWindow.variable.setClearButtonEnabled(True)
+                promptYWindow.variable.redoAvailable=True
+                promptYWindow.variable.undoAvailable=True
+
+                d.promptYWindow = promptYWindow
+                
+        else: # creates a cursor? FIXME/TODO 2023-06-17 14:14:26
+            promptX = qd.FloatInput(d, "X coordinate:")
+            promptX.variable.setClearButtonEnabled(True)
+            promptX.variable.redoAvailable=True
+            promptX.variable.undoAvailable=True
+
+            d.promptX = promptX
+        
+            promptXWindow = qd.FloatInput(d, "Horizontal window size:")
+            promptXWindow.variable.setClearButtonEnabled(True)
+            promptXWindow.variable.redoAvailable=True
+            promptXWindow.variable.undoAvailable=True
+
+            d.promptXWindow = promptXWindow
+            
+            promptY = qd.FloatInput(d, "Y coordinate:")
+            promptY.variable.setClearButtonEnabled(True)
+            promptY.variable.redoAvailable=True
+            promptY.variable.undoAvailable=True
+
+            d.promptY = promptY
+        
+            promptYWindow = qd.FloatInput(d, "Vertical window size:")
+            promptYWindow.variable.setClearButtonEnabled(True)
+            promptYWindow.variable.redoAvailable=True
+            promptYWindow.variable.undoAvailable=True
+
+            d.promptYWindow = promptYWindow
+                
+        if not isinstance(crsId, str): # populate dialog fields w/ data
+            crsId = [c for c in self._data_cursors_.keys()][0]
+            
+        d.staysInAxesCheckBox = qd.CheckBox(d, "Stays in axis")
+        d.followMouseCheckBox = qd.CheckBox(d, "Follow Mouse")
+        d.showsValueCheckBox = qd.CheckBox(d, "Label shows value")
+        
+        self._slot_updateCursorEditorDlg_(crsId, d)
+            
+        if d.exec() == QtWidgets.QDialog.Accepted:
+            if choose: # choose cursor as per dialog; otherwise cursor is set above
+                crsId = cursorComboBox.text() 
+                cursor = self.dataCursor(crsId)
+                initialID = crsId
+                
+            if cursor is None: # bail out
+                return
+            
+            name = d.namePrompt.text() # when a name change is desired this would be different from the cursor's id
+            
+            if initialID is not None:
+                if name is not None and len(name.strip()) > 0 and name != initialID: # change cursor id if new name not empty
+                    cursorNames = [c.ID for c in self.cursors]
+                    if name in cursorNames:
+                        newName = counter_suffix(name, cursorNames, "")
+                        
+                        namedlg = qd.QuickDialog(self, f"A cursors named {name} already exists")
+                        namedlg.addLabel(f"Rename {name}")
+                        pw = qd.StringInput(namedlg, "To: ")
+                        pw.variable.undoAvailable = True
+                        pw.variable.redoAvailable = True
+                        pw.variable.setClearButtonEnabled(True)
+                        pw.setText(newName)
+                        namedlg.addWidget(pw)
+                        
+                        if namedlg.exec() == 0:
+                            return
+                        else:
+                            name = pw.text()
+                            if name in cursorNames and name != initialID:
+                                self.errorMessage("Edit cursor", f"Cursors must have unique names; reverting to the original ('{initialID}')")
+                                name = initialID
+                            
+                    cursor.ID = name
+                    
+                    if cursor.isVertical:
+                        self._verticalSignalCursors_.pop(initialID)
+                        self._verticalSignalCursors_[cursor.ID] = cursor
+                        
+                    elif cursor.isHorizontal:
+                        self._horizontalSignalCursors_.pop(initialID)
+                        self._horizontalSignalCursors_[cursor.ID] = cursor
+                        
+                    else:
+                        self._crosshairSignalCursors_.pop(initialID)
+                        self._crosshairSignalCursors_[cursor.ID] = cursor
+                        
+            if cursor.isVertical:
+                cursor.x = d.promptX.value()
+                cursor.xwindow = d.promptXWindow.value()
+                
+            elif cursor.isHorizontal:
+                cursor.y = d.promptY.value()
+                cursor.ywindow = d.promptYWindow.value()
+                
+            else:
+                cursor.x = d.promptX.value()
+                cursor.xwindow = d.promptXWindow.value()
+                cursor.y = d.promptY.value()
+                cursor.ywindow = d.promptYWindow.value()
+                
+            cursor.staysInAxes  = d.staysInAxesCheckBox.isChecked()
+            cursor.followsMouse = d.followMouseCheckBox.isChecked()
+            cursor.showsValue   = d.showsValueCheckBox.isChecked()
+            
+        if hasattr(d, "cursorComboBox"):
+            d.cursorComboBox.disconnect()
+                
+        del d
+        
+        return cursor.ID if cursor else None
     
     def getAxis_xDataPrecision(self, axis):
         #pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
@@ -3756,21 +3969,24 @@ anything else       anything else       ❌
     def slot_addVerticalCursor(self, label = None, follows_mouse=False):
         return self._addCursor_("vertical", axis=self._selected_plot_item_, 
                                   label=label, follows_mouse=follows_mouse,
-                                  show_value=self.setCursorsShowValue.isChecked())
+                                  show_value=self.setCursorsShowValue.isChecked(),
+                                  editFirst = self.editCursorUponCreation)
     
     @pyqtSlot()
     @safeWrapper
     def slot_addHorizontalCursor(self, label=None, follows_mouse=False):
         return self._addCursor_("horizontal", axis=self._selected_plot_item_, 
                                   label=label, follows_mouse=follows_mouse,
-                                  show_value=self.setCursorsShowValue.isChecked())
+                                  show_value=self.setCursorsShowValue.isChecked(),
+                                  editFirst = self.editCursorUponCreation)
         
     @pyqtSlot()
     @safeWrapper
     def slot_addCrosshairCursor(self, label=None, follows_mouse=False):
         return self._addCursor_("crosshair", axis=self._selected_plot_item_, 
                                   label=label, follows_mouse=follows_mouse,
-                                  show_value=self.setCursorsShowValue.isChecked())
+                                  show_value=self.setCursorsShowValue.isChecked(),
+                                  editFirst = self.editCursorUponCreation)
     
     @pyqtSlot()
     @safeWrapper
@@ -3877,21 +4093,25 @@ anything else       anything else       ❌
     @safeWrapper
     def slot_addDynamicCrosshairCursor(self, label=None):
         return self._addCursor_("crosshair", item=self._selected_plot_item_, 
-                                  label=label, follows_mouse=True)
+                                  label=label, follows_mouse=True, 
+                                  editFirst = self.editCursorUponCreation)
     
     @pyqtSlot()
     @safeWrapper
     def slot_addDynamicVerticalCursor(self, label=None):
         return self._addCursor_("vertical", item=self._selected_plot_item_, 
-                                  label=label, follows_mouse=True)
+                                  label=label, follows_mouse=True,
+                                  editFirst = self.editCursorUponCreation)
     
     @pyqtSlot()
     @safeWrapper
     def slot_addDynamicHorizontalCursor(self, label=None):
         return self._addCursor_("horizontal", item=self._selected_plot_item_, 
-                                  label=label, follows_mouse=True)
+                                  label=label, follows_mouse=True,
+                                  editFirst = self.editCursorUponCreation)
     
-    def _construct_multi_axis_vertical_(self, label=None, dynamic=False):
+    def _construct_multi_axis_vertical_(self, label=None, dynamic=False,
+                                        editFirst = False):
         # print(f"{self.__class__.__name__}._construct_multi_axis_vertical_ label = {label}, dynamic = {dynamic}")
         # NOTE: 2020-02-26 14:37:50
         # code being migrated to _addCursor_()
@@ -3923,20 +4143,25 @@ anything else       anything else       ❌
                 precision = min(pi_precisions)
             return self._addCursor_("vertical", axis=self.signalsLayout.scene(), 
                                     label=label, follows_mouse=dynamic, xBounds=xbounds,
-                                    precision=precision)
+                                    precision=precision,
+                                    editFirst=editFirst)
         
     
     @pyqtSlot()
     @safeWrapper
     def slot_addMultiAxisVerticalCursor(self, label=None):
-        self._construct_multi_axis_vertical_(label=label)
+        askForParams = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        self._construct_multi_axis_vertical_(label=label, editFirst=askForParams)
         
     @pyqtSlot()
     @safeWrapper
     def slot_addDynamicMultiAxisVerticalCursor(self, label=None):
-        self._construct_multi_axis_vertical_(label=label, dynamic=True)
+        self._construct_multi_axis_vertical_(label=label, dynamic=True,
+                                             editFirst = self.editCursorUponCreation)
         
-    def _construct_multi_axis_crosshair_(self, label=None, dynamic=False):
+    def _construct_multi_axis_crosshair_(self, label=None, dynamic=False,
+                                         editFirst=False):
         # NOTE: 2020-02-26 14:39:09
         # see  NOTE: 2020-02-26 14:37:50
         if self.signalsLayout.scene() is not None:
@@ -3962,18 +4187,21 @@ anything else       anything else       ❌
             
             return self._addCursor_("crosshair", axis=self.signalsLayout.scene(), 
                                     label=label, follows_mouse=dynamic, 
-                                    xBounds = xbounds, yBounds = ybounds)
+                                    xBounds = xbounds, yBounds = ybounds,
+                                    editFirst = editFirst)
         
         
     @pyqtSlot()
     @safeWrapper
     def slot_addMultiAxisCrosshairCursor(self, label=None):
-        self._construct_multi_axis_crosshair_(label=label)
+        self._construct_multi_axis_crosshair_(label=label, 
+                                              editFirst = self.editCursorUponCreation)
         
     @pyqtSlot()
     @safeWrapper
     def slot_addDynamicMultiAxisCrosshairCursor(self, label=None):
-        self._construct_multi_axis_crosshair_(label=label, dynamic=True)
+        self._construct_multi_axis_crosshair_(label=label, dynamic=True,
+                                              editFirst = self.editCursorUponCreation)
         
     @safeWrapper
     def removeCursors(self):
@@ -4142,196 +4370,67 @@ anything else       anything else       ❌
         return
         # print(f"{self.__class__.__name__} ({self.windowTitle()}) slot_cursorMenu RMB click on {crsId}")
         
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_makeVerticalCursorsFromEpoch(self):
+            if isinstance(self._yData_, neo.Block):
+                segments = self._yData_.segments
+                
+            elif isinstance(self._yData_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._yData_):
+                segments = self._yData_
+                
+            elif isinstance(self._yData_, neo.Segment):
+                segments = [self._yData_]
+                
+            elif isinstance(self._yData_, neo.core.basesignal.BaseSignal):
+                if self._yData_.segment is None:
+                    return
+                
+                segments = [self._yData_.segment]
+                
+            else:
+                return
+            
+            if len(segments) == 0:
+                return
+            
+            epochs = segments[self.currentFrame].epochs
+            
+            if len(epochs) == 0:
+                return
+            
+            epoch_names = [e.name for e in epochs]
+            seldlg = ItemsListDialog(self, itemsList = epoch_names,
+                                     title="Select epoch",
+                                     selectmode = QtWidgets.QAbstractItemView.SingleSelection)
+            ans = seldlg.exec_()
+            if ans != QtWidgets.QDialog.Accepted:
+                return
+            
+            selItems = seldlg.selectedItemsText
+            
+            if len(selItems) == 0:
+                return
+            
+            else:
+                selItem = selItems[0]
+                
+            selEpoch = [e for e in epochs if e.name == selItem]
+            
+            if len(selEpoch) == 0:
+                warnings.warn(f"There's no epoch named {selItem}")
+                return
+            
+            selEpoch = selEpoch[0]
+            
+            cursors = epoch2cursors(selEpoch, axis=self.currentAxis,
+                                    signal_viewer = self)
+            
     @pyqtSlot(str)
     @pyqtSlot(bool)
     @safeWrapper
     def slot_editCursor(self, crsId=None, choose=False):
-        from core.utilities import counter_suffix
-        
-        if len(self._data_cursors_) == 0:
-            return
-        
-        cursor = None
-        
-        if crsId is None:
-            cursor = self.selectedDataCursor # get the selected cursor if no ID given
-                
-        else:
-            cursor = self.dataCursor(crsId) # otherwise try to get cursor with given ID
-            
-        # if neither returned a valid cursor, then 
-        if cursor is None:
-            if not choose:
-                cursor = self.sender() # use the sender() only when not choosing
-            
-            if not isinstance(cursor, SignalCursor): # but if sender is not a cursor then force making a choice
-                cursor = None
-                choose = True
-        
-        if cursor is not None: # we actually did get a cursor in the end, 
-            if crsId is None:
-                crsId = cursor.ID # make sure we also have its id
-                
-        initialID = crsId
-                
-        if choose:
-            d = qd.QuickDialog(self, "Edit cursor")
-            cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
-            cursorComboBox.setItems([c for c in self._data_cursors_])
-            
-            d.cursorComboBox = cursorComboBox
-            
-            d.cursorComboBox.connectIndexChanged(partial(self._slot_updateCursorEditorDlg_, d=d))
-        
-        else:
-            d = qd.QuickDialog(self, "Edit cursor %s" % crsId)
-        
-        namePrompt = qd.StringInput(d, "Name:")
-        namePrompt.variable.setClearButtonEnabled(True)
-        namePrompt.variable.redoAvailable=True
-        namePrompt.variable.undoAvailable=True
-        
-        d.namePrompt = namePrompt
-       
-        if cursor is not None:
-            if cursor.cursorTypeName in ("vertical", "crosshair"):
-                promptX = qd.FloatInput(d, "X coordinate:")
-                promptX.variable.setClearButtonEnabled(True)
-                promptX.variable.redoAvailable=True
-                promptX.variable.undoAvailable=True
-
-                d.promptX = promptX
-            
-                promptXWindow = qd.FloatInput(d, "Horizontal window size:")
-                promptXWindow.variable.setClearButtonEnabled(True)
-                promptXWindow.variable.redoAvailable=True
-                promptXWindow.variable.undoAvailable=True
-
-                d.promptXWindow = promptXWindow
-            
-            if cursor.cursorTypeName in ("horizontal", "crosshair"):
-                promptY = qd.FloatInput(d, "Y coordinate:")
-                promptY.variable.setClearButtonEnabled(True)
-                promptY.variable.redoAvailable=True
-                promptY.variable.undoAvailable=True
-
-                d.promptY = promptY
-            
-                promptYWindow = qd.FloatInput(d, "Vertical window size:")
-                promptYWindow.variable.setClearButtonEnabled(True)
-                promptYWindow.variable.redoAvailable=True
-                promptYWindow.variable.undoAvailable=True
-
-                d.promptYWindow = promptYWindow
-                
-        else:
-            promptX = qd.FloatInput(d, "X coordinate:")
-            promptX.variable.setClearButtonEnabled(True)
-            promptX.variable.redoAvailable=True
-            promptX.variable.undoAvailable=True
-
-            d.promptX = promptX
-        
-            promptXWindow = qd.FloatInput(d, "Horizontal window size:")
-            promptXWindow.variable.setClearButtonEnabled(True)
-            promptXWindow.variable.redoAvailable=True
-            promptXWindow.variable.undoAvailable=True
-
-            d.promptXWindow = promptXWindow
-            
-            promptY = qd.FloatInput(d, "Y coordinate:")
-            promptY.variable.setClearButtonEnabled(True)
-            promptY.variable.redoAvailable=True
-            promptY.variable.undoAvailable=True
-
-            d.promptY = promptY
-        
-            promptYWindow = qd.FloatInput(d, "Vertical window size:")
-            promptYWindow.variable.setClearButtonEnabled(True)
-            promptYWindow.variable.redoAvailable=True
-            promptYWindow.variable.undoAvailable=True
-
-            d.promptYWindow = promptYWindow
-                
-        if not isinstance(crsId, str): # populate dialog fields w/ data
-            crsId = [c for c in self._data_cursors_.keys()][0]
-            
-        d.staysInAxesCheckBox = qd.CheckBox(d, "Stays in axis")
-        d.followMouseCheckBox = qd.CheckBox(d, "Follow Mouse")
-        d.showsValueCheckBox = qd.CheckBox(d, "Label shows value")
-        
-        self._slot_updateCursorEditorDlg_(crsId, d)
-            
-        if d.exec() == QtWidgets.QDialog.Accepted:
-            if choose: # choose cursor as per dialog; otherwise cursor is set above
-                crsId = cursorComboBox.text() 
-                cursor = self.dataCursor(crsId)
-                initialID = crsId
-                
-            if cursor is None: # bail out
-                return
-            
-            name = d.namePrompt.text() # when a name change is desired this would be different from the cursor's id
-            
-            if initialID is not None:
-                if name is not None and len(name.strip()) > 0 and name != initialID: # change cursor id if new name not empty
-                    cursorNames = [c.ID for c in self.cursors]
-                    if name in cursorNames:
-                        newName = counter_suffix(name, cursorNames, "")
-                        
-                        namedlg = qd.QuickDialog(self, f"A cursors named {name} already exists")
-                        namedlg.addLabel(f"Rename {name}")
-                        pw = qd.StringInput(namedlg, "To: ")
-                        pw.variable.undoAvailable = True
-                        pw.variable.redoAvailable = True
-                        pw.variable.setClearButtonEnabled(True)
-                        pw.setText(newName)
-                        namedlg.addWidget(pw)
-                        
-                        if namedlg.exec() == 0:
-                            return
-                        else:
-                            name = pw.text()
-                            if name in cursorNames and name != initialID:
-                                self.errorMessage("Edit cursor", f"Cursors must have unique names; reverting to the original ('{initialID}')")
-                                name = initialID
-                            
-                    cursor.ID = name
-                    
-                    if cursor.isVertical:
-                        self._verticalSignalCursors_.pop(initialID)
-                        self._verticalSignalCursors_[cursor.ID] = cursor
-                        
-                    elif cursor.isHorizontal:
-                        self._horizontalSignalCursors_.pop(initialID)
-                        self._horizontalSignalCursors_[cursor.ID] = cursor
-                        
-                    else:
-                        self._crosshairSignalCursors_.pop(initialID)
-                        self._crosshairSignalCursors_[cursor.ID] = cursor
-                        
-            if cursor.isVertical:
-                cursor.x = d.promptX.value()
-                cursor.xwindow = d.promptXWindow.value()
-                
-            elif cursor.isHorizontal:
-                cursor.y = d.promptY.value()
-                cursor.ywindow = d.promptYWindow.value()
-                
-            else:
-                cursor.x = d.promptX.value()
-                cursor.xwindow = d.promptXWindow.value()
-                cursor.y = d.promptY.value()
-                cursor.ywindow = d.promptYWindow.value()
-                
-            cursor.staysInAxes  = d.staysInAxesCheckBox.isChecked()
-            cursor.followsMouse = d.followMouseCheckBox.isChecked()
-            cursor.showsValue   = d.showsValueCheckBox.isChecked()
-            
-        if hasattr(d, "cursorComboBox"):
-            d.cursorComboBox.disconnect()
-                
-        del d
+        self._editCursor_(crsId, choose)
     
     @pyqtSlot(str)
     @safeWrapper
@@ -4870,8 +4969,15 @@ anything else       anything else       ❌
                 scipyenWindow.assignToWorkspace(name, epoch)
         
     @safeWrapper
-    def cursorsToEpoch(self, *cursors, name:typing.Optional[str] = None, embed:bool = False, all_segments:bool = True, relative_to_segment_start:bool=False, overwrite:bool = False):
-        """Creates a neo.Epoch from a list of cursors
+    def cursorsToEpoch(self, *cursors, name:typing.Optional[str] = None, 
+                       embed:bool = False, 
+                       all_segments:bool = True, 
+                       relative_to_segment_start:bool=False, 
+                       overwrite:bool = False):
+        """Creates a neo.Epoch from a list of vertical cursors.
+        
+        Each cursor contributes to one epoch interval with duration equal to the 
+        cursor's xwindow, and time equal to cursor's x - xindow/2
         
         Parameters:
         ===========
@@ -4951,6 +5057,8 @@ anything else       anything else       ❌
         else:
             if any([c.cursorType not in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair) for c in cursors]):
                 raise ValueError("Expecting only vertical or crosshair cursors")
+            
+        
                 
         if name is None or (isinstance(name, str) and len(name.strip())) == 0:
             if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
@@ -4974,8 +5082,10 @@ anything else       anything else       ❌
             # epochs that are out of the signal domain, in each segment
             if isinstance(self._yData_, neo.Block):
                 segments = self._yData_.segments
+                
             elif isinstance(self._yData_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._yData_):
                 segments = self._yData_
+                
             elif isinstance(self._yData_, neo.Segment):
                 segments = [self._yData_]
                 
@@ -4992,16 +5102,19 @@ anything else       anything else       ❌
                 return
                 
             seg_starts = [segment_start(s) for s in segments]
+            
             if not all(ss == seg_starts[0] for ss in seg_starts):
                 epochs = list()
                 current_seg_start = segment_start(segments[self.currentFrame])
                 
                 rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                
                 # print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
                 for k, seg in enumerate(segments):
                     s_start = seg_starts[k]
                     epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
-                    seg_epoch = cursors2epoch(*epoch_tuples, name=name)
+                    intervals = [Interval(s_start + rel_starts[i],cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
+                    seg_epoch = intervals2epoch(*epoch_tuples, name=name)
                     epochs.append(seg_epoch)
                     if embed:
                         if overwrite:
@@ -5015,19 +5128,25 @@ anything else       anything else       ❌
                 
         if isinstance(self._yData_, neo.Block):
             t_units = self._yData_.segments[self.frameIndex[self._current_frame_index_]].t_start.units
+            
         elif isinstance(self._yData_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._yData_):
             t_units = self._yData_[self.frameIndex[self._current_frame_index_]].t_start.units
+            
         elif isinstance(self._yData_, neo.Segment):
             t_units = self._yData_.t_start.units
+            
         elif isinstance(self._yData_, neo.core.basesignal.BaseSignal):
             if self._yData_.segment is None:
+                
                 return
             t_units = self._yData_.times[0].units
+            
         else:
             t_units = pq.s # reasonable default (although not necessarily always applicable !!!)
         
         # returns a neo.Epoch or a DataZone depending on the _yData_ units
-        epoch = cursors2epoch(*cursors, name=name, sort=True, units = t_units)
+        epoch = cursors2epoch(*cursors, name=name, sort=True, units = t_units,
+                              durations=True)
         
         if embed:
             if isinstance(self._yData_, neo.Block):
@@ -5102,32 +5221,32 @@ anything else       anything else       ❌
                 
         return epoch
     
-    def cursorToEpoch(self, crs=None, name=None):
-        """Creates a neo.Epoch from a single cursor
-        DEPRECATED superceded by the new cursorsToEpoch
-        """
-        if crs is None:
-            return
-        
-        if crs.isHorizontal:
-            return
-        
-        if name is None:
-            d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
-            d.promptWidgets = list()
-            d.promptWidgets.append(qd.StringInput(d, "Name:"))
-            #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
-            d.promptWidgets[0].setText("Epoch from "+crs.ID)
-            
-            if d.exec() == QtWidgets.QDialog.Accepted:
-                txt = d.promptWidgets[0].text()
-                if txt is not None and len(txt)>0:
-                    name=txt
-                    
-            else:
-                return
-            
-        return cursors2epoch(crs, name=name)
+#     def cursorToEpoch(self, crs=None, name=None):
+#         """Creates a neo.Epoch from a single cursor
+#         DEPRECATED superceded by the new cursorsToEpoch
+#         """
+#         if crs is None:
+#             return
+#         
+#         if crs.isHorizontal:
+#             return
+#         
+#         if name is None:
+#             d = qd.QuickDialog(self, "Make Epoch From SignalCursor:")
+#             d.promptWidgets = list()
+#             d.promptWidgets.append(qd.StringInput(d, "Name:"))
+#             #d.promptWidgets.append(vigra.pyqt.qd.StringInput(d, "Name:"))
+#             d.promptWidgets[0].setText("Epoch from "+crs.ID)
+#             
+#             if d.exec() == QtWidgets.QDialog.Accepted:
+#                 txt = d.promptWidgets[0].text()
+#                 if txt is not None and len(txt)>0:
+#                     name=txt
+#                     
+#             else:
+#                 return
+#             
+#         return cursors2epoch(crs, name=name)
         
     def epochBetweenCursors(self, c0:typing.Union[SignalCursor, str], c1:typing.Union[SignalCursor, str], name:typing.Optional[str]=None, label:typing.Optional[str]=None, embed:bool = False, all_segments:bool = True, relative_to_segment_start:bool=False, overwrite:bool = False):
         """ Creates a neo.Epoch between two vertical cursors.
@@ -7162,6 +7281,10 @@ signals in the signal collection.
     @pyqtSlot(bool)
     def _slot_setXAxesLinked(self, value):
         self.xAxesLinked = value == True
+        
+    @pyqtSlot(bool)
+    def _slot_setEditCursorWhenCreated(self, value):
+        self.editCursorUponCreation = value == True
             
     @pyqtSlot(bool)
     def _slot_setCursorsShowValue(self, val):

@@ -94,6 +94,7 @@ from . import imageviewer as iv
 from . import dictviewer as dv
 from iolib import h5io, jsonio
 from iolib import pictio as pio
+from core import datazone
 from core.datazone import DataZone
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
@@ -3290,6 +3291,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
+        """Triggered by single-click of lmb in workspace viewer.
+    """
         self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
             ndx)
         try:
