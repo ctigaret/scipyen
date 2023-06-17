@@ -168,6 +168,7 @@ from neo.core.baseneo import (MergeError, _reference_name, _container_name)
 
 from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
+import pyqtgraph as pg
 
 #### END 3rd party modules
 
@@ -5464,117 +5465,158 @@ def merge_annotations(A, *Bs):
     logger.debug("Merging annotations: A=%s Bs=%s merged=%s", A, Bs, merged)
     return merged
 
-def epoch2intervals(epoch: neo.Epoch, keep_units:bool = True,
-                    duration:bool=True) -> typing.List[Interval]:
-    """Generates a sequence of datatypes.Interval objects
-    
-    Each interval coresponds to the epoch's interval.
-    
-    Parameters:
-    ----------
-    epoch: neo.Epoch
-    
-    keep_units: bool (default False)
-        When True, the t_start and t_stop in each interval are scalar python 
-        Quantity objects (units borrowed from the epoch)
-    
-    """
-    if (epoch.labels.size) > 0:
-        labels = epoch.labels
-    else:
-        labels = [f"Interval_{k}" for k in range(len(epoch))]
-        
-    if keep_units:
-        return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times, epoch.durations, labels)]
-        
-    else:
-        return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, labels)]
-    
-@safeWrapper
-def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch or DataZone from a sequence of intervals.
-    All numeric values in the intervals must be python Quantities.
-    
-    TODO: 2023-06-13 23:48:09
-    
-    Var-positional parameters:
-    --------------------------
-    
-    datatypes.Interval objects
-    
-    NOTE: When args contains only one element, this can sequence of interval
-    tuples as above.
-    
-    WARNING: 
-    • The first two elements of the interval tuples, when quantities, MUST have
-        compatible units (i.e. units that can be inter-converted)
-    
-    • The structure of the interval tuples is NOT checked 
-    
-    Var-keyword parameters:
-    -----------------------
-    
-    duration:bool, default is False; flags the semantic of the second element in
-            the interval tuples in *args
-    
-        When True, the interval tuples in args are supposed to contain
-            (start, duration, …)
-    
-        When False, the tuples are supposed to contain (start, stop, …)
-    
-    zone:bool, default is False; flags whether to FORCE creation of a DataZone 
-        object (this is always True when the interval tuples are quantities with
-        units other than time units)
-    
-    prefix: str, default is 'interval'; the default prefix for interval names when the tuples 
-        contain only two elements
-    
-    name:str, default is "epoch" or "zone", depending on that is returned; this 
-        is the name of the gerenated neo.Epoch or DataZone object
 
-"""
-    def __make_label_unique__(label, collection):
-        if label in collection:
-            label = counter_suffix(label, collection)
-        
-        collection.append(label)
-        return label
-    
-    # duration = kwargs.pop("duration", False)
-    zone = kwargs.pop("zone", False)
-    prefix = kwargs.pop("prefix", "interval")
-    
-    if len(args) == 1 and isinstance(args[0], (tuple, list)) and not isinstance(args[0], Interval):
-        args = args[0]
-    
-    if not all(isinstance(a, Interval) for a in args):
-        raise TypeError(f"Expecting a sequence of Interval objects")
-    
-    # also takes care of getting durations right, for "true" intervals
-    interval_labels = []
-    # TODO TODO TODO 2023-06-16 23:15:44 check labels uniqueness
-    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_label_unique__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_label_unique__(x.name, interval_labels)), args))
+# @safeWrapper
+# def cursors2epoch(*args, **kwargs):
+#     """Constructs a neo.Epoch from a sequence of SignalCursor objects.
+#     
+#     Each cursor contributes an interval in the Epoch, corresponding to the 
+#     cursor's horizontal (x) window. In other words, the interval's start time
+#     equals the cursor's x coordinate - ½ cursor's x window, and the duration of
+#     the interval equals the cursor's x window.
+#     
+#     """
+#     units = kwargs.get("units", pq.s)
+#     
+#     if not isinstance(units, pq.UnitQuantity):
+#         units = units.units
+#         
+#     elif not isinstance(units, pq.Quantity) or units.size > 1:
+#         raise TypeError("Units expected to be a python Quantity; got %s instead" % type(units).__name__)
+#         
+#     name = kwargs.get("name", "Epoch")
+#     
+#     if not isinstance(name, str):
+#         raise TypeError("name expected to be a string")
+#     
+#     if len(name.strip())==0:
+#         raise ValueError("name must not be empty")
+#     
+#     sort = kwargs.get("sort", True)
+#     
+#     if not isinstance(sort, bool):
+#         raise TypeError("sort must be a boolean")
+#     
+#     zone = kwargs.pop("zone", False)
+#     if not isinstance(zone, bool):
+#         raise TypeError("zone must be a boolean")
+#     
+#     #### BEGIN ------ __parse_cursors_tuples__ ---------------------------------
+#     def __parse_cursors_tuples__(*values):
+#         # NOTE: 2023-06-17 09:11:56
+#         # NOT USING intervals (tuples) ANYMORE
+#         # FOR THE intervals-based code SEE intervals* functions in ephys
+#         # -> to be moved in a core.signalintervals.py module !!!
+#         # NOTE: 2023-06-13 21:42:25
+#         # reminder - an element of values is: 
+#         # 2-tuple ⇒ x, xwindow
+#         # 3-tuple ⇒ x, xwindow, label
+#         # 4-tuple ⇒ x, xwindow, y, ywindow
+#         # 5-tuple ⇒ x, xwindow, y, ywindow, label
+#         #
+#         # pseudocode for the case of 2-tuple (easily extrapolated):
+#         # if not intervals ⇒ return (start, duration), where:
+#         #   start = x - xwindow/2; duration = xwindow     ⇒ use_durations=True
+#         # else ⇒ return:
+#         #   (start, duration) as above, if durations == True ⇒ use_durations=durations
+#         #   (start, stop) othwerise, where:                  ⇒ use_durations=durations
+#         #   start = x - xwindow/2; stop = x + xwindow/2
+#         
+#         # check for dimensionality consistency
+#         if len(values) == 1:#  allow for a sequence to be given as first argument
+#             values = values[0]
+#             
+#         #print("given values", values)
+#         values_ = list(values)
+#         
+#         for k,c in enumerate(values_):
+#             if all([isinstance(v, pq.Quantity) for v in c[0:2]]):
+#                 if c[0].units != c[1].units:
+#                     if not units_convertible(c[0], c[1]):
+#                         raise TypeError("Quantities must have compatible dimensionalities")
+#                     
+#                 values = values_ # convert back
+#                 
+#             elif all([isinstance(v, numbers.Number) for v in c[0:2]]):
+#                 if units is not None:
+#                     c_ = [v*units for v in c[0:2]]
+#                     
+#                     if len(c) > 2:
+#                         c_ += list(c[2:])
+#                         
+#                     values_[k] = tuple(c_)
+#                     
+#                 values = tuple(values_)
+#         
+#         #print("values:", values)
+#         
+#         # NOTE: 2023-06-13 21:30:34
+#         # the durations parameter is used only when intervals is True
+#         # however, when intervals is False, we need durations to construct
+#         # Epoch or DataZone
+#         # if not intervals:
+#         #     use_durations = True
+#         # else:
+#         #     use_durations = durations
+#             
+#         # if use_durations:
+#         if durations:
+#             return [(v[0]-v[1]/2., v[1],         f"{k}") if len(v) in (2,4) else (v[0]-v[1]/2., v[1],         v[-1]) for k,v in enumerate(values)]
+#         else:
+#             return [(v[0]-v[1]/2., v[0]+v[1]/2., f"{k}") if len(v) in (2,4) else (v[0]-v[1]/2., v[0]+v[1]/2., v[-1]) for k,v in enumerate(values)]
+#         
+#     #### END ------- __parse_cursors_tuples__ ---------------------------------
+#             
+#     if len(args) == 0:
+#         raise ValueError("Expecting at least one argument")
+#     
+#     if len(args) == 1:
+#         if isinstance(args[0], (tuple, list)):
+#             if all ([isinstance(c, SignalCursor) for c in args[0]]):
+#                 if all([c.cursorTypeName in ("vertical", "crosshair")  for c in args[0]]):
+#                     t_d_i = __parse_cursors_tuples__(*[c.parameters for c in args[0]])                    
+#                 else:
+#                     raise TypeError("Expecting only vertical or crosshair cursors")
+#                 
+#             else:
+#                 raise TypeError("Expecting a sequence of signal cursors")
+#                 
+#         elif isinstance(args[0], SignalCursor):
+#             if args[0].cursorType is SignalCursorTypes.horizontal:
+#                 raise TypeError("Expecting a vertical or crosshair cursor")
+#             
+#             t_d_i = __parse_cursors_tuples__([args[0].parameters])
+#             
+#         else:
+#             raise TypeError(f"Expecting a SignalCursor; got {type(args[0]).__name__} instead")
+#             
+#     else:
+#         if all([isinstance(c, SignalCursor) for c in args]):
+#             if all ([c.cursorTypeName in ("vertical", "crosshair") for c in args]):
+#                 t_d_i = __parse_cursors_tuples__([c.parameters for c in args])
+#                 
+#             else:
+#                 raise TypeError("Expecting only vertical or crosshair cursors")
+#             
+#         else:
+#             raise TypeError("Expecting a sequence of SignalCursor")
+#             
+#     if sort:
+#         t_d_i = sorted(t_d_i, key=lambda x: x[0])
+# 
+#     t, d, i = [v for v in zip(*t_d_i)]
+#     
+#     if isinstance(t[0], pq.Quantity):
+#         units = t[0].units
+#         
+#     if zone or not check_time_units(units):
+#         klass = DataZone
+#     else:
+#         klass = neo.Epoch
+#         
+#     return klass(times=t, durations=d, labels=i, units=units, name=name)
+ 
 
-    # cache the units, because conversion from a list to a numpy array 'slices'
-    # them out
-    if isinstance(epoch_intervals[0][0], pq.Quantity):
-        units = epoch_intervals[0][0].units
-    else:
-        units = pq.s
-
-    # convert the above into numpy arrays, apply the units 
-    times = np.array([x[0] for x in epoch_intervals]) * units
-
-    durations = np.array([x[1] for x in epoch_intervals]) * units
-    
-    labels = np.array([x[2] for x in epoch_intervals])
-    
-    klass = DataZone if zone or not check_time_units(units) else neo.Epoch
-    
-    name = kwargs.pop("name", klass.__name__)
-    
-    return klass(times, durations=durations, labels=labels, name=name)
-    
 @safeWrapper
 def irregularsignal2epoch(sig, name=None, labels=None):
     """Constructs a neo.Epoch object from the times and durations in a neo.IrregularlySampledSignal

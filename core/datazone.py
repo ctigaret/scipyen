@@ -26,7 +26,7 @@ def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
                    description=description,array_annotations=array_annotations,
                    **annotations)
     
-    
+
 class DataZone(DataObject):
     """neo.Epoch-like for DataSignals
     
@@ -409,3 +409,316 @@ class DataZone(DataObject):
             raise ValueError("Labels array has different length to times ({} != {})"
                              .format(len(labels), self.size))
         self._labels = np.array(labels)
+
+class Interval(collections.namedtuple("Interval", ("t0", "t1", "name", "extent"))):
+    """Encapsulates an interval of a signal.
+This can be specified by two landmarks, or by a landmark and an extent
+(or duration) - in this case is similar to a neo.Epoch or DataZone, except that
+if specifies an unique interval.
+
+This class is intended to be a light-weight, and volatile tool for accessing a
+signal subset (region or slice) used in common by neo.Epoch, DataZone and 
+SignalCursor.
+Both landmarks and the extent are defined in the signal's domain.
+        
+WARNING: the class is immutable, hence any of its instance attribute values 
+    (t0, t1, name, extent) cannot be changed.
+        
+"""
+    __slots__ = ()
+    # t0: typing.Union[numbers.Number, pq.Quantity]
+    # t1: typing.Union[numbers.Number, pq.Quantity]
+    # name: str = "Interval"
+    # extent: bool = False
+    
+    def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],
+                 t1: typing.Union[numbers.Number, pq.Quantity],
+                 name: str = "Interval", extent:bool=False):
+        OK = all(isinstance(v, numbers.Number) for v in (t0, t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0, t1))
+        
+        if not OK:
+            raise TypeError(f"Expecting scalar numbers or quantities")
+        
+        if all(isinstance(v, pq.Quantity) for v in (t0,t1)):
+            if t0.units != t1.units:
+                if not units_convertible(t0, t1):
+                    raise TypeError(f"t0 units ({t0.units}) are incompatible with t1 units ({t1.units})")
+                
+                t1 = t1.rescale(t0)
+                
+        if extent:
+            if t1 < 0:
+                raise ValueError(f"extent {t1} must be > = 0)")
+        else:
+            if t0 > t1:
+                raise ValueError(f"t0 ({t0}) should precede t1 ({t1})")
+        
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = self.__class__.__name__
+
+        super().__init__()
+        
+    @classmethod
+    def from_epoch(cls:type, epoch: typing.Union[neo.Epoch, DataZone],  
+                           index: typing.Union[str, bytes, np.str_, int],
+                           duration: bool = False):
+        from . import neoutils
+        import neo
+        interval = neoutils.get_epoch_interval(epoch, index, duration=False)
+        if len(interval) == 2: # empty labels
+            if isinstance(epoch.name, str) and len(epoch.name.strip()):
+                name = epoch.name
+            else:
+                name = "Interval"
+            interval = tuple([*interval] + [name])
+            
+        return cls(*interval, extent=duration)
+
+    
+def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = True,
+                    duration:bool=True) -> typing.List[Interval]:
+    """Generates a sequence of datatypes.Interval objects
+    
+    Each interval coresponds to the epoch's interval.
+    
+    Parameters:
+    ----------
+    epoch: neo.Epoch
+    
+    keep_units: bool (default False)
+        When True, the t_start and t_stop in each interval are scalar python 
+        Quantity objects (units borrowed from the epoch)
+    
+    """
+    if (epoch.labels.size) > 0:
+        labels = epoch.labels
+    else:
+        labels = [f"Interval_{k}" for k in range(len(epoch))]
+        
+    if keep_units:
+        return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times, epoch.durations, labels)]
+        
+    else:
+        return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, labels)]
+    
+@safeWrapper
+def intervals2epoch(*args, **kwargs):
+    """Construct a neo.Epoch or DataZone from a sequence of intervals.
+    All numeric values in the intervals must be python Quantities.
+    
+    TODO: 2023-06-13 23:48:09
+    
+    Var-positional parameters:
+    --------------------------
+    
+    datatypes.Interval objects
+    
+    NOTE: When args contains only one element, this can sequence of interval
+    tuples as above.
+    
+    WARNING: 
+    • The first two elements of the interval tuples, when quantities, MUST have
+        compatible units (i.e. units that can be inter-converted)
+    
+    • The structure of the interval tuples is NOT checked 
+    
+    Var-keyword parameters:
+    -----------------------
+    
+    duration:bool, default is False; flags the semantic of the second element in
+            the interval tuples in *args
+    
+        When True, the interval tuples in args are supposed to contain
+            (start, duration, …)
+    
+        When False, the tuples are supposed to contain (start, stop, …)
+    
+    zone:bool, default is False; flags whether to FORCE creation of a DataZone 
+        object (this is always True when the interval tuples are quantities with
+        units other than time units)
+    
+    prefix: str, default is 'interval'; the default prefix for interval names when the tuples 
+        contain only two elements
+    
+    name:str, default is "epoch" or "zone", depending on that is returned; this 
+        is the name of the gerenated neo.Epoch or DataZone object
+
+"""
+    def __make_unique_label__(label, collection):
+        if label in collection:
+            label = counter_suffix(label, collection)
+        
+        collection.append(label)
+        return label
+    
+    # duration = kwargs.pop("duration", False)
+    zone = kwargs.pop("zone", False)
+    prefix = kwargs.pop("prefix", "interval")
+    
+    if len(args) == 1 and isinstance(args[0], (tuple, list)) and not isinstance(args[0], Interval):
+        args = args[0]
+    
+    if not all(isinstance(a, Interval) for a in args):
+        raise TypeError(f"Expecting a sequence of Interval objects")
+    
+    # also takes care of getting durations right, for "true" intervals, and
+    # checks interval labels uniqueness
+    interval_labels = [] # used in the comprehension below,via __make_unique_label__
+    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_unique_label__(x.name, interval_labels)), args))
+
+    # cache the units, because conversion from a list to a numpy array 'slices'
+    # them out
+    if isinstance(epoch_intervals[0][0], pq.Quantity):
+        units = epoch_intervals[0][0].units
+    else:
+        units = pq.s
+
+    # convert the above into numpy arrays, apply the units 
+    times = np.array([x[0] for x in epoch_intervals]) * units
+
+    durations = np.array([x[1] for x in epoch_intervals]) * units
+    
+    labels = np.array([x[2] for x in epoch_intervals])
+    
+    klass = DataZone if zone or not check_time_units(units) else neo.Epoch
+    
+    name = kwargs.pop("name", klass.__name__)
+    
+    return klass(times, durations=durations, labels=labels, name=name)
+    
+@safeWrapper
+def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone], 
+                  axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
+                  **kwargs):
+    """Creates vertical signal cursors from a neo.Epoch.
+    
+    Parameters:
+    ----------
+    epoch: neo.Epoch
+    
+    axis: (optional) pyqtgraph.PlotItem, pyqtgraph.GraphicsScene, or None.
+    
+        Default is None, in which case the function returns cursor parameters.
+    
+        When not None, the function populates 'axis' with a sequence of 
+        vertical SignalCursor objects and returns their references in a list.
+        
+    Var-keyword parameters:
+    ----------------------
+    keep_units: bool, optional default is False
+        When True, the numeric cursor parameters are python Quantities with the
+        units borrowed from 'epoch'
+        
+    Other keyword parameters are passed to the cursor constructors:
+    parent, follower, xBounds, yBounds, pen, linkedPen, hoverPen
+    
+    See the documentation of gui.cursors.SignalCursor.__init__ for details.
+    
+    signal_viewer:SignalViewer instance, or None (the default)
+        When given, the cursors will also be registered with the signal viewer
+        instance that owns the axis.
+    
+        Prerequisite: the axis must be owned by the signal viewer instance.
+    
+    Returns:
+    --------
+    When axis is None, returns a list of tuples of vertical cursor parameters
+        (time, window, labels) where:
+        
+        time = epoch.times + epoch.durations/2.
+        window = epoch.durations
+        labels = epoch.labels -- the labels of the epoch's intervals
+        
+    When axis is a pyqtgraph.PlotItem or a pyqtgraph.GraphicsScene, the function
+    adds vertical SignalCursors to the axis and returns a list with references
+    to them.
+    
+    Side effects:
+    -------------
+    When axis is not None, the cursors are added to the PlotItem or GraphicsScene
+    specified by the 'axis' parameter.
+    """
+    
+    from gui.signalviewer import SignalViewer
+    from gui.cursors import SignalCursor
+
+    keep_units = kwargs.pop("keep_units", False)
+    if not isinstance(keep_units, bool):
+        keep_units = False
+        
+    epoch_name = epoch.name if isinstance(epoch.name, str) and len(epoch.name.strip()) else "i"
+        
+    if keep_units:
+        ret = [(t + d/2. if d else t, d if d else 0*t.units, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels, range(len(epoch)))]
+        
+    else:
+        ret = [(t + d/2. if d else t, d if d else 0, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
+        
+    signal_viewer = kwargs.pop("signal_viewer", None)
+    
+    if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
+        # NOTE: 2020-03-10 18:23:03
+        # cursor constructor accepts python Quantity objects for its numeric
+        # parameters x, y, xwindow, ywindow, xBounds and yBounds
+        # NOTE: below, parent MUST be set to axis, else there will be duplicate
+        # cursor lines when registering with signal viewer instance
+        cursors = [SignalCursor(axis, x=t, xwindow=d,
+                                cursor_type=SignalCursorTypes.vertical,
+                                cursorID=l, parent=axis, relative=True) for (t,d,l) in ret]
+        
+        if isinstance(signal_viewer, SignalViewer):
+            if isinstance(axis, pg.PlotItem):
+                if axis not in signal_viewer.axes:
+                    return cursors
+                
+            elif isinstance(axis, pg.GraphicsScene):
+                if axis is not signal_viewer.signalsLayout.scene():
+                    return cursors
+                
+            cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
+            cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            cursorPen.setCosmetic(True)
+            hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
+            hoverPen.setCosmetic(True)
+            linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            linkedPen.setCosmetic(True)
+            if isinstance(axis, pg.PlotItem):
+                cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
+            elif isinstance(axis, pg.GraphicsScene):
+                pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+                cursorPrecision = min(pi_precisions)
+                
+            else: 
+                cursorPrecision = None
+               
+            for c in cursors:
+                signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
+                                             linkedPen=linkedPen,
+                                             precision=cursorPrecision,
+                                             showValue = signal_viewer.cursorsShowValue)
+        
+        return cursors
+    
+    return ret
+
+def intervals2cursors(*args,
+                      axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
+                      **kwargs):
+    from gui.signalviewer import SignalViewer
+    from gui.cursors import SignalCursor
+
+    keep_units = kwargs.pop("keep_units", False)
+    if not isinstance(keep_units, bool):
+        keep_units = False
+        
+    ret = [(i.t0+i.t1/2 if i.extent else i.t0 + (i.t1 - i.t0)/2, i.t1 if t.extent else i.t1-it0, i.label)]
+    
+    if not keep_units:
+        pass
+    if keep_units:
+        ret = [(t + d/2. if d else t, d if d else 0*t.units, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels, range(len(epoch)))]
+        
+    else:
+        ret = [(t + d/2. if d else t, d if d else 0, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
+        
+    
