@@ -1478,6 +1478,10 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
         
         
     """
+    # FIXME 2023-06-18 22:09:23
+    # Currently this function does almost the same thing as detect_boxcar.
+    # TODO 2023-06-18 22:10:21 merge codes into one function !
+    
     from scipy import cluster
     from scipy.signal import boxcar
     
@@ -2422,7 +2426,8 @@ def correlate(in1, in2, **kwargs):
 
 @safeWrapper
 def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal], 
-                  thr:typing.Optional[float] = 1., return_levels:bool=False):
+                  thr:typing.Optional[float] = 1., 
+                  return_levels:bool=False):
     """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
     
     The signal must undergo at least one transition between two distinct states 
@@ -2447,8 +2452,11 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     distance is < thr)`
     
     """
-    from scipy import cluster
-    from scipy import signal
+    # FIXME 2023-06-18 22:09:23
+    # Currently this function does almost the same thing as parse_step_waveform_signal.
+    # TODO 2023-06-18 22:10:21 merge codes into one function !
+    from scipy import (cluster, signal)
+    from scipy.signal import boxcar
     
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)

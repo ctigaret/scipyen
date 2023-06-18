@@ -413,7 +413,7 @@ class DataZone(DataObject):
                              .format(len(labels), self.size))
         self._labels = np.array(labels)
 
-class Interval(collections.namedtuple("Interval", ("t0", "t1", "name", "extent", "axis"))):
+class Interval(collections.namedtuple("Interval", ("t0", "t1", "name", "extent"))):
     """Encapsulates an interval of a signal in a Cartesian axis system.
 This can be specified by two landmarks, or by a landmark and an extent
 (or duration) - in this case is similar to a neo.Epoch or DataZone, except that
@@ -473,8 +473,7 @@ WARNING: the class is immutable, hence any of its instance attribute values
     
     def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],
                  t1: typing.Union[numbers.Number, pq.Quantity],
-                 name: str = "Interval", extent:bool=False,
-                 axis: int = 0):
+                 name: str = "Interval", extent:bool=False):
         OK = all(isinstance(v, numbers.Number) for v in (t0, t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0, t1))
         
         if not OK:

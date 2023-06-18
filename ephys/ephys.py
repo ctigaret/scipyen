@@ -2531,7 +2531,6 @@ def _(locator, func, signal, channel=None,
     return epoch_reduce(func, signal, locator, 
                         index=locatorIndex, channel=channel)
 
-
 def signal_measures_in_segment(s: neo.Segment, 
                             signal: typing.Union[int, str],
                             command_signal: typing.Optional[typing.Union[int, str]] = None,
