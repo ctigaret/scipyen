@@ -1770,28 +1770,23 @@ def cursors2epoch(*args, **kwargs):
     --------------------
     *args: comma-separated list of EITHER:
     
-        • SignalCursor objects - all of either 'vertical' or 'crosshair' type.
+        • SignalCursor objects - they all should have the same type
+        As of 2023-06-18 19:15:21, supported cursor types are vertical, horizontal
+        and crosshair.
         
-        • tuple of "notional" cursor parameters (containing 2-5 scalars):
+        When all cursors are have crosshair type, only a pair of their coordinates
+        is used, and should be indicated with the keyword "vertical" (see below).
         
-            ∘ 2-tuples are interpreted as (time, window) pairs of coordinates
-                for a notional vertical cursor
-            
-            ∘ 3-tuples are interpreted as (time, window, label) parameters for
-                a notional vertical cursor
-    
-            ∘ 4-tuples are interpreted as (x, xwindow, y, ywindow) parameters of
-                a notional vertical cursor
-            
-            ∘ 5-tuples are interpreted as (x, xwindow, y, ywindow, label)
-                 of parameters for a notional crosshair cursor
-    
-        NOTE: Only the first two scalar coordinates and the label (when present)
-        are used
-            
-        NOTE: the following are NOT allowed:
-            □ Mixing SignalCursor objects with parameter tuples.
-            □ Mixing parameter tuples of different lengths.
+        However, all cursors SHOULD have the same type, otherwise the result may
+        not make sense.
+        
+        In particular, the following mixtures of cursor types are NOT allowed:
+            ∘ vertical & horizontal
+            ∘ vertical, horizontal, and crosshair
+        
+        the following mixtures ARE allowed:
+            ∘ vertical & crosshair
+            ∘ horizontal & crosshair
         
     Var-keyword parameters:
     ----------------------
@@ -1840,7 +1835,17 @@ def cursors2epoch(*args, **kwargs):
         Only used when 'intervals' is True, and indicates if the second element
         of the interval tuples is a 'stop' time stamp (when False) or a duration
         (when True)
+        
+    vertical:bool default is True. Only used when the cursors are crosshair.
+        When True, indicates that the vertical coordinates are used.
     
+        Otherwise, "vertical" is set implicitly to:
+            ∘ True, for vertical & crosshair cursors
+            ∘ False, for horizontal & crosshair cursors
+        
+        The "vertical" keyword is ignored when all cursors are either vertical or
+        horizontal.
+        
     Returns:
     -------
     
@@ -1850,7 +1855,7 @@ def cursors2epoch(*args, **kwargs):
         
             times = cursor.x - cursor.xwindow/2
             durations = cursor.xwindow
-            
+        
     When 'intervals' is True, returns a list of triplets with semantics 
         according to the value of the 'durations' parameter:
     
@@ -1954,6 +1959,14 @@ def cursors2epoch(*args, **kwargs):
     if not isinstance(zone, bool):
         raise TypeError("zone must be a boolean")
     
+    axis = kwargs.pop("axis", 0)
+    if not isinstance(axis, int):
+        axis = 0
+        
+    vertical = kwargs.pop("vertical", False)
+    if not isinstance(vertical, bool):
+        raise TypeError("vertical must be a bool")
+    
     #### BEGIN __parse_cursors_params__
     def __parse_cursors_params__(*values):
         """For each SignalCursor in values returns (x0, x1, label, extent)
@@ -1963,11 +1976,11 @@ def cursors2epoch(*args, **kwargs):
     label = cursors.ID
     """
         # NOTE: 2023-06-13 21:42:25
-        # reminder: 
-        # 2-tuple ⇒ x, xwindow
-        # 3-tuple ⇒ x, xwindow, label
-        # 4-tuple ⇒ x, xwindow, y, ywindow
-        # 5-tuple ⇒ x, xwindow, y, ywindow, label
+        # reminder: p.parameters returns:
+        # 2-tuple ⇒ x, xwindow                          OR y, ywindow for horizontal 
+        # 3-tuple ⇒ x, xwindow, label                   OR y, ywindow, label for horizontal
+        # 4-tuple ⇒ x, xwindow, y, ywindow              for crosshair
+        # 5-tuple ⇒ x, xwindow, y, ywindow, label       for crosshair
         #
         # pseudocode for the case of 2-tuple (easily extrapolated):
         # if not intervals ⇒ return (start, duration), where:
@@ -1987,27 +2000,26 @@ def cursors2epoch(*args, **kwargs):
         
         for k,c in enumerate(values):
             p = c.parameters
-            if all([isinstance(v, pq.Quantity) for v in p[0:2]]):
-                if p[0].units != p[1].units:
-                    if not units_convertible(p[0], p[1]):
+            t = c.cursorType
+            if t == SignalCursorTypes.crosshair:
+                pc_ = p[0:2] if vertical else p[2:4]
+            else:
+                pc_ = p[0:2]
+                
+            l = p[-1] if len(p) in (3,5) else f"{k}"
+                
+            if all([isinstance(v, pq.Quantity) for v in pc_]):
+                if pc_[0].units != pc_[1].units:
+                    if not units_convertible(pc_[0], pc_[1]):
                         raise TypeError("Quantities must have compatible dimensionalities")
                     
-                values_.append(p)
-                
-            elif all([isinstance(v, numbers.Number) for v in p[0:2]]):
+            elif all([isinstance(v, numbers.Number) for v in pc_]):
                 if units is not None:
-                    p_ = [v*units for v in p[0:2]]
+                    pc_ = [v*units for v in pc_] 
                     
-                    if len(p) > 2:
-                        p_ += list(p[2:])
-                        
-                    # values_[k] = tuple(p_)
-                    values_.append(tuple(p_))
-                    
-                # values = tuple(values_)
-        
-        #print("values:", values)
-        
+            pc_ += [l]
+            values_.append(tuple(pc_))
+            
         if intervals:
             use_durations = durations
         else:
@@ -2015,9 +2027,14 @@ def cursors2epoch(*args, **kwargs):
         
         # if durations:
         if use_durations:
-            return [(v[0]-v[1]/2., v[1],         f"{k}") if len(p) in (2,4) else (v[0]-v[1]/2., v[1],         v[-1]) for k,v in enumerate(values_)]
+            return [(v[0]-v[1]/2., v[1], v[2]) for k,v in enumerate(values_)]
         else:
-            return [(v[0]-v[1]/2., v[0]+v[1]/2., f"{k}") if len(p) in (2,4) else (v[0]-v[1]/2., v[0]+v[1]/2., v[-1]) for k,v in enumerate(values_)]
+            return [(v[0]-v[1]/2., v[0]+v[1]/2., v[2]) for k,v in enumerate(values_)]
+            
+        # if use_durations:
+        #     return [(v[0]-v[1]/2., v[1],         f"{k}") if len(p) in (2,4) else (v[0]-v[1]/2., v[1],         v[-1]) for k,v in enumerate(values_)]
+        # else:
+        #     return [(v[0]-v[1]/2., v[0]+v[1]/2., f"{k}") if len(p) in (2,4) else (v[0]-v[1]/2., v[0]+v[1]/2., v[-1]) for k,v in enumerate(values_)]
             
     #### END __parse_cursors_params__
     
@@ -2026,19 +2043,31 @@ def cursors2epoch(*args, **kwargs):
         raise ValueError("Expecting at least one argument")
     
     if len(args) == 1:
+        if isinstance(args[0], (list, tuple)) and all(isinstance(v, SignalCursor) for v in args[0]):
+            args = args[0]
+        elif not isinstance(args[0], SignalCursor):
+            raise TypeError(f"Expecting a SignalCursor object or a sequence of SignalCursor objects; instead, got {type(args[0]).__name}")
+        
+    else:
+        if not all(isinstance(v, SignalCursor) for v in args):
+            raise TypeError(f"Expecting a SignalCursor object or a sequence of SignalCursor objects; instead, got {type(args[0]).__name}")
+
+    
+    if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
             if all ([isinstance(c, SignalCursor) for c in args[0]]):
-                if all([c.cursorTypeName in ("vertical", "crosshair")  for c in args[0]]):
-                    t_d_i = __parse_cursors_params__(*args[0])                    
-                else:
-                    raise TypeError("Expecting only vertical or crosshair cursors")
+                t_d_i = __parse_cursors_params__(*args[0])                    
+                # if all([c.cursorTypeName in ("vertical", "crosshair")  for c in args[0]]):
+                #     t_d_i = __parse_cursors_params__(*args[0])                    
+                # else:
+                #     raise TypeError("Expecting only vertical or crosshair cursors")
                 
             else:
                 raise TypeError("Expecting a sequence of SignalCursor objects")
                 
         elif isinstance(args[0], SignalCursor):
-            if args[0].cursorType is SignalCursorTypes.horizontal:
-                raise TypeError("Expecting a vertical or crosshair cursor")
+            # if args[0].cursorType is SignalCursorTypes.horizontal:
+            #     raise TypeError("Expecting a vertical or crosshair cursor")
             
             t_d_i = __parse_cursors_params__([args[0]])
             
@@ -2047,21 +2076,16 @@ def cursors2epoch(*args, **kwargs):
             
     else:
         if all([isinstance(c, SignalCursor) for c in args]):
-            if all ([c.cursorTypeName in ("vertical", "crosshair") for c in args]):
-                t_d_i = __parse_cursors_params__(args)
-                
-            else:
-                raise TypeError("Expecting only vertical or crosshair cursors")
+            t_d_i = __parse_cursors_params__(args)
+#             if all ([c.cursorTypeName in ("vertical", "crosshair") for c in args]):
+#                 t_d_i = __parse_cursors_params__(args)
+#                 
+#             else:
+#                 raise TypeError("Expecting only vertical or crosshair cursors")
             
         else:
             raise TypeError("Expecting a sequence of SignalCursor objects")
             
-#         elif all([isinstance(c, (tuple, list)) and len(c) in (2,3,5) for c in args]):
-#             t_d_i = __parse_cursors_params__(args)
-#             
-#         else:
-#             raise TypeError("Unexpected argument types")
-        
     if sort:
         t_d_i = sorted(t_d_i, key=lambda x: x[0])
 

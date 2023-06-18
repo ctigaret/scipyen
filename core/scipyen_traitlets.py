@@ -435,7 +435,9 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
             return
     
         try:
-            #silent = new_value is old_value
+            if any(v is None for v in (new_value, old_value)):
+                silent=False
+                
             if silent:
                 silent = bool(new_value.dtype == old_value.dtype)
                 

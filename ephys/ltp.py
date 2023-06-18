@@ -96,8 +96,7 @@ import iolib.pictio as pio
 
 import ephys.ephys as ephys
 from ephys.ephys import ClampMode, ElectrodeMode
-from ephys.ephys import SignalMeasureAtLocation as SM
-from ephys.ephys import SignalMeasureAtMultipleLocations as SMM
+from ephys.ephys import LocationMeasure
 from ephys import membrane
 
 

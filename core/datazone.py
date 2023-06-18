@@ -413,16 +413,53 @@ class DataZone(DataObject):
                              .format(len(labels), self.size))
         self._labels = np.array(labels)
 
-class Interval(collections.namedtuple("Interval", ("t0", "t1", "name", "extent"))):
-    """Encapsulates an interval of a signal.
+class Interval(collections.namedtuple("Interval", ("t0", "t1", "name", "extent", "axis"))):
+    """Encapsulates an interval of a signal in a Cartesian axis system.
 This can be specified by two landmarks, or by a landmark and an extent
 (or duration) - in this case is similar to a neo.Epoch or DataZone, except that
 if specifies an unique interval.
 
-This class is intended to be a light-weight, and volatile tool for accessing a
-signal subset (region or slice) used in common by neo.Epoch, DataZone and 
-SignalCursor.
-Both landmarks and the extent are defined in the signal's domain.
+This class is intended to be a light-weight, convergent common data type useful
+for accessing a signal region (a.k.a "slice") encapsulated in a neo.Epoch, 
+DataZone or SignalCursor.
+        
+Suppose you write a function to calculate a measure in a signal based on a cursor
+or an epoch interval. Since a SignalCursor and a neo.Epoch are very different 
+types, you may have to write two separate pieces of code for doing the same thing
+i.e., to calculate something based on the signal values in the region defined by
+        
+    • the SignalCursor xwindow around its x coordinate
+    • the Epoch's interval defined by its time and duration.
+        
+The separate pieces of code will differ in the way that the two parameters
+('x' and 'xwindow', for a SignalCursor, or times[k] and durations[k], for 
+the kᵗʰ interval in an Epoch) are used to determine the start and stop times
+of the signal regions where the calculation is to be made.
+        
+An Interval object brings this to a common denominator, so that it can be used
+directly instead of either a cursor or a Epoch's interval, although functions
+using either types are available as well in the 'ephys.ephys' module in Scipyen.
+        
+An Interval it that it allows storing Epoch intervals SEPARATELY, instead of 
+storing the entire Epoch when that is not desired (one could extract one
+interval from an Epoch and use it to construct another Epoch to be stored; 
+however, the first part of this exercise is already done bny constructing an #
+Interval).
+        
+Another use of Interval is to store SignalCursor coordinates to files; since a
+SignalCursor is a PyQt5 object that handles graphic items, IT IS NOT SERIALIZABLE
+HENCE IT CANNOT BE "PICKLED" or otherwise "saved" to a file.
+        
+The only thing an Interval does not know about is the type of the cursor it took
+its coordinates from (i.e., vertical or horizontal) but that can be deduced from
+the context.
+
+A croshair cursor, for example would be stored as a pair of
+Interval objects according to an ad-hoc convention (e.g. the horizontal coordinates
+first, then the vertical coordinates).
+        
+
+
         
 WARNING: the class is immutable, hence any of its instance attribute values 
     (t0, t1, name, extent) cannot be changed.
@@ -436,7 +473,8 @@ WARNING: the class is immutable, hence any of its instance attribute values
     
     def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],
                  t1: typing.Union[numbers.Number, pq.Quantity],
-                 name: str = "Interval", extent:bool=False):
+                 name: str = "Interval", extent:bool=False,
+                 axis: int = 0):
         OK = all(isinstance(v, numbers.Number) for v in (t0, t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0, t1))
         
         if not OK:
@@ -705,6 +743,7 @@ def intervals2cursors(*args,
     from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
+    cursor_type = kwargs.pop("cursor_type", "vertical")
     
     if not isinstance(keep_units, bool):
         keep_units = False

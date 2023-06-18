@@ -92,10 +92,17 @@ from . import signalviewer as sv
 from . import matrixviewer as matview
 from . import imageviewer as iv
 from . import dictviewer as dv
+from .cursors import (SignalCursor, SignalCursorTypes,
+                    cursors2epoch, cursors2intervals)
+                    
+
 from iolib import h5io, jsonio
 from iolib import pictio as pio
 from core import datazone
-from core.datazone import DataZone
+from core.datazone import (DataZone, Interval, 
+                           intervals2cursors, intervals2epoch,
+                           epoch2cursors, epoch2intervals)
+
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol

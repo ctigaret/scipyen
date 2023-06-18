@@ -198,6 +198,7 @@ from core import pyabfbridge
 from core.utilities import normalized_index
 from core.neoutils import get_index_of_named_signal
 from core.quantities import (units_convertible, check_time_units)
+from core.datatypes import check_type
 
 from gui.cursors import (SignalCursor, SignalCursorTypes)
 
@@ -212,195 +213,212 @@ if __debug__:
 
     __debug_count__ = 0
     
-class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "location", "name"))):
-    """Functor to calculate a signal measure at a single location.
-    'func' is the actual function that calculates the measure.
-    'location' is one of the following types (let's call them 'locator types'):
-        • SignalCursor
-        • neo.Epoch
-        • DataZone
-        • Interval
-        or a sequence of locator types
+LOCATOR_TYPES = (SignalCursor, neo.Epoch, DataZone, Interval, type(MISSING))
 
-    NOTE: When locator is an Epoch or DataZone, the 'intervals' is set to MISSING. 
-    (see, e.g., epoch_reduce for what this means).
+LocatorTypeVar = typing.TypeVar('LocatorTypeVar', *LOCATOR_TYPES)
+
+LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
+
+REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
+IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
+
+class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locations", "name"))):
+    """Lightweight functor to calculate a signal measure at a location.
+
+A location is an object with one of the following types ('locator' types):
+• SignalCursor
+• neo.Epoch
+• DataZone
+• Interval
+
+or a sequence (tuple, list) of SignalCursor, neo.Epoch, DataZone or Interval
+
+Examples:
+---------
+from ephys import (LocationMeasure, cursor_average, interval_average,
+                    cursors_difference, intervals_difference)
+
+from datazone import Interval
+
+from neoutils import get_epoch_interval
+
+We assume a neo.AnalogSignal object is bound to the symbol 'signal' in the 
+workspace, and that 'signal' is a voltage-clamp record of the membrane current
+containing, say, and evoked excitatory synaptic current (EPSC).
+
+1) Calculate the average of signal samples at a vertical cursor, which marks
+the signal region corresponding to the cursor's xwindow extended symmetrically
+around the cursor's x coordinate. The cursors is bound to a symbol 'cursor' in
+the workspace.
+
+c_measure = LocationMeasure(cursor_average, cursor, "c_measure")
+
+a = c_measure(signal) → a quantity array
+
+2) Same as (1) but using datazone.Interval objects; we assume there is a 
+neo.Epoch bound to the symbol 'epoch' in the workspace.
+
+To demonstrate, the following two lines generate two intervals based on an 
+epoch interval labeled "EPSC0Base"; one Interval encapsulates a start time and a
+duration; the other encapsulates a start and a stop time (see datazone.Interval)
+
+intvl = get_epoch_interval(epoch, "EPSC0Base", duration=True)
+intvl2 = get_epoch_interval(epoch, "EPSC0Base")
+
+i_measure_1 = LocationMeasure(interval_average, intvl, "i_measure_1")
+
+i_measure_2 = LocationMeasure(interval_average, intvl, "i_measure_2")
+
+b = i_measure_1(signal)
+
+c = i_measure_2(signal)
+
+assert np.all(a == b) # see example (1) regarding 'a'
+assert np.all(a == c)
+
+3) Obtain a measure at a pair of locations of the same type.
+
+We want to calculate the amplitude of an EPSC elicited as a difference between 
+averages of the membrane current signal around the "peak" (or nadir) of the EPSC
+and a baseline BEFORE the stimulus that elicited the EPSC.
+
+For this example we assume that there are two intervals inside 'epoch' that
+correspond to baseline and EPSC peak regions of the signal, labeled "EPSC0Base"
+"EPSC0Peak".
+
+From this epoch we generate two Interval objects (one each, for baseline and 
+peak; note how we access the corresponding epoch intervals by using their labels):
+
+# 'intervals' will be a list of Interval objects
+intervals = [get_epoch_interval(epoch, i, duration=True) for i in ("EPSC0Base",
+"EPSC0Peak")]
+
+We also assume that there are two vertical cursors available (c0, c1), 
+indicating the baseline and the peak regions of the signal.
+
+We calculate this measure using the intervals (note we construct the LocationMeasure
+and we call it with the signal in a one-line code):
+
+a = LocalMeasure(intervals_difference, intervals, "i_diff") (signal)
+
+For demonstration, we do the same using the cursors:
+
+b = LocationMeasure(cursors_difference, [c0,c1], "c_diff")(signal)
+
+assert np.all(a == b)
+
+4) To calculate the same measure at the same location in several signals, 
+you can call the LocationMeasure on each signal.
+
+Say you want to calculate the input resistance during a voltage-clamp recording,
+based on a recorded membrane current (the 'signal') and a recorded analog command 
+signal (here, the command voltage, i.e. 'command').
+
+For this purpose, the command signal contains a boxcar waveform (a hyperpolarizing
+or depolarizing change in the membrane potential) - the "membrane test". 
+
+If no whole-cell compensation is applied, then the membrane current recorded 
+during the membrane test undergoes a rapid transient change (the "capacitive 
+transient") before it settles to a new steady-state value, different from the 
+baseline before the membrane test).
+
+We calculate Rin by applying Ohm's law:
+
+V = I×R ⇒ R = V / I
+
+In this case:
+V = the amplitude of the boxcar; 
+I = the difference between the membrane current during the steady-state and that
+during the baseline before the membrane test boxcar.
+
+Therefore we need two LocationMeasure objects.
+
+If we were to use two appropriately-placed cursors as locators:
+
+baseline = LocationMeasure(cursor_average, baseline_cursor, "baseline")
+
+steady_state = LocationMeasure(cursor_average, steady_state_cursor, "steady_state")
+
+# next line calculates the average baseline membrane current before the membrane test boxcar
+i0 = baseline(signal) 
+# next line calculates the average baseline potential before the membrane test boxcar
+v0 = baseine(command) # return
+
+# similarly, for the steady-state membrane current and potential
+i1 = steady_state(signal)
+v1 = steady_state(command)
+
+finally we calculate Rin as (v1 - v0) / (i1 - i0)
+
+Note that in both cases we used cursor_average as the function passed to the 
+LocationMeasure functor. Since we are taking a difference between the averages
+of signals at two locations, we can be more direct and use just one 
+LocationMeasure object (see example (3) above):
+
+delta = LocationMeasure(cursors_difference, (baseline_cursor, steady_state_cursor), "delta")
+
+dI = delta(signal)
+dV = delta(command)
+
+Rin = dV/dI # ⇒ this will generate a Quantity in command.units / signal.units
+            # e.g. pq.mV / pq/pA
+            # Most likely we want the resistance in MOhm (pq.MOhm), therefore
+            # we must rescale it, so the last call should be:
+
+Rin = (dV/dI).rescale(pq.MOhm)
+
+Finally, a few reminders:
+
+• Signals are 2D Quantity arrays (with the data represented as column vectors) 
+and MAY have more than one trace (a.k.a "signal channel", not to be confused 
+with a "recording channel"). A trace, therefore is a column in the signal array.
+
+• Functions that calculate a measure at a single location return a Quantity
+array. 
+    ∘ For signals with just one trace, the result has only one element, so 
+    in cases where just a scalar Quantity is needed, this value can be accessed 
+    by indexing, e.g.:
+
+        result[0], or more directly np.squeeze(result)
+
+    ∘ For signals with more than one trace, the result is a subdimensional (1D)
+    Quantity array, with one value per trace. Since the traces are indexed along
+    the second axis (axis 1) of the original signal, one may want to restrict the
+    calculations to the desired trace only, by passing the "channel" keyword to
+    the call by the functor.
+
+    • For situations where a numpy array is constructed from a list comprehension
+    (such as is the case for cursors_difference, intervals_difference) the final
+    result will gain a second axis (hence it will be 2D), even though it only 
+    contains one value.
+
+    I all these situation it is recommended to drop the singleton axes. 
+
+So, we can finish the last example:
+
+Rin = np.squeeze((dV/dI).rescale(pq.MOhm))  # ⇒ e.g. array(90.1997, dtype=float32) * Mohm
+
+This is a SCALAR Quantity (even though it is described as an array, but note the
+absence of square brackets in its string representation).
+
+Indeed:
+
+assert (Rin.ndim == 0) # ⇒ is True
     
-    To calculate the measure at EVERY interval in the epoch, please use the 
-    SignalMeasureAtMultipleLocations functor.
-
-    To use just one EPoch or DataZone interval, extract that interval using
-    e,g, neoutils.get_epoch_interval(…) and pass that to the constructor.
-
-    PREREQUISITES: 
-
-    1) the function passed as 'func' must acept a signal type as the first 
-    parameter (one can use a more generic functor e.g. cursor_reduce etc by using
-    a functool.partial)
-
-    2) When 'func' expects several location (passed as individual parameters,
-    or as varioadic parameters) 'location' MUST be a sequence of locators, the 'func' should also expect a sequence
-    of locations; the 'location' will be passed 'unwrapped'
-
-    2) the type and number of the location(s) should be consistent with the 
-    function passed to the constructor of this functor
-
-
-
 """
     __slots__ = ()
-    def __init__(self, func:typing.Union[types.FunctionType, typing.Callable], 
-                 location:typing.Union[SignalCursor, neo.Epoch, DataZone, Interval, type(MISSING)],
-                 name:str):
-        params = get_func_param_types(func)
-        if len(params) == 0:
-            raise TypeError("'func' must be a function with annotated signature")
-        
-        plist = [(p, t) for p,t in params.items()]
-        sigpartype = plist[0][1]
-        locpartype = plist[1][1]
-        
-        if isinstance(sigpartype, (tuple, list)):
-            if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
-                raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-            
-        elif isinstance(sigpartype, type):
-            if sigpartype not in (neo.AnalogSignal, DataSignal):
-                raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-            
-        if type(location) not in locpartype:
-            raise TypeError(f"Invalid location type {type(location).__name__} for the function {func}")
-        
-        super().__init__()
-        
-    def __call__(self, signal:typing.Union[neo.AnalogSignal, DataSignal],
-                 channel:typing.Union[int]=None, **kwargs):
-        
-        if isinstance(self.location, (neo.Epoch, DataZone)):
-            kwargs["intervals"] = MISSING   
-            
-        if isinstance(self.location, (tuple, list)):
-            return self.func(signal, *self.location, **kwargs)
-            
-        return self.func(signal, self.location, **kwargs)
-        
-# class SignalMeasureAtLocation(LocationMeasure):
-#     """Functor to calculate a signal measure at a single location.
-#     'func' is the actual function that calculates the measure.
-#     'locator' is a SignalCursor, a neo.Epoch, a DataZone, or an interval.
-# 
-#     NOTE: When locator is an Epoch or DataZone, the 'intervals' is set to MISSING. 
-#     (see, e.g., epoch_reduce for what this means).
-#     
-#     To calculate the measure at EVERY interval in the epoch, please use the 
-#     SignalMeasureAtMultipleLocations functor.
-# 
-#     To use just one EPoch or DataZone interval, extract that interval using
-#     e,g, neoutils.get_epoch_interval(…) and pass that to the constructor.
-# 
-#     PREREQUISITES: 
-# 
-#     1) the function passed as func must acept a signal type as the first 
-#     parameter (one can use a more geenric functor e.g. cursor_reduce etc by 
-#     by creating a partial function, e.g. using functools.partial)
-# 
-#     2) the type of location should be consistent with the function that
-#     is wrapped by this functor, i.e.,, do NOT pass a cursors to an interval
-#     or epoch function, etc.
-# 
-# 
-# """
-# 
-#     __slots__ = ()
-#     
-#     def __init__(self, func, location):
-# #         params = get_func_param_types(func)
-# #         if len(params) == 0:
-# #             raise TypeError("'func' must be a function with annotated signature")
-# #         
-# #         plist = [(p, t) for p,t in params.items()]
-# #         sigpartype = plist[0][1]
-# #         locpartype = plist[1][1]
-# #         
-# #         
-# #         if isinstance(sigpartype, (tuple, list)):
-# #             if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
-# #                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-# #             
-# #         elif isinstance(sigpartype, type):
-# #             if sigpartype not in (neo.AnalogSignal, DataSignal):
-# #                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-# #             
-# #         if type(location) not in locpartype:
-# #             raise TypeError(f"Invalid location type {type(location).__name__} for the function {func}")
-#         
-#         super().__init__(func, location)
-#     
-#     def __call__(self, signal: typing.Union[neo.AnalogSignal, DataSignal],
-#                  **kwargs):
-#         """Applies this functor to the signal.
-#     Additional arugments to the called function are passed via **kwargs.
-#     Please see the class docstring for how the intervals of an Epoch or DataZone
-#     are handled.
-#     """
-#         if isinstance(self.location, (neo.Epoch, DataZone)):
-#             kwargs["intervals"] = MISSING
-#             
-#         return self.func(signal, self.location, **kwargs)
-# 
-# class SignalMeasureAtMultipleLocations(collections.namedtuple("SignalMeasureAtMultipleLocations", ("func", "locations"))):
-#     """functor to calculate a signal measure at several locations.
-#     'func' is the actual function that calculates the measure.
-#     'locator' is a sequence of SignalCursor or intervals, OR a neo.Epoch or DataZone.
-#     
-#     NOTE: a sequence of Epoch or DataZone is NOT supported (these objects already
-#     encapsulate a sequence of locations).
-#     
-#     To use just ONE Epoch or DataZone interval, use SignalMeasureAtLocation
-#     with just the one interval (although this can also be passed here, wrapped in 
-#     a sequence).
-#     
-#     PREREQUISITES: 
-# 
-#     1) the function passed as func must acept a signal type as the first 
-#     parameter (one can use a more geenric functor e.g. cursor_reduce etc by 
-#     by creating a partial function, e.g. using functools.partial)
-# 
-#     2) the type of locations should be consistent with the function that
-#     is wrapped by this functor, i.e.,, do NOT pass cursors to an intervals
-#     or epoch function, etc. WARNING: this is not checked !.
-# 
-# """
-#     __slots__ = ()
-#     
-#     def __init__(self, func, location):
-#         params = get_func_param_types(func)
-#         if len(params) == 0:
-#             raise TypeError("'func' must be a function with annotated signature")
-#         
-#         plist = [(p, t) for p,t in params.items()]
-#         sigpartype = plist[0][1]
-#         
-#         
-#         if isinstance(sigpartype, (tuple, list)):
-#             if any(t not in (neo.AnalogSignal, DataSignal) for t in sigpartype):
-#                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-#             
-#         elif isinstance(sigpartype, type):
-#             if sigpartype not in (neo.AnalogSignal, DataSignal):
-#                 raise TypeError(f"'func' expected to get a signal type {(neo.AnalogSignal, DataSignal)} at parameter {sigparndx}")
-#             
-#         super().__init__()
-#     
-#     def __call__(self, signal: typing.Union[neo.AnalogSignal, DataSignal],
-#                  **kwargs):
-#         """Applies this functor to the signal.
-#     Additional arugments to the called function are passed via **kwargs.
-#     """
-#         
-#         return self.func(signal, *self.locations, **kwargs)
-
-
     
+    def __call__(self, *args, **kwargs):
+        # *args is a signal or sequence of signals
+        
+        if isinstance(self.locations, (list, tuple)) and not isinstance(self.locations, Interval):
+            args = args + tuple(self.locations)
+            
+        else:
+            args = args + (self.locations,)
+            
+        return self.func(*args, **kwargs)
+  
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
                         # but OK with other ElectrodeMode
@@ -673,10 +691,6 @@ def epoch_reduce(func:types.FunctionType,
     
     ret = [interval_reduce(func, signal, interval, channel=channel) for interval in intervals]
     
-#     if len(ret) > 1:
-#         u = ret[0].units
-#         return np.array(ret)*u
-#     
     if len(ret)== 1:
         ret = ret[0]
         return ret
@@ -685,7 +699,7 @@ def epoch_reduce(func:types.FunctionType,
     
 def interval_reduce(func:typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal],
-                    interval:typing.Sequence[typing.Union[numbers.Number, pq.Quantity]],
+                    interval:typing.Union[Interval, typing.Sequence[typing.Union[numbers.Number, pq.Quantity]]],
                     channel:typing.Optional[int] = None,
                     duration:bool=False) -> pq.Quantity:
     """As cursor_reduce, but using an interval instead.
@@ -773,32 +787,37 @@ def interval_reduce(func:typing.Callable,
     
     
     t0, t1 = interval[0:2]
+    x0, x1 = t0, t1
     # NOTE: Must convert to scalars, i.e., unsized arrays
     if t0.ndim > 0:
-        t0 = t0[0]
+        x0 = t0[0]
         
     if t1.ndim > 0:
-        t1 = t1[0]
+        x1 = t1[0]
     
     if not isinstance(t0, pq.Quantity):
-        t0 *= signal.times.units
+        x0 = t0 * signal.times.units
     
     if not isinstance(t1, pq.Quantity):
-        t1 *= signal.times.units
+        x1 = t1 * signal.times.units
+        
+    if isinstance(interval, Interval):
+        duration = interval.extent
         
     if duration:
-        t1 += t0
+        # t1 += t0 # BUG: 2023-06-18 14:18:16 → modified Interval in-place !!!
+        x1 = t0 + t1
         
     # print(f"interval_reduce: interval = {interval} ⇒ t0 = {t0}, t1 = {t1}")
         
-    if t0 == t1:
-        ret = signal[signal.time_index(t0),:]
+    if x0 == x1:
+        ret = signal[signal.time_index(x0),:]
         
-    elif t0 > t1:
+    elif x0 > x1:
         raise ValueError(f"The interval cannot have negative size")
     else:
         # print(f"t0 = {t0}, t1 = {t1}")
-        ret = func(signal.time_slice(t0,t1), axis=0)
+        ret = func(signal.time_slice(x0,x1), axis=0)
         
     if isinstance(channel, int):
         return ret[channel].flatten()
@@ -1417,71 +1436,6 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     return data_index
 
-# @safeWrapper
-# def cursors_measure_in_segment(func, data, *cursors, 
-#                     segment_index: int = None, 
-#                     analog: typing.Optional[typing.Union[int, str]] = None, 
-#                     irregular: typing.Optional[typing.Union[int, str]] = None, 
-#                     **kwargs):
-#     """
-#     TODO/FIXME
-#     data: a neo.AnalogSignal or DataSignal
-#     """
-#     # from gui.signalviewer import SignalCursor as SignalCursor
-# 
-#     
-#     def __signal_measure__(f, x, *cursors, **kwargs):
-#         return f(x, *cursors, **kwargs)
-#     
-#     def __parse_signal_index__(x, ndx, stype):
-#         if isinstance(ndx, int):
-#             if ndx < 0 or ndx >= len(x):
-#                 raise ValueError("Invalid signal index %d for %d signals" % (ndx, len(x)))
-#             
-#             return ndx
-#         
-#         elif isinstance(ndx, str):
-#             ndx = get_index_of_named_signal(x, ndx, stype=stype)
-#             
-#         else:
-#             raise TypeError("invalid indexing type")
-#             
-#     
-#     if not isinstance(func, types.FunctionType):
-#         raise TypeError("first parameter expected to be a function; got %s instead")
-#     
-#     if isinstance(data, (neo.AnalogSignal, DataSignal)):
-#         return __signal_measure__(func, data, *cursors, **kwargs)
-#     
-#     elif isinstance(data, neo.Segment):
-#         if analog is not None:
-#             analog = __parse_signal_index__(data, analog, stype=neo.AnalogSignal)
-#             return __signal_measure__(func, data.analogsignals[analog], *cursors, **kwargs)
-#             
-#         elif irregular is not None:
-#             irregular = __parse_signal_index__(data, irregular, stype=neo.IrregularlySampledDataSignal)
-#             return __signal_measure__(func, data.irregularlysampledsignals[irregular], *cursors, **kwargs)
-#         
-#         else:
-#             raise TypeError("Analog signal index must be specified")
-#         
-#     elif isinstance(data, neo.Block):
-#         # iterate through segments # TODO 2023-06-12 23:17:33
-#         pass
-#     
-#     elif isinstance(data, (tuple, list)):
-#         if all([isinstance(s, (neo.AnalogSignal, DataSignal)) for s in data]):
-#             # treat as a segment's signal collection # TODO 2023-06-12 23:17:33
-#             pass
-#         
-#         elif all([isinstance(d, neo.Segment) for d in data]):
-#             # iterate through segments as for block # TODO 2023-06-12 23:17:33
-#             pass
-#             
-#         
-#     return func(data, *cursors, **kwargs)
-
-    
 @safeWrapper
 def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                        cursor0: typing.Union[SignalCursor, tuple], 
@@ -1586,7 +1540,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
         if len(params) == 0:
             raise TypeError("'func' must be a function with annotated signature")
         
-        plist = [(p, t) for p,t in params.items()]
+        plist = [(p, (t, k)) for p, (t, k) in params.items()]
         
         # check against the first parameter
         
@@ -1612,17 +1566,26 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     else:
         raise TypeError(f"'func' must be a callable; got {type(func).__name__} instead")
 
+    # NOTE: 2023-06-18 18:08:24
+    # below, we use numpy diff, but this will return a 2D array
+    # this is DELIBERATE and is left up to the caller to decide that to do
+    # (e.g. call np.squeeze() on the result, if that is suitable)
     if functor:
         if not isinstance(subfun, (typing.Callable, types.FunctionType)):
             raise TypeError(f"When 'func' is a functor, 'subfun' must be a callable or function; got {type(subfun).__name__} instead" )
         
-        y0 = func(subfun, signal, cursor0, channel=channel)
-        y1 = func(subfun, signal, cursor1, channel=channel)
+        data = np.array([func(subfun, signal, c, channel=channel) for c in (cursor0, cursor1)]) * signal.units
+        
+        # y0 = func(subfun, signal, cursor0, channel=channel)
+        # y1 = func(subfun, signal, cursor1, channel=channel)
     else:
-        y0 = func(signal, cursor0, channel=channel)
-        y1 = func(signal, cursor1, channel=channel)
+        data = np.array([func(signal, c, channel=channel) for c in (cursor0, cursor1)]) * signal.units
+        # y0 = func(signal, cursor0, channel=channel)
+        # y1 = func(signal, cursor1, channel=channel)
     
-    return y1-y0
+    return np.diff(data, axis=0)
+    # return np.ediff1d(data)
+    # return y1-y0
 
 @safeWrapper
 def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], 
@@ -1782,151 +1745,6 @@ def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     return ret
     
-    
-
-# @safeWrapper
-# def intervals2cursors(*args, **kwargs):
-#     """Construct a sequence of Signalcursor objects from a sequence of intervals.
-#     
-#     NOTE: In this context, an interval must not be confused with the arithmetic 
-#     concept of interval (see PyInterval, https://pyinterval.readthedocs.io/en/latest/)
-# 
-#     Variadic parameters:
-#     --------------------
-#     triplets (t0,t1,label), or a sequence of tuples or triplets
-#     each specifying an interval
-#     
-#     """
-#     from gui.cursors import SignalCursor
-#     signal_viewer = kwargs.pop("signal_viewer", None)
-# 
-#     axis = kwargs.pop("axis", None)
-#     if not isinstance(axis, (int, pg.PlotItem, type(None))):
-#         raise TypeError("axis expected to be an int, a PlotItem or None; got %s instead" % type(axis).__name__)
-# 
-#     sort = kwargs.pop("sort", True)
-#     
-#     if not isinstance(sort, bool):
-#         raise TypeError("sort must be a boolean")
-#     
-#     def __generate_cursor_params__(value):
-#         # BUG 2023-06-13 23:47:28 what if no label?!?
-#         # start, stop, label
-#         if not isinstance(value, (tuple, list)) or len(value) != 3:
-#             raise TypeError("expecting a tuple of 3 elements")
-#         
-#         if not isinstance(value[2], str) or len(value[2].strip()) == 0:
-#             raise ValueError("expecting a non-empty string as third element in the tuple")
-#         
-#         l = value[2]
-#         
-#         if not all([isinstance(v, (pq.Quantity, numbers.Number)) for v in value[0:2]]):
-#             raise TypeError("interval boundaries must be scalar numbers or quantities")
-#         
-#         if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
-#             if any([v.size != 1 for v in value[0:2]]):
-#                 raise TypeError("interval boundaries must be scalar quantities")
-#             
-#             if value[0].units != value[1].units:
-#                 if not units_convertible(value[0], value[1]):
-#                     raise TypeError("interval boundaries must have compatible units")
-#                 
-#                 else:
-#                     value = [float(value[0]), float(value[1].rescale(value[0].units)), value[2]]
-#                     
-#             else:
-#                 value = [float(v) for v in value[0:2]] + [value[2]]
-#             
-#         x, xwindow = (value[0], value[1]-value[0])
-#         
-#         if xwindow < 0:
-#             raise ValueError("interval cannot have negative duration")
-#         
-#         x += xwindow/2. 
-#         
-#         return (x, xwindow, l)
-#      
-#     xwl = None
-#     
-#     if len(args) == 1:
-#         if isinstance(args[0], (tuple, list)):
-#             if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
-#                 if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
-#                     # this can be an interval tuple
-#                     xwl = [__generate_cursor_params__(args[0])] # BUG 2023-06-13 23:47:28 what if no label?!?
-#                     
-#                 elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-#                     # or a sequence of tuples -- feed this into __generate_cursor_params__
-#                     # and hope for the best
-#                     if sort:
-#                         xwl = [__generate_cursor_params__(v) for v in sorted(args[0], key=lambda x: x[0])]
-#                     
-#                     else:
-#                         xwl = [__generate_cursor_params__(v) for v in args[0]]
-#                     
-#                 else:
-#                     raise TypeError("incorrect syntax")
-#                 
-#             else:
-#                 if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-#                     if sort:
-#                         xwl = [__generate_cursor_params__(v) for v in sorted(args[0], key=lambda x: x[0])]
-# 
-#         else:
-#             raise TypeError("expecting a sequence of tuples, or a 2- or 3- tuple")
-#         
-#     else:
-#         # sequence of 2- or 3- tuples
-#         if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args]):
-#             if sort:
-#                 xwl = [__generate_cursor_params__(v) for v in sorted(args, key=lambda x: x[0])]
-#             
-#             else:
-#                 xwl = [__generate_cursor_params__(v) for v in args]
-#         
-#         else:
-#             raise TypeError("expecting 2- or 3- tuples")
-#         
-#     if xwl is not None:
-#         if axis is not None:
-#             cursors = [SignalCursor(axis, x=p[0], xwindow=p[1], cursorID=p[2], 
-#                                     cursor_type=SignalCursorTypes.vertical) for p in xwl]
-#                 
-#         if isinstance(signal_viewer, SignalViewer):
-#             if isinstance(axis, pg.PlotItem):
-#                 if axis not in signal_viewer.axes:
-#                     return cursors
-#                 
-#             elif isinstance(axis, pg.GraphicsScene):
-#                 if axis is not signal_viewer.signalsLayout.scene():
-#                     return cursors
-#                 
-#             cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
-#             cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-#             cursorPen.setCosmetic(True)
-#             hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
-#             hoverPen.setCosmetic(True)
-#             linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-#             linkedPen.setCosmetic(True)
-#             if isinstance(axis, pg.PlotItem):
-#                 cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
-#             elif isinstance(axis, pg.GraphicsScene):
-#                 pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
-#                 cursorPrecision = min(pi_precisions)
-#                 
-#             else: 
-#                 cursorPrecision = None
-#                
-#             for c in cursors:
-#                 signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
-#                                              linkedPen=linkedPen,
-#                                              precision=cursorPrecision,
-#                                              showValue = signal_viewer.cursorsShowValue)
-#         
-#             return cursors
-#         
-#         return xwl
-
 @safeWrapper
 def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   epoch: neo.Epoch, 

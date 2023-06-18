@@ -818,7 +818,25 @@ def deprecation(msg):
     
 def get_func_param_types(func:typing.Callable):
     """Quick'n dirty parser of function parameter types
-    WARNING: does not support *args and **kwargs in func signature (yet)!
+    
+    Returns a dict: param_name ↦ tuple(type_or_types, kind), where:
+    • param_name (str) is the name of the parameter
+    
+    • type_or_types is the type (or types) of the parameter
+    
+    • kind is the kind of the parameter (see inspect.Parameter for details)
+    
+        As a remainder, the parameter kinds in Python are:
+    
+Kind:                               Example:
+---------------------------------------------------------------------------
+Parameter.POSITIONAL_ONLY           'a' in foo(a, /, b, c = 3, …)
+Parameter.POSITIONAL_OR_KEYWORD     'b' and 'c' in foo(a, /, b, c = 3. …)
+Parameter.VAR_POSITIONAL            'args' in bar(*args, b, c=0, …)
+Parameter.KEYWORD_ONLY              'b' and 'c' in bar(*args, b, c=0, …)
+Parameter.VAR_KEYWORD               'kwargs' in baz(a, b, **kwargs)
+    
+    
     """
     if isinstance(func, functools.partial):
         fn = func.func
@@ -829,10 +847,15 @@ def get_func_param_types(func:typing.Callable):
         
     params = inspect.get_annotations(fn)
     
+    signature = inspect.signature(fn)
     
     ret = dict()
     
     for name, ptype in params.items():
+        if name == "return": # skip the return annotation if present
+            continue
+        # print(f"prog.get_func_param_types name = {name}")
+        kind = signature.parameters[name].kind
         if isinstance(ptype, type):
             t = ptype
             
@@ -848,7 +871,7 @@ def get_func_param_types(func:typing.Callable):
             warnings.warn(f"Cannot parse the type of {name} parameter")
             
         if (isinstance(t, (tuple, list)) and all(t_ not in pargtypes for t_ in t)) or (t not in pargtypes):
-            ret[name] = t
+            ret[name] = (t, kind)
         
     return ret
     

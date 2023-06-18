@@ -869,13 +869,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         self._fileLoadWorker_.moveToThread(self._fileLoadThread_)
         self._fileLoadThread_.started.connect(self._fileLoadWorker_.run)
         self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.quit)
-        self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
+        # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
         self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.deleteLater)
         self._fileLoadWorker_.signals.signal_Finished.connect(lambda : progressDlg.setValue(progressDlg.maximum()))
         self._fileLoadWorker_.signals.signal_Result.connect(self._slot_fileLoadThread_ready)
         
         self._fileLoadThread_.finished.connect(self._fileLoadWorker_.deleteLater)
-        self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
+        # self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
         
         self._fileLoadThread_.start()
         
