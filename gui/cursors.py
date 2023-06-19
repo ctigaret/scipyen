@@ -740,7 +740,9 @@ class SignalCursor(QtCore.QObject):
             else:
                 self._is_selected_ = val
             
-    def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None):
+    def setBounds(self, host:typing.Optional[pg.GraphicsItem]=None,
+                  xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                  yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None):
         """ Sets the X and Y allowed range for the cursor lines
         """
         # NOTE: 2023-01-14 14:04:31

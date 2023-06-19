@@ -792,6 +792,22 @@ def check_time_units(value):
     ref = pq.s
     
     return value._reference.dimensionality == ref.dimensionality
+
+def check_current_units(value):
+    if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
+        raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
+    
+    ref = pq.A
+    
+    return value._reference.dimensionality == ref.dimensionality
+
+def check_voltage_units(value):
+    if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
+        raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
+    
+    ref = pq.V
+    
+    return value._reference.dimensionality == ref.dimensionality
     
 def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     """Calculates the conversion factor from y units to x units.

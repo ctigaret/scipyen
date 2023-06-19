@@ -133,7 +133,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -221,10 +221,29 @@
      <addaction name="crosshairCursorColorsAction"/>
      <addaction name="cursorHoverColorAction"/>
     </widget>
+    <widget class="QMenu" name="menuVerticalCursorsFromEpoch">
+     <property name="toolTip">
+      <string>Create vertical cursors from Epoch</string>
+     </property>
+     <property name="statusTip">
+      <string>Create vertical cursors from Epoch</string>
+     </property>
+     <property name="whatsThis">
+      <string>Create vertical cursors from Epoch</string>
+     </property>
+     <property name="title">
+      <string>From Epoch</string>
+     </property>
+     <property name="toolTipsVisible">
+      <bool>true</bool>
+     </property>
+     <addaction name="actionVerticalCursorsFromEpochInCurrentAxis"/>
+     <addaction name="actionMultiAxisVerticalCursorsFromEpoch"/>
+    </widget>
     <addaction name="addCursorsMenu"/>
     <addaction name="editCursorsMenu"/>
     <addaction name="removeCursorsMenu"/>
-    <addaction name="actionVerticalCursorsFromEpoch"/>
+    <addaction name="menuVerticalCursorsFromEpoch"/>
     <addaction name="separator"/>
     <addaction name="setCursorsShowValue"/>
     <addaction name="setCursorsLabelPrecisionAction"/>
@@ -595,12 +614,17 @@
     <string>Show Cursor Editing Dialog When Created</string>
    </property>
   </action>
-  <action name="actionVerticalCursorsFromEpoch">
+  <action name="actionVerticalCursorsFromEpochInCurrentAxis">
    <property name="text">
-    <string>From Epoch...</string>
+    <string>In current axis...</string>
    </property>
-   <property name="toolTip">
-    <string>Create Vertical Cursors From Epoch</string>
+  </action>
+  <action name="actionMultiAxisVerticalCursorsFromEpoch">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Multi-axes...</string>
    </property>
   </action>
  </widget>

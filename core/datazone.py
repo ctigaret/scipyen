@@ -10,6 +10,7 @@ import pyqtgraph as pg
 
 from core import quantities as cq
 from .prog import (safeWrapper, with_doc)
+from PyQt5 import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,
@@ -620,13 +621,20 @@ def intervals2epoch(*args, **kwargs):
     
 @safeWrapper
 def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone], 
-                  axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
+                  signal_viewer: typing.Optional[QtWidgets.QMainWindow] = None, 
+                  axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, 
                   **kwargs):
     """Creates vertical signal cursors from a neo.Epoch.
     
     Parameters:
     ----------
     epoch: neo.Epoch
+    
+    signal_viewer:SignalViewer instance, or None (the default)
+        When given, the cursors will also be registered with the signal viewer
+        instance that owns the axis.
+    
+        Prerequisite: the axis must be owned by the signal viewer instance.
     
     axis: (optional) pyqtgraph.PlotItem, pyqtgraph.GraphicsScene, or None.
     
@@ -645,12 +653,6 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     parent, follower, xBounds, yBounds, pen, linkedPen, hoverPen
     
     See the documentation of gui.cursors.SignalCursor.__init__ for details.
-    
-    signal_viewer:SignalViewer instance, or None (the default)
-        When given, the cursors will also be registered with the signal viewer
-        instance that owns the axis.
-    
-        Prerequisite: the axis must be owned by the signal viewer instance.
     
     Returns:
     --------
@@ -687,7 +689,21 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     else:
         ret = [(t + d/2. if d else t, d if d else 0, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
         
-    signal_viewer = kwargs.pop("signal_viewer", None)
+    # signal_viewer = kwargs.pop("signal_viewer", None)
+    
+    if isinstance(axis, (int, str)):
+        if not isinstance(signal_viewer, SignalViewer):
+            raise TypeError(f"When axis is indicated by its index or name ({axis}) then signal_viewer must be a SignalViewer instance")
+        
+        if isinstance(axis, str) and axis.lower() == "all":
+            axis = signal_viewer.signalsLayout.scene()
+        
+        else:
+            if isinstance(axis, (int, str)):
+                axis = signal_viewer.axis(axis)
+            
+    if axis is None and isinstance(signal_viewer, SignalViewer):
+        axis = signal_viewer.currentAxis()
     
     if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
         # NOTE: 2020-03-10 18:23:03
@@ -707,6 +723,30 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
             elif isinstance(axis, pg.GraphicsScene):
                 if axis is not signal_viewer.signalsLayout.scene():
                     return cursors
+                
+                pIs = [i for i in axis.items() if isinstance(i, pg.PlotItem)]
+                
+                if len(pIs):
+                    min_x_axis = np.min([p.viewRange()[0][0] for p in pIs])
+                    max_x_axis = np.max([p.viewRange()[0][1] for p in pIs])
+                    
+                    min_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(min_x_axis, 0))
+                    max_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(max_x_axis, 0))
+                    
+                    xbounds = [min_point.x(), max_point.x()]
+                    
+                    for c in cursors: # BUG 2023-06-19 12:20:36 FIXME
+                        c.setBounds(xBounds = xbounds)
+                        # newX = 
+                        
+
+                    pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+                    precision = min(pi_precisions)
+                else:                 
+                    scene_rect = axis.sceneRect()
+                    xbounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
+                    precision=None
+                
                 
             cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
             cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)

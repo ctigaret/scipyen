@@ -895,7 +895,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.crosshairCursorColorsAction.triggered.connect(self._slot_setCrosshairCursorColors)
         self.cursorHoverColorAction.triggered.connect(self._slot_setCursorHoverColor)
         self.actionShow_Cursor_Edit_Dialog_When_Created.toggled.connect(self._slot_setEditCursorWhenCreated)
-        self.actionVerticalCursorsFromEpoch.triggered.connect(self._slot_makeVerticalCursorsFromEpoch)
+        # self.actionVerticalCursorsFromEpoch.triggered.connect(self._slot_makeVerticalCursorsFromEpoch)
+        self.actionVerticalCursorsFromEpochInCurrentAxis.triggered.connect(self._slot_makeVerticalCursorsFromEpoch)
+        self.actionMultiAxisVerticalCursorsFromEpoch.triggered.connect(self._slot_makeMultiAxisVerticalCursorsFromEpoch)
+        self.actionMultiAxisVerticalCursorsFromEpoch.setEnabled(False)# BUG/FIXME 2023-06-19 12:21:54
         #### END Cursor actions
         
         #### BEGIN Epoch actions
@@ -4123,7 +4126,7 @@ anything else       anything else       ❌
             pIs = self.plotItems
             
             # NOTE: 2023-01-14 23:23:06
-            # always expect at least on PlotItem present
+            # always expect at least one PlotItem present
             if len(pIs) == 0: #
                 scene_rect = self.signalsLayout.scene().sceneRect()
                 xbounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
@@ -4141,6 +4144,7 @@ anything else       anything else       ❌
 
                 pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                 precision = min(pi_precisions)
+                
             return self._addCursor_("vertical", axis=self.signalsLayout.scene(), 
                                     label=label, follows_mouse=dynamic, xBounds=xbounds,
                                     precision=precision,
@@ -4424,6 +4428,62 @@ anything else       anything else       ❌
             selEpoch = selEpoch[0]
             
             cursors = epoch2cursors(selEpoch, axis=self.currentAxis,
+                                    signal_viewer = self)
+            
+    @pyqtSlot()
+    @safeWrapper
+    def _slot_makeMultiAxisVerticalCursorsFromEpoch(self):
+            if isinstance(self._yData_, neo.Block):
+                segments = self._yData_.segments
+                
+            elif isinstance(self._yData_, (tuple, list)) and all(isinstance(s, neo.Segment) for s in self._yData_):
+                segments = self._yData_
+                
+            elif isinstance(self._yData_, neo.Segment):
+                segments = [self._yData_]
+                
+            elif isinstance(self._yData_, neo.core.basesignal.BaseSignal):
+                if self._yData_.segment is None:
+                    return
+                
+                segments = [self._yData_.segment]
+                
+            else:
+                return
+            
+            if len(segments) == 0:
+                return
+            
+            epochs = segments[self.currentFrame].epochs
+            
+            if len(epochs) == 0:
+                return
+            
+            epoch_names = [e.name for e in epochs]
+            seldlg = ItemsListDialog(self, itemsList = epoch_names,
+                                     title="Select epoch",
+                                     selectmode = QtWidgets.QAbstractItemView.SingleSelection)
+            ans = seldlg.exec_()
+            if ans != QtWidgets.QDialog.Accepted:
+                return
+            
+            selItems = seldlg.selectedItemsText
+            
+            if len(selItems) == 0:
+                return
+            
+            else:
+                selItem = selItems[0]
+                
+            selEpoch = [e for e in epochs if e.name == selItem]
+            
+            if len(selEpoch) == 0:
+                warnings.warn(f"There's no epoch named {selItem}")
+                return
+            
+            selEpoch = selEpoch[0]
+            
+            cursors = epoch2cursors(selEpoch, axis=self.signalsLayout.scene(),
                                     signal_viewer = self)
             
     @pyqtSlot(str)
@@ -6929,9 +6989,19 @@ signals in the signal collection.
         """
         return self.axes[index]
     
-    def axis(self, index):
+    def axis(self, index:typing.Union[int, str]):
         """Calls self.plotItem(index) -- syntactic sugar
         """
+        if isinstance(index, str):
+            axnames = [ax.vb.name for ax in self.axes]
+            if index not in axnames:
+                raise ValueError(f"An axis named {index} does not exist in this viewer")
+            
+            index = axnames.index(index)
+        
+        if not isinstance(index, int):
+            raise TypeError(f"Axis index expected to be an int or str; nstead, got {type(index).__name__} ")
+
         return self.plotItem(index)
     
     @property

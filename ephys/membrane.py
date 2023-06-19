@@ -9,6 +9,7 @@ import collections
 import itertools
 import math
 from copy import deepcopy
+from dataclasses import MISSING
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -52,7 +53,6 @@ import core.models as models
 import core.datatypes  
 import plots.plots as plots
 import core.datasignal as datasignal
-
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import (DataZone, Interval)
 from core import quantities as scq
@@ -88,6 +88,204 @@ import ephys.ephys as ephys
 # NOTE: 2023-06-12 16:09:45
 # measure_Rs_Rin must be defined early so that it can be picked up by the with_doc
 # decorator, later
+
+@safeWrapper
+def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
+                  command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity, numbers.Number],
+                  locations: typing.Optional[typing.Union[typing.Sequence[typing.Union[SignalCursor,type(MISSING)]],
+                                             typing.Sequence[typing.Union[Interval, type(MISSING)]]]] = None,
+                  clampMode:typing.Optional[ephys.ClampMode] = None,
+                  channel:typing.Optional[int] = None,
+                  **kwargs
+                  ):
+    """Membrane test measurements.
+
+Var-keyword parameters:
+------------------------
+1) passed to signalprocessing.detect_boxcar()
+
+levels_method:str, one of "state_levels" or "kmeans" default is "state_levels"
+box_size:int length of smoothing boxcar default is 0 (no smoothing)
+adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
+
+"""
+    # check for signals consistency; command MAY BE a scalar (i.e. the amount
+    # of Vm change (in voltage-clamp) or injected curent (in current clamp)
+    if not isinstance(signal, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"'signal' expected to be an AnalogSignal or DataSignal; instead, got {type(signal).__name__}")
+    
+    if not isinstance(command, neo.core.basesignal.BaseSignal):
+        if isinstance(command, pq.Quantity) and command.size > 1:
+            raise TypeError(f"When not a signal, command was expected to be a scalar Quantity or number")
+        
+    elif not isinstance(command, numbers.Number):
+        raise TypeError(f"When not a signal, command was expected to be a scalar Quantity or number")
+    
+    if not isinstance(clampMode, ephys.ClampMode) or clampMode == ephys.ClampMode.NoClamp:
+        if isinstance(command, (neo.core.basesignal.BaseSignal, pq.Quantity)):
+            vc_mode = scq.check_current_units(signal) and scq.check_voltage_units(command)
+            ic_mode = scq.check_voltage_units(signal) and scq.check_current_units(command)
+            
+            clampMode = ephys.ClampMode.VoltageClamp if vc_mode else epys.ClampMode.CurrentClamp if ic_mode
+            
+            if clampMode not in (ephys.ClampMode.VoltageClamp, ephys.ClampMode.CurrentClamp):
+                raise RuntimeError(f"Cannot determine the clamping mode from the units of signal ({signal.units}) and command ({command.units}). \nPlease specify a valid clampMode (either ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp) manually")
+
+        else:
+            raise TypeError(f"Clamping mode ('clampMode') must be specified as ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp")
+        
+    if clampMode == ephys.ClampMode.NoClamp:
+        raise ValueError(f"For a membrane test, the clamping mode must be either ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp")
+    
+    # check for units correctness, force to correct units (I know you may be 
+    # frowning on that but sometimes the telegraphs don't quite work; so this is
+    # a temporary work-around for this contigency)
+    #
+    # TODO: 2023-06-19 13:08:23 - factor out in an ephys function
+    # this is very important and likely to happen in other scenarios, not just in
+    # the case of the membrane test.
+    # After all, we should be able to determine the clamping mode from the signals
+    # which is possible when the signals have got the units and scaling right.
+    # However, this relies on a telegraph being properly set up in the acquisition
+    # hardware or, failing that, on the user assigning the correct units and scaling
+    # post-hoc.
+    if clampMode == ephys.ClampMode.VoltageClamp:
+        if not scq.check_current_units(signal):
+            warings.warn(f"'signal' has wrong units ({signal.units}) for VoltageClamp mode.\nThe signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
+            klass = type(signal)
+            signal = klass(signal.magnitude, units = pq.pA, 
+                                         t_start = signal.t_start, sampling_rate = signal.sampling_rate,
+                                         name=signal.name)
+            
+        if isinstance(command, pq.Quantity):
+            if not scq.check_voltage_units(command)
+                if isinstance(command, neo.core.basesignal.BaseSignal):
+                    warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+                    klass = type(command)
+                    command = klass(command.magnitude, units = pq.mV, 
+                                                t_start = command.t_start, sampling_rate = command.sampling_rate,
+                                                name=command.name)
+                    
+                else:
+                    warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+                    command = command.magnitude * pq.mV
+                
+        else: # command is a number
+            command = command * pq.mV
+        
+    else: # current clamp mode
+        if not scq.check_voltage_units(signal):
+            warings.warn(f"'signal' has wrong units ({signal.units}) for CurrentClamp mode.\nThe signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+            klass = type(signal)
+            signal = klass(signal.magnitude, units = pq.mV, 
+                                         t_start = signal.t_start, sampling_rate = signal.sampling_rate,
+                                         name=signal.name)
+            
+        if isinstance(command, pq.Quantity):
+            if not scq.check_current_units(command):
+                if isinstance(command, neo.core.basesignal.BaseSignal):
+                    warings.warn(f"'command' has wrong units ({command.units}) for CurrentClamp mode.\nThe command signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
+                    klass = type(command)
+                    command = klass(command.magnitude, units = pq.pA, 
+                                                t_start = command.t_start, sampling_rate = command.sampling_rate,
+                                                name=command.name)
+                    
+                else:
+                    warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
+                    command = command.magnitude * pq.pA
+                    
+        else: # command is a number
+            command  = command * pq.pA
+                
+    # figure out:
+    # • the timings of the boxcar ⇒ useful when locations are not given;
+    #   (not used when command is a scalar quantity and we rely on locations)
+    #
+    # • the amplitude of the test (i.e. of change in Vm, in voltage-clamp, or
+    #   amplitude of the injected current, in current-clamp)
+    #
+    # NOTE: 2023-06-19 14:32:16
+    # for a voltage-clamp membrane test, both a depolarizing or a hyperpolarizing
+    # Vm boxcar are acceptable (with the caveat that a depolarizing boxcar should
+    # be sub-threshold i.e. NOT elicit an AP)
+    #
+    # for curent-clamp, although both directions are mathematically acceptable,
+    # it is more likely for a depolarizing current injection boxcar to elicit APs
+    # so better to use a hyperpolarizing one.
+    if isinstance(command, neo.core.basesignal.BaseSignal):
+        u, d, test_amplitude, _, _ = sigp.detect_boxcar(command, **kwargs)
+        if d.ndim > 0:
+            d = d[0]
+            
+        if u.ndim > 0:
+            u = u[0]
+            
+        if any(v.size > 1 for v in (d,u)):
+            raise RuntimeError("More than one transition between levels has been detected")
+            
+        start, stop = (min(d,u), max(d,u))
+        
+    else: # command is a scalar ⇒ use it as test amplitude (can be negative !!!)
+        test_amplitude = command
+        start = stop = None
+        
+        
+    # figure-out locations:
+    # for a membrane test in voltage-clamp we need three locations:
+    # • baseline
+    # • first capacitive transient (to calculate Rs)
+    # • the steady-state (to calculate Rin)
+    #
+    # for current-clamp there is no capacitive transient, but there may be a
+    # sag and a rebound ⇒ we need six locations; for compatibility with the 
+    # voltage clamp mode, the first three are as above (see passive_Iclamp(…)):
+    # • baseline
+    # • start of the command Im boxcar (omologue of the Rs location in voltage-clamp)
+    # • steady-state during test (to calculate Rin)
+    # • end of the command boxcar (may be MISSING)
+    # • nadir of the sag (may be MISSING)
+    # • peak of the rebound (may be MISSING) 
+    # • a time point after the test ("V∞") so that we can fit the rebound (may be MISSING)
+    # 
+    # Moreover, we do not measure the command signal at these locations (the only
+    #   value that is relevant is the amplitude of the test, which was 
+    #   determined above)
+    
+    if not isinstance(locations, (list,tuple)):
+        raise TypeError(f"Expecting a sequence of location")
+        # check if locations are as many as needed, given the clamping mode
+        # (see above)
+        # then create a LocationMeasure to apply to the signal:
+        #
+        # Use ephys.cursors_dfference if cursors are given,
+        # else use ephys.intervals_difference
+        # (TODO maybe: allow for the use of an Epoch - but that complicates
+        # the code)
+        # 
+        # in VoltageClamp mode:
+        #   use the *_difference functions with location 0 and location 1 ⇒ Rs
+        #   use the *_difference functions with location 0 and location 2 ⇒ Rin
+        #
+        # in CurrentClamp mode:
+        #   use the *_difference functions with locations 0 and 2 ⇒ Rin
+        #   
+        #   use *_difference with locations 0 and 3 to calculate sag
+        #       amplitude IF GIVEN, else determine from the signal 
+        #   use *_difference with locations 0 and 4 to calculate rebound
+        #       amplitude IF GIVEN,  else determine from the signal
+        # 
+        if all(isinstance(l, SignalCursor) for l in locations):
+            # 
+            pass
+            
+        
+    
+        
+        
+    
+            
+    #TODO 2023-06-19 13:18:21 finish this up !!!
+    
 
 def measure_Rs_Rin(im_signal:neo.AnalogSignal, 
                            testVm:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity],
@@ -356,29 +554,6 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
         return Rs, Rin, Idc
     else:
         return Rs, Rin
-    
-@safeWrapper
-def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
-                  command:typing.Union[neo.AnalogSignal, DataSignal],
-                  locations: typing.Optional[typing.Union[typing.Sequence[SignalCursor],
-                                             typing.Sequence[Interval]]],
-                  clampMode:typing.Optional[ephys.ClampMode] = None,
-                  channel:typing.Optional[int] = None,
-                  returnDC:bool = False,
-                  **kwargs
-                  ):
-    """Membrane test measurements.
-
-Var-keyword parameters:
-------------------------
-1) passed to signalprocessing.detect_boxcar()
-
-levels_method:str, one of "state_levels" or "kmeans" default is "state_levels"
-box_size:int length of smoothing boxcar default is 0 (no smoothing)
-adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
-
-"""
-
     
 @safeWrapper
 def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], 
@@ -1603,7 +1778,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuratio
     
     steadyStateDuration: scalar or python quantity
                 use to calculate the interval for Vm average on baseline and
-                during trhe steady-state hyperpolarization
+                during the steady-state hyperpolarization
                 default is 0.05 * pq.s
     
     box_size: int scalar (default 0) size of the boxcar window for filtering 
@@ -1763,6 +1938,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuratio
     
     
     # sag & rebound peak values (on filtered data => ~ average of box_size samples)
+    # BUG 2023-06-19 14:56:19 breaks down when box_size = 0 FIXME
     vsag            = v_flt[box_size+1:-(box_size+1),:].min() # avoid filter artifacts at ends
     vrebound        = v_flt[box_size+1:-(box_size+1),:].max()
     
@@ -1864,7 +2040,12 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuratio
     return vbase, vss, vsag, vrebound, Rin, Rss, time_constant, vfit, v_flt
 
 
-def PassiveMembranePropertiesAnalysis(block:neo.Block, Vm_index:(int,str) = "Vm_prim_1", Im_index:(int,str) = "Im_sec_1", box_size:int = 63, name:(str, type(None)) = None,plot:bool = True,**kwargs):
+def PassiveMembranePropertiesAnalysis(block:neo.Block, 
+                                      Vm_index:(int,str) = "Vm_prim_1",
+                                      Im_index:(int,str) = "Im_sec_1", 
+                                      box_size:int = 63, 
+                                      name:(str, type(None)) = None,
+                                      plot:bool = True,**kwargs):
     """User-friendly wrap around the passive_Iclamp function.
     
     Arguments:

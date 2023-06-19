@@ -2550,7 +2550,7 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     
     try:
         if method == "state_levels":
-            print("detect_boxcar using state_levels")
+            # print("detect_boxcar using state_levels")
             levels = kwargs.pop("levels", 0.5)
             # NOTE: 2023-06-19 09:04:30
             # TODO code to get these values from the ABF file (via pyabfbridge?)
@@ -2591,7 +2591,7 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
             cbook = np.array(centroids).T[:,np.newaxis]
             
         else:
-            print("detect_boxcar using kmeans")
+            # print("detect_boxcar using kmeans")
             cbook, dist = cluster.vq.kmeans(sig_filt, 2) # two levels
             cbook = np.array(cbook, dtype=float)
             
