@@ -21,8 +21,9 @@ import typing
 import numpy as np
 import pandas as pd
 import quantities as pq
+import neo
 
-from core import quantities as spq
+from core import quantities as scq
 from iolib.pictio import getABF
 
 try:
@@ -98,8 +99,8 @@ def epochTable2DF(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = 
             else:
                 adcName = adcUnits = dacName = dacUnits = None
                 
-            dacLevel = epoch.level*spq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.level
-            dacLevelDelta = epoch.levelDelta*spq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.levelDelta
+            dacLevel = epoch.level*scq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.level
+            dacLevelDelta = epoch.levelDelta*scq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.levelDelta
 
             epValues = np.array([epoch.epochTypeStr,    # str description of epoch type (as per Clampex e.g Step, Pulse, etc)                            
                               dacLevel,                 # "first" DAC level -> quantity; CAUTION units depen on Clampex and whether its telegraphs were OK
@@ -122,3 +123,72 @@ def epochTable2DF(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = 
         
         return pd.DataFrame(epochData, index = rowIndex)
     
+def getCommandWaveforms(abf: pyabf.ABF, 
+                        sweep:typing.Optional[int] = None,
+                        channel:typing.Optional[int] = None,
+                        absoluteTime:bool=False) -> typing.List[typing.List[neo.AnalogSignal]]:
+    
+    def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
+        x_units = scq.unit_quantity_from_name_or_symbol(abf.sweepUnitsX)
+        x = abf.sweepX
+        y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
+        y_units = scq.unit_quantity_from_name_or_symbol(y_units_str)
+        y = abf.sweepC # the command waveform for this sweep
+        # y_label = abf.sweepLabelC
+        sampling_rate = abf.sampleRate * pq.Hz
+        
+        return neo.AnalogSignal(y, units = y_units, 
+                                t_start = x[0] * x_units,
+                                sampling_rate = abf.sampleRate * pq.Hz,
+                                name = y_name)
+        
+    if isinstance(sweep, int):
+        if sweep < 0:
+            raise ValueError("sweep must be >= 0")
+        
+        if sweep >= abf.sweepCount:
+            raise ValueError(f"Invalid sweep {sweep} for {abf.sweepCount} sweeps")
+        
+    if isinstance(channel, int):
+        if channel < 0 :
+            raise ValueError("channel must be >= 0")
+        
+        if channel >= abf.channelCount:
+            raise ValueError(f"Invalid channel {channel} for {abf.channelCount} channels")
+    
+    ret = []
+    if not isinstance(sweep, int):
+        for s in range(abf.sweepCount):
+            sweepSignals = []
+            if not isinstance(channel, int):
+                for c in range(abf.channelCount):
+                    abf.setSweep(s, c, absoluteTime)
+                    sweepSignals.append(__f__(abf, c))
+            else:
+                    
+                abf.setSweep(s, channel, absoluteTime)
+                sweepSignals.append(__f__(abf, channel))
+                
+            ret.append(sweepSignals)
+            
+    else:
+        sweepSignals = []
+        if not isinstance(channel, int):
+            for c in range(abf.channelCount):
+                abf.setSweep(sweep, c, absoluteTime)
+                sweepSignals.append(__f__(abf, c))
+                
+        else:
+            abf.setSweep(sweep, channel, absoluteTime)
+            sweepSignals.append(__f__(abf, channel))
+            
+        ret.append(sweepSignals)
+        
+    return ret
+            
+        
+        
+            
+            
+        
+        

@@ -2786,3 +2786,90 @@ on the acquisition device)
 
     return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
 
+def infer_clamp_mode(signal, command):
+    """
+    Infers a clamp mode from the units embedded in the signals.
+    
+    WARNING: Prerequisites:
+    
+    • The command signal must be available. This is achieved in one of the 
+    following ways:
+    
+        ∘ Recording of the secondary amplifier output. When available, and 
+        appropriately selected in the amplifier software/hardware, this signal
+        is - under usual circumstances - an APPROXIMATION of the actual 
+        command signal. NOTE: These are NOT identical! The secondary amplifier
+        output is a signal recorded through the microelectrode, and NOT a "clean"
+        command signal.
+    
+            Example for voltage-clamp mode with Multiclamp 700B:
+    
+            ⋆ The "Primary Output" and the "Secondary Output" are selectable in 
+                MultiClamp commander software
+    
+            ⋆ The Primary output should be set to "Membrane current" (scaled by
+                the gain)
+    
+            ⋆ The Secondary output should be set to "Membrane Potential".
+                This is the membrane potential measured at the tip of the 
+                microelectrode.
+
+                Remember that in reality, the preamplifier (headstage) only
+                measures potential, never a current.
+    
+                In voltage-clamp, the amplifier measures the membrane potential
+                and injects a current with amplitude and polarity as needed to
+                correct any deviations of the membrane potential from a desired
+                value (the "clamp"). Traditionally, this requires two electrodes:
+                one for potential measurement, and the other for current injection.
+    
+                In these amplifiers, both processes take place with a single
+                electrode: the potential measurement and the current injection
+                are performed via the same electrode alternatively - 
+                interleaved - with a high repetition rate (μs period). This allows
+                the amplifier to run a fast feedback loop to adjust the amount 
+                of injected current needed to "clamp" the membrane potential.
+    
+                As the membrane potential deviates from the desired value, 
+                a current (positive or negative) is injected in order to 
+                compensate this change.
+    
+                Therefore, in voltage clamp, the primary output is actually the 
+                current injected to "clamp" the voltage, whereas the secondary
+                output (as set up above) is the actual membrane potential
+                measured by the pipette.
+    
+                In other words, the command signal in voltage clamp merely alters
+                the current injection so that the measured membrane potential
+                follows the desired change described by the "command" waveform. 
+    
+                In these circumstances the secondary output (measured membrane
+                potential) can be used as an approximation of the voltage 
+                "command".
+    
+            In current clamp the same process applies, except for the need of a 
+            feedback loop: the amplifier injects a predetermined current through
+            the microelectrode, alternatively with measuring the membrane potential.
+            Since the membrane potential is not being "clamped", no feedback loop
+            is required.
+    
+            The Primary output is, now, the recorded membrane potential, whereas
+            the Secondary output, when set to show membrane current, reflects
+            the "real" command signal: the time-varying current injected through 
+            the microelectrode.  
+    
+        ∘ A virtual command signal is generated post-hoc based on the protocol data. 
+            This data may be present in the record file stored by the digitizer 
+            software or in the protocol file
+    
+        ∘ A virtual command signal is generated manually by the user, based on 
+            protocol information.
+            
+        
+
+"""
+    pass
+# should also pass an abf object; 
+# find out adc names and units ⇒ recorded signal
+# then for the DAC: dacNames, dacUnits ⇒ "command signal"
+    

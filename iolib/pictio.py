@@ -1746,8 +1746,9 @@ def getABF(obj):
     Parameters:
     ----------
     obj: str (ABF file name) or a neo.core.baseneo.BaseNeo object containing an
-        attribute named "file_origin" that points to an ABF file on disk where
-        its data is stored.
+        attribute named "file_origin" pointing to an ABF file on disk where its
+        data is stored (in Scipyen, the contents of ABF files are normally loaded
+        as neo.Block objects).
     """
     import os
     if not hasPyABF:

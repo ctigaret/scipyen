@@ -21,7 +21,7 @@ import pandas as pd
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-import core.datatypes  
+import core.datatypes as datatypes
 
 import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration
@@ -32,8 +32,11 @@ from imaging.scandata import (ScanData, AnalysisUnit)
 from core.triggerprotocols import TriggerProtocol
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 
-import core.datasignal
+import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+
+import core.datazone as datazone
+from core.datazone import (DataZone, Interval)
 
 from core import xmlutils, strutils
 

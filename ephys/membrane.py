@@ -126,7 +126,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
             vc_mode = scq.check_current_units(signal) and scq.check_voltage_units(command)
             ic_mode = scq.check_voltage_units(signal) and scq.check_current_units(command)
             
-            clampMode = ephys.ClampMode.VoltageClamp if vc_mode else epys.ClampMode.CurrentClamp if ic_mode
+            clampMode = ephys.ClampMode.VoltageClamp if vc_mode else epys.ClampMode.CurrentClamp if ic_mode else ephyc.ClampMode.NoClamp
             
             if clampMode not in (ephys.ClampMode.VoltageClamp, ephys.ClampMode.CurrentClamp):
                 raise RuntimeError(f"Cannot determine the clamping mode from the units of signal ({signal.units}) and command ({command.units}). \nPlease specify a valid clampMode (either ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp) manually")
@@ -158,7 +158,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
                                          name=signal.name)
             
         if isinstance(command, pq.Quantity):
-            if not scq.check_voltage_units(command)
+            if not scq.check_voltage_units(command):
                 if isinstance(command, neo.core.basesignal.BaseSignal):
                     warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
                     klass = type(command)
@@ -253,31 +253,32 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
     
     if not isinstance(locations, (list,tuple)):
         raise TypeError(f"Expecting a sequence of location")
-        # check if locations are as many as needed, given the clamping mode
-        # (see above)
-        # then create a LocationMeasure to apply to the signal:
-        #
-        # Use ephys.cursors_dfference if cursors are given,
-        # else use ephys.intervals_difference
-        # (TODO maybe: allow for the use of an Epoch - but that complicates
-        # the code)
-        # 
-        # in VoltageClamp mode:
-        #   use the *_difference functions with location 0 and location 1 ⇒ Rs
-        #   use the *_difference functions with location 0 and location 2 ⇒ Rin
-        #
-        # in CurrentClamp mode:
-        #   use the *_difference functions with locations 0 and 2 ⇒ Rin
-        #   
-        #   use *_difference with locations 0 and 3 to calculate sag
-        #       amplitude IF GIVEN, else determine from the signal 
-        #   use *_difference with locations 0 and 4 to calculate rebound
-        #       amplitude IF GIVEN,  else determine from the signal
-        # 
-        if all(isinstance(l, SignalCursor) for l in locations):
-            # 
-            pass
+    
+    # check if locations are as many as needed, given the clamping mode
+    # (see above)
+    # then create a LocationMeasure to apply to the signal:
+    #
+    # Use ephys.cursors_dfference if cursors are given,
+    # else use ephys.intervals_difference
+    # (TODO maybe: allow for the use of an Epoch - but that complicates
+    # the code)
+    # 
+    # in VoltageClamp mode:
+    #   use the *_difference functions with location 0 and location 1 ⇒ Rs
+    #   use the *_difference functions with location 0 and location 2 ⇒ Rin
+    #
+    # in CurrentClamp mode:
+    #   use the *_difference functions with locations 0 and 2 ⇒ Rin
+    #   
+    #   use *_difference with locations 0 and 3 to calculate sag
+    #       amplitude IF GIVEN, else determine from the signal 
+    #   use *_difference with locations 0 and 4 to calculate rebound
+    #       amplitude IF GIVEN,  else determine from the signal
+    # 
             
+    if clampMode == ephys.ClampMode.CurrentClamp:
+        pass
+        # do what the passive_Iclamp does
         
     
         
