@@ -54,6 +54,7 @@ import plots.plots as plots
 import core.datasignal as datasignal
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.datazone import (DataZone, Interval)
 from core import quantities as scq
 from core.quantities import units_convertible
 import core.neoutils as neoutils
@@ -70,6 +71,7 @@ from core.prog import safeWrapper, with_doc
 
 #### BEGIN pict.gui modules
 import gui.signalviewer as sv
+import gui.cursors as cursors
 from gui.cursors import SignalCursor
 import gui.pictgui as pgui
 
@@ -354,6 +356,29 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
         return Rs, Rin, Idc
     else:
         return Rs, Rin
+    
+@safeWrapper
+def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
+                  command:typing.Union[neo.AnalogSignal, DataSignal],
+                  locations: typing.Optional[typing.Union[typing.Sequence[SignalCursor],
+                                             typing.Sequence[Interval]]],
+                  clampMode:typing.Optional[ephys.ClampMode] = None,
+                  channel:typing.Optional[int] = None,
+                  returnDC:bool = False,
+                  **kwargs
+                  ):
+    """Membrane test measurements.
+
+Var-keyword parameters:
+------------------------
+1) passed to signalprocessing.detect_boxcar()
+
+levels_method:str, one of "state_levels" or "kmeans" default is "state_levels"
+box_size:int length of smoothing boxcar default is 0 (no smoothing)
+adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
+
+"""
+
     
 @safeWrapper
 def segment_Rs_Rin(segment: neo.Segment, Im: typing.Union[str, int], 
@@ -3346,11 +3371,14 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         current injection.
         
         See also the functions:
-        signalprocessing.parse_step_waveform_signal
+        signalprocessing.detect_boxcar
+        signalprocessing.parse_step_waveform_signal (DEPRECATED)
     
     adcres, adcrange, adcscale: float scalars
         See also the functions:
-        signalprocessing.parse_step_waveform_signal and signalprocessing.state_levels.
+        signalprocessing.detect_boxcar
+        signalprocessing.state_levels
+        signalprocessing.parse_step_waveform_signal (DEPRECATED).
     
         Used only when method is "state_levels"
         
@@ -3415,18 +3443,29 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             # up   = time point of the down-up transition
             # inj  = injected current (difference between centroids )
             # label = int array "mask" with 0 for down and 1 for up; same shape as im
-            d, u, inj, c, l = sigp.parse_step_waveform_signal(im,
-                                                                method=method,
-                                                                box_size=box_size, 
-                                                                adcres=adcres,
-                                                                adcrange=adcrange,
-                                                                adcscale=adcscale)
+            d, u, inj, c, l = sigp.detect_boxcar(im,
+                                                method=method,
+                                                box_size=box_size, 
+                                                adcres=adcres,
+                                                adcrange=adcrange,
+                                                adcscale=adcscale)
+            
+            # d, u, inj, c, l = sigp.parse_step_waveform_signal(im,
+            #                                                     method=method,
+            #                                                     box_size=box_size, 
+            #                                                     adcres=adcres,
+            #                                                     adcrange=adcrange,
+            #                                                     adcscale=adcscale)
             
             
             if d.ndim > 0:
                 d = d[0]
+                
             if u.ndim > 0:
                 u = u[0]
+                
+            if any(v.size > 1 for v in (d,u)):
+                raise RuntimeError("More than one transition between levels has been detected")
                 
             start, stop = (min(d,u), max(d,u))
             
@@ -4934,7 +4973,11 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         im = segment.analogsignals[ImSignal]
         vm = segment.analogsignals[VmSignal]
         if isinstance(im, neo.AnalogSignal):
-            d,u,_,_,_ = sigp.parse_step_waveform_signal(im)
+            d,u,_,_,_ = sigp.detect_boxcar(im)
+            # d,u,_,_,_ = sigp.parse_step_waveform_signal(im)
+            
+            if any(v.size > 1 for v in (d,u)):
+                raise RuntimeError("More than one transition between levels has been detected")
             
             start_stop = list((d,u))
 
@@ -4958,10 +5001,6 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
         istep = im.time_slice(start_stop[0], start_stop[1]).copy() # avoid references
         i_steps.append(istep.magnitude)
             
-        
-        # reset the time domain, but use the same units else this breaks the AnalogSignal API
-        #istep.t_start = 0 * istep.times.units
-        #vstep.t_start = 0 * vstep.times.units
         
         
     i_steps_signal = neo.AnalogSignal(np.concatenate(i_steps, axis=1), \
@@ -5166,7 +5205,7 @@ def analyse_AP_step_injection_series(data, **kwargs):
         "up" vs "down" states of the step current injection waveform
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from signalprocessing.parse_step_waveform_signal() 
+        called from signalprocessing.detect_boxcar() 
         
         Used only when method is "state_levels"
         
@@ -6119,7 +6158,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     method: str, one of "state_levels" (default) or "kmeans"
     
     adcres, adcrange, adcscale: float scalars, see signalprocessing.state_levels()
-        called from signalprocessing.parse_step_waveform_signal() 
+        called from signalprocessing.detect_boxcar() 
         
         Used only when method is "state_levels"
         

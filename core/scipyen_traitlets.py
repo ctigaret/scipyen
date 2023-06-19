@@ -435,7 +435,7 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
             return
     
         try:
-            if any(v is None for v in (new_value, old_value)):
+            if any(not isinstance(v, np.ndarray) for v in (new_value, old_value)):
                 silent=False
                 
             if silent:
