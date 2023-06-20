@@ -34,7 +34,7 @@ except:
 
 # import pyabf
 
-def getABFProtocolEpochs(obj):
+def getABFProtocolEpochs(obj, sweep:int):
     if not hasPyABF:
         warning.warn("getABF requires pyabf package")
         return
@@ -44,22 +44,49 @@ def getABFProtocolEpochs(obj):
     if abf:
         return getABFEpochsTable(abf, as_dataFrame=True)
     
-def getABFEpochsTable(x:pyabf.ABF, as_dataFrame:bool=False, allTables:bool=False):
+def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
+                      as_dataFrame:bool=False, allTables:bool=False):
     if not isinstance(x, pyabf.ABF):
         raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
     
-    # NOTE: 2022-03-04 15:30:22
-    # only return the epoch tables that actually contain any non-OFF epochs (filtered here)
-    if allTables:
-        etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+    
+    sweepTables = list()
+    if isinstance(sweep, int):
+        if sweep < 0 or sweep >= x.sweepCount:
+            raise ValueError(f"Invalid sweep {sweep} for {x.sweepCount} sweeps")
+        
+        x.setSweep(sweep)
+        # NOTE: 2022-03-04 15:30:22
+        # only return the epoch tables that actually contain any non-OFF epochs (filtered here)
+        if allTables:
+            etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+        else:
+            etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+            
+        if as_dataFrame:
+            etables = [epochTable2DF(e, x) for e in etables]
+            
+        sweepTables.append(etables)
+    
     else:
-        etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+        for sweep in range(x.sweepCount):
+            x.setSweep(sweep)
+            if allTables:
+                etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+            else:
+                etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+                
+            if as_dataFrame:
+                etables = [epochTable2DF(e, x) for e in etables]
+                
+            sweepTables.append(etables)
+            
+    return sweepTables
     
-    
-    if as_dataFrame:
-        return list(epochTable2DF(e, x) for e in etables)
-    
-    return etables
+#     if as_dataFrame:
+#         return list(epochTable2DF(e, x) for e in etables)
+#     
+#     return etables
     # return [e for e in etables if len(e.epochs)]
 
 def epochTable2DF(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None):
