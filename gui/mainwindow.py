@@ -98,6 +98,7 @@ from .cursors import (SignalCursor, SignalCursorTypes,
 
 from iolib import h5io, jsonio
 from iolib import pictio as pio
+from core import pyabfbridge as pab
 from core import datazone
 from core.datazone import (DataZone, Interval, 
                            intervals2cursors, intervals2epoch,
