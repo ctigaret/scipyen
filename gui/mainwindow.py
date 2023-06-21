@@ -952,8 +952,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     sig_refreshRecentFilesMenu = pyqtSignal()
     sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
     
-    sig_newItemsInCurrentDir = pystSignal(tuple, name="sig_newItemsInCurrentDir")
-    sig_itemsRemovedFromCurrentDir = pystSignal(tuple, name="sig_itemsRemovedFromCurrentDir")
+    sig_newItemsInCurrentDir = pyqtSignal(tuple, name="sig_newItemsInCurrentDir")
+    sig_itemsRemovedFromCurrentDir = pyqtSignal(tuple, name="sig_itemsRemovedFromCurrentDir")
 
     _instance = None
 
