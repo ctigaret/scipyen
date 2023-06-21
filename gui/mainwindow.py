@@ -1330,6 +1330,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.navPrevDir = collections.deque()
         self.navNextDir = collections.deque()
         self.currentDir = None
+        self.dirFileWatcher = None
+        self._nMaxWatchedDirectories_ = 10
+        self._nMaxWatchedFiles_= 10
+        
+        
         
         # NOTE: 2023-05-27 22:00:37
         # self._init_QtConsole_ will asign to self.workspace a reference to the 
@@ -1710,6 +1715,24 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._showFilesFilter = val is True
 
         self.filesFilterFrame.setVisible(self._showFilesFilter)
+
+
+    @property
+    def currentDirectory(self):
+        return self.currentDir
+
+    @property
+    def maximumWatchedDirectories(self):
+        return self._nMaxWatchedDirectories_
+    
+    @markConfigurable("NMAxWatchedDirectories", "Qt")
+    @maximumWatchedDirectories.setter
+    def maximumWatchedDirectories(self,, value:int):
+    
+        if value < 0:
+            value = 0
+            
+        self._nMaxWatchedDirectories_= value
 
     @property
     def variableSearches(self):
@@ -7130,6 +7153,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                    askForParams=askForParams)
 
         return False
+    
+    def testDirWatch(self, on:bool=True):
+        if not isinstance(self.dirFileWatcher, QtCore.QFileSystemWatcher):
+            self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
+            
+            if on:
+                if self.currentDir in self.dirFileWatcher.directories():
+                    print(f"The directory {self.currentDir} is already being watched")
+                
+                else:
+                    if len(self.dirFileWatcher.directories()) > 1:
+                        pass
+        
 
     def viewObject(self, obj, objname, winType=None, newWindow=False, askForParams=False):
         """Actually displays a python object in user's workspace
