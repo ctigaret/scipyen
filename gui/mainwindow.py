@@ -1747,10 +1747,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if self._isDirWatching_:
                 with os.scandir(self._currentDir_) as dirIt:
                     # maybe include subdirs also (but do not recurse)
-                    self._currentDirCache_ = [entry.name for entry in dirIt] # if entry.is_file]
+                    dirItems = dict((entry.name, entry.stat()) for entry in dirIt)
+                    self._currentDirCache_.clear()
+                    self._currentDirCache_.update(dirItems)
+                    
                 self.dirFileWatcher.addPath(self.currentDir)
-                
-        
             
     @property
     def watchCurrentDirectory(self):
@@ -5427,7 +5428,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             except:
                 pass
             
-            print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
+            # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
 
             if sys.platform == "win32":
                 targetDir = targetDir.replace("\\", "/")
@@ -7309,7 +7310,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         print(f"{self.__class__.__name__}._slot_directoryChanged (from dirFileWatcher) *args {args}, **kwargs {kwargs}")
         
         if self.fileSystemModel.rootPath() == self.currentDirectory:
-            dirItems = []
+            dirItems = dict()
             with os.scandir(self.currentDirectory) as dirIt:
                 # dirItems = [entry.name for entry in dirIt]
                 dirItems = dict((entry.name, entry.stat()) for entry in dirIt)
@@ -7344,9 +7345,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     for i in changedItems:
                         self._currentDirCache_[i] = dirItems[i]
                     
-                    
-                
-                
             else:
                 print(f"{self.__class__.__name__}._slot_directoryChanged first cache = {dirItems}")
                 self._currentDirCache_.update(dirItems)

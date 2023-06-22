@@ -188,17 +188,18 @@ from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventTyp
 from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes
-from core.datatypes import TypeEnum
+from core.datatypes import (TypeEnum, check_type)
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
-from core import quantities as spq
 from core import pyabfbridge
 from core.utilities import normalized_index
 from core.neoutils import get_index_of_named_signal
-from core.quantities import (units_convertible, check_time_units)
-from core.datatypes import check_type
+from core import quantities as scq
+from core.quantities import (units_convertible, check_time_units, 
+                             check_eletrical_current_units, 
+                             check_electrical_potential_units)
 
 from gui.cursors import (SignalCursor, SignalCursorTypes)
 
@@ -2786,89 +2787,137 @@ on the acquisition device)
 
     return (Idc, Rs, Rin, EPSC0, EPSC1, PPR, ISI)
 
-def infer_clamp_mode(signal, command):
+def infer_clamp_mode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
+                     command:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]) -> typing.Optional[ClampMode]:
     """
     Infers a clamp mode from the units embedded in the signals.
     
-    WARNING: Prerequisites:
+When 'command' is None, returns NoClamp, as this might be a recording of 
+current or potential without any clamping (the latter case is more usual, e.g. 
+the voltage follower, or the "I=0" mode in some amplifiers)
     
-    • The command signal must be available. This is achieved in one of the 
-    following ways:
+When 'command' is available, returns a ClampMode according to this table:
     
-        ∘ Recording of the secondary amplifier output. When available, and 
-        appropriately selected in the amplifier software/hardware, this signal
-        is - under usual circumstances - an APPROXIMATION of the actual 
-        command signal. NOTE: These are NOT identical! The secondary amplifier
-        output is a signal recorded through the microelectrode, and NOT a "clean"
-        command signal.
-    
-            Example for voltage-clamp mode with Multiclamp 700B:
-    
-            ⋆ The "Primary Output" and the "Secondary Output" are selectable in 
-                MultiClamp commander software
-    
-            ⋆ The Primary output should be set to "Membrane current" (scaled by
-                the gain)
-    
-            ⋆ The Secondary output should be set to "Membrane Potential".
-                This is the membrane potential measured at the tip of the 
-                microelectrode.
+Signal units                    Command units                   ClampMode
+----------------------------------------------------------------------------
+electrical current (e.g. pA)    electrical potential (e.g. mV)  VoltageClamp
+electrical potential (e.g. mV)  electrical current (e.g. pA)    CurrentClamp
 
-                Remember that in reality, the preamplifier (headstage) only
-                measures potential, never a current.
-    
-                In voltage-clamp, the amplifier measures the membrane potential
-                and injects a current with amplitude and polarity as needed to
-                correct any deviations of the membrane potential from a desired
-                value (the "clamp"). Traditionally, this requires two electrodes:
-                one for potential measurement, and the other for current injection.
-    
-                In these amplifiers, both processes take place with a single
-                electrode: the potential measurement and the current injection
-                are performed via the same electrode alternatively - 
-                interleaved - with a high repetition rate (μs period). This allows
-                the amplifier to run a fast feedback loop to adjust the amount 
-                of injected current needed to "clamp" the membrane potential.
-    
-                As the membrane potential deviates from the desired value, 
-                a current (positive or negative) is injected in order to 
-                compensate this change.
-    
-                Therefore, in voltage clamp, the primary output is actually the 
-                current injected to "clamp" the voltage, whereas the secondary
-                output (as set up above) is the actual membrane potential
-                measured by the pipette.
-    
-                In other words, the command signal in voltage clamp merely alters
-                the current injection so that the measured membrane potential
-                follows the desired change described by the "command" waveform. 
-    
-                In these circumstances the secondary output (measured membrane
-                potential) can be used as an approximation of the voltage 
-                "command".
-    
-            In current clamp the same process applies, except for the need of a 
-            feedback loop: the amplifier injects a predetermined current through
-            the microelectrode, alternatively with measuring the membrane potential.
-            Since the membrane potential is not being "clamped", no feedback loop
-            is required.
-    
-            The Primary output is, now, the recorded membrane potential, whereas
-            the Secondary output, when set to show membrane current, reflects
-            the "real" command signal: the time-varying current injected through 
-            the microelectrode.  
-    
-        ∘ A virtual command signal is generated post-hoc based on the protocol data. 
-            This data may be present in the record file stored by the digitizer 
-            software or in the protocol file
-    
-        ∘ A virtual command signal is generated manually by the user, based on 
-            protocol information.
+In any other case (e.g. both signal and command have either current or potential
+units) returns NoClamp, with a warning.
+
+A command signal can be provided in one of the following ways:
+
+∘ Recording of the secondary amplifier output. When available, and 
+appropriately selected in the amplifier software/hardware, this signal
+is - under usual circumstances - an APPROXIMATION of the actual 
+command signal. NOTE: These are NOT identical! The secondary amplifier
+output is a signal recorded through the microelectrode, and NOT a "clean"
+command signal.
+
+    Example for voltage-clamp mode with Multiclamp 700B:
+
+    ⋆ The "Primary Output" and the "Secondary Output" are selectable in 
+        MultiClamp commander software
+
+    ⋆ The Primary output should be set to "Membrane current" (scaled by
+        the gain)
+
+    ⋆ The Secondary output should be set to "Membrane Potential".
+        This is the membrane potential measured at the tip of the 
+        microelectrode.
+
+        Remember that in reality, the preamplifier (headstage) only
+        measures potential, never a current.
+
+        In voltage-clamp, the amplifier measures the membrane potential
+        and injects a current with amplitude and polarity as needed to
+        correct any deviations of the membrane potential from a desired
+        value (the "clamp"). Traditionally, this requires two electrodes:
+        one for potential measurement, and the other for current injection.
+
+        In these amplifiers, both processes take place with a single
+        electrode: the potential measurement and the current injection
+        are performed via the same electrode alternatively - 
+        interleaved - with a high repetition rate (μs period). This allows
+        the amplifier to run a fast feedback loop to adjust the amount 
+        of injected current needed to "clamp" the membrane potential.
+
+        As the membrane potential deviates from the desired value, 
+        a current (positive or negative) is injected in order to 
+        compensate this change.
+
+        Therefore, in voltage clamp, the primary output is actually the 
+        current injected to "clamp" the voltage, whereas the secondary
+        output (as set up above) is the actual membrane potential
+        measured by the pipette.
+
+        In other words, the command signal in voltage clamp merely alters
+        the current injection so that the measured membrane potential
+        follows the desired change described by the "command" waveform. 
+
+        In these circumstances the secondary output (measured membrane
+        potential) can be used as an approximation of the voltage 
+        "command".
+
+    In current clamp the same process applies, except for the need of a 
+    feedback loop: the amplifier injects a predetermined current through
+    the microelectrode, alternatively with measuring the membrane potential.
+    Since the membrane potential is not being "clamped", no feedback loop
+    is required.
+
+    The Primary output is, now, the recorded membrane potential, whereas
+    the Secondary output, when set to show membrane current, reflects
+    the "real" command signal: the time-varying current injected through 
+    the microelectrode.  
+
+∘ A virtual command signal is generated post-hoc based on the protocol data. 
+    This data may be present in the record file stored by the digitizer 
+    software or in the protocol file
+
+∘ A virtual command signal is generated manually by the user, based on 
+    protocol information.
             
         
 
 """
-    pass
+    recordsCurrent = False
+    recordsPotential = False
+    commandIsCurrent = False
+    commandIsPotential = False
+    
+    if isinstance(signal, (neo.AnalogSignal, DataSignal)):
+        recordsCurrent = check_eletrical_current_units(signal)
+        recordsPotential = check_electrical_potential_units(signal)
+        
+    else:
+        raise TypeError(f"'signal' expected a neo.AnalogSignal or DataSignal; instead, got {type(signal).__name__}")
+    
+    if not any(recordsCurrent, recordsPotential):
+        raise ValueError(f"'signal' had incompatible units {signal.units}")
+        
+    if isinstance(command, (neo.AnalogSignal, DataSignal)):
+        commandIsCurrent = check_eletrical_current_units(command)
+        commandIsPotential = check_electrical_potential_units(command)
+        
+        if not any(commandIsCurrent, commandIsPotential):
+            raise ValueError(f"'command' has incompatible units {command.units}")
+        
+    elif command is None:
+        return ClampMode.NoClamp
+    else:
+        raise TypeError(f"'comand' expected to be a neo.analogsignal, DataSignal or None; instead, got {type(command).__name__}")
+    
+    if commandIsPotential and recordsCurrent:
+        return ClampMode.VoltageClamp
+    
+    if commandIsCurrent and recordsPotential:
+        return ClampMode.CurrentClamp
+    
+    warnings.warn(f"Cannot infer clamp mode when recorded signal has {signal.units} units and the command signal has {command.units} units")
+    
+    return ClampMode.NoClamp
+    
 # should also pass an abf object; 
 # find out adc names and units ⇒ recorded signal
 # then for the DAC: dacNames, dacUnits ⇒ "command signal"

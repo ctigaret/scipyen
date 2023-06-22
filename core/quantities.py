@@ -793,7 +793,7 @@ def check_time_units(value):
     
     return value._reference.dimensionality == ref.dimensionality
 
-def check_current_units(value):
+def check_eletrical_current_units(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
     
@@ -801,7 +801,7 @@ def check_current_units(value):
     
     return value._reference.dimensionality == ref.dimensionality
 
-def check_voltage_units(value):
+def check_electrical_potential_units(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
     

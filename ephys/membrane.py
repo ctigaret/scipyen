@@ -123,8 +123,8 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
     
     if not isinstance(clampMode, ephys.ClampMode) or clampMode == ephys.ClampMode.NoClamp:
         if isinstance(command, (neo.core.basesignal.BaseSignal, pq.Quantity)):
-            vc_mode = scq.check_current_units(signal) and scq.check_voltage_units(command)
-            ic_mode = scq.check_voltage_units(signal) and scq.check_current_units(command)
+            vc_mode = scq.check_eletrical_current_units(signal) and scq.check_electrical_potential_units(command)
+            ic_mode = scq.check_electrical_potential_units(signal) and scq.check_eletrical_current_units(command)
             
             clampMode = ephys.ClampMode.VoltageClamp if vc_mode else epys.ClampMode.CurrentClamp if ic_mode else ephyc.ClampMode.NoClamp
             
@@ -150,7 +150,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
     # hardware or, failing that, on the user assigning the correct units and scaling
     # post-hoc.
     if clampMode == ephys.ClampMode.VoltageClamp:
-        if not scq.check_current_units(signal):
+        if not scq.check_eletrical_current_units(signal):
             warings.warn(f"'signal' has wrong units ({signal.units}) for VoltageClamp mode.\nThe signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
             klass = type(signal)
             signal = klass(signal.magnitude, units = pq.pA, 
@@ -158,7 +158,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
                                          name=signal.name)
             
         if isinstance(command, pq.Quantity):
-            if not scq.check_voltage_units(command):
+            if not scq.check_electrical_potential_units(command):
                 if isinstance(command, neo.core.basesignal.BaseSignal):
                     warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
                     klass = type(command)
@@ -174,7 +174,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
             command = command * pq.mV
         
     else: # current clamp mode
-        if not scq.check_voltage_units(signal):
+        if not scq.check_electrical_potential_units(signal):
             warings.warn(f"'signal' has wrong units ({signal.units}) for CurrentClamp mode.\nThe signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
             klass = type(signal)
             signal = klass(signal.magnitude, units = pq.mV, 
@@ -182,7 +182,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
                                          name=signal.name)
             
         if isinstance(command, pq.Quantity):
-            if not scq.check_current_units(command):
+            if not scq.check_eletrical_current_units(command):
                 if isinstance(command, neo.core.basesignal.BaseSignal):
                     warings.warn(f"'command' has wrong units ({command.units}) for CurrentClamp mode.\nThe command signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
                     klass = type(command)

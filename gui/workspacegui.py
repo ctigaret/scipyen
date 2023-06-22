@@ -91,7 +91,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
     def inspect_wm(self):
         if isinstance(self.timer, QtCore.QTimer):
             self.timer.start()
-        
+            
 
 class GuiMessages(object):
     @safeWrapper
