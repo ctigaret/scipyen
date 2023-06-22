@@ -1939,6 +1939,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             return
 
         assert viewer.ID == wid
+        
+    def activateWindow(self):
+        super().activateWindow()
+        if os.platform== "win32":
+            self.raise_()
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
