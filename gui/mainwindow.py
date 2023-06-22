@@ -7300,7 +7300,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if self.fileSystemModel.rootPath() == self.currentDirectory:
             dirItems = []
             with os.scandir(self.currentDirectory) as dirIt:
-                dirItems = [entry.name for entry in it]
+                dirItems = [entry.name for entry in dirIt]
                 
             if len(self._currentDirCache_):
                 currentItems = set(dirItems)
@@ -7312,12 +7312,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 newItems = currentItems - cachedItems
                 
                 if len(oldItems):
+                    print(f"{self.__class__.__name__}._slot_directoryChanged oldItems = {oldItems}")
+                    for i in oldItems:
+                        self._currentDirCache_.remove(i)
+                        
                     self.sig_itemsRemovedFromCurrentDir.emit(tuple(oldItems))
                     
                 if len(newItems):
+                    print(f"{self.__class__.__name__}._slot_directoryChanged newItems = {newItems}")
+                    for i in newItems:
+                        self._currentDirCache_.append(i)
                     self.sig_newItemsInCurrentDir.emit(tuple(newItems))
                 
             else:
+                print(f"{self.__class__.__name__}._slot_directoryChanged newItems = {dirItems}")
                 self._currentDirCache_[:] = dirItems
                 self.sig_newItemsInCurrentDir.emit(tuple(dirItems))
                 

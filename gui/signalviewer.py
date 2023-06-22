@@ -4770,12 +4770,12 @@ anything else       anything else       ❌
             d.epoch_name = "Epoch"
             
             if hasattr(self._yData_, "name") and isinstance(self._yData_.name, str) and len(self._yData_.name.strip()):
-                d.epoch_name = "%s_Epoch"
+                d.epoch_name = f"{self._yData_.name}_Epoch"
             
             if isinstance(self.selectedDataCursor, SignalCursor) and self.selectedDataCursor.cursorType in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
                 cursor = self.selectedDataCursor
                 cursorNameField = None
-                d.namePrompt.setText("%s from %s" % (d.epoch_name, cursor.ID))
+                d.namePrompt.setText(f"{d.epoch_name} from {cursor.ID}")
                 
             else:
                 d.cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
@@ -4796,6 +4796,8 @@ anything else       anything else       ❌
                 txt = d.namePrompt.text()
                 if isinstance(txt, str) and len(txt.strip()):
                     name=txt
+                else:
+                    name = d.epoch_name
                     
                 toAllSegments  = d.toAllSegmentsCheckBox.isChecked()
                 relativeSweep  = d.sweepRelativeCheckBox.isChecked()
@@ -8523,9 +8525,13 @@ signals in the signal collection.
         
         if len(guiSelection):
             selected_signal_axis_names = guiSelection
-            selected_signal_ndx, selected_signal_names = zip(*list(mapping[k] for k in selected_signal_axis_names))
+            selected_signal_ndx, selected_signal_names = zip(*list(mapping[k] for k in selected_signal_axis_names if k in mapping ))
             # selected_signal_ndx = [mapping[k][0] for k in guiSelection]
-            selected_signals = [signals[ndx] for ndx in selected_signal_ndx]
+            if len(selected_signal_ndx):
+                selected_signals = [signals[ndx] for ndx in selected_signal_ndx]
+            else:
+                selected_signals = signals[:]
+                
             
         else:
             selected_signals[:] = signals[:]
