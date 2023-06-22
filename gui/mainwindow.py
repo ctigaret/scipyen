@@ -954,6 +954,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     sig_newItemsInCurrentDir = pyqtSignal(tuple, name="sig_newItemsInCurrentDir")
     sig_itemsRemovedFromCurrentDir = pyqtSignal(tuple, name="sig_itemsRemovedFromCurrentDir")
+    sig_itemsChangedInCurrentDir = pyqtSignal(tuple, name="sig_itemsChangedInCurrentDir")
 
     _instance = None
 
@@ -1339,7 +1340,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._isDirWatching_ = False
         self._fileSystemChanged_ = False
         self._changesInWatchedDir_ = False
-        self._currentDirCache_ = []
+        self._currentDirCache_ = dict()
         
         
         # NOTE: 2023-05-27 22:00:37
@@ -5459,6 +5460,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.currentDirLabel.setText(targetDir)
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
+            with os.scandir(self.currentDirectory) as dirIt:
+                dirItems = dict((entry.name, entry.stat()) for entry in dirIt)
+                self._currentDirCache_.clear()
+                self._currentDirCache_.update(dirItems)
+               
 
     def _slot_workdirChangedInConsole(self, targetDir):
         self._updateFileSystemView_(targetDir, cd=True)
@@ -7300,34 +7306,46 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if self.fileSystemModel.rootPath() == self.currentDirectory:
             dirItems = []
             with os.scandir(self.currentDirectory) as dirIt:
-                dirItems = [entry.name for entry in dirIt]
+                # dirItems = [entry.name for entry in dirIt]
+                dirItems = dict((entry.name, entry.stat()) for entry in dirIt)
                 
             if len(self._currentDirCache_):
-                currentItems = set(dirItems)
+                currentItems = set(dirItems.keys())
                 
-                cachedItems = set(self._currentDirCache_)
+                cachedItems = set(self._currentDirCache_.keys())
                 
-                oldItems = cachedItems - currentItems
+                removedItems = cachedItems - currentItems
                 
                 newItems = currentItems - cachedItems
                 
-                if len(oldItems):
-                    print(f"{self.__class__.__name__}._slot_directoryChanged oldItems = {oldItems}")
-                    for i in oldItems:
-                        self._currentDirCache_.remove(i)
+                changedItems = tuple(i[0] for i in dirItems.items() if (i[0] in self._currentDirCache_ and (i[1].st_size != self._currentDirCache_[i[0]].st_size or i[1].st_mtime_ns != self._currentDirCache_[i[0]].st_mtime_ns)))
+                
+                if len(removedItems):
+                    print(f"{self.__class__.__name__}._slot_directoryChanged removedItems = {removedItems}")
+                    for i in removedItems:
+                        self._currentDirCache_.pop(i)
                         
-                    self.sig_itemsRemovedFromCurrentDir.emit(tuple(oldItems))
+                    self.sig_itemsRemovedFromCurrentDir.emit(tuple(removedItems))
                     
                 if len(newItems):
                     print(f"{self.__class__.__name__}._slot_directoryChanged newItems = {newItems}")
                     for i in newItems:
-                        self._currentDirCache_.append(i)
+                        self._currentDirCache_[i] = dirItems[i]
                     self.sig_newItemsInCurrentDir.emit(tuple(newItems))
+                    
+                if len(changedItems):
+                    print(f"{self.__class__.__name__}._slot_directoryChanged changedItems = {changedItems}")
+                    self.sig_itemsChangedInCurrentDir.emit(changedItems)
+                    for i in changedItems:
+                        self._currentDirCache_[i] = dirItems[i]
+                    
+                    
+                
                 
             else:
-                print(f"{self.__class__.__name__}._slot_directoryChanged newItems = {dirItems}")
-                self._currentDirCache_[:] = dirItems
-                self.sig_newItemsInCurrentDir.emit(tuple(dirItems))
+                print(f"{self.__class__.__name__}._slot_directoryChanged first cache = {dirItems}")
+                self._currentDirCache_.update(dirItems)
+                self.sig_newItemsInCurrentDir.emit(tuple(dirItems.keys()))
                 
                 # number of objects in the dir has changed
             # TODO:2023-06-21 22:54:32
