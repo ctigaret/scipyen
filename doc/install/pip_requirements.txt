@@ -167,7 +167,7 @@ python-magic
 pytz
 pywin32 ; sys_platform == 'win32'
 pyxdg
-pyxml
+#pyxml
 qimage2ndarray
 ravenclaw
 rdflib
@@ -201,8 +201,8 @@ testpath
 thinc
 tiffile
 tokenizers
-torch
-tqdm
+#torch
+#tqdm
 traitlets
 transformers
 twine
