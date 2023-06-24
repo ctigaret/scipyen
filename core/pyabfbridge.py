@@ -16,34 +16,7 @@ See also
 • https://swharden.com/pyabf/
 
 
-"""
-import typing
-import numpy as np
-import pandas as pd
-import quantities as pq
-import neo
-
-from core import quantities as scq
-from iolib.pictio import getABF
-
-# try:
-#     import pyabf
-#     hasPyABF = True
-# except:
-#     hasPyABF = False
-#     raise RuntimeError("This module requires the pyabf packages")
-
-import pyabf
-from pyabf.abf2.section import Section
-
-class EpochSection(Section):
-    """
-    This section contains the digital output signals for each epoch. This
-    section has been overlooked by some previous open-source ABF-reading
-    projects. Note that the digital output is a single byte, but represents
-    8 bits corresponding to 8 outputs (7->0). When working with these bits,
-    I convert it to a string like "10011101" for easy eyeballing.
-
+NOTE: About pyabf EpochSection
 Cezar Tigaret <cezar.tigaret@gmail.com>
 
 The original pyabf code onlt takes into account "regular" digital bit patterns
@@ -117,54 +90,34 @@ bytes 4, 5 ⇒ 'starred' bit pattern Channel#0 (NOT read by pyabf)
 bytes 6, 7 ⇒ 'regular' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 bytes 8, 9 ⇒ 'starred' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 
+"""
+import typing
+import numpy as np
+import pandas as pd
+import quantities as pq
+import neo
 
-    """
+from core import quantities as scq
+from iolib.pictio import getABF
 
-    def __init__(self, fb):
-        Section.__init__(self, fb, 124)
+# try:
+#     import pyabf
+#     hasPyABF = True
+# except:
+#     hasPyABF = False
+#     raise RuntimeError("This module requires the pyabf packages")
 
-        self.nEpochNum = [None]*self._entryCount
-        self.nEpochDigitalOutput = [None]*self._entryCount
-        self.nEpochDigitalStarOutput = [None]*self._entryCount
-        self.nEpochDigitalOutputAlternate = [None]*self._entryCount
-        self.nEpochDigitalStarOutputAlternate = [None]*self._entryCount
+# def getABFProtocolEpochs(obj, sweep:int):
+#     if not hasPyABF:
+#         warning.warn("getABF requires pyabf package")
+#         return
+#     
+#     abf = getABF(obj)
+#     
+#     if abf:
+#         return getABFEpochsTable(abf, as_dataFrame=True)
+#     
 
-        # NOTE: 2023-06-23 22:36:26
-        # _entryCount is the number of configured Clampex epochs
-        # e.g. if only Epoch "A" is NOT "Off" the _entryCount is 1, etc.
-        for i in range(self._entryCount):
-            # for Epoch the _byteStart is at 4096 (decimal offset)
-            self.seek(self._byteStart + i*self._entrySize)
-            self.nEpochNum[i] = self.readInt16()
-            # self.nEpochDigitalOutput[i] = self.readInt16()
-            # NOTE: abfReader.readInt16 reads TWO bytes
-            # it looks like in Clampex >= 10.1 the digital bit pattern
-            # is not what pyabf expects
-            self.nEpochDigitalOutput[i] = self.readInt16_verbose()
-            self.nEpochDigitalStarOutput[i] = self.readInt16_verbose()
-            self.nEpochDigitalOutputAlternate[i] = self.readInt16_verbose()
-            self.nEpochDigitalStarOutputAlternate[i] = self.readInt16_verbose()
-            
-        print(f"EpochSection: nEpochDigitalOutput = {self.nEpochDigitalOutput}")
-        print(f"EpochSection: nEpochDigitalStarOutput = {self.nEpochDigitalStarOutput}")
-        print(f"EpochSection: nEpochDigitalOutputAlternate = {self.nEpochDigitalOutputAlternate}")
-        print(f"EpochSection: nEpochDigitalStarOutputAlternate = {self.nEpochDigitalStarOutputAlternate}")
-            
-            # self.nEpochNum[i] = self.readInt32()
-            # self.nEpochDigitalOutput[i] = self.readInt32()
-            
-# pyabf.epochSection.EpochSection = EpochSection
-            
-def getABFProtocolEpochs(obj, sweep:int):
-    if not hasPyABF:
-        warning.warn("getABF requires pyabf package")
-        return
-    
-    abf = getABF(obj)
-    
-    if abf:
-        return getABFEpochsTable(abf, as_dataFrame=True)
-    
 def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
                       as_dataFrame:bool=False, allTables:bool=False):
     if not isinstance(x, pyabf.ABF):
