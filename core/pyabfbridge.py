@@ -91,32 +91,101 @@ bytes 6, 7 ⇒ 'regular' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 bytes 8, 9 ⇒ 'starred' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 
 """
-import typing
+import typing, struct
 import numpy as np
 import pandas as pd
 import quantities as pq
 import neo
+import pyabf
 
 from core import quantities as scq
-from iolib.pictio import getABF
+from iolib import pictio as pio
 
-# try:
-#     import pyabf
-#     hasPyABF = True
-# except:
-#     hasPyABF = False
-#     raise RuntimeError("This module requires the pyabf packages")
+from pyabf.abf1.headerV1 import HeaderV1
+from pyabf.abf2.headerV2 import HeaderV2
+from pyabf.abf2.section import Section
+from pyabf.abfReader import AbfReader
 
-# def getABFProtocolEpochs(obj, sweep:int):
-#     if not hasPyABF:
-#         warning.warn("getABF requires pyabf package")
-#         return
-#     
-#     abf = getABF(obj)
-#     
-#     if abf:
-#         return getABFEpochsTable(abf, as_dataFrame=True)
-#     
+DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
+
+def getABF(obj):
+    """
+    Returns a pyabf.ABF object from an ABF file.
+    
+    Parameters:
+    ----------
+    obj: str (ABF file name) or a neo.core.baseneo.BaseNeo object containing an
+        attribute named "file_origin" pointing to an ABF file on disk where its
+        data is stored (in Scipyen, the contents of ABF files are normally loaded
+        as neo.Block objects).
+    """
+    import os
+    # if not hasPyABF:
+    #     warning.warn("getABF requires pyabf package")
+    #     return
+
+    if isinstance(obj, str):
+        filename = obj
+    else:
+        filename = getattr(obj, "file_origin", None)
+        
+    if not os.path.exists(filename):
+        return
+    
+    loader = pio.getLoaderForFile(filename)
+    
+    if loader == pio.loadAxonFile:
+        try:
+            if filename.lower().endswith(".abf"):
+                return pyabf.ABF(filename)
+            elif filename.lower().endswith(".atf"):
+                return pyabf.ATF(filename)
+            else:
+                raise RuntimeError("pyabf can only handle ABF and ATF files")
+        except:
+            pass
+        
+    else:
+        warning.warn(f"{filename} is not an Axon file")
+        
+def readInt16(fb):
+    bytes = fb.read(2)
+    values = struct.unpack("h", bytes) # ⇐ this is a tuple! first element is what we need
+    # print(f"abfReader.readInt16 bytes = {bytes}, values = {values}")
+    return values[0]
+    
+def valToBitList(value, bitCount = DIGITAL_OUTPUT_COUNT, reverse = False):
+    value = int(value)
+    binString = bin(value)[2:].zfill(bitCount)
+    bits = list(binString)
+    bits = [int(x) for x in bits]
+    if reverse:
+        bits.reverse()
+    return bits
+        
+def getDIGOutput(abf:pyabf.ABF):
+    with open(abf.abfFilePath, 'rb') as fb:
+        epochSection = abf._epochSection
+        nEpochs = epochSection._entryCount
+        epochNumbers = [None] * nEpochs
+        epochDigital = [None] * nEpochs
+        epochDigitalStarred = [None] * nEpochs
+        epochDigitalAlt = [None] * nEpochs
+        epochDigitalStarredAlt = [None] * nEpochs
+        
+        for i in range(nEpochs):
+            fb.seek(epochSection._byteStart + i * epochSection._entrySize)
+            epochNumbers[i] = readInt16(fb)
+            epochDigital[i] = readInt16(fb)
+            epochDigitalStarred[i] = readInt16(fb)
+            epochDigitalAlt[i] = readInt16(fb)
+            epochDigitalStarredAlt[i] = readInt16(fb)
+            
+        
+        return epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
+        
+    
+    
 
 def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
                       as_dataFrame:bool=False, allTables:bool=False):

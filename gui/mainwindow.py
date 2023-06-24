@@ -5466,10 +5466,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.currentDirLabel.setText(targetDir)
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
-            with os.scandir(self.currentDirectory) as dirIt:
-                dirItems = dict((entry.name, entry.stat()) for entry in dirIt)
-                self._currentDirCache_.clear()
-                self._currentDirCache_.update(dirItems)
+            # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
+            if os.path.isdir(self.currentDirectory):
+                with os.scandir(self.currentDirectory) as dirIt:
+                    dirItems = dict((entry.name, entry.stat(follow_symlinks=False)) for entry in dirIt if os.path.lexists(entry.name))
+                    # dirItems = dict((entry.name, entry.stat()) for entry in dirIt if os.path.lexists(entry.name))
+                    self._currentDirCache_.clear()
+                    self._currentDirCache_.update(dirItems)
                
 
     def _slot_workdirChangedInConsole(self, targetDir):
