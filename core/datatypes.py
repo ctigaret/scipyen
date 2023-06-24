@@ -983,7 +983,7 @@ class Procedure:
     name:str = ""
     _:KW_ONLY
     procedureType:ProcedureType = ProcedureType.null
-    schedule:Schedule = Schedule()
+    schedule:Schedule = field(default_factory = Schedule())
     
 @dataclass
 class TreatmentProcedure(Procedure):

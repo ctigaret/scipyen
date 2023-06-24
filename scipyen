@@ -53,4 +53,4 @@ if [ $0 == 0 ] ; then
     fi
 fi
 
-python3 $scipyendir/scipyen.py
+python3 -Xfrozen_modules=off $scipyendir/scipyen.py
