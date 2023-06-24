@@ -200,8 +200,6 @@ testpath
 thinc
 tiffile
 tokenizers
-#torch
-#tqdm
 traitlets
 transformers
 twine
