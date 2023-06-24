@@ -154,35 +154,101 @@ def readInt16(fb):
     # print(f"abfReader.readInt16 bytes = {bytes}, values = {values}")
     return values[0]
     
-def valToBitList(value, bitCount = DIGITAL_OUTPUT_COUNT, reverse = False):
+def valToBitList(value:int, bitCount:int = DIGITAL_OUTPUT_COUNT, 
+                 reverse:bool = False, breakout:bool = True, as_bool:bool=False):
+    # NOTE: 2023-06-24 23:18:15
+    # I think DIGITAL_OUTPUT_COUNT should be abf._protocolSection.nDigitizerSynchDigitalOuts 
+    # but I'm not sure...
     value = int(value)
     binString = bin(value)[2:].zfill(bitCount)
     bits = list(binString)
-    bits = [int(x) for x in bits]
+    if as_bool:
+        bits = [True if int(x) == 1 else False for x in bits]
+    else:
+        bits = [int(x) for x in bits]
+    if breakout:
+        reverse = False
     if reverse:
         bits.reverse()
+    if breakout:
+        return bits[4:], bits [0:4]
     return bits
+
+def bitListToString(bits:list, star:bool=False):
+    ret = ''.join([str(x) for x in bits])
+    if star:
+        ret = ret.replace('1', '*')
+    return ret
         
-def getDIGOutput(abf:pyabf.ABF):
+def getDIGPatterns(abf:pyabf.ABF, dacChannel:typing.Optional[int] = None):
+    # NOTE: 2023-06-24 23:37:33
+    # the _protocolSection has the following flags useful in this context:
+    # nDigitalEnable: int (0 or 1) → whether D0-D8 are enabled
+    # nAlternateDigitalOutputState: int (0 or 1) → whether the DAC channel 0
+    #      and the others (see below) use an alternative DIG bit pattern
+    # nDigitalDACChannel: int (0 ⋯ N) where N is _protocolSection.nDigitizerDACs - 1 
+    #                   → on which DAC channel are the DIG outputs enabled
+    #   This IS IMPORTANT because when the nAlternateDigitalOutputState is 1
+    #   then the PRIMARY pattern applies to the actual DAC channel used for 
+    #   digital output: when this is Channel 0 then the alternative pattern is 
+    #   applied on the channels 1 and higher; when this is Channel 1 (or higher)
+    #   then the alternative pattern is applied on Channel 0 !
+    epochsDigitalPattern = dict()
+    
+    
+    
     with open(abf.abfFilePath, 'rb') as fb:
         epochSection = abf._epochSection
         nEpochs = epochSection._entryCount
         epochNumbers = [None] * nEpochs
         epochDigital = [None] * nEpochs
         epochDigitalStarred = [None] * nEpochs
+        
+        # NOTE: When these are populated, then abf._protocolSection.nAlternateDigitalOutputState
+        # SHOULD be 1 (but we don't check for this here)
         epochDigitalAlt = [None] * nEpochs
         epochDigitalStarredAlt = [None] * nEpochs
         
         for i in range(nEpochs):
             fb.seek(epochSection._byteStart + i * epochSection._entrySize)
-            epochNumbers[i] = readInt16(fb)
-            epochDigital[i] = readInt16(fb)
-            epochDigitalStarred[i] = readInt16(fb)
-            epochDigitalAlt[i] = readInt16(fb)
-            epochDigitalStarredAlt[i] = readInt16(fb)
+            epochNumber = readInt16(fb)
+            epochDig = readInt16(fb)
+            epochDigS = readInt16(fb)
+            epochDig_alt = readInt16(fb)
+            epochDigS_alt = readInt16(fb)
+            epochNumbers[i] = epochNumber
+            epochDigital[i] = epochDig
+            epochDigitalStarred[i] = epochDigS
+            epochDigitalAlt[i] = epochDig_alt
+            epochDigitalStarredAlt[i] = epochDigS_alt
             
-        
-        return epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
+            epochDict = dict()
+            d = valToBitList(epochDig, as_bool=True)
+            s = valToBitList(epochDigS, as_bool=True)
+            da = valToBitList(epochDig_alt, as_bool=True)
+            sa = valToBitList(epochDigS_alt, as_bool=True)
+            
+            digitalPattern = list()
+            for k in range(2):
+                pattern = list()
+                for i in range(len(d[k])):
+                    val = 1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0
+                    pattern.append(val)
+                    
+                digitalPattern.append(pattern)
+                    
+            alternateDigitalPattern = list()
+            for k in range(2):
+                pattern = list()
+                for i in range(len(da[k])):
+                    val = 1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0
+                    pattern.append(val)
+                    
+                alternateDigitalPattern.append(pattern)
+                
+            epochsDigitalPattern[epochNumber] = {"pattern": digitalPattern, "alternate": alternateDigitalPattern}
+                    
+        return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
         
     
     
