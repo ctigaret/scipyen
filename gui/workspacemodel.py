@@ -614,7 +614,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             removed_symbols = self.foreign_namespaces[ns_name]["current"] - initial
             # print("\tremoved_symbols", removed_symbols)
             for vname in removed_symbols:
-                self.removeRowForVariable(vname, ns=ns_name)
+                self.removeRowForVariable2(vname, ns=ns_name)
+                # self.removeRowForVariable(vname, ns=ns_name)
                 # self.removeRowForVariable(vname, ns = ns_name.replace("_", " "))
 
             added_symbols = initial - \
