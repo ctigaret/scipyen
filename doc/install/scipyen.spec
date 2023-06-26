@@ -65,28 +65,28 @@ def DataFiles(topdir, ext, **kw):
 
 block_cipher = None
 
-uitoc = DataFiles('/home/cezar/scipyen', ".ui")
+uitoc = DataFiles('/home/cezar/scipyen/src', ".ui")
 
 print(f"uitoc = {uitoc}\n\n")
-jsontoc = DataFiles('/home/cezar/scipyen', ".json")
+jsontoc = DataFiles('/home/cezar/scipyen/src', ".json")
 print(f"jsontoc = {jsontoc}\n\n")
-pickletoc = DataFiles('/home/cezar/scipyen', ".pkl")
+pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
 print(f"pickletoc = {pickletoc}\n\n")
 
-abftoc = DataFiles('/home/cezar/scipyen', ".abf")
+abftoc = DataFiles('/home/cezar/scipyen/src', ".abf")
 print(f"abftoc = {abftoc}\n\n")
-atftoc = DataFiles('/home/cezar/scipyen', ".atf")
+atftoc = DataFiles('/home/cezar/scipyen/src', ".atf")
 print(f"atftoc = {atftoc}\n\n")
-shtoc =  DataFiles('/home/cezar/scipyen', ".sh")
+shtoc =  DataFiles('/home/cezar/scipyen/src', ".sh")
 print(f"shtoc = {shtoc}\n\n")
-txttoc =  DataFiles('/home/cezar/scipyen', ".txt")
+txttoc =  DataFiles('/home/cezar/scipyen/src', ".txt")
 print(f"txttoc = {txttoc}\n\n")
-readmetoc =  DataFiles('/home/cezar/scipyen', "README", as_ext=False)
+readmetoc =  DataFiles('/home/cezar/scipyen/src', "README", as_ext=False)
 print(f"readmetoc = {readmetoc}\n\n")
 
 a = Analysis(
-    ['/home/cezar/scipyen/scipyen.py'],
-    pathex=['/home/cezar/scipyen/'],
+    ['/home/cezar/scipyen/src/scipyen.py'],
+    pathex=['/home/cezar/scipyen/src/'],
     binaries=[],
     # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
     #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
@@ -97,9 +97,9 @@ a = Analysis(
            ('/home/cezar/scipyenv.3.11.3/include','include'),
            ('/home/cezar/scipyenv.3.11.3/man', 'man'),
            ('/home/cezar/scipyenv.3.11.3/share', 'share'),
-           ('/home/cezar/scipyen/ephys/options', 'ephys/options'),
-           ('/home/cezar/scipyen/ephys/waveforms', 'ephys/waveforms'),
-           ('/home/cezar/scipyen/gui', 'gui'),
+           ('/home/cezar/scipyen/src/ephys/options', 'ephys/options'),
+           ('/home/cezar/scipyen/src/ephys/waveforms', 'ephys/waveforms'),
+           ('/home/cezar/scipyen/src/gui', 'gui'),
            ],
     hiddenimports=[],
     hookspath=[],

@@ -27,6 +27,7 @@
 #wheel
 
 distlib
+pyinstaller
 Babel
 GitPython
 Jinja2
