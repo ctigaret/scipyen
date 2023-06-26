@@ -1,4 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
+# NOTE: 2023-06-26 17:25:32
+# do something like:
+# mkdir -p scipyen_app && cd scipyen_app
+# scipyact
+# scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean $HOME/scipyen/doc/install/scipyen.spec
 
 def datafile(path, strip_path=True):
     parts = path.split('/')
@@ -49,7 +54,7 @@ def DataFiles(topdir, ext, **kw):
     
     entries = scanForFiles(topdir, ext, as_ext)
 
-    print(f"entries = {entries}")
+    # print(f"entries = {entries}\n\n")
     
     return TOC(
         file2TOCEntry(filename, topdirparts, strip_path=strip_path)
@@ -59,17 +64,22 @@ def DataFiles(topdir, ext, **kw):
 block_cipher = None
 
 uitoc = DataFiles('/home/cezar/scipyen', ".ui")
-print(f"uitoc = {uitoc}")
-# jsontoc = DataFiles('/home/cezar/scipyen', ".json")
+print(f"uitoc = {uitoc}\n\n")
+jsontoc = DataFiles('/home/cezar/scipyen', ".json")
+print(f"jsontoc = {jsontoc}\n\n")
 pickletoc = DataFiles('/home/cezar/scipyen', ".pkl")
+print(f"pickletoc = {pickletoc}\n\n")
+
 abftoc = DataFiles('/home/cezar/scipyen', ".abf")
+print(f"abftoc = {abftoc}\n\n")
 atftoc = DataFiles('/home/cezar/scipyen', ".atf")
+print(f"atftoc = {atftoc}\n\n")
 shtoc =  DataFiles('/home/cezar/scipyen', ".sh")
+print(f"shtoc = {shtoc}\n\n")
 txttoc =  DataFiles('/home/cezar/scipyen', ".txt")
+print(f"txttoc = {txttoc}\n\n")
 readmetoc =  DataFiles('/home/cezar/scipyen', "README", as_ext=False)
-
-
-# print(f"uitoc = {uitoc}")
+print(f"readmetoc = {readmetoc}\n\n")
 
 a = Analysis(
     ['/home/cezar/scipyen/scipyen.py'],
