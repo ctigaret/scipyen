@@ -393,21 +393,23 @@ function dovigra ()
 function make_desktop_entry ()
 {
 if [ ! -r ${VIRTUAL_ENV}/.desktopdone ] || [[ $reinstall_desktop -gt 0 ]] ; then
+if [[ `id -u` -eq 0 ]] ; then
+target_dir=/usr/local/bin
+else
+target_dir=${HOME}/bin
+fi
 tmpfiledir=$(mktemp -d)
 # tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
 tmpfile=${tmpfiledir}/Scipyen.desktop
-if [[ `id -u` -eq 0 ]] ; then
-script=/usr/local/bin/scipyen
-else
-script=${scipyendir}/scipyen
-fi
+script=${target_dir}/scipyen
+echo -e "Script to execute: ${script}"
 cat<<END > ${tmpfile}
 [Desktop Entry]
 Type=Application
 Name[en_GB]=Scipyen
 Name=Scipyen
-Comment[en_GB]=Scientific Python Environment for Neurophysiology (using systemwide virtual python environment)
-Comment=Scientific Python Environment for Neurophysiology (using systemwide virtual python environment)
+Comment[en_GB]=Scientific Python Environment for Neurophysiology
+Comment=Scientific Python Environment for Neurophysiology
 GenericName[en_GB]=Scientific Python Environment for Neurophysiology
 GenericName=Scientific Python Environment for Neurophysiology
 Icon=pythonbackend
@@ -690,13 +692,23 @@ if [ -r ${target_dir}/scipyen ] ; then
 fi
 shopt -s lastpipe
 
-if [[ `id -u` -eq 0 ]] ; then
+# if [[ `id -u` -eq 0 ]] ; then
 cat << END > ${target_dir}/scipyen 
 #! /bin/sh
 if [ -z ${VIRTUAL_ENV} ]; then
 source ${install_dir}/${virtual_env}/bin/activate
 fi
-echo -e "Using Python environment in ${VIRTUAL_ENV}\n"
+git -C $scipyendir rev-parse 2>/dev/null;
+if [[ $? -eq 0 ]]; then
+branch=`git -C $scipyendir branch --show-current`
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+echo -e "${RED}WARNING:${NC} Running ${GREEN}${branch}${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
+git -C $scipyendir status --short --branch
+fi
+echo -e "\nUsing Python environment in ${VIRTUAL_ENV}\n"
 if [ -z $BROWSER ]; then
 if [ -a $VIRTUAL_ENV/bin/browser ]; then
 source $VIRTUAL_ENV/bin/browser
@@ -706,23 +718,25 @@ export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
 export OUTDATED_IGNORE=1
 a=`which xrdb` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
 if [ $0 == 0 ] ; then
-if [ -r $scipyendir/neuron_python/app-defaults/nrniv ] ; then
-xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
+if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
+xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
-${python_executable} -Xfrozen_modules=off ${scipyendir}/scipyen.py
+${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py
 END
+shopt -u lastpipe
 chmod +x ${target_dir}/scipyen 
-else
-ln -s ${scipyendir}/scipyen ${target_dir}/scipyen
-echo -e "Link to scipyen startup script created in ${target_dir} \n"
-fi    
+echo -e "Scipyen startup script created in ${target_dir} \n"
+# else
+# ln -s ${scipyensrcdir}/scipyen ${target_dir}/scipyen
+# echo -e "Link to scipyen startup script created in ${target_dir} \n"
+# fi    
 #     mkdir -p ${HOME}/bin
 #     if [ -r ${HOME}/bin/scipyen ] ; then
 #         dt=`date '+%Y-%m-%d_%H-%M-%s'`
 #         mv ${HOME}/bin/scipyen ${HOME}/bin/scipyen.$dt
 #     fi
-#     ln -s ${scipyendir}/scipyen ${HOME}/bin/scipyen
+#     ln -s ${scipyensrcdir}/scipyen ${HOME}/bin/scipyen
 #     
 #     echo -e "Link to scipyen startup script created in ${HOME}/bin \n"
 }
@@ -745,11 +759,16 @@ virtual_env_pfx="scipyenv" #.$pyver"
 # qdbus_python_dir=
 
 
+if [[ `id -u ` -eq 0 ]] ; then
 install_dir="/usr/local"
+else
+install_dir=${HOME}
+fi
 realscript=`realpath $0`
 installscriptdir=`dirname "$realscript"`
 docdir=`dirname "$installscriptdir"`
 scipyendir=`dirname "$docdir"`
+scipyensrcdir=${scipyendir}/src
 using_python=""
 install_neuron=0
 use_pypi_neuron=1
