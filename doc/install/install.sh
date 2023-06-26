@@ -106,7 +106,7 @@ function upgrade_virtualenv ()
 function makevirtenv ()
 {
     echo -e "Trying to create/use virtual environment ${virtual_env} in ${install_dir} using ${using_python}\n"
-    #NOTE: Generates a virtual enviornment
+    #NOTE: Generates a virtual environment
     # check if the environment directory exists (and that it does belong to a
     # virtual python environment - that is, it contains a file named "pyenv.cfg"
     # containing "virtualenv" in it, has a "bin" directory with "activate" script,
@@ -406,8 +406,8 @@ cat<<END > ${tmpfile}
 Type=Application
 Name[en_GB]=Scipyen
 Name=Scipyen
-Comment[en_GB]=Scientific Python Environment for Neurophysiology
-Comment=Scientific Python Environment for Neurophysiology
+Comment[en_GB]=Scientific Python Environment for Neurophysiology (using systemwide virtual python environment)
+Comment=Scientific Python Environment for Neurophysiology (using systemwide virtual python environment)
 GenericName[en_GB]=Scientific Python Environment for Neurophysiology
 GenericName=Scientific Python Environment for Neurophysiology
 Icon=pythonbackend
