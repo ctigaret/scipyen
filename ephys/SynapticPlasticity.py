@@ -29,7 +29,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
-import core.datatypes as dt
+import core.datatypes  
 from core.datatypes import TypeEnum
 from core.quantities import units_convertible
 import plots.plots as plots

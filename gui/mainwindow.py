@@ -92,9 +92,18 @@ from . import signalviewer as sv
 from . import matrixviewer as matview
 from . import imageviewer as iv
 from . import dictviewer as dv
+from .cursors import (SignalCursor, SignalCursorTypes,
+                    cursors2epoch, cursors2intervals)
+                    
+
 from iolib import h5io, jsonio
 from iolib import pictio as pio
-from core.datazone import DataZone
+from core import pyabfbridge as pab
+from core import datazone
+from core.datazone import (DataZone, Interval, 
+                           intervals2cursors, intervals2epoch,
+                           epoch2cursors, epoch2intervals)
+
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
@@ -117,7 +126,7 @@ import core.tiwt as tiwt
 import core.xmlutils as xmlutils
 import core.desktoputils as desktoputils
 from core import neoutils
-from core import datatypes as dt
+from core import datatypes
 from plots import plots as plots
 from core.scipyen_config import scipyen_config as scipyen_settings
 from core import scipyen_config as scipyenconf
@@ -165,6 +174,7 @@ import typing
 import functools
 import operator
 import json
+import pathlib
 from pprint import pprint
 from copy import copy, deepcopy
 import collections
@@ -941,6 +951,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     startPluginLoad = pyqtSignal()
     sig_refreshRecentFilesMenu = pyqtSignal()
     sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
+    
+    sig_newItemsInCurrentDir = pyqtSignal(tuple, name="sig_newItemsInCurrentDir")
+    sig_itemsRemovedFromCurrentDir = pyqtSignal(tuple, name="sig_itemsRemovedFromCurrentDir")
+    sig_itemsChangedInCurrentDir = pyqtSignal(tuple, name="sig_itemsChangedInCurrentDir")
 
     _instance = None
 
@@ -1320,7 +1334,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.navPrevDir = collections.deque()
         self.navNextDir = collections.deque()
-        self.currentDir = None
+        self._currentDir_ = None
+        self._nMaxWatchedDirectories_ = 1
+        self._nMaxWatchedFiles_= 1
+        self._isDirWatching_ = False
+        self._fileSystemChanged_ = False
+        self._changesInWatchedDir_ = False
+        self._currentDirCache_ = dict()
+        
         
         # NOTE: 2023-05-27 22:00:37
         # self._init_QtConsole_ will asign to self.workspace a reference to the 
@@ -1701,6 +1722,80 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._showFilesFilter = val is True
 
         self.filesFilterFrame.setVisible(self._showFilesFilter)
+        
+    @property
+    def currentDir(self):
+        return self.currentDirectory
+    
+    @currentDir.setter
+    def currentDir(self, value):
+        self.currentDirectory = value
+
+    @property
+    def currentDirectory(self):
+        return self._currentDir_
+    
+    @currentDirectory.setter
+    def currentDirectory(self, value:typing.Union[str, pathlib.Path]):
+        self._currentDir_ = value
+        
+        if self.watchCurrentDirectory:
+            watchedDirs = self.dirFileWatcher.directories()
+            if len(watchedDirs):
+                self.dirFileWatcher.removePaths(watchedDirs)
+                
+            if self._isDirWatching_:
+                with os.scandir(self._currentDir_) as dirIt:
+                    # maybe include subdirs also (but do not recurse)
+                    dirItems = dict((entry.name, entry.stat()) for entry in dirIt)
+                    self._currentDirCache_.clear()
+                    self._currentDirCache_.update(dirItems)
+                    
+                self.dirFileWatcher.addPath(self.currentDir)
+            
+    @property
+    def watchCurrentDirectory(self):
+        return self._isDirWatching_
+    
+    @watchCurrentDirectory.setter
+    def watchCurrentDirectory(self, value:bool):
+        self._isDirWatching_ = value == True
+        
+        watchedDirs = self.dirFileWatcher.directories()
+        if len(watchedDirs):
+            self.dirFileWatcher.removePaths(watchedDirs)
+            
+        if self._isDirWatching_:
+            self.dirFileWatcher.addPath(self.currentDir)
+            
+    
+#     @property
+#     def maximumWatchedFiles(self):
+#         return self._nMaxWatchedFiles_
+#     
+#     @markConfigurable("NMaxWatchedFiles", "Qt")
+#     @maximumWatchedFiles.setter
+#     def maximumWatchedFiles(self, value:int):
+#         if not isinstance(value, int):
+#             raise TypeError(f"Expecting and int; instead got {type(value).__name__}")
+#         if value < 0:
+#             value = 0
+#             
+#         self._nMaxWatchedFiles_ = value
+# 
+#     @property
+#     def maximumWatchedDirectories(self):
+#         return self._nMaxWatchedDirectories_
+#     
+#     @markConfigurable("NMaxWatchedDirectories", "Qt")
+#     @maximumWatchedDirectories.setter
+#     def maximumWatchedDirectories(self, value:int):
+#         if not isinstance(value, int):
+#             raise TypeError(f"Expecting and int; instead got {type(value).__name__}")
+#         if value < 0:
+#             value = 0
+#             
+#         self._nMaxWatchedDirectories_= value
 
     @property
     def variableSearches(self):
@@ -1845,6 +1940,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             return
 
         assert viewer.ID == wid
+        
+    def activateWindow(self):
+        super().activateWindow()
+        if os.platform== "win32":
+            self.raise_()
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
@@ -2782,6 +2882,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if self.activeDockWidget is self.dockWidgetFileSystem:
             # self.slot_updateCwd()
             self._updateFileSystemView_(self.currentDir, False)
+            
         elif self.activeDockWidget is self.dockWidgetHistory:
             # only update history if something has indeed been executed
             if self.console is not None and self.ipkernel.shell.execution_count > self.executionCount:
@@ -3290,6 +3391,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
+        """Triggered by single-click of lmb in workspace viewer.
+    """
         self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
             ndx)
         try:
@@ -4588,8 +4691,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_resizeFileTreeColumnForPath)
         self.fileSystemModel.rootPathChanged[str].connect(
             self.slot_rootPathChanged)
-        # self.fileSystemModel.dataChanged[QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>"].connect(self.slot_fileSystemDataChanged)
+        
+        self.fileSystemModel.dataChanged[QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>"].connect(self.slot_fileSystemDataChanged)
 
+        self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
+        self.dirFileWatcher.directoryChanged.connect(self._slot_directoryChanged)
+        
         self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
 
         self.removeRecentDirFromListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-delete"),
@@ -5320,6 +5427,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             except:
                 pass
+            
+            # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
 
             if sys.platform == "win32":
                 targetDir = targetDir.replace("\\", "/")
@@ -5352,10 +5461,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # self.fileSystemTreeView.setRootIndex(self.fileSystemModel.index(targetDir))
             # self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
 
-            self.currentDir = targetDir
+            # self.currentDir = targetDir
+            self.currentDirectory = targetDir
             self.currentDirLabel.setText(targetDir)
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
+            # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
+            if os.path.isdir(self.currentDirectory):
+                with os.scandir(self.currentDirectory) as dirIt:
+                    dirItems = dict((entry.name, entry.stat(follow_symlinks=False)) for entry in dirIt if os.path.lexists(entry.name))
+                    # dirItems = dict((entry.name, entry.stat()) for entry in dirIt if os.path.lexists(entry.name))
+                    self._currentDirCache_.clear()
+                    self._currentDirCache_.update(dirItems)
+               
 
     def _slot_workdirChangedInConsole(self, targetDir):
         self._updateFileSystemView_(targetDir, cd=True)
@@ -7119,6 +7237,130 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                    askForParams=askForParams)
 
         return False
+    
+    # @pyqtSlot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
+    @pyqtSlot()
+    def slot_fileSystemDataChanged(self, *args, **kwargs):
+        print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
+        self._fileSystemChanged_ = True
+    
+#     def enableDirectoryWatch(self, on:bool=True):
+#         # if not isinstance(self.dirFileWatcher, QtCore.QFileSystemWatcher):
+#         #     self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
+#         #     self.dirFileWatcher.directoryChanged.connect(self._slot_directoryChanged)
+#             
+#         if on:
+#             self._isDirWatching_ = True
+#             if self.currentDir in self.dirFileWatcher.directories():
+#             # do nothing if diretory already watched
+#                 print(f"{self.__class__.__name__}.enableDirectoryWatch: The directory {self.currentDir} is already being watched")
+#             
+#             else:
+#                 watchedDirs = self.dirFileWatcher.directories()
+#                 if len(watchedDirs) > self._nMaxWatchedDirectories_:
+#                     self.dirFileWatcher.removePath(watchedDirs[0])
+#                     
+#                 self.dirFileWatcher.addPath(self.currentDir)
+#                 
+#         else:
+#             self._isDirWatching_ = False
+#             watchedDirs = self.dirFileWatcher.directories()
+#             if len(watchedDirs):
+#                 self.dirFileWatcher.removePaths(watchedDirs)
+#                 
+#     def watchCurrentDirectory(self):
+#         if not self._isDirWatching_:
+#             return
+#         
+#         if self.currentDir in self.dirFileWatcher.directories():
+#             # do nothing if diretory already watched
+#             print(f"{self.__class__.__name__}.watchCurrentDirectory: The directory {self.currentDir} is already being watched")
+#         
+#         else:
+#             # remove prev watched directory from the file system watcher
+#             # add current directory to the file system watcher
+#             watchedDirs = self.dirFileWatcher.directories()
+#             if len(watchedDirs) > self._nMaxWatchedDirectories_:
+#                 self.dirFileWatcher.removePath(watchedDirs[0])
+#                 
+#             self.dirFileWatcher.addPath(self.currentDir)
+#                 
+        
+            
+    @pyqtSlot()
+    def _slot_directoryChanged(self, *args, **kwargs):
+        """Called when the contents of the watched directory have changed:
+        
+        • when a new file was created in the directory 
+            to see this, call 'touch somefile' in a shell, to see this
+        
+        • when an existing file has changed (size, time stamp, etc
+            to see this call 'touch somefile' in a shell once again
+        
+        • when an existing file has been removes 
+            to see this, call 'rm somefile' in a shell to see this - WARNING be
+            careful with this one
+        
+        In addition, the second case above will ALSO trigger the fileSystemModel
+        to emit dataChanged signal, here connected to the slot_fileSystemDataChanged.
+        
+        Any change OF directory will also set the watched directory to the new
+        one (we only watch the self.currentDirectory).
+        
+        
+    
+    """
+        print(f"{self.__class__.__name__}._slot_directoryChanged (from dirFileWatcher) *args {args}, **kwargs {kwargs}")
+        
+        if self.fileSystemModel.rootPath() == self.currentDirectory:
+            dirItems = dict()
+            with os.scandir(self.currentDirectory) as dirIt:
+                # dirItems = [entry.name for entry in dirIt]
+                dirItems = dict((entry.name, entry.stat()) for entry in dirIt)
+                
+            if len(self._currentDirCache_):
+                currentItems = set(dirItems.keys())
+                
+                cachedItems = set(self._currentDirCache_.keys())
+                
+                removedItems = cachedItems - currentItems
+                
+                newItems = currentItems - cachedItems
+                
+                changedItems = tuple(i[0] for i in dirItems.items() if (i[0] in self._currentDirCache_ and (i[1].st_size != self._currentDirCache_[i[0]].st_size or i[1].st_mtime_ns != self._currentDirCache_[i[0]].st_mtime_ns)))
+                
+                if len(removedItems):
+                    print(f"{self.__class__.__name__}._slot_directoryChanged removedItems = {removedItems}")
+                    for i in removedItems:
+                        self._currentDirCache_.pop(i)
+                        
+                    self.sig_itemsRemovedFromCurrentDir.emit(tuple(removedItems))
+                    
+                if len(newItems):
+                    print(f"{self.__class__.__name__}._slot_directoryChanged newItems = {newItems}")
+                    for i in newItems:
+                        self._currentDirCache_[i] = dirItems[i]
+                    self.sig_newItemsInCurrentDir.emit(tuple(newItems))
+                    
+                if len(changedItems):
+                    print(f"{self.__class__.__name__}._slot_directoryChanged changedItems = {changedItems}")
+                    self.sig_itemsChangedInCurrentDir.emit(changedItems)
+                    for i in changedItems:
+                        self._currentDirCache_[i] = dirItems[i]
+                    
+            else:
+                print(f"{self.__class__.__name__}._slot_directoryChanged first cache = {dirItems}")
+                self._currentDirCache_.update(dirItems)
+                self.sig_newItemsInCurrentDir.emit(tuple(dirItems.keys()))
+                
+                # number of objects in the dir has changed
+            # TODO:2023-06-21 22:54:32
+            # find out is the number of entries in the directory has changed
+            #   identify the new file(s) or the removed file(s)
+            # if the number is unchanged then find out what has changed
+            # we compare the result of a scandir() iteration with a cached one 
+            # which HAS TO BE SETUP when the directory first becomes watched.
+            
 
     def viewObject(self, obj, objname, winType=None, newWindow=False, askForParams=False):
         """Actually displays a python object in user's workspace

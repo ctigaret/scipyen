@@ -18,7 +18,7 @@ import neo
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from core import (tiwt, datatypes as dt, strutils, curvefitting as crvf,)
+from core import (tiwt, datatypes  , strutils, curvefitting as crvf,)
 
 from imaging.axisutils import (axisTypeFromString,
                                axisTypeName, 

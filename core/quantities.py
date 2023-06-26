@@ -1,4 +1,4 @@
-import inspect, typing, traceback
+import inspect, typing, traceback, warnings
 from math import (log, inf, nan)
 from pandas import NA
 from numpy import log10
@@ -790,6 +790,22 @@ def check_time_units(value):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
     
     ref = pq.s
+    
+    return value._reference.dimensionality == ref.dimensionality
+
+def check_eletrical_current_units(value):
+    if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
+        raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
+    
+    ref = pq.A
+    
+    return value._reference.dimensionality == ref.dimensionality
+
+def check_electrical_potential_units(value):
+    if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
+        raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
+    
+    ref = pq.V
     
     return value._reference.dimensionality == ref.dimensionality
     

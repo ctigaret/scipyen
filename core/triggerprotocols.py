@@ -1585,8 +1585,8 @@ def detect_trigger_events(x, event_type,
     
     if not isinstance(use_lo_hi, bool):
         raise TypeError("'use_lo_hi' parameter expected to be a boolean; got %s instead" % type(use_lo_hi).__name__)
-    
-    [lo_hi, hi_lo] = detect_boxcar(x)
+   
+    lo_hi, hi_lo,_, _, _ = detect_boxcar(x)
     
     if all([v is None for v in (lo_hi, hi_lo)]):
         return
@@ -1613,71 +1613,6 @@ def detect_trigger_events(x, event_type,
     return trig
     
     
-# @safeWrapper
-# def detect_boxcar(x, thr:typing.Optional[float] = 1.):
-#     """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
-#     
-#     The signal must undergo at least one transition between two distinct states 
-#     ("low" and "high").
-#     
-#     The states are detected using the kmeans algorithm (scipy.cluster.vq.kmeans)
-#     
-#     Optionally the float parameter thr specifies the minimum difference between
-#     signal's clusters for it to be considered as containing embedded TTL-like
-#     waveforms. By default, this is 1.0
-#     
-#     The function is useful in detecting the ACTUAL time of a trigger (be it 
-#     "emulated" in the ADC command current/voltage or in the digital output "DIG") 
-#     when this differs from what was intended in the protocol (e.g. in Clampex)
-#     
-#     Returns:
-#     ========
-#     A tuple of times for the lo → hi and for the hi → lo transitions
-#     or (None, None) when no such transition were found (e.g. when the cluster 
-#     distance is < thr)`
-#     
-#     """
-#     from scipy import cluster
-#     from scipy import signal
-#     
-#     if not isinstance(x, neo.AnalogSignal):
-#         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
-#     
-#     
-#     # WARNING: algorithm fails for noisy signals with no TTL waveform
-#     
-#     try:
-#         cbook, dist = cluster.vq.kmeans(x, 2)
-#         
-#         if float(np.abs(np.diff(cbook,axis=0))) < thr:
-#             return (None, None)
-#             
-#         code, cdist = cluster.vq.vq(x, sorted(cbook))
-#         
-#         diffcode = np.diff(code)
-#         
-#         ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
-#         ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
-#         
-#         if ndx_lo_hi.size:
-#             times_lo_hi = [x.times[k] for k in ndx_lo_hi]
-#             
-#         #else:
-#             #times_lo_hi = None
-#             
-#         if ndx_hi_lo.size:
-#             times_hi_lo = [x.times[k] for k in ndx_hi_lo]
-#             
-#         #else:
-#             #times_hi_lo = None
-# 
-#     except Exception as e:
-#         #traceback.print_exc()
-#         times_lo_hi = None
-#         times_hi_lo = None
-#         
-#     return times_lo_hi, times_hi_lo
-
 
 def remove_trigger_protocol(protocol, block):
     """Removes embedded trigger events associated with a specified trigger protocol

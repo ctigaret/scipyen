@@ -133,7 +133,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -168,6 +168,7 @@
     <addaction name="actionShow_Legends"/>
     <addaction name="actionIgnore_empty_spike_trains"/>
     <addaction name="actionLink_X_axes"/>
+    <addaction name="actionShow_Cursor_Edit_Dialog_When_Created"/>
    </widget>
    <widget class="QMenu" name="cursorsMenu">
     <property name="title">
@@ -220,9 +221,29 @@
      <addaction name="crosshairCursorColorsAction"/>
      <addaction name="cursorHoverColorAction"/>
     </widget>
+    <widget class="QMenu" name="menuVerticalCursorsFromEpoch">
+     <property name="toolTip">
+      <string>Create vertical cursors from Epoch</string>
+     </property>
+     <property name="statusTip">
+      <string>Create vertical cursors from Epoch</string>
+     </property>
+     <property name="whatsThis">
+      <string>Create vertical cursors from Epoch</string>
+     </property>
+     <property name="title">
+      <string>From Epoch</string>
+     </property>
+     <property name="toolTipsVisible">
+      <bool>true</bool>
+     </property>
+     <addaction name="actionVerticalCursorsFromEpochInCurrentAxis"/>
+     <addaction name="actionMultiAxisVerticalCursorsFromEpoch"/>
+    </widget>
     <addaction name="addCursorsMenu"/>
     <addaction name="editCursorsMenu"/>
     <addaction name="removeCursorsMenu"/>
+    <addaction name="menuVerticalCursorsFromEpoch"/>
     <addaction name="separator"/>
     <addaction name="setCursorsShowValue"/>
     <addaction name="setCursorsLabelPrecisionAction"/>
@@ -576,6 +597,34 @@
    </property>
    <property name="toolTip">
     <string>Unlink all X axes</string>
+   </property>
+  </action>
+  <action name="actionShow_Cursor_Edit_Dialog_When_Created">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="settings-configure">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Edit Cursor At Creation</string>
+   </property>
+   <property name="toolTip">
+    <string>Show Cursor Editing Dialog When Created</string>
+   </property>
+  </action>
+  <action name="actionVerticalCursorsFromEpochInCurrentAxis">
+   <property name="text">
+    <string>In current axis...</string>
+   </property>
+  </action>
+  <action name="actionMultiAxisVerticalCursorsFromEpoch">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Multi-axes...</string>
    </property>
   </action>
  </widget>

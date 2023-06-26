@@ -91,7 +91,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
     def inspect_wm(self):
         if isinstance(self.timer, QtCore.QTimer):
             self.timer.start()
-        
+            
 
 class GuiMessages(object):
     @safeWrapper
@@ -869,13 +869,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         self._fileLoadWorker_.moveToThread(self._fileLoadThread_)
         self._fileLoadThread_.started.connect(self._fileLoadWorker_.run)
         self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.quit)
-        self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
+        # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
         self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.deleteLater)
         self._fileLoadWorker_.signals.signal_Finished.connect(lambda : progressDlg.setValue(progressDlg.maximum()))
         self._fileLoadWorker_.signals.signal_Result.connect(self._slot_fileLoadThread_ready)
         
         self._fileLoadThread_.finished.connect(self._fileLoadWorker_.deleteLater)
-        self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
+        # self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
         
         self._fileLoadThread_.start()
         

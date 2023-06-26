@@ -22,6 +22,7 @@ import collections.abc
 from collections import deque, OrderedDict
 from dataclasses import MISSING
 import numpy as np
+import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
 import pandas as pd
@@ -40,6 +41,7 @@ from .prog import safeWrapper, deprecation, with_doc
 
 from .strutils import get_int_sfx
 from .quantities import units_convertible
+from .datazone import DataZone
 
 # NOTE: 2021-07-24 15:03:53
 # moved TO core.datatypes
@@ -119,7 +121,7 @@ class SafeComparator(object):
             
             # NOTE: 2018-11-09 21:46:52
             # isn't this redundant after checking for shape?
-            # unless an object could have shape attribte but not ndim
+            # unless an object could have shape attribute but not ndim
             if hasattr(x, "ndim"):
                 ret &= x.ndim == y.ndim
             
@@ -2918,7 +2920,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
     """Alternative to list.index(), such that a missing value returns None
-    of raising an Exception.
+    instead of raising an Exception.
     DEPRECATED
     Use prog.filter_attr
     """
@@ -3453,16 +3455,19 @@ def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
         raise TypeError(f"Invalid types for index merging: {type(not_missing[0]).__name__}")
     
 @with_doc(prog.filter_attr, use_header = True)
-def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], 
+# @singledispatch
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series, np.ndarray]], 
                      index: typing.Optional[GeneralIndexType] = None, 
-                     silent:bool=False) -> typing.Union[range, typing.Iterable[int]]:
+                     silent:bool=False, axis:typing.Optional[int] = None) -> typing.Union[range, typing.Iterable[int]]:
     """Transform various indexing objects to a range or an iterable of int indices.
     
 Also checks the validity of the index for an iterable, given its size.
 
 Parameters:
 -----------
-data: Sequence or int; 
+data: collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, 
+        pd.Series, np.ndarray
+    
     When a Sequence, the index will be verified against len(data).
     
     When one of the pandas data types:
@@ -3471,15 +3476,18 @@ data: Sequence or int;
         
         pandas.core.indexes.base.Index: the index will be cheched against it
         (useful when passing the columns attribute of a DataFrame)
+    
+    For numpy arrays, return a flat index to be used with array.ravel()
         
     When an int, 'data' is the length of a virtual Sequence (hence data >= 0 is
     expected).
-
+    
 index: GeneralIndexType: a typing alias for:
 
     int → selects only the element with the specified int index
 
-    str → selects only the element having 'name' attribute with the value
+    str → selects only the element having a 'name' or 'label' attribute with the 
+        value; for numpy arrays, returns the index of elements equal to the index
 
     range → selects the elements with int indices in the specified range
 
@@ -3491,19 +3499,20 @@ index: GeneralIndexType: a typing alias for:
     collections.abc.Sequence[str] → selects the elements having a 'name'
             attribute with value in this parameter
 
-    1D np.ndarray with integer dtype (i.e., np.dtype(int)) →  Returns a list 
-        of the array's values (after validation for the 'data' parameter)
-        Prerequisite: 'index' must satisfy:
-        len(index) == len(data) (with 'data' a Sequence)
-        len(index) == data (whith 'data' an int)
-
+    1D np.ndarray with integer dtype (i.e., np.dtype(int)) →  behaved like a flat
+        array index (see online Numpy documentation)
+        
+        WARNING: This is simply converted to a tuple and returned (no checks 
+        against values)
     
+        ATTENTION: For array data, 1D int arrays should be used directly as flat
+        indices into ravelled arrays (see Numpy documentation)
     
     1D np.ndarray with logical dtype  (i.e., np.dtype(bool)) → Used as a 
-        'mask': returns the indices of the True values 
-        Prerequisite: 'index' must satisfy:
-        len(index) == len(data) (with 'data' a Sequence)
-        len(index) == data (whith 'data' an int)
+        'mask': returns the indices of the True values as a tuple of int
+    
+        ATTENTION: For array data, 1D logical arrays should be used directly as 
+        flat indices into ravelled arrays (see Numpy documentation)
 
     MISSING ⇒ select NO elements from the data (returns an empty range)
 
@@ -3517,6 +3526,10 @@ index: GeneralIndexType: a typing alias for:
         
     CAUTION: negative integral indices are valid and perform the reverse 
         indexing (going "backwards" in the iterable).
+    
+    axis: int (optional, default is None)
+        Used only for numpy array data; specifies the axis along which the 
+        "normalized" index is to be returned.
         
 Returns:
 --------
@@ -3542,8 +3555,16 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         data_len = len(data)
         data = data.index
         
-    elif isinstance(data, pd.core.indexes.base.Index):
+    elif isinstance(data, (pd.core.indexes.base.Index, neo.Epoch, DataZone)):
         data_len = len(data)
+        
+    elif isinstance(data, np.ndarray):
+        if isinstance(axis, int):
+            if axis not in range(-data.ndim, data.ndim):
+                raise ValueError(f"Invalid axis index {axis} for an array with {data.ndim} dimensions")
+            data_len = data.shape[axis]
+        else:
+            data_len = data.size
         
     else:
         raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
@@ -3557,19 +3578,11 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         return range(0)
     
     # 3) index is an int ⇒ 
-    #   If data is a Pandas Index then get its element at index int, pack it in
-    #       a tuple then return this tuple
-    #   Else, pack the int in a tuple and return this tuple
-    #
-    #   In either case, check that the index is valid given the data lengh.
-    #   
-    #   The index can have a negative value, meaning it is counted backwards from
-    #   the end of the collection in 'data'.
     if isinstance(index, int):
         # NOTE: 2020-03-12 22:40:31
         # negative values ARE supported: they simply go backwards from the end of
         # the sequence
-        if index not in range(-data_len,data_len):
+        if index not in range(-data_len, data_len):
             if silent:
                 return None
             raise ValueError(f"Index {index} is invalid for {len(data)} elements")
@@ -3580,13 +3593,33 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         return (index,)
     
     # 4) index is a str ⇒
-    #   Check that elements in data have an attribute with name given in index.
+    #   Check that elements in data are either str, or have an attribute with 
+    #   name given in index.
     #   Requires that 'data' is an actual collection, not the length of a virtual
     #   collection.
-    if isinstance(index, str):
+    if isinstance(index, (str, np.str_, bytes)):
+        if isinstance(index, bytes):
+            index = index.decode()
+            
         if isinstance(data, (tuple, list)):
-            return tuple(prog.filter_attr(data, name=lambda x: x==index, indices_only=True))
-    
+            if all(isinstance(data, (str, np.str_, bytes))):
+                ret = tuple(filter(lambda x: x.decode() == index if isinstance(x, bytes) else x == index,
+                                   data))
+                if len(ret) == 0:
+                    if silent:
+                        return None
+                    raise ValueError(f"Index {index} not found in data")
+                return ret
+            else:
+                ret = tuple(prog.filter_attr(data, operator.or_, indices_only=True, 
+                                             name=lambda x: x==index, label=lambda x: x==index))
+                if len(ret) == 0:
+                    if silent:
+                        return None
+                    raise AttributeError(f"The objects have no attribute named 'name' or 'label' with the value {index}")
+                
+                return ret
+            
         if isinstance(data, (pd.core.indexes.base.Index)):
             if index in data:
                 return (index,)
@@ -3594,8 +3627,18 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             
             if not silent:
                 raise IndexError(f"Invalid 'index' specification {index}")
+            
+        if isinstance(data, np.ndarray):
+            if index in data:
+                ret = np.flatnonzero(data == index)
+            else:
+                if silent:
+                    return None
                 
-        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index")
+                else:
+                    raise ValueError(f"Index {index} not found in data array")
+                
+        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index, Series, or DataFrame, or a numpy array")
         
     # 5) index is an Iterable of objects of the same type!
     elif isinstance(index, collections.abc.Iterable):
@@ -3607,7 +3650,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             return index
         
         # 5.2) of str values
-        elif all(isinstance(v, str) for v in index):
+        elif all(isinstance(v, (str, np.str_, bytes) ) for v in index):
             if not isinstance(data, collections.abc.Iterable):
                 raise TypeError("When indexing by name attribute (str), data must be an iterable")
             
@@ -3664,6 +3707,11 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             
         # 8.1) of integer dtype
         if index.dtype.kind == "i": # index is an array of int
+            if np.any((index < 0) | (index >= data_len) ):
+                if silent:
+                    return None
+                raise ValueError(f"Indexing array out of bounds")
+            
             return tuple(index)
         
         # 8.2) of boolean dtype
@@ -3685,6 +3733,9 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         if silent:
             return
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
+    
+# @normalized_index.register(type(None))
+# def _(data, )
     
 def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.AxisInfo], index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
     """Calls normalized_index on a specific array axis.
@@ -3894,7 +3945,7 @@ def sp_get_loc(x, index, columns):
     
     # Save the original sparse format for reuse later
     
-    # NOTE: dt.dtypes returns a Series!!! 
+    # NOTE:  datatypes.dtypes returns a Series!!! 
     # NOTE: it is 'dtypes' not 'dtype'!
     spdtypes = x.dtypes[columns] # this is a pd.Series with column names as row index
     

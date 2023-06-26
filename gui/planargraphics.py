@@ -2214,7 +2214,7 @@ class PlanarGraphics():
                         a sequence (tuple, list) of states or int (no mixed types!)
         
         """
-        import core.datatypes as dt
+        import core.datatypes  
         
         sorted_states = sorted(self._states_, key = lambda x:x.z_frame)
         
@@ -3307,7 +3307,7 @@ class PlanarGraphics():
         
         """
         from scipy import interpolate, spatial
-        import core.datatypes as dt
+        import core.datatypes  
         
         if prev is None:
             x0 = y0 = 0.

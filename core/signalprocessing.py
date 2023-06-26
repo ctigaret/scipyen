@@ -3,7 +3,7 @@
 For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.
 """
-import typing, numbers, functools
+import typing, numbers, functools, warnings
 #### BEGIN 3rd party modules
 import numpy as np
 import scipy
@@ -397,7 +397,7 @@ def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.
     FIXME: 2022-12-13 16:57:47 This is NOT nan-friendly!
     
     """
-    from core import datatypes as dt
+    from core import datatypes
     if x.ndim != 1:
         if x.ndim == 2:
             if min(x.shape) != 1:
@@ -1251,10 +1251,10 @@ def rms(x:np.ndarray, **kwargs):
     x: 1D numpy array
     
     """
-    from core import datatypes as dt
+    from core import datatypes
     if not isinstance(x, np.ndarray):
         raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
-    if not dt.is_vector(x):
+    if not  datatypes.is_vector(x):
         raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
     
     return np.sqrt(np.linalg.norm(x)/x.size)
@@ -1449,6 +1449,8 @@ def convolve(sig, w, **kwargs):
 def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
     """Parse a step waveform -- containing two states ("high" and "low").
     
+    DEPRECATED: Please use detect_boxcar(…) instead.
+    
     Typical example is a depolarizing curent injection step (or rectangular pulse)
     
     Parameters:
@@ -1478,8 +1480,14 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
         
         
     """
+    # FIXME 2023-06-18 22:09:23
+    # Currently this function does almost the same thing as detect_boxcar.
+    # TODO 2023-06-18 22:10:21 merge codes into one function !
+    
     from scipy import cluster
     from scipy.signal import boxcar
+    
+    warnings.warn("This function is DEPRECATED. Please use 'detect_boxcar'",category=warnings.DeprecationWarning)
     
     if not isinstance(sig, neo.AnalogSignal):
         raise TypeError("Expecting an analogsignal; got %s instead" % type(sig).__name__)
@@ -1581,7 +1589,7 @@ def resample_pchip(sig, new_sampling_period, old_sampling_period = 1):
     # we replace these values wihtt he last signal sample value
     from scipy.interpolate import PchipInterpolator as pchip
     
-    from . import datatypes as dt
+    from . import datatypes
     
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         if isinstance(new_sampling_period, pq.Quantity):
@@ -2036,7 +2044,7 @@ def root_mean_square(x, axis = None):
     RMS = sqrt(mean(x^2))
     
     """
-    from . import datatypes as dt
+    from . import datatypes 
     
     if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
@@ -2087,7 +2095,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
         When True, the result is expressed in decibel (10*log10(...))
         
     """
-    from . import datatypes as dt
+    from . import datatypes  
 
     if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
         raise TypeError("Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datatypes.DataSignal; got %s instead" % type(x).__name__)
@@ -2359,7 +2367,7 @@ def correlate(in1, in2, **kwargs):
     
     from scipy.signal import correlate
     
-    from . import datatypes as dt
+    from . import datatypes  
     
     name = kwargs.pop("name", "")
     
@@ -2422,13 +2430,19 @@ def correlate(in1, in2, **kwargs):
 
 @safeWrapper
 def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal], 
-                  thr:typing.Optional[float] = 1., return_levels:bool=False):
-    """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
+                  thr:typing.Optional[float] = 1., 
+                  channel:typing.Optional[int] = None,
+                  up_first:bool=True,
+                  **kwargs):
+    """Detect boxcar waveforms in a signal.
+
     
     The signal must undergo at least one transition between two distinct states 
     ("low" and "high").
     
     The states are detected using the kmeans algorithm (scipy.cluster.vq.kmeans)
+    or using a histogram-based method (see state_levels); this is selected using
+    the 'method' keyword (by default this is set to 'kmeans')
     
     Optionally the float parameter thr specifies the minimum difference between
     signal's clusters for it to be considered as containing embedded TTL-like
@@ -2440,54 +2454,186 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     there is a padding before and after the actual signal, and the size of the 
     padding is about 
     
+
+    Parameters:
+    ----------
+    x: signal-like object
+    thr: float: a minimum value of boxcar amplitude (useful for noisy signals)
+        default is 1.
+    
+    channel: required when the signal 'x' has more than one channel (or traces);
+        selects a single trace (or channel) along the 2nd axis (axis 1)
+    
+        (remember, a signal is a 2D array and its traces are column vectors, 
+        with axis 0 the 'domain' (time, etc) and channels - or traces - indexed
+        on axis 1)
+    
+    up_first: bool default is True
+        When True, the upward transitions times are in the first element of the 
+            returned tuple (see below), and the downward transition times are in
+            the second element.
+    
+        When False, the order is reversed (down, then up).
+    
+        NOTE: This allows the caller to pre-empt which transition time stamps 
+        are returned first, although it is easy to determine this post-hoc, by
+        comparing the time stamps.
+    
     Returns:
     ========
-    A tuple of times for the lo → hi and for the hi → lo transitions
-    or (None, None) when no such transition were found (e.g. when the cluster 
-    distance is < thr)`
+    A tuple of five elements: 
+        "up", "down", "amplitude", "centroids", "label" when up_first is True
+        "down", "up", "amplitude", "centroids", "label" when up_first is False
+    
+        "up" and "down" are arrays of time stamps for the lo → hi and  hi → lo
+            transitions, respectively.
     
     """
-    from scipy import cluster
-    from scipy import signal
+    # FIXME 2023-06-18 22:09:23
+    # Currently this function does almost the same thing as parse_step_waveform_signal.
+    # TODO 2023-06-18 22:10:21 merge codes into one function !
+    from scipy import (cluster, signal)
+    from scipy.signal import boxcar
+
     
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
     
-    
+
     # WARNING: algorithm fails for noisy signals with no TTL waveform
     
-    try:
-        cbook, dist = cluster.vq.kmeans(x, 2)
+    # NOTE: 2023-06-19 08:54:33
+    # merging with parse_step_waveform_signal
+    
+    # NOTE: 2023-06-19 08:55:01
+    # Test signal shape -> we need a single-trace signal; although we could 
+    # possibly work on multi-trace (or multi-channel) signals, this would 
+    # complicate things too much, so let;s make sure we only select one trace 
+    # from a multi-trace signal
+    if x.ndim == 2 and x.shape[1] > 1:
+        if not isinstance(channel, int):
+            raise ValueError(f"Expecting a signal with one channel, instead got {sig.shape[1]}, but 'channel' was not specified")
         
-        if float(np.abs(np.diff(cbook,axis=0))) < thr:
-            return (None, None, None) if return_levels else (None, None)
+        sig = x[:,channel] # a single-trace view of x
+        
+    else:
+        sig = x
             
-        code, cdist = cluster.vq.vq(x, sorted(cbook))
+    # NOTE: 2023-06-19 08:56:25
+    # optionally smooth the data with a boxcar filter
+    
+    box_size = kwargs.pop("box_size", 0)
+    
+    if not isinstance(box_size, int):
+        raise TypeError(f"boxcar filter size must be an int; instead, got {type(box_size).__name__}")
+    
+    if box_size < 0:
+        raise ValueError(f"boxcar filter size must be >= 0")
+    
+    if box_size > 0:
+        bckernel = boxcar(box_size)/ box_size # generate a boxcar kernel
+        sig_filt = convolve(sig, bckernel)
         
-        diffcode = np.diff(code)
+    else:
+        sig_filt = sig
         
+    method = kwargs.pop("method", "kmeans") # better default
+    
+    if not isinstance(method, str):
+        raise TypeError(f"'methd' expected to be a str; instead, got {type(method).__name__}")
+    
+        
+    # NOTE: 2023-06-19 08:59:37
+    # from here onwards we work on sig_filt!
+    
+    # NOTE: 2023-06-19 09:00:05
+    # get the transition levels - first check what method we use
+    
+    if method not in ("kmeans", "state_levels"):
+        raise ValueError(f"'method' {method} is invalid; expecting one of 'state_levels' or 'kmeans'")
+    
+    try:
+        if method == "state_levels":
+            # print("detect_boxcar using state_levels")
+            levels = kwargs.pop("levels", 0.5)
+            # NOTE: 2023-06-19 09:04:30
+            # TODO code to get these values from the ABF file (via pyabfbridge?)
+            # TODO and similarly, from CED (for CED, the code still needs to be written)
+            # TODO write documentation hint on how these numbers can be obtained
+            # outside this function (ie., before calling it); 
+            adcres = kwargs.pop("adcres", 15)
+            adcrange = kwargs.pop("adcrange", 10)
+            adcscale = kwargs.pop("adcrange", 1e3)
+        
+            # NOTE: 2023-06-19 09:09:44
+            # state_levels is a histogrm method to determine distinct 'levels' 
+            # in the signal, see IEEE Std 181-2011: IEEE Standard for Transitions, 
+            # Pulses, and Related Waveforms
+            #
+            # here we pass the default moment (the 'mean'), axis (0, i.e. the 
+            # data axis), bins (100) and bw (bin width, None) ⇒ we don't need to 
+            # find these in the kwargs
+            # 
+            # returns:
+            # • centroids: a list of reference levels - same as cbook with the
+            #   kmeans method below, but IS NOT an array, and the values may 
+            #   differ slightly
+            # • cnt: numpy array (int): histogram counts (i.e. the histogram
+            #   "column" values) in increasing order of the bins
+            # • edg: numpy array (float) of histogram edges
+            # • rng: list of ranges (one per level) within the cnt array
+            #   indicates the range of column indices that fall inside each level
+            
+            centroids, cnt, edg, rng = state_levels(sig_filt.magnitude, levels = levels, 
+                                        adcres = adcres, 
+                                        adcrange = adcrange, 
+                                        adcscale = adcscale)
+            
+            if len(centroids) == 0:
+                return (None, None, None) if return_levels else (None, None)
+                
+            cbook = np.array(centroids).T[:,np.newaxis]
+            
+        else:
+            # print("detect_boxcar using kmeans")
+            cbook, dist = cluster.vq.kmeans(sig_filt, 2) # two levels
+            cbook = np.array(cbook, dtype=float)
+            
+        # the boxcar amplitude
+        amplitude = np.diff(cbook, axis=0) * sig.units
+        
+        if np.all(amplitude < thr*sig.units):
+            return (None, None, None, None, None)
+            
+        code, cdist = cluster.vq.vq(sig, sorted(cbook)) # use un-filtered signal here
+        
+        # diffcode = np.diff(code)
+        diffcode = np.ediff1d(code, to_begin=0)
+        
+        # indices of up transitions (lo → hi)
         ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
+        # indices of down transitions (hi → lo)
         ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
         
         if ndx_lo_hi.size:
-            times_lo_hi = [x.times[k] for k in ndx_lo_hi]
-            
-        #else:
-            #times_lo_hi = None
+            times_lo_hi = [x.times[k] for k in ndx_lo_hi] # up transitions
             
         if ndx_hi_lo.size:
-            times_hi_lo = [x.times[k] for k in ndx_hi_lo]
-            
-        #else:
-            #times_hi_lo = None
-
+            times_hi_lo = [x.times[k] for k in ndx_hi_lo] # down transitions
+                
+        
     except Exception as e:
         #traceback.print_exc()
         times_lo_hi = None
         times_hi_lo = None
+
+        amplitude = None
         cbook = None
+        code = None
         
-    if return_levels:
-        return times_lo_hi, times_hi_lo, cbook
+    if up_first:
+        return times_lo_hi, times_hi_lo, amplitude, cbook, code
     
-    return times_lo_hi, times_hi_lo
+    # emulates parse_step_waveform_signal
+    return times_hi_lo, times_lo_hi, amplitude, cbook, code
+

@@ -47,12 +47,6 @@ import vigra
 import neo
 import confuse # for programmatic read/write of non-gui settings
 
-try:
-    import pyabf
-    hasPyABF=True
-except:
-    hasPyABF=False
-
 from PyQt5 import QtCore, QtGui, QtWidgets
 #### END 3rd party modules
 
@@ -1739,45 +1733,6 @@ def is_spreadsheet(fileName:str):
     
     return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in (mime_type, file_type)) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
     
-def getABF(obj):
-    """
-    Returns a pyabf.ABF object from an ABF file.
-    
-    Parameters:
-    ----------
-    obj: str (ABF file name) or a neo.core.baseneo.BaseNeo object containing an
-        attribute named "file_origin" that points to an ABF file on disk where
-        its data is stored.
-    """
-    import os
-    if not hasPyABF:
-        warning.warn("getABF requires pyabf package")
-        return
-
-    if isinstance(obj, str):
-        filename = obj
-    else:
-        filename = getattr(obj, "file_origin", None)
-        
-    if not os.path.exists(filename):
-        return
-    
-    loader = getLoaderForFile(filename)
-    
-    if loader == loadAxonFile:
-        try:
-            if filename.lower().endswith(".abf"):
-                return pyabf.ABF(filename)
-            elif filename.lower().endswith(".atf"):
-                return pyabf.ATF(filename)
-            else:
-                raise RuntimeError("pyabf can only handle ABF and ATF files")
-        except:
-            pass
-        
-    else:
-        warning.warn(f"{filename} is not an Axon file")
-
 def loadFile(fName):
     value = None
     fileLoader = getLoaderForFile(fName)

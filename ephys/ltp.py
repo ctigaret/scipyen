@@ -30,7 +30,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
-import core.datatypes as dt
+import core.datatypes  
 from core.datatypes import (Episode, Schedule, TypeEnum)
 import plots.plots as plots
 import core.models as models
@@ -48,6 +48,8 @@ from core.triggerprotocols import (TriggerProtocol,
                                    remove_trigger_protocol,)
 
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.datazone import DataZone
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
 from core.prog import (safeWrapper, AttributeAdapter, with_doc)
@@ -85,6 +87,7 @@ from gui.itemslistdialog import ItemsListDialog
 import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
+from gui.cursors import SignalCursor
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -93,6 +96,8 @@ import iolib.pictio as pio
 
 import ephys.ephys as ephys
 from ephys.ephys import ClampMode, ElectrodeMode
+from ephys.ephys import LocationMeasure
+from ephys import membrane
 
 
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
@@ -104,8 +109,6 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
-
-
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
@@ -1596,8 +1599,9 @@ def segment_synplast_params_i_clamp(s: neo.Segment,
         chord_slopes = [((sig.max()-sig.min())/d_t).rescale(pq.V/pq.s) for (sig, d_t) in zip(epsp_rises, dt)]
         
         return chord_slopes
-        
-        
+    
+
+    
 def segment_synplast_params_v_clamp(s: neo.Segment, 
                                        signal_index_Im: int,
                                        signal_index_Vm: typing.Optional[int]=None,
@@ -1863,9 +1867,10 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
     
     Idc    = np.mean(s.analogsignals[signal_index_Im].time_slice(t_test[0][0], t_test[0][1]))
     
-    Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
+    Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t_test[1][0], t_test[1][1])) 
     
-    Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t[2][0], t[2][1]))
+    Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t_test[2][0], t_test[2][1]))
+
     
     if signal_index_Vm is None:
         if isinstance(testVm, numbers.Number):
@@ -1898,11 +1903,11 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         # vm_signal = s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])
         # vm_signal = vm_signal.time_slice(t[0][0], t[0][1])
         
-        Vbase = np.mean(vm_signal.time_slice(t[0][0], t[0][1])) # where Idc is measured
+        Vbase = np.mean(vm_signal.time_slice(t_test[0][0], t_test[0][1])) # where Idc is measured
         # Vbase = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[0][0], t[0][1])) # where Idc is measured
         #print("Vbase", Vbase)
 
-        Vss   = np.mean(vm_signal.time_slice(t[2][0], t[2][1])) # where Rin is calculated
+        Vss   = np.mean(vm_signal.time_slice(t_test[2][0], t_test[2][1])) # where Rin is calculated
         # Vss   = np.mean(s.analogsignals[signal_index_Vm].time_slice(t[2][0], t[2][1])) # where Rin is calculated
         #print("Vss", Vss)
         
@@ -1915,9 +1920,9 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         
     #print("dIRs", (Irs-Idc), "dIRin", (Irin-Idc), "Rs", Rs, "Rin", Rin)
         
-    Iepsc0base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[3][0], t[3][1])) 
+    Iepsc0base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[0][0], t[0][1])) 
     
-    Iepsc0peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[4][0], t[4][1])) 
+    Iepsc0peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
 
     EPSC0 = Iepsc0peak - Iepsc0base
     
@@ -1929,10 +1934,6 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t[0][0], t[0][1])) 
         
         Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t[1][0], t[1][1])) 
-        
-        #Iepsc1base = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[5], t1[5])) 
-        
-        #Iepsc1peak = np.mean(s.analogsignals[signal_index_Im].time_slice(t0[6], t1[6])) 
         
         EPSC1 = Iepsc1peak - Iepsc1base
         PPR = (EPSC1 / EPSC0).magnitude.flatten()[0] # because it's dimensionless
@@ -2453,5 +2454,3 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
     return result
 
 
-    
-    

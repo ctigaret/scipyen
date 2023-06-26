@@ -168,6 +168,7 @@ from neo.core.baseneo import (MergeError, _reference_name, _container_name)
 
 from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
+import pyqtgraph as pg
 
 #### END 3rd party modules
 
@@ -181,18 +182,19 @@ from .prog import (safeWrapper, deprecation,
                    )#SignatureDict)
 
 from .datatypes import (is_string, is_vector,
-                        RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
+                        RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
 from .quantities import (units_convertible, check_time_units, name_from_unit)
 from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from .datazone import DataZone
+from .datazone import (DataZone, Interval)
 from .triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
 
 from . import workspacefunctions
 from . import signalprocessing as sigp
 from . import utilities
 from core.utilities import (normalized_index, name_lookup, GeneralIndexType,
-                            elements_types, index_of, isclose, similar_strings)
+                            elements_types, index_of, isclose, similar_strings,
+                            counter_suffix)
 
 from core.strutils import (InflectEngine, pluralize)
 
@@ -1892,9 +1894,28 @@ def get_index_of_named_signal(src, names,
     else:
         raise TypeError("First argument must be a neo.Block object, a list of neo.Segment objects, or a neo.Segment object; got %s instead" % type(src).__name__)
 
+def epoch_has_interval(epoch:typing.Union[neo.Epoch, DataZone],
+                       interval_name:typing.Union[str, np.str_, bytes]) -> bool:
+    if not isinstance(epoch, (neo.Epoch, DataZone)):
+        raise TypeError(f"'epoch' expected to be a neo.Epoch or DataZone; got {type(epoch).__name__} instead")
+    
+    if isinstance(interval_name, bytes):
+        interval_name = interval_name.decode()
+        
+    elif not isinstance(interval_name, (str, np.str_)):
+        raise TypeError(f"'interval_name' expected a str, np.str_ or bytes; got {type(interval_name).__name__} instead")
+    
+    return interval_name in epoch.labels
+
 @safeWrapper
-def get_epoch_interval(epoch: neo.Epoch, index: typing.Union[str, bytes, np.str_, int], duration:bool=False):
-    """Returns a tuple of time quantities for a specific epoch interval
+def get_epoch_interval(epoch: typing.Union[neo.Epoch, DataZone], 
+                       index: typing.Union[str, bytes, np.str_, int], 
+                       duration:bool=False) -> tuple:
+    """Returns the time stamps for an epoch interval.
+    
+    These are the (time, duration, <label>) or (time, time+duration, <label>),
+    depending on the 'duration' flag. The term in angle brackets is optional and 
+    is returned only when the epoch's intervals are labeled
     
     Parameters:
     ----------
@@ -1916,8 +1937,6 @@ def get_epoch_interval(epoch: neo.Epoch, index: typing.Union[str, bytes, np.str_
         epoch[k] or epoch.times[k]  ⇾ start of the kᵗʰ interval
         epoch.durations[k]          ⇾ duration of the kᵗʰ interval
     
-            
-        
     duration: bool Optional (default is False)
         When True, returns the (time, duration) tuple for the specified interval
         (see above)
@@ -1928,30 +1947,31 @@ def get_epoch_interval(epoch: neo.Epoch, index: typing.Union[str, bytes, np.str_
     Returns:
     --------
     
-    A tuple of two Python Quantities with time units, that depending on the value
-    of the 'duration' parameter, represent either:
+    A tuple:
     
-    (time, duration)
+    (time, duration, <label>) when duration is True
     
     or:
     
-    (time, time + duration) - i.e., a (t0, t1) time tuple useful for time slicing
-    of neo-style data arrays
+    (time, time + duration, <label>), when duration is False (the default)  - 
+        this tuple is useful for time slicing of neo-style data arrays; 
+    
+    NOTE: <label> is optional, and is included ONLY when the epoch.labels is 
+    non-empty.
     
     """
-    if not isinstance(epoch, neo.Epoch):
+    if not isinstance(epoch, (neo.Epoch, DataZone)):
         raise TypeError(f"'epoch' expected to be a neo.Epoch; got {type(epoch).__name__} instead")
     
-    if isinstance(index, (str, bytes, np.str_)):
-        # if len(index.strip()) == 0:
-        #     raise ValueError("'index' is empty!")
-    
+    if isinstance(index, (str, np.str_, bytes)):
+        if isinstance(index, bytes):
+            index = index.decode()
+            
         if index not in epoch.labels:
             raise ValueError(f"Interval label {index} not found")
         
+        ndx = np.flatnonzero(epoch.labels == index)
     
-        ndx = int(np.where(epoch.labels == index)[0])
-        
     elif isinstance(index, int):
         if index not in range(-len(epoch), len(epoch)):
             raise ValueError(f"Invalid index {index} for an epoch with {len(epoch)} intervals")
@@ -1960,10 +1980,15 @@ def get_epoch_interval(epoch: neo.Epoch, index: typing.Union[str, bytes, np.str_
     else:
         raise TypeError(f"Index expected to be a bytes, str, or int; got {type(index).__name__} instead")
             
+            
+    if duration:
+        intvl = (epoch.times[ndx].flatten()[0], epoch.durations[ndx].flatten()[0], epoch.labels[ndx].flatten()[0]) if ndx in range(epoch.labels.size) else (epoch.times[ndx].flatten()[0], epoch.durations[ndx].flatten()[0], epoch.labels[ndx])
+    else:
+        intvl = (epoch.times[ndx].flatten()[0], epoch.times[ndx].flatten()[0]+epoch.durations[ndx].flatten()[0], epoch.labels[ndx].flatten()[0]) if ndx in range(epoch.labels.size) else (epoch.times[ndx].flatten()[0], epoch.times[ndx],flatten()[0]+epoch.durations[ndx].flatten()[0])
     
-    return (epoch.times[ndx], epoch.durations[ndx]) if duration else (epoch.times[ndx], epoch.times[ndx]+epoch.durations[ndx])
-    
-def get_sample_at_time(data, t):
+    return Interval(*intvl, extent=duration)
+
+def get_sample_at_time(data, t, channel=None):
     """Returns the signal sample value at (or around) time t.
     
     Returns np.nan * data.units if a value is not found (typically this happens 
@@ -1989,6 +2014,7 @@ def get_sample_at_time(data, t):
     data: neo.core.basesignal.BaseSignal
     t: scalar, or numpy array or Quantity with size of 1
     """
+    # TODO: Adapt for multi-channel signals
     u = data.times.units
     
     if isinstance(t, float):
@@ -5439,146 +5465,158 @@ def merge_annotations(A, *Bs):
     logger.debug("Merging annotations: A=%s Bs=%s merged=%s", A, Bs, merged)
     return merged
 
-def epoch2intervals(epoch: neo.Epoch, keep_units:bool = False):
-    """Generates a sequence of intervals as triplets (t_start, t_stop, label).
-    
-    Each interval coresponds to the epoch's interval.
-    
-    Parameters:
-    ----------
-    epoch: neo.Epoch
-    
-    keep_units: bool (default False)
-        When True, the t_start and t_stop in each interval are scalar python 
-        Quantity objects (units borrowed from the epoch)
-    
-    """
-    if keep_units:
-        return [(t, t+d, l) for (t,d,l) in zip(epoch.times, epoch.durations, epoch.labels)]
-        
-    else:
-        return [(t, t+d, l) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels)]
-    
-@safeWrapper
-def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch from a sequence of interval tuples or triplets.
-    
-    Variadic parameters:
-    --------------------
-    tuples (t0,t1) or triplets (t0,t1,label), or a sequence of tuples or triplets
-    each specifying an interval
-    
-    """
-    units = kwargs.pop("units", pq.s)
-    if not isinstance(units, pq.Quantity) or units.size > 1:
-        raise TypeError("units expected to be a scalar python Quantity")
 
-    name = kwargs.pop("name", "Epoch")
-    if not isinstance(name, str):
-        raise TypeError("name expected to be a string")
-    
-    if len(name.strip())==0:
-        raise ValueError("name must not be empty")
-    
-    sort = kwargs.pop("sort", True)
-    if not isinstance(sort, bool):
-        raise TypeError("sort must be a boolean")
-    
-    def __generate_epoch_interval__(value):
-        if not isinstance(value, (tuple, list)) or len(value) not in (2,3):
-            raise TypeError("expecting a tuple of 2 or 3 elements")
-        
-        if len(value) == 3:
-            if not isinstance(value[2], str) or len(value[2].strip()) == 0:
-                raise ValueError("expecting a non-empty string as thirs element in the tuple")
-            
-            l = value[2]
-                
-        else:
-            l = None
-            
-        u = units # by default if boundaries are scalars
-        
-        if not all([isinstance(v, (pq.Quantity, numbers.Number)) for v in value[0:2]]):
-            raise TypeError("interval boundaries must be scalar numbers or quantities")
-        
-        if all([isinstance(v, pq.Quantity) for v in value[0:2]]):
-            if any([v.size != 1 for v in value[0:2]]):
-                raise TypeError("interval boundaries must be scalar quantities")
-            
-            u = value[0].units #store the units
-            
-            if value[0].units != value[1].units:
-                if not units_convertible(value[0], value[1]):
-                    raise TypeError("interval boundaries must have compatible units")
-                
-                else:
-                    value = [float(value[0]), float(value[1].rescale(value[0].units))]
-                    
-            else:
-                value = [float(v) for v in value[0:2]]
-            
-        t, d = (value[0], value[1] - value[0])
-        
-        if d < 0:
-            raise ValueError("interval cannot have negative duration")
+# @safeWrapper
+# def cursors2epoch(*args, **kwargs):
+#     """Constructs a neo.Epoch from a sequence of SignalCursor objects.
+#     
+#     Each cursor contributes an interval in the Epoch, corresponding to the 
+#     cursor's horizontal (x) window. In other words, the interval's start time
+#     equals the cursor's x coordinate - ½ cursor's x window, and the duration of
+#     the interval equals the cursor's x window.
+#     
+#     """
+#     units = kwargs.get("units", pq.s)
+#     
+#     if not isinstance(units, pq.UnitQuantity):
+#         units = units.units
+#         
+#     elif not isinstance(units, pq.Quantity) or units.size > 1:
+#         raise TypeError("Units expected to be a python Quantity; got %s instead" % type(units).__name__)
+#         
+#     name = kwargs.get("name", "Epoch")
+#     
+#     if not isinstance(name, str):
+#         raise TypeError("name expected to be a string")
+#     
+#     if len(name.strip())==0:
+#         raise ValueError("name must not be empty")
+#     
+#     sort = kwargs.get("sort", True)
+#     
+#     if not isinstance(sort, bool):
+#         raise TypeError("sort must be a boolean")
+#     
+#     zone = kwargs.pop("zone", False)
+#     if not isinstance(zone, bool):
+#         raise TypeError("zone must be a boolean")
+#     
+#     #### BEGIN ------ __parse_cursors_tuples__ ---------------------------------
+#     def __parse_cursors_tuples__(*values):
+#         # NOTE: 2023-06-17 09:11:56
+#         # NOT USING intervals (tuples) ANYMORE
+#         # FOR THE intervals-based code SEE intervals* functions in ephys
+#         # -> to be moved in a core.signalintervals.py module !!!
+#         # NOTE: 2023-06-13 21:42:25
+#         # reminder - an element of values is: 
+#         # 2-tuple ⇒ x, xwindow
+#         # 3-tuple ⇒ x, xwindow, label
+#         # 4-tuple ⇒ x, xwindow, y, ywindow
+#         # 5-tuple ⇒ x, xwindow, y, ywindow, label
+#         #
+#         # pseudocode for the case of 2-tuple (easily extrapolated):
+#         # if not intervals ⇒ return (start, duration), where:
+#         #   start = x - xwindow/2; duration = xwindow     ⇒ use_durations=True
+#         # else ⇒ return:
+#         #   (start, duration) as above, if durations == True ⇒ use_durations=durations
+#         #   (start, stop) othwerise, where:                  ⇒ use_durations=durations
+#         #   start = x - xwindow/2; stop = x + xwindow/2
+#         
+#         # check for dimensionality consistency
+#         if len(values) == 1:#  allow for a sequence to be given as first argument
+#             values = values[0]
+#             
+#         #print("given values", values)
+#         values_ = list(values)
+#         
+#         for k,c in enumerate(values_):
+#             if all([isinstance(v, pq.Quantity) for v in c[0:2]]):
+#                 if c[0].units != c[1].units:
+#                     if not units_convertible(c[0], c[1]):
+#                         raise TypeError("Quantities must have compatible dimensionalities")
+#                     
+#                 values = values_ # convert back
+#                 
+#             elif all([isinstance(v, numbers.Number) for v in c[0:2]]):
+#                 if units is not None:
+#                     c_ = [v*units for v in c[0:2]]
+#                     
+#                     if len(c) > 2:
+#                         c_ += list(c[2:])
+#                         
+#                     values_[k] = tuple(c_)
+#                     
+#                 values = tuple(values_)
+#         
+#         #print("values:", values)
+#         
+#         # NOTE: 2023-06-13 21:30:34
+#         # the durations parameter is used only when intervals is True
+#         # however, when intervals is False, we need durations to construct
+#         # Epoch or DataZone
+#         # if not intervals:
+#         #     use_durations = True
+#         # else:
+#         #     use_durations = durations
+#             
+#         # if use_durations:
+#         if durations:
+#             return [(v[0]-v[1]/2., v[1],         f"{k}") if len(v) in (2,4) else (v[0]-v[1]/2., v[1],         v[-1]) for k,v in enumerate(values)]
+#         else:
+#             return [(v[0]-v[1]/2., v[0]+v[1]/2., f"{k}") if len(v) in (2,4) else (v[0]-v[1]/2., v[0]+v[1]/2., v[-1]) for k,v in enumerate(values)]
+#         
+#     #### END ------- __parse_cursors_tuples__ ---------------------------------
+#             
+#     if len(args) == 0:
+#         raise ValueError("Expecting at least one argument")
+#     
+#     if len(args) == 1:
+#         if isinstance(args[0], (tuple, list)):
+#             if all ([isinstance(c, SignalCursor) for c in args[0]]):
+#                 if all([c.cursorTypeName in ("vertical", "crosshair")  for c in args[0]]):
+#                     t_d_i = __parse_cursors_tuples__(*[c.parameters for c in args[0]])                    
+#                 else:
+#                     raise TypeError("Expecting only vertical or crosshair cursors")
+#                 
+#             else:
+#                 raise TypeError("Expecting a sequence of signal cursors")
+#                 
+#         elif isinstance(args[0], SignalCursor):
+#             if args[0].cursorType is SignalCursorTypes.horizontal:
+#                 raise TypeError("Expecting a vertical or crosshair cursor")
+#             
+#             t_d_i = __parse_cursors_tuples__([args[0].parameters])
+#             
+#         else:
+#             raise TypeError(f"Expecting a SignalCursor; got {type(args[0]).__name__} instead")
+#             
+#     else:
+#         if all([isinstance(c, SignalCursor) for c in args]):
+#             if all ([c.cursorTypeName in ("vertical", "crosshair") for c in args]):
+#                 t_d_i = __parse_cursors_tuples__([c.parameters for c in args])
+#                 
+#             else:
+#                 raise TypeError("Expecting only vertical or crosshair cursors")
+#             
+#         else:
+#             raise TypeError("Expecting a sequence of SignalCursor")
+#             
+#     if sort:
+#         t_d_i = sorted(t_d_i, key=lambda x: x[0])
+# 
+#     t, d, i = [v for v in zip(*t_d_i)]
+#     
+#     if isinstance(t[0], pq.Quantity):
+#         units = t[0].units
+#         
+#     if zone or not check_time_units(units):
+#         klass = DataZone
+#     else:
+#         klass = neo.Epoch
+#         
+#     return klass(times=t, durations=d, labels=i, units=units, name=name)
+ 
 
-        return (t, d, u) if l is None else (t, d, u, l)
-     
-    tdl = None
-    
-    if len(args) == 1:
-        if isinstance(args[0], (tuple, list)):
-            if len(args[0]) in (2,3): # a sequence with one tuple of 2-3 elements
-                if all([isinstance(v, (numbers.Number, pq.Quantity)) for v in args[0][0:2]]):
-                    # this can be an interval tuple
-                    tdl = [__generate_epoch_interval__(args[0])]
-                    
-                elif all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-                    # or a sequence of tuples -- feed this into __generate_epoch_interval__
-                    # and hope for the best
-                    if sort:
-                        tdl = [__generate_epoch_interval__(v) for v in sorted(args[0], key=lambda x: x[0])]
-                        
-                    else:
-                        tdl = [__generate_epoch_interval__(v) for v in args[0]]
-                    
-                else:
-                    raise TypeError("incorrect syntax")
-                
-            else:
-                if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args[0]]):
-                    if sort:
-                        tdl = [__generate_epoch_interval__(v) for v in sorted(args[0], key=lambda x: x[0])]
-                    else:
-                        tdl = [__generate_epoch_interval__(v) for v in args[0]]
-
-        else:
-            raise TypeError("expecting a sequence of tuples, or a 2- or 3- tuple")
-        
-    else:
-        # sequence of 2- or 3- tuples
-        if all([isinstance(v, (tuple, list)) and len(v) in (2,3) and all([isinstance(_x, (numbers.Number, pq.Quantity)) for _x in v[0:2]]) for v in args]):
-            if sort:
-                tdl = [__generate_epoch_interval__(v) for v in sorted(args, key=lambda x: x[0])]
-                
-            else:
-                tdl = [__generate_epoch_interval__(v) for v in args]
-        
-        else:
-            raise TypeError("expecting 2- or 3- tuples")
-        
-    if tdl is not None:
-        # all numeric elements in tdl are python quantities
-        if all([len(v) == 4 for v in tdl]):
-            times, durations, units, labels = [x_ for x_ in zip(*tdl)]
-            ret = neo.Epoch(times = times, durations = durations, units = units[0], labels=labels)
-        else:
-            times, durations, units = [x_ for x_ in zip(*tdl)]
-            ret = neo.Epoch(times = times, durations = durations, units=units[0])
-                
-        return ret
-    
 @safeWrapper
 def irregularsignal2epoch(sig, name=None, labels=None):
     """Constructs a neo.Epoch object from the times and durations in a neo.IrregularlySampledSignal
@@ -5599,7 +5637,7 @@ def irregularsignal2epoch(sig, name=None, labels=None):
         When an array it must have the same length as sig.
     
     """
-    from . import datatypes as dt
+    from . import datatypes
     
     if not isinstance(sig, neo.IrregularlySampledSignal):
         raise TypeError("Expecting a neo.IrregularlySampledSignal; got %s instead" % type(sig).__name__)
@@ -5611,7 +5649,7 @@ def irregularsignal2epoch(sig, name=None, labels=None):
         labels = np.array([label] * sig.times.size)
         
     elif isinstance(labels, np.ndarray):
-        if not dt.is_string(labels):
+        if not  datatypes.is_string(labels):
             raise TypeError("'labels' array has wrong dtype: %s" % labels.dtype)
         
         if labels.shape != sig.times.shape:
@@ -5686,7 +5724,7 @@ def aggregate_signals(*args, name_prefix:str, collectSD:bool=True, collectSEM:bo
     Returns a dict
     
     """
-    from . import datatypes as dt
+    from . import datatypes
     
     if len(args) == 0:
         return
@@ -5828,7 +5866,7 @@ def average_segments_old(*args, **kwargs):
         
     
     """
-    from core import datatypes as dt
+    from core import datatypes
     
     def __resample_add__(signal, new_signal):
         if new_signal.sampling_rate != signal.sampling_rate:
@@ -6747,7 +6785,7 @@ def average_segments(*args, **kwargs):
         
     TODO: simplify to average all signal with same index across segments
     """
-    from core import datatypes as dt
+    from core import datatypes
     
     
     #print(args)

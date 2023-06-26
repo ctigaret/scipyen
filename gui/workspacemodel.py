@@ -166,9 +166,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self._varChanges_callbacks_ = {WorkspaceVarChange.New:      partial(self.__class__.addRowForVariable2, self, self.shell.user_ns),
                                        WorkspaceVarChange.Modified: partial(self.__class__.updateRowForVariable2, self, self.shell.user_ns),
                                        WorkspaceVarChange.Removed:  partial(self.__class__.removeRowForVariable2, self, self.shell.user_ns)}
-        # self._varChanges_callbacks_ = {WorkspaceVarChange.New:      self.addRowForVariable2,
-        #                                WorkspaceVarChange.Modified: self.updateRowForVariable2,
-        #                                WorkspaceVarChange.Removed:  self.removeRowForVariable2}
         
         self.sig_varAdded.connect(self.addRowForVariable2)
         self.sig_varModified.connect(self.updateRowForVariable2)
@@ -176,7 +173,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
         self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
-        self.sig_startAsyncUpdate.connect(self._slot_updateModelAsync_)# , QtCore.Qt.QueuedConnection)
+        self.sig_startAsyncUpdate.connect(self._slot_updateModelAsync_)
 
     def _foreignNamespacesCountChanged_(self, change):
         # FIXME / TODO 2020-07-30 23:49:13
@@ -617,7 +614,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             removed_symbols = self.foreign_namespaces[ns_name]["current"] - initial
             # print("\tremoved_symbols", removed_symbols)
             for vname in removed_symbols:
-                self.removeRowForVariable(vname, ns=ns_name)
+                self.removeRowForVariable2(vname, ns=ns_name)
+                # self.removeRowForVariable(vname, ns=ns_name)
                 # self.removeRowForVariable(vname, ns = ns_name.replace("_", " "))
 
             added_symbols = initial - \
