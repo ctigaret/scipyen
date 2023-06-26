@@ -124,6 +124,7 @@ matplotlib-inline
 metakernel
 modelspec
 more-itertools
+myst_parser
 murmurhash
 nbclassic
 nbclient
