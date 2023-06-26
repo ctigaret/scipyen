@@ -2435,6 +2435,7 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
                   up_first:bool=True,
                   **kwargs):
     """Detect boxcar waveforms in a signal.
+
     
     The signal must undergo at least one transition between two distinct states 
     ("low" and "high").
@@ -2453,6 +2454,7 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     there is a padding before and after the actual signal, and the size of the 
     padding is about 
     
+
     Parameters:
     ----------
     x: signal-like object
@@ -2492,10 +2494,12 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     # TODO 2023-06-18 22:10:21 merge codes into one function !
     from scipy import (cluster, signal)
     from scipy.signal import boxcar
+
     
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
     
+
     # WARNING: algorithm fails for noisy signals with no TTL waveform
     
     # NOTE: 2023-06-19 08:54:33
@@ -2622,6 +2626,7 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
         #traceback.print_exc()
         times_lo_hi = None
         times_hi_lo = None
+
         amplitude = None
         cbook = None
         code = None
@@ -2631,3 +2636,4 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     
     # emulates parse_step_waveform_signal
     return times_hi_lo, times_lo_hi, amplitude, cbook, code
+

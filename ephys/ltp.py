@@ -1870,6 +1870,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
     Irs    = np.max(s.analogsignals[signal_index_Im].time_slice(t_test[1][0], t_test[1][1])) 
     
     Irin   = np.mean(s.analogsignals[signal_index_Im].time_slice(t_test[2][0], t_test[2][1]))
+
     
     if signal_index_Vm is None:
         if isinstance(testVm, numbers.Number):

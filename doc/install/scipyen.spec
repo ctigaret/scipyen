@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+
 # NOTE: 2023-06-26 17:25:32
 # do something like:
 # mkdir -p scipyen_app && cd scipyen_app
@@ -55,6 +56,7 @@ def DataFiles(topdir, ext, **kw):
     entries = scanForFiles(topdir, ext, as_ext)
 
     # print(f"entries = {entries}\n\n")
+
     
     return TOC(
         file2TOCEntry(filename, topdirparts, strip_path=strip_path)
@@ -64,6 +66,7 @@ def DataFiles(topdir, ext, **kw):
 block_cipher = None
 
 uitoc = DataFiles('/home/cezar/scipyen', ".ui")
+
 print(f"uitoc = {uitoc}\n\n")
 jsontoc = DataFiles('/home/cezar/scipyen', ".json")
 print(f"jsontoc = {jsontoc}\n\n")

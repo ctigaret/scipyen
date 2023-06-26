@@ -1,0 +1,57 @@
+#! /bin/sh 
+realscript=`realpath $0`
+scipyendir=`dirname $realscript`
+virtual_env="__SEDME__"
+
+# the line below supplies the shell function 'scipyact' created by make_scripts
+source $HOME/.scipyenrc 
+if [ -z $VIRTUAL_ENV ]; then
+    scipyact
+fi
+
+# are we using scipyen from a git repository?
+git -C $scipyendir rev-parse 2>/dev/null;
+isgit=`echo $?`
+
+if [ $isgit -eq "0" ]; then
+# scigitstatus=`git -C $scipyendir status --short --branch`
+branch=`git -C $scipyendir branch --show-current`
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+echo -e "${RED}WARNING:${NC} Running ${GREEN}$branch${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
+git -C $scipyendir status --short --branch
+echo "Using Python environment in ${VIRTUAL_ENV}"
+echo ""
+else
+echo "Using Python environment in ${VIRTUAL_ENV}"
+echo ""
+fi
+# echo "PYTHONHOME=$PYTHONHOME"
+# echo "PYTHONPATH=$PYTHONPATH"
+# echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+
+if [ -z $BROWSER ]; then
+    if [ -a $VIRTUAL_ENV/bin/browser ]; then
+        source $VIRTUAL_ENV/bin/browser
+    fi
+fi
+
+# export LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$VIRTUAL_ENV/lib64:$LD_LIBRARY_PATH
+
+# NOTE: 2022-11-23 15:03:59
+# stop annoying warning from outdated
+export OUTDATED_IGNORE=1
+
+# NOTE: 2021-02-04 18:00:07
+# On linux, override KDE or other DEs theming from overriding the resources 
+# (colors etc) in the InterViews GUI
+a=`which xrdb` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
+if [ $0 == 0 ] ; then
+    if [ -r $scipyendir/neuron_python/app-defaults/nrniv ] ; then
+        xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
+    fi
+fi
+
+python3 -Xfrozen_modules=off $scipyendir/scipyen.py

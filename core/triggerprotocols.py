@@ -1529,6 +1529,7 @@ def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence
         
     return get_events(*src, triggers=triggers, as_dict=as_dict, flat=flat, match=match)
 
+# @with_doc(detect_boxcar, use_header=True)
 @safeWrapper
 def detect_trigger_events(x, event_type, 
                           use_lo_hi=True, 
@@ -1584,7 +1585,7 @@ def detect_trigger_events(x, event_type,
     
     if not isinstance(use_lo_hi, bool):
         raise TypeError("'use_lo_hi' parameter expected to be a boolean; got %s instead" % type(use_lo_hi).__name__)
-    
+   
     lo_hi, hi_lo,_, _, _ = detect_boxcar(x)
     
     if all([v is None for v in (lo_hi, hi_lo)]):
@@ -1612,6 +1613,7 @@ def detect_trigger_events(x, event_type,
     return trig
     
     
+
 def remove_trigger_protocol(protocol, block):
     """Removes embedded trigger events associated with a specified trigger protocol
     """
