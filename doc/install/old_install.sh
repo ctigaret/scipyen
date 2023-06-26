@@ -32,7 +32,7 @@ function show_help ()
     echo -e "--environment=NAME\tCustom name for the virtual environment (default is ${virtual_env})\n"
     echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
     echo -e "--build_neuron\t\tBuild neuron python locally\n"
-    echo -e "--with_coreneuron\then '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
+    echo -e "--with_coreneuron\tWhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
     echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
     echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
     echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
@@ -64,8 +64,6 @@ function findqmake ()
         echo -e "Cannot build Pyqt5 without qmake. Goodbye!\n"
         exit 1
     fi
-    
-    echo "using qmake: ${qmake_binary}"
 }
 
 function findcmake ()
@@ -80,93 +78,47 @@ function findcmake ()
 
 function upgrade_virtualenv ()
 {
-    havevenv=`${python_executable} -m virtualenv --version`
-    echo "havevenv = ${havevenv}"
-    if [ -z $"havevenv" ] ; then
-        echo -e "Scipyen requires virtualenv.\n"
-        if [[ `id -u ` -eq 0 ]] ; then
-            echo -e "To install virtualenv please use the software manager of your distribution,"
-            echo -e "or run this script as regular user (which will install virtualenv locally).\n"
-            echo -e "\nQuitting, for now..."
-            exit 1
-        fi
+    havevenv=`python3 -m virtualenv --version`
+    if [ -z $havenev ] ; then
         echo -e "Installing virtualenv locally...\n"
-        ${python_executable} -m pip install --user virtualenv
-#         python3 -m pip install --user virtualenv
+        python3 -m pip install --user virtualenv
     else
-        if [[ `id -u ` -eq 0 ]] ; then
-            echo -e "Skipping the upgrade of virtualenv as root. Please use the software manager of your distribution to upgrade if needed.\n"
-        else
-            echo -e "Upgrading virtualenv locally...\n"
-            ${python_executable} -m pip install --user --upgrade virtualenv
-        fi
+        echo -e "Upgrading virtualenv locally...\n"
+        pytyhon3 -m pip install --user --upgrade virtualenv
     fi
 }
 
 function makevirtenv ()
 {
-    echo -e "Trying to create/use virtual environment ${virtual_env} in ${install_dir} using ${using_python}\n"
     #NOTE: Generates a virtual enviornment
     # check if the environment directory exists (and that it does belong to a
     # virtual python environment - that is, it contains a file named "pyenv.cfg"
     # containing "virtualenv" in it, has a "bin" directory with "activate" script,
     # which can be sourced to generate VIRTUAL_ENV variable)
-    if [ -d $install_dir/$virtual_env ] ; then
-        if [ -a $install_dir/$virtual_env/pyvenv.cfg ] ; then
-            aa=`cat $install_dir/$virtual_env/pyvenv.cfg | grep "virtualenv"`
+    if [ -d $ve_path/$virtual_env ] ; then
+        if [ -a $ve_path/$virtual_env/pyvenv.cfg ] ; then
+            aa=`cat $ve_path/$virtual_env/pyvenv.cfg | grep "virtualenv"`
             if [ -n "$aa" ] ; then
-                if [ ! -d $install_dir/$virtual_env/bin ] ; then
-                    echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                if [ ! -d $ve_path/$virtual_env/bin ] ; then
+                    echo -e "$ve_path/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                     exit 1
                 fi
-                if [ ! -r $install_dir/$virtual_env/bin ] ; then
-                    echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                if [ ! -r $ve_path/$virtual_env/bin ] ; then
+                    echo -e "$ve_path/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                     exit 1
                 fi
-                
-                echo -e "Virtual environment found; activating it...\n"
-                
-                source $install_dir/$virtual_env/bin/activate
-                
+                source $ve_path/$virtual_env/bin/activate
                 if [[ -z ${VIRTUAL_ENV} ]]; then
-                    echo -r "Cannot activate a virtual environment from  $install_dir/$virtual_env . Goodbye!\n"
+                    echo -r "Cannot activate a virtual environment from  $ve_path/$virtual_env . Goodbye!\n"
                     exit 1
                 fi
-                
-                python_executable=`which python3`
-                
-                echo -e "Virtual environment activated and will use ${python_executable}\n"
-                
-                
-                
             else
-                echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                echo -e "$ve_path/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                 exit 1
             fi 
         fi
     else
-#         ${python_executable} -m virtualenv --python ${python_executable} $install_dir/$virtual_env && source $install_dir/$virtual_env/bin/activate
-        ${python_executable} -m virtualenv --python ${python_executable} $install_dir/$virtual_env
-        
-        if [[ $? -ne 0 ]] ; then
-            echo -e "Could NOT create a virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
-            exit 1
-        fi
-
-        echo -e "Virtual environment created at ${install_dir}/${virtual_env}\n"
-        echo -e "Activating the virtual environment\n"
-        
-        source $install_dir/$virtual_env/bin/activate
-        
-        if [[ $? -ne 0 ]] ; then
-            echo -e "Could NOT activate the virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
-            exit 1
-        fi
-        
-        python_executable=`which python3`
-        
-        echo -e "Virtual environment at ${VIRTUAL_ENV} activated; python executable is ${python_executable}\n"
-        
+        python3 -m virtualenv $virtual_env && source $ve_path/$virtual_env/bin/activate
     fi
     
 }
@@ -196,22 +148,7 @@ function installpipreqs ()
         #            python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
         #        fi
         #NOTE: commented out previous to prevent a bug with installation
-        
-        
-        # NOTE: 2023-06-25 10:56:34 
-        # when we are root, make sure to use the virtual environment's python 
-        # executable here
-#         if [[ `id -u` -eq 0 ]] ; then
-#             py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-#         else
-#             py_exec=${python_exec}
-#         fi
-        
-        echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
-        
-#         ${python_executable} -m pip install dummy_test
-        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements.txt
-#         python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
+        python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
@@ -240,24 +177,10 @@ function dopyqt5 ()
             exit 1
         fi
         
-        # NOTE: 2023-06-25 10:56:34 
-        # when we are root, make sure to use the virtual environment's python 
-        # executable here
-        if [[ `id -u` -eq 0 ]] ; then
-            py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-            sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-        else
-            py_exec=${python_exec}
-            sip_wheel_exec=sip-wheel
-        fi
-        
-        echo "Using ${py_exec} as `whoami` to build PyQt5"
-        
         # NOTE: locate_pyqt5_src.py uses distlib to locate the (latest) source 
         # archive (i.e., the sdist) of PyQt5 - its file name typically ends with
         # .tar.gz
-#         pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
-        pyqt5_src_url=`${py_exec} $installscriptdir/locate_pyqt5_src.py`
+        pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
         pyqt5_src=`basename $pyqt5_src_url`
         
         pyqt5_src_dir=${pyqt5_src%.tar.gz}
@@ -300,11 +223,9 @@ function dopyqt5 ()
         # cores in your system seems to be  good choice), or
         # • remove the --jobs option altogether
         if [[ $njobs -gt 0 ]] ; then
-            ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#             sip-wheel --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+            sip-wheel --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
         else
-            ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#             sip-wheel --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+            sip-wheel --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
         fi
 #         sip-wheel --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
 
@@ -321,7 +242,7 @@ function dopyqt5 ()
             echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
             exit 1
         else
-            ${py_exec} -m pip install --force-reinstall ${wheel_file}
+            python -m pip install --force-reinstall ${wheel_file}
             
             if [[ $? -ne 0 ]] ; then
                 echo -e "Cannot install the PyQt5 wheel; check console output. Goodbye!\n"
@@ -394,13 +315,7 @@ function make_desktop_entry ()
 {
 if [ ! -r ${VIRTUAL_ENV}/.desktopdone ] || [[ $reinstall_desktop -gt 0 ]] ; then
 tmpfiledir=$(mktemp -d)
-# tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
-tmpfile=${tmpfiledir}/Scipyen.desktop
-if [[ `id -u` -eq 0 ]] ; then
-script=/usr/local/bin/scipyen
-else
-script=${scipyendir}/scipyen
-fi
+tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
 cat<<END > ${tmpfile}
 [Desktop Entry]
 Type=Application
@@ -412,7 +327,7 @@ GenericName[en_GB]=Scientific Python Environment for Neurophysiology
 GenericName=Scientific Python Environment for Neurophysiology
 Icon=pythonbackend
 Categories=Science;Utilities;
-Exec=${script}
+Exec=${scipyendir}/scipyen
 MimeType=
 Path=
 StartupNotify=true
@@ -423,13 +338,13 @@ X-DBUS-StartupType=
 X-KDE-SubstituteUID=false
 X-KDE-Username=
 END
-xdg-desktop-menu install --novendor ${tmpfile}
+xdg-desktop-menu install ${tmpfile}
 if [[ $? -ne 0 ]] ; then
-echo -e "Installation of Scipyen application file failed\n"
+echo -e "Installation of Scipyen Desktop file failed\n"
 exit 1
 fi
 # NOTE: 2023-05-02 15:25:50 this below installs an Icon on the desktop
-xdg-desktop-icon install --novendor ${tmpfile}
+xdg-desktop-icon install ${tmpfile}
 if [[ $? -ne 0 ]] ; then
 echo -e "Installation of Scipyen Desktop file failed\n"
 exit 1
@@ -445,14 +360,6 @@ function doneuron ()
         echo -e "Not in an active environment! Goodbye!\n"
         exit 1
     fi
-    if [[ `id -u` -eq 0 ]] ; then
-        py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-        sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-    else
-        py_exec=${python_exec}
-        sip_wheel_exec=sip-wheel
-    fi
-    
 #     echo "Reinstall neuron: $reinstall_neuron"
 #     echo "Using PyPI: $use_pypi_neuron"
 #     echo "Using coreneuron: $use_core_neuron"
@@ -474,8 +381,7 @@ function doneuron ()
 #     /home/cezar/scipyenv.3.10.10/lib64/python3.10/site-packages/neuron/*
     if [ ! -r ${VIRTUAL_ENV}/.nrndone ] || [[ $reinstall_neuron -gt 0 ]]; then
         if [ $use_pypi_neuron -ne 0 ] ; then
-#             python3 -m pip install neuron
-            ${py_exec} -m pip install neuron
+            python3 -m pip install neuron
             if [[ $? -ne 0 ]] ; then
                 echo -e "Cannot install NEURON; check console output. Bailing out. Goodbye!\n"
                 exit 1
@@ -506,12 +412,10 @@ function doneuron ()
             
             if [ $use_core_neuron -ne 0 ] ; then
                 echo -e "Configuring local neuron build with coreneuron ..."
-                $cmake_binary -DPYTHON_EXECUTABLE=${py_exec} -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=0 -DCMAKE_SKIP_RPATH=0 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=0 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_CORENEURON=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABLE_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
-#                 $cmake_binary -DPYTHON_EXECUTABLE=$(which python3) -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=0 -DCMAKE_SKIP_RPATH=0 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=0 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_CORENEURON=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABLE_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
+                $cmake_binary -DPYTHON_EXECUTABLE=$(which python3) -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=0 -DCMAKE_SKIP_RPATH=0 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=0 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_CORENEURON=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABLE_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
             else
                 echo -e "Configuring local neuron build ..."
-                $cmake_binary -DPYTHON_EXECUTABLE=${py_exec} -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=0 -DCMAKE_SKIP_RPATH=0 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=0 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABLE_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
-#                 $cmake_binary -DPYTHON_EXECUTABLE=$(which python3) -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=0 -DCMAKE_SKIP_RPATH=0 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=0 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABLE_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
+                $cmake_binary -DPYTHON_EXECUTABLE=$(which python3) -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_INSTALL_LIBEXECDIR=libexec -DCMAKE_SKIP_INSTALL_RPATH=0 -DCMAKE_SKIP_RPATH=0 -DIV_ENABLE_SHARED=1 -DNRN_AVOID_ABSOLUTE_PATHS=0 -DNRN_ENABLE_MPI=1 -DNRN_ENABLE_INTERVIEWS=1 -DNRN_ENABLE_PYTHON_DYNAMIC=1 -DNRN_ENABLE_RX3D=1 -DNRN_ENABLE_SHARED=1 -DNRN_ENABLE_THREADS=1 -DNRN_ENABLE_MECH_DLL_STYLE=1 -DLIB_INSTALL_DIR=$VIRTUAL_ENV/lib64 -DLIB_SUFFIX=64 -DMOD2C_ENABLE_LEGACY_UNITS=0 -DNRN_ENABLE_DOCS=ON ../nrn
             fi
             
             echo -e "Building neuron locally and installing ..."
@@ -529,10 +433,8 @@ function doneuron ()
             
 #             echo -e "Installing nrnpython"
             # check where nrnpython is installed:
-            lib_sites=`${py_exec} -c "import sys, os; venv=os.getenv(\"VIRTUAL_ENV\"); print([p for p in sys.path if p.startswith(venv) and \"lib\" in p][0])"`
-            lib64_sites=`${py_exec} -c "import sys, os; venv=os.getenv(\"VIRTUAL_ENV\"); print([p for p in sys.path if p.startswith(venv) and \"lib64\" in p][0])"`
-#             lib_sites=`python -c "import sys, os; venv=os.getenv(\"VIRTUAL_ENV\"); print([p for p in sys.path if p.startswith(venv) and \"lib\" in p][0])"`
-#             lib64_sites=`python -c "import sys, os; venv=os.getenv(\"VIRTUAL_ENV\"); print([p for p in sys.path if p.startswith(venv) and \"lib64\" in p][0])"`
+            lib_sites=`python -c "import sys, os; venv=os.getenv(\"VIRTUAL_ENV\"); print([p for p in sys.path if p.startswith(venv) and \"lib\" in p][0])"`
+            lib64_sites=`python -c "import sys, os; venv=os.getenv(\"VIRTUAL_ENV\"); print([p for p in sys.path if p.startswith(venv) and \"lib64\" in p][0])"`
   
             # try to see if neuron is in lib/site-packages/python3.10
             if [ ! -d ${lib_sites}/neuron ] ; then
@@ -569,14 +471,9 @@ function doneuron ()
 
 function make_scipyenrc () 
 {
-# When the installer script is run as regular user, it will create 
-# ${HOME}/.scipeynrc which allows activation of the virtual python environment
+# Creates ${HOME}/.scipeynrc which allows activation of the virtual python environment
 # used to run Scipyen.
 #
-#
-# When the script is run as root, it will create a scipyact script in the 
-# /usr/local/bin (which should be on PATH by default on linux)
-# TODO/FIXME check for other UN*X platforms (e.g. BSD family)
 # The ${HOME}/.scipyenrc defines a single bash function - 'scipyact' - which 
 # when called, activates the virtual environment and optionally sets up a few 
 # needed environment variables (see below in the code)
@@ -592,29 +489,8 @@ if [[ -z "$VIRTUAL_ENV" ]] ; then
     exit 1
 fi
 
+# scipyenvdir=${VIRTUAL_ENV} # not really needed, right?
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
-
-if [[ `id -u` -eq 0 ]] ; then
-py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-bindir=/usr/local/bin
-
-
-if [ -r ${bindir}/scipyact ]; then
-shopt -s lastpipe
-echo "Copying ${bindir}/scipyact to ${bindir}/scipyact.$dt"
-cp ${bindir}/scipyact ${bindir}/scipyact.$dt
-fi
-cat<<END > ${bindir}/scipyact
-#! /bin/bash
-scipyact () {
-source ${VIRTUAL_ENV}/bin/activate
-}
-export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
-END
-shopt -u lastpipe
-    
-else
-py_exec=${python_exec}
 if [ -r ${HOME}/.scipyenrc ] ; then
 # make a backup copy of .scipyenrc
 shopt -s lastpipe
@@ -628,9 +504,6 @@ source ${VIRTUAL_ENV}/bin/activate
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
 END
 shopt -u lastpipe
-
-fi
-# scipyenvdir=${VIRTUAL_ENV} # not really needed, right?
 }
 
 function update_bashrc () 
@@ -664,78 +537,34 @@ fi
 
 function get_pyver ()
 {
-declare -a ver_array
-ver_array=( `python3 --version` )
-pyver=${ver_array[1]}
-oldifs=$IFS
-IFS=. 
-read major minor micro <<EOF
-${pyver##*-}
-EOF
-IFS=$oldifs
+    declare -a ver_array
+    ver_array=( `python3 --version` )
+    pyver=${ver_array[1]}
 }
 
 function linkscripts () 
 {
-if [[ `id -u` -eq 0 ]] ; then
-    target_dir=/usr/local/bin
-else
-    target_dir=${HOME}/bin
-fi
+    mkdir -p ${HOME}/bin
+    if [ -r ${HOME}/bin/scipyen ] ; then
+        dt=`date '+%Y-%m-%d_%H-%M-%s'`
+        mv ${HOME}/bin/scipyen ${HOME}/bin/scipyen.$dt
+    fi
+    ln -s ${scipyendir}/scipyen ${HOME}/bin/scipyen
     
-mkdir -p ${target_dir}
-if [ -r ${target_dir}/scipyen ] ; then
-    dt=`date '+%Y-%m-%d_%H-%M-%s'`
-    mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
-fi
-shopt -s lastpipe
-
-if [[ `id -u` -eq 0 ]] ; then
-cat << END > ${target_dir}/scipyen 
-#! /bin/sh
-if [ -z ${VIRTUAL_ENV} ]; then
-source ${install_dir}/${virtual_env}/bin/activate
-fi
-echo -e "Using Python environment in ${VIRTUAL_ENV}\n"
-if [ -z $BROWSER ]; then
-if [ -a $VIRTUAL_ENV/bin/browser ]; then
-source $VIRTUAL_ENV/bin/browser
-fi
-fi
-export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
-export OUTDATED_IGNORE=1
-a=`which xrdb` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
-if [ $0 == 0 ] ; then
-if [ -r $scipyendir/neuron_python/app-defaults/nrniv ] ; then
-xrdb -merge $scipyendir/neuron_python/app-defaults/nrniv
-fi
-fi
-${python_executable} -Xfrozen_modules=off ${scipyendir}/scipyen.py
-END
-chmod +x ${target_dir}/scipyen 
-else
-ln -s ${scipyendir}/scipyen ${target_dir}/scipyen
-echo -e "Link to scipyen startup script created in ${target_dir} \n"
-fi    
-#     mkdir -p ${HOME}/bin
-#     if [ -r ${HOME}/bin/scipyen ] ; then
-#         dt=`date '+%Y-%m-%d_%H-%M-%s'`
-#         mv ${HOME}/bin/scipyen ${HOME}/bin/scipyen.$dt
-#     fi
-#     ln -s ${scipyendir}/scipyen ${HOME}/bin/scipyen
-#     
-#     echo -e "Link to scipyen startup script created in ${HOME}/bin \n"
+    echo -e "Link to scipyen startup script created in ${HOME}/bin \n"
 }
 
 #### Execution starts here ###
-
 # start_time=`date +%s`
 SECONDS=0
 get_pyver
 
+# upgrade_virtualenv="N"
+# use_preexisting="Y"
+# TODO: switch to a relevant name e.g. scipyenv
 # virtual_env="testenv"
-virtual_env_pfx="scipyenv" #.$pyver"
-# install_dir=$HOME
+virtual_env="scipyenv.$pyver"
+ve_path=$HOME
 # pyqt5_version=5.15.9
 # pyqt5_repo=https://files.pythonhosted.org/packages/source/P/PyQt5/
 # pyqt5_src=PyQt5-$pyqt5_version.tar.gz
@@ -745,12 +574,10 @@ virtual_env_pfx="scipyenv" #.$pyver"
 # qdbus_python_dir=
 
 
-install_dir="/usr/local"
 realscript=`realpath $0`
 installscriptdir=`dirname "$realscript"`
 docdir=`dirname "$installscriptdir"`
 scipyendir=`dirname "$docdir"`
-using_python=""
 install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
@@ -767,21 +594,8 @@ refresh_git_repos=0
 #     for_msys=1
 # fi
 
-# if [[ `id -u` -eq 0 ]]; then 
-#     echo "Running as root" 
-#     install_dir="/usr/local"
-# else 
-# #     echo "Must be root"
-#     install_dir=$HOME
-#     
-# fi
-
 for i in "$@" ; do
     case $i in
-        --python)
-        using_python="${i#*=}"
-        shift
-        ;;
         --with_neuron)
         install_neuron=1
         use_pypi_neuron=1
@@ -797,7 +611,7 @@ for i in "$@" ; do
         shift
         ;;
         --install_dir=*)
-        install_dir="${i#*=}"
+        ve_path="${i#*=}"
         shift
         ;;
         --refresh_repos)
@@ -809,7 +623,7 @@ for i in "$@" ; do
         shift
         ;;
         --environment=*)
-        virtual_env_pfx="${i#*=}"
+        virtual_env="${i#*=}"
         shift
         ;;
         --reinstall=*)
@@ -860,54 +674,10 @@ for i in "$@" ; do
     esac
 done
 
-install_dir=`realpath ${install_dir}`
-
-if [ -d ${install_dir} ]; then
-    if ! [ -w ${install_dir} ]; then
-        echo -e "You do not have permission to install in ${install_dir}.\nPlease choose a location to create the virtual environment where you have permissions"
-        exit 1
-    fi
-    
-else
-    updir=`dirname ${install_dir}`
-    
-    if ! [ -w ${updir} ]; then
-        echo -e "You do not have permission to create ${install_dir}"
-        exit 1
-    fi
-    
-    mkdir ${install_dir}
-    
-fi
-
-
-echo -e "Will install in ${install_dir}" 
-
-# echo "python major": $major
-# echo "python minor": $minor
-# echo "python micro": $micro
-
-virtual_env=${virtual_env_pfx}.$pyver
-python_exec="python${major}.${minor}"
-
-if [[ `id -u ` -eq 0 ]] ; then
-#     echo "running as root"
-    python_executable=`which ${python_exec}`;
-else
-    python_executable=${python_exec}
-fi
-
-echo -e "virtual_env is ${virtual_env} \n\twith full path ${install_dir}/${virtual_env}"
-echo -e "python executable: ${python_executable}"
-
-
 # makes a virtual environment and activates it
 if ! [ -v VIRTUAL_ENV ] ; then
-# NOTE: 2023-06-25 20:57:31 
-# these two MUST be run
 upgrade_virtualenv && makevirtenv
 fi
-
 
 if [[ $? -ne 0 ]] ; then
     echo -e "\nCould not create and/or activate a virtual environment. Goodbye!\n"
@@ -920,13 +690,11 @@ if [[ -z "$VIRTUAL_ENV" ]] ; then
     exit 1
 fi
 
-# exit
-
 if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
-    echo -e "Creating 'src' directory inside $VIRTUAL_ENV ...\n"
+#     echo -e "Creating 'src' directory inside $VIRTUAL_ENV ...\n"
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
-    # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    # install pip requirements
     installpipreqs
     
     if [[ $? -ne 0 ]] ; then
@@ -934,25 +702,20 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
         exit 1
     fi
     
-#     build Pyqt5 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    # build Pyqt5
     dopyqt5
     
     
-    # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    # build vigra
     dovigra
     
-    # build neuron NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    # build neuron
     if [ $install_neuron -ne 0 ] ; then
         doneuron
     fi
     
     # make scripts
-    make_scipyenrc
-    
-    if [[ `id -u` -ne 0 ]] ; then
-        # only update bashrc for regular users
-        update_bashrc
-    fi
+    make_scipyenrc && update_bashrc
     
     linkscripts
     
