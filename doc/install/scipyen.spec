@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+# from PyInstaller.utils.hooks import collect_data_files
+
 # NOTE: 2023-06-26 17:25:32
 # do something like:
 # mkdir -p scipyen_app && cd scipyen_app
@@ -67,9 +69,11 @@ block_cipher = None
 
 uitoc = DataFiles('/home/cezar/scipyen/src', ".ui")
 
+# nixiodata = collect_data_files("nixio")
+
 print(f"uitoc = {uitoc}\n\n")
-jsontoc = DataFiles('/home/cezar/scipyen/src', ".json")
-print(f"jsontoc = {jsontoc}\n\n")
+# jsontoc = DataFiles('/home/cezar/scipyen/src', ".json")
+# print(f"jsontoc = {jsontoc}\n\n")
 pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
 print(f"pickletoc = {pickletoc}\n\n")
 
