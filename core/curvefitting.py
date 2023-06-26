@@ -25,7 +25,7 @@ import neo
 from . import tiwt
 from . import models
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-from core import datatypes as dt
+from core import datatypes
 #from .patchneo import *
 #### END pict.core modules
 
@@ -37,7 +37,7 @@ def fitGauss1DSum(x, y, locations, **kwargs):
    
     """
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-    #from . import datatypes as dt
+    #from . import datatypes  
     
     if not isinstance(locations, (tuple, list, np.ndarray, numbers.Real)):
         raise TypeError("Locations expected to be a sequence of floats or a scalar")
@@ -211,7 +211,7 @@ def fit_compound_exp_rise_multi_decay(data, p0, bounds=(-np.inf, np.inf), method
     result["Rsq"]: the R2 of the entire EPSCaT fit
     
     """
-    #from . import datatypes as dt
+    #from . import datatypes  
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
     
     if not isinstance(data, (neo.AnalogSignal, DataSignal)):
@@ -560,7 +560,7 @@ def fit_Event_model(data, p0, **kwargs):
     """
     # TODO/FIXME: 2022-10-25 23:33:58
     # allow lower/upper bounds individually for each parameter
-    from core import datatypes as dt
+    from core import datatypes
     from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
     
     jac         = kwargs.pop("jac",         "2-point")
@@ -659,7 +659,7 @@ def fit_Event_model(data, p0, **kwargs):
         if l0.size not in (1, len(p0)):
             raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
         
-        if not dt.is_vector(l0):
+        if not  datatypes.is_vector(l0):
             raise ValueError("Lower bounds must be a vector")
         
     elif isinstance(l0, pd.Series):
@@ -694,7 +694,7 @@ def fit_Event_model(data, p0, **kwargs):
         if u0.size not in (1, len(p0)):
             raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
         
-        if not dt.is_vector(u0):
+        if not  datatypes.is_vector(u0):
             raise ValueError("Lower bounds must be a vector")
         
     elif isinstance(u0, pd.Series):
@@ -811,7 +811,7 @@ def scale_fit_wave(x, y, p0 = 1, method="nelder-mead"):
     if not all(isinstance(x, np.ndarray) for v in (x,y)):
         raise TypeError("Expecting two numpy arrays")
     
-    if not all(dt.is_vector(v) for v in (x,y)):
+    if not all( datatypes.is_vector(v) for v in (x,y)):
         raise ValueError("Expecting two vectors")
     
     if x.ndim != y.ndim or x.shape != y.shape:
@@ -838,7 +838,7 @@ def scale_fit_wave2(x, y, p0 = (1,0)):
     if not all(isinstance(x, np.ndarray) for v in (x,y)):
         raise TypeError("Expecting two numpy arrays")
     
-    if not all(dt.is_vector(v) for v in (x,y)):
+    if not all( datatypes.is_vector(v) for v in (x,y)):
         raise ValueError("Expecting two vectors")
     
     if x.ndim != y.ndim or x.shape != y.shape:
@@ -967,7 +967,7 @@ def fit_nsfa(data, p0, **kwargs):
         if l0.size not in (1, len(p0)):
             raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
         
-        if not dt.is_vector(l0):
+        if not  datatypes.is_vector(l0):
             raise ValueError("Lower bounds must be a vector")
         
     elif isinstance(l0, pd.Series):
@@ -1002,7 +1002,7 @@ def fit_nsfa(data, p0, **kwargs):
         if u0.size not in (1, len(p0)):
             raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
         
-        if not dt.is_vector(u0):
+        if not  datatypes.is_vector(u0):
             raise ValueError("Lower bounds must be a vector")
         
     elif isinstance(u0, pd.Series):
@@ -1200,7 +1200,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         if l0.size not in (1, len(p0)):
             raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
         
-        if not dt.is_vector(l0):
+        if not  datatypes.is_vector(l0):
             raise ValueError("Lower bounds must be a vector")
         
     elif isinstance(l0, pd.Series):
@@ -1235,7 +1235,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         if u0.size not in (1, len(p0)):
             raise ValueError(f"Incorrect number of upper bounds; expecting 1 or {len(p0)}, got {u0.size} instead")
         
-        if not dt.is_vector(u0):
+        if not  datatypes.is_vector(u0):
             raise ValueError("Lower bounds must be a vector")
         
     elif isinstance(u0, pd.Series):

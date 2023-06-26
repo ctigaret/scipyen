@@ -31,7 +31,7 @@ import matplotlib.mlab as mlb
 
 #### BEGIN pict.core modules
 #from core.patchneo import *
-import core.datatypes as dt
+import core.datatypes  
 
 import core.strutils as strutils
 from core.strutils import str2float

@@ -16,6 +16,9 @@ from operator import attrgetter, itemgetter, methodcaller
 
 from collections import OrderedDict, deque
 
+from core.prog import with_doc
+from core.strutils import (is_glob, is_regexp)
+
 try:
     from reprlib import repr
     
@@ -66,54 +69,78 @@ def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None):
     elif not isinstance(arg, bool):
         raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
         
-def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None, sort:bool=False, sortkey:object=None, reverse:bool=False):
-    """List names of variables in a namespace, according to a selection criterion.
+@with_doc((is_regexp, is_glob), use_header = True)
+def lsvars(*args, 
+           glob:typing.Optional[bool]=None, 
+           ws:typing.Union[dict, type(None)]=None, 
+           var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None, 
+           sort:bool=False, 
+           sortkey:object=None, 
+           reverse:bool=False) -> typing.Union[typing.List[str], typing.Generator, typing.KeysView]:
+    """List names of variables in a namespace, according to selection criteria.
     
-    Returns a (possibly sorted) list of variable names if found, or an empty list.
+The selection occurs in stages:
+
+Stage 1 identifies symbols in the 'ws' workspace that match the glob or regular
+    expression patterns given in 'args'.
+
+Stage 2 (optional) narrows down the result by selecting the variables bound to
+    the symbols found in Stage 1, based on the type of the variable ('var_type'
+    parameter).
     
-    See also: docstring for getvars() for details
+Stage 3 (optional) applies a sorting criteria and the ordering mode, which is
+    by default, ascending ('sort', 'sortkey' and 'reverse' parameters)
     
-    Var-positional parameters:
-    -------------------------
-    args: comma-separated list of strings, types, or sequence of types
+
+Var-positional parameters:
+--------------------------
+args: comma-separated list of strings, types, or sequence of types
+
+    When args contains strings, these define patterns to match against the 
+    variable names in the search namespace.
     
-        When args contains strings, these define patterns to match against the 
-        variable names in the search namespace.
-        
-        When args only contain an empty string, or not given, the function
-        returns a list with all the varioable names in the search namespace.
-        
-        When args contains types, these identify what type of variables to be listed
-        in the search namespace.
+    When args only contain an empty string, or not given, the function
+    returns a list with all the varioable names in the search namespace.
     
-    Named parameters:
-    -----------------
+    When args contains types, these identify what type of variables to be listed
+    in the search namespace.
+
+Named parameters:
+-----------------
+
+glob: bool (optional default is None)
+    When True, the strings in args are treated as UNIX shell-style globs; 
+    when False, they are treated as regular expression strings.
+
+    When None, the strings are checked to see if they are regexp-like or 
+    glob-like, using is_regexp() and is_glob().
     
-    glob: bool (default is True)
-        When True, the strings in args are treated as UNIX shell-style globs; 
-            otherwise, they are treated as regular expression strings.
-        
-    ws: dict (default None) = the search namespace
+ws: dict (default None) = the search namespace
+
+    When a dict, its keys must all be strings.
     
-        When a dict, its keys must all be strings.
-        
-        The search namespace. This can be:
-        a) a global namespace as returned by globals(),
-        b) a local namespace as returned by locals(), or vars()
-        c) an object's namespace as returned by vars([object]) -- technically, 
-            the object.__dict__
-        
-        When None, the function tries ot find the user namespace (the "workspace")
-        as set up by the Scipyen Main Window in Scipyen application.
+    The search namespace. This can be:
+    a) a global namespace as returned by globals(),
+    b) a local namespace as returned by locals(), or vars()
+    c) an object's namespace as returned by vars([object]) -- technically, 
+        the object.__dict__
     
-    var_type: a type, a sequence of types, or None (default)
-        When a type, only select the variables of the indicated type
-        
+    When None, the function tries ot find the user namespace (the "workspace")
+    as set up by the Scipyen Main Window in Scipyen application.
+
+var_type: a type, a sequence of types, or None (default)
+    When a type, only select the variables of the indicated type
+    
+Returns:
+-------
+
+A (possibly sorted) list of variable names if found, or an empty list.
     """
     from fnmatch import translate
     
     if ws is None:
         ws = user_workspace()
+        
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         
@@ -127,10 +154,18 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_ty
             return ws.keys() # no selector: get all variables names in ws
             
         elif isinstance(sel, str): # select by variable name
-            
             if len(sel.strip()) == 0:# empty selector string: get all variables names in ws
                 return ws.keys()
             
+            if glob is None:
+                if is_regexp(sel):
+                    glob = False
+                elif is_glob(sel):
+                    glob = True
+                    
+                else:
+                    glob = False # treat non-globs as a plain regexp
+                    
             p = _re.compile(translate(sel)) if glob else _re.compile(sel)
             
             var_names_filter = filter(p.match, ws.keys())
@@ -155,6 +190,14 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_ty
         for (sk, sel) in enumerate(args):
             if isinstance(sel, str): # string selector
                 if len(sel.strip()):
+                    if glob is None:
+                        if is_regexp(sel):
+                            glob = False
+                        elif if_glob(sel):
+                            glob = True
+                            
+                        else:
+                            glob = True # treat non-globs as a plain regexp
                     
                     p = _re.compile(translate(sel)) if glob else _re.compile(sel)
                     
@@ -163,10 +206,10 @@ def lsvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_ty
                     vlist = [k for k in var_names_filter] 
                     
                     if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
-                        ret.expand([s for s in vlist if isinstance(ws[s], var_type)])
+                        ret.extend([s for s in vlist if isinstance(ws[s], var_type)])
                         
                     else:
-                        ret.expand(vlist) # return a list of variable names
+                        ret.extend(vlist) # return a list of variable names
                     
                 #if len(ret) == 0:
                     #return ws.keys()
@@ -210,123 +253,131 @@ def getvarsbytype(vartype, ws=None):
     
     #return dict(lst)
         
-def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None, as_dict:bool=False, sort:bool= False, sortkey:object=None, reverse:bool = False):
+@with_doc(lsvars, use_header=True)
+def getvars(*args, 
+            glob:typing.Optional[bool]=None, 
+            ws:typing.Union[dict, type(None)]=None, 
+            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None, 
+            as_dict:bool=False, 
+            sort:bool= False, 
+            sortkey:object=None, 
+            reverse:bool = False) -> typing.Sequence:
     """Collects a subset of variabes from a workspace or a dictionary.
 
-    Returns a (possibly sorted) list of the variables if found, or an empty list.
-    
-    Var-positional parameters:
-    ==========================
-    *args: selection criterion. This may be: 
-        1) a string or a sequence of strings, each containing either a shell-type
-            "glob" expression, or a regular expression (a "regexp", see python's 
-            re module for help about regexps).
-            
-            For example, to select variables with names beginning with "data",
-            the selection string may be either
-            
-            "data*" (a shell-type glob) or "^data*" (a regexp string)
-            
-            Whether the sele tion string is interpreted as a glob or a regexp
-            depends on the value of the "glob" parameter (see below).
-        
-        2) a type, or an iterable (list, tuple) of types
-        
-            This allows to select all ws variables of the type(s) specified in 'sel'
-            
-    Named parameters:
-    =================
-    glob: bool, default is True
-    
-        When True, the selection strings in args are treated these as UNIX 
-            shell-type globs.
-            
-        Otherwise, they are treated as regular expression strings.
-    
-    ws : a dictionary or None (default).
-    
-        When a dict, its keys must all be strings, and represents the namespace
-        where the variables are searched.
-        
-            This can be:
-            a) a global namespace as returned by globals(),
-            b) a local namespace as returned by locals(), or vars()
-            c) an object's namespace as returned by vars([object]);
-                this is technically the __dict__ attribute of the object
-            
-        When None, the function searches inside the user namespace. This is a
-        reference to the console kernel's namespace and is the same as the 
-        "workspace" attribute of Scipyen's main window. In turn, Scipyen
-        main window is referenced as the "mainWindow" variable in the console 
-        namespace.
-        
-    var_type: a type, a sequence of types, or None (default)
-        When a type, only select the variables of the indicated type
-        
-    as_dict: bool, default False.
-    
-        When True, returns an ordered dict with objects stored by their names in
-        the search namespace, sorted alphabetically;
-        
-        Whe False (the default) the function return a list of objects.
-        
-    sort:bool, default is False
-        Sort the variables according to their name (by default) or by sortkey
-        
-    sortkey:None or an objetc that is valid as a sort key for list sorting
-        (see list.sorted() or sort() python functions)
-        
-    reverse:bool, default is False.
-        When sort is True, the data is sorted in reverse order. Otherwise, this 
-        is ignored.
-    
-            
-    Returns:
-    ========
-    a list or a dict.
-        The list is sorted by the variable name.
+Returns a (possibly sorted) list of the variables if found, or an empty list.
 
-    Examples:
-    =========
-    
-    ret = getvars(some_type, ws=globals())
-    
-        Returns a list of all variables in the user namespace that are instances of some_type
+Var-positional parameters:
+==========================
+*args: selection criterion. This may be: 
+    1) a string or a sequence of strings, each containing either a shell-type
+        "glob" expression, or a regular expression (a "regexp", see python's 
+        re module for help about regexps).
         
-    ret = getvars(list_or_tuple_of_type_objects, ws=globals())
-    
-        Returns a list of variables in the user namespace that are instances of any of the 
-            types contained in list_or_tuple_of_type_objects
-            
-    ret = getvars(regexp, glob=False, ws=globals())
-    
-    ret = getvars(glob_pattern, glob=True, ws=globals())
-        Return a list of variables in the user name space, with names that return a match 
-        for the string in regexp
+        For example, to select variables with names beginning with "data",
+        the selection string may be either
         
+        "data*" (a shell-type glob) or "^data*" (a regexp string)
         
-    ret = getvars(neo.Block, ws = locals())
+        Whether the selection string is interpreted as a glob or a regexp
+        depends on the value of the "glob" parameter (see below).
     
-    # useful idioms:
+    2) a type, or an iterable (list, tuple) of types
     
-    # lst=[(name, val) for (name, val) in locals().items() if isinstance(val,neo.Block)]
-    #
-    #sort by variable name:
-    #
-    # slst = sorted(lst, key = lambda v: v[0])
-    #
-    #
-    # check this: compare lst[0][0] with slst[0][0]
+        This allows to select all ws variables of the type(s) specified in 'sel'
+        
+Named parameters:
+=================
+glob: bool, optional, default is None - see lsvars documentation for details
+
+    When True, the selection strings in args are treated these as UNIX 
+        shell-type globs.
+        
+    Otherwise, they are treated as regular expression strings.
+
+ws : a dictionary or None (default).
+
+    When a dict, its keys must all be strings, and represents the namespace
+    where the variables are searched.
     
-    NOTE: The function calls lsvars(...) to select the variables.
+        This can be:
+        a) a global namespace as returned by globals(),
+        b) a local namespace as returned by locals(), or vars()
+        c) an object's namespace as returned by vars([object]);
+            this is technically the __dict__ attribute of the object
+        
+    When None, the function searches inside the user namespace. This is a
+    reference to the console kernel's namespace and is the same as the 
+    "workspace" attribute of Scipyen's main window. In turn, Scipyen
+    main window is referenced as the "mainWindow" variable in the console 
+    namespace.
     
-    See also: lsvars(), sorted()
-            
-    NOTE: The function was designed to complement the %who, %who_ls and %whos 
-            IPython linemagics, which conspicuously lack the facility to filter
-            their output according to variable names or types. It is NOT thread
-            safe -- if the contents of the "ws" workspace are concurrently 
-            modified by another thread, it may raise an exception.
+var_type: a type, a sequence of types, or None (default)
+    When a type, only select the variables of the indicated type
+    
+as_dict: bool, default False.
+
+    When True, returns an ordered dict with objects stored by their names in
+    the search namespace, sorted alphabetically;
+    
+    Whe False (the default) the function return a list of objects.
+    
+sort:bool, default is False
+    Sort the variables according to their name (by default) or by sortkey
+    
+sortkey:None or an objetc that is valid as a sort key for list sorting
+    (see list.sorted() or sort() python functions)
+    
+reverse:bool, default is False.
+    When sort is True, the data is sorted in reverse order. Otherwise, this 
+    is ignored.
+
+        
+Returns:
+========
+a list or a dict.
+    The list is sorted by the variable name.
+
+Examples:
+=========
+
+ret = getvars(some_type, ws=globals())
+
+    Returns a list of all variables in the user namespace that are instances of some_type
+    
+ret = getvars(list_or_tuple_of_type_objects, ws=globals())
+
+    Returns a list of variables in the user namespace that are instances of any of the 
+        types contained in list_or_tuple_of_type_objects
+        
+ret = getvars(regexp, glob=False, ws=globals())
+
+ret = getvars(glob_pattern, glob=True, ws=globals())
+    Return a list of variables in the user name space, with names that return a match 
+    for the string in regexp
+    
+    
+ret = getvars(neo.Block, ws = locals())
+
+# useful idioms:
+
+# lst=[(name, val) for (name, val) in locals().items() if isinstance(val,neo.Block)]
+#
+#sort by variable name:
+#
+# slst = sorted(lst, key = lambda v: v[0])
+#
+#
+# check this: compare lst[0][0] with slst[0][0]
+
+NOTE: The function calls lsvars(...) to select the variables.
+
+See also: lsvars(), sorted()
+        
+NOTE: The function was designed to complement the %who, %who_ls and %whos 
+        IPython linemagics, which conspicuously lack the facility to filter
+        their output according to variable names or types. It is NOT thread
+        safe -- if the contents of the "ws" workspace are concurrently 
+        modified by another thread, it may raise an exception.
             
     """
     if ws is None:
@@ -341,29 +392,20 @@ def getvars(*args, glob:bool=True, ws:typing.Union[dict, type(None)]=None, var_t
     if as_dict:
         lst = [(n, ws[n]) for n in var_names]
         
-        # NOTE: 2020-10-12 14:18:14
-        # var_type already used in lsvars
-        #if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
-            #lst = [(n, ws[n]) for n in var_names if isinstance(ws[n], var_type)]
-            
-        #else:
-            #lst = [(n, ws[n]) for n in var_names]
+        if not sort:
+            if sortkey is not None:
+                sort = True
         
         if sort and sortkey is not None:
             lst.sort(key=sortkey)
+            
+        if reverse is True:
+            lst.reverse()
         
         ret = OrderedDict(lst)
         
     else:
         ret = [ws[n] for n in var_names]
-        
-        # NOTE: 2020-10-12 14:18:14
-        # var_type already used in lsvars
-        #if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
-            #ret = [ws[n] for n in var_names if isinstance(ws[n], var_type)]
-            
-        #else:
-            #ret = [ws[n] for n in var_names]
         
         if sort and sortkey is not None:
             ret.sort(key=sortkey)

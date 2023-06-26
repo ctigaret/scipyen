@@ -79,7 +79,7 @@ from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_attr, filterfalse_attr)
 
 from core import strutils as strutils
-from core import datatypes as dt
+from core import datatypes  
 from core.quantities import quantity2str
 from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
@@ -285,7 +285,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.resolution = 1.0
         self.origin = 0.0
-        self.units = dt.pixel_unit
+        self.units =  datatypes.pixel_unit
         
         self.selectedAxisIndex = 0
         
@@ -327,7 +327,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.unitsLineEdit.setText(self.units.__str__().split()[1])
         
-        #self.unitsLineEdit.setValidator(dt.UnitsStringValidator())
+        #self.unitsLineEdit.setValidator( datatypes.UnitsStringValidator())
         
         self.unitsLineEdit.editingFinished.connect(self.slot_unitsChanged)
         
@@ -3191,8 +3191,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             xcal = None
             ycal = None
             
-            x_units = dt.pixel_unit
-            y_units = dt.pixel_unit
+            x_units =  datatypes.pixel_unit
+            y_units =  datatypes.pixel_unit
             
             if isinstance(self._data_, vigra.VigraArray):
                 w = self._data_.shape[0]
@@ -4724,7 +4724,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     arrayAxes = vigra.VigraArray.defaultAxistags("x")
                     
                 elif data.ndim == 2:
-                    if dt.is_vector(data):
+                    if  datatypes.is_vector(data):
                         arrayAxes = vigra.VigraArray.defaultAxistags("y")
                     else:
                         arrayAxes = vigra.VigraArray.defaultAxistags("xy")

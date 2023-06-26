@@ -22,6 +22,7 @@ import collections.abc
 from collections import deque, OrderedDict
 from dataclasses import MISSING
 import numpy as np
+import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
 import pandas as pd
@@ -36,10 +37,11 @@ import pyqtgraph # for their own eq operator
 #     from operator import eq
 
 from core import prog
-from .prog import safeWrapper, deprecation
+from .prog import safeWrapper, deprecation, with_doc
 
 from .strutils import get_int_sfx
 from .quantities import units_convertible
+from .datazone import DataZone
 
 # NOTE: 2021-07-24 15:03:53
 # moved TO core.datatypes
@@ -71,6 +73,9 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
                                 ]
+
+GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]
+"""Generic index type, used with normalized_indexed and similar functions"""
 
 class SafeComparator(object):
     # NOTE: 2021-07-28 13:42:07
@@ -116,7 +121,7 @@ class SafeComparator(object):
             
             # NOTE: 2018-11-09 21:46:52
             # isn't this redundant after checking for shape?
-            # unless an object could have shape attribte but not ndim
+            # unless an object could have shape attribute but not ndim
             if hasattr(x, "ndim"):
                 ret &= x.ndim == y.ndim
             
@@ -888,11 +893,15 @@ def similar_strings(a:str, b:str) -> bool:
 
 @safeWrapper
 def safe_identity_test2(x, y) -> bool:
+    """Uses SafeComparator object"""
     return SafeComparator(comp=eq)(x, y)
 
 @safeWrapper
 def safe_identity_test(x, y, idcheck=False) -> bool:
     ret = True
+    
+    if x is y:
+        return True
     
     if all(isinstance(v, type) for v in (x,y)):
         return x==y
@@ -913,23 +922,35 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
     if isinstance(x, partial):
         return x.func == y.func and x.args == y.args and x.keywords == y.keywords
         
-    if hasattr(x, "size"):
+    if hasattr(x, "size"): # np arrays and subtypes
         ret &= x.size == y.size
 
         if not ret:
             return ret
     
-    elif hasattr(x, "__len__") or hasattr(x, "__iter__"):
+    elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
         ret &= len(x) == len(y)
-
+        
         if not ret:
             return ret
         
         if all(isinstance(v, dict) for v in (x,y)):
+            # ret &= list(x.keys()) == list(y.keys())
+            # if not ret:
+            #     return ret
+            
+#             x_items = list(filter(lambda x_: x_[1] not in (x,y), x.items()))
+#             y_items = list(filter(lambda x_: x_[1] not in (x,y), y.items()))
+#             
+#             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x_items, y_items)))
+            # FIXME: 2023-06-01 13:37:10
+            # prone to infinite recursion when either dict is among either x.values() or y.values()
             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
             if not ret:
                 return ret
         else:
+            # FIXME: 2023-06-01 13:43:34
+            # prone to infinite recursion when either element is in x or y
             ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
         
         if not ret:
@@ -2523,7 +2544,7 @@ def reverse_dict(x:dict) -> dict:
         
     return ret
 
-def reverse_mapping_lookup(x:dict, y:typing.Any):
+def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union[typing.Any, typing.Sequence[typing.Any]]]:
     """Looks up the key mapped to value y in the x mapping (dict)
     Parameters:
     ===========
@@ -2542,8 +2563,15 @@ def reverse_mapping_lookup(x:dict, y:typing.Any):
     #from .traitcontainers import (DataBag, Bunch, )
     #from collections import OrderedDict
     
-    if y in x.values():
-        ret = [name for name, val in x.items() if y == val]
+    vals = list(x.values()) # bypass the errors raise when comparing np.arrays
+    
+    if any(isinstance(v, np.ndarray) for v in vals) or isinstance(y, np.ndarray):
+        testincluded = any(safe_identity_test(y,v) for v in vals)
+    else:
+        testincluded = y in x.values()
+    
+    if testincluded:
+        ret = [name for name, val in x.items() if (np.all(y == val) if (isinstance(y, np.ndarray) or isinstance(val, np.ndarray)) else y == val)]
         
         if len(ret) == 1:
             return ret[0]
@@ -2892,7 +2920,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
     """Alternative to list.index(), such that a missing value returns None
-    of raising an Exception.
+    instead of raising an Exception.
     DEPRECATED
     Use prog.filter_attr
     """
@@ -3373,88 +3401,142 @@ def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> 
         
     return names.index(name)
 
-def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series]], 
-                     index: typing.Optional[typing.Union[str, int, collections.abc.Sequence, np.ndarray, range, slice, type(MISSING)]] = None, 
-                     silent:bool=False):
+def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
+    """Merge several GeneralIndexType objects into one.
+    Prerequisites:
+    • each element in args must be of the same type or MISSING
+
+    
+    
+    """
+    
+    if len(args) == 0:
+        return
+    
+    if not all(isinstance(v, GeneralIndexType) for v in args):
+        raise TypeError("Expecting a sequence of GeneralIndexType objects")
+    
+    not_missing = [a for a in args if not isinstance(a, type(MISSING))]
+    
+    if len(not_missing) == 0:
+        return MISSING
+    
+    if not all(map(lambda x: type(x) == type(not_missing[0]), not_missing)):
+        raise TypeError("All indices other than MISING must be of the same type")
+    
+    if isinstance(not_missing[0], (range, slice)):
+        # NOTE: 2023-06-04 11:19:54
+        # this works for either range or slice objects
+        max_range_step = max(r.step for r in not_missing)
+        min_range_start = min(r.start for r in not_missing)
+        max_range_stop = max(r.stop for r in not_missing)
+        mytype = type(not_missing[0])
+        return mytype(min_range_start, max_range_stop, max_range_step)
+    
+    elif isinstance(not_missing[0], (int, str)):
+        # already in a list ⇒ return it
+        return not_missing
+    
+    elif isinstance(not_missing[0], np.ndarray):
+        # concatenate, sort, then return
+        if any(n.ndim > 1 for n in not_missing):
+            raise TypeError(f"Expecting 1D arrays; got {not_missing[0].ndim} instead")
+        
+        return np.sort(np.concatenate())
+    
+    elif isinstance(not_missing[0], collections.abc.Iterable):
+        if all(all(isinstance(v, int) for v in n) for n in not_missing) or all(all(isinstance(v, str) for v in n) for n in not_missing):
+            ret = itertools.chain.from_iterable(not_missing)
+            return sorted(ret)
+        else:
+            raise TypeError("Can only merge all int or all str indexing objects")
+        
+    else:
+        raise TypeError(f"Invalid types for index merging: {type(not_missing[0]).__name__}")
+    
+@with_doc(prog.filter_attr, use_header = True)
+# @singledispatch
+def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series, np.ndarray]], 
+                     index: typing.Optional[GeneralIndexType] = None, 
+                     silent:bool=False, axis:typing.Optional[int] = None) -> typing.Union[range, typing.Iterable[int]]:
     """Transform various indexing objects to a range or an iterable of int indices.
     
-    Also checks the validity of the index for an iterable, given its size.
+Also checks the validity of the index for an iterable, given its size.
+
+Parameters:
+-----------
+data: collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, 
+        pd.Series, np.ndarray
     
-    Parameters:
-    -----------
-    data: Sequence or int; 
-        When a Sequence, the index will be verified against len(data).
-        
-        When one of the pandas data types:
-            DataFrame, Series: the index will be checked against the object's 
-            'index' attribute
-            
-            pandas.core.indexes.base.Index: the index will be cheched against it
-            (useful when passing the columns attribute of a DataFrame)
-            
-        When an int, 'data' is the length of a putative Sequence (hence 
-        data >= 0)
+    When a Sequence, the index will be verified against len(data).
     
-    index: int, iterable, np.ndarray, range, slice, str, dataclasses.MISSING, or
-        None (default).
+    When one of the pandas data types:
+        DataFrame, Series: the index will be checked against the object's 
+        'index' attribute
+        
+        pandas.core.indexes.base.Index: the index will be cheched against it
+        (useful when passing the columns attribute of a DataFrame)
     
-        When 'index' is None, the function returns range(0, len(data)) with 
-            'data' is a Sequence, else range(, data) when 'data' is an int.
+    For numpy arrays, return a flat index to be used with array.ravel()
+        
+    When an int, 'data' is the length of a virtual Sequence (hence data >= 0 is
+    expected).
     
-            (i.e., NO index is specified)
+index: GeneralIndexType: a typing alias for:
+
+    int → selects only the element with the specified int index
+
+    str → selects only the element having a 'name' or 'label' attribute with the 
+        value; for numpy arrays, returns the index of elements equal to the index
+
+    range → selects the elements with int indices in the specified range
+
+    slice → selects the elements within the slice range
+
+    collections.abc.Sequence[int] → selects the elements with the specified 
+            int indices
+
+    collections.abc.Sequence[str] → selects the elements having a 'name'
+            attribute with value in this parameter
+
+    1D np.ndarray with integer dtype (i.e., np.dtype(int)) →  behaved like a flat
+        array index (see online Numpy documentation)
+        
+        WARNING: This is simply converted to a tuple and returned (no checks 
+        against values)
     
-        When index is MISSING, the function returns an empty range:
-            range(0)
+        ATTENTION: For array data, 1D int arrays should be used directly as flat
+        indices into ravelled arrays (see Numpy documentation)
     
-            (i.e., leave everything OUT )
-            
-        Otherwise, the function behaves as below:
-        
-        Index type 
-        -----------
-        range                       It is returned, provided max(index) < len(data)
-                                    (or max(index) < data when 'data' is an int)
-        
-        slice                       Returns slice.indices(len(data))
-                                    (or slice.indices(data) when 'data' is an int)
-        
-        collections.abc.Sequence    Each element must be in range(-len(data), len(data))
-        with int elements           (or range(-data, data) when 'data' is an int)
-        
-                                    Returns 'index'
-                                    
-        str                         'data' must be a Sequence containing elements 
-                                    that MAY have an attribute named 'name' (those
-                                    without a 'name' attribute are ignored and 
-                                    their indices in the Sequence will be skipped).
-                                    
-        collections.abc.Sequence    'data' must be a Sequence, as above;
-        with str elements           
-                                    Returns the indices of those elements in 'data'
-                                    having 'name' attribute with value in index.
-                                    
-        1D np.ndarray with
-        integer dtype               Returns a list of array's values (after validation)
-        (e.g. np.dtype(int))
-        
-        logical dtype               Used as a 'mask': returns the indices of the 
-        (e.g., np.dtype(bool))      True values; 'index' must satisfy:
-                                    len(index) == len(data) (with 'data' a Sequence)
-                                    len(index) == data (whith 'data' an int)
-        
-        CAUTION: negative integral indices are valid and perform the reverse 
-            indexing (going "backwards" in the iterable).
-            
-    Returns:
-    --------
-    ret - an iterable object (range, or tuple of integer indices) that can be 
-        used in list comprehensions using 'data' (when 'data' is a Sequence) or
-        any sequence with same length as 'data' (when 'data' is an int).
-        
-    See also:
+    1D np.ndarray with logical dtype  (i.e., np.dtype(bool)) → Used as a 
+        'mask': returns the indices of the True values as a tuple of int
     
-    prog.filter_attr
+        ATTENTION: For array data, 1D logical arrays should be used directly as 
+        flat indices into ravelled arrays (see Numpy documentation)
+
+    MISSING ⇒ select NO elements from the data (returns an empty range)
+
+    None (default) ⇒ select ALL elements in the data
+
+    When 'index' is None, the function returns range(0, len(data)) when 
+        'data' is a Sequence, else range(, data) when 'data' is an int.
+
+    When index is MISSING, the function returns an empty range:
+        range(0)
+        
+    CAUTION: negative integral indices are valid and perform the reverse 
+        indexing (going "backwards" in the iterable).
     
+    axis: int (optional, default is None)
+        Used only for numpy array data; specifies the axis along which the 
+        "normalized" index is to be returned.
+        
+Returns:
+--------
+ret - an iterable object (range, or tuple of integer indices) that can be 
+    used in list comprehensions using 'data' (when 'data' is a Sequence) or
+    any sequence with same length as 'data' (when 'data' is an int).
+        
     """
     from core.datatypes import is_vector
     
@@ -3462,6 +3544,7 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         return tuple()
     
     elif isinstance(data, int):
+        assert(data >= 0)
         data_len = data
         data = None
         
@@ -3472,54 +3555,102 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         data_len = len(data)
         data = data.index
         
-    elif isinstance(data, pd.core.indexes.base.Index):
+    elif isinstance(data, (pd.core.indexes.base.Index, neo.Epoch, DataZone)):
         data_len = len(data)
+        
+    elif isinstance(data, np.ndarray):
+        if isinstance(axis, int):
+            if axis not in range(-data.ndim, data.ndim):
+                raise ValueError(f"Invalid axis index {axis} for an array with {data.ndim} dimensions")
+            data_len = data.shape[axis]
+        else:
+            data_len = data.size
         
     else:
         raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
     
+    # 1) index is None ⇒ return the entire range of data
     if index is None:
         return range(data_len)
     
+    # 2) index is MISSING ⇒ return an empty range
     if isinstance(index, type(MISSING)):
         return range(0)
     
+    # 3) index is an int ⇒ 
     if isinstance(index, int):
         # NOTE: 2020-03-12 22:40:31
         # negative values ARE supported: they simply go backwards from the end of
         # the sequence
-        if index not in range(-data_len,data_len):
+        if index not in range(-data_len, data_len):
             if silent:
                 return None
-            raise ValueError("Index %s is invalid for %d elements" % (index, len(data)))
+            raise ValueError(f"Index {index} is invalid for {len(data)} elements")
         
         if isinstance(data, pd.core.indexes.base.Index):
             return (data[index], )
         
         return (index,)
     
-    if isinstance(index, str):
+    # 4) index is a str ⇒
+    #   Check that elements in data are either str, or have an attribute with 
+    #   name given in index.
+    #   Requires that 'data' is an actual collection, not the length of a virtual
+    #   collection.
+    if isinstance(index, (str, np.str_, bytes)):
+        if isinstance(index, bytes):
+            index = index.decode()
+            
         if isinstance(data, (tuple, list)):
-            return tuple(prog.filter_attr(data, name=lambda x: x==index, indices_only=True))
-    
+            if all(isinstance(data, (str, np.str_, bytes))):
+                ret = tuple(filter(lambda x: x.decode() == index if isinstance(x, bytes) else x == index,
+                                   data))
+                if len(ret) == 0:
+                    if silent:
+                        return None
+                    raise ValueError(f"Index {index} not found in data")
+                return ret
+            else:
+                ret = tuple(prog.filter_attr(data, operator.or_, indices_only=True, 
+                                             name=lambda x: x==index, label=lambda x: x==index))
+                if len(ret) == 0:
+                    if silent:
+                        return None
+                    raise AttributeError(f"The objects have no attribute named 'name' or 'label' with the value {index}")
+                
+                return ret
+            
         if isinstance(data, (pd.core.indexes.base.Index)):
             if index in data:
-                return index
+                return (index,)
                 #return (list(data).index(index), )
             
             if not silent:
                 raise IndexError(f"Invalid 'index' specification {index}")
+            
+        if isinstance(data, np.ndarray):
+            if index in data:
+                ret = np.flatnonzero(data == index)
+            else:
+                if silent:
+                    return None
                 
-        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index")
+                else:
+                    raise ValueError(f"Index {index} not found in data array")
+                
+        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index, Series, or DataFrame, or a numpy array")
         
+    # 5) index is an Iterable of objects of the same type!
     elif isinstance(index, collections.abc.Iterable):
+        # 5.1) of int values
         if all(isinstance(v, int) and v in range(-data_len, data_len) for v in index):
             if isinstance(data, pd.core.indexes.base.Index):
                 return (data[v] for v in index )
             
             return index
         
-        elif all(isinstance(v, str) for v in index):
+        # 5.2) of str values
+        elif all(isinstance(v, (str, np.str_, bytes) ) for v in index):
             if not isinstance(data, collections.abc.Iterable):
                 raise TypeError("When indexing by name attribute (str), data must be an iterable")
             
@@ -3531,47 +3662,59 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
         
                 if not silent:
                     raise IndexError(f"Invalid 'index' specification {index}")
+                
+        # 5.3) of anything else ⇒ Error
         else:
             if silent:
                 return None
             
             raise IndexError(f"Invalid 'index' specification {index}")
         
+    # 6) index is a range
     elif isinstance(index, range):
         if max(index) >= data_len:
             if silent:
                 return None
-            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+            raise IndexError(f"Index {index} out of range for {data_len} elements")
         
         return index # -> index IS a range
     
+    # 7) index is a slice
     elif isinstance(index, slice):
         ndx = index.indices(data_len)
             
         if len(ndx) == 0:
             if silent:
                 return None
-            raise IndexError("Indexing %s results in an empty indexing list" % index)
+            raise IndexError(f"Indexing {index} results in an empty indexing list")
         
         if max(ndx) >= data_len:
             if silent:
                 return None
-            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+            raise IndexError(f"Index {index} out of range for {data_len} elements")
         
         if min(ndx) < -data_len:
             if silent:
                 return None
-            raise IndexError("Index %s out of range for %d elements" % (index, data_len))
+            raise IndexError(f"Index {index} out of range for {data_len} elements")
         
         return ndx # -> ndx IS a tuple
     
+    # 8) index is a 1D numpy array
     elif isinstance(index, np.ndarray):
         if not is_vector(index):
-            raise TypeError("Indexing array must be a vector; instead its shape is %s" % index.shape)
+            raise TypeError(f"Indexing array must be a vector; instead its shape is %s" % index.shape)
             
+        # 8.1) of integer dtype
         if index.dtype.kind == "i": # index is an array of int
+            if np.any((index < 0) | (index >= data_len) ):
+                if silent:
+                    return None
+                raise ValueError(f"Indexing array out of bounds")
+            
             return tuple(index)
         
+        # 8.2) of boolean dtype
         elif index.dtype.kind == "b": # index is an array of bool
             if len(index) != data_len:
                 raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
@@ -3579,8 +3722,20 @@ def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence
             return tuple(np.arange(data_len)[index])
             #return tuple([k for k in range(data_len) if index[k]])
             
+        # 8.3) of any other dtype ⇒ Error
+        else:
+            if silent:
+                return
+            raise TypeError(f"Invalid dtype {index.dtype} for indexing array")
+            
+    # 9) index is of any other type ⇒ Error
     else:
+        if silent:
+            return
         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
+    
+# @normalized_index.register(type(None))
+# def _(data, )
     
 def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.AxisInfo], index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
     """Calls normalized_index on a specific array axis.
@@ -3790,7 +3945,7 @@ def sp_get_loc(x, index, columns):
     
     # Save the original sparse format for reuse later
     
-    # NOTE: dt.dtypes returns a Series!!! 
+    # NOTE:  datatypes.dtypes returns a Series!!! 
     # NOTE: it is 'dtypes' not 'dtype'!
     spdtypes = x.dtypes[columns] # this is a pd.Series with column names as row index
     

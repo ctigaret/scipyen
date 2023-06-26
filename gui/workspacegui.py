@@ -91,7 +91,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
     def inspect_wm(self):
         if isinstance(self.timer, QtCore.QTimer):
             self.timer.start()
-        
+            
 
 class GuiMessages(object):
     @safeWrapper
@@ -733,6 +733,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             else:
                 return
 
+        if not isinstance(title, str) or len(title.strip()) == 0:
+            title = "Export data to workspace"
+            
         newVarName = validate_varname(newVarName, ws = scipyenWindow.workspace)
         
         dlg = qd.QuickDialog(self, title)
@@ -748,7 +751,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             newVarName = namePrompt.text()
             # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
             if newVarName in scipyenWindow.workspace:
-                accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                accept = self.questionMessage(title, f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                # accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
                 if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
                     return
                 
@@ -865,13 +869,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         self._fileLoadWorker_.moveToThread(self._fileLoadThread_)
         self._fileLoadThread_.started.connect(self._fileLoadWorker_.run)
         self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.quit)
-        self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
+        # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
         self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.deleteLater)
         self._fileLoadWorker_.signals.signal_Finished.connect(lambda : progressDlg.setValue(progressDlg.maximum()))
         self._fileLoadWorker_.signals.signal_Result.connect(self._slot_fileLoadThread_ready)
         
         self._fileLoadThread_.finished.connect(self._fileLoadWorker_.deleteLater)
-        self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
+        # self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
         
         self._fileLoadThread_.start()
         
@@ -887,9 +891,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             # WARNING: 2023-05-28 23:42:57
             #  DO NOT USE - STILL NEEDS WORK
             try:
-                # self.workspaceModel.update() # CAUTION: this BLOCKS the UI
-                with self.workspaceModel.holdUIUpdate():
-                    self.workspaceModel.update2() # CAUTION: this DOES NOT update the model viewer UI
+                self.workspaceModel.update() 
+                # self.workspaceModel.update() 
+                # with self.workspaceModel.holdUIUpdate():
+                #     self.workspaceModel.update2()
             except:
                 traceback.print_exc()
             

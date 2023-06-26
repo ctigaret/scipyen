@@ -1,3 +1,6 @@
+"""GUI for synaptic plasticity experiments
+"""
+
 #### BEGIN core python modules
 import sys, traceback, inspect, numbers
 import warnings
@@ -26,7 +29,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
-import core.datatypes as dt
+import core.datatypes  
 from core.datatypes import TypeEnum
 from core.quantities import units_convertible
 import plots.plots as plots
@@ -62,7 +65,6 @@ from ephys.ltp import PathwayType, SynapticPathway
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-#__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"))
 __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too

@@ -15,7 +15,6 @@ I. Module-level functions for the management of trigger events and protocols
 auto_define_trigger_events
 auto_detect_trigger_protocols
 detect_trigger_events
-detect_trigger_times
 embed_trigger_event
 embed_trigger_protocol
 get_trigger_events
@@ -57,9 +56,10 @@ from core.neoutils import (get_index_of_named_signal, remove_events, clear_event
                            is_same_as, get_events)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
-from core.prog import (safeWrapper, WithDescriptors)
+from core.prog import (safeWrapper, WithDescriptors, with_doc)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.traitcontainers import DataBag
+from core.signalprocessing import detect_boxcar
 
 #### BEGIN module-level default options
 DEFAULTS = DataBag()
@@ -92,12 +92,13 @@ DEFAULTS["ImagingFrameTrigger"]["DetectionEnd"] = 1 * pq.s
 DEFAULTS["ImagingFrameTrigger"]["Name"] = "imaging"
 
 #### END module-level default options
-    
+  
+@with_doc((neo.core.baseneo.BaseNeo, WithDescriptors), use_header=True)
 class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
     """Encapsulates an experimental stimulation protocol (i.e., "triggers").
     
     A protocol is composed of at least one type of TriggerEvent objects, and
-    is associatd with at least one neo.Segment, encapsulating the set of 
+    is associated with at least one neo.Segment, encapsulating the set of 
     triggers that ocurred during that particular segment (or "sweep").
     
     Containers of Segment objects (e.g. a neo.Block) can associate several 
@@ -105,12 +106,12 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
     sets of trigger events - where each such set represents a trigger
     protocol.
     
-    A given trigger protocol can occuir in more than one segment. However, any
+    A given trigger protocol can occur in more than one segment. However, any
     one segment can be associated with at most one trigger protocol.
     
     Unlike TriggerEvent, a TriggerProtocol is not currently "embedded" in any of
-    the neo containers. Instead, its component TriggerEvent are contained ("embedded")
-    in the "events" attribute of the Segment associated with this protocol.
+    the neo containers. Instead, its component TriggerEvent objects are contained
+    ("embedded") in the "events" attribute of the Segment associated with this protocol.
     
     Contains TriggerEvents and indices specifying which segments from a collection
     of segments, this protocol applies to.
@@ -1274,8 +1275,13 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
 
 #### BEGIN Module-level functions
 
+# @with_doc(detect_trigger_events, use_header=True)
 @safeWrapper
-def auto_define_trigger_events(src, event_type, analog_index, times=None, label=None, name=None, use_lo_hi=True, time_slice=None, clear = False, clearSimilarEvents=True, clearTriggerEvents=True, clearAllEvents=False):
+def auto_define_trigger_events(src, event_type, analog_index, 
+                               times=None, label=None, name=None, 
+                               use_lo_hi=True, time_slice=None, clear = False, 
+                               clearSimilarEvents=True, clearTriggerEvents=True, 
+                               clearAllEvents=False):
     """Constructs TriggerEvent objects from events detected in analog signals.
     
     TriggerEvent objects are constructed using either time stamps given as
@@ -1404,6 +1410,8 @@ def auto_define_trigger_events(src, event_type, analog_index, times=None, label=
         raise TypeError("src expected to be a neo.Block, neo.Segment or a sequence of neo.Block or neo.Segment objects; got %s instead" % type(src).__name__)
     
     if isinstance(times, pq.Quantity):
+        # simply construct TriggerEvents based on the supplied time stamps
+        # NO SIGNAL PARSING is performed
         if not check_time_units(times):  # event times passed at function call -- no detection is performed
             raise TypeError("times expected to have time units; it has %s instead" % times.units)
 
@@ -1485,7 +1493,10 @@ def auto_define_trigger_events(src, event_type, analog_index, times=None, label=
                 
     return src
 
-def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence], as_dict:bool=False, flat:bool=False, triggers:typing.Optional[typing.Union[str, int, type, typing.Sequence]]=None, match:str="==") -> list:
+def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence], 
+                       as_dict:bool=False, flat:bool=False, 
+                       triggers:typing.Optional[typing.Union[str, int, type, typing.Sequence]]=None, 
+                       match:str="==") -> list:
     """
     Returns a list of TriggerEvent objects embedded in the data.
     
@@ -1518,11 +1529,13 @@ def get_trigger_events(*src:typing.Union[neo.Block, neo.Segment, typing.Sequence
         
     return get_events(*src, triggers=triggers, as_dict=as_dict, flat=flat, match=match)
 
+# @with_doc(detect_boxcar, use_header=True)
 @safeWrapper
-def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
+def detect_trigger_events(x, event_type, 
+                          use_lo_hi=True, 
+                          label=None, 
+                          name=None):
     """Creates a datatypes.TriggerEvent object (array) of specified type.
-    
-    Calls detect_trigger_times(x) to detect the time stamps.
     
     Parameters:
     ===========
@@ -1572,8 +1585,8 @@ def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
     
     if not isinstance(use_lo_hi, bool):
         raise TypeError("'use_lo_hi' parameter expected to be a boolean; got %s instead" % type(use_lo_hi).__name__)
-    
-    [lo_hi, hi_lo] = detect_trigger_times(x)
+   
+    lo_hi, hi_lo,_, _, _ = detect_boxcar(x)
     
     if all([v is None for v in (lo_hi, hi_lo)]):
         return
@@ -1600,55 +1613,6 @@ def detect_trigger_events(x, event_type, use_lo_hi=True, label=None, name=None):
     return trig
     
     
-@safeWrapper
-def detect_trigger_times(x):
-    """Detect and returns the time stamps of rectangular pulse waveforms in a neo.AnalogSignal
-    
-    The signal must undergo at least one transition between two distinct states 
-    ("low" and "high").
-    
-    The function is useful in detecting the ACTUAL time of a trigger (be it 
-    "emulated" in the ADC command current/voltage or in the digital output "DIG") 
-    when this differs from what was intended in the protocol (e.g. in Clampex)
-    """
-    from scipy import cluster
-    from scipy import signal
-    
-    if not isinstance(x, neo.AnalogSignal):
-        raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
-    
-    
-    # WARNING: algorithm fails for noisy signals with no TTL waveform
-    
-    try:
-        cbook, dist = cluster.vq.kmeans(x, 2)
-            
-        code, cdist = cluster.vq.vq(x, sorted(cbook))
-        
-        diffcode = np.diff(code)
-        
-        ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
-        ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
-        
-        if ndx_lo_hi.size:
-            times_lo_hi = [x.times[k] for k in ndx_lo_hi]
-            
-        #else:
-            #times_lo_hi = None
-            
-        if ndx_hi_lo.size:
-            times_hi_lo = [x.times[k] for k in ndx_hi_lo]
-            
-        #else:
-            #times_hi_lo = None
-
-    except Exception as e:
-        #traceback.print_exc()
-        times_lo_hi = None
-        times_hi_lo = None
-        
-    return times_lo_hi, times_hi_lo
-
 
 def remove_trigger_protocol(protocol, block):
     """Removes embedded trigger events associated with a specified trigger protocol
@@ -1837,9 +1801,13 @@ def embed_trigger_event(event, segment, clear=False):
             
         
 @safeWrapper
-def embed_trigger_protocol(protocol:TriggerProtocol, target:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], useProtocolSegments:bool=True, clearTriggers:bool=True, clearEvents:bool=False):
+def embed_trigger_protocol(protocol:TriggerProtocol, 
+                           target:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]], 
+                           useProtocolSegments:bool=True, 
+                           clearTriggers:bool=True, 
+                           clearEvents:bool=False):
     """ Embeds TriggerEvent objects found in the TriggerProtocol 'protocol', 
-    in the segments of 'target'.
+    in the segments of the neo.Block object 'target'.
     
     Inside the target, trigger event objects are stored by reference!
     
@@ -1995,7 +1963,7 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     Individual TriggerEvent objects can be manually appended to the events 
         list of each neo.Segment.
     
-    Alternatively, the function detect_trigger_times() can help generate 
+    Alternatively, the function detect_boxcar() can help generate 
     TriggerEvent objects from specific neo.AnalogSignal arrays containing 
     trigger-like data (i.e., signals with transitions between a low and 
     a high state, e.g. rectangular pulses, or step functions).
@@ -2203,10 +2171,18 @@ def parse_trigger_protocols(src, return_source:typing.Optional[bool]=False):
     
     return protocols
 
-def auto_detect_trigger_protocols(data: neo.Block, presynaptic:tuple=(), postsynaptic:tuple=(), photostimulation:tuple=(), imaging:tuple=(), clear:typing.Union[bool, str, int, tuple, list, ]=False, up=True, protocols=True):
+# @with_doc(auto_define_trigger_events, use_header=True)
+def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Block], typing.Union[neo.Segment]], 
+                                  presynaptic:tuple=(), 
+                                  postsynaptic:tuple=(), 
+                                  photostimulation:tuple=(), 
+                                  imaging:tuple=(), 
+                                  clear:typing.Union[bool, str, int, tuple, list, ]=False, 
+                                  up=True, 
+                                  protocols=True) -> typing.Optional[typing.List[TriggerProtocol]]:
     
     """Determines the set of trigger protocols in a neo.Block by searching for 
-    trigger waveforms in the analogsignals contained in data.
+    trigger waveforms in the analogsignals contained in 'data'.
     
     Time stamps of the detected trigger protocols will then be used to construct
     TriggerEvent objects according to which of the keyword parameters below
@@ -2222,19 +2198,34 @@ def auto_detect_trigger_protocols(data: neo.Block, presynaptic:tuple=(), postsyn
     =================
     
     presynaptic, postsynaptic, photostimulation, imaging:
+        Tuples specifying the parameters detecting pre-, postsynaptic, 
+        photostimulation or imaging trigger event types, respectively. 
     
-        Each is a tuple with 0 (default), two or three elements
+        Each is a tuple with 0 (default), two, or three elements:
         
             (signal_index, label, (t_start, t_stop))
         
-        that specify parameters for the detection of pre-, postsynaptic, 
-        photostimulation or imaging trigger event types, respectively. 
+        This tuple specifies the following:
         
+        • signal_index: int or str: index or name of the analog signal in 
+            the Segments in 'data' where trigger event waveforms are searched.
+            This signal is expected to contain a recording of the TTL 'pulses'
+            emitted through the digital output of the acqusition board. Such
+            recordings are made by 'branching' out the signal from the digital
+            output, into an analog input port of the acquisition board.
+        
+        • label: str, a common label for the detected trigger events
+        
+        • (t_start, t_stop): quantities with time units, specifying the time 
+            interval, within the signal, where the TTL waveforms will be 
+            searched.
+
         In particular, the imaging trigger event also determines the delay
-        between the acquisition of image and electrophysiology data.
+        between the acquisition of image and electrophysiology data, in experiments
+        where imaging is synchronized with electrophysiology.
         
         Their values are passed along to the auto_define_trigger_events,
-        detect_trigger_events, and detect_trigger_times functions.
+        detect_trigger_events, and detect_boxcar functions.
 
         When empty, no events of the specified type will be constructed.
         
@@ -2249,9 +2240,8 @@ def auto_detect_trigger_protocols(data: neo.Block, presynaptic:tuple=(), postsyn
             of rectangular pulses with polarity (upward or downward) specified 
             by the 'up' parameter, which emulate a TTL signal.
             
-            Currently, thei functions supports only the "up" logic i.e., 
+            Currently, the functions supports only the "up" logic i.e., 
             upward-going TTL-like waveforms.
-            
         
         label: str = a label to be assigned to the detected event
         
@@ -2320,6 +2310,14 @@ def auto_detect_trigger_protocols(data: neo.Block, presynaptic:tuple=(), postsyn
     When protocols is True, returns a list of trigger protocols; otherwise, 
     returns None
         
+    CAUTION: When there is no TTL-like waveform, a large number of false-positive
+        events will be "detected" - likely due to noise in the signal.
+        
+    WARNING: if running this is a loop iterated over the segments of a block,
+        caling this function for each segment individually will assign the 
+        'segment' index to 0 in the detected trigger protocol. Make sure you
+        correct for that, accordingly.
+        
     """
     # NOTE: 2021-01-06 11:28:23 NEW: introduced "up" parameter - to use the
     # ability to detect negative pulses ("down" logic); 
@@ -2336,13 +2334,17 @@ def auto_detect_trigger_protocols(data: neo.Block, presynaptic:tuple=(), postsyn
         clear = False
 
     elif isinstance(clear, (TriggerEventType, str,  int, tuple, list)):
-        if isinstance(clear, str) and clear == "triggers":
+        if isinstance(clear, str) and clear in ("triggers", "all"):
             clear = True
         # NOTE: 2021-01-06 12:38:32
         # specifying triggerType implies triggersOnly is True
         clear_events(data, triggers = clear)
         # also, clear_events raises error if clear is a non compliant sequence
         clear = False
+        
+    if not all(isinstance(v, tuple) and len(v) in (0,2,3) for v in (presynaptic, postsynaptic, 
+                                              photostimulation, imaging)):
+        raise TypeError(f"All trigger specifications must be tuples with 0, 2 or 3 elements")
         
     # collect trigger parameter tuples in a mapping, to iterate
     tpars = {"presynaptic": presynaptic,
@@ -2368,12 +2370,14 @@ def auto_detect_trigger_protocols(data: neo.Block, presynaptic:tuple=(), postsyn
     ####        pfun(data)
     
     for p_name, p_tuple in tpars.items():
-        if len(tpars[p_name]) >= 2:
+        if len(tpars[p_name]) >= 2: # skip empty trigger spec
             pfun = partial(auto_define_trigger_events, event_type = p_name, 
                         analog_index = p_tuple[0], label = p_tuple[1], 
                         use_lo_hi=up, clear=clear)
             
             if len(p_tuple) == 3:
+                if not isinstance(p_tuple[2], tuple) or len(p_tuple[2]) != 2 or (not all(isinstance(v_, pq.Quantity) and units_convertible(v_, pq.s) for v_ in p_tuple[2])):
+                    raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two time quantities")
                 pfun(data, time_slice = p_tuple[2])
                 
             else:

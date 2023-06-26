@@ -124,6 +124,7 @@ matplotlib-inline
 metakernel
 modelspec
 more-itertools
+myst_parser
 murmurhash
 nbclassic
 nbclient
@@ -167,7 +168,6 @@ python-magic
 pytz
 pywin32 ; sys_platform == 'win32'
 pyxdg
-pyxml
 qimage2ndarray
 ravenclaw
 rdflib
@@ -201,8 +201,6 @@ testpath
 thinc
 tiffile
 tokenizers
-torch
-tqdm
 traitlets
 transformers
 twine

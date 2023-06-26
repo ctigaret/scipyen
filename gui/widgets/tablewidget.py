@@ -22,7 +22,7 @@ import pandas as pd
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-import core.datatypes as dt
+import core.datatypes  
 
 import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration

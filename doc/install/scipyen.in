@@ -1,6 +1,7 @@
 #! /bin/sh 
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
+virtual_env="__SEDME__"
 
 # the line below supplies the shell function 'scipyact' created by make_scripts
 source $HOME/.scipyenrc 

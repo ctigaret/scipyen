@@ -12,8 +12,9 @@ from __future__ import print_function
 
 #### BEGIN core python modules
 import collections 
-from collections import deque
+from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod)
+import itertools
 import datetime
 from enum import (Enum, IntEnum, EnumMeta)
 import inspect
@@ -50,6 +51,7 @@ from core import quantities as scq
 from . import xmlutils
 from . import strutils
 from .prog import safeWrapper, is_hashable, is_type_or_subclass, ImmutableDescriptor
+from core.datazone import DataZone
 
 #### END pict.core.modules
 
@@ -336,6 +338,55 @@ def is_uniform_collection(obj):
 def sequence_element_type(s):
     from utilities import unique
     return unique((type(e) for e in s))
+
+def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]], 
+                     ref:typing.Union[type, typing.Sequence[type], typing.Set[type]],
+                     use_mro:bool=False,
+                     use_ref_mro:bool=False) -> bool:
+    """Checks a type in 't' against a reference type in 'ref'.
+    
+    't': a type, or a collection of types (i.e., tuple, list or set)
+    
+    'ref': a type, or a collection of types - the 'reference'
+    
+    Supported collections of types are tuple, list, and set.
+    
+    When 't' is a type, the function verifies if 't' is the same as 'ref' (when 
+    'ref' is a type) or is in 'ref' (when 'ref' is a collection of types)
+    
+    When 't' is a collection of types (see above) the function verifies that any
+    of the members in 't' are 'ref' (or in 'ref').
+    
+    Named parameters:
+    -----------------
+    use_mro: bool, optional, default is False; when True, the comparison extends
+        to the type hierarchy of objects in 't'
+    
+    use_ref_mro: bool, optional, default is False; when True, the comparison extends
+        to the type hierarchy of objects in 'ref'
+    
+    
+"""
+    if isinstance(t, type):
+        t = set(inspect.getmro(t)) if use_mro else set([t])
+        
+    elif isinstance(t, (tuple, list, set)):
+        t = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else set(t)
+        
+    else:
+        raise TypeError(f"'t': Expecting a type, or a list, set, or tuple of types; instead, got {type(t).__name__}")
+        
+    if isinstance(ref, type):
+        ref = set(inspect.getmro(ref)) if use_ref_mro else set([type])
+        
+    elif isinstance(ref, (list, tuple, set)):
+        ref = set(itertools.chain.from_iterable([inspect.getmro(t_) for t_ in ref])) if use_ref_mro else set(ref)
+        
+    else:
+        raise TypeError(f"'ref': Expecting a type, or a list, set, or tuple of types; instead, got {type(ref).__name__}")
+        
+    return len(t & ref) > 0
+    
     
     
 def array_slice(data:np.ndarray, slicing:(dict, type(None))):
@@ -891,9 +942,10 @@ class Episode:
     _:KW_ONLY
     begin:datetime.datetime = datetime.datetime.now()
     end:datetime.datetime = datetime.datetime.now()
-    startFrame:int = 0
+    beginFrame:int = 0
     endFrame:int = 1
     
+            
 @dataclass
 class Schedule:
     name:str = ""
@@ -977,12 +1029,13 @@ class AdministrationRoute(TypeEnum):
     tc = transcutaneous
     gavage = peros
     
+
 @dataclass
 class Procedure:
     name:str = ""
     _:KW_ONLY
     procedureType:ProcedureType = ProcedureType.null
-    schedule:Schedule = Schedule()
+    schedule:Schedule = field(default_factory = Schedule())
     
 @dataclass
 class TreatmentProcedure(Procedure):

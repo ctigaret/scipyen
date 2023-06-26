@@ -19,12 +19,22 @@ InflectEngine = inflect.engine()
 
 from PyQt5 import QtCore, QtGui
 
+REGEXP_METACHARACTERS = (".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "\\", "|", "(", ")")
+
 __translation_table_to_identifier = str.maketrans(dict([(c_, "_") for c_ in string.punctuation + string.whitespace]))
 
 __translation_table_to_R_identifier = str.maketrans(dict([(c_, ".") for c_ in string.punctuation + string.whitespace]))
 
+__output_cache_regexp__ = _re.compile("^(_o)|(_+)(h|\d*)$")
+
+__input_cache_regexp__ = _re.compile("^_i+(h|\d*)$")
+
 import errno, os
-def is_sequence(s:str):
+def is_sequence(s:str) -> bool:
+    """Return True if the s is a string representation of a tuple or list"""
+    if not isinstance(s, str):
+        return False
+    
     possibleSequence = False
     if s.startswith('(') and s.endswith(')'):
         possibleSequence = True
@@ -43,9 +53,31 @@ def is_sequence(s:str):
                 return True
             
     return False
+
+def is_cached_output_varname(s:str) -> bool:
+    """Returns True if s is an IPython cached output variable"""
+    return __output_cache_regexp__.match(s) is not None
+
+def is_cached_input_varname(s:str) -> bool:
+    """Returns True if s is an IPython cached input variable"""
+    return __input_cache_regexp__.match(s) is not None
             
+def is_glob(s:str) -> bool:
+    """Returns True if s is a string containing the '*' character"""
+    return isinstance(s, str) and any(c in s for c in ('*', '?') )
+
+def is_regexp(s:str) -> bool:
+    """Returns True if s is a string containing regexp metacharacters.
+
+The regexp metacharacters are:
+
+".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "\\", "|", "(", ")"
+    
+"""
+    return isinstance(s, str) and any(c in s for c in REGEXP_METACHARACTERS)
         
-def str2sequence(s:str):
+def str2sequence(s:str) -> typing.List[str]:
+    """Parses the string representation of a sequence into a sequence of strings"""
     possibleSequence = False
     
     if s.startswith('(') and s.endswith(')'):
@@ -78,17 +110,19 @@ def str2sequence(s:str):
         
     return s
             
-def is_path(s:str):
-    return any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
+def is_path(s:str) -> bool:
+    """Returns True if s is a string representation of a file system path."""
+    return isinstance(s, str) and any(c in s for c in (os.sep, os.pathsep, ";", "\\"))
     
-def str2range(s):
+def str2range(s:str) -> range:
+    """Parses the stirng representation of a range into a range object"""
     parts = list(int(s_) for s_ in s.split(":"))
     if len(parts) <= 3:
         return range(*parts)
     else:
         return range(*parts[0:3])
     
-def is_pathname_valid(pathname: str):
+def is_pathname_valid(pathname: str) -> bool:
     '''
     `True` if the passed pathname is a valid pathname for the current OS;
     `False` otherwise.
@@ -168,8 +202,7 @@ def is_pathname_valid(pathname: str):
     #
     # Did we mention this should be shipped with Python already?
 
-# def get_int_sfx(s, sep = "_", bracketed=False):
-def get_int_sfx(s, sep = "_"):
+def get_int_sfx(s:str, sep:str = "_", use_re:bool=False) -> typing.Tuple[str, int]:
     """Parses an integral suffix from the string.
     
     The suffix needs to be delimited by the sep string.
@@ -192,28 +225,43 @@ def get_int_sfx(s, sep = "_"):
     
     
     """
-    parts = s.split(sep)
-    
-    if len(parts) <= 1:
-        return s, None
-        #return s, 0
-    
-    sfx = parts[-1]
-    base = sep.join(parts[0:-1])
+    if not isinstance(sep, str) or len(sep) == 0 or use_re:
+        regexp = _re.compile("^(\D+)*(\d*)$")
+        re_match = regexp.match(s)
+        if re_match is not None and len(re_match.groups()) > 1:
+            try:
+                base, sfx = re_match.group(1,2)
+            except:
+                base, sfx = s, 0
+                # base, sfx = s, None
+                
+        else:
+            base, sfx = s, 0
+            # base, sfx = s, None
+                
+    else:
+        parts = s.split(sep)
+        
+        # if len(parts) <= 1:
+        if len(parts) < 2:
+            return s, 0
+            # return s, None
+        
+        sfx = parts[-1]
+        base = sep.join(parts[-1])
     
     try:
-        # if bracketed:
-        #     sfx = sfx[1:-1]
-            # sfx = sfx.lstrip("(").strip(")")
-        # print(f"sfx = {sfx}")
         sfx = int(sfx)
     except:
-        sfx = None
-        #sfx = 0
+        # sfx = None
+        sfx = 0
         
     return base, sfx
+
+def pluralize(s:str, n:int) -> str:
+    return InflectEngine.plural(s, n)
     
-def str2symbol(s):
+def str2symbol(s:str) -> str:
     """Returns a string that can be used as valid Python symbol (a.k.a variable name).
     
     If argument can already be used as a symbol ('s.isidentifier() is True') 
@@ -254,12 +302,15 @@ def str2symbol(s):
         
     return s
 
-def strcat(a,b):
+def strcat(a:str, b:str) -> str:
     """Just a convenience function for ''.join((a,b))
     """
     return ''.join((a,b))
 
-def str2R(s):
+def str2R(s:str) -> str:
+    """Converts the string s into a form usable in R.
+    The non-alpha-numeric characters are replaced with dots ('.')
+"""
     if not isinstance(s, str):
         raise TypeError("Expecting a str; got %s instead" % type(s).__name__)
     
@@ -280,7 +331,7 @@ class QNameValidator(QtGui.QValidator):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         
-    def validate(self, value, pos):
+    def validate(self, value:str, pos:int) -> QtGui.QValidator.State:
         if len(value.strip()) == 0:
             return QtGui.QValidator.Intermediate
             
@@ -293,7 +344,7 @@ class QNameValidator(QtGui.QValidator):
         else:
             return QtGui.QValidator.Intermediate
         
-    def fixup(self, value):
+    def fixup(self, value:str) -> str:
         return str2symbol(value)
             
 
@@ -301,7 +352,7 @@ class QRNameValidator(QtGui.QValidator):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         
-    def validate(self, value, pos):
+    def validate(self, value:str, pos:int) -> QtGui.QValidator.State:
         if len(value.strip()) == 0:
             return QtGui.QValidator.Intermediate
             
@@ -315,10 +366,11 @@ class QRNameValidator(QtGui.QValidator):
             else:
                 return QtGui.QValidator.Acceptable
         
-    def fixup(self, value):
+    def fixup(self, value:str) -> str:
         return str2R(value)
         
-def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, list]], precision:int=5, format:str="g", show_units=False):
+def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, list]], 
+                precision:int=5, format:str="g", show_units=False) -> str:
     """Generates a string representation of numeric data in base 10.
     Parameters:
     ----------
@@ -362,7 +414,8 @@ def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, li
         
     return txt
 
-def str2float(s):
+def str2float(s:str) -> float:
+    """Parse the stirng s into a float value"""
     if not isinstance(s, str):
         return np.nan
     
@@ -374,7 +427,7 @@ def str2float(s):
     
     return ret
 
-def isnumber(s):
+def isnumber(s:str) -> bool:
     """Returns True if string s can be evalated to a numbers.Number
     
     Strings of the form [-/+]x.y[e][-/+]z return True.

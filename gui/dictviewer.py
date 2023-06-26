@@ -27,7 +27,7 @@ import pandas as pd
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-import core.datatypes as dt
+import core.datatypes  
 
 import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration
@@ -777,11 +777,11 @@ class DataViewer(ScipyenViewer):
                 # FIXME 2021-10-03 22:17:29 this is really buggy!
                 #newVarName = validate_varname(namePrompt.text(), self._scipyenWindow_.workspace)
                 
-                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0])
+                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
                 
         else:
             for name, obj in zip(names, objects):
-                self._scipyenWindow_.assignToWorkspace(name, obj)
+                self._scipyenWindow_.assignToWorkspace(name, obj, check_name=False)
 
     def _collapse_expand_Recursive(self, item, expand=False, current=True):
         if expand:

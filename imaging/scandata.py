@@ -8110,7 +8110,7 @@ class ScanData(BaseScipyenData):
                     protocol_frames = protocol.segmentIndices()
                     protocol_name = protocol
         
-        elif isinstance(protocol, dt.TriggerProtocol):
+        elif isinstance(protocol,  datatypes.TriggerProtocol):
             protocol_frames = protocol.segmentIndices()
             protocol_name = protocol.name
             
