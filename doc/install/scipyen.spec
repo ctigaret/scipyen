@@ -6,7 +6,8 @@
 # do something like:
 # mkdir -p scipyen_app && cd scipyen_app
 # scipyact
-# scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean $HOME/scipyen/doc/install/scipyen.spec
+# scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/doc/install/scipyen.spec
+
 
 def datafile(path, strip_path=True):
     parts = path.split('/')
@@ -25,12 +26,12 @@ def datafile(path, strip_path=True):
 #         for filename in filenames
 #         if os.path.isfile(filename))
 
-def file2TOCEntry(path, topdirparts, strip_path=True):
+def file2TOCEntry(path:str, topdirparts:list, strip_path:bool=True, file_category:str="DATA"):
     parts = [p for p in path.split('/') if p not in topdirparts]
     path = name = os.path.join(*parts)
     if strip_path:
         name = os.path.basename(path)
-    return name, path, 'DATA'
+    return name, path, file_category
 
 def scanForFiles(path, ext, as_ext:True):
     uis = []
@@ -57,7 +58,8 @@ def DataFiles(topdir, ext, **kw):
     
     entries = scanForFiles(topdir, ext, as_ext)
 
-    # print(f"entries = {entries}\n\n")
+    if ext == ".ui":
+        print(f"entries = {entries}\n\n")
 
     
     return TOC(
@@ -67,13 +69,9 @@ def DataFiles(topdir, ext, **kw):
 
 block_cipher = None
 
-uitoc = DataFiles('/home/cezar/scipyen/src', ".ui")
-
-# nixiodata = collect_data_files("nixio")
-
+uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", strip_path=True)
 print(f"uitoc = {uitoc}\n\n")
-# jsontoc = DataFiles('/home/cezar/scipyen/src', ".json")
-# print(f"jsontoc = {jsontoc}\n\n")
+
 pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
 print(f"pickletoc = {pickletoc}\n\n")
 
@@ -89,7 +87,7 @@ readmetoc =  DataFiles('/home/cezar/scipyen/src', "README", as_ext=False)
 print(f"readmetoc = {readmetoc}\n\n")
 
 a = Analysis(
-    ['/home/cezar/scipyen/src/scipyen.py'],
+    ['../../src/scipyen.py'],
     pathex=['/home/cezar/scipyen/src/'],
     binaries=[],
     # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
@@ -103,10 +101,11 @@ a = Analysis(
            ('/home/cezar/scipyenv.3.11.3/share', 'share'),
            ('/home/cezar/scipyen/src/ephys/options', 'ephys/options'),
            ('/home/cezar/scipyen/src/ephys/waveforms', 'ephys/waveforms'),
-           ('/home/cezar/scipyen/src/gui', 'gui'),
+           # ('/home/cezar/scipyen/src/gui', 'gui'),
+           # ('/home/cezar/scipyen/src/imaging', 'imaging'),
            ],
     hiddenimports=[],
-    hookspath=[],
+    hookspath=['/home/cezar/scipyen/src/__pyinstaller'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
@@ -139,7 +138,7 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    uitoc,
+    # uitoc,
     # jsontoc,
     pickletoc,
     abftoc,

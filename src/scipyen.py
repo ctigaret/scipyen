@@ -57,6 +57,8 @@ except:
 from core import scipyen_config
 #### END Scipyen modules
 
+__version__ = "0.0.1"
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
