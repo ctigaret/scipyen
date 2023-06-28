@@ -55,6 +55,8 @@ def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
     parts = [p for p in src_path.split('/') if p not in topdirparts]
     my_path = name = os.path.join(*parts)
     target_path = os.path.dirname(my_path)
+    if len(target_path) == 0:
+        target_path = '.'
     # if strip_path:
     #     name = os.path.basename(path)
     return src_path, target_path
@@ -104,6 +106,26 @@ block_cipher = None
 # NOTE: 2023-06-28 11:07:31
 # expects a list of tuples (src_full_path_or_glob, dest_dir), see NOTE: 2023-06-28 11:08:08
 uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True)
+txttoc = DataFiles('/home/cezar/scipyen/src', ".txt", forAnalysis=True)
+svgtoc = DataFiles('/home/cezar/scipyen/src', ".svg", forAnalysis=True)
+pngtoc = DataFiles('/home/cezar/scipyen/src', ".png", forAnalysis=True)
+jpgtoc = DataFiles('/home/cezar/scipyen/src', ".jpg", forAnalysis=True)
+giftoc = DataFiles('/home/cezar/scipyen/src', ".fig", forAnalysis=True)
+tifftoc = DataFiles('/home/cezar/scipyen/src', ".tif", forAnalysis=True)
+tifftoc.extend(DataFiles('/home/cezar/scipyen/src', ".tiff", forAnalysis=True))
+icotoc = DataFiles('/home/cezar/scipyen/src', ".ico", forAnalysis=True)
+xsltoc = DataFiles('/home/cezar/scipyen/src', ".xsl", forAnalysis=True)
+shtoc = DataFiles('/home/cezar/scipyen/src', ".sh", forAnalysis=True)
+qrctoc = DataFiles('/home/cezar/scipyen/src', ".qrc", forAnalysis=True)
+readmetoc = DataFiles('/home/cezar/scipyen/src', "README", as_ext=False, forAnalysis=True)
+pkltoc = DataFiles('/home/cezar/scipyen/src', ".pkl", forAnalysis=True)
+hdftoc = DataFiles('/home/cezar/scipyen/src', ".h5", forAnalysis=True)
+hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf5", forAnalysis=True))
+hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf", forAnalysis=True))
+abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True)
+atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True)
+yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True)
+
 # print(f"uitoc = {uitoc}\n\n")
 # 
 # pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
@@ -130,6 +152,22 @@ hiddenimports = list()
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
 datas.extend(uitoc)
+datas.extend(txttoc)
+datas.extend(svgtoc)
+datas.extend(pngtoc)
+datas.extend(jpgtoc)
+datas.extend(giftoc)
+datas.extend(tifftoc)
+datas.extend(icotoc)
+datas.extend(xsltoc)
+datas.extend(shtoc)
+datas.extend(qrctoc)
+datas.extend(readmetoc)
+datas.extend(pkltoc)
+datas.extend(hdftoc)
+datas.extend(abftoc)
+datas.extend(atftoc)
+datas.extend(yamltoc)
 
 # jqc_data = collect_data_files("jupyter_qtconsole_colorschemes")
 # datas.extend(jqc_data)

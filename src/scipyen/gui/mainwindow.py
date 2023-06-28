@@ -7584,6 +7584,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         For details, see the documentation of the core.scipyen_plugin_loader 
         module.
         '''
+        # print(f"{self.__class__.__name__}.slot_loadPlugins")
+        scipyen_plugin_loader.find_frozen()
         scipyen_plugin_loader.find_plugins(self._scipyendir_)  # calls os.walk
 
         # NOTE: 2016-04-15 11:53:08
@@ -7674,7 +7676,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # (i.e., don't make this mistake again...)
         # calling this seems to make the qt app close -- why?
         # NOTE: FIXED 2016-04-03 01:03:53 -- we call this asynchronously,
-        # via Qt signal/slot mechanism (main window emits startPluginLoad)
+        # via Qt signal/slot mechanism (main window emits startPluginLoad at end of __init__)
         # dw = os.walk(path)
 
     def _locateMenuByItemText_(self, parent, itemText):
