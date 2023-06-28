@@ -16,6 +16,7 @@ function showinstalldoc ()
         cat $installscriptdir/Install.md
     fi
 }
+
 function show_help ()
 {
     echo -e "\n***                                                         ***"
@@ -47,7 +48,6 @@ function show_help ()
     echo -e "Python environment for this !\n"
    
 }
-
 
 function findqmake ()
 {
@@ -768,7 +768,7 @@ realscript=`realpath $0`
 installscriptdir=`dirname "$realscript"`
 docdir=`dirname "$installscriptdir"`
 scipyendir=`dirname "$docdir"`
-scipyensrcdir=${scipyendir}/src
+scipyensrcdir=${scipyendir}/src/scipyen
 using_python=""
 install_neuron=0
 use_pypi_neuron=1
