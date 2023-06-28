@@ -41,37 +41,68 @@ def scanForFiles(path, ext, as_ext:True):
                 
     return items
         
-def file2TOCEntry(path:str, topdirparts:list, strip_path:bool=True, file_category:str="DATA"):
+def file2TOCEntry(src_path:str, topdirparts:list, file_category:str="DATA"):
     parts = [p for p in path.split('/') if p not in topdirparts]
-    path = name = os.path.join(*parts)
-    path = os.path.dirname(path)
-    if strip_path:
-        name = os.path.basename(path)
-    return name, path, file_category
+    my_path = name = os.path.join(*parts)
+    target_path = os.path.dirname(my_path)
+    return target_path, src_path, file_category
 
+def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
+    """Returns a 2-tuple (source_full_path, target_dir)
+    To be used in the Analysis constructor, below
+    """
+    parts = [p for p in src_path.split('/') if p not in topdirparts]
+    my_path = name = os.path.join(*parts)
+    target_path = os.path.dirname(my_path)
+    # if strip_path:
+    #     name = os.path.basename(path)
+    return src_path, target_path
+    
 
 def DataFiles(topdir, ext, **kw):
     import os
-    strip_path = kw.get('strip_path', False)
+    # strip_path = kw.get('strip_path', False)
     as_ext = kw.get("as_ext", True)
+    forAnalysis = kw.get("forAnalysis", False)
 
     topdirparts = topdir.split('/')
     
     items = scanForFiles(topdir, ext, as_ext)
 
-    if ext == ".ui":
-        print(f"ui files = {items}\n\n")
+    # if ext == ".ui":
+    #     print(f"ui files = {items}\n\n")
+    
+    # NOTE: 2023-06-28 11:14:37
+    # The Analysis.datas expects a list (src, dest) where:
+    #
+    #   • src is the absolute or relative path of a data file
+    #   • dest is the directory where the data file will be placed
+    #
+    # The COLLECT constructor expects a TOC, where the TOC is a list-like object
+    #   with tuples (name, path, typecode) where:
+    #
+    #   • name - final name (path ?) inside the bundle -- the runtime name
+    #   • path - the full path name in build (source?)
+    #   • typecode - "DATA" for data files, see PyInstaller.building.datastruct.TOC for details
+    #
+    #   WARNING: the name, path in the COLLECT are, respectively, the same as 
+    #   dest, src in Analysis.datas (but the order is reversed)
 
+    if forAnalysis:
+        return [file2entry(filename, topdirparts) for filename in items]
     
     return TOC(
-        file2TOCEntry(filename, topdirparts, strip_path=strip_path)
+        file2TOCEntry(filename, topdirparts)
         for filename in items
         if os.path.isfile(filename))
 
 block_cipher = None
 
 # uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", strip_path=True)
-uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", strip_path=False)
+
+# NOTE: 2023-06-28 11:07:31
+# expects a list of tuples (src_full_path_or_glob, dest_dir), see NOTE: 2023-06-28 11:08:08
+uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True)
 print(f"uitoc = {uitoc}\n\n")
 # 
 # pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
@@ -88,20 +119,28 @@ print(f"uitoc = {uitoc}\n\n")
 # readmetoc =  DataFiles('/home/cezar/scipyen/src', "README", as_ext=False)
 # print(f"readmetoc = {readmetoc}\n\n")
 
-datas = collect_data_files("scipyen") # works only when scipyen is a package
+datas = list()
+
+# NOTE: 2023-06-28 11:09:08 DOES NOT WORK BECAUSE SCIPYEN IS NOT A PACKAGE (INSTALLED PACKAGE)
+# datas = collect_data_files("scipyen")
+
+# NOTE: 2023-06-28 11:06:50 This WORKS!!! 
+# see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
 datas.extend(uitoc)
 
-print(f"\ndatas = {datas}\n")
+# print(f"\ndatas = {datas}\n")
 
 a = Analysis(
     ['../../src/scipyen/scipyen.py'],
-    pathex=['/home/cezar/scipyen/src'], # ← to find the scipyen package
+    pathex=['/home/cezar/scipyen/src/scipyen'], # ← to find the scipyen package
     binaries=[],
     # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
     #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
     #           ('/home/cezar/scipyenv.3.11.3/lib64/*', 'lib64'),
     #           ],
     datas=datas,
+    # NOTE: 2023-06-28 11:08:08
+    # Example of what is needed for this attribute:
     # datas=[('/home/cezar/scipyenv.3.11.3/doc', 'doc'),
     #        ('/home/cezar/scipyenv.3.11.3/etc', 'etc'),
     #        ('/home/cezar/scipyenv.3.11.3/include','include'),
@@ -113,7 +152,7 @@ a = Analysis(
     #        # ('/home/cezar/scipyen/src/imaging', 'imaging'),
     #        ],
     hiddenimports=[],
-    hookspath=['/home/cezar/scipyen/src/__pyinstaller'],
+    hookspath=['/home/cezar/scipyen/src/scipyen/__pyinstaller'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
