@@ -44,44 +44,30 @@
 		<file>images/JupyterConsole.svg</file>
 		<file>images/JupyterQtConsole.svg</file>
 		<file>images/kr_combine.svg</file>
-		<file>images/labplot-xy-curve (1).svg</file>
 		<file>images/labplot-xy-curve-dark.svg</file>
-		<file>images/labplot-xy-curve-points (1).svg</file>
-		<file>images/labplot-xy-curve-points (2).svg</file>
 		<file>images/labplot-xy-curve-points-dark.svg</file>
 		<file>images/labplot-xy-curve-points.svg</file>
-		<file>images/labplot-xy-curve-segments (1).svg</file>
 		<file>images/labplot-xy-curve-segments-dark.svg</file>
 		<file>images/labplot-xy-curve-segments.svg</file>
 		<file>images/labplot-xy-curve.svg</file>
-		<file>images/labplot-xy-equation-curve (1).svg</file>
 		<file>images/labplot-xy-equation-curve-dark.svg</file>
 		<file>images/labplot-xy-equation-curve.svg</file>
-		<file>images/labplot-xy-fit-curve (1).svg</file>
 		<file>images/labplot-xy-fit-curve-dark.svg</file>
 		<file>images/labplot-xy-fit-curve.svg</file>
-		<file>images/labplot-xy-fourier-filter-curve (1).svg</file>
 		<file>images/labplot-xy-fourier-filter-curve-dark.svg</file>
 		<file>images/labplot-xy-fourier-filter-curve.svg</file>
-		<file>images/labplot-xy-fourier-transform-curve (1).svg</file>
 		<file>images/labplot-xy-fourier-transform-curve-dark.svg</file>
 		<file>images/labplot-xy-fourier-transform-curve.svg</file>
-		<file>images/labplot-xy-interpolation-curve (1).svg</file>
 		<file>images/labplot-xy-interpolation-curve-dark.svg</file>
 		<file>images/labplot-xy-interpolation-curve.svg</file>
-		<file>images/labplot-xy-plot-four-axes (1).svg</file>
 		<file>images/labplot-xy-plot-four-axes-dark.svg</file>
 		<file>images/labplot-xy-plot-four-axes.svg</file>
-		<file>images/labplot-xy-plot-two-axes (1).svg</file>
-		<file>images/labplot-xy-plot-two-axes-centered (1).svg</file>
 		<file>images/labplot-xy-plot-two-axes-centered-dark.svg</file>
-		<file>images/labplot-xy-plot-two-axes-centered-origin (1).svg</file>
 		<file>images/labplot-xy-plot-two-axes-centered-origin-dark.svg</file>
 		<file>images/labplot-xy-plot-two-axes-centered-origin.svg</file>
 		<file>images/labplot-xy-plot-two-axes-centered.svg</file>
 		<file>images/labplot-xy-plot-two-axes-dark.svg</file>
 		<file>images/labplot-xy-plot-two-axes.svg</file>
-		<file>images/labplot-xy-smoothing-curve (1).svg</file>
 		<file>images/labplot-xy-smoothing-curve-dark.svg</file>
 		<file>images/labplot-xy-smoothing-curve.svg</file>
 		<file>images/list-remove.svg</file>

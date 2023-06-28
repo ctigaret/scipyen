@@ -6,6 +6,7 @@ __pycache__
 *.pyc
 *.py~
 *DS_Store
+kate.project.*
 
 # Ignore dynaconf secret files
 .secrets.*
