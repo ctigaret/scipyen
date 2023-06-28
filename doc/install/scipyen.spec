@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
+                                     collect_all)
 
 # NOTE: 2023-06-26 17:25:32
 # do something like:
@@ -103,7 +104,7 @@ block_cipher = None
 # NOTE: 2023-06-28 11:07:31
 # expects a list of tuples (src_full_path_or_glob, dest_dir), see NOTE: 2023-06-28 11:08:08
 uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True)
-print(f"uitoc = {uitoc}\n\n")
+# print(f"uitoc = {uitoc}\n\n")
 # 
 # pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
 # print(f"pickletoc = {pickletoc}\n\n")
@@ -119,14 +120,27 @@ print(f"uitoc = {uitoc}\n\n")
 # readmetoc =  DataFiles('/home/cezar/scipyen/src', "README", as_ext=False)
 # print(f"readmetoc = {readmetoc}\n\n")
 
-datas = list()
-
-# NOTE: 2023-06-28 11:09:08 DOES NOT WORK BECAUSE SCIPYEN IS NOT A PACKAGE (INSTALLED PACKAGE)
+# NOTE: 2023-06-28 11:09:08 DOES NOT WORK WITH SCIYEN BECAUSE SCIPYEN IS NOT 
+# A(N INSTALLED) PACKAGE
 # datas = collect_data_files("scipyen")
+binaries = list()
+datas = list()
+hiddenimports = list()
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
 datas.extend(uitoc)
+
+# jqc_data = collect_data_files("jupyter_qtconsole_colorschemes")
+# datas.extend(jqc_data)
+# # NOTE: 2023-06-28 11:45:44
+# # either this, or override hook-pygments.py / hook-pkg_resources.py
+# jqc = collect_submodules("jupyter_qtconsole_colorschemes")
+
+jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
+datas.extend(jqc_datas)
+binaries.extend(jqc_binaries)
+hiddenimports.extend(jqc_hiddenimports)
 
 # print(f"\ndatas = {datas}\n")
 
@@ -151,7 +165,8 @@ a = Analysis(
     #        # ('/home/cezar/scipyen/src/gui', 'gui'),
     #        # ('/home/cezar/scipyen/src/imaging', 'imaging'),
     #        ],
-    hiddenimports=[],
+    # hiddenimports=[],
+    hiddenimports=hiddenimports,
     hookspath=['/home/cezar/scipyen/src/scipyen/__pyinstaller'],
     hooksconfig={},
     runtime_hooks=[],
