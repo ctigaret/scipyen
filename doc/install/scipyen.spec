@@ -1,10 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_data_files
+
 # NOTE: 2023-06-26 17:25:32
 # do something like:
 # mkdir -p scipyen_app && cd scipyen_app
 # scipyact
-# scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean $HOME/scipyen/doc/install/scipyen.spec
+# scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/doc/install/scipyen.spec
+
 
 def datafile(path, strip_path=True):
     parts = path.split('/')
@@ -23,28 +26,29 @@ def datafile(path, strip_path=True):
 #         for filename in filenames
 #         if os.path.isfile(filename))
 
-def file2TOCEntry(path, topdirparts, strip_path=True):
-    parts = [p for p in path.split('/') if p not in topdirparts]
-    path = name = os.path.join(*parts)
-    if strip_path:
-        name = os.path.basename(path)
-    return name, path, 'DATA'
-
 def scanForFiles(path, ext, as_ext:True):
-    uis = []
+    items = []
     with os.scandir(path) as dirIt:
         for e in dirIt:
             if e.is_dir():
-                _uis = scanForFiles(e.path, ext, as_ext)
-                if len(_uis):
-                    uis.extend(_uis)
+                _items = scanForFiles(e.path, ext, as_ext)
+                if len(_items):
+                    items.extend(_items)
                     
             elif e.is_file():
                 if (as_ext and e.path.endswith(ext)) or (not as_ext and ext in e.path):
-                    uis.append(e.path)
+                    items.append(e.path)
                 
-    return uis
+    return items
         
+def file2TOCEntry(path:str, topdirparts:list, strip_path:bool=True, file_category:str="DATA"):
+    parts = [p for p in path.split('/') if p not in topdirparts]
+    path = name = os.path.join(*parts)
+    path = os.path.dirname(path)
+    if strip_path:
+        name = os.path.basename(path)
+    return name, path, file_category
+
 
 def DataFiles(topdir, ext, **kw):
     import os
@@ -53,56 +57,63 @@ def DataFiles(topdir, ext, **kw):
 
     topdirparts = topdir.split('/')
     
-    entries = scanForFiles(topdir, ext, as_ext)
+    items = scanForFiles(topdir, ext, as_ext)
 
-    # print(f"entries = {entries}\n\n")
+    if ext == ".ui":
+        print(f"ui files = {items}\n\n")
 
     
     return TOC(
         file2TOCEntry(filename, topdirparts, strip_path=strip_path)
-        for filename in entries
+        for filename in items
         if os.path.isfile(filename))
 
 block_cipher = None
 
-uitoc = DataFiles('/home/cezar/scipyen/src', ".ui")
-
+# uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", strip_path=True)
+uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", strip_path=False)
 print(f"uitoc = {uitoc}\n\n")
-jsontoc = DataFiles('/home/cezar/scipyen/src', ".json")
-print(f"jsontoc = {jsontoc}\n\n")
-pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
-print(f"pickletoc = {pickletoc}\n\n")
+# 
+# pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
+# print(f"pickletoc = {pickletoc}\n\n")
+# 
+# abftoc = DataFiles('/home/cezar/scipyen/src', ".abf")
+# print(f"abftoc = {abftoc}\n\n")
+# atftoc = DataFiles('/home/cezar/scipyen/src', ".atf")
+# print(f"atftoc = {atftoc}\n\n")
+# shtoc =  DataFiles('/home/cezar/scipyen/src', ".sh")
+# print(f"shtoc = {shtoc}\n\n")
+# txttoc =  DataFiles('/home/cezar/scipyen/src', ".txt")
+# print(f"txttoc = {txttoc}\n\n")
+# readmetoc =  DataFiles('/home/cezar/scipyen/src', "README", as_ext=False)
+# print(f"readmetoc = {readmetoc}\n\n")
 
-abftoc = DataFiles('/home/cezar/scipyen/src', ".abf")
-print(f"abftoc = {abftoc}\n\n")
-atftoc = DataFiles('/home/cezar/scipyen/src', ".atf")
-print(f"atftoc = {atftoc}\n\n")
-shtoc =  DataFiles('/home/cezar/scipyen/src', ".sh")
-print(f"shtoc = {shtoc}\n\n")
-txttoc =  DataFiles('/home/cezar/scipyen/src', ".txt")
-print(f"txttoc = {txttoc}\n\n")
-readmetoc =  DataFiles('/home/cezar/scipyen/src', "README", as_ext=False)
-print(f"readmetoc = {readmetoc}\n\n")
+datas = collect_data_files("scipyen") # works only when scipyen is a package
+datas.extend(uitoc)
+
+print(f"\ndatas = {datas}\n")
 
 a = Analysis(
-    ['/home/cezar/scipyen/src/scipyen.py'],
-    pathex=['/home/cezar/scipyen/src/'],
+    ['../../src/scipyen/scipyen.py'],
+    pathex=['/home/cezar/scipyen/src'], # ← to find the scipyen package
     binaries=[],
     # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
     #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
     #           ('/home/cezar/scipyenv.3.11.3/lib64/*', 'lib64'),
     #           ],
-    datas=[('/home/cezar/scipyenv.3.11.3/doc', 'doc'),
-           ('/home/cezar/scipyenv.3.11.3/etc', 'etc'),
-           ('/home/cezar/scipyenv.3.11.3/include','include'),
-           ('/home/cezar/scipyenv.3.11.3/man', 'man'),
-           ('/home/cezar/scipyenv.3.11.3/share', 'share'),
-           ('/home/cezar/scipyen/src/ephys/options', 'ephys/options'),
-           ('/home/cezar/scipyen/src/ephys/waveforms', 'ephys/waveforms'),
-           ('/home/cezar/scipyen/src/gui', 'gui'),
-           ],
+    datas=datas,
+    # datas=[('/home/cezar/scipyenv.3.11.3/doc', 'doc'),
+    #        ('/home/cezar/scipyenv.3.11.3/etc', 'etc'),
+    #        ('/home/cezar/scipyenv.3.11.3/include','include'),
+    #        ('/home/cezar/scipyenv.3.11.3/man', 'man'),
+    #        ('/home/cezar/scipyenv.3.11.3/share', 'share'),
+    #        ('/home/cezar/scipyen/src/ephys/options', 'ephys/options'),
+    #        ('/home/cezar/scipyen/src/ephys/waveforms', 'ephys/waveforms'),
+    #        # ('/home/cezar/scipyen/src/gui', 'gui'),
+    #        # ('/home/cezar/scipyen/src/imaging', 'imaging'),
+    #        ],
     hiddenimports=[],
-    hookspath=[],
+    hookspath=['/home/cezar/scipyen/src/__pyinstaller'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
@@ -135,12 +146,12 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    uitoc,
+    # uitoc,
     # jsontoc,
-    pickletoc,
-    abftoc,
-    atftoc,
-    shtoc,
+    # pickletoc,
+    # abftoc,
+    # atftoc,
+    # shtoc,
     strip=False,
     upx=True,
     upx_exclude=[],
