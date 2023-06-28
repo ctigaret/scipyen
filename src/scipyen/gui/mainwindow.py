@@ -6577,7 +6577,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 # now vardict only has variables shuttled (via pickle) from the
                 # external kernel namespace into our own
-
+                # NOTE: 2023-06-28 22:30:51 WARNING
+                # next line injects these variables in our workspace
+                # WARNING: these variables ARE NOT references, but true bit
+                # copies of the data in the foreign kernel
                 self.workspace.update(vardict)
                 self.workspaceModel.update()
                 # self.workspaceModel.update(from_console=False)
