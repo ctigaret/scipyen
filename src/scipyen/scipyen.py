@@ -7,7 +7,7 @@
 import sys, os
 
 import atexit, re, inspect, gc, io, traceback, platform
-import faulthandler
+import faulthandler, warnings
 #import cProfile
 
 # has_breeze_resources_for_win32 = False
@@ -36,9 +36,8 @@ if sys.platform == "win32" and sys.version_info.minor >= 9:
     # except:
     #     has_breeze_resources_for_win32 = False
 
-        
+
     
-#import warnings
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -57,10 +56,16 @@ except:
 from core import scipyen_config
 #### END Scipyen modules
 
+__version__ = "0.0.1"
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    print(f'running in a PyInstaller bundle with frozen: {sys.frozen} and _MEIPASS: {sys._MEIPASS}')
+else:
+    print('running in a normal Python process')
+    
 # NOTE: 2021-01-10 13:19:20
 # the same Configuration object holds/merges both the user options and the 
 # package defaults (therefore there is no need for two Configuration objects)
