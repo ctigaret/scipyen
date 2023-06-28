@@ -9,6 +9,7 @@ from neo.core.dataobject import DataObject, ArrayDict
 import pyqtgraph as pg
 
 from core import quantities as cq
+from core.quantities import check_time_units
 from .prog import (safeWrapper, with_doc)
 from PyQt5 import QtWidgets
 
