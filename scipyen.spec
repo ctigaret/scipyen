@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-
+import io, os, sys, subprocess, shutil, tempfile
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 
@@ -7,8 +7,29 @@ from PyInstaller.utils.hooks import (collect_data_files, collect_submodules,
 # do something like:
 # mkdir -p scipyen_app && cd scipyen_app
 # scipyact
-# scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/doc/install/scipyen.spec
+# scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/scipyen.spec
+# or from the $HOME:
+# scipyen_app> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
 
+myfile = sys.argv[-1]
+
+
+if "--distpath" in sys.argv:
+    ndx = sys.argv.index("--distpath")
+    if ndx < (len(sys.argv) - 1):
+        distpath = sys.argv[ndx+1]
+        
+    else:
+        distpath = DEFAULT_DISTPATH
+else:
+    distpath = DEFAULT_DISTPATH
+
+if not os.path.isabs(myfile):
+    myfile = os.path.abspath(myfile)
+    
+mydir = os.path.dirname(myfile)
+
+print(f"\nWARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
 def datafile(path, strip_path=True):
     parts = path.split('/')
@@ -16,16 +37,6 @@ def datafile(path, strip_path=True):
     if strip_path:
         name = os.path.basename(path)
     return name, path, 'DATA'
-
-# def Datafiles(*filenames, **kw):
-#     import os
-#     
-# 
-#     strip_path = kw.get('strip_path', True)
-#     return TOC(
-#         datafile(filename, strip_path=strip_path)
-#         for filename in filenames
-#         if os.path.isfile(filename))
 
 def scanForFiles(path, ext, as_ext:True):
     items = []
@@ -126,28 +137,79 @@ abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True)
 atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True)
 yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True)
 
-# print(f"uitoc = {uitoc}\n\n")
-# 
-# pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
-# print(f"pickletoc = {pickletoc}\n\n")
-# 
-# abftoc = DataFiles('/home/cezar/scipyen/src', ".abf")
-# print(f"abftoc = {abftoc}\n\n")
-# atftoc = DataFiles('/home/cezar/scipyen/src', ".atf")
-# print(f"atftoc = {atftoc}\n\n")
-# shtoc =  DataFiles('/home/cezar/scipyen/src', ".sh")
-# print(f"shtoc = {shtoc}\n\n")
-# txttoc =  DataFiles('/home/cezar/scipyen/src', ".txt")
-# print(f"txttoc = {txttoc}\n\n")
-# readmetoc =  DataFiles('/home/cezar/scipyen/src', "README", as_ext=False)
-# print(f"readmetoc = {readmetoc}\n\n")
-
 # NOTE: 2023-06-28 11:09:08 DOES NOT WORK WITH SCIYEN BECAUSE SCIPYEN IS NOT 
 # A(N INSTALLED) PACKAGE
 # datas = collect_data_files("scipyen")
 binaries = list()
 datas = list()
 hiddenimports = list()
+
+tempdir = ""
+desktoptempdir=""
+# origin_fn = None
+# origin_file = None
+namesfx = ""
+
+if os.path.isdir(os.path.join(mydir, ".git")):
+    gitout = subprocess.run(["git", "-C", mydir, "branch", "--show-current"],
+                            capture_output=True)
+    
+    if gitout.returncode == 0 and len(gitout.stdout):
+        gitbranch = gitout.stdout.decode().split("\n")[0]
+        if gitbranch != "master":
+            namesfx = f"_{gitbranch}"
+            
+        if len(gitbranch):
+            gitout = subprocess.run(["git", "-C", mydir, "status", "--short", "--branch"],
+                                    capture_output=True)
+            if gitout.returncode == 0:
+                branch_status = gitout.stdout.decode().split("\n")
+                branch_status.insert(0, f"Bundled from '{gitbranch}' git branch with status:")
+                
+                print(f"branch_status = {branch_status}")
+                
+                if len(branch_status):
+                    tempdir = tempfile.mkdtemp()
+                    origin_file_name = os.path.join(tempdir, "bundle_origin")
+                    with open(origin_file_name, "wt") as origin_file:
+                        for s in branch_status:
+                            origin_file.write(f"{s}\n")
+                        
+                    datas.append((origin_file_name, '.'))
+                        
+product = f"scipyen{namesfx}"
+bundlepath = os.path.join(distpath, product)
+
+desktoptempdir = tempfile.mkdtemp()
+desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
+desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
+exec_file = os.path.join(bundlepath, "scipyen")
+desktop_file_contents = ["[Desktop Entry]",
+"Type=Application"
+"Name[en_GB]=Scipyen",
+"Name=Scipyen",
+"Comment[en_GB]=Scientific Python Environment for Neurophysiology",
+"Comment=Scientific Python Environment for Neurophysiology",
+"GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
+"GenericName=Scientific Python Environment for Neurophysiology",
+f"Icon={desktop_icon_file}",
+"Categories=Science;Utilities;",
+"Exec=%k/scipyen",
+"MimeType=",
+"Path=",
+"StartupNotify=true",
+"Terminal=true",
+"TerminalOptions=\s",
+"X-DBUS-ServiceName=",
+"X-DBUS-StartupType=",
+"X-KDE-SubstituteUID=false",
+"X-KDE-Username=",
+]
+with open(desktop_file_name, "wt") as desktop_file:
+    for line in desktop_file_contents:
+        desktop_file.write(f"{line}\n")
+
+datas.append((desktop_file_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
@@ -169,23 +231,29 @@ datas.extend(abftoc)
 datas.extend(atftoc)
 datas.extend(yamltoc)
 
-# jqc_data = collect_data_files("jupyter_qtconsole_colorschemes")
-# datas.extend(jqc_data)
-# # NOTE: 2023-06-28 11:45:44
-# # either this, or override hook-pygments.py / hook-pkg_resources.py
-# jqc = collect_submodules("jupyter_qtconsole_colorschemes")
-
+# NOTE: 2023-06-28 11:45:44
+# I think the next line below ('collect_all') is better than trying to see what
+# can be tweaked in hook-pygments.py / hook-pkg_resources.py
 jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
 datas.extend(jqc_datas)
 binaries.extend(jqc_binaries)
 hiddenimports.extend(jqc_hiddenimports)
 
+# NOTE: 2023-06-29 08:32:55
+# try as above for jupyter_client (needed because "local-provisioner" issues 
+# when starting external IPython console in Scipyen)
+
+jc_datas, jc_binaries, jc_hiddenimports = collect_all("jupyter_client")
+datas.extend(jc_datas)
+binaries.extend(jc_binaries)
+hiddenimports.extend(jc_hiddenimports)
+
 # print(f"\ndatas = {datas}\n")
 
 a = Analysis(
-    ['../../src/scipyen/scipyen.py'],
+    ['/home/cezar/scipyen/src/scipyen/scipyen.py'],
     pathex=['/home/cezar/scipyen/src/scipyen'], # ← to find the scipyen package
-    binaries=[],
+    binaries=binaries,
     # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
     #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
     #           ('/home/cezar/scipyenv.3.11.3/lib64/*', 'lib64'),
@@ -203,7 +271,6 @@ a = Analysis(
     #        # ('/home/cezar/scipyen/src/gui', 'gui'),
     #        # ('/home/cezar/scipyen/src/imaging', 'imaging'),
     #        ],
-    # hiddenimports=[],
     hiddenimports=hiddenimports,
     hookspath=['/home/cezar/scipyen/src/scipyen/__pyinstaller'],
     hooksconfig={},
@@ -221,7 +288,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='scipyen',
+    name='scipyen', # name of the final executable
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -238,14 +305,16 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    # uitoc,
-    # jsontoc,
-    # pickletoc,
-    # abftoc,
-    # atftoc,
-    # shtoc,
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='scipyen',
+    name=product, # name of distribution directry (e.g, 'scipyen_dev' etc)
+    # name='scipyen',
 )
+
+if isinstance(tempdir, str) and os.path.isdir(tempdir):
+    shutil.rmtree(tempdir)
+    
+if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
+    shutil.rmtree(desktoptempdir)
+    
