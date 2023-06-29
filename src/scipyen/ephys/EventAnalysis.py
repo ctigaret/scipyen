@@ -408,8 +408,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         # NOTE: 2022-11-26 11:22:38
         # this works, but still needs to be made abortable
-        # self._detectController_ = pgui.ProgressThreadController(self._detect_all_)
-        # self._detectController_.sig_ready.connect(self._slot_detectThread_ready)
+        # NOTE: 2023-06-29 21:35:06 API changed
+        # ⇒ inappropriate for this case, don't use here.
+        # # # # self._detectController_ = pgui.ProgressThreadController(self._detect_all_)
+        # # # # self._detectController_.sig_ready.connect(self._slot_detectThread_ready)
         
         # NOTE: 2022-11-26 11:23:21
         # alternative from below:

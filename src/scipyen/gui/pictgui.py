@@ -331,12 +331,6 @@ class MouseEventSink(QtCore.QObject):
         self.itemSelected.emit(item.text())
         self.close()
         
-# class ThreadWorker(QtCore.QObject):
-#     def __init__(self, fn):
-#         super(ThreadWorker, self).__init__()
-#         self.fn = fn
-#         self.signals = ProgressWorkerSignals()
-
 class ProgressWorkerThreaded(QtCore.QObject):
     """Calls a worker function in a separate QThread.
         The worker function is typically executing a time-consuming loop (such
@@ -364,10 +358,12 @@ class ProgressWorkerThreaded(QtCore.QObject):
         self.args = args
         self.kwargs = kwargs
         self.signals = ProgressWorkerSignals()
+        # print(f"{self.__class__.__name__}.__init__ signals = {self.signals} ")
         self.pd = None
         self.loopControl = loopControl
         self.kwargs['progressSignal'] = self.signals.signal_Progress
         self.kwargs["finishedSignal"] = self.signals.signal_Finished
+        self.kwargs["canceledSignal"] = self.signals.signal_Canceled
         self.kwargs["resultSignal"] = self.signals.signal_Result
         self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
         self.kwargs["loopControl"] = self.loopControl
@@ -379,27 +375,27 @@ class ProgressWorkerThreaded(QtCore.QObject):
         if isinstance(progressDialog, QtWidgets.QProgressDialog):
             self.pd = progressDialog
             self.pd.setValue(0)
-            self.signals.signal_Progress.connect(self.pd.setValue)
+            self.signals.signal_Progress.connect(self.progress)
             self.signals.signal_setMaximum.connect(self.pd.setMaximum)
             self.signals.signal_Finished.connect(self.pd.reset)
         else:
             self.pd is None
             
+    @pyqtSlot(int)
+    def progress(self, value):
+        # print(f"{self.__class__.__name__}.progress({value})")
+        if isinstance(self.pd, QtWidgets.QProgressDialog):
+            self.pd.setValue(value)
+        # else:
+        #     print("\tno progress dialog!")
+            
     @property
     def progressDialog(self):
         return self.pd
     
-    # @pyqtSlot()
-    # def slot_canceled(self):
-    #     print(f"{self.__class__.__name__}.slot_canceled")
-    #     self.thread().quit()
-    #     self.loopControl["break"] = True
-    #     self.signals.signal_Canceled.emit()
-        
     @pyqtSlot()
     def run(self):
         # print(f"{self.__class__.__name__}.run()")
-        # self.poller.start(self.refreshTime)
         # result = self.fn(*self.args, **self.kwargs)
         # self.signals.signal_Result.emit(result)  # Return the result of the processing
         # self.signals.signal_Finished.emit()  # Done
@@ -413,6 +409,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
             
         else:
             self.signals.signal_Result.emit(result)  # Return the result of the processing
+            self.signals.signal_Finished.emit()  # Done
             
         finally:
             self.signals.signal_Finished.emit()  # Done
@@ -421,16 +418,27 @@ class ProgressThreadController(QtCore.QObject):
     sig_start = pyqtSignal(name="sig_start")
     sig_ready = pyqtSignal(object, name="sig_ready")
     
-    def __init__(self, fn, /, progressDialog=None, *args, **kwargs):
+    # def __init__(self, fn, /, progressDialog=None, *args, **kwargs):
+    def __init__(self, progressWorker:ProgressWorkerThreaded, /, *args, **kwargs):
         super().__init__()
-        print(f"{self.__class__.__name__}.__init__(fn={fn}, progressDialog = {progressDialog})")
+        if not isinstance(progressWorker, ProgressWorkerThreaded):
+            raise TypeError(f"Expecting a ProgressWorkerThreaded; instead, got a {type(progressWorker).__name__}")
+        self.result = None
+        
+        # print(f"{self.__class__.__name__}.__init__(fn={fn}, progressDialog = {progressDialog})")
         self.workerThread = QtCore.QThread()
-        self.worker = ProgressWorkerThreaded(fn, progressDialog, *args, **kwargs)
+        self.worker = progressWorker
+        # self.worker = ProgressWorkerThreaded(fn, progressDialog, *args, **kwargs)
         self.worker.moveToThread(self.workerThread)
+        self.workerThread.started.connect(self.worker.run)
         self.workerThread.finished.connect(self.worker.deleteLater)
-        self.sig_start.connect(self.worker.run)
         self.worker.signals.signal_Result.connect(self.handleResult)
+        if hasattr(self.worker, "pd") and isinstance(self.worker.pd, QtWidgets.QProgressDialog):
+            self.worker.signals.signal_Finished.connect(self.worker.pd.reset)
+        self.worker.signals.signal_Finished.connect(self.finished)
         self.worker.signals.signal_Canceled.connect(self.abort)
+        self.worker.signals.signal_Progress[int].connect(self.worker.progress)
+        # self.sig_start.connect(self.worker.run)
         self.workerThread.start()
         
     def __del__(self):
@@ -438,15 +446,23 @@ class ProgressThreadController(QtCore.QObject):
         self.workerThread.wait()
         # super().__del__()
         
-    def setProgressDialog(self, progressDialog):
-        if isinstance(progressDialog, QtWidgets.QProgressDialog):
-            self.worker.setProgressDialog(progressDialog)
+    # def setProgressDialog(self, progressDialog):
+    #     if isinstance(progressDialog, QtWidgets.QProgressDialog):
+    #         self.worker.setProgressDialog(progressDialog)
             
     @pyqtSlot(object)
     def handleResult(self, result:object):
-        if isinstance(self.worker.progressDialog, QtWidgets.QProgressDialog):
-            self.worker.progressDialog.setValue(self.worker.progressDialog.maximum())
-        self.sig_ready.emit(result)
+        # print(f"{self.__class__.__name__}.handleResult({result})")
+        self.result = result
+        if isinstance(self.worker.pd, QtWidgets.QProgressDialog):
+            self.worker.pd.setValue(self.worker.progressDialog.maximum())
+        self.sig_ready.emit(self.result)
+        self.workerThread.quit()
+        
+    @pyqtSlot()
+    def finished(self):
+        # print(f"{self.__class__.__name__}.finished")
+        self.workerThread.quit()
         
     @pyqtSlot()
     def abort(self):
