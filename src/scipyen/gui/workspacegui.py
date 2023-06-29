@@ -531,8 +531,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
         self._scipyenWindow_ = None
         
-        self._fileLoadThread_ = None
         self._fileLoadWorker_ = None
+        self._fileLoadController_ = None
         
         # NOTE: 2023-05-27 13:46:40
         # mutable control data for the worker loops, to communicate with the
@@ -839,6 +839,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         """To be connected to the `canceled` signal of a progress dialog.
         Modifies the loopControl variable to interrupt a worker loop gracefully.
         """
+        print(f"{self.__class__.__name__}._slot_breakLoop")
         self.loopControl["break"] = True
         
         
@@ -857,27 +858,39 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         progressDlg.setMinimumDuration(1000)
         progressDlg.canceled.connect(self._slot_breakLoop)
         
-        self._fileLoadThread_ = QtCore.QThread()
         self._fileLoadWorker_ = pgui.ProgressWorkerThreaded(fileLoaderFn,
-                                                            loopControl = self.loopControl,
-                                                            filePaths = filePaths,
-                                                            ioReader=ioReaderFn,
-                                                            updateUi = updateUi)
+                                                     progressDialog=progressDlg,
+                                                     loopControl = self.loopControl,
+                                                     filePaths = filePaths,
+                                                     ioReader=ioReaderFn,
+                                                     updateUi = updateUi)
         
-        self._fileLoadWorker_.signals.signal_Progress.connect(progressDlg.setValue)
+        self._fileLoadController_ = pgui.ProgressThreadController(self._fileLoadWorker_)
+        self._fileLoadController_.sig_ready[object].connect(self._slot_fileLoadThread_ready)
         
-        self._fileLoadWorker_.moveToThread(self._fileLoadThread_)
-        self._fileLoadThread_.started.connect(self._fileLoadWorker_.run)
-        self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.quit)
+        
+        # self._fileLoadWorker_.signals.signal_Progress.connect(progressDlg.setValue)
+        # self._fileLoadWorker_.signals.signal_Finished.connect(lambda : progressDlg.setValue(progressDlg.maximum()))
+        
+        
+        
+        # self._fileLoadWorker_.moveToThread(self._fileLoadThread_)
+        # self._fileLoadWorker_.moveToThread(fileLoadThread)
+        # self._fileLoadThread_.started.connect(self._fileLoadWorker_.run)
+        # fileLoadThread.started.connect(self._fileLoadWorker_.run)
+        # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.quit)
+        # self._fileLoadWorker_.signals.signal_Finished.connect(fileLoadThread.quit)
         # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
-        self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.deleteLater)
-        self._fileLoadWorker_.signals.signal_Finished.connect(lambda : progressDlg.setValue(progressDlg.maximum()))
-        self._fileLoadWorker_.signals.signal_Result.connect(self._slot_fileLoadThread_ready)
+        # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.deleteLater)
+        # self._fileLoadController_.sig_start.emit()
         
-        self._fileLoadThread_.finished.connect(self._fileLoadWorker_.deleteLater)
+        # self._fileLoadThread_.finished.connect(self._fileLoadWorker_.deleteLater)
+        # fileLoadThread.finished.connect(self._fileLoadWorker_.deleteLater)
         # self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
         
-        self._fileLoadThread_.start()
+        # self._fileLoadThread_.start()
+        # fileLoadThread.start()
+        # # self._fileLoadThreads_.append(fileLoadThread)
         
     @pyqtSlot(object)
     def _slot_fileLoadThread_ready(self, result:object):
