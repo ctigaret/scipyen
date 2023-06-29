@@ -5646,6 +5646,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         Pass this as fileLoaderFn argument to self.loadFiles inherited from WorkspaceGuiMixin.
         """
+        # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded called")
         filePaths = kwargs.pop("filePaths", None)
         
         if not isinstance(filePaths, (tuple, list)) or len(filePaths) == 0: 
@@ -5653,8 +5654,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         loopControl = kwargs.pop("loopControl", None)
         progressSignal = kwargs.pop("progressSignal", None)
-        finishedSignal = kwargs.pop("finishedSignal", None)
-        resultSignal = kwargs.pop("resultSignal", None)
+        # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded progressSignal = {progressSignal}")
+        # finishedSignal = kwargs.pop("finishedSignal", None)
+        # resultSignal = kwargs.pop("resultSignal", None)
+        # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded resultSignal = {resultSignal}")
+        canceledSignal = kwargs.pop("canceledSignal", None)
         ioReader = kwargs.pop("ioReader", None)
         separateWorkspaceViewUpdate = kwargs.pop("updateAfter", False) == True
         updateUi = kwargs.pop("updateUi", True)
@@ -5668,17 +5672,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         self.updateUiWithFileLoad = updateUi # def'ed in WorkspaceGuiMixin
         
+        canceled = False
+        
         for k, item in enumerate(filePaths):
             # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded ({k}, {item})")
             OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
             if OK and isinstance(progressSignal, QtCore.pyqtBoundSignal):
+                # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded loaded ({k}, {item})")
                 progressSignal.emit(k)
                     
             if isinstance(loopControl, dict) and loopControl.get("break", None) == True:
+                if isinstance(canceledSignal, QtCore.pyqtBoundSignal):
+                    canceledSignal.emit()
                 break
                 
-        if isinstance(resultSignal, QtCore.pyqtBoundSignal):
-            resultSignal.emit(OK)
+        return OK
             
     @pyqtSlot()
     @safeWrapper
