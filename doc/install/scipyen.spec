@@ -8,7 +8,10 @@ from PyInstaller.utils.hooks import (collect_data_files, collect_submodules,
 # mkdir -p scipyen_app && cd scipyen_app
 # scipyact
 # scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/doc/install/scipyen.spec
+# or from the $HOME:
+# scipyen_app> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/doc/install/scipyen.spec
 
+print(f"WARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen")
 
 def datafile(path, strip_path=True):
     parts = path.split('/')
@@ -126,22 +129,6 @@ abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True)
 atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True)
 yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True)
 
-# print(f"uitoc = {uitoc}\n\n")
-# 
-# pickletoc = DataFiles('/home/cezar/scipyen/src', ".pkl")
-# print(f"pickletoc = {pickletoc}\n\n")
-# 
-# abftoc = DataFiles('/home/cezar/scipyen/src', ".abf")
-# print(f"abftoc = {abftoc}\n\n")
-# atftoc = DataFiles('/home/cezar/scipyen/src', ".atf")
-# print(f"atftoc = {atftoc}\n\n")
-# shtoc =  DataFiles('/home/cezar/scipyen/src', ".sh")
-# print(f"shtoc = {shtoc}\n\n")
-# txttoc =  DataFiles('/home/cezar/scipyen/src', ".txt")
-# print(f"txttoc = {txttoc}\n\n")
-# readmetoc =  DataFiles('/home/cezar/scipyen/src', "README", as_ext=False)
-# print(f"readmetoc = {readmetoc}\n\n")
-
 # NOTE: 2023-06-28 11:09:08 DOES NOT WORK WITH SCIYEN BECAUSE SCIPYEN IS NOT 
 # A(N INSTALLED) PACKAGE
 # datas = collect_data_files("scipyen")
@@ -169,23 +156,29 @@ datas.extend(abftoc)
 datas.extend(atftoc)
 datas.extend(yamltoc)
 
-# jqc_data = collect_data_files("jupyter_qtconsole_colorschemes")
-# datas.extend(jqc_data)
-# # NOTE: 2023-06-28 11:45:44
-# # either this, or override hook-pygments.py / hook-pkg_resources.py
-# jqc = collect_submodules("jupyter_qtconsole_colorschemes")
-
+# NOTE: 2023-06-28 11:45:44
+# I think the next line below ('collect_all') is better than trying to see what
+# can be tweaked in hook-pygments.py / hook-pkg_resources.py
 jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
 datas.extend(jqc_datas)
 binaries.extend(jqc_binaries)
 hiddenimports.extend(jqc_hiddenimports)
+
+# NOTE: 2023-06-29 08:32:55
+# try as above for jupyter_client (needed because "local-provisioner" issues 
+# when starting external IPython console in Scipyen)
+
+jc_datas, jc_binaries, jc_hiddenimports = collect_all("jupyter_client")
+datas.extend(jc_datas)
+binaries.extend(jc_binaries)
+hiddenimports.extend(jc_hiddenimports)
 
 # print(f"\ndatas = {datas}\n")
 
 a = Analysis(
     ['../../src/scipyen/scipyen.py'],
     pathex=['/home/cezar/scipyen/src/scipyen'], # ← to find the scipyen package
-    binaries=[],
+    binaries=binaries,
     # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
     #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
     #           ('/home/cezar/scipyenv.3.11.3/lib64/*', 'lib64'),

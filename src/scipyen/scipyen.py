@@ -62,7 +62,8 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    print(f'Running in a PyInstaller bundle with frozen: {sys.frozen}; _MEIPASS: {sys._MEIPASS}; __file__: {__file__}')
+    print(f'Running in a PyInstaller bundle with frozen: {sys.frozen}; _MEIPASS: {sys._MEIPASS}; __file__: {__file__}\n')
+    print("WARNING: External consoles (including NEURON) are currently NOT supported")
 else:
     print('Running in a normal Python process')
     
