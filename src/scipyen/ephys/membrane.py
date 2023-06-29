@@ -132,7 +132,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
                 raise RuntimeError(f"Cannot determine the clamping mode from the units of signal ({signal.units}) and command ({command.units}). \nPlease specify a valid clampMode (either ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp) manually")
 
         else:
-            raise TypeError(f"Clamping mode ('clampMode') must be specified as ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp")
+            raise TypeError(f"Clamping mode ('clampMode') must be specified as ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp (see ClampMode in ephys module)")
         
     if clampMode == ephys.ClampMode.NoClamp:
         raise ValueError(f"For a membrane test, the clamping mode must be either ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp")
@@ -277,6 +277,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
     # 
             
     if clampMode == ephys.ClampMode.CurrentClamp:
+        
         pass
         # do what the passive_Iclamp does
         
@@ -1764,7 +1765,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuratio
     im: analogsignal with Im command (injected current) - mandatory unless 
             Iinj is given
     
-    baseEpoch: neo.Epoch, or sequence of t_start, t_stop time points
+    baseEpoch: neo.Epoch with one interval, an Interval, or a SignalCursor, or sequence of t_start, t_stop time points
                 baseline before current injection (optional, default is None) 
                 needed when im is None
                 
