@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-import io, os, sys, subprocess, shutil, tempfile
+import os, sys, subprocess, tempfile
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 
@@ -18,23 +18,12 @@ print(f"sys.argv = {sys.argv}")
 
 myfile = sys.argv[-1]
 
-
-if "--distpath" in sys.argv:
-    ndx = sys.argv.index("--distpath")
-    if ndx < (len(sys.argv) - 1):
-        distpath = sys.argv[ndx+1]
-        
-    else:
-        distpath = DEFAULT_DISTPATH
-else:
-    distpath = DEFAULT_DISTPATH
-
 if not os.path.isabs(myfile):
     myfile = os.path.abspath(myfile)
     
 mydir = os.path.dirname(myfile)
 
-print(f"\nWARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
+print(f"WARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
 def datafile(path, strip_path=True):
     parts = path.split('/')
@@ -159,38 +148,31 @@ binaries = list()
 datas = list()
 hiddenimports = list()
 
-# tempdir = ""
-# # origin_fn = None
-# # origin_file = None
-# namesfx = ""
-# 
-# if os.path.isdir(os.path.join(mydir, ".git")):
-#     gitout = subprocess.run(["git", "-C", mydir, "branch", "--show-current"],
-#                             capture_output=True)
-#     
-#     if gitout.returncode == 0 and len(gitout.stdout):
-#         gitbranch = gitout.stdout.decode().split("\n")[0]
-#         if gitbranch != "master":
-#             namesfx = f"_{gitbranch}"
-#             
-#         if len(gitbranch):
-#             gitout = subprocess.run(["git", "-C", mydir, "status", "--short", "--branch"],
-#                                     capture_output=True)
-#             if gitout.returncode == 0:
-#                 branch_status = gitout.stdout.decode().split("\n")
-#                 branch_status.insert(0, f"Bundled from '{gitbranch}' git branch with status:")
-#                 
-#                 if len(branch_status):
-#                     tempdir = tempfile.mkdtemp()
-#                     origin_file_name = os.path.join(tempdir, "bundle_origin")
-#                     with open(origin_file_name, "wt") as origin_file:
-#                         for s in branch_status:
-#                             origin_file.write(f"{s}\n")
-#                         
-#                     datas.append((origin_file_name, '.'))
+if os.path.isdir(os.path.join(mydir, ".git")):
+    origin_file_name = os.path.join(mydir, "bundle_origin")
+    gitout = subprocess.run(["git", "-C", mydir, "branch", "--show-current"],
+                            capture_output=True)
+    
+    if gitout.returncode == 0 and len(gitout.stdout):
+        gitbranch = gitout.stdout.decode().split("\n")[0]
+        if gitbranch != "master":
+            namesfx = f"_{gitbranch}"
+        if len(gitbranch):
+            gitout = subprocess.run(["git", "-C", mydir, "status", "--short", "--branch"],
+                                    capture_output=True)
+            if gitout.returncode == 0:
+                branch_status = gitout.stdout.decode().split("\n")
+                branch_status.insert(0, f"Bundled from '{gitbranch}' git branch with status:")
+                
+                if len(branch_status):
+                    with tempfile.NamedTemporaryFile(mode="w+t") as origin_file:
+                        origin_file_name = origin_file.name
+                        for s in branch_status:
+                            origin_file.write(f"{s}\n")
+                            
+                        datas.append((origin_file_name, '.'))
                         
-# product = f"scipyen{namesfx}"
-# bundlepath = os.path.join(distpath, product)
+    
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
@@ -232,8 +214,8 @@ hiddenimports.extend(jc_hiddenimports)
 # print(f"\ndatas = {datas}\n")
 
 a = Analysis(
-    ['/home/cezar/scipyen/src/scipyen/scipyen.py'],
-    pathex=['/home/cezar/scipyen/src/scipyen'], # ← to find the scipyen package
+    ['SCRIPTNAME'],
+    pathex=['SCIPYENPATH'], # ← to find the scipyen package
     binaries=binaries,
     # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
     #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
@@ -254,7 +236,7 @@ a = Analysis(
     #        ],
     # hiddenimports=[],
     hiddenimports=hiddenimports,
-    hookspath=['/home/cezar/scipyen/src/scipyen/__pyinstaller'],
+    hookspath=['SCIPYENPATH/__pyinstaller'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
@@ -270,7 +252,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='scipyen',
+    name=f'scipyen{namesfx}',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -296,10 +278,6 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    # name=product,
-    name='scipyen',
+    name=f'scipyen{namesfx}',
+    # name='scipyen',
 )
-
-# if isinstance(tempdir, str) and os.path.isdir(tempdir):
-    # shutil.rmtree(tempdir)
-    
