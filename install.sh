@@ -39,6 +39,7 @@ function show_help ()
     echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
     echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of pips, pyqt5, vigra, neuron, or desktopentry; can be passed more than once\n"
     echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
+    echo -e "--dist\t\t\tCreates a binary Scipyen diwstribution using PyInstaller. Requires that a virtual environment has already been built using this script.\n"
     echo -e "-h | -? | --help \tShow this help message and quit\n"
     echo -e "\nFor details, execute install.sh --about\n"
     echo -e "\n"
@@ -765,9 +766,11 @@ else
 install_dir=${HOME}
 fi
 realscript=`realpath $0`
-installscriptdir=`dirname "$realscript"`
-docdir=`dirname "$installscriptdir"`
-scipyendir=`dirname "$docdir"`
+scipyendir=`dirname "$realscript"`
+docdir=${scipyendir}/doc
+installscriptdir=${docdir}/indtall
+# docdir=`dirname "$installscriptdir"`
+# scipyendir=`dirname "$docdir"`
 scipyensrcdir=${scipyendir}/src/scipyen
 using_python=""
 install_neuron=0
@@ -879,6 +882,28 @@ for i in "$@" ; do
         ;;
     esac
 done
+
+# if [[ $make_dist -eq 1 ]] ; then
+# scipyact
+# if [[ $? -ne 0 ]] ; then
+# echo -e "Cannot activate the Scipyen virtual environment. Have you built one first?"
+# exit 1
+# fi
+# scriptname=${scipyensrcdir}/scipyen.py
+# distdir=${install_dir}/scipyen_app/dist
+# workdir=${install_dir}/scipyen_app/build
+# cat ${scipyendir}/scipyen.spec.in | sed s/SCRIPTNAME/"$scriptname"/g | sed s/SCIPYENPATH/"$scipyensrcdir"/g > ${scipyendir}/scipyen.spec
+# if [[ $? -ne 0 ]] ; then
+# echo -e "Cannot generate a spec file\n"
+# exit 1
+# fi
+# pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ${scipyendir}/scipyen.spec
+# if [[ $? -ne 0 ]] ; then
+# echo -e "Cannot create a distribution\n"
+# exit 1
+# fi
+# exit 0
+# fi
 
 install_dir=`realpath ${install_dir}`
 

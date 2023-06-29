@@ -238,7 +238,20 @@ sys.meta_path.append(pluginsSpecFinder)
 
 # __avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
 
+def find_frozen():
+    """Useful to locate plugin modules packaged with pyinstaller (i.e., 'frozen')
+"""
+    # this should be run AFTER all relevant modules have been loaded
+    # and BEFORE find_plugins(…) is called
+    plugin_modules = [sys.modules[n] for n in sys.modules if (hasattr(sys.modules[n], "__scipyen_plugin__") or hasattr(sys.modules[n], "init_scipyen_plugin"))]
+    for module in plugin_modules:
+        if isinstance(module, types.ModuleType): # this is guaranteed, no?
+            reloaded_module = importlib.reload(module)
+            loaded_plugins[module.__name__] = module
+
 def find_plugins(path):
+    # NOTE: 2023-06-28 21:13:30
+    # an entry is a 3-tuple (root, dirs, file)
     dw = os.walk(path)
     # module_dict = dict()
     for entry in dw:

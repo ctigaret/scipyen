@@ -5175,8 +5175,8 @@ anything else       anything else       ❌
                 for k, seg in enumerate(segments):
                     s_start = seg_starts[k]
                     epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
-                    intervals = [Interval(s_start + rel_starts[i],cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
-                    seg_epoch = intervals2epoch(*epoch_tuples, name=name)
+                    intervals = [Interval(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name, True) for i in range(len(cursors))]
+                    seg_epoch = intervals2epoch(*intervals, name=name)
                     epochs.append(seg_epoch)
                     if embed:
                         if overwrite:
