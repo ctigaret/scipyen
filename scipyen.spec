@@ -11,7 +11,7 @@ from PyInstaller.utils.hooks import (collect_data_files, collect_submodules,
 # or from the $HOME:
 # scipyen_app> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/doc/install/scipyen.spec
 
-print(f"WARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen")
+print(f"WARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
 def datafile(path, strip_path=True):
     parts = path.split('/')
