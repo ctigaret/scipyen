@@ -180,8 +180,6 @@ if os.path.isdir(os.path.join(mydir, ".git")):
 product = f"scipyen{namesfx}"
 bundlepath = os.path.join(distpath, product)
 
-datas.append((os.path.join(mydir, "doc", "install", "pythonbackend.ico"), '.'))
-
 desktoptempdir = tempfile.mkdtemp()
 desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
 desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
@@ -316,4 +314,7 @@ coll = COLLECT(
 
 if isinstance(tempdir, str) and os.path.isdir(tempdir):
     shutil.rmtree(tempdir)
+    
+if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
+    shutil.rmtree(desktoptempdir)
     
