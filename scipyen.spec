@@ -11,11 +11,6 @@ from PyInstaller.utils.hooks import (collect_data_files, collect_submodules,
 # or from the $HOME:
 # scipyen_app> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
 
-# print(f"I am {__file__}")
-# __mypath__ = os.path.dirname(__file__)
-
-print(f"sys.argv = {sys.argv}")
-
 myfile = sys.argv[-1]
 
 
@@ -42,16 +37,6 @@ def datafile(path, strip_path=True):
     if strip_path:
         name = os.path.basename(path)
     return name, path, 'DATA'
-
-# def Datafiles(*filenames, **kw):
-#     import os
-#     
-# 
-#     strip_path = kw.get('strip_path', True)
-#     return TOC(
-#         datafile(filename, strip_path=strip_path)
-#         for filename in filenames
-#         if os.path.isfile(filename))
 
 def scanForFiles(path, ext, as_ext:True):
     items = []
@@ -159,38 +144,74 @@ binaries = list()
 datas = list()
 hiddenimports = list()
 
-# tempdir = ""
-# # origin_fn = None
-# # origin_file = None
-# namesfx = ""
-# 
-# if os.path.isdir(os.path.join(mydir, ".git")):
-#     gitout = subprocess.run(["git", "-C", mydir, "branch", "--show-current"],
-#                             capture_output=True)
-#     
-#     if gitout.returncode == 0 and len(gitout.stdout):
-#         gitbranch = gitout.stdout.decode().split("\n")[0]
-#         if gitbranch != "master":
-#             namesfx = f"_{gitbranch}"
-#             
-#         if len(gitbranch):
-#             gitout = subprocess.run(["git", "-C", mydir, "status", "--short", "--branch"],
-#                                     capture_output=True)
-#             if gitout.returncode == 0:
-#                 branch_status = gitout.stdout.decode().split("\n")
-#                 branch_status.insert(0, f"Bundled from '{gitbranch}' git branch with status:")
-#                 
-#                 if len(branch_status):
-#                     tempdir = tempfile.mkdtemp()
-#                     origin_file_name = os.path.join(tempdir, "bundle_origin")
-#                     with open(origin_file_name, "wt") as origin_file:
-#                         for s in branch_status:
-#                             origin_file.write(f"{s}\n")
-#                         
-#                     datas.append((origin_file_name, '.'))
+tempdir = ""
+desktoptempdir=""
+# origin_fn = None
+# origin_file = None
+namesfx = ""
+
+if os.path.isdir(os.path.join(mydir, ".git")):
+    gitout = subprocess.run(["git", "-C", mydir, "branch", "--show-current"],
+                            capture_output=True)
+    
+    if gitout.returncode == 0 and len(gitout.stdout):
+        gitbranch = gitout.stdout.decode().split("\n")[0]
+        if gitbranch != "master":
+            namesfx = f"_{gitbranch}"
+            
+        if len(gitbranch):
+            gitout = subprocess.run(["git", "-C", mydir, "status", "--short", "--branch"],
+                                    capture_output=True)
+            if gitout.returncode == 0:
+                branch_status = gitout.stdout.decode().split("\n")
+                branch_status.insert(0, f"Bundled from '{gitbranch}' git branch with status:")
+                
+                print(f"branch_status = {branch_status}")
+                
+                if len(branch_status):
+                    tempdir = tempfile.mkdtemp()
+                    origin_file_name = os.path.join(tempdir, "bundle_origin")
+                    with open(origin_file_name, "wt") as origin_file:
+                        for s in branch_status:
+                            origin_file.write(f"{s}\n")
                         
-# product = f"scipyen{namesfx}"
-# bundlepath = os.path.join(distpath, product)
+                    datas.append((origin_file_name, '.'))
+                        
+product = f"scipyen{namesfx}"
+bundlepath = os.path.join(distpath, product)
+
+datas.append((os.path.join(mydir, "doc", "install", "pythonbackend.ico"), '.'))
+
+desktoptempdir = tempfile.mkdtemp()
+desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
+desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
+exec_file = os.path.join(bundlepath, "scipyen")
+desktop_file_contents = ["[Desktop Entry]",
+"Type=Application"
+"Name[en_GB]=Scipyen",
+"Name=Scipyen",
+"Comment[en_GB]=Scientific Python Environment for Neurophysiology",
+"Comment=Scientific Python Environment for Neurophysiology",
+"GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
+"GenericName=Scientific Python Environment for Neurophysiology",
+f"Icon={desktop_icon_file}",
+"Categories=Science;Utilities;",
+f"Exec={exec_file}",
+"MimeType=",
+"Path=",
+"StartupNotify=true",
+"Terminal=true",
+"TerminalOptions=\s",
+"X-DBUS-ServiceName=",
+"X-DBUS-StartupType=",
+"X-KDE-SubstituteUID=false",
+"X-KDE-Username=",
+]
+with open(desktop_file_name, "wt") as desktop_file:
+    for line in desktop_file_contents:
+        desktop_file.write(f"{line}\n")
+
+datas.append((desktop_file_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
@@ -252,7 +273,6 @@ a = Analysis(
     #        # ('/home/cezar/scipyen/src/gui', 'gui'),
     #        # ('/home/cezar/scipyen/src/imaging', 'imaging'),
     #        ],
-    # hiddenimports=[],
     hiddenimports=hiddenimports,
     hookspath=['/home/cezar/scipyen/src/scipyen/__pyinstaller'],
     hooksconfig={},
@@ -270,7 +290,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='scipyen',
+    name='scipyen', # name of the final executable
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -287,19 +307,13 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
-    # uitoc,
-    # jsontoc,
-    # pickletoc,
-    # abftoc,
-    # atftoc,
-    # shtoc,
     strip=False,
     upx=True,
     upx_exclude=[],
-    # name=product,
-    name='scipyen',
+    name=product, # name of distribution directry (e.g, 'scipyen_dev' etc)
+    # name='scipyen',
 )
 
-# if isinstance(tempdir, str) and os.path.isdir(tempdir):
-    # shutil.rmtree(tempdir)
+if isinstance(tempdir, str) and os.path.isdir(tempdir):
+    shutil.rmtree(tempdir)
     

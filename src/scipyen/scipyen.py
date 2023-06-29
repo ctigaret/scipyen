@@ -65,7 +65,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     print(f'Running in a PyInstaller bundle with frozen modules: {sys.frozen}; _MEIPASS: {sys._MEIPASS}; __file__: {__file__}\n\n')
     print("WARNING: External consoles (including NEURON) are currently NOT supported\n\n")
     if os.path.isfile(os.path.join(__module_path__, "bundle_origin")):
-        with open(os.path.join(__module_path__, "bundle_origin"), "wt", encoding="utf-8") as origin_file:
+        with open(os.path.join(__module_path__, "bundle_origin"), "rt", encoding="utf-8") as origin_file:
             for line in origin_file:
                 print(line, end="")
 else:
