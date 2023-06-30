@@ -4146,19 +4146,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.slot_copyWorkspaceSelection()
         self.console.paste()
 
-#     @pyqtSlot()
-#     @safeWrapper
-#     def slot_loadFileSystemItems(self):
-#         """
-#         Triggered when items in the file system viewer are dragged onto the console.
-#         Will try to load them
-#         """
-#         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
-#                          if item.column() == 0]# list of QModelIndex
-#
-#         if len(selectedItems):
-#             fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
-
     @pyqtSlot()
     @safeWrapper
     def slot_pasteQuotedWorkspaceSelection(self):
@@ -4878,6 +4865,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_systemOpenSelectedFiles(self):
+        """Opens selected file(s) or directory/ies in the system application"""
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                          if item.column() == 0]  # list of QModelIndex
 
@@ -5052,6 +5040,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
     def slot_fileSystemContextMenuRequest(self, point):
+        """Pops up a context menu for the File System viewer.
+        NOTE: The context menu only appears if the collection of selected items
+        contains only items pointing to regular files.
+    """
         cm = QtWidgets.QMenu("Selected Items", self)
 
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
@@ -5730,6 +5722,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(str)
     @safeWrapper
     def slot_systemOpenFileOrFolder(self, fileName):
+        """Opens fileName with the associated system application."""
         if isinstance(fileName, str) and len(fileName.strip()):
             if os.path.exists(fileName):
                 url = QtCore.QUrl.fromLocalFile(fileName)
@@ -7252,7 +7245,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # @pyqtSlot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
     @pyqtSlot()
     def slot_fileSystemDataChanged(self, *args, **kwargs):
-        print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
+        # print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
         self._fileSystemChanged_ = True
     
 #     def enableDirectoryWatch(self, on:bool=True):
