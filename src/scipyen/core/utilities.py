@@ -3458,7 +3458,9 @@ def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
 # @singledispatch
 def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series, np.ndarray]], 
                      index: typing.Optional[GeneralIndexType] = None, 
-                     silent:bool=False, axis:typing.Optional[int] = None) -> typing.Union[range, typing.Iterable[int]]:
+                     silent:bool=False, 
+                     axis:typing.Optional[int] = None,
+                     return_indices:bool=True) -> typing.Union[range, typing.Iterable[int]]:
     """Transform various indexing objects to a range or an iterable of int indices.
     
 Also checks the validity of the index for an iterable, given its size.
@@ -3526,11 +3528,58 @@ index: GeneralIndexType: a typing alias for:
         
     CAUTION: negative integral indices are valid and perform the reverse 
         indexing (going "backwards" in the iterable).
+
+axis: int or str; optional, default is None
+    Used only for numpy array data and pandas DataFrames, specifies the axis 
+    along which the "normalized" index is to be returned.
     
-    axis: int (optional, default is None)
-        Used only for numpy array data; specifies the axis along which the 
-        "normalized" index is to be returned.
-        
+    When data is a numpy array, and axis is None, the index will be calculated 
+    along a flattened version of the numpy array.
+    
+    When data is a pandas object, when axis is None, the first axis (i.e. the 
+    rows axis) will be used
+    
+    When axis is an int or str, this specifies the index of the axis, subject to 
+    the following constraints given by the data type:
+    
+    Data type               Possible type: values of the axis parameter
+    ----------------------------------------------------------------------------
+    numpy.ndarray           int: any value in [0, data.ndim)
+                            None: indexing is applied to a flattened array
+    
+    vigra.VigraArray        int: as above; 
+                            str: any axis type flag (as long as it exists in the array)
+                            None: indexing is applied to a flattened array
+    
+    pandas.DataFrame        int: 0 or 1; any value != 0 will be forced to 1)
+                            str: "rows" or "columns"; any value != "rows" will use axis 1 (the columns axis)
+                            None: will use axis 0 (the rows axis)
+    
+    pandas.Series¹           int: 0;
+                            str: "rows"
+                            None: axis is assigned value 0
+                            anything else: will use axis 0
+    
+    ¹axis is effectively ignored here
+    
+    
+return_indices: bool (optional default is True)
+    When True (default): returns tuple of normalized indices
+    
+    When False, returns the data element(s) at the specified indices or None
+        when data is an int.
+    
+    When data is a pandas object (Series or DataFrame) and return_indices is True
+    the function returns the elements of the Index of the object.
+    
+    If you want to normalize indices into a pandas Index, then pass the Index 
+    object to this function.
+    
+silent: bool (optional, default if False)
+    When False (default): all exceptions from indexing errors will be raised
+    When True: any exceptions raised from indexing errors will result in 
+    returning None.
+    
 Returns:
 --------
 ret - an iterable object (range, or tuple of integer indices) that can be 
@@ -3539,6 +3588,8 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         
     """
     from core.datatypes import is_vector
+    
+    axis = kwargs.pop("axis", None)
     
     if data is None:
         return tuple()
@@ -3551,11 +3602,15 @@ ret - an iterable object (range, or tuple of integer indices) that can be
     elif isinstance(data, collections.abc.Sequence):
         data_len = len(data)
         
-    elif isinstance(data, (pd.Series, pd.DataFrame)):
-        data_len = len(data)
-        data = data.index
+    elif isinstance(data, pd.Series):
+        data_len = len(data) is axis in  (0, "rows", None) else data_len = data.shape[1]
         
-    elif isinstance(data, (pd.core.indexes.base.Index, neo.Epoch, DataZone)):
+    elif isinstance(data, pd.Series):
+        data_len = len(data)
+        
+    elif isinstance(data, (pd.core.indexes.base.Index, neo.Epoch, DataZone, 
+                           neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList)):
+        # NOTE: the columns attribute of a DataFrame is also a pandas Index
         data_len = len(data)
         
     elif isinstance(data, np.ndarray):
@@ -3563,34 +3618,48 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             if axis not in range(-data.ndim, data.ndim):
                 raise ValueError(f"Invalid axis index {axis} for an array with {data.ndim} dimensions")
             data_len = data.shape[axis]
+            
+        elif isinstance(axis, str):
+            if not isinstance(data, vigra.VigraArray):
+                raise TypeError(f"str axis index not supported by {type(data).__name__}")
+            
+            if axis not in data.axistags:
+                raise ValueError(f"Invaid axis index {axis} for a VigraArray with {data.axistags} axis tags")
+            
+            
+            
         else:
-            data_len = data.size
+            data_len = data.size # for a flattened array
+            
+            
         
     else:
         raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
     
-    # 1) index is None ⇒ return the entire range of data
+    # 1) index is None ⇒ return the entire range of data (or entire data)
     if index is None:
-        return range(data_len)
+        return range(data_len) if return_indices else data # may be None
     
     # 2) index is MISSING ⇒ return an empty range
     if isinstance(index, type(MISSING)):
-        return range(0)
+        return range(0) if return_indices else list()
     
     # 3) index is an int ⇒ 
     if isinstance(index, int):
         # NOTE: 2020-03-12 22:40:31
         # negative values ARE supported: they simply go backwards from the end of
         # the sequence
-        if index not in range(-data_len, data_len):
-            if silent:
-                return None
-            raise ValueError(f"Index {index} is invalid for {len(data)} elements")
+        if isinstance(data, pd.DataSeries):
+            if axis is None:
+                if index not in range(-data_len, data_len):
+                    if silent:
+                        return None
+                    raise ValueError(f"Index {index} is invalid for {data_len} elements")
+                # get a column by default
+                return data.iloc[index]
         
-        if isinstance(data, pd.core.indexes.base.Index):
-            return (data[index], )
         
-        return (index,)
+        return (index,) if return_indices else (data[index],) # here data can be anything indexable by an int
     
     # 4) index is a str ⇒
     #   Check that elements in data are either str, or have an attribute with 
@@ -3603,15 +3672,24 @@ ret - an iterable object (range, or tuple of integer indices) that can be
             
         if isinstance(data, (tuple, list)):
             if all(isinstance(data, (str, np.str_, bytes))):
-                ret = tuple(filter(lambda x: x.decode() == index if isinstance(x, bytes) else x == index,
-                                   data))
+                if return_indices:
+                    ret = tuple(filter(lambda x: data[x].decode() == index if isinstance(data[x], bytes) else data[x] == index,
+                                    range(len(data))))
+                    
+                else:
+                    ret = tuple(filter(lambda x: x.decode() == index if isinstance(x, bytes) else x == index,
+                                    data))
+                    
                 if len(ret) == 0:
                     if silent:
                         return None
+                    
                     raise ValueError(f"Index {index} not found in data")
+                
                 return ret
+            
             else:
-                ret = tuple(prog.filter_attr(data, operator.or_, indices_only=True, 
+                ret = tuple(prog.filter_attr(data, operator.or_, indices_only=return_indices, 
                                              name=lambda x: x==index, label=lambda x: x==index))
                 if len(ret) == 0:
                     if silent:
@@ -3619,6 +3697,8 @@ ret - an iterable object (range, or tuple of integer indices) that can be
                     raise AttributeError(f"The objects have no attribute named 'name' or 'label' with the value {index}")
                 
                 return ret
+            
+        if isinstance(data, (pd.Series)):
             
         if isinstance(data, (pd.core.indexes.base.Index)):
             if index in data:
@@ -3737,7 +3817,9 @@ ret - an iterable object (range, or tuple of integer indices) that can be
 # @normalized_index.register(type(None))
 # def _(data, )
     
-def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.AxisInfo], index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
+def normalized_sample_index(data:np.ndarray, 
+                            axis: typing.Union[int, str, vigra.AxisInfo], 
+                            index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
     """Calls normalized_index on a specific array axis.
     Also checks index validity along a numpy array axis.
     
