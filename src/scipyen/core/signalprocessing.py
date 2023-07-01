@@ -2433,7 +2433,7 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
                   thr:typing.Optional[float] = 1., 
                   channel:typing.Optional[int] = None,
                   up_first:bool=True,
-                  **kwargs):
+                  **kwargs) -> tuple:
     """Detect boxcar waveforms in a signal.
 
     
@@ -2482,11 +2482,16 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     Returns:
     ========
     A tuple of five elements: 
-        "up", "down", "amplitude", "centroids", "label" when up_first is True
+        "up", "down", "amplitude", "centroids", "label" when up_first is True (default)
+    
         "down", "up", "amplitude", "centroids", "label" when up_first is False
     
-        "up" and "down" are arrays of time stamps for the lo → hi and  hi → lo
+        "up" and "down" are lists of time stamps for the lo → hi and  hi → lo
             transitions, respectively.
+
+            The length of each array is the number of transitions in the 
+            respective direction. For n boxcar waveforms in the signal there will
+            be n transitions in each direction.
     
     """
     # FIXME 2023-06-18 22:09:23
@@ -2495,11 +2500,9 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     from scipy import (cluster, signal)
     from scipy.signal import boxcar
 
-    
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
     
-
     # WARNING: algorithm fails for noisy signals with no TTL waveform
     
     # NOTE: 2023-06-19 08:54:33
@@ -2616,14 +2619,14 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
         ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
         
         if ndx_lo_hi.size:
-            times_lo_hi = [x.times[k] for k in ndx_lo_hi] # up transitions
+            times_lo_hi = np.array([x.times[k] for k in ndx_lo_hi]) * x.times.units # up transitions
             
         if ndx_hi_lo.size:
-            times_hi_lo = [x.times[k] for k in ndx_hi_lo] # down transitions
+            times_hi_lo = np.array([x.times[k] for k in ndx_hi_lo]) * x.times.units # down transitions
                 
         
     except Exception as e:
-        #traceback.print_exc()
+        traceback.print_exc()
         times_lo_hi = None
         times_hi_lo = None
 

@@ -6,9 +6,12 @@ modelfitting.py in the (hopefully not too distant) future.
 For now, stick with THIS module.
 
 """
+import typing
 import numpy as np
 import quantities as pq
 import numbers
+from core import quantities as scq
+from core.datatypes import is_vector
 
 def check_rise_decay_params(x):
     """Returns the number of decay components for a exp-rise-multi-decay transient.
@@ -424,21 +427,21 @@ def Markwardt_Nilius(x, g, e, h, s):
     
     return y
 
-def Xu_Lipscombe():
-    #Vm = membrane potential
-    #V0_5 = activation midpoint
-    #Erev = reversal potential
-    
-    #p1 = Ca2+ permability * [Ca2+]i * RT
-    #p2 = zF/RT with z = 2 valency
-    #F = Faraday constant
-    #R = gas constant
-    #T temperature in degK
-    #k = Boltzmann constant
-    
-    #I = p1 * p2**2 * Vm * (1 - exp(-(Vm-Erev * p2))/(1- exp(-(Vm * p2)))) / (1 + exp(-(Vm-V0_5)/k))
-    
-    pass
+# def Xu_Lipscombe():
+#     #Vm = membrane potential
+#     #V0_5 = activation midpoint
+#     #Erev = reversal potential
+#     
+#     #p1 = Ca2+ permability * [Ca2+]i * RT
+#     #p2 = zF/RT with z = 2 valency
+#     #F = Faraday constant
+#     #R = gas constant
+#     #T temperature in degK
+#     #k = Boltzmann constant
+#     
+#     #I = p1 * p2**2 * Vm * (1 - exp(-(Vm-Erev * p2))/(1- exp(-(Vm * p2)))) / (1 + exp(-(Vm-V0_5)/k))
+#     
+#     pass
 
 def Talbot_Sayer(x, a, b, c, x0, **kwargs):# t = 33 * pq.degC, o = 2.5 * pq.mM):
     """
@@ -669,13 +672,13 @@ def Boltzmann(x, p, pos:bool=True):
 
         Inactivation:
     
-        Iₘ = 1/(1+exp(-(V½ - Vₘ)/κ))                                 (2)
+        Iₘ = 1/(1+exp(-(V½ - Vₘ)/κ))                                (2)
     
     where:
     
     Iₘ can be:
         ∘ the recorded membrane current at a range of Vₘ values, normalized to 
-            the maximal recorded current value)
+            the maximal recorded current value
     
         ∘ fractional open time (for recordings from a small number of channels, 
             see e.g., Magee & Johnston, JPhysiol, 1995) - by definition 
@@ -693,11 +696,11 @@ def Boltzmann(x, p, pos:bool=True):
     current is half the maximum, or where half of the channels are active
     
     κ is a "slope" factor
-    
-        NOTE the change in sign of the exponential argument!
-        NOTE V½ and κ are often different for the activation and inactivation
+
+    NOTE V½ and κ are often different for activation and inactivation
     
     Let ξ = (V½ - Vₘ)/κ
+    
     
     Then:
     
@@ -709,6 +712,8 @@ def Boltzmann(x, p, pos:bool=True):
     |___________|                                                 |__________|
     inactivation                                                   activation
     
+    (NOTE the change in sign of the exponential argument!)
+    
     When fitting experimental data, the fitted parameters are x₀ and κ.
     
     The equation is also an empyrical model of the "gating" mechanism for 
@@ -717,18 +722,143 @@ def Boltzmann(x, p, pos:bool=True):
     Function parameters:
     ====================
     x: scalar (e.g., membrane voltage)
+    
     p: array-like, with two elements: x₀ and κ (in THIS order)
-    pos: optional default is True ⇒ positive exponential argument (e.g. to fit
-        an activation curve)
-        When False, the argument is negaive (e.g., to fit an inactivation curve)
+    
+    pos: optional (default is True)
+        When True, the function uses a positive exponential argument (e.g. useful
+        to fit an activation curve)
+    
+        When False, the exponential argument is negative (e.g., useful to fit an 
+        inactivation curve)
     
     Returns:
     =======
     A scalar (e.g., membrane current)
     """
-    α = 1 if pos == True else -1
+    
     x0, κ = p
-    return 1/(1+np.exp(α * (x0 - x) / κ))
+    
+    # sign of ξ
+    ξ = x0 - x if pos else x - x0
+    ξ /= κ
+    # ξ = (x0 - x) / κ if pos else (x - x0)/κ
+    return 1/(1+np.exp(ξ))
+    
+    # α = 1 if pos == True else -1
+    # return 1/(1+np.exp(α * (x0 - x) / κ))
 
+def Heaviside(x:typing.Union[pq.Quantity, np.ndarray], 
+              x0:typing.Union[float, pq.Quantity], 
+              α:bool=True) -> np.ndarray:
+    """Heaviside (step) function
+    
+    Parameters:
+    ===========
+    x: domain vector
+    x0: coordinate of the step change (in domain space)
+    α: optional, default is True; sets the direction of the change:
+        True  ⇒ change from 0. to 1.
+        False ⇒ change from 1. to 0.
+        
+"""
+    if not is_vector(x):
+        raise TypeError(f"Domain (x) is not a vector")
+    
+    if isinstance(x0, np.ndarray):
+        if x0.size != 1:
+            raise TypeError(f"x0 expected an array of size 1; got {x0.size} instead")
+        
+    elif not isinstance(x0, float):
+        raise TypeError(f"x0 must be a scalar float or an array with size 1")
+        
+    # if all(isinstance(v, pq.Quantity) for v in (x, x0)):
+    if isinstance(x, pq.Quantity):
+        if isinstance(x0, pq.Quantity):
+            if not scq.units_convertible(x,x0):
+                raise TypeError(f"x and x0 have incompatible units")
+            
+            if x.units != x0.units:
+                x0 = x0.rescale(x.units)
+                
+            x0 = x0.magnitude.flatten()[0]
+
+        x = x.magnitude
+                
+    else:
+        if isinstance(x0, pq.Quantity):
+            warnings.warn(f"x0 is a quantity but the domain is not; will strip the units from x0")
+            x0 = x0.magnitude.flatten()[0]
+            
+    x = x.flatten()
+    
+    xx = x - x0
+    
+    ν = 0. if α else 1.
+    λ = 1. if α else 0.
+    
+    y = np.full_like(x, fill_value = ν)
+    y[xx >= 0] = λ
+    
+    return y
+    
+    
+def boxcar(x, p, up=True):
+    x0, x1 = p
+    
+    return Heaviside(x, x0, up) * Heaviside(x, x1, not up)
+
+
+
+def ramp(x, p = (0., 0., 1., 1.)):
+    x0, y0, x1, y1 = p
+    
+    if isinstance(x, pq.Quantity):
+        if isinstance(x0, pq.Quantity):
+            if not scq.units_convertible(x,x0):
+                raise TypeError(f"x and x0 have incompatible units")
+            
+            if x.units != x0.units:
+                x0 = x0.rescale(x.units)
+                
+            x0 = x0.magnitude.flatten()[0]
+
+        if isinstance(x1, pq.Quantity):
+            if not scq.units_convertible(x,x1):
+                raise TypeError(f"x and x1 have incompatible units")
+            
+            if x.units != x1.units:
+                x1 = x1.rescale(x.units)
+                
+            x1 = x1.magnitude.flatten()[0]
+
+        x = x.magnitude
+                
+    else:
+        if isinstance(x0, pq.Quantity):
+            warnings.warn(f"x0 is a quantity but the domain is not; will strip the units from x0")
+            x0 = x0.magnitude.flatten()[0]
+            
+        if isinstance(x1, pq.Quantity):
+            warnings.warn(f"x1 is a quantity but the domain is not; will strip the units from x0")
+            x1 = x1.magnitude.flatten()[0]
+            
+    x = x.flatten()
+    y = np.full_like(x, fill_value = y0)
+    
+    xx0 = x-x0
+    xx1 = x-x1
+    
+    α = (y1-y0)/(x1-x0)
+    
+    y[xx1 >= 0] = y1
+    y[xx0 < 0] = y0
+    ndx = (xx0 >= 0) & (xx1 < 0)
+    y[ndx] = α * xx0[ndx]
+    
+    return y
+    
+    
+    
 
     

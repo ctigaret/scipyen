@@ -198,7 +198,7 @@ from core.utilities import normalized_index
 from core.neoutils import get_index_of_named_signal
 from core import quantities as scq
 from core.quantities import (units_convertible, check_time_units, 
-                             check_eletrical_current_units, 
+                             check_electrical_current_units, 
                              check_electrical_potential_units)
 
 from gui.cursors import (SignalCursor, SignalCursorTypes)
@@ -2887,7 +2887,7 @@ command signal.
     commandIsPotential = False
     
     if isinstance(signal, (neo.AnalogSignal, DataSignal)):
-        recordsCurrent = check_eletrical_current_units(signal)
+        recordsCurrent = check_electrical_current_units(signal)
         recordsPotential = check_electrical_potential_units(signal)
         
     else:
@@ -2897,7 +2897,7 @@ command signal.
         raise ValueError(f"'signal' had incompatible units {signal.units}")
         
     if isinstance(command, (neo.AnalogSignal, DataSignal)):
-        commandIsCurrent = check_eletrical_current_units(command)
+        commandIsCurrent = check_electrical_current_units(command)
         commandIsPotential = check_electrical_potential_units(command)
         
         if not any(commandIsCurrent, commandIsPotential):
