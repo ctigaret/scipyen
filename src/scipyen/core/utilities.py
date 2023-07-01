@@ -3620,7 +3620,7 @@ def _(data:int, index: typing.Optional[GeneralIndexType] = None, silent:bool=Fal
         return index
     
     elif isinstance(index, slice):
-        return = range(*index.indices(data))
+        return range(*index.indices(data))
     
     elif isinstance(index, (tuple, list)) and all(isinstance(i, int) for i in index):
         if all (i in range(-data, data) for i in index):
@@ -3631,7 +3631,7 @@ def _(data:int, index: typing.Optional[GeneralIndexType] = None, silent:bool=Fal
             raise ValueError(f"Invalid indices ({index}) for {data} elements")
         
     elif isinstance(index, np.ndarray):
-        if all(i in range(-data, data) for in index):
+        if all(i in range(-data, data) for i in index):
             return index
         else:
             if silent:
@@ -3745,10 +3745,10 @@ def _(data: typing.Union[pd.Series, pd.DataFrame],
             
     elif isinstance(index, np.ndarray):
         if index.dtype not in (np.dtype(bool), np.dtype(int), np.dtype(object), np.dtype(str)) or index.dtype.kind != "U":
-            raise TypeError(f"Indexing arrays has wriong dtype ({index dtype}); esxpecing one of {(np.dtype(int), np.dtype(bool), np.dtype(str), np.dtype(object))} or with dtype kind 'U'; instead got {index.dtype}")
+            raise TypeError(f"Indexing arrays has wriong dtype ({index.dtype}); esxpecing one of {(np.dtype(int), np.dtype(bool), np.dtype(str), np.dtype(object))} or with dtype kind 'U'; instead got {index.dtype}")
         
         if isinstance(data, pd.DataFrame):
-            ndx = data.index id axis in (0, "rows", None) else data.columns
+            ndx = data.index if axis in (0, "rows", None) else data.columns
 
             try:
                 nndx = ndx[index] if index.dtype == np.dtype(int) else ndx[index.nonzero()]
@@ -3832,7 +3832,7 @@ def _(data: typing.Union[pd.Series, pd.DataFrame],
     # NOTE: tuple or list of int or bool are dealt with at the top (through conversion to np.array)
 
 @normalized_index.register(collections.abc.Iterable)
-def_(data:collections.abc.Iterable,
+def _(data:collections.abc.Iterable,
       index: typing.Optional[GeneralIndexType] = None, 
       silent:bool=False, 
       axis:typing.Optional[int] = None,
@@ -3858,6 +3858,11 @@ def _(data:vigra.VigraArray,
       silent:bool=False, 
       axis:typing.Optional[int] = None,
       return_indices:bool=True) -> typing.Union[range, typing.Iterable[int]]:
+    
+    if index is None:
+        return tuple()
+    
+    
     pass # TODO 2023-06-30 23:26:19
 
 @normalized_index.register(np.ndarray)
@@ -3866,286 +3871,286 @@ def _(data:np.ndarray,
       silent:bool=False, 
       axis:typing.Optional[int] = None,
       return_indices:bool=True) -> typing.Union[range, typing.Iterable[int]]:
+    from core.datatypes import is_vector
     pass # TODO 2023-06-30 23:26:52
 
 
     
-    from core.datatypes import is_vector
     
-    elif isinstance(data, (pd.core.indexes.base.Index, neo.Epoch, DataZone, 
-                           neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList)):
-        # NOTE: the columns attribute of a DataFrame is also a pandas Index
-        data_len = len(data)
-        
-    elif isinstance(data, np.ndarray):
-        if isinstance(axis, int):
-            if axis not in range(-data.ndim, data.ndim):
-                raise ValueError(f"Invalid axis index {axis} for an array with {data.ndim} dimensions")
-            data_len = data.shape[axis]
-            
-        elif isinstance(axis, str):
-            if not isinstance(data, vigra.VigraArray):
-                raise TypeError(f"str axis index not supported by {type(data).__name__}")
-            
-            if axis not in data.axistags:
-                raise ValueError(f"Invaid axis index {axis} for a VigraArray with {data.axistags} axis tags")
-            
-            
-            
-        else:
-            data_len = data.size # for a flattened array
-            
-            
-        
-    else:
-        raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
-    
-    # 1) index is None ⇒ return the entire range of data (or entire data)
-    if index is None:
-        return range(data_len) if return_indices else data # may be None
-    
-    # 2) index is MISSING ⇒ return an empty range
-    if isinstance(index, type(MISSING)):
-        return range(0) if return_indices else list()
-    
-    # 3) index is an int ⇒ 
-    if isinstance(index, int):
-        # NOTE: 2020-03-12 22:40:31
-        # negative values ARE supported: they simply go backwards from the end of
-        # the sequence
-        if isinstance(data, pd.DataFrame):
-            if axis in (0, "rows", None):
-                data_len = len(data)
-            else:
-                data_len = data.shape[1]
-                
-            if index not in range(-data_len, data_len):
-                if silent:
-                    return None
-                raise ValueError(f"Index {index} is invalid for {data_len} elements")
-            
-            # ATTENTION: 2023-06-30 21:01:22
-            # if data.index is a RangeIndex or a sequence of ints, when index is an int
-            # both the following expressions are valid, ALTHOUGH they MAY return
-            # entirely different values:
-            # data.iloc[k,:] ⇒ returns the kᵗʰ data row
-            # data.loc[k,:]  ⇒ returns the row at the data row index with value k
-            #
-            # The prime example is the case where a data frame has a row index 
-            # given by, say, r = RangeIndex(-1, 3, 1).
-            # In this reasonable example
-            # 
-            # data.iloc[0,:] returns the first row of data, whereas
-            #
-            # data.loc[0,:] returns the second row (because the value 0 is in 
-            # the second position of the range:
-            #
-            # list(r) ⇒ [-1, 0, 1, 2]
-            # 
-            # We do not necessarily have to have data frames with integral row
-            # indices. Therefore, for generality, when an int index is given it 
-            # will be interpreted as the index position (as for .iloc expression).
-            #
-            # Thus, when return_indices is True, the function will return a positional
-            # index and NOT a pd.Index value !!!
-            #
-            # To emulate the .loc behaviour one can use the somewhat contrived
-            # expression:
-            # data.loc[n,:], where n = data.index[k]
-            #
-            # These notes also apply to data frame columns.
-            
-            if axis in (0, "rows", None):
-                return (data.index[index], ) if return_indices else (data.iloc[index,:], )
-            else:
-                return (data.columns[index], ) if return_indices else (data.iloc[:,index], )
-            
-        elif isinstance(data, pd.Series):
-            data_len = len(data)
-            if index not in range(-data_len, data_len):
-                if silent:
-                    return None
-                raise ValueError(f"Index {index} is invalid for {data_len} elements")
-            return (data.index[index], ) if return_indices else (data.iloc[index,:], )
-            
-        elif isinstance(data, int): # size of a putative 1D container
-            if index not in range(-data, data):
-                if silent:
-                    return None
-                raise ValueError(f"Index {index} is invalid for {data_len} elements")
-                
-            return (index, )
-        
-        elif isinstance(data, (tuple, list)):
-            data_len = len(data)
-            if index not in range(-data_len, data_len):
-                if silent:
-                    return None
-                raise ValueError(f"Index {index} is invalid for {data_len} elements")
-            return (index,) if return_indices else return (data[index],)
-        
-        elif isinstance(data)
-        
-        # return (index,) if return_indices else (data[index],) # here data can be anything indexable by an int
-    
-    # 4) index is a str ⇒
-    #   Check that elements in data are either str, or have an attribute with 
-    #   name given in index.
-    #   Requires that 'data' is an actual collection, not the length of a virtual
-    #   collection.
-    if isinstance(index, (str, np.str_, bytes)):
-        if isinstance(index, bytes):
-            index = index.decode()
-            
-        if isinstance(data, (tuple, list)):
-            if all(isinstance(data, (str, np.str_, bytes))):
-                if return_indices:
-                    ret = tuple(filter(lambda x: data[x].decode() == index if isinstance(data[x], bytes) else data[x] == index,
-                                    range(len(data))))
-                    
-                else:
-                    ret = tuple(filter(lambda x: x.decode() == index if isinstance(x, bytes) else x == index,
-                                    data))
-                    
-                if len(ret) == 0:
-                    if silent:
-                        return None
-                    
-                    raise ValueError(f"Index {index} not found in data")
-                
-                return ret
-            
-            else:
-                ret = tuple(prog.filter_attr(data, operator.or_, indices_only=return_indices, 
-                                             name=lambda x: x==index, label=lambda x: x==index))
-                if len(ret) == 0:
-                    if silent:
-                        return None
-                    raise AttributeError(f"The objects have no attribute named 'name' or 'label' with the value {index}")
-                
-                return ret
-            
-        if isinstance(data, (pd.Series)):
-            if axis in (0, "row", None):
-                if index in data.index:
-                    if return_indices:
-                        return data.index.index(index)
-                    else:
-                        return data.loc[index,:]
-        if isinstance(data, (pd.core.indexes.base.Index)):
-            if index in data:
-                return (index,)
-                #return (list(data).index(index), )
-            
-            if not silent:
-                raise IndexError(f"Invalid 'index' specification {index}")
-            
-        if isinstance(data, np.ndarray):
-            if index in data:
-                ret = np.flatnonzero(data == index)
-            else:
-                if silent:
-                    return None
-                
-                else:
-                    raise ValueError(f"Index {index} not found in data array")
-                
-        raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index, Series, or DataFrame, or a numpy array")
-        
-    # 5) index is an Iterable of objects of the same type!
-    elif isinstance(index, collections.abc.Iterable):
-        # 5.1) of int values
-        if all(isinstance(v, int) and v in range(-data_len, data_len) for v in index):
-            if isinstance(data, pd.core.indexes.base.Index):
-                return (data[v] for v in index )
-            
-            return index
-        
-        # 5.2) of str values
-        elif all(isinstance(v, (str, np.str_, bytes) ) for v in index):
-            if not isinstance(data, collections.abc.Iterable):
-                raise TypeError("When indexing by name attribute (str), data must be an iterable")
-            
-            if isinstance(data, collections.abc.Sequence):
-                return tuple(prog.filter_attr(data, name=lambda x: x in index, indices_only=True))
-            
-            if isinstance(data, pd.core.indexes.base.Index):
-                return tuple(v for v in index if v in data)
-        
-                if not silent:
-                    raise IndexError(f"Invalid 'index' specification {index}")
-                
-        # 5.3) of anything else ⇒ Error
-        else:
-            if silent:
-                return None
-            
-            raise IndexError(f"Invalid 'index' specification {index}")
-        
-    # 6) index is a range
-    elif isinstance(index, range):
-        if max(index) >= data_len:
-            if silent:
-                return None
-            raise IndexError(f"Index {index} out of range for {data_len} elements")
-        
-        return index # -> index IS a range
-    
-    # 7) index is a slice
-    elif isinstance(index, slice):
-        ndx = index.indices(data_len)
-            
-        if len(ndx) == 0:
-            if silent:
-                return None
-            raise IndexError(f"Indexing {index} results in an empty indexing list")
-        
-        if max(ndx) >= data_len:
-            if silent:
-                return None
-            raise IndexError(f"Index {index} out of range for {data_len} elements")
-        
-        if min(ndx) < -data_len:
-            if silent:
-                return None
-            raise IndexError(f"Index {index} out of range for {data_len} elements")
-        
-        return ndx # -> ndx IS a tuple
-    
-    # 8) index is a 1D numpy array
-    elif isinstance(index, np.ndarray):
-        if not is_vector(index):
-            raise TypeError(f"Indexing array must be a vector; instead its shape is %s" % index.shape)
-            
-        # 8.1) of integer dtype
-        if index.dtype.kind == "i": # index is an array of int
-            if np.any((index < 0) | (index >= data_len) ):
-                if silent:
-                    return None
-                raise ValueError(f"Indexing array out of bounds")
-            
-            return tuple(index)
-        
-        # 8.2) of boolean dtype
-        elif index.dtype.kind == "b": # index is an array of bool
-            if len(index) != data_len:
-                raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
-            
-            return tuple(np.arange(data_len)[index])
-            #return tuple([k for k in range(data_len) if index[k]])
-            
-        # 8.3) of any other dtype ⇒ Error
-        else:
-            if silent:
-                return
-            raise TypeError(f"Invalid dtype {index.dtype} for indexing array")
-            
-    # 9) index is of any other type ⇒ Error
-    else:
-        if silent:
-            return
-        raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
-    
+#     elif isinstance(data, (pd.core.indexes.base.Index, neo.Epoch, DataZone, 
+#                            neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList)):
+#         # NOTE: the columns attribute of a DataFrame is also a pandas Index
+#         data_len = len(data)
+#         
+#     elif isinstance(data, np.ndarray):
+#         if isinstance(axis, int):
+#             if axis not in range(-data.ndim, data.ndim):
+#                 raise ValueError(f"Invalid axis index {axis} for an array with {data.ndim} dimensions")
+#             data_len = data.shape[axis]
+#             
+#         elif isinstance(axis, str):
+#             if not isinstance(data, vigra.VigraArray):
+#                 raise TypeError(f"str axis index not supported by {type(data).__name__}")
+#             
+#             if axis not in data.axistags:
+#                 raise ValueError(f"Invaid axis index {axis} for a VigraArray with {data.axistags} axis tags")
+#             
+#             
+#             
+#         else:
+#             data_len = data.size # for a flattened array
+#             
+#             
+#         
+#     else:
+#         raise TypeError("Expecting an int or a sequence (tuple, list, deque) or None; got %s instead" % type(data).__name__)
+#     
+#     # 1) index is None ⇒ return the entire range of data (or entire data)
+#     if index is None:
+#         return range(data_len) if return_indices else data # may be None
+#     
+#     # 2) index is MISSING ⇒ return an empty range
+#     if isinstance(index, type(MISSING)):
+#         return range(0) if return_indices else list()
+#     
+#     # 3) index is an int ⇒ 
+#     if isinstance(index, int):
+#         # NOTE: 2020-03-12 22:40:31
+#         # negative values ARE supported: they simply go backwards from the end of
+#         # the sequence
+#         if isinstance(data, pd.DataFrame):
+#             if axis in (0, "rows", None):
+#                 data_len = len(data)
+#             else:
+#                 data_len = data.shape[1]
+#                 
+#             if index not in range(-data_len, data_len):
+#                 if silent:
+#                     return None
+#                 raise ValueError(f"Index {index} is invalid for {data_len} elements")
+#             
+#             # ATTENTION: 2023-06-30 21:01:22
+#             # if data.index is a RangeIndex or a sequence of ints, when index is an int
+#             # both the following expressions are valid, ALTHOUGH they MAY return
+#             # entirely different values:
+#             # data.iloc[k,:] ⇒ returns the kᵗʰ data row
+#             # data.loc[k,:]  ⇒ returns the row at the data row index with value k
+#             #
+#             # The prime example is the case where a data frame has a row index 
+#             # given by, say, r = RangeIndex(-1, 3, 1).
+#             # In this reasonable example
+#             # 
+#             # data.iloc[0,:] returns the first row of data, whereas
+#             #
+#             # data.loc[0,:] returns the second row (because the value 0 is in 
+#             # the second position of the range:
+#             #
+#             # list(r) ⇒ [-1, 0, 1, 2]
+#             # 
+#             # We do not necessarily have to have data frames with integral row
+#             # indices. Therefore, for generality, when an int index is given it 
+#             # will be interpreted as the index position (as for .iloc expression).
+#             #
+#             # Thus, when return_indices is True, the function will return a positional
+#             # index and NOT a pd.Index value !!!
+#             #
+#             # To emulate the .loc behaviour one can use the somewhat contrived
+#             # expression:
+#             # data.loc[n,:], where n = data.index[k]
+#             #
+#             # These notes also apply to data frame columns.
+#             
+#             if axis in (0, "rows", None):
+#                 return (data.index[index], ) if return_indices else (data.iloc[index,:], )
+#             else:
+#                 return (data.columns[index], ) if return_indices else (data.iloc[:,index], )
+#             
+#         elif isinstance(data, pd.Series):
+#             data_len = len(data)
+#             if index not in range(-data_len, data_len):
+#                 if silent:
+#                     return None
+#                 raise ValueError(f"Index {index} is invalid for {data_len} elements")
+#             return (data.index[index], ) if return_indices else (data.iloc[index,:], )
+#             
+#         elif isinstance(data, int): # size of a putative 1D container
+#             if index not in range(-data, data):
+#                 if silent:
+#                     return None
+#                 raise ValueError(f"Index {index} is invalid for {data_len} elements")
+#                 
+#             return (index, )
+#         
+#         elif isinstance(data, (tuple, list)):
+#             data_len = len(data)
+#             if index not in range(-data_len, data_len):
+#                 if silent:
+#                     return None
+#                 raise ValueError(f"Index {index} is invalid for {data_len} elements")
+#             return (index,) if return_indices else return (data[index],)
+#         
+#         elif isinstance(data)
+#         
+#         # return (index,) if return_indices else (data[index],) # here data can be anything indexable by an int
+#     
+#     # 4) index is a str ⇒
+#     #   Check that elements in data are either str, or have an attribute with 
+#     #   name given in index.
+#     #   Requires that 'data' is an actual collection, not the length of a virtual
+#     #   collection.
+#     if isinstance(index, (str, np.str_, bytes)):
+#         if isinstance(index, bytes):
+#             index = index.decode()
+#             
+#         if isinstance(data, (tuple, list)):
+#             if all(isinstance(data, (str, np.str_, bytes))):
+#                 if return_indices:
+#                     ret = tuple(filter(lambda x: data[x].decode() == index if isinstance(data[x], bytes) else data[x] == index,
+#                                     range(len(data))))
+#                     
+#                 else:
+#                     ret = tuple(filter(lambda x: x.decode() == index if isinstance(x, bytes) else x == index,
+#                                     data))
+#                     
+#                 if len(ret) == 0:
+#                     if silent:
+#                         return None
+#                     
+#                     raise ValueError(f"Index {index} not found in data")
+#                 
+#                 return ret
+#             
+#             else:
+#                 ret = tuple(prog.filter_attr(data, operator.or_, indices_only=return_indices, 
+#                                              name=lambda x: x==index, label=lambda x: x==index))
+#                 if len(ret) == 0:
+#                     if silent:
+#                         return None
+#                     raise AttributeError(f"The objects have no attribute named 'name' or 'label' with the value {index}")
+#                 
+#                 return ret
+#             
+#         if isinstance(data, (pd.Series)):
+#             if axis in (0, "row", None):
+#                 if index in data.index:
+#                     if return_indices:
+#                         return data.index.index(index)
+#                     else:
+#                         return data.loc[index,:]
+#         if isinstance(data, (pd.core.indexes.base.Index)):
+#             if index in data:
+#                 return (index,)
+#                 #return (list(data).index(index), )
+#             
+#             if not silent:
+#                 raise IndexError(f"Invalid 'index' specification {index}")
+#             
+#         if isinstance(data, np.ndarray):
+#             if index in data:
+#                 ret = np.flatnonzero(data == index)
+#             else:
+#                 if silent:
+#                     return None
+#                 
+#                 else:
+#                     raise ValueError(f"Index {index} not found in data array")
+#                 
+#         raise TypeError("Name index requires 'data' to be a sequence of objects, or a pandas Index, Series, or DataFrame, or a numpy array")
+#         
+#     # 5) index is an Iterable of objects of the same type!
+#     elif isinstance(index, collections.abc.Iterable):
+#         # 5.1) of int values
+#         if all(isinstance(v, int) and v in range(-data_len, data_len) for v in index):
+#             if isinstance(data, pd.core.indexes.base.Index):
+#                 return (data[v] for v in index )
+#             
+#             return index
+#         
+#         # 5.2) of str values
+#         elif all(isinstance(v, (str, np.str_, bytes) ) for v in index):
+#             if not isinstance(data, collections.abc.Iterable):
+#                 raise TypeError("When indexing by name attribute (str), data must be an iterable")
+#             
+#             if isinstance(data, collections.abc.Sequence):
+#                 return tuple(prog.filter_attr(data, name=lambda x: x in index, indices_only=True))
+#             
+#             if isinstance(data, pd.core.indexes.base.Index):
+#                 return tuple(v for v in index if v in data)
+#         
+#                 if not silent:
+#                     raise IndexError(f"Invalid 'index' specification {index}")
+#                 
+#         # 5.3) of anything else ⇒ Error
+#         else:
+#             if silent:
+#                 return None
+#             
+#             raise IndexError(f"Invalid 'index' specification {index}")
+#         
+#     # 6) index is a range
+#     elif isinstance(index, range):
+#         if max(index) >= data_len:
+#             if silent:
+#                 return None
+#             raise IndexError(f"Index {index} out of range for {data_len} elements")
+#         
+#         return index # -> index IS a range
+#     
+#     # 7) index is a slice
+#     elif isinstance(index, slice):
+#         ndx = index.indices(data_len)
+#             
+#         if len(ndx) == 0:
+#             if silent:
+#                 return None
+#             raise IndexError(f"Indexing {index} results in an empty indexing list")
+#         
+#         if max(ndx) >= data_len:
+#             if silent:
+#                 return None
+#             raise IndexError(f"Index {index} out of range for {data_len} elements")
+#         
+#         if min(ndx) < -data_len:
+#             if silent:
+#                 return None
+#             raise IndexError(f"Index {index} out of range for {data_len} elements")
+#         
+#         return ndx # -> ndx IS a tuple
+#     
+#     # 8) index is a 1D numpy array
+#     elif isinstance(index, np.ndarray):
+#         if not is_vector(index):
+#             raise TypeError(f"Indexing array must be a vector; instead its shape is %s" % index.shape)
+#             
+#         # 8.1) of integer dtype
+#         if index.dtype.kind == "i": # index is an array of int
+#             if np.any((index < 0) | (index >= data_len) ):
+#                 if silent:
+#                     return None
+#                 raise ValueError(f"Indexing array out of bounds")
+#             
+#             return tuple(index)
+#         
+#         # 8.2) of boolean dtype
+#         elif index.dtype.kind == "b": # index is an array of bool
+#             if len(index) != data_len:
+#                 raise TypeError("Boolean indexing vector must have the same length as the iterable against it will be normalized (%d); got %d instead" % (data_len, len(index)))
+#             
+#             return tuple(np.arange(data_len)[index])
+#             #return tuple([k for k in range(data_len) if index[k]])
+#             
+#         # 8.3) of any other dtype ⇒ Error
+#         else:
+#             if silent:
+#                 return
+#             raise TypeError(f"Invalid dtype {index.dtype} for indexing array")
+#             
+#     # 9) index is of any other type ⇒ Error
+#     else:
+#         if silent:
+#             return
+#         raise TypeError("Unsupported data type for index: %s" % type(index).__name__)
+#     
 def normalized_sample_index(data:np.ndarray, 
                             axis: typing.Union[int, str, vigra.AxisInfo], 
                             index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
