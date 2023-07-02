@@ -721,60 +721,60 @@ def split_histogram(counts, f):
     
 def state_levels(x:np.ndarray, **kwargs):
     """Calculate states from a 1D waveform.
-    See IEEE Std 181-2011: 
-        IEEE Standard for Transitions, Pulses, and Related Waveforms
-    
-    Parameters:
-    -----------
-    
-    x = np.ndarray (usually, a column vector; when a 2D array, then the function
-        is applied on the given `axis` (or on flattened array if `axis` is None))
-    
-    Var-keyword parameters:
-    ----------------------
-    
-    bins:  int or None;
-            
-            number of bins (default: 100)
-            
-            When None is passed here, the function attempts to calculate the 
-            numbr of histogram bins according to ADC parameters specified , as
-            described below.
-            
-    bw:     float;
-            
-            bin width (used if bins is None)
-            
-    adcres, adcrange, adcscale : float scalars
-            
-            used when bins is None AND bw is None
-            
-            These are passed as arguments to generate_bin_width() function (in this module)
-            
-            Their default values are, respectively: 15 bit, 10 V, and 1 (for Axon Digidata 1550)
-            
-    levels: float or sequence of floats
-            
-            The fractional reference levels; allowed values are in the interval 
-            [0,1] (see "f" argument to split_histogram() function in this module); 
-            default is 0.5.
-            
-    moment: str
-            The statistical moment used to calculate the state level:
-            "mean" or "mode" or a function that takes a 1D sequence of numbers
-            and returns a scalar; default is "mean"
-    
-    axis:   int
-            The axis of the array (when x.ndim > 1); default is 0
-            
-    Returns:
-    ========
-    sLevels: A list of reference levels, corresponding to the fractional reference 
-                levels specified in "levels" argument.
-    counts: histogram counts
-    edges: histogram edges
-    ranges: ranges of count values for the two levels
-    
+See IEEE Std 181-2011: 
+    IEEE Standard for Transitions, Pulses, and Related Waveforms
+
+Parameters:
+-----------
+
+x = np.ndarray (usually, a column vector; when a 2D array, then the function
+    is applied on the given `axis` (or on flattened array if `axis` is None))
+
+Var-keyword parameters:
+----------------------
+
+bins:  int or None;
+        
+        number of bins (default: 100)
+        
+        When None is passed here, the function attempts to calculate the 
+        numbr of histogram bins according to ADC parameters specified , as
+        described below.
+        
+bw:     float;
+        
+        bin width (used if bins is None)
+        
+adcres, adcrange, adcscale : float scalars
+        
+        used when bins is None AND bw is None
+        
+        These are passed as arguments to generate_bin_width() function (in this module)
+        
+        Their default values are, respectively: 15 bit, 10 V, and 1 (for Axon Digidata 1550)
+        
+levels: float or sequence of floats
+        
+        The fractional reference levels; allowed values are in the interval 
+        [0,1] (see "f" argument to split_histogram() function in this module); 
+        default is 0.5.
+        
+moment: str
+        The statistical moment used to calculate the state level:
+        "mean" or "mode" or a function that takes a 1D sequence of numbers
+        and returns a scalar; default is "mean"
+
+axis:   int
+        The axis of the array (when x.ndim > 1); default is 0
+        
+Returns:
+========
+sLevels: A list of reference levels, corresponding to the fractional reference 
+            levels specified in "levels" argument.
+counts: histogram counts
+edges: histogram edges
+ranges: ranges of count values for the two levels
+
 
     """
     from scipy import where
@@ -2429,70 +2429,125 @@ def correlate(in1, in2, **kwargs):
         return corr
 
 @safeWrapper
+@with_doc(state_levels, use_header=True)
 def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal], 
                   thr:typing.Optional[float] = 1., 
                   channel:typing.Optional[int] = None,
                   up_first:bool=True,
                   **kwargs) -> tuple:
-    """Detect boxcar waveforms in a signal.
+    """Detection of boxcar or step (Heaviside) waveforms in a signal.
+    
+The signal must undergo at least one transition between two distinct states —
+"low" and "high" — of a minimum transition amplitude¹.
 
+The states are detected using an algorithm selected using the 'method' parameter
+    from:
     
-    The signal must undergo at least one transition between two distinct states 
-    ("low" and "high").
+• the kmeans algorithm (see documentation for scipy.cluster.vq.kmeans(…) 
+    function)
     
-    The states are detected using the kmeans algorithm (scipy.cluster.vq.kmeans)
-    or using a histogram-based method (see state_levels); this is selected using
-    the 'method' keyword (by default this is set to 'kmeans')
+• a histogram-based method (see documentation for state_levels(…) function in 
+    this module).
+
+By default the 'method' parameter is set to 'kmeans'.
     
-    Optionally the float parameter thr specifies the minimum difference between
-    signal's clusters for it to be considered as containing embedded TTL-like
-    waveforms. By default, this is 1.0
+Optionally the float parameter 'thr' specifies the minimum difference between
+signal's clusters for it to be considered as containing an embedded TTL-like
+waveforms. By default, this is 1.0
+
+The function is useful in detecting the ACTUAL time of a trigger (be it 
+"emulated" in the ADC command current/voltage or in the digital output "DIG") 
+when this differs from what was intended in the protocol (e.g. in Clampex,
+there is a padding before and after the actual signal, and the size of the 
+padding is about 
+
+Parameters:
+----------
+x: signal-like object
     
-    The function is useful in detecting the ACTUAL time of a trigger (be it 
-    "emulated" in the ADC command current/voltage or in the digital output "DIG") 
-    when this differs from what was intended in the protocol (e.g. in Clampex,
-    there is a padding before and after the actual signal, and the size of the 
-    padding is about 
+thr: float: a minimum value of boxcar amplitude (useful for noisy signals)
+    default is 1 (see NOTE 1).
+
+channel: required when the signal 'x' has more than one channel (or traces);
+    selects a single trace (or channel) along the 2nd axis (axis 1)
+
+    (remember, a signal is a 2D array and its traces are column vectors, 
+    with axis 0 the 'domain' (time, etc) and channels - or traces - indexed
+    on axis 1)
+
+up_first: bool default is True
+    When True, the upward transitions times are in the first element of the 
+        returned tuple (see below), and the downward transition times are in
+        the second element.
+
+    When False, the order is reversed (down, then up).
+
+    NOTE: This allows the caller to pre-empt which transition time stamps 
+    are returned first, although it is easy to determine this post-hoc, by
+    comparing the time stamps.
+    
+Var-keyword parameters:
+=======================
+• method: str; default is 'kmeans'; valid values are 'kmeans', 'state_levels',
+    'states' ('states' is an alias/shorthand for 'state_levels')
+    
+When 'method' is 'states' or 'state_levels', the following keyword parameters are
+passed to the state_levels(…) function (see documentation for state_levels(…)):
+    
+• box_size
+• levels
+• adcres, adcrange, adcscale
+• moment
+• bins, bw     
+    
+When 'method' is 'kmeans' the function passes the value of 2 to the kmeans 
+'k_or_guess' parameter (i.e. classify 'x' data in levels). The following
+keyword parameters cna be used to control the behaviour of kmeans(…):
+    
+• iter (here, default is None)
+    
+TODO: pass others as well
+
+
+
+Returns:
+========
+A tuple of five elements: ("t0", "t1", "amplitude", "centroids", "label") , 
+
+where:
+
+• t0, t1 are the domain values² for the transitions between the low ('lo') and 
+    high ('hi') states, as follows:
+        
+    variable:   Transition:     Condition:
+    ------------------------------------------------
+    t0          lo → hi         up_first == True
+                hi → lo         up_first == False
+
+    t1          hi → lo         up_first == True
+                lo → hi         up_first == False
+    ------------------------------------------------
     
 
-    Parameters:
-    ----------
-    x: signal-like object
-    thr: float: a minimum value of boxcar amplitude (useful for noisy signals)
-        default is 1.
+• amplitude: the amplitude of the boxcar
+• centroids: the mean value of each of the low and high states    
+• label: numpy array (vector) of same size as the signal in 'x', with values of
+    0 or 1, indicating which state the samples in 'x' belong to:
     
-    channel: required when the signal 'x' has more than one channel (or traces);
-        selects a single trace (or channel) along the 2nd axis (axis 1)
+    Samples in 'label' with value 0 correspond to the samples in 'x' belonging
+    to the 'low' state.
+        
+    Samples in 'label' with value 1 correspond to the samples in 'x' belonging
+    to the 'high' state.
     
-        (remember, a signal is a 2D array and its traces are column vectors, 
-        with axis 0 the 'domain' (time, etc) and channels - or traces - indexed
-        on axis 1)
+NOTES:
+=====
+¹ To avoid false detection in noisy signals.
     
-    up_first: bool default is True
-        When True, the upward transitions times are in the first element of the 
-            returned tuple (see below), and the downward transition times are in
-            the second element.
-    
-        When False, the order is reversed (down, then up).
-    
-        NOTE: This allows the caller to pre-empt which transition time stamps 
-        are returned first, although it is easy to determine this post-hoc, by
-        comparing the time stamps.
-    
-    Returns:
-    ========
-    A tuple of five elements: 
-        "up", "down", "amplitude", "centroids", "label" when up_first is True (default)
-    
-        "down", "up", "amplitude", "centroids", "label" when up_first is False
-    
-        "up" and "down" are lists of time stamps for the lo → hi and  hi → lo
-            transitions, respectively.
+² When the signals are in time domain, these are simply the times of the
+    transitions
 
-            The length of each array is the number of transitions in the 
-            respective direction. For n boxcar waveforms in the signal there will
-            be n transitions in each direction.
-    
+        
     """
     # FIXME 2023-06-18 22:09:23
     # Currently this function does almost the same thing as parse_step_waveform_signal.
@@ -2552,11 +2607,11 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     # NOTE: 2023-06-19 09:00:05
     # get the transition levels - first check what method we use
     
-    if method not in ("kmeans", "state_levels"):
+    if method.lower() not in ("kmeans", "state_levels", "states"):
         raise ValueError(f"'method' {method} is invalid; expecting one of 'state_levels' or 'kmeans'")
     
     try:
-        if method == "state_levels":
+        if method.lower() in ("state_levels", "states"):
             # print("detect_boxcar using state_levels")
             levels = kwargs.pop("levels", 0.5)
             # NOTE: 2023-06-19 09:04:30
@@ -2635,14 +2690,23 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
         
         # indices of up transitions (lo → hi)
         ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
+        
+        print(f"ndx_lo_hi = {ndx_lo_hi}, size = {ndx_lo_hi.size}")
+        
         # indices of down transitions (hi → lo)
         ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
         
+        print(f"ndx_hi_lo = {ndx_hi_lo}, size = {ndx_hi_lo.size}")
+        
         if ndx_lo_hi.size:
             times_lo_hi = np.array([x.times[k] for k in ndx_lo_hi]) * x.times.units # up transitions
+        else:
+            times_lo_hi = None
             
         if ndx_hi_lo.size:
             times_hi_lo = np.array([x.times[k] for k in ndx_hi_lo]) * x.times.units # down transitions
+        else:
+            times_hi_lo = None
                 
         
     except Exception as e:
