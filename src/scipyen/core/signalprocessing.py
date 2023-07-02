@@ -2437,37 +2437,13 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
                   **kwargs) -> tuple:
     """Detection of boxcar or step (Heaviside) waveforms in a signal.
     
-The signal must undergo at least one transition between two distinct states —
-"low" and "high" — of a minimum transition amplitude¹.
-
-The states are detected using an algorithm selected using the 'method' parameter
-    from:
-    
-• the kmeans algorithm (see documentation for scipy.cluster.vq.kmeans(…) 
-    function)
-    
-• a histogram-based method (see documentation for state_levels(…) function in 
-    this module).
-
-By default the 'method' parameter is set to 'kmeans'.
-    
-Optionally the float parameter 'minampli' specifies the minimum difference between
-signal's clusters for it to be considered as containing an embedded TTL-like
-waveforms. By default, this is 1.0
-
-The function is useful in detecting the ACTUAL time of a trigger (be it 
-"emulated" in the ADC command current/voltage or in the digital output "DIG") 
-when this differs from what was intended in the protocol (e.g. in Clampex,
-there is a padding before and after the actual signal, and the size of the 
-padding is about 
-
 Parameters:
-----------
+===========
 x: signal-like object
     
 minampli: float: a minimum value of boxcar amplitude (useful for noisy signals)
     default is 1 (see NOTE 1).
-
+    
 channel: required when the signal 'x' has more than one channel (or traces);
     selects a single trace (or channel) along the 2nd axis (axis 1)
 
@@ -2527,7 +2503,6 @@ where:
     t1          hi → lo         up_first == True
                 lo → hi         up_first == False
     ------------------------------------------------
-    
 
 • amplitude: the amplitude of the boxcar
 • centroids: the mean value of each of the low and high states    
@@ -2543,10 +2518,46 @@ where:
 • upward: a bool indicating the direction of the boxcar (True ⇒ the boxcar is
 an upward deflection)
     
-Limitations:
-============
-The samples in 'x' must fall in one of two distinct levels, with the following
-implications:
+What this function does:
+========================
+The function detects step transitions between two distinct states — "low" and 
+"high" —  in a regularly sampled signal (a.k.a "analog" signal).
+    
+A transition may be unique (a.k.a a "step", or Heaviside function) or followed
+by a transition in the opposite direction to the first (a.k.a "boxcar" function:
+a boxcar is effectively a series of two step transitions in opposite directions).
+    
+Boxcar and/or step waveforms are typically used to represent TTL-like signals
+(e.g., "digital trigger signals", with widths in the order of ms) but can also
+be used with digital-to-analog (DAC) command signals (e.g., a "step" change in 
+holding potential or injected current).
+
+Optionally the transitions can be detected subject to a minimum amplitude¹.
+    
+The state transitions are detected using an algorithm selected from among:
+    
+• the kmeans algorithm (see documentation for scipy.cluster.vq.kmeans(…) 
+    function).
+    
+• a histogram-based method (see documentation for state_levels(…) function in 
+    this module).
+
+By default, the 'method' parameter is set to 'kmeans'.
+    
+Optionally the float parameter 'minampli' specifies the minimum difference between
+signal's clusters for it to be considered as containing an embedded TTL-like
+waveforms. By default, this is 1.0
+
+The function is useful in detecting the ACTUAL time of a trigger (be it 
+"emulated" in the ADC command current/voltage or in the digital output "DIG") 
+when this differs from what was intended in the protocol (e.g. in Clampex,
+there is a padding before and after the actual signal, and the size of the 
+padding is about 
+
+Limitations and ways to work around them:
+=========================================
+The samples in 'x' must fall in one of two distinct levels for the detection to
+work. This prerequisite has the following implications:
 
 • multiple boxcars in the signal can be detected as long as they have the same
 amplitude and direction (i.e., either upward or downward);
@@ -2554,6 +2565,21 @@ amplitude and direction (i.e., either upward or downward);
 • the signal can have at most one step function in a given direction; if the
 signal also contains one or more boxcars, then the step function occurs AFTER the 
 boxcars and has the same direction and amplitude as the boxcars.
+    
+To work around these limitations one can pass a "slice" of the signal, containing
+only the boxcar waveforms of interest, to this function.
+    
+Another possibility is to use "lower-level" code, e.g. by invoking 'kmeans' with
+a higher number of putative levels (the 'k_or_guess' parameter) or 'state_levels'
+with a tuple of fractional levels (the 'levels' parameter) and work out the
+location, direction, and amplitude of transitions from the result.
+    
+To keep code simple, this function only deals with two well-separated state
+levels in the signal.
+    
+Finally, for signals with several detected boxcars, one may use the results to
+figure out the boxcar widths and filter the detected boxcars subject to width
+constraints.
     
 NOTES:
 =====
@@ -2742,6 +2768,8 @@ NOTES:
             times_hi_lo = np.array([x.times[k] for k in ndx_hi_lo]) * x.times.units # down transitions
         else:
             times_hi_lo = None
+            
+        
             
         if all(v is not None for v in (times_lo_hi, times_hi_lo)):
             if times_lo_hi.size == times_hi_lo.size: # signal has boxcars only
