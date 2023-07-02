@@ -2431,7 +2431,7 @@ def correlate(in1, in2, **kwargs):
 @safeWrapper
 @with_doc(state_levels, use_header=True)
 def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal], 
-                  thr:typing.Optional[float] = 1., 
+                  minampli:typing.Optional[float] = 1., 
                   channel:typing.Optional[int] = None,
                   up_first:bool=True,
                   **kwargs) -> tuple:
@@ -2451,7 +2451,7 @@ The states are detected using an algorithm selected using the 'method' parameter
 
 By default the 'method' parameter is set to 'kmeans'.
     
-Optionally the float parameter 'thr' specifies the minimum difference between
+Optionally the float parameter 'minampli' specifies the minimum difference between
 signal's clusters for it to be considered as containing an embedded TTL-like
 waveforms. By default, this is 1.0
 
@@ -2465,7 +2465,7 @@ Parameters:
 ----------
 x: signal-like object
     
-thr: float: a minimum value of boxcar amplitude (useful for noisy signals)
+minampli: float: a minimum value of boxcar amplitude (useful for noisy signals)
     default is 1 (see NOTE 1).
 
 channel: required when the signal 'x' has more than one channel (or traces);
@@ -2491,8 +2491,8 @@ Var-keyword parameters:
 • method: str; default is 'kmeans'; valid values are 'kmeans', 'state_levels',
     'states' ('states' is an alias/shorthand for 'state_levels')
     
-When 'method' is 'states' or 'state_levels', the following keyword parameters are
-passed to the state_levels(…) function (see documentation for state_levels(…)):
+When 'method' is 'states' or 'state_levels', the following keyword parameters
+control the behaviour of the state_levels(…) function :
     
 • box_size
 • levels
@@ -2500,19 +2500,19 @@ passed to the state_levels(…) function (see documentation for state_levels(…
 • moment
 • bins, bw     
     
-When 'method' is 'kmeans' the function passes the value of 2 to the kmeans 
-'k_or_guess' parameter (i.e. classify 'x' data in levels). The following
-keyword parameters cna be used to control the behaviour of kmeans(…):
+When 'method' is 'kmeans' the function passes he kmeans parameter 'k_or_guess' to
+2 (i.e. classify 'x' data in levels). 
+
+The following keyword parameters control the behaviour of kmeans(…):
     
-• iter (here, default is None)
+• iter
+• thresh → NOTE: do not confuse with 'minampli'
+• check_finite
+• seed
     
-TODO: pass others as well
-
-
-
 Returns:
 ========
-A tuple of five elements: ("t0", "t1", "amplitude", "centroids", "label") , 
+A 6-tuple (t0, t1, amplitude, centroids, label, upward) , 
 
 where:
 
@@ -2539,6 +2539,9 @@ where:
         
     Samples in 'label' with value 1 correspond to the samples in 'x' belonging
     to the 'high' state.
+    
+• upward: a bool indicating the direction of the boxcar (True ⇒ the boxcar is
+an upward deflection)
     
 NOTES:
 =====
@@ -2613,15 +2616,29 @@ NOTES:
     try:
         if method.lower() in ("state_levels", "states"):
             # print("detect_boxcar using state_levels")
+            # NOTE: 2023-07-02 15:57:07
+            # remove the kwargs normally expected by kmeans(…)
+            #
+            kwargs.pop("iter", None)
+            kwargs.pop("thresh", None)
+            kwargs.pop("check_finite", None)
+            kwargs.pop("seed", None)
+            
+            # NOTE: make sure we have got OUR defaults here
             levels = kwargs.pop("levels", 0.5)
+            kwargs["levels"] = levels
+            
             # NOTE: 2023-06-19 09:04:30
             # TODO code to get these values from the ABF file (via pyabfbridge?)
             # TODO and similarly, from CED (for CED, the code still needs to be written)
             # TODO write documentation hint on how these numbers can be obtained
             # outside this function (ie., before calling it); 
             adcres = kwargs.pop("adcres", 15)
+            kwargs["adcres"] = adcres
             adcrange = kwargs.pop("adcrange", 10)
+            kwargs["adcrange"] = adcrange
             adcscale = kwargs.pop("adcrange", 1e3)
+            kwargs["adcscale"] = adcscale
         
             # NOTE: 2023-06-19 09:09:44
             # state_levels is a histogrm method to determine distinct 'levels' 
@@ -2642,10 +2659,8 @@ NOTES:
             # • rng: list of ranges (one per level) within the cnt array
             #   indicates the range of column indices that fall inside each level
             
-            centroids, cnt, edg, rng = state_levels(sig_filt.magnitude, levels = levels, 
-                                        adcres = adcres, 
-                                        adcrange = adcrange, 
-                                        adcscale = adcscale)
+            centroids, cnt, edg, rng = state_levels(sig_filt.magnitude,
+                                                    **kwargs)
             
             if len(centroids) == 0:
                 return (None, None, None) if return_levels else (None, None)
@@ -2653,34 +2668,42 @@ NOTES:
             cbook = np.array(centroids).T[:,np.newaxis]
             
         else:
+            # NOTE 2023-07-02 16:01:04
+            # remove keyword params normally expected by state_levels(…)
+            kwargs.pop("bins", None)
+            kwargs.pop("bw", None)
+            kwargs.pop("levels", None)
+            kwargs.pop("adcres", None)
+            kwargs.pop("adcrange", None)
+            kwargs.pop("adcscale", None)
             # print("detect_boxcar using kmeans")
-            cbook, dist = cluster.vq.kmeans(sig_filt, 2) # two levels
+            cbook, dist = cluster.vq.kmeans(sig_filt, 2, **kwargs) # two levels
             cbook = np.array(cbook, dtype=float)
             
         # the boxcar amplitude
         amplitude = np.diff(cbook, axis=0) * sig.units
         
-        if isinstance(thr, numbers.Number):
+        if isinstance(minampli, numbers.Number):
             if isinstance(sig, pq.Quantity):
-                thr = thr * sig.units
+                minampli = minampli * sig.units
                 
-        elif isinstance(thr, pq.Quantity):
-            if thr.size != 1:
+        elif isinstance(minampli, pq.Quantity):
+            if minampli.size != 1:
                 raise ValueError("Threshold must be a scalar")
             
             if isinstance(sig, pq.Quantity):
-                if not scq.units_convertible(sig, thr):
+                if not scq.units_convertible(sig, minampli):
                     raise ValueError("Threshold and signal have incompatible units")
                 
-                if thr.units != sig.units:
-                    thr = thr.rescale(sig.units)
+                if minampli.units != sig.units:
+                    minampli = minampli.rescale(sig.units)
                     
             else:
-                thr = thr.magnitude.flatten()[0]
+                minampli = minampli.magnitude.flatten()[0]
                 
-        # print(f"threshold = {thr*sig.units}")
+        # print(f"threshold = {minampli*sig.units}")
         
-        if np.all(np.abs(amplitude) < thr):
+        if np.all(np.abs(amplitude) < minampli):
             return (None, None, None, None, None)
             
         code, cdist = cluster.vq.vq(sig, sorted(cbook)) # use un-filtered signal here
@@ -2691,12 +2714,12 @@ NOTES:
         # indices of up transitions (lo → hi)
         ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
         
-        print(f"ndx_lo_hi = {ndx_lo_hi}, size = {ndx_lo_hi.size}")
+        # print(f"ndx_lo_hi = {ndx_lo_hi}, size = {ndx_lo_hi.size}")
         
         # indices of down transitions (hi → lo)
         ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
         
-        print(f"ndx_hi_lo = {ndx_hi_lo}, size = {ndx_hi_lo.size}")
+        # print(f"ndx_hi_lo = {ndx_hi_lo}, size = {ndx_hi_lo.size}")
         
         if ndx_lo_hi.size:
             times_lo_hi = np.array([x.times[k] for k in ndx_lo_hi]) * x.times.units # up transitions
@@ -2717,6 +2740,8 @@ NOTES:
         amplitude = None
         cbook = None
         code = None
+        
+    
         
     if up_first:
         return times_lo_hi, times_hi_lo, amplitude, cbook, code
