@@ -18,7 +18,7 @@ from . import quantities as scq
 from . import datasignal as sds
 from .datasignal import DataSignal, IrregularlySampledDataSignal
 from . import prog as prog
-from .prog import safeWrapper
+from .prog import (safeWrapper, with_doc)
 #### END scipyen core modules
 
 def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
