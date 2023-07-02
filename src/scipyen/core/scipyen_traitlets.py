@@ -1182,7 +1182,7 @@ class QuantityTrait(Instance, ScipyenTraitTypeMixin):
                 # so far silent is True when the observed knows about us
                 # check it we changed and notify
                 # silent = (new_hash == self.hashed)
-                silent = new_value == old_value
+                silent = safe_identity_test(new_value, old_value)
             
         except:
             traceback.print_exc()

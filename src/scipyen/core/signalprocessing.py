@@ -3,7 +3,7 @@
 For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.
 """
-import typing, numbers, functools, warnings
+import typing, numbers, functools, warnings, traceback
 #### BEGIN 3rd party modules
 import numpy as np
 import scipy
@@ -2543,6 +2543,18 @@ where:
 • upward: a bool indicating the direction of the boxcar (True ⇒ the boxcar is
 an upward deflection)
     
+Limitations:
+============
+The samples in 'x' must fall in one of two distinct levels, with the following
+implications:
+
+• multiple boxcars in the signal can be detected as long as they have the same
+amplitude and direction (i.e., either upward or downward);
+
+• the signal can have at most one step function in a given direction; if the
+signal also contains one or more boxcars, then the step function occurs AFTER the 
+boxcars and has the same direction and amplitude as the boxcars.
+    
 NOTES:
 =====
 ¹ To avoid false detection in noisy signals.
@@ -2730,8 +2742,28 @@ NOTES:
             times_hi_lo = np.array([x.times[k] for k in ndx_hi_lo]) * x.times.units # down transitions
         else:
             times_hi_lo = None
+            
+        if all(v is not None for v in (times_lo_hi, times_hi_lo)):
+            if times_lo_hi.size == times_hi_lo.size: # signal has boxcars only
+                if times_lo_hi.size == 1:
+                    upward = times_lo_hi[0] <= times_hi_lo[0]# if up_first else times_lo_hi[0] > times_hi_lo[0]
+                    
+                else:
+                    upward = times_lo_hi <= times_hi_lo #if up_first else times_lo_hi > times_hi_lo
+                    
+            else:
+                minlen = min(v.size for v in (times_lo_hi, times_hi_lo))
+                if minlen == 1:
+                    upward = times_lo_hi[0] <= times_hi_lo[0] #if up_first else times_lo_hi[0] > times_hi_lo[0]
+                else:
+                    upward = times_lo_hi[0:minlen] <= times_hi_lo[0:minlen]# if up_first else times_lo_hi[0:minlen] <= times_hi_lo[0:minlen]
+                    
+                    lastup = times_lo_hi[-1] > times_hi_lo[-1] #if up_first else times_lo_hi[-1] > times_hi_lo[-1]
+                    upward = np.append(upward, lastup)
+                    
+        else:
+            upward = True if times_lo_hi is not None else False
                 
-        
     except Exception as e:
         traceback.print_exc()
         times_lo_hi = None
@@ -2741,11 +2773,20 @@ NOTES:
         cbook = None
         code = None
         
+        upward = None
+        
+    # when there are all boxcars, times_lo_hi and times_hi_lo have the same length
+    # where there is just one steap (Heaviside) then one of times_lo_hi and times_hi_lo
+    # is None
+    # where there are only Heaviside steps there will be several levels in the 
+    # waveform, (one step after another) - A CONDITION NOT DEALT WITH HERE
+    #
+    # when there can be at most one step of the same direction
     
         
     if up_first:
-        return times_lo_hi, times_hi_lo, amplitude, cbook, code
+        return times_lo_hi, times_hi_lo, amplitude, cbook, code, upward
     
     # emulates parse_step_waveform_signal
-    return times_hi_lo, times_lo_hi, amplitude, cbook, code
+    return times_hi_lo, times_lo_hi, amplitude, cbook, code, upward
 
