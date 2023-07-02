@@ -2605,7 +2605,27 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
         # the boxcar amplitude
         amplitude = np.diff(cbook, axis=0) * sig.units
         
-        if np.all(amplitude < thr*sig.units):
+        if isinstance(thr, numbers.Number):
+            if isinstance(sig, pq.Quantity):
+                thr = thr * sig.units
+                
+        elif isinstance(thr, pq.Quantity):
+            if thr.size != 1:
+                raise ValueError("Threshold must be a scalar")
+            
+            if isinstance(sig, pq.Quantity):
+                if not scq.units_convertible(sig, thr):
+                    raise ValueError("Threshold and signal have incompatible units")
+                
+                if thr.units != sig.units:
+                    thr = thr.rescale(sig.units)
+                    
+            else:
+                thr = thr.magnitude.flatten()[0]
+                
+        # print(f"threshold = {thr*sig.units}")
+        
+        if np.all(np.abs(amplitude) < thr):
             return (None, None, None, None, None)
             
         code, cdist = cluster.vq.vq(sig, sorted(cbook)) # use un-filtered signal here

@@ -1683,26 +1683,27 @@ def normalized_signal_index(src: neo.core.container.Container, index: typing.Uni
         return [i.name for i in signal_collection].index(index)
     
     elif isinstance(index, (tuple, list)):
-        indices = list()
-        
-        for ndx in index:
-            if isinstance(ndx, int):
-                indices.append(normalized_index(data_len, ndx))
-                
-            elif isinstance(ndx, str):
-                if silent:
-                    indices.append(utilities.silentindex([i.name for i in signal_collection], ndx))
-                    
-                else:
-                    indices.append([i.name for i in signal_collection].index(ndx) )
-                    
-            else:
-                raise TypeError("Invalid index element type %s" % type(ndx).__name__)
-                
-        return indices
+        return normalized_index(signal_collection, index)
+#         indices = list()
+#         
+#         for ndx in index:
+#             if isinstance(ndx, int):
+#                 indices.append(normalized_index(data_len, ndx))
+#                 
+#             elif isinstance(ndx, str):
+#                 if silent:
+#                     indices.append(utilities.silentindex([i.name for i in signal_collection], ndx))
+#                     
+#                 else:
+#                     indices.append([i.name for i in signal_collection].index(ndx) )
+#                     
+#             else:
+#                 raise IndexError("Invalid index element type %s" % type(ndx).__name__)
+#                 
+#         return indices
                 
     else:
-        raise TypeError("Invalid indexing: %s" % index)
+        raise IndexError("Invalid indexing: %s" % index)
     
 #@safeWrapper
 def get_index_of_named_signal(src, names, 
@@ -6452,7 +6453,7 @@ def average_segments_in_block(data, **kwargs):
     if isinstance(new_segs, (tuple, list)) and all(isinstance(s, neo.Segment) for s in new_segs):
         ret.segments[:] = new_segs
     else:
-        warnings.warn("Averaging return no segments", RuntimeWarning)
+        warnings.warn("Averaging returns no segments", RuntimeWarning)
         
     
     ret.annotations = data.annotations
