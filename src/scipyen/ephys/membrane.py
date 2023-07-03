@@ -237,6 +237,12 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
         u, d, test_amplitude, levels, labels, upward = sigp.detect_boxcar(command, up_first=up_first,
                                                                           **kwargs)
         
+        if u.size != d.size:
+            raise RuntimeError(f"The 'command' signal should have the same number of state transitions in both directions; currently, there are {d.size} down and {u.size} up transitions")
+        
+        if isinstance(upward, (tuple, list)) and not all(upward[0] == v for v in upward):
+            raise RuntimeError("All boxcars must be in the same direction")
+        
         if any(v.size > 1 for v in (d,u)): # more than one boxcar detected
             if boxwidth is None:
                 raise RuntimeError("More than one transition between levels has been detected and no constraints on boxcar width were specified ('boxwidth')")
@@ -247,6 +253,8 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
                         widths = d-u if upward[0] else u-d
                     else:
                         widths = u-d if upward[0] else d-u
+                        
+            
                         
                     
                 

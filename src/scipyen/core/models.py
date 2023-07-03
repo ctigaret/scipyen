@@ -748,18 +748,20 @@ def Boltzmann(x, p, pos:bool=True):
     # α = 1 if pos == True else -1
     # return 1/(1+np.exp(α * (x0 - x) / κ))
 
+# def Heaviside(x:typing.Union[pq.Quantity, np.ndarray], 
+#               x0:typing.Union[float, pq.Quantity], 
+#               α:bool=True) -> np.ndarray:
 def Heaviside(x:typing.Union[pq.Quantity, np.ndarray], 
               x0:typing.Union[float, pq.Quantity], 
-              α:bool=True) -> np.ndarray:
+              level0:float=0., level1:float=1.) -> np.ndarray:
     """Heaviside (step) function
     
     Parameters:
     ===========
     x: domain vector
     x0: coordinate of the step change (in domain space)
-    α: optional, default is True; sets the direction of the change:
-        True  ⇒ change from 0. to 1.
-        False ⇒ change from 1. to 0.
+    level0, level1:float; optional, defaults are 0 anbd 1, respectively
+        The initial and the final level of the step function.
         
 """
     if not is_vector(x):
@@ -794,19 +796,23 @@ def Heaviside(x:typing.Union[pq.Quantity, np.ndarray],
     
     xx = x - x0
     
-    ν = 0. if α else 1.
-    λ = 1. if α else 0.
+    y = np.full_like(x, fill_value = level0)
+    y[xx >= 0] = level1
     
-    y = np.full_like(x, fill_value = ν)
-    y[xx >= 0] = λ
-    
+#     ν = 0. if α else 1.
+#     λ = 1. if α else 0.
+#     
+#     y = np.full_like(x, fill_value = ν)
+#     y[xx >= 0] = λ
+#     
     return y
     
     
-def boxcar(x, p, up=True):
+# def boxcar(x, p, up=True):
+def boxcar(x, p, level0=0., level1=1.):
     x0, x1 = p
     
-    return Heaviside(x, x0, up) * Heaviside(x, x1, not up)
+    return Heaviside(x, x0, level0, level1) + Heaviside(x, x1, level1, level0)
 
 
 

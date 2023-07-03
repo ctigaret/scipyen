@@ -2714,11 +2714,14 @@ NOTES:
             kwargs.pop("adcres", None)
             kwargs.pop("adcrange", None)
             kwargs.pop("adcscale", None)
+            levels = kwargs.pop("levels", 2)
             # print("detect_boxcar using kmeans")
-            cbook, dist = cluster.vq.kmeans(sig_filt, 2, **kwargs) # two levels
+            cbook, dist = cluster.vq.kmeans(sig_filt, levels, **kwargs) # two levels
             cbook = np.array(cbook, dtype=float)
             
         # the boxcar amplitude
+        # BUG: 2023-07-03 23:01:53 FIXME
+        # this is WRONG for more than two levels!
         amplitude = np.diff(cbook, axis=0) * sig.units
         
         if isinstance(minampli, numbers.Number):
