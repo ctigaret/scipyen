@@ -1913,7 +1913,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         
         testVm  = Vss - Vbase
 
-    #print("testVm", testVm)
+    # print("testVm", testVm)
     
     Rs     = (testVm / (Irs - Idc)).rescale(pq.Mohm)
     Rin    = (testVm / (Irin - Idc)).rescale(pq.Mohm)

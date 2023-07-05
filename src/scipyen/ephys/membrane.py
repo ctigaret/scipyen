@@ -300,13 +300,23 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
         if not isinstance(command, neo.core.basesignal.BaseSignal):
             raise ValueError("When no locations are specified, the command must be a signal object")
         
+        up_first = kwargs.pop("up_first", True)
+        
+        if not isinstance(up_first, bool):
+            raise TypeError(f"The 'up_first' parameter expected a bool; instead, got {type(up_first).__name__}")
+        
+        kwargs["up_first"] = up_first
+        
         boxdetect = sigp.detect_boxcar(command, **kwargs)
+        
         if any(boxdetect[k] is None for k in (1,2)):
             raise ValueError("The command signal does not appear to contain a boxcar waveform")
+
+        if boxdetect[0].size != boxdetect[1].size:
+            raise ValueError(f"Mismatch between the number of low → high transitions ({boxdetect[0].size}) and that of high → low transitions ({boxdetect[1].size})")
         
-        nboxcars = min(boxdetect[k].size for k in (1,2))
-        if nboxcars != 1:
-            raise RuntimeError(f"At least {min(nboxcars)} were detected in the command signal but only one was expected")
+        nboxcars = min(boxdetect[0].size)
+        
             
         
         

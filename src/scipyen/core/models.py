@@ -748,10 +748,63 @@ def Boltzmann(x, p, pos:bool=True):
     # α = 1 if pos == True else -1
     # return 1/(1+np.exp(α * (x0 - x) / κ))
 
-# def Heaviside(x:typing.Union[pq.Quantity, np.ndarray], 
-#               x0:typing.Union[float, pq.Quantity], 
-#               α:bool=True) -> np.ndarray:
 def Heaviside(x:typing.Union[pq.Quantity, np.ndarray], 
+              x0:typing.Union[float, pq.Quantity], 
+              α:bool=True) -> np.ndarray:
+    """Heaviside (step) function
+    
+    Parameters:
+    ===========
+    x: domain vector
+    x0: coordinate of the step change (in domain space)
+    α: bool, default is True.
+        Flag for the direction of step change:
+        True (default) → 0 → 1 transition
+        False ⇒ transition 1 → 0
+        
+"""
+    if not is_vector(x):
+        raise TypeError(f"Domain (x) is not a vector")
+    
+    if isinstance(x0, np.ndarray):
+        if x0.size != 1:
+            raise TypeError(f"x0 expected an array of size 1; got {x0.size} instead")
+        
+    elif not isinstance(x0, float):
+        raise TypeError(f"x0 must be a scalar float or an array with size 1")
+        
+    # if all(isinstance(v, pq.Quantity) for v in (x, x0)):
+    if isinstance(x, pq.Quantity):
+        if isinstance(x0, pq.Quantity):
+            if not scq.units_convertible(x,x0):
+                raise TypeError(f"x and x0 have incompatible units")
+            
+            if x.units != x0.units:
+                x0 = x0.rescale(x.units)
+                
+            x0 = x0.magnitude.flatten()[0]
+
+        x = x.magnitude
+                
+    else:
+        if isinstance(x0, pq.Quantity):
+            warnings.warn(f"x0 is a quantity but the domain is not; will strip the units from x0")
+            x0 = x0.magnitude.flatten()[0]
+            
+    x = x.flatten()
+    
+    xx = x - x0
+    
+    ν = 0. if α else 1.
+    λ = 1. if α else 0.
+    
+    y = np.full_like(x, fill_value = ν)
+    y[xx >= 0] = λ
+    
+    return y
+    
+    
+def Heaviside2(x:typing.Union[pq.Quantity, np.ndarray], 
               x0:typing.Union[float, pq.Quantity], 
               level0:float=0., level1:float=1.) -> np.ndarray:
     """Heaviside (step) function
@@ -799,20 +852,34 @@ def Heaviside(x:typing.Union[pq.Quantity, np.ndarray],
     y = np.full_like(x, fill_value = level0)
     y[xx >= 0] = level1
     
-#     ν = 0. if α else 1.
-#     λ = 1. if α else 0.
-#     
-#     y = np.full_like(x, fill_value = ν)
-#     y[xx >= 0] = λ
-#     
     return y
     
     
-# def boxcar(x, p, up=True):
-def boxcar(x, p, level0=0., level1=1.):
+def boxcar(x, p, up_first:bool=True):
     x0, x1 = p
     
-    return Heaviside(x, x0, level0, level1) + Heaviside(x, x1, level1, level0)
+    ud = [True, False] if up_first else [False, True]
+    
+    if x0 < x1:
+        print(f"x0 < x1 {x0 < x1}; up_first: {up_first}")
+        #       up then down                                                        down then up
+        return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x0, False) + Heaviside(x, x1, True)
+        
+    else:
+        print(f"x0 >= x1 {x0 >= x1}; up_first: {up_first}")
+        return Heaviside(x, x0, ud[0]) * Heaviside(x, x1, ud[1])# if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
+        # return Heaviside(x, x0, False) + Heaviside(x, x1, True) if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
+        # return Heaviside(x, x0,False) * Heaviside(x, x1, True) if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
+        # return Heaviside(x, x1, True) * Heaviside(x, x0, False) if up_first else Heaviside(x, x1, False) + Heaviside(x, x0, True)
+        #      up follows down                                                  down follows up
+        # return Heaviside(x, x0, False) + Heaviside(x, x1, True) if up_first else Heaviside(x, x0, False) + Heaviside(x, x1, False)
+        
+
+def boxcar2(x, p, level0=0., level1=1.):
+    """"""
+    x0, x1 = p
+    
+    return Heaviside2(x, x0, level0, level1) + Heaviside2(x, x1, level1, level0)
 
 
 
