@@ -7481,14 +7481,6 @@ signals in the signal collection.
         Anything else                   ↦ ignored
         
         """
-        # if self.parent().__class__.__name__ == "EventAnalysis" and "Detected events" in self.windowTitle():
-        #     print(f"{self.windowTitle()} - displayFrame")
-        #     stack = inspect.stack()
-        #     for s in stack:
-        #         print(f"\tcaller {s.function} in {s.filename}")
-        
-        # print(f"\n{self.__class__.__name__}[{self.windowTitle()}].displayFrame()")
-        
         if self._yData_ is None:
             # print(f"{self.__class__.__name__} self._yData_ is None")
             self.clear()
@@ -7572,37 +7564,42 @@ signals in the signal collection.
                     
                 
         # NOTE: 2023-05-09 10:41:27
-        # thsi also sets up axes lines visibility & tickmarks
+        # this also sets up axes lines visibility & tickmarks
+        self._get_axes_X_view_states_()
         self._align_X_range()
         self._update_axes_spines_()
         
     def _get_axes_X_view_states_(self):
         self._axes_X_view_states_.clear()
         
-        for ax in self.axes:
-            data_x_range = self._get_axis_data_X_range_(ax)
-            
-            if any(v is None for v in data_x_range):
-                self._axes_X_view_states_.append((None, None))
-            
-            else:
-                view_x_range = ax.vb.viewRange()[0]
-                
-                offset = view_x_range[0] - data_x_range[0]
-                
-                viewXspan = view_x_range[1] - view_x_range[0]
-                dataXspan = data_x_range[1] - data_x_range[0]
-                
-                if dataXspan == 0:
-                    factor = 1.0
-                else:
-                    factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
-                
-                self._axes_X_view_states_.append((offset, factor))
+        self._axes_X_view_states_ =[self._get_axis_X_view_state(ax) for ax in self.axes]
+        
+#         for ax in self.axes:
+#             data_x_range = self._get_axis_data_X_range_(ax)
+#             
+#             if any(v is None for v in data_x_range):
+#                 self._axes_X_view_states_.append((None, None))
+#             
+#             else:
+#                 view_x_range = ax.vb.viewRange()[0]
+#                 
+#                 offset = view_x_range[0] - data_x_range[0]
+#                 
+#                 viewXspan = view_x_range[1] - view_x_range[0]
+#                 dataXspan = data_x_range[1] - data_x_range[0]
+#                 
+#                 if dataXspan == 0:
+#                     factor = 1.0
+#                 else:
+#                     factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
+#                 
+#                 self._axes_X_view_states_.append((offset, factor))
                 
         return self._axes_X_view_states_ # for convenience
                 
     def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]):
+        """Returns a tuple (offset, scale).
+    When there is no data plottd in the item returns (None, None)"""
         if isinstance(ax, pg.PlotItem):
             if ax not in self.axes:
                 raise ValueError(f"Axis {ax} not found in this viewer")
@@ -7708,9 +7705,16 @@ signals in the signal collection.
         if len(self.axes) == 0:
             return
         
+        # NOTE: 2023-07-06 08:39:41
         # update self._axes_X_view_states_
-        if len(self._axes_X_view_states_) == 0:
-            self._get_axes_X_view_states_()
+        # this should be a list of 𝑵 2-tuples, where 𝑵 is the number of axes
+        # each 2-tuple is either (None, None), or (offsetₓ, scaleₓ)
+        # print(f"{self.__class__.__name__}._align_X_range \n\t_axes_X_view_states_ = {self._axes_X_view_states_}")
+        
+        self._get_axes_X_view_states_()
+        # if len(self._axes_X_view_states_) == 0: 
+        #     self._get_axes_X_view_states_()
+            # print(f"{self.__class__.__name__}._align_X_range after update: \n\t_axes_X_view_states_ = {self._axes_X_view_states_}")
         
         if padding is None:
             padding = self._common_axes_X_padding_
@@ -7735,12 +7739,24 @@ signals in the signal collection.
         # for ax in self.signalAxes:
         for kax, ax in enumerate(self.axes):
             # xLinkedAxes = [ax_ for ax_ in self.axes if ax_ != ax and (ax_.vb.state["linkedViews"][0] is not None and ax_.vb.state["linkedViews"][0]() == ax.vb)]
-            if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
+            # if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
+            if ax.isVisible():
                 # ax.setXRange(minDataX, maxDataX, padding)
                 if ax.vb.state["autoRange"][0] == False:
                     # I think by default this is True, so upon the first axis show,
                     # this will skip this branch and enable full auto-range
                     offset, scale = self._axes_X_view_states_[kax]
+                    print(f"{self.__class__.__name__}._align_X_range axis {kax}: offset = {offset}, scale = {scale}")
+                    
+                    print(f"{self.__class__.__name__}._align_X_range axis {kax}: minDataX = {minDataX}, maxDataX = {maxDataX}")
+                    
+                    ax_x0,ax_x1 =self._get_axis_data_X_range_(ax)
+                    
+                    ax_view_x0, ax_view_x1= ax.vb.state["viewRange"][0]
+                    
+                    print(f"{self.__class__.__name__}._align_X_range axis {kax}: axis data x0 = {ax_x0}, axis data x1 = {ax_x1}")
+                    
+                    print(f"{self.__class__.__name__}._align_X_range axis {kax}: axis view x0 = {ax_view_x0}, axis view x1 = {ax_view_x1}")
                     
                     if minDataX is not None and maxDataX is not None:
                         if offset is not None and scale is not None:
@@ -7755,6 +7771,11 @@ signals in the signal collection.
                         newX1 = max(x1)
                     # print(f"{self.__class__.__name__}._align_X_range : newX0 = {newX0}, newX1 = {newX1}")
                     ax.setXRange(newX0, newX1, padding)
+                    
+            #     else:
+            #         print(f"{self.__class__.__name__}._align_X_range axis {kax}: no X auto-range")
+            # else:
+            #     print(f"{self.__class__.__name__}._align_X_range axis {kax} not visible")
                 
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
