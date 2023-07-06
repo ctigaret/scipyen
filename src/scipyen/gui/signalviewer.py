@@ -103,7 +103,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.uic import loadUiType as __loadUiType__
 
-
+import math
 import numpy as np
 import pandas as pd
 from pandas import NA
@@ -7565,14 +7565,38 @@ signals in the signal collection.
                 
         # NOTE: 2023-05-09 10:41:27
         # this also sets up axes lines visibility & tickmarks
-        self._get_axes_X_view_states_()
-        self._align_X_range()
+        # self._get_axes_X_view_states_()
+        # self._align_X_range()
+#         
+        
         self._update_axes_spines_()
         
     def _get_axes_X_view_states_(self):
         self._axes_X_view_states_.clear()
+            
+        # minx , max x in view range
+        xv0, xv1 = zip(*[ax.vb.state["viewRange"][0] for ax in self.axes])
+        # view range x span
+        vr = list(map(lambda x: x[1]-x[0], zip(xv0,xv1)))
         
-        self._axes_X_view_states_ =[self._get_axis_X_view_state(ax) for ax in self.axes]
+        # min x, max x in data
+        xd0, xd1 = zip(*[self._get_axis_data_X_range_(ax) for ax in self.axes])
+        # data x span
+        dr = list(map(lambda x: x[1]-x[0], zip(xd0,xd1)))
+        
+        # offset is data min x - view range min x
+        offsets = list(map(lambda x: x[0]-x[1], zip(xd0, xv0)))
+        
+        # x scale is the view x span / data x span
+        scales = list(map(lambda x: x[0]/x[1] if x[1] != 0 else 1, zip(vr, dr)))
+        
+        self._axes_X_view_states_ = list(zip(offsets, scales))
+        
+        return self._axes_X_view_states_ # for convenience
+        
+        # self._axes_X_view_states_ = [self._get_axis_X_view_state(ax) for ax in self.axes]
+        
+        
         
 #         for ax in self.axes:
 #             data_x_range = self._get_axis_data_X_range_(ax)
@@ -7595,7 +7619,7 @@ signals in the signal collection.
 #                 
 #                 self._axes_X_view_states_.append((offset, factor))
                 
-        return self._axes_X_view_states_ # for convenience
+        # return self._axes_X_view_states_ # for convenience
                 
     def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]):
         """Returns a tuple (offset, scale).
@@ -7615,21 +7639,26 @@ signals in the signal collection.
         else:
             raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
         
-        data_x_range = self._get_axis_data_X_range_(ax)
+        # data_x_range = self._get_axis_data_X_range_(ax)
+        
+        xd0, xd1 = self._get_axis_data_X_range_(ax)
+        
+        xv0, xv1 = ax.vb.viewRange()[0]
         
         if any(v is None for v in data_x_range):
             return (None, None)
         else:
             view_x_range = ax.vb.viewRange()[0]
             
-            offset = view_x_range[0] - data_x_range[0]
+            # offset = view_x_range[0] - data_x_range[0]
+            offset = data_x_range[0] - view_x_range[0]
             
             dx = data_x_range[1] - data_x_range[0] if data_x_range[1] != data_x_range[0] else 1.
             
-            factor = (view_x_range[1] - view_x_range[0]) / dx
+            scale = (view_x_range[1] - view_x_range[0]) / dx
             # factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
             
-            return (offset, factor)
+            return (offset, scale)
             
         
     def _get_axis_data_X_range_(self, axis:typing.Union[int, pg.PlotItem]):
@@ -7657,7 +7686,7 @@ signals in the signal collection.
             return [min_x, max_x]
             
         else:
-            return [None, None]
+            return [math.nan, math.nan]
         
     def _get_axis_data_Y_range_(self, axis:typing.Union[int, pg.PlotItem]):
         if isinstance(axis, int):
@@ -7684,7 +7713,7 @@ signals in the signal collection.
             return [min_y, max_y]
             
         else:
-            return [None, None]
+            return [math.nan, math.nan]
         
         
         
@@ -7720,7 +7749,9 @@ signals in the signal collection.
             padding = self._common_axes_X_padding_
         
         x0, x1 = zip(*[ax.vb.state["viewRange"][0] for ax in self.signalAxes])
+        print(f"{self.__class__.__name__}._align_X_range viewRanges: x0 = {x0}, x1 = {x1}")
         xdata0, xdata1 = zip(*[self._get_axis_data_X_range_(ax) for ax in self.signalAxes])
+        print(f"{self.__class__.__name__}._align_X_range X ranges: xdata0 = {xdata0}, xdata1 = {xdata1}\n")
         
         minX = min(x0)
         maxX = max(x1)
@@ -7756,7 +7787,7 @@ signals in the signal collection.
                     
                     print(f"{self.__class__.__name__}._align_X_range axis {kax}: axis data x0 = {ax_x0}, axis data x1 = {ax_x1}")
                     
-                    print(f"{self.__class__.__name__}._align_X_range axis {kax}: axis view x0 = {ax_view_x0}, axis view x1 = {ax_view_x1}")
+                    print(f"{self.__class__.__name__}._align_X_range axis {kax}: axis view x0 = {ax_view_x0}, axis view x1 = {ax_view_x1}\n")
                     
                     if minDataX is not None and maxDataX is not None:
                         if offset is not None and scale is not None:
