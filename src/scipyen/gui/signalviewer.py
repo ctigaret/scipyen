@@ -401,6 +401,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     sig_plot = pyqtSignal(dict, name="sig_plot")
     sig_newEpochInData = pyqtSignal(name="sig_newEpochInData")
     sig_axisActivated = pyqtSignal(int, name="sig_axisActivated")
+    sig_frameDisplayReady = pyqtSignal(name="sig_frameDisplayReady")
     
     closeMe  = pyqtSignal(int)
     frameChanged = pyqtSignal(int)
@@ -852,6 +853,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # NOTE: 2021-11-13 23:24:12
         # signal/slot connections & UI for pg.PlotItem objects are configured in
         # self._prepareAxes_()
+        self.sig_frameDisplayReady.connect(self._slot_post_frameDisplay)
         
         self.sig_plot.connect(self._slot_plot_numeric_data_, type = QtCore.Qt.QueuedConnection)
         
@@ -7395,7 +7397,7 @@ signals in the signal collection.
 
     @pyqtSlot(object, object)
     @safeWrapper
-    def _slot_plot_axis_x_range_changed(self, x0, x1):
+    def _slot_plot_axis_x_range_changed(self, vb, x0x1):
         """To update non-data items such as epochs
         """
         ax = self.sender()
@@ -7403,7 +7405,10 @@ signals in the signal collection.
         if ax not in self.axes:
             return
         
-        # ax_ndx = self.axes.index(ax)
+        
+        ax_ndx = self.axes.index(ax)
+        
+        x0, x1 = x0x1
         
         # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}, x0 = {x0}, x1 = {x1}")
         
@@ -7569,10 +7574,9 @@ signals in the signal collection.
         # NOTE: 2023-05-09 10:41:27
         # this also sets up axes lines visibility & tickmarks
         # self._axes_X_view_states_ = self._get_axes_X_view_states_()
-        self._align_X_range()
-        
-        
-        self._update_axes_spines_()
+        self.sig_frameDisplayReady.emit()
+        # self._align_X_range()
+        # self._update_axes_spines_()
         
     def _get_axes_X_view_states_(self):
         # self._axes_X_view_states_.clear()
@@ -7770,6 +7774,11 @@ signals in the signal collection.
         yv0, yv1 = axis.vb.viewRange()[1]
         
         return yv0, yv1
+    
+    @pyqtSlot()
+    def _slot_post_frameDisplay(self):
+        self._align_X_range()
+        self._update_axes_spines_()
         
         
     def _align_X_range(self, padding:typing.Optional[float] = None):
@@ -7822,16 +7831,16 @@ signals in the signal collection.
             print(f"\tdata X view range = {viewXrange}")
             targetXrange = ax.vb.state["targetRange"][0]
             print(f"\tdata X target range = {targetXrange}")
-            print(f"\tcached X view state = {self._axes_X_view_states_[kax]}")
+            print(f"\tcached X view offset, scale = {self._axes_X_view_states_[kax]}")
             cached_offset, cached_scale = self._axes_X_view_states_[kax]
             x0,x1 = bounds
             dx1 = x1-x0
             new_vx0 = x0 + cached_offset
             new_dx_view = dx1 * cached_scale
             new_vx1 = new_vx0 + new_dx_view
-            print(f"\t to set new view: {new_vx0, new_vx1}")
+            print(f"\tto set new view range: {new_vx0, new_vx1}")
             currentState = self._get_axis_X_view_state(ax)
-            print(f"\tcurrent X view state = {currentState}")
+            print(f"\tcurrent X view offset, scale = {currentState}")
             self._axes_X_view_states_[kax] = currentState
             
             newState = self._calculate_new_X_state_(bounds, viewXrange)
