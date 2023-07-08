@@ -487,6 +487,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # a cache of x data bounds for all axes
         self._x_data_bounds_ = list()
         
+        self._axes_X_view_ranges_ = list()
+        
         # define these early
         self._xData_ = None
         self._yData_ = None
@@ -7400,15 +7402,24 @@ signals in the signal collection.
     def _slot_plot_axis_x_range_changed(self, vb, x0x1):
         """To update non-data items such as epochs
         """
+        if not isinstance(vb, pg.ViewBox):
+            return
+        
+        if not isinstance(x0x1, tuple) or len(x0x1) != 2:
+            return
+        
         ax = self.sender()
         
         if ax not in self.axes:
             return
         
-        
         ax_ndx = self.axes.index(ax)
         
-        x0, x1 = x0x1
+        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed axis {ax_ndx} vb = {vb.name}, x0x1 = {x0x1}")
+        
+        # x0, x1 = x0x1
+        
+        self._axes_X_view_ranges_[ax_ndx][:] = x0x1
         
         # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}, x0 = {x0}, x1 = {x1}")
         
@@ -7817,12 +7828,17 @@ signals in the signal collection.
         
         # print(f"{self.__class__.__name__}._align_X_range: right at top: data X bounds =")
         for kax, ax in enumerate(self.axes):
+            print(f"\tAxis {kax} named {ax.vb.name}")
+            print(f"\tvisible: {ax.isVisible()}")
             if not ax.isVisible():
                 continue
+            
+            print(f"\tauto-range: {ax.vb.autoRangeEnabled()}")
+            if ax.vb.autoRangeEnabled():
+                continue
+            
             print(f"axis {kax}:")
             print(f"\tX linked to: {getattr(ax.vb.linkedView(0), 'name', None)}")
-            print(f"\tauto-range: {ax.vb.autoRangeEnabled()}")
-            # print(f"\tvisible: {ax.isVisible()}")
             print(f"\tcached data X bounds = {self._x_data_bounds_[kax]}")
             bounds= self._get_axis_data_X_range_(ax)
             print(f"\tcurrent data X bounds = {bounds}")
@@ -9538,6 +9554,10 @@ signals in the signal collection.
         ¹ PyQtGraph's PlotItem 
         """
         self._plot_names_.clear()
+        nAxes = _n_signal_axes_ + 2 # how many axes the data requires?
+        
+        # set this up at earliest occasion
+        self._axes_X_view_ranges_ = [[math.nan, math.nan] for k in range(nAxes)]
 
         # retrieve (cache) the events axis and ths spiketrains axis, if they exist
         # check if there are any plotitems in the layout and of these, is 
@@ -9565,7 +9585,6 @@ signals in the signal collection.
         if isinstance(self._spiketrains_axis_, pg.PlotItem):
             self.signalsLayout.removeItem(self._spiketrains_axis_)
             
-        # if len(self.signalAxes) < self._n_signal_axes_:
         if len(self.signalAxes) < _n_signal_axes_:
             # NOTE: 2023-05-09 13:00:18 - create axes as necessary
             # there are fewer signal axes than needed - create here as necessary
@@ -9679,6 +9698,7 @@ signals in the signal collection.
                 self.linkAllXAxes()
             else:
                 self.unlinkAllXAxes()
+                
         
     @pyqtSlot(object)
     @safeWrapper
