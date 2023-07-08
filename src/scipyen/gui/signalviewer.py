@@ -482,7 +482,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # • offset is the difference between the view range leftmost point and
         #   the leftmost domain value
         # • factor is the ratio between the vew range and data domain range
-        self._axes_X_view_states_ = list()
+        self._axes_X_view_offsets_scales_ = list()
         
         # a cache of x data bounds for all axes
         self._x_data_bounds_ = list()
@@ -921,6 +921,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionLink_X_axes.setEnabled(False)
         
         # the actual layout of the plot items (pyqtgraph framework)
+        # its "layout" is a QtWidgets.QGraphicsGridLayout
         self.signalsLayout = pg.GraphicsLayout()
         self.signalsLayout.layout.setVerticalSpacing(0)
 
@@ -942,6 +943,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.viewerWidgetContainer.layout().contentsMargins().setBottom(0)
         self.viewerWidgetContainer.layout().addWidget(self.viewerWidget, 0,0)
     
+        # NOTE: 2023-07-08 23:25:32
+        # self.viewerWidget.ci is the central item of the viewer widgets (a 
+        # pg.GraphicsLayoutWidget object) and contains the signalsLayout (a 
+        # pg.GraphicsLayout object)
+        # We set thsi centrsl item as the "main layout" of the signalviewer, to
+        # which we add:
+        # • a QLabel (plotTitleLabel) on the top (first) row)
+        # • the signals layout on the second row
         self.mainLayout = self.viewerWidget.ci
         self.mainLayout.layout.setVerticalSpacing(0)
         self.mainLayout.layout.setHorizontalSpacing(0)
@@ -7400,7 +7409,9 @@ signals in the signal collection.
     @pyqtSlot(object, object)
     @safeWrapper
     def _slot_plot_axis_x_range_changed(self, vb, x0x1):
-        """To update non-data items such as epochs
+        """Captures changes in the view range on the X axis.
+        These changes are typically generated using a mouse button pressed in 
+        a Plotitem (signal viewer "axis")
         """
         if not isinstance(vb, pg.ViewBox):
             return
@@ -7414,21 +7425,17 @@ signals in the signal collection.
             return
         
         ax_ndx = self.axes.index(ax)
-        
-        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed axis {ax_ndx} vb = {vb.name}, x0x1 = {x0x1}")
-        
-        # x0, x1 = x0x1
-        
         self._axes_X_view_ranges_[ax_ndx][:] = x0x1
         
-        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}, x0 = {x0}, x1 = {x1}")
+        if not ax.isVisible():
+            return 
         
-        # if len(self._axes_X_view_states_) != len(self.axes):
-        #     self._get_axes_X_view_states_()
-        # else:
-        #     self._axes_X_view_states_[ax_ndx] = self._get_axis_X_view_state(ax)
-            
-        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed newState = {self._axes_X_view_states_[ax_ndx]}")
+        if ax.vb.autoRangeEnabled()[0]:
+            return 
+        
+        bounds = self._get_axis_data_X_range_(ax)
+        offset_scale = self._calculate_new_X_offset_scale_(bounds, x0x1)
+        self._axes_X_view_offsets_scales_[ax_ndx] = offset_scale
         
         if self.currentFrame in self._cached_epochs_:
             if len(self._cached_epochs_[self.currentFrame]):
@@ -7582,15 +7589,12 @@ signals in the signal collection.
                             ax.addItem(tgt)
                     
                 
-        # NOTE: 2023-05-09 10:41:27
+        # NOTE: 2023-05-09 10:41:27 connected to _slot_post_frameDisplay
         # this also sets up axes lines visibility & tickmarks
-        # self._axes_X_view_states_ = self._get_axes_X_view_states_()
         self.sig_frameDisplayReady.emit()
-        # self._align_X_range()
-        # self._update_axes_spines_()
         
     def _get_axes_X_view_states_(self):
-        # self._axes_X_view_states_.clear()
+        # self._axes_X_view_offsets_scales_.clear()
             
         # minx , max x in view range
         # xv0, xv1 = zip(*[ax.vb.state["viewRange"][0] for ax in self.axes])
@@ -7612,13 +7616,18 @@ signals in the signal collection.
         
         return list(zip(offsets, scales))
         
-        # return self._axes_X_view_states_ # for convenience
+        # return self._axes_X_view_offsets_scales_ # for convenience
         
-    def _calculate_new_X_state_(self, databounds:tuple, viewbounds:tuple) -> tuple:
+    def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
+                                       padding:typing.Optional[float] = 0.) -> tuple:
+        """Calculates the X offset and X view scale given X data bounds and view range.
+    Helper function returning a tuple (offset, scale) used in the _align_X_range
+    """
+        # print(f"{self.__class__.__name__}._calculate_new_X_offset_scale_ databounds = {databounds}, viewbounds = {viewbounds}")
         dspan = databounds[1]-databounds[0]
         vspan = viewbounds[1]-viewbounds[0]
         
-        offset = databounds[0] - viewbounds[0]
+        offset = databounds[0] - viewbounds[0] + padding
         scale = vspan/dspan if dspan != 0 else 1
         
         return offset,scale
@@ -7793,34 +7802,44 @@ signals in the signal collection.
         
         
     def _align_X_range(self, padding:typing.Optional[float] = None):
-        """ Heuristic to align plot items X axis:
-            • if the plotitems have x boundaries that overlap then align them
-                to these boundaries ⇒ will also align the plotitems displaying
-                the events and spiketrain, where data is located WITHIN the 
-                common signal boundaries
+        """ Maintains an X view range for frames with different X data bounds.
+    Necessary to recreate a view range to an axis relative to the axis' X data.
         
-            ∘ then we only plot labels & values on the X axis of the last plotitem, 
-                as a "common" X axis
+    This is intended for the particular case where the X domain in each 'frame' 
+    starts at different values (e.g. sweep 0 starts at time 0 s, sweep 1 starts
+    at 5 s etc). In this case "zooming" in on a signal feature in sweep 0 would 
+    set a view range (in PyQtGraph) falling outside the domain of sweep 1, and so
+    on.
         
-            • when data in the plotitems have non-overlapping X domains, we align 
-            each plotitem on its own domain AND we label the X axis individually
+    This unwanted effect can be prevented by recalculating the X range of the 
+    view based on the current X bounds and the previous view range, via two
+    intermediate values which are independent of the actual sweep X domain:
+    • offset (the difference between the data X start and the view range X start)
+    • scale (> 1 if the view range is larger that the X data range).
+    
+    WARNING: Works best - and is useful- when X data ranges for the plotted 
+    curves in distinct frames are similar, if not identical, even though they 
+    start at distinct values.
+    
+    CAUTION: For best result ensure all axes (Plotitem objects) in the SignalViewer
+    are linked.
         
         """
         if len(self.axes) == 0:
             return
         
-        if len(self._axes_X_view_states_) == 0:
-            self._axes_X_view_states_ = self._get_axes_X_view_states_()
+        if len(self._axes_X_view_offsets_scales_) == 0:
+            self._axes_X_view_offsets_scales_ = self._get_axes_X_view_states_()
             
         if len(self._x_data_bounds_) == 0:
             self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
         
         # print(f"{self.__class__.__name__}._align_X_range: before call: X view states =")
-        # for k, state in enumerate(self._axes_X_view_states_):
+        # for k, state in enumerate(self._axes_X_view_offsets_scales_):
         #     print(f"\naxis {k} state = {state}")
         # print("\n")
         
-        print(f"{self.__class__.__name__}._align_X_range: frame = {self.currentFrame}")
+        # print(f"{self.__class__.__name__}._align_X_range: frame = {self.currentFrame}")
         
         # xbounds = list(self._get_axis_data_X_range_(ax) for ax in self.axes)
         for ax in self.axes:
@@ -7828,127 +7847,72 @@ signals in the signal collection.
         
         # print(f"{self.__class__.__name__}._align_X_range: right at top: data X bounds =")
         for kax, ax in enumerate(self.axes):
-            print(f"\tAxis {kax} named {ax.vb.name}")
-            print(f"\tvisible: {ax.isVisible()}")
-            if not ax.isVisible():
+            # print(f"\tAxis {kax} named {ax.vb.name}")
+            # print(f"\t\tvisible: {ax.isVisible()}")
+            # if not ax.isVisible():
+            #     continue
+            
+            # print(f"\t\tauto-range: {ax.vb.autoRangeEnabled()}")
+            if ax.vb.autoRangeEnabled()[0]:
                 continue
             
-            print(f"\tauto-range: {ax.vb.autoRangeEnabled()}")
-            if ax.vb.autoRangeEnabled():
-                continue
             
-            print(f"axis {kax}:")
-            print(f"\tX linked to: {getattr(ax.vb.linkedView(0), 'name', None)}")
-            print(f"\tcached data X bounds = {self._x_data_bounds_[kax]}")
-            bounds= self._get_axis_data_X_range_(ax)
-            print(f"\tcurrent data X bounds = {bounds}")
-            self._x_data_bounds_[kax] = bounds
+            # print(f"\t\tX linked to: {getattr(ax.vb.linkedView(0), 'name', None)}")
+            cached_bounds = self._x_data_bounds_[kax]
+            # print(f"\t\tcached data X bounds = {cached_bounds}")
+            current_bounds = self._get_axis_data_X_range_(ax)
+            # print(f"\t\tcurrent data X bounds = {current_bounds}")
+            self._x_data_bounds_[kax] = current_bounds
             viewXrange = ax.vb.viewRange()[0]
-            print(f"\tdata X view range = {viewXrange}")
-            targetXrange = ax.vb.state["targetRange"][0]
-            print(f"\tdata X target range = {targetXrange}")
-            print(f"\tcached X view offset, scale = {self._axes_X_view_states_[kax]}")
-            cached_offset, cached_scale = self._axes_X_view_states_[kax]
-            x0,x1 = bounds
+            # print(f"\t\tdata X view range = {viewXrange}")
+            
+            if any(np.isnan(v) for v in self._axes_X_view_ranges_[kax]):
+                self._axes_X_view_ranges_[kax] = viewXrange
+            
+            # print(f"\t\tcached view X range = {self._axes_X_view_ranges_[kax]}")
+            # targetXrange = ax.vb.state["targetRange"][0]
+            # print(f"\t\tdata X target range = {targetXrange}")
+            # print(f"\t\tcached X view offset, scale = {self._axes_X_view_offsets_scales_[kax]}")
+            cached_offset, cached_scale = self._axes_X_view_offsets_scales_[kax]
+            # x0,x1 = current_bounds
+            # dx1 = x1-x0
+            # new_vx0 = x0 + cached_offset
+            # new_dx_view = dx1 * cached_scale
+            # new_vx1 = new_vx0 + new_dx_view
+            # print(f"\t\tto set new view range: {new_vx0, new_vx1}")
+            # currentState = self._get_axis_X_view_state(ax)
+            # print(f"\t\tcurrent X view offset, scale = {currentState}")
+            # self._axes_X_view_offsets_scales_[kax] = currentState
+            
+            # if any(np.isnan(v) for v in self._axes_X_view_ranges_[kax]):
+            #     continue # this only happens when axis.vb.autoRangeEnabled
+            
+            
+            view_dx = self._axes_X_view_ranges_[kax][1] - self._axes_X_view_ranges_[kax][0]
+            
+            bounds = current_bounds if any(np.isnan(v) for v in cached_bounds) else cached_bounds
+            
+            if any(np.isnan(v) for v in bounds): # axis with no data
+                continue
+            
+            # newState = self._calculate_new_X_offset_scale_(cached_bounds, viewXrange)
+            newState = self._calculate_new_X_offset_scale_(bounds, viewXrange)
+            # print(f"\t\tnew state = {newState}")
+            newOffset, newScale = newState
+            x0,x1 = current_bounds
             dx1 = x1-x0
-            new_vx0 = x0 + cached_offset
-            new_dx_view = dx1 * cached_scale
-            new_vx1 = new_vx0 + new_dx_view
-            print(f"\tto set new view range: {new_vx0, new_vx1}")
-            currentState = self._get_axis_X_view_state(ax)
-            print(f"\tcurrent X view offset, scale = {currentState}")
-            self._axes_X_view_states_[kax] = currentState
             
-            newState = self._calculate_new_X_state_(bounds, viewXrange)
-            print(f"\tnew state = {newState}")
+            offset = newOffset if np.isnan(cached_offset) else cached_offset
+            scale = newScale if np.isnan(cached_scale) else cached_scale
+            new_vx0 = x0 - offset
+            new_view_dx = dx1 * scale
+            new_vx1 = new_vx0 + new_view_dx
+            # print(f"\t\tto set new view range: {new_vx0, new_vx1}")
+            ax.vb.setRange(xRange=(new_vx0, new_vx1), padding = 0.)
             
             
-            
-        print("\n")
-        
-        
-        # states = self._get_axes_X_view_states_()
-        # print(f"{self.__class__.__name__}._align_X_range: right at top: X view states =")
-        # for k, state in enumerate(states):
-        #     print(f"axis {k} state = {state}")
         # print("\n")
         
-        
-        
-        
-        # NOTE: 2023-07-06 08:39:41
-        # update self._axes_X_view_states_
-        # this should be a list of 𝑵 2-tuples, where 𝑵 is the number of axes
-        # each 2-tuple is either (None, None), or (offsetₓ, scaleₓ)
-        # print(f"{self.__class__.__name__}._align_X_range \n\t_axes_X_view_states_ = {self._axes_X_view_states_}")
-        
-        # self._get_axes_X_view_states_()
-        # if len(self._axes_X_view_states_) == 0: 
-        #     self._get_axes_X_view_states_()
-            # print(f"{self.__class__.__name__}._align_X_range after update: \n\t_axes_X_view_states_ = {self._axes_X_view_states_}")
-        
-        if padding is None:
-            padding = self._common_axes_X_padding_
-        
-#         x0, x1 = zip(*[ax.vb.state["viewRange"][0] for ax in self.signalAxes])
-#         print(f"{self.__class__.__name__}._align_X_range viewRanges: x0 = {x0}, x1 = {x1}")
-#         xdata0, xdata1 = zip(*[self._get_axis_data_X_range_(ax) for ax in self.signalAxes])
-#         print(f"{self.__class__.__name__}._align_X_range X ranges: xdata0 = {xdata0}, xdata1 = {xdata1}\n")
-#         
-#         minX = min(x0)
-#         maxX = max(x1)
-#         
-#         # BUG/FIXME 2023-06-15 08:49:46 - occasionally (after reestablishing axes)
-#         # TypeError: '<' not supported between instances of 'NoneType' and 'float'
-#         # FIXED 2023-06-15 10:56:21
-#         xdata0 = tuple(x for x in xdata0 if x is not None)
-#         xdata1 = tuple(x for x in xdata1 if x is not None)
-#         minDataX = min(xdata0) if len(xdata0) else None
-#         maxDataX = max(xdata1) if len(xdata1) else None
-#         
-#         # print(f"{self.__class__.__name__}._align_X_range minX = {minX} ; maxX = {maxX}")
-#         # print(f"{self.__class__.__name__}._align_X_range minDataX = {minDataX} ; maxDataX = {maxDataX}")
-#         
-#         # for ax in self.signalAxes:
-#         for kax, ax in enumerate(self.axes):
-#             # xLinkedAxes = [ax_ for ax_ in self.axes if ax_ != ax and (ax_.vb.state["linkedViews"][0] is not None and ax_.vb.state["linkedViews"][0]() == ax.vb)]
-#             # if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
-#             if ax.isVisible():
-#                 # ax.setXRange(minDataX, maxDataX, padding)
-#                 if ax.vb.state["autoRange"][0] == False:
-#                     # I think by default this is True, so upon the first axis show,
-#                     # this will skip this branch and enable full auto-range
-#                     offset, scale = self._axes_X_view_states_[kax]
-#                     print(f"{self.__class__.__name__}._align_X_range axis {kax}: offset = {offset}, scale = {scale}")
-#                     
-#                     print(f"{self.__class__.__name__}._align_X_range axis {kax}: minDataX = {minDataX}, maxDataX = {maxDataX}")
-#                     
-#                     ax_x0,ax_x1 =self._get_axis_data_X_range_(ax)
-#                     
-#                     ax_view_x0, ax_view_x1= ax.vb.state["viewRange"][0]
-#                     
-#                     print(f"{self.__class__.__name__}._align_X_range axis {kax}: axis data x0 = {ax_x0}, axis data x1 = {ax_x1}")
-#                     
-#                     print(f"{self.__class__.__name__}._align_X_range axis {kax}: axis view x0 = {ax_view_x0}, axis view x1 = {ax_view_x1}\n")
-#                     
-#                     if minDataX is not None and maxDataX is not None:
-#                         if offset is not None and scale is not None:
-#                             # print(f"{self.__class__.__name__}._align_X_range :\n\toffset = {offset} ; scale = {scale}")
-#                             newX0 = minDataX + offset
-#                             newX1 = newX0 + (maxDataX - minDataX) * scale
-#                         else:
-#                             newX0 = minDataX
-#                             newX1 = maxDataX
-#                     else:
-#                         newX0 = min(x0)
-#                         newX1 = max(x1)
-#                     # print(f"{self.__class__.__name__}._align_X_range : newX0 = {newX0}, newX1 = {newX1}")
-#                     ax.setXRange(newX0, newX1, padding)
-#                     
-#             #     else:
-#             #         print(f"{self.__class__.__name__}._align_X_range axis {kax}: no X auto-range")
-#             # else:
-#             #     print(f"{self.__class__.__name__}._align_X_range axis {kax} not visible")
                 
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
@@ -9556,8 +9520,10 @@ signals in the signal collection.
         self._plot_names_.clear()
         nAxes = _n_signal_axes_ + 2 # how many axes the data requires?
         
-        # set this up at earliest occasion
+        # set these up at earliest occasion
         self._axes_X_view_ranges_ = [[math.nan, math.nan] for k in range(nAxes)]
+        self._x_data_bounds_ = [[math.nan, math.nan] for k in range(nAxes)]
+        self._axes_X_view_offsets_scales_ = [[math.nan, math.nan] for k in range(nAxes)]
 
         # retrieve (cache) the events axis and ths spiketrains axis, if they exist
         # check if there are any plotitems in the layout and of these, is 
@@ -9595,7 +9561,6 @@ signals in the signal collection.
                 self._register_plot_item_name_(plotItem, plotname)
                 plotItem.setVisible(False)
                 
-            # for k in range(len(self.signalAxes), self._n_signal_axes_):
             for k in range(len(self.signalAxes), _n_signal_axes_):
                 # create new PlotItem objects as necessary, add to layout
                 plotname = f"signal_axis_{k}"
@@ -9944,15 +9909,14 @@ signals in the signal collection.
         self._plotEpochs_()
                 
     @safeWrapper
-    def clear(self, keepCursors=False):
+    # def clear(self, keepCursors=False):
+    def clear(self):
+        """Clears the display
         """
-        TODO: cache cursors when keepCursors is True
-        at the moment do NOT pass keepCcursor other than False!
-        need to store axis index witht he cursors so that we can restore it ?!?
-        """
-        #self.viewerWidget.clear() # both mpl.Figure and pg.GraphicsLayoutWidget have this method
-        #print("SignalViewer.clear() %s" % self.windowTitle())
-        print(f"{self.__class__.__name__}.clear()")
+        # TODO: cache cursors when keepCursors is True
+        # at the moment do NOT pass keepCcursor other than False!
+        # need to store axis index witht he cursors so that we can restore it ?!?
+        # print(f"{self.__class__.__name__}.clear()")
         self._selected_plot_item_ = None
         self._selected_plot_item_index_ = -1
         self._hovered_plot_item_ = None
@@ -9980,15 +9944,23 @@ signals in the signal collection.
             for c in clist:
                 c.detach()
             
-        if not keepCursors:
-            self._crosshairSignalCursors_.clear() # a dict of SignalCursors mapping str name to cursor object
-            self._verticalSignalCursors_.clear()
-            self._horizontalSignalCursors_.clear()
-            self._cached_cursors_.clear()
-            
-            self.linkedCrosshairCursors = []
-            self.linkedHorizontalCursors = []
-            self.linkedVerticalCursors = []
+        self._crosshairSignalCursors_.clear() # a dict of SignalCursors mapping str name to cursor object
+        self._verticalSignalCursors_.clear()
+        self._horizontalSignalCursors_.clear()
+        self._cached_cursors_.clear()
+        
+        self.linkedCrosshairCursors = []
+        self.linkedHorizontalCursors = []
+        self.linkedVerticalCursors = []
+#         if not keepCursors:
+#             self._crosshairSignalCursors_.clear() # a dict of SignalCursors mapping str name to cursor object
+#             self._verticalSignalCursors_.clear()
+#             self._horizontalSignalCursors_.clear()
+#             self._cached_cursors_.clear()
+#             
+#             self.linkedCrosshairCursors = []
+#             self.linkedHorizontalCursors = []
+#             self.linkedVerticalCursors = []
         
         self.signalNo = 0
         self.frameIndex = [0]
