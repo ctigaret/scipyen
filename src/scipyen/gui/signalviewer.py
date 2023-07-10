@@ -1168,17 +1168,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     @property
     def xAxesLinked(self): 
-        # if len(self.axes) > 0:
-        #     # NOTE 2023-05-09 18:21:53 
-        #     # allow for SOME axes to be linked; dump self._xAxesLinked_
-        #     # read link status from vb states
-        #     xLinks = [ax.vb.state["linkedViews"][0] for ax in self.axes]
-        #     allXLinked = not all(v is None for v in xLinks)
-        #     if self._xAxesLinked_ != allXLinked:
-        #         self._xAxesLinked_ = allXLinked
-        #         signalBlocker = QtCore.QSignalBlocker(self.actionLink_X_axes)
-        #         self.actionLink_X_axes.setChecked(self._xAxesLinked_)
-        
+        """This is True when all PlotItems but one have X axes linked"""
         return self._xAxesLinked_
     
     @markConfigurable("XAxesLinked")
@@ -7306,21 +7296,18 @@ signals in the signal collection.
         if not isinstance(x0x1, tuple) or len(x0x1) != 2:
             return
         
-        ax = self.sender()
+        vbAxes = [ax for ax in self.axes if ax.vb == vb]
         
-        if ax not in self.axes:
+        if len(vbAxes):
+            vbAxis = vbAxes[0]
+            
+        else:
             return
         
-        ax_ndx = self.axes.index(ax)
-        self._axes_X_view_ranges_[ax_ndx][:] = x0x1
+        ax_ndx = self.axes.index(vbAxis)
+        self._axes_X_view_ranges_[ax_ndx] = x0x1
         
-        if not ax.isVisible():
-            return 
-        
-        if ax.vb.autoRangeEnabled()[0]:
-            return 
-        
-        bounds = self._get_axis_data_X_range_(ax)
+        bounds = self._get_axis_data_X_range_(vbAxis)
         offset_scale = self._calculate_new_X_offset_scale_(bounds, x0x1)
         self._axes_X_view_offsets_scales_[ax_ndx] = offset_scale
         
@@ -7333,13 +7320,22 @@ signals in the signal collection.
         """Triggered by PlotItem's ViewBox sigRangeChangedManually signal"""
         vb = self.sender()
         
+        
+        if value in (pg.ViewBox.RectMode, pg.ViewBox.PanMode):
+            mouseMode = value
+        else:
+            mouseMode = vb.state["mouseMode"]
+            
+        # print(f"{self.__class__.__name__} range changed manually in {mouseMode}")
+
         ax = [ax for ax in self.axes if ax.vb == vb]
         
         if len(ax) == 0:
             return
         
         ax = ax[0]
-        ax.sigXRangeChanged.emit(math.nan, math.nan)
+        ax.sigXRangeChanged.emit(vb, vb.viewRange()[0])
+        # ax.sigXRangeChanged.emit(vb, (math.nan, math.nan))
         # ax.sigXRangeChanged.emit(None, None)
         
     @safeWrapper
@@ -7480,6 +7476,19 @@ signals in the signal collection.
                 
         # NOTE: 2023-05-09 10:41:27 connected to _slot_post_frameDisplay
         # this also sets up axes lines visibility & tickmarks
+        
+        # cache these now (they may be overwritten in slots triggered by mouse
+        # interactions in the plot item)
+        # for kax, ax in enumerate(self.axes):
+        #     bounds = self._get_axis_data_X_range_(ax)
+        #     if any(np.isnan(v) for v in bounds):
+        #         continue
+        #     self._x_data_bounds_[kax] = bounds
+        #     viewXrange = ax.vb.viewRange()[0]
+        #     self._axes_X_view_ranges_[kax] = viewXrange
+        #     offset, scale = self._calculate_new_X_offset_scale_(bounds, viewXrange)
+        #     self._axes_X_view_offsets_scales_[kax] = (offset, scale)
+            
         self.sig_frameDisplayReady.emit()
         
     def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
@@ -7696,159 +7705,119 @@ signals in the signal collection.
         if len(self.axes) == 0:
             return
         
-        viewXrange = None
-        
         if len(self._x_data_bounds_) == 0:
             self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
             
         for ax in self.axes:
             ax.vb.updateViewRange(True, True)
         
-        xLinkAxes = list()
         
-        if self.xAxesLinked:
+        # print(f"{self.__class__.__name__}._align_X_range axeslinked = {self.xAxesLinked}")
+        if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
             if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
                 return
+            # NOTE: 2023-07-10 10:55:57 FIXME/TODO
+            # still have to figure to figure out this contingency below:
+            # selecting to show just plot items without autoranging
+            # does not respect the view range previously set by the link target !!!
             
-            xLinks = [ax.vb.linkedView(0) for ax in self.axes if isinstance(ax.vb.linkedView(0), pg.ViewBox)]
-            if len(xLinks):
-                xLinkAxes = [[_ax for _ax in self.axes if _ax.vb == xLink][0] for xLink in xLinks]
+#                 # get the axis which is auto-range enabled on X
+#                 # autoXaxes = [ax for ax in self.axes if ax.vb.autoRangeEnabled()[0]]
+#                 
+#                 xLinkAxes = list()
+#                 xLinks = [ax.vb.linkedView(0) for ax in self.axes if isinstance(ax.vb.linkedView(0), pg.ViewBox)]
+#                 if len(xLinks): # is this guaranteed to happen ?!?
+#                     xLinkAxes = list(set([[_ax for _ax in self.axes if _ax.vb == xLink][0] for xLink in xLinks]))
+#                     
+#                 # figure out the following:
+#                 # • if an axis is auto-ranged on X ⇒ continue; else:
+#                 #   ∘ if an axis is X-linked to a target, get the target's viewXrange
+#                 #       and apply it to the axis; else:
+#                 #   ∘ get the topmost X-link target viewX range and apply it to 
+#                 #       the axis
+#                 
+#                 for kax, ax in enumerate(self.axes):
+#                     if ax.vb.autoRangeEnabled()[0]: # ← skip axes auto-ranged on X
+#                         continue
+#                     bounds = self._get_axis_data_X_range_(ax)
+#                     if any(np.isnan(v) for v in bounds): # ← no data
+#                         continue
+#                     xLink = ax.vb.linkedView(0)
+#                     if not isinstance(xLink, pg.ViewBox):
+#                         # get the topmost xLink if this is NOT a linked axis
+#                         # (might happen when individual axes are manually unlinked
+#                         # but self._xAxesLinked_ is not updated, yet there still
+#                         # are at least one link target in the axes)
+#                         xLinkNdx = min([self.axes.index(a) for a in xLinkAxes])
+#                         xLinkAxis = self.axes[xLinkNdx]
+#                         xLink = xLinkAxis.vb
+#                         
+#                     xLinkViewXrange = xLink.viewRange()[0]
+#                     xLinkAxes = [a for a in self.axes if a.vb == xLink]
+#                     if len(xLinkAxes) == 0:
+#                         continue # shouldn't happen
+#                     xLinkAxis = xLinkAxes[0]
+#                     xLinkAxNdx = self.axes.index(xLinkAxis)
+#                     xLinkXBounds = self._get_axis_data_X_range_(xLinkAxis)
+#                     print(f"{kax} bounds {bounds} link {xLinkAxNdx} link X bounds {xLinkXBounds} link Xview {xLinkViewXrange} ")
+#                     offset, scale = self._axes_X_view_offsets_scales_[xLinkAxNdx]
+#                     if any(np.isnan(v) for v in (offset, scale)):
+#                         offset, scale = self._calculate_new_X_offset_scale_(xLinkXBounds, xLinkViewXrange)
+#                     x0,x1 = bounds
+#                     dx1 = x1-x0
+#                     new_vx0 = x0 - offset
+#                     new_view_dx = dx1 * scale
+#                     new_vx1 = new_vx0 + new_view_dx
+#                     print(f"offset = {offset}, scale = {scale}, dx1 = {dx1}, new_vx0 = {new_vx0}, new_view_dx = {new_view_dx}, new_vx1 = {new_vx1}")
+#                     ax.vb.setXRange(new_vx0, new_vx1, padding=0., update=True)
+#                     self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
+#                 return
                 
-        if len(xLinkAxes):
-            axes = xLinkAxes
-        else:
-            axes = self.axes
-        
-        for kax, ax in enumerate(axes):
+        for kax, ax in enumerate(self.axes):
+            # NOTE: 2023-07-10 10:51:10
+            # this loop OK when auto-ranging is disabled across plot items
+            # such as in the case of mouse interaction
+            # still a BUG when showing a linked plot item without its link
+            # target
+            # having them linked still messes up the display of linked plot item
+            # (not target) in isolation
+            # WORKAROUND: for this to work the link target MUST ALSO BE VISIBLE
             # NOTE: 2023-07-09 21:17:19
             # this returns the actual data X bounds (see NOTE: 2023-07-09 21:09:08)
             current_X_bounds = self._get_axis_data_X_range_(ax)
-            if any(np.isnan(v) for v in current_X_bounds):
+            if any(np.isnan(v) for v in current_X_bounds): # ← no data !
                 continue
             
-            cached_X_bounds = self._x_data_bounds_[kax]
-            if any(np.isnan(v) for v in cached_X_bounds):
-                cached_X_bounds = current_X_bounds
-                
-            print(f"{self.__class__.__name__}._align_X_range Axis {kax} named {ax.vb.name} X bounds: cached = {cached_X_bounds} current = {current_X_bounds}")
-            self._x_data_bounds_[kax] = current_X_bounds
-            
-            # print(f"\t\tauto-range: {ax.vb.autoRangeEnabled()}")
-            # should in fact check if the axis this one is linked to is auto-ranged
             xLinkAxis = None
+            xLinkAxisNdx = None
+            xLinkXBounds = None
+            xLinkViewXrange = None
             xLink = ax.vb.linkedView(0)
             if isinstance(xLink, pg.ViewBox):
-                xLinkAxes = [_ax for _ax in self.axes if _ax.vb == xLink]
-                
-                if len(xLinkAxes):
-                    xLinkAxis = xLinkAxes[0]
-                    
-                # NOTE: 2023-07-09 22:00:22
-                # temporarily suspend the X link
-                # ax.vb.setXLink(None)
-                
-            
-            # NOTE: 2023-07-09 21:19:00
-            # leave alone axes that are NOT linked AND are auto-ranged on X 
-            # if xLink is None and ax.vb.autoRangeEnabled()[0] in (True, 1.0):
-            #     continue
-            
-            # # NOTE: 2023-07-09 21:23:00
-            # # also leave alone axes that ARE x-linked to an axis that is auto-ranged on X
-            # elif isinstance(xLink, pg.ViewBox) and xLink.autoRangeEnabled()[0] in (True, 1.0):
-            #     continue
-            
-            # # NOTE: 2023-07-09 21:19:44
-            # # carry on for axes that are either NOT auto-ranged on X, OR 
-            # # have a X axis link that is NOT auto-ranged on X
-            # xLinkAxis = None
-
-#             if isinstance(xLink, pg.ViewBox):
-#                 xLinkAxes = [_ax for _ax in self.axes if _ax.vb == xLink]
-#                 
-#                 if len(xLinkAxes):
-#                     xLinkAxis = xLinkAxes[0]
-#                     
-#                 viewXrange = xLink.viewRange()[0]
-#                 
-#             else:
-#                 viewXrange = ax.vb.viewRange()[0]
-                
-            viewXrange = xLink.viewRange()[0] if isinstance(xLink, pg.ViewBox) else ax.vb.viewRange()[0]
-            print(f"{self.__class__.__name__}._align_X_range Axis {kax} named {ax.vb.name} current viewXrange = {viewXrange}")
-                
-            # offset, scale = self._calculate_new_X_offset_scale_(current_X_bounds, viewXrange)
-            offset, scale = self._calculate_new_X_offset_scale_(cached_X_bounds, viewXrange)
-            print(f"{self.__class__.__name__}._align_X_range Axis {kax} named {ax.vb.name} offset = {offset} scale = {scale}")
-            view_dx = viewXrange[1] - viewXrange[0]
-            x0,x1 = current_X_bounds
+                ax.vb.blockLink(True)
+                xLink.blockLink(True)
+                aa = [a for a in self.axes if a.vb == xLink]
+                if len(aa):
+                    xLinkAxis = aa[0]
+                    xLinkAxisNdx = self.axes.index(xLinkAxis)
+                    xLinkXBounds = self._get_axis_data_X_range_(ax)
+                    xLinkViewXrange = xLink.viewRange()[0]
+                        
+            current_viewXrange = ax.vb.viewRange()[0] if xLinkViewXrange is None else xLinkViewXrange
+            offset, scale = self._axes_X_view_offsets_scales_[kax] # if xLinkAxisNdx is None else self._axes_X_view_offsets_scales_[xLinkAxisNdx] # ← set by _slot_plot_axis_x_range_changed
+            view_dx = current_viewXrange[1] - current_viewXrange[0]
+            x0,x1 = current_X_bounds if xLinkXBounds is None else xLinkXBounds
             dx1 = x1-x0
             new_vx0 = x0 - offset
             new_view_dx = dx1 * scale
             new_vx1 = new_vx0 + new_view_dx
-            print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} to set new view range: {new_vx0, new_vx1}")
+            # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} to set new view range: {new_vx0, new_vx1}")
             ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
-            # NOTE: 2023-07-09 22:06:27
-            # restore X link
-            # if isinstance(xLinkAxis, pg.PlotItem):
-            #     ax.vb.setXLink(xLinkAxis)
-                    
-#                 # NOTE: 2023-07-09 21:24:39
-#                 # use the X view range of the axis with which this one is linked on X
-#             
-#             # elif isinstance(xLink, pg.ViewBox) and xLink.isVisible() and xLink.autoRangeEnabled()[0] in (True, 1.0):
-# 
-#             # print(f"\t\tX linked to: {getattr(ax.vb.linkedView(0), 'name', None)}")
-#             # print(f"\t\tcached data X bounds = {cached_bounds}")
-#             # current_bounds = self._get_axis_data_X_range_(xLinkAxis) if isinstance(xLinkAxis, pg.PlotItem) else self._get_axis_data_X_range_(ax)
-#             # print(f"\t\tcurrent data X bounds = {current_bounds}")
-#             self._x_data_bounds_[kax] = current_X_bounds
-#             cachedXrange = self._axes_X_view_ranges_[kax]
-#             # viewXrange = xLink.viewRange()[0] if isinstance(xLink, pg.ViewBox) else ax.vb.viewRange()[0]
-#             # viewXrange = ax.vb.viewRange()[0] if not isinstance(xLink, pg.ViewBox) or not xLink.isVisible() else xLink.viewRange()[0]
-#             # print(f"\t\tdata X view range = {viewXrange}")
-#             
-#             if any(np.isnan(v) for v in cachedXrange):
-#                 self._axes_X_view_ranges_[kax] = viewXrange
-#             
-#             # print(f"\t\tcached view X range = {self._axes_X_view_ranges_[kax]}")
-#             # targetXrange = ax.vb.state["targetRange"][0]
-#             # print(f"\t\tdata X target range = {targetXrange}")
-#             # print(f"\t\tcached X view offset, scale = {self._axes_X_view_offsets_scales_[kax]}")
-#             cached_offset, cached_scale = self._axes_X_view_offsets_scales_[kax]
-# 
-#             view_dx = self._axes_X_view_ranges_[kax][1] - self._axes_X_view_ranges_[kax][0]
-#             
-#             bounds = current_X_bounds if any(np.isnan(v) for v in cached_X_bounds) else cached_X_bounds
-#             
-#             # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} bounds: {bounds}")
-#             
-#             if any(np.isnan(v) for v in bounds): 
-#                 # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} has no data bounds")
-#                 continue
-#             
-#             newState = self._calculate_new_X_offset_scale_(bounds, viewXrange)
-#             # print(f"\t\tnew state = {newState}")
-#             newOffset, newScale = newState
-#             x0,x1 = current_X_bounds
-#             dx1 = x1-x0
-#             
-#             offset = newOffset if np.isnan(cached_offset) else cached_offset
-#             scale = newScale if np.isnan(cached_scale) else cached_scale
-#             new_vx0 = x0 - offset
-#             new_view_dx = dx1 * scale
-#             new_vx1 = new_vx0 + new_view_dx
-#             print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} to set new view range: {new_vx0, new_vx1}")
-#             if any(np.isnan(v) for v in (new_vx0, new_vx1)):
-#                 ax.vb.setXRange(*bounds, update=True)
-#             else:
-#                 ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
-#                 # ax.vb.setXRange(new_vx0, new_vx1, update=True)
-#             
-#             
-#         # print("\n")
-        
-                
+            if isinstance(xLink, pg.ViewBox):
+                ax.vb.blockLink(False)
+                xLink.blockLink(False)
+            self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
+
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
         
