@@ -7248,47 +7248,47 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
         self._fileSystemChanged_ = True
     
-#     def enableDirectoryWatch(self, on:bool=True):
-#         # if not isinstance(self.dirFileWatcher, QtCore.QFileSystemWatcher):
-#         #     self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
-#         #     self.dirFileWatcher.directoryChanged.connect(self._slot_directoryChanged)
-#             
-#         if on:
-#             self._isDirWatching_ = True
-#             if self.currentDir in self.dirFileWatcher.directories():
-#             # do nothing if diretory already watched
-#                 print(f"{self.__class__.__name__}.enableDirectoryWatch: The directory {self.currentDir} is already being watched")
-#             
-#             else:
-#                 watchedDirs = self.dirFileWatcher.directories()
-#                 if len(watchedDirs) > self._nMaxWatchedDirectories_:
-#                     self.dirFileWatcher.removePath(watchedDirs[0])
-#                     
-#                 self.dirFileWatcher.addPath(self.currentDir)
-#                 
-#         else:
-#             self._isDirWatching_ = False
-#             watchedDirs = self.dirFileWatcher.directories()
-#             if len(watchedDirs):
-#                 self.dirFileWatcher.removePaths(watchedDirs)
-#                 
-#     def watchCurrentDirectory(self):
-#         if not self._isDirWatching_:
-#             return
-#         
-#         if self.currentDir in self.dirFileWatcher.directories():
-#             # do nothing if diretory already watched
-#             print(f"{self.__class__.__name__}.watchCurrentDirectory: The directory {self.currentDir} is already being watched")
-#         
-#         else:
-#             # remove prev watched directory from the file system watcher
-#             # add current directory to the file system watcher
-#             watchedDirs = self.dirFileWatcher.directories()
-#             if len(watchedDirs) > self._nMaxWatchedDirectories_:
-#                 self.dirFileWatcher.removePath(watchedDirs[0])
-#                 
-#             self.dirFileWatcher.addPath(self.currentDir)
-#                 
+    def enableDirectoryWatch(self, on:bool=True):
+        # if not isinstance(self.dirFileWatcher, QtCore.QFileSystemWatcher):
+        #     self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
+        #     self.dirFileWatcher.directoryChanged.connect(self._slot_directoryChanged)
+            
+        if on:
+            self._isDirWatching_ = True
+            if self.currentDir in self.dirFileWatcher.directories():
+            # do nothing if diretory already watched
+                print(f"{self.__class__.__name__}.enableDirectoryWatch: The directory {self.currentDir} is already being watched")
+            
+            else:
+                watchedDirs = self.dirFileWatcher.directories()
+                if len(watchedDirs) > self._nMaxWatchedDirectories_:
+                    self.dirFileWatcher.removePath(watchedDirs[0])
+                    
+                self.dirFileWatcher.addPath(self.currentDir)
+                
+        else:
+            self._isDirWatching_ = False
+            watchedDirs = self.dirFileWatcher.directories()
+            if len(watchedDirs):
+                self.dirFileWatcher.removePaths(watchedDirs)
+                
+    def watchCurrentDirectory(self):
+        if not self._isDirWatching_:
+            return
+        
+        if self.currentDir in self.dirFileWatcher.directories():
+            # do nothing if diretory already watched
+            print(f"{self.__class__.__name__}.watchCurrentDirectory: The directory {self.currentDir} is already being watched")
+        
+        else:
+            # remove prev watched directory from the file system watcher
+            # add current directory to the file system watcher
+            watchedDirs = self.dirFileWatcher.directories()
+            if len(watchedDirs) > self._nMaxWatchedDirectories_:
+                self.dirFileWatcher.removePath(watchedDirs[0])
+                
+            self.dirFileWatcher.addPath(self.currentDir)
+                
         
             
     @pyqtSlot()
