@@ -7812,7 +7812,6 @@ signals in the signal collection.
             new_view_dx = dx1 * scale
             new_vx1 = new_vx0 + new_view_dx
             # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} to set new view range: {new_vx0, new_vx1}")
-            # should we autorange first?
             ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
             if isinstance(xLink, pg.ViewBox):
                 ax.vb.blockLink(False)
