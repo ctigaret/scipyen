@@ -7812,6 +7812,7 @@ signals in the signal collection.
             new_view_dx = dx1 * scale
             new_vx1 = new_vx0 + new_view_dx
             # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} to set new view range: {new_vx0, new_vx1}")
+            # should we autorange first?
             ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
             if isinstance(xLink, pg.ViewBox):
                 ax.vb.blockLink(False)
@@ -9381,9 +9382,14 @@ signals in the signal collection.
         
         # NOTE: 2023-07-09 15:25:32
         # link all X axes ot the X axis of the top PlotItem (with index 0)
-        for ax in self.axes[1:]:
-            ax.vb.setXLink(self.axes[0])
+        # for ax in self.axes[1:]:
+        #     ax.vb.setXLink(self.axes[0])
 
+        # NOTE: 2023-07-10 12:21:29
+        # this links all axes pairwise (2nd to first, 3rd to 2nd etc)
+        for ax in pairwise(self.axes):
+            ax[1].vb.setXLink(ax[0])
+    
         # NOTE: 2023-07-09 14:28:00
         # this links axes pairwise except for the non-signal axes;
         # not sure this is the best approach
@@ -9399,6 +9405,7 @@ signals in the signal collection.
 #         else:
 #             for ax in pairwise(self.axes):
 #                 ax[1].vb.setXLink(ax[0])
+        
         
     def unlinkAllXAxes(self):
         if len(self.axes) < 1:
@@ -9439,7 +9446,8 @@ signals in the signal collection.
         # set these up at earliest occasion
         self._axes_X_view_ranges_ = [[math.nan, math.nan] for k in range(nAxes)]
         self._x_data_bounds_ = [[math.nan, math.nan] for k in range(nAxes)]
-        self._axes_X_view_offsets_scales_ = [[math.nan, math.nan] for k in range(nAxes)]
+        # self._axes_X_view_offsets_scales_ = [[math.nan, math.nan] for k in range(nAxes)]
+        self._axes_X_view_offsets_scales_ = [[0., 1.] for k in range(nAxes)]
 
         # retrieve (cache) the events axis and ths spiketrains axis, if they exist
         # check if there are any plotitems in the layout and of these, is 
