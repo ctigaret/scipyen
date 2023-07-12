@@ -5380,7 +5380,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
 
         else:
-            self.loadFiles([self.fileSystemModel.filePath(ndx)], self._openSelectedFileItemsThreaded)
+            self.loadFiles([self.fileSystemModel.filePath(ndx)], 
+                           self._openSelectedFileItemsThreaded)
             
 
     @pyqtSlot(str)
@@ -5559,7 +5560,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         fileNames = [self.fileSystemModel.filePath(i) for i in selectedItems]
         
-        self.loadFiles(fileNames, self._openSelectedFileItemsThreaded,ioReaderFn = pio.importDataFrame)
+        self.loadFiles(fileNames, self._openSelectedFileItemsThreaded,
+                       ioReaderFn = pio.importDataFrame)
 
         # nItems = len(fileNames)
         # 
@@ -5603,35 +5605,46 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if nItems == 0:
             return False
         
-        # NOTE: 2023-05-27 14:48:04
-        # self.loadFiles is inherited from workspace
-        # creates a pgui.ProgressWorkerThreaded to create a file loading loop 
-        # in a separate thread. The actual file loading method that is called 
-        # inside the loop is self._openSelectedFileItemsThreaded. 
+        # NOTE: 2023-07-12 11:52:30
+        # self.loadFiles is inherited from WorkspaceGuiMixin
+        # creates a pgui.WorkerThread that runs a file loading loop 
+        # in a separate thread. The actual file loading loop is executed by 
+        # self._openSelectedFileItemsThreaded. 
         #
         # In turn, self._openSelectedFileItemsThreaded calls self.loadDiskFile
-        # which places the loaded file data in the workspace by one of two 
-        # mechanisms, depending on the value passed for 'updateUi' parameter:
+        # on each file in the selectedItems
         #
-        # 1) When updateUI == True:
-        #   Data is placed in the workspace via the method 
-        #   workspaceModel.bindObjectInNamespace();
+        # The WorkspaceView is populated with the object created as a result of
+        # self.loadDiskFile(…), depending on the value of the updateUi parameter
+        # below, either:
+        # • after each file has been read (updateUi = True):
+        #   Data is placed in the workspace via the method workspaceModel.bindObjectInNamespace();
         #   This will trigger an update of the workspaceModel for each iteration
         #   of the loop - the PROBLEM is that the iteration speed slows down with
-        #   the number of files (number of iterations)
+        #   the number of files (number of iterations) - because the execution
+        #   time scales UP with the number of items in the workspace
         #
-        # 2) When updateUi == False:
-        #   Data is placed DIRECTLY in the workspace ⇒ this is faster, BUT 
-        #   requires a separate post-hoc update to the workspaceModel; 
-        #   NOTE: as of 2023-05-29 23:12:25 this does NOT blocm the UI anymore
+        # • after the worker thread that runs the loop has emitted a signal_Result
+        #   Data is placed DIRECTLY in the workspace ⇒ this is faster, but needs 
+        #   a separate post-hoc update to the workspaceModel; 
+        #   NOTE: as of 2023-05-29 23:12:25 this does NOT block the UI anymore
         #   and the whole process is now more swift
         #
-        # self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=True)
-        
-        # NOTE: 2023-05-29 23:11:05 NOW, WORKS LIKE A CHARM!
+
+        # NOTE: 2023-07-12 11:40:44
+        # Now THIS works like a charm...
+        # NOTE: 2023-07-12 11:50:19
+        # this below using updateUi=False <feels> faster
         self.loadFiles(selectedItems, 
                        self._openSelectedFileItemsThreaded, updateUi=False)
+        # self.loadFiles(selectedItems, 
+        #                self._openSelectedFileItemsThreaded, updateUi=True)
         
+    @safeWrapper
+    def _saveSelectedObjectsThreaded(self, saveFn: typing.Callable):
+        # TODO: replicate the logic in _openSelectedFileItemsThreaded
+        # click into pickling etc.
+        pass
 
     @safeWrapper
     def _openSelectedFileItemsThreaded(self, **kwargs):
@@ -5662,13 +5675,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         OK = True
         
-        self.updateUiWithFileLoad = updateUi # def'ed in WorkspaceGuiMixin
+        # self.updateUiWithFileLoad is def'ed in WorkspaceGuiMixin
+        self.updateUiWithFileLoad = updateUi 
         
         canceled = False
         
         for k, item in enumerate(filePaths):
             # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded ({k}, {item})")
-            OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
+            OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, 
+                                    updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
             if OK and isinstance(progressSignal, QtCore.pyqtBoundSignal):
                 # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded loaded ({k}, {item})")
                 progressSignal.emit(k)

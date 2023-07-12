@@ -1,22 +1,5 @@
 """
-    This module contains:
-
-    1) PlanarGraphics objects:
-        Move (aliased to Point and Start)
-        Line
-        Arc
-        ArcMove
-        Cubic
-        Cursor
-        Quad
-        Ellipse
-        Rrect
-        Path
-        
-    2) GraphicsObject 
-    A GUI representation of PlanarGraphics objects in the Qt GraphicsView framework.
-    
-    3) Various generic GUI utilities: mostly dialogues
+    This module contains various generic GUI utilities: mostly dialogues
 """
 # NOTE: 2018-04-15 10:34:03
 # frameVisibility parameter in graphics object creation:
@@ -25,6 +8,8 @@
 # because the frames where the graphics object is visible are set by the frame-state
 # associations of the backend
 
+# NOTE: 2023-07-12 09:22:44
+# these below moved to planargraphics.py
 # TODO/FIXME 2018-02-11 22:11:38
 # consider a single Point "class", with _qt_path_composition_call_ set to either
 # moveTo or lineTo, depending on whether the Point is at the beginning of a (sub)path
@@ -84,6 +69,7 @@ from core.workspacefunctions import debug_scipyen
 #### BEGIN pict.gui modules
 from . import quickdialog
 from . import resources_rc
+# NOTE: 2023-07-12 09:23:22 are these needed here? FIXME/TODO
 from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,
                            PlanarGraphics, Point, Quad, Rect, Text, VerticalCursor,
                            HorizontalCursor, CrosshairCursor, PointCursor,
@@ -100,6 +86,9 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 # Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "linearrangemappingwidget.ui"))
 
+# FIXME 2023-07-12 09:24:29 TODO
+# from BEGIN to END below move to another module (e.g. guiutils? or scipyen_colormaps?)
+#### BEGIN FIXME 2023-07-12 09:24:29 TODO
 def generateColorCycle():
     pass
 
@@ -127,12 +116,13 @@ def genColorTable(cmap, ncolors=256):
     colortable = smap.to_rgba(x, bytes=True)
     return colortable
 
+#### END FIXME 2023-07-12 09:24:29 TODO
+
 class GuiWorkerSignals(QtCore.QObject):
     signal_Finished = pyqtSignal(name="signal_Finished")
     sig_error = pyqtSignal(tuple, name="sig_error")
     signal_Result = pyqtSignal(object, name="signal_Result")
     
-
     
 class GuiWorker(QtCore.QRunnable):
     def __init__(self, fn, *args, **kwargs):
@@ -199,7 +189,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
     """
     ProgressWorkerRunnable thread
 
-    Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
+    Inherits from QRunnable to handle worker thread setup, signals and wrap-up.
 
     :param fn:  The function callback to run on this worker thread. Supplied args and 
                      kwargs will be passed through to the runner.
@@ -246,16 +236,6 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
             self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
             self.kwargs["progressUI"] = self.pd
             
-        #else:
-            #self.pd = None
-
-        # Add the callback to our kwargs
-        
-        #print("ProgressWorkerRunnable fn args", self.args)
-        
-    # @pyqtSlot()
-    # def slot_canceled(self):
-    #     self.signals.signal_Canceled(emit)
 
     @pyqtSlot()
     def run(self):
@@ -332,7 +312,7 @@ class MouseEventSink(QtCore.QObject):
         self.close()
         
 class ProgressWorkerThreaded(QtCore.QObject):
-    """Calls a worker function in a separate QThread.
+    """Wraps a worker function in a separate QThread.
         The worker function is typically executing a time-consuming loop (such
         as an iteration through some data, where each cycle involves a time-
         consuming operation).
@@ -415,6 +395,15 @@ class ProgressWorkerThreaded(QtCore.QObject):
             self.signals.signal_Finished.emit()  # Done
         
 class ProgressThreadController(QtCore.QObject):
+    """The problem(s) with this approach:
+• the progres dialog's timers would be stopped from another thread, thus generating
+        'QObject::killTimer: Timers cannot be stopped from another thread' which 
+        may crash Scipyen.
+• the progress dialog cannot be moved itself to another thread, it being a member
+        of the ProgressWorkerThreaded instance (although the threaded worker IS
+    moved ot another thread)
+
+"""
     sig_start = pyqtSignal(name="sig_start")
     sig_ready = pyqtSignal(object, name="sig_ready")
     
@@ -469,5 +458,40 @@ class ProgressThreadController(QtCore.QObject):
         print(f"{self.__class__.__name__}.abort")
         self.sig_ready.emit(None)
         
+class WorkerThread(QtCore.QThread):
+    """Thread for an atomic function call in a loop.
+See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
+"""
+    # sig_ready = pyqtSignal(object, name="sig_ready")
+    
+    def __init__(self, parent, fn:typing.Callable, /, 
+                 loopControl:typing.Optional[dict]=None, *args, **kwargs):
+        QtCore.QThread.__init__(self, parent)
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.loopControl = loopControl
+        self.signals = ProgressWorkerSignals()
+        self.kwargs['progressSignal'] = self.signals.signal_Progress
+        self.kwargs["finishedSignal"] = self.signals.signal_Finished
+        self.kwargs["canceledSignal"] = self.signals.signal_Canceled
+        self.kwargs["resultSignal"] = self.signals.signal_Result
+        # self.kwargs["setMaxSignal"] = self.signals.signal_setMaximum
+        self.kwargs["loopControl"] = self.loopControl
         
-        
+    def run(self):
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+            self.signals.signal_Result.emit(result)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            
+        else:
+            # self.signals.signal_Result.emit(result)
+            self.signals.signal_Finished.emit()
+        finally:
+            # self.signals.signal_Result.emit(result)
+            self.signals.signal_Finished.emit()
+            
