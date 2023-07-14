@@ -192,6 +192,7 @@ from core.traitcontainers import DataBag
 # from core.traitutils import (trait_from_type, )
 # from core.traitutils import (TraitsObserver, trait_from_type, )
                                   
+from core.sysutils import adapt_ui_path
 
 #### END pict.core modules
 
@@ -232,9 +233,11 @@ import ephys.ephys as ephys
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+__ui_path__ = adapt_ui_path(__module_path__)
 
 # Form class,        Base class                                                                               package with the resources.qrc file
-__UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LSCaTWindow.ui"), from_imports=True, import_from="gui")
+__UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__ui_path__,"LSCaTWindow.ui"), from_imports=True, import_from="gui")
+# __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LSCaTWindow.ui"), from_imports=True, import_from="gui")
 
 def vCursor2ScanlineProjection(v, path, span=None):
     """Maps the x coordinate for a vertical cursor in linescans space (x,y) coordinates on scanline path, in scene space.

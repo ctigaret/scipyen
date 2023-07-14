@@ -160,6 +160,7 @@ from core.traitcontainers import DataBag
 
 from core.strutils import (InflectEngine, get_int_sfx)
 
+from core.sysutils import adapt_ui_path
 
 from imaging.vigrautils import kernel2array
 
@@ -216,8 +217,10 @@ DEPRECATED here, but keep for reference
 """
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+__ui_path__ = adapt_ui_path(__module_path__)
 
-Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer.ui'))
+# Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer.ui'))
+Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__ui_path__,'signalviewer.ui'))
 
 class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     """ A plotter for multi-sweep signals ("frames" or "segments"), with cursors.

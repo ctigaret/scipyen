@@ -42,6 +42,8 @@ from core.prog import safeWrapper
 
 from core.workspacefunctions import get_symbol_in_namespace
 
+from core.sysutils import adapt_ui_path
+
 from gui import quickdialog as qd
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenFrameViewer

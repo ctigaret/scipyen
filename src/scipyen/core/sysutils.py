@@ -99,3 +99,20 @@ def is_kde_x11():
         return False
     
     return get_desktop("session") == "x11" and get_desktop() == "KDE"
+
+def adapt_ui_path(module_path, uifile):
+    # NOTE: CAUTION: 2023-07-14 18:10:01
+    # make sure this is in sync with the destination for uitoc in scipyen.spec file
+    # if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    uifull = os.path.join(module_path, uifile)
+    if os.path.isfile(uifull):
+        return uifull
+    
+    module_place = os.path.dirname(module_path)
+    # print(f"adapt_ui_path module_place {module_place}")
+    return os.path.join(module_place, "UI", module_path, uifile)
+
+#     if hasattr(sys, "_MEIPASS"):
+#         return os.path.join(module_place, "UI", module_path)
+#     
+#     return module_path

@@ -1,13 +1,27 @@
-import os
+import os, sys
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
 from PyQt5.uic import loadUiType as __loadUiType__
 
+# NOTE: 2023-07-14 16:32:06
+# necessary to adapt to the situation where Scipyen is bundled
+from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"itemslistdialog.ui"))
+# if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+#      # WARNING this must be reflected in scipyen.spec file!
+#     __ui_path__ = os.path.join(__module_path__, "UI")
+# else:
+#     __ui_path__ = __module_path__
+
+__ui_path__ = adapt_ui_path(__module_path__, "itemslistdialog.ui")
+
+print(f"__ui_path__ {__ui_path__}")
+    
+Ui_ItemsListDialog, QDialog = __loadUiType__(__ui_path__)
+# Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__ui_path__,"itemslistdialog.ui"))
 
 class ItemsListDialog(QDialog, Ui_ItemsListDialog):
     itemSelected = QtCore.pyqtSignal(str)

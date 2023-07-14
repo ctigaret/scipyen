@@ -46,6 +46,8 @@ import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datatypes import array_slice
 
+from core.sysutils import adapt_ui_path
+
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -69,7 +71,10 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_TableEditor, QMainWindow = __loadUiType__(os.path.join(__module_path__, "tableeditor.ui"))
+__ui_path__ = adapt_ui_path(__module_path__)
+
+Ui_TableEditor, QMainWindow = __loadUiType__(os.path.join(__ui_path__, "tableeditor.ui"))
+# Ui_TableEditor, QMainWindow = __loadUiType__(os.path.join(__module_path__, "tableeditor.ui"))
 # Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "widgets","tableeditorwidget.ui"))
 
 # class MetaHeaderView(QtWidgets.QHeaderView):

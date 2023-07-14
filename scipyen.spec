@@ -1,17 +1,30 @@
 # -*- mode: python ; coding: utf-8 -*-
-import io, os, sys, subprocess, shutil, tempfile
+import io, os, sys, subprocess, shutil, tempfile, typing
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 
 # NOTE: 2023-06-26 17:25:32
-# do something like:
-# mkdir -p scipyen_app && cd scipyen_app
-# scipyact
-# scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/scipyen.spec
-# or from the $HOME:
-# scipyen_app> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
+# This is for the developer, NOT the final user:
+# To create a distributable scipyen application, you need to:
+# 1) clone the scipyen git repo locally (e.g. to $HOME/scipyen)- NOTE: this is assumed to be the case from here onwards
+# 2) use the install.sh script to create a local virtual environment with all the 
+#   binaries needed for Scipyen (this includes building PyQt5, VIGRA and - -optionally - NEURON)
+# 3) activate the new environment, then buld the distributable app:
+#   in a bash shell do something like (NOTE: 'user@host:>'is your terminal prompt
+#   and it may look different on your machine, make sure you understand this):
+#
+#       user@host:>scipyact # to activate the environment
+#       user@host:>mkdir -p scipyen_app && cd scipyen_app
+#       user@host:~/scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/scipyen.spec
+#
+#   alternatively, you don't have to cd to scipyen_app, so from the $HOME, call:
+#       user@host:> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
+#
+#
+# TODO: For more customization contemplate calling pyinstaller as above from a
+# bash script
 
-myfile = sys.argv[-1]
+myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 
 
 if "--distpath" in sys.argv:
@@ -59,17 +72,34 @@ def file2TOCEntry(src_path:str, topdirparts:list, file_category:str="DATA"):
     target_path = os.path.dirname(my_path)
     return target_path, src_path, file_category
 
-def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
+# def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
+def file2entry(src_path:str, topdirparts:list, 
+               destination:typing.Optional[str]=None) -> tuple:
     """Returns a 2-tuple (source_full_path, target_dir)
     To be used in the Analysis constructor, below
+    
+    Parameters:
+    ===========
+    src_path: fully-qualified path to the file (including the file name & extension)
+        
+    topdirparts: a list of directories representing the path to the actual file
+    
+    destination: the name of the directory where the entry will be placed;
+        WARNING this is the directory in the ditribution tree, where the file will
+        be placed (including any sub-path below the topdirparts)
+        
+        Optional default is None => the file will be placed in the root directory
+        of the distribution
     """
     parts = [p for p in src_path.split('/') if p not in topdirparts]
+    if isinstance(destination, str):
+        parts.insert(0, destination)
+        
     my_path = name = os.path.join(*parts)
     target_path = os.path.dirname(my_path)
     if len(target_path) == 0:
         target_path = '.'
-    # if strip_path:
-    #     name = os.path.basename(path)
+        
     return src_path, target_path
     
 
@@ -78,6 +108,7 @@ def DataFiles(topdir, ext, **kw):
     # strip_path = kw.get('strip_path', False)
     as_ext = kw.get("as_ext", True)
     forAnalysis = kw.get("forAnalysis", False)
+    destination = kw.get("destination", None)
 
     topdirparts = topdir.split('/')
     
@@ -103,7 +134,7 @@ def DataFiles(topdir, ext, **kw):
     #   dest, src in Analysis.datas (but the order is reversed)
 
     if forAnalysis:
-        return [file2entry(filename, topdirparts) for filename in items]
+        return [file2entry(filename, topdirparts, destination=destination) for filename in items]
     
     return TOC(
         file2TOCEntry(filename, topdirparts)
@@ -116,30 +147,35 @@ block_cipher = None
 
 # NOTE: 2023-06-28 11:07:31
 # expects a list of tuples (src_full_path_or_glob, dest_dir), see NOTE: 2023-06-28 11:08:08
-uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True)
-txttoc = DataFiles('/home/cezar/scipyen/src', ".txt", forAnalysis=True)
-svgtoc = DataFiles('/home/cezar/scipyen/src', ".svg", forAnalysis=True)
-pngtoc = DataFiles('/home/cezar/scipyen/src', ".png", forAnalysis=True)
-jpgtoc = DataFiles('/home/cezar/scipyen/src', ".jpg", forAnalysis=True)
-giftoc = DataFiles('/home/cezar/scipyen/src', ".fig", forAnalysis=True)
-tifftoc = DataFiles('/home/cezar/scipyen/src', ".tif", forAnalysis=True)
+# "forAnalysis" is a flag indicating that tuples are generated for use by the Analysis object
+# constructed below
+uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True, destination="UI") # WARNING must be reflected in core.sysutils.adapt_ui_path
+print(f"uitoc: {uitoc}")
+txttoc = DataFiles('/home/cezar/scipyen/src', ".txt", forAnalysis=True, destination="Documentation")
+svgtoc = DataFiles('/home/cezar/scipyen/src', ".svg", forAnalysis=True, destination="Resources")
+pngtoc = DataFiles('/home/cezar/scipyen/src', ".png", forAnalysis=True, destination="Resources")
+jpgtoc = DataFiles('/home/cezar/scipyen/src', ".jpg", forAnalysis=True, destination="Resources")
+giftoc = DataFiles('/home/cezar/scipyen/src', ".fig", forAnalysis=True, destination="Resources")
+tifftoc = DataFiles('/home/cezar/scipyen/src', ".tif", forAnalysis=True, destination="Resources")
 tifftoc.extend(DataFiles('/home/cezar/scipyen/src', ".tiff", forAnalysis=True))
-icotoc = DataFiles('/home/cezar/scipyen/src', ".ico", forAnalysis=True)
-xsltoc = DataFiles('/home/cezar/scipyen/src', ".xsl", forAnalysis=True)
-shtoc = DataFiles('/home/cezar/scipyen/src', ".sh", forAnalysis=True)
-qrctoc = DataFiles('/home/cezar/scipyen/src', ".qrc", forAnalysis=True)
-readmetoc = DataFiles('/home/cezar/scipyen/src', "README", as_ext=False, forAnalysis=True)
-pkltoc = DataFiles('/home/cezar/scipyen/src', ".pkl", forAnalysis=True)
-hdftoc = DataFiles('/home/cezar/scipyen/src', ".h5", forAnalysis=True)
-hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf5", forAnalysis=True))
-hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf", forAnalysis=True))
-abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True)
-atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True)
-yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True)
+icotoc = DataFiles('/home/cezar/scipyen/src', ".ico", forAnalysis=True, destination="Resources")
+xsltoc = DataFiles('/home/cezar/scipyen/src', ".xsl", forAnalysis=True, destination="Resources")
+shtoc = DataFiles('/home/cezar/scipyen/src', ".sh", forAnalysis=True, destination="Resources")
+qrctoc = DataFiles('/home/cezar/scipyen/src', ".qrc", forAnalysis=True, destination="Resources")
+readmetoc = DataFiles('/home/cezar/scipyen/src', "README", as_ext=False, forAnalysis=True, destination="Documentation")
+pkltoc = DataFiles('/home/cezar/scipyen/src', ".pkl", forAnalysis=True, destination="Data")
+hdftoc = DataFiles('/home/cezar/scipyen/src', ".h5", forAnalysis=True, destination="Data")
+hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf5", forAnalysis=True, destination="Data"))
+hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf", forAnalysis=True, destination="Data"))
+abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True, destination="Data")
+atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True, destination="Data")
+yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True, destination="Configuration")
 
-# NOTE: 2023-06-28 11:09:08 DOES NOT WORK WITH SCIYEN BECAUSE SCIPYEN IS NOT 
+# NOTE: 2023-06-28 11:09:08 
+# collect_data_files DOES NOT WORK WITH SCIPYEN BECAUSE SCIPYEN IS NOT 
 # A(N INSTALLED) PACKAGE
 # datas = collect_data_files("scipyen")
+
 binaries = list()
 datas = list()
 hiddenimports = list()
@@ -150,6 +186,8 @@ desktoptempdir=""
 # origin_file = None
 namesfx = ""
 
+# NOTE: 2023-07-14 15:19:48
+# this gets the name of the scipyen git branch we are packaging ⇒ namesfx
 if os.path.isdir(os.path.join(mydir, ".git")):
     gitout = subprocess.run(["git", "-C", mydir, "branch", "--show-current"],
                             capture_output=True)
@@ -249,6 +287,10 @@ binaries.extend(jc_binaries)
 hiddenimports.extend(jc_hiddenimports)
 
 # print(f"\ndatas = {datas}\n")
+
+# NOTE: 2023-07-14 15:22:26
+# hookspath contains code for pyinstaller hooks called ONLY when the Analyser
+# detects an import in Scipyen code; thse won't work for NEURON stuff....
 
 a = Analysis(
     ['/home/cezar/scipyen/src/scipyen/scipyen.py'],

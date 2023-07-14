@@ -38,6 +38,7 @@ from core.datazone import DataZone
 import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datatypes import array_slice
+from core.sysutils import adapt_ui_path
 
 #### END pict.core modules
 
@@ -52,10 +53,12 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+__ui_path__ = adapt_ui_path(__module_path__)
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "tableeditorwidget.ui"))
+Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__ui_path__, "tableeditorwidget.ui"))
+# Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "tableeditorwidget.ui"))
 
 class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     # TODO 2019-11-01 22:57:01
