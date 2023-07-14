@@ -839,15 +839,14 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         """To be connected to the `canceled` signal of a progress dialog.
         Modifies the loopControl variable to interrupt a worker loop gracefully.
         """
-        print(f"{self.__class__.__name__}._slot_breakLoop")
+        # print(f"{self.__class__.__name__}._slot_breakLoop")
         self.loopControl["break"] = True
-        
         
     @safeWrapper
     def loadFiles(self, filePaths:typing.Sequence[typing.Union[str, pathlib.Path]],
                        fileLoaderFn:typing.Callable, 
                        ioReaderFn:typing.Optional[typing.Callable]=None,
-                       updateUi:bool=True): #, postLoadfn:typing.Callable):
+                       updateUi:bool=True):
         if len(filePaths) == 0:
             return
         
@@ -857,48 +856,32 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                                                 nItems, self)
         progressDlg.setMinimumDuration(1000)
         progressDlg.canceled.connect(self._slot_breakLoop)
+        kw = {"filePaths": filePaths, "ioReader": ioReaderFn, "updateUi": updateUi}
+        workerThread = pgui.WorkerThread(self, fileLoaderFn, **kw)
+        workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
+        workerThread.signals.signal_Result[object].connect(self.workerReady)
+        workerThread.signals.signal_Finished.connect(progressDlg.reset)
+        workerThread.start()
         
-        self._fileLoadWorker_ = pgui.ProgressWorkerThreaded(fileLoaderFn,
-                                                     progressDialog=progressDlg,
-                                                     loopControl = self.loopControl,
-                                                     filePaths = filePaths,
-                                                     ioReader=ioReaderFn,
-                                                     updateUi = updateUi)
+    @safeWrapper
+    def saveObjects(self, objects:typing.Union[tuple, list],
+                    saver:typing.Callable):
         
-        self._fileLoadController_ = pgui.ProgressThreadController(self._fileLoadWorker_)
-        self._fileLoadController_.sig_ready[object].connect(self._slot_fileLoadThread_ready)
+        if any(not isinstance(o, (tuple, list)) or len(o) != 2 or not isinstance(o[0], str)):
+            raise ValueError("'objects' expected to be a sequnce of (name, object) tuples")
         
+        # TODO replicate the logic in loadFiles -> mainWindow._saveSelectedObjectsThreaded
         
-        # self._fileLoadWorker_.signals.signal_Progress.connect(progressDlg.setValue)
-        # self._fileLoadWorker_.signals.signal_Finished.connect(lambda : progressDlg.setValue(progressDlg.maximum()))
-        
-        
-        
-        # self._fileLoadWorker_.moveToThread(self._fileLoadThread_)
-        # self._fileLoadWorker_.moveToThread(fileLoadThread)
-        # self._fileLoadThread_.started.connect(self._fileLoadWorker_.run)
-        # fileLoadThread.started.connect(self._fileLoadWorker_.run)
-        # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.quit)
-        # self._fileLoadWorker_.signals.signal_Finished.connect(fileLoadThread.quit)
-        # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadWorker_.deleteLater)
-        # self._fileLoadWorker_.signals.signal_Finished.connect(self._fileLoadThread_.deleteLater)
-        # self._fileLoadController_.sig_start.emit()
-        
-        # self._fileLoadThread_.finished.connect(self._fileLoadWorker_.deleteLater)
-        # fileLoadThread.finished.connect(self._fileLoadWorker_.deleteLater)
-        # self._fileLoadThread_.finished.connect(self._fileLoadThread_.deleteLater)
-        
-        # self._fileLoadThread_.start()
-        # fileLoadThread.start()
-        # # self._fileLoadThreads_.append(fileLoadThread)
         
     @pyqtSlot(object)
-    def _slot_fileLoadThread_ready(self, result:object):
+    def workerReady(self, obj):
+        # print(f"{self.__class__.__name__}.workerReady: obj = {obj}; self.updateUiWithFileLoad = {self.updateUiWithFileLoad }")
         self.loopControl["break"] = False
         try:
-            ok = bool(result==True)
+            ok = bool(obj==True)
         except:
             ok = False
+        # print(f"{self.__class__.__name__}.workerReady: ok = {ok}")
 
         if ok and not self.updateUiWithFileLoad and hasattr(self, "workspaceModel"):
             # WARNING: 2023-05-28 23:42:57

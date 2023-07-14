@@ -3,7 +3,7 @@
 For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.
 """
-import typing, numbers, functools, warnings
+import typing, numbers, functools, warnings, traceback
 #### BEGIN 3rd party modules
 import numpy as np
 import scipy
@@ -18,7 +18,7 @@ from . import quantities as scq
 from . import datasignal as sds
 from .datasignal import DataSignal, IrregularlySampledDataSignal
 from . import prog as prog
-from .prog import safeWrapper
+from .prog import (safeWrapper, with_doc)
 #### END scipyen core modules
 
 def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
@@ -721,60 +721,60 @@ def split_histogram(counts, f):
     
 def state_levels(x:np.ndarray, **kwargs):
     """Calculate states from a 1D waveform.
-    See IEEE Std 181-2011: 
-        IEEE Standard for Transitions, Pulses, and Related Waveforms
-    
-    Parameters:
-    -----------
-    
-    x = np.ndarray (usually, a column vector; when a 2D array, then the function
-        is applied on the given `axis` (or on flattened array if `axis` is None))
-    
-    Var-keyword parameters:
-    ----------------------
-    
-    bins:  int or None;
-            
-            number of bins (default: 100)
-            
-            When None is passed here, the function attempts to calculate the 
-            numbr of histogram bins according to ADC parameters specified , as
-            described below.
-            
-    bw:     float;
-            
-            bin width (used if bins is None)
-            
-    adcres, adcrange, adcscale : float scalars
-            
-            used when bins is None AND bw is None
-            
-            These are passed as arguments to generate_bin_width() function (in this module)
-            
-            Their default values are, respectively: 15 bit, 10 V, and 1 (for Axon Digidata 1550)
-            
-    levels: float or sequence of floats
-            
-            The fractional reference levels; allowed values are in the interval 
-            [0,1] (see "f" argument to split_histogram() function in this module); 
-            default is 0.5.
-            
-    moment: str
-            The statistical moment used to calculate the state level:
-            "mean" or "mode" or a function that takes a 1D sequence of numbers
-            and returns a scalar; default is "mean"
-    
-    axis:   int
-            The axis of the array (when x.ndim > 1); default is 0
-            
-    Returns:
-    ========
-    sLevels: A list of reference levels, corresponding to the fractional reference 
-                levels specified in "levels" argument.
-    counts: histogram counts
-    edges: histogram edges
-    ranges: ranges of count values for the two levels
-    
+See IEEE Std 181-2011: 
+    IEEE Standard for Transitions, Pulses, and Related Waveforms
+
+Parameters:
+-----------
+
+x = np.ndarray (usually, a column vector; when a 2D array, then the function
+    is applied on the given `axis` (or on flattened array if `axis` is None))
+
+Var-keyword parameters:
+----------------------
+
+bins:  int or None;
+        
+        number of bins (default: 100)
+        
+        When None is passed here, the function attempts to calculate the 
+        numbr of histogram bins according to ADC parameters specified , as
+        described below.
+        
+bw:     float;
+        
+        bin width (used if bins is None)
+        
+adcres, adcrange, adcscale : float scalars
+        
+        used when bins is None AND bw is None
+        
+        These are passed as arguments to generate_bin_width() function (in this module)
+        
+        Their default values are, respectively: 15 bit, 10 V, and 1 (for Axon Digidata 1550)
+        
+levels: float or sequence of floats
+        
+        The fractional reference levels; allowed values are in the interval 
+        [0,1] (see "f" argument to split_histogram() function in this module); 
+        default is 0.5.
+        
+moment: str
+        The statistical moment used to calculate the state level:
+        "mean" or "mode" or a function that takes a 1D sequence of numbers
+        and returns a scalar; default is "mean"
+
+axis:   int
+        The axis of the array (when x.ndim > 1); default is 0
+        
+Returns:
+========
+sLevels: A list of reference levels, corresponding to the fractional reference 
+            levels specified in "levels" argument.
+counts: histogram counts
+edges: histogram edges
+ranges: ranges of count values for the two levels
+
 
     """
     from scipy import where
@@ -2429,65 +2429,166 @@ def correlate(in1, in2, **kwargs):
         return corr
 
 @safeWrapper
+@with_doc(state_levels, use_header=True)
 def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal], 
-                  thr:typing.Optional[float] = 1., 
+                  minampli:typing.Optional[float] = 1., 
                   channel:typing.Optional[int] = None,
                   up_first:bool=True,
-                  **kwargs):
-    """Detect boxcar waveforms in a signal.
+                  **kwargs) -> tuple:
+    """Detection of boxcar or step (Heaviside) waveforms in a signal.
+    
+Parameters:
+===========
+x: signal-like object
+    
+minampli: float: a minimum value of boxcar amplitude (useful for noisy signals)
+    default is 1 (see NOTE 1).
+    
+channel: required when the signal 'x' has more than one channel (or traces);
+    selects a single trace (or channel) along the 2nd axis (axis 1)
 
-    
-    The signal must undergo at least one transition between two distinct states 
-    ("low" and "high").
-    
-    The states are detected using the kmeans algorithm (scipy.cluster.vq.kmeans)
-    or using a histogram-based method (see state_levels); this is selected using
-    the 'method' keyword (by default this is set to 'kmeans')
-    
-    Optionally the float parameter thr specifies the minimum difference between
-    signal's clusters for it to be considered as containing embedded TTL-like
-    waveforms. By default, this is 1.0
-    
-    The function is useful in detecting the ACTUAL time of a trigger (be it 
-    "emulated" in the ADC command current/voltage or in the digital output "DIG") 
-    when this differs from what was intended in the protocol (e.g. in Clampex,
-    there is a padding before and after the actual signal, and the size of the 
-    padding is about 
-    
+    (remember, a signal is a 2D array and its traces are column vectors, 
+    with axis 0 the 'domain' (time, etc) and channels - or traces - indexed
+    on axis 1)
 
-    Parameters:
-    ----------
-    x: signal-like object
-    thr: float: a minimum value of boxcar amplitude (useful for noisy signals)
-        default is 1.
+up_first: bool default is True
+    When True, the upward transitions times are in the first element of the 
+        returned tuple (see below), and the downward transition times are in
+        the second element.
+
+    When False, the order is reversed (down, then up).
+
+    NOTE: This allows the caller to pre-empt which transition time stamps 
+    are returned first, although it is easy to determine this post-hoc, by
+    comparing the time stamps.
     
-    channel: required when the signal 'x' has more than one channel (or traces);
-        selects a single trace (or channel) along the 2nd axis (axis 1)
+Var-keyword parameters:
+=======================
+• method: str; default is 'kmeans'; valid values are 'kmeans', 'state_levels',
+    'states' ('states' is an alias/shorthand for 'state_levels')
     
-        (remember, a signal is a 2D array and its traces are column vectors, 
-        with axis 0 the 'domain' (time, etc) and channels - or traces - indexed
-        on axis 1)
+When 'method' is 'states' or 'state_levels', the following keyword parameters
+control the behaviour of the state_levels(…) function :
     
-    up_first: bool default is True
-        When True, the upward transitions times are in the first element of the 
-            returned tuple (see below), and the downward transition times are in
-            the second element.
+• box_size
+• levels
+• adcres, adcrange, adcscale
+• moment
+• bins, bw     
     
-        When False, the order is reversed (down, then up).
+When 'method' is 'kmeans' the function passes he kmeans parameter 'k_or_guess' to
+2 (i.e. classify 'x' data in levels). 
+
+The following keyword parameters control the behaviour of kmeans(…):
     
-        NOTE: This allows the caller to pre-empt which transition time stamps 
-        are returned first, although it is easy to determine this post-hoc, by
-        comparing the time stamps.
+• iter
+• thresh → NOTE: do not confuse with 'minampli'
+• check_finite
+• seed
     
-    Returns:
-    ========
-    A tuple of five elements: 
-        "up", "down", "amplitude", "centroids", "label" when up_first is True
-        "down", "up", "amplitude", "centroids", "label" when up_first is False
+Returns:
+========
+A 6-tuple (t0, t1, amplitude, centroids, label, upward) , 
+
+where:
+
+• t0, t1 are the domain values² for the transitions between the low ('lo') and 
+    high ('hi') states, as follows:
+        
+    variable:   Transition:     Condition:
+    ------------------------------------------------
+    t0          lo → hi         up_first == True
+                hi → lo         up_first == False
+
+    t1          hi → lo         up_first == True
+                lo → hi         up_first == False
+    ------------------------------------------------
+
+• amplitude: the amplitude of the boxcar
+• centroids: the mean value of each of the low and high states    
+• label: numpy array (vector) of same size as the signal in 'x', with values of
+    0 or 1, indicating which state the samples in 'x' belong to:
     
-        "up" and "down" are arrays of time stamps for the lo → hi and  hi → lo
-            transitions, respectively.
+    Samples in 'label' with value 0 correspond to the samples in 'x' belonging
+    to the 'low' state.
+        
+    Samples in 'label' with value 1 correspond to the samples in 'x' belonging
+    to the 'high' state.
     
+• upward: a bool indicating the direction of the boxcar (True ⇒ the boxcar is
+an upward deflection)
+    
+What this function does:
+========================
+The function detects step transitions between two distinct states — "low" and 
+"high" —  in a regularly sampled signal (a.k.a "analog" signal).
+    
+A transition may be unique (a.k.a a "step", or Heaviside function) or followed
+by a transition in the opposite direction to the first (a.k.a "boxcar" function:
+a boxcar is effectively a series of two step transitions in opposite directions).
+    
+Boxcar and/or step waveforms are typically used to represent TTL-like signals
+(e.g., "digital trigger signals", with widths in the order of ms) but can also
+be used with digital-to-analog (DAC) command signals (e.g., a "step" change in 
+holding potential or injected current).
+
+Optionally the transitions can be detected subject to a minimum amplitude¹.
+    
+The state transitions are detected using an algorithm selected from among:
+    
+• the kmeans algorithm (see documentation for scipy.cluster.vq.kmeans(…) 
+    function).
+    
+• a histogram-based method (see documentation for state_levels(…) function in 
+    this module).
+
+By default, the 'method' parameter is set to 'kmeans'.
+    
+Optionally the float parameter 'minampli' specifies the minimum difference between
+signal's clusters for it to be considered as containing an embedded TTL-like
+waveforms. By default, this is 1.0
+
+The function is useful in detecting the ACTUAL time of a trigger (be it 
+"emulated" in the ADC command current/voltage or in the digital output "DIG") 
+when this differs from what was intended in the protocol (e.g. in Clampex,
+there is a padding before and after the actual signal, and the size of the 
+padding is about 
+
+Limitations and ways to work around them:
+=========================================
+The samples in 'x' must fall in one of two distinct levels for the detection to
+work. This prerequisite has the following implications:
+
+• multiple boxcars in the signal can be detected as long as they have the same
+amplitude and direction (i.e., either upward or downward);
+
+• the signal can have at most one step function in a given direction; if the
+signal also contains one or more boxcars, then the step function occurs AFTER the 
+boxcars and has the same direction and amplitude as the boxcars.
+    
+To work around these limitations one can pass a "slice" of the signal, containing
+only the boxcar waveforms of interest, to this function.
+    
+Another possibility is to use "lower-level" code, e.g. by invoking 'kmeans' with
+a higher number of putative levels (the 'k_or_guess' parameter) or 'state_levels'
+with a tuple of fractional levels (the 'levels' parameter) and work out the
+location, direction, and amplitude of transitions from the result.
+    
+To keep code simple, this function only deals with two well-separated state
+levels in the signal.
+    
+Finally, for signals with several detected boxcars, one may use the results to
+figure out the boxcar widths and filter the detected boxcars subject to width
+constraints.
+    
+NOTES:
+=====
+¹ To avoid false detection in noisy signals.
+    
+² When the signals are in time domain, these are simply the times of the
+    transitions
+
+        
     """
     # FIXME 2023-06-18 22:09:23
     # Currently this function does almost the same thing as parse_step_waveform_signal.
@@ -2495,11 +2596,9 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     from scipy import (cluster, signal)
     from scipy.signal import boxcar
 
-    
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
     
-
     # WARNING: algorithm fails for noisy signals with no TTL waveform
     
     # NOTE: 2023-06-19 08:54:33
@@ -2549,21 +2648,35 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
     # NOTE: 2023-06-19 09:00:05
     # get the transition levels - first check what method we use
     
-    if method not in ("kmeans", "state_levels"):
+    if method.lower() not in ("kmeans", "state_levels", "states"):
         raise ValueError(f"'method' {method} is invalid; expecting one of 'state_levels' or 'kmeans'")
     
     try:
-        if method == "state_levels":
+        if method.lower() in ("state_levels", "states"):
             # print("detect_boxcar using state_levels")
+            # NOTE: 2023-07-02 15:57:07
+            # remove the kwargs normally expected by kmeans(…)
+            #
+            kwargs.pop("iter", None)
+            kwargs.pop("thresh", None)
+            kwargs.pop("check_finite", None)
+            kwargs.pop("seed", None)
+            
+            # NOTE: make sure we have got OUR defaults here
             levels = kwargs.pop("levels", 0.5)
+            kwargs["levels"] = levels
+            
             # NOTE: 2023-06-19 09:04:30
             # TODO code to get these values from the ABF file (via pyabfbridge?)
             # TODO and similarly, from CED (for CED, the code still needs to be written)
             # TODO write documentation hint on how these numbers can be obtained
             # outside this function (ie., before calling it); 
             adcres = kwargs.pop("adcres", 15)
+            kwargs["adcres"] = adcres
             adcrange = kwargs.pop("adcrange", 10)
+            kwargs["adcrange"] = adcrange
             adcscale = kwargs.pop("adcrange", 1e3)
+            kwargs["adcscale"] = adcscale
         
             # NOTE: 2023-06-19 09:09:44
             # state_levels is a histogrm method to determine distinct 'levels' 
@@ -2584,10 +2697,8 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
             # • rng: list of ranges (one per level) within the cnt array
             #   indicates the range of column indices that fall inside each level
             
-            centroids, cnt, edg, rng = state_levels(sig_filt.magnitude, levels = levels, 
-                                        adcres = adcres, 
-                                        adcrange = adcrange, 
-                                        adcscale = adcscale)
+            centroids, cnt, edg, rng = state_levels(sig_filt.magnitude,
+                                                    **kwargs)
             
             if len(centroids) == 0:
                 return (None, None, None) if return_levels else (None, None)
@@ -2595,14 +2706,45 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
             cbook = np.array(centroids).T[:,np.newaxis]
             
         else:
+            # NOTE 2023-07-02 16:01:04
+            # remove keyword params normally expected by state_levels(…)
+            kwargs.pop("bins", None)
+            kwargs.pop("bw", None)
+            kwargs.pop("levels", None)
+            kwargs.pop("adcres", None)
+            kwargs.pop("adcrange", None)
+            kwargs.pop("adcscale", None)
+            levels = kwargs.pop("levels", 2)
             # print("detect_boxcar using kmeans")
-            cbook, dist = cluster.vq.kmeans(sig_filt, 2) # two levels
+            cbook, dist = cluster.vq.kmeans(sig_filt, levels, **kwargs) # two levels
             cbook = np.array(cbook, dtype=float)
             
         # the boxcar amplitude
+        # BUG: 2023-07-03 23:01:53 FIXME
+        # this is WRONG for more than two levels!
         amplitude = np.diff(cbook, axis=0) * sig.units
         
-        if np.all(amplitude < thr*sig.units):
+        if isinstance(minampli, numbers.Number):
+            if isinstance(sig, pq.Quantity):
+                minampli = minampli * sig.units
+                
+        elif isinstance(minampli, pq.Quantity):
+            if minampli.size != 1:
+                raise ValueError("Threshold must be a scalar")
+            
+            if isinstance(sig, pq.Quantity):
+                if not scq.units_convertible(sig, minampli):
+                    raise ValueError("Threshold and signal have incompatible units")
+                
+                if minampli.units != sig.units:
+                    minampli = minampli.rescale(sig.units)
+                    
+            else:
+                minampli = minampli.magnitude.flatten()[0]
+                
+        # print(f"threshold = {minampli*sig.units}")
+        
+        if np.all(np.abs(amplitude) < minampli):
             return (None, None, None, None, None)
             
         code, cdist = cluster.vq.vq(sig, sorted(cbook)) # use un-filtered signal here
@@ -2612,18 +2754,49 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
         
         # indices of up transitions (lo → hi)
         ndx_lo_hi = np.where(diffcode ==  1)[0].flatten() # transitions from low to high
+        
+        # print(f"ndx_lo_hi = {ndx_lo_hi}, size = {ndx_lo_hi.size}")
+        
         # indices of down transitions (hi → lo)
         ndx_hi_lo = np.where(diffcode == -1)[0].flatten() # hi -> lo transitions
         
+        # print(f"ndx_hi_lo = {ndx_hi_lo}, size = {ndx_hi_lo.size}")
+        
         if ndx_lo_hi.size:
-            times_lo_hi = [x.times[k] for k in ndx_lo_hi] # up transitions
+            times_lo_hi = np.array([x.times[k] for k in ndx_lo_hi]) * x.times.units # up transitions
+        else:
+            times_lo_hi = None
             
         if ndx_hi_lo.size:
-            times_hi_lo = [x.times[k] for k in ndx_hi_lo] # down transitions
-                
+            times_hi_lo = np.array([x.times[k] for k in ndx_hi_lo]) * x.times.units # down transitions
+        else:
+            times_hi_lo = None
+            
         
+            
+        if all(v is not None for v in (times_lo_hi, times_hi_lo)):
+            if times_lo_hi.size == times_hi_lo.size: # signal has boxcars only
+                if times_lo_hi.size == 1:
+                    upward = times_lo_hi[0] <= times_hi_lo[0]# if up_first else times_lo_hi[0] > times_hi_lo[0]
+                    
+                else:
+                    upward = times_lo_hi <= times_hi_lo #if up_first else times_lo_hi > times_hi_lo
+                    
+            else:
+                minlen = min(v.size for v in (times_lo_hi, times_hi_lo))
+                if minlen == 1:
+                    upward = times_lo_hi[0] <= times_hi_lo[0] #if up_first else times_lo_hi[0] > times_hi_lo[0]
+                else:
+                    upward = times_lo_hi[0:minlen] <= times_hi_lo[0:minlen]# if up_first else times_lo_hi[0:minlen] <= times_hi_lo[0:minlen]
+                    
+                    lastup = times_lo_hi[-1] > times_hi_lo[-1] #if up_first else times_lo_hi[-1] > times_hi_lo[-1]
+                    upward = np.append(upward, lastup)
+                    
+        else:
+            upward = True if times_lo_hi is not None else False
+                
     except Exception as e:
-        #traceback.print_exc()
+        traceback.print_exc()
         times_lo_hi = None
         times_hi_lo = None
 
@@ -2631,9 +2804,20 @@ def detect_boxcar(x:typing.Union[neo.AnalogSignal, DataSignal],
         cbook = None
         code = None
         
+        upward = None
+        
+    # when there are all boxcars, times_lo_hi and times_hi_lo have the same length
+    # where there is just one steap (Heaviside) then one of times_lo_hi and times_hi_lo
+    # is None
+    # where there are only Heaviside steps there will be several levels in the 
+    # waveform, (one step after another) - A CONDITION NOT DEALT WITH HERE
+    #
+    # when there can be at most one step of the same direction
+    
+        
     if up_first:
-        return times_lo_hi, times_hi_lo, amplitude, cbook, code
+        return times_lo_hi, times_hi_lo, amplitude, cbook, code, upward
     
     # emulates parse_step_waveform_signal
-    return times_hi_lo, times_lo_hi, amplitude, cbook, code
+    return times_hi_lo, times_lo_hi, amplitude, cbook, code, upward
 

@@ -108,12 +108,16 @@ class SafeComparator(object):
                 return self.comp(x,y)
             
             if hasattr(x, "size"):
+                if not hasattr(y, "size"):
+                    return False
                 ret &= x.size == y.size
 
             if not ret:
                 return ret
             
             if hasattr(x, "shape"):
+                if not hasattr(y, "shape"):
+                    return False
                 ret &= x.shape == y.shape
                 
             if not ret:
@@ -123,12 +127,17 @@ class SafeComparator(object):
             # isn't this redundant after checking for shape?
             # unless an object could have shape attribute but not ndim
             if hasattr(x, "ndim"):
+                if not hasattr(y, "ndim"):
+                    return False
                 ret &= x.ndim == y.ndim
             
             if not ret:
                 return ret
             
             if hasattr(x, "__len__") or hasattr(x, "__iter__"):
+                if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
+                    return False
+                
                 ret &= len(x) == len(y)
 
                 if not ret:
@@ -923,12 +932,18 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
         return x.func == y.func and x.args == y.args and x.keywords == y.keywords
         
     if hasattr(x, "size"): # np arrays and subtypes
+        if not hasattr(y, "size"):
+            return False
+        
         ret &= x.size == y.size
 
         if not ret:
             return ret
     
     elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
+        if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
+            return False
+        
         ret &= len(x) == len(y)
         
         if not ret:
@@ -957,6 +972,9 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
             return ret
         
     if hasattr(x, "shape"):
+        if not hasattr(y, "shape"):
+            return False
+        
         ret &= x.shape == y.shape
             
         if not ret:
@@ -966,12 +984,16 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
     # isn't this redundant after checking for shape?
     # unless an object could have shape attribte but not ndim
     if hasattr(x, "ndim"):
+        if not hasattr(y, "ndim"):
+            return False
         ret &= x.ndim == y.ndim
     
         if not ret:
             return ret
     
     if hasattr(x, "dtype"):
+        if not hasattr(y, "dtype"):
+            return False
         ret &= x.dtype == y.dtype
     
         if not ret:
@@ -2571,7 +2593,9 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
         testincluded = y in x.values()
     
     if testincluded:
-        ret = [name for name, val in x.items() if (np.all(y == val) if (isinstance(y, np.ndarray) or isinstance(val, np.ndarray)) else y == val)]
+        
+        ret = [name for name, val in x.items() if safe_identity_test(y, val)]
+        # ret = [name for name, val in x.items() if (np.all(y == val) if (isinstance(y, np.ndarray) or isinstance(val, np.ndarray)) else y == val)]
         
         if len(ret) == 1:
             return ret[0]

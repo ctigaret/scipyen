@@ -690,6 +690,12 @@ if [ -r ${target_dir}/scipyen ] ; then
     dt=`date '+%Y-%m-%d_%H-%M-%s'`
     mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
 fi
+# branch=`git -C $scipyendir branch --show-current`
+# RED='\033[0;31m'
+# GREEN='\033[0;32m'
+# BLUE='\033[0;34m'
+# NC='\033[0m'
+
 shopt -s lastpipe
 
 # if [[ `id -u` -eq 0 ]] ; then
@@ -700,12 +706,8 @@ source ${install_dir}/${virtual_env}/bin/activate
 fi
 git -C $scipyendir rev-parse 2>/dev/null;
 if [[ $? -eq 0 ]]; then
-branch=`git -C $scipyendir branch --show-current`
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-echo -e "${RED}WARNING:${NC} Running ${GREEN}${branch}${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
+branch=( git -C $scipyendir branch --show-current )
+echo -e "'${RED}'WARNING:'${NC}' Running '${GREEN}${branch}${NC}' branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
 git -C $scipyendir status --short --branch
 fi
 echo -e "\nUsing Python environment in ${VIRTUAL_ENV}\n"
