@@ -4,9 +4,9 @@ from PyQt5.uic import loadUiType as __loadUiType__
 from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__)
+__ui_path__ = adapt_ui_path(__module_path__, "linearrangemappingwidget.ui")
 
 # Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "linearrangemappingwidget.ui"))
-Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__ui_path__, "linearrangemappingwidget.ui"))
+Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(__ui_path__)
 
 # TODO

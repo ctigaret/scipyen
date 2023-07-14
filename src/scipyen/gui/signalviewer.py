@@ -217,10 +217,10 @@ DEPRECATED here, but keep for reference
 """
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__)
+__ui_path__ = adapt_ui_path(__module_path__,'signalviewer.ui')
 
 # Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer.ui'))
-Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__ui_path__,'signalviewer.ui'))
+Ui_SignalViewerWindow, QMainWindow = __loadUiType__(__ui_path__)
 
 class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     """ A plotter for multi-sweep signals ("frames" or "segments"), with cursors.

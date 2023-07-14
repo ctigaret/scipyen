@@ -130,7 +130,7 @@ if sys.version_info[0] >= 3:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-__ui_path__ = adapt_ui_path(__module_path__)
+# __ui_path__ = adapt_ui_path(__module_path__)
     
 import qimage2ndarray 
 from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view
@@ -138,22 +138,26 @@ from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte
 # don't use this yet, until we fully understand how to deal with VigraQt colormap
 #mechanism from Python side
 # Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"widgets","editcolormap2.ui"))
-Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__ui_path__,"widgets","editcolormap2.ui"))
+# Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__ui_path__,"widgets","editcolormap2.ui"))
+Ui_EditColorMapWidget, QWidget = __loadUiType__(adapt_ui_path(__module_path__,os.path.join("widgets","editcolormap2.ui")))
 
 #Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,'itemslistdialog.ui'))
 
 # used for ImageWindow and ImageWindow, below
 # Ui_ImageViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'imageviewer.ui'))
-Ui_ImageViewerWindow, QMainWindow = __loadUiType__(os.path.join(__ui_path__,'imageviewer.ui'))
+# Ui_ImageViewerWindow, QMainWindow = __loadUiType__(os.path.join(__ui_path__,'imageviewer.ui'))
+Ui_ImageViewerWindow, QMainWindow = __loadUiType__(adapt_ui_path(__module_path__, 'imageviewer.ui'))
 
 # Ui_GraphicsImageViewerWidget, QWidget = __loadUiType__(os.path.join(__module_path__,'graphicsimageviewer.ui'))
-Ui_GraphicsImageViewerWidget, QWidget = __loadUiType__(os.path.join(__ui_path__,'graphicsimageviewer.ui'))
+# Ui_GraphicsImageViewerWidget, QWidget = __loadUiType__(os.path.join(__ui_path__,'graphicsimageviewer.ui'))
+Ui_GraphicsImageViewerWidget, QWidget = __loadUiType__(adapt_ui_path(__module_path__,'graphicsimageviewer.ui'))
 
 # Ui_AxesCalibrationDialog, QDialog = __loadUiType__(os.path.join(__module_path__, "axescalibrationdialog.ui"))
-Ui_AxesCalibrationDialog, QDialog = __loadUiType__(os.path.join(__ui_path__, "axescalibrationdialog.ui"))
+Ui_AxesCalibrationDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__, "axescalibrationdialog.ui"))
 
 # Ui_TransformImageValueDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"transformimagevaluedialog.ui"))
-Ui_TransformImageValueDialog, QDialog = __loadUiType__(os.path.join(__ui_path__,"transformimagevaluedialog.ui"))
+# Ui_TransformImageValueDialog, QDialog = __loadUiType__(os.path.join(__ui_path__,"transformimagevaluedialog.ui"))
+Ui_TransformImageValueDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
 
 ####don't use this yet, until we fully understand how to deal with VigraQt colormap
 ####mechanism from Python side

@@ -68,11 +68,11 @@ import ephys.ephys as ephys
 #### END scipyen modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__)
+__ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
 
 #__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(__module_path__,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
 # __UI_PrairieImporter, __QDialog__ = __loadUiType__(os.path.join(__module_path__, "PrairieImporter.ui"), from_imports=True, import_from="gui")
-__UI_PrairieImporter, __QDialog__ = __loadUiType__(os.path.join(__ui_path__, "PrairieImporter.ui"), from_imports=True, import_from="gui")
+__UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
 
 
 """ NOTE: 2017-09-22 09:28:23

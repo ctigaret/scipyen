@@ -101,10 +101,14 @@ def is_kde_x11():
     return get_desktop("session") == "x11" and get_desktop() == "KDE"
 
 def adapt_ui_path(module_path, uifile):
+    # NOTE: 2023-07-14 18:50:57
+    # this won't work at runtime in a bundle because is exec'd at by pyinstaller
+    # and frozen as if the ui files are in the right place!
     # NOTE: CAUTION: 2023-07-14 18:10:01
     # make sure this is in sync with the destination for uitoc in scipyen.spec file
     # if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
     uifull = os.path.join(module_path, uifile)
+    # print(f"uifull", uifull)
     if os.path.isfile(uifull):
         return uifull
     

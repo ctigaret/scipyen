@@ -71,9 +71,9 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-__ui_path__ = adapt_ui_path(__module_path__)
+__ui_path__ = adapt_ui_path(__module_path__, "tableeditor.ui")
 
-Ui_TableEditor, QMainWindow = __loadUiType__(os.path.join(__ui_path__, "tableeditor.ui"))
+Ui_TableEditor, QMainWindow = __loadUiType__(__ui_path__)
 # Ui_TableEditor, QMainWindow = __loadUiType__(os.path.join(__module_path__, "tableeditor.ui"))
 # Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "widgets","tableeditorwidget.ui"))
 

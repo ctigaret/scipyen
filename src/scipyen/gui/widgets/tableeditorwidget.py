@@ -53,11 +53,11 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__)
+__ui_path__ = adapt_ui_path(__module_path__, "tableeditorwidget.ui")
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__ui_path__, "tableeditorwidget.ui"))
+Ui_TableEditorWidget, QWidget = __loadUiType__(__ui_path__)
 # Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "tableeditorwidget.ui"))
 
 class TableEditorWidget(QWidget, Ui_TableEditorWidget):
