@@ -2,6 +2,12 @@
 import io, os, sys, subprocess, shutil, tempfile, typing
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
+hasNeuron=False
+try:
+    import neuron
+    hasNeuron = True
+except:
+    hasNeuron = False
 
 # NOTE: 2023-06-26 17:25:32
 # This is for the developer, NOT the final user:
@@ -149,27 +155,27 @@ block_cipher = None
 # expects a list of tuples (src_full_path_or_glob, dest_dir), see NOTE: 2023-06-28 11:08:08
 # "forAnalysis" is a flag indicating that tuples are generated for use by the Analysis object
 # constructed below
-uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True, destination="UI") # WARNING must be reflected in core.sysutils.adapt_ui_path
+uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True)#, destination="UI") # WARNING must be reflected in core.sysutils.adapt_ui_path
 print(f"uitoc: {uitoc}")
-txttoc = DataFiles('/home/cezar/scipyen/src', ".txt", forAnalysis=True, destination="Documentation")
-svgtoc = DataFiles('/home/cezar/scipyen/src', ".svg", forAnalysis=True, destination="Resources")
-pngtoc = DataFiles('/home/cezar/scipyen/src', ".png", forAnalysis=True, destination="Resources")
-jpgtoc = DataFiles('/home/cezar/scipyen/src', ".jpg", forAnalysis=True, destination="Resources")
-giftoc = DataFiles('/home/cezar/scipyen/src', ".fig", forAnalysis=True, destination="Resources")
-tifftoc = DataFiles('/home/cezar/scipyen/src', ".tif", forAnalysis=True, destination="Resources")
-tifftoc.extend(DataFiles('/home/cezar/scipyen/src', ".tiff", forAnalysis=True))
-icotoc = DataFiles('/home/cezar/scipyen/src', ".ico", forAnalysis=True, destination="Resources")
-xsltoc = DataFiles('/home/cezar/scipyen/src', ".xsl", forAnalysis=True, destination="Resources")
-shtoc = DataFiles('/home/cezar/scipyen/src', ".sh", forAnalysis=True, destination="Resources")
-qrctoc = DataFiles('/home/cezar/scipyen/src', ".qrc", forAnalysis=True, destination="Resources")
-readmetoc = DataFiles('/home/cezar/scipyen/src', "README", as_ext=False, forAnalysis=True, destination="Documentation")
-pkltoc = DataFiles('/home/cezar/scipyen/src', ".pkl", forAnalysis=True, destination="Data")
-hdftoc = DataFiles('/home/cezar/scipyen/src', ".h5", forAnalysis=True, destination="Data")
-hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf5", forAnalysis=True, destination="Data"))
-hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf", forAnalysis=True, destination="Data"))
-abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True, destination="Data")
-atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True, destination="Data")
-yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True, destination="Configuration")
+txttoc = DataFiles('/home/cezar/scipyen/src', ".txt", forAnalysis=True)#, destination="Documentation")
+svgtoc = DataFiles('/home/cezar/scipyen/src', ".svg", forAnalysis=True)#, destination="Resources")
+pngtoc = DataFiles('/home/cezar/scipyen/src', ".png", forAnalysis=True)#, destination="Resources")
+jpgtoc = DataFiles('/home/cezar/scipyen/src', ".jpg", forAnalysis=True)#, destination="Resources")
+giftoc = DataFiles('/home/cezar/scipyen/src', ".fig", forAnalysis=True)#, destination="Resources")
+tifftoc = DataFiles('/home/cezar/scipyen/src', ".tif", forAnalysis=True)#, destination="Resources")
+tifftoc.extend(DataFiles('/home/cezar/scipyen/src', ".tiff", forAnalysis=True))#, destination="Resources"))
+icotoc = DataFiles('/home/cezar/scipyen/src', ".ico", forAnalysis=True)#, destination="Resources")
+xsltoc = DataFiles('/home/cezar/scipyen/src', ".xsl", forAnalysis=True)#, destination="Resources")
+shtoc = DataFiles('/home/cezar/scipyen/src', ".sh", forAnalysis=True)#, destination="Resources")
+qrctoc = DataFiles('/home/cezar/scipyen/src', ".qrc", forAnalysis=True)#, destination="Resources")
+readmetoc = DataFiles('/home/cezar/scipyen/src', "README", as_ext=False, forAnalysis=True)#, destination="Documentation")
+pkltoc = DataFiles('/home/cezar/scipyen/src', ".pkl", forAnalysis=True)#, destination="Data")
+hdftoc = DataFiles('/home/cezar/scipyen/src', ".h5", forAnalysis=True)#, destination="Data")
+hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf5", forAnalysis=True))#, destination="Data"))
+hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf", forAnalysis=True))#, destination="Data"))
+abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True)#, destination="Data")
+atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True)#, destination="Data")
+yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True)#, destination="Configuration")
 
 # NOTE: 2023-06-28 11:09:08 
 # collect_data_files DOES NOT WORK WITH SCIPYEN BECAUSE SCIPYEN IS NOT 
@@ -273,6 +279,7 @@ datas.extend(yamltoc)
 # I think the next line below ('collect_all') is better than trying to see what
 # can be tweaked in hook-pygments.py / hook-pkg_resources.py
 jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
+print(f"jqc_hiddenimports = {jqc_hiddenimports}")
 datas.extend(jqc_datas)
 binaries.extend(jqc_binaries)
 hiddenimports.extend(jqc_hiddenimports)
@@ -285,6 +292,13 @@ jc_datas, jc_binaries, jc_hiddenimports = collect_all("jupyter_client")
 datas.extend(jc_datas)
 binaries.extend(jc_binaries)
 hiddenimports.extend(jc_hiddenimports)
+hiddenimports.extend(["python-dateutil", "pyzmq"])
+
+# if hasNeuron:
+#     nrn_data, nrn_binaries, nrn_hiddenimports = collect_all("neuron")
+#     datas.extend(nrn_data)
+#     binaries.extend(nrn_binaries)
+#     hiddenimports.extend(nrn_hiddenimports)
 
 # print(f"\ndatas = {datas}\n")
 

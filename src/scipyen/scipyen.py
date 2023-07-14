@@ -68,6 +68,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         with open(os.path.join(__module_path__, "bundle_origin"), "rt", encoding="utf-8") as origin_file:
             for line in origin_file:
                 print(line, end="")
+    # os.environ["SCIPYEN_UI_PATH"] = "UI"
 else:
     print('Running in a normal Python process\n\n')
     

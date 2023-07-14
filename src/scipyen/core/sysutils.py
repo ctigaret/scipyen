@@ -1,6 +1,6 @@
 """System and platform utilities
 """
-import os, sys, subprocess, shutil, platform
+import os, sys, subprocess, shutil, platform, pathlib
 from shutil import which
 
 from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
@@ -101,22 +101,38 @@ def is_kde_x11():
     return get_desktop("session") == "x11" and get_desktop() == "KDE"
 
 def adapt_ui_path(module_path, uifile):
-    # NOTE: 2023-07-14 18:50:57
-    # this won't work at runtime in a bundle because is exec'd at by pyinstaller
-    # and frozen as if the ui files are in the right place!
-    # NOTE: CAUTION: 2023-07-14 18:10:01
-    # make sure this is in sync with the destination for uitoc in scipyen.spec file
-    # if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-    uifull = os.path.join(module_path, uifile)
-    # print(f"uifull", uifull)
-    if os.path.isfile(uifull):
-        return uifull
-    
-    module_place = os.path.dirname(module_path)
-    # print(f"adapt_ui_path module_place {module_place}")
-    return os.path.join(module_place, "UI", module_path, uifile)
-
-#     if hasattr(sys, "_MEIPASS"):
-#         return os.path.join(module_place, "UI", module_path)
+    return os.path.join(module_path, uifile)
+#     if os.environ.get("SCIPYEN_UI_PATH", None) is None:
 #     
-#     return module_path
+#     mpth = pathlib.Path(module_path)
+#     guindx = mpth.parts.index("gui")
+#     if guindx == len(mpth.parts):
+#         mplc = mpth.parent.joinpath(os.environ["SCIPYEN_UI_PATH"], uifile)
+#         # mdl = ["gui"]
+#     else:
+#         mdl = mpth.parts[guindx+1]:
+#     mplc = mpth.parent.joinpath(os.environ["SCIPYEN_UI_PATH"], *mdl, uifile)
+#     
+#     
+#     return mplc
+#     
+    
+#     # NOTE: 2023-07-14 18:50:57
+#     # this won't work at runtime in a bundle because is exec'd at by pyinstaller
+#     # and frozen as if the ui files are in the right place!
+#     # NOTE: CAUTION: 2023-07-14 18:10:01
+#     # make sure this is in sync with the destination for uitoc in scipyen.spec file
+#     # if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+#     uifull = os.path.join(module_path, uifile)
+#     # print(f"uifull", uifull)
+#     if os.path.isfile(uifull):
+#         return uifull
+#     
+#     module_place = os.path.dirname(module_path)
+#     # print(f"adapt_ui_path module_place {module_place}")
+#     return os.path.join(module_place, "UI", module_path, uifile)
+# 
+# #     if hasattr(sys, "_MEIPASS"):
+# #         return os.path.join(module_place, "UI", module_path)
+# #     
+# #     return module_path

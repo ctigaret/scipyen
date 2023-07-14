@@ -5563,37 +5563,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.loadFiles(fileNames, self._openSelectedFileItemsThreaded,
                        ioReaderFn = pio.importDataFrame)
 
-        # nItems = len(fileNames)
-        # 
-        # if nItems == 1:
-        #     self.loadDiskFile(fileNames[0], pio.importDataFrame)
-        # 
-        # else:
-        #     progressDlg = QtWidgets.QProgressDialog(
-        #         "Loading data...", "Abort", 0, nItems, self)
-        # 
-        #     progressDlg.setWindowModality(QtCore.Qt.WindowModal)
-        # 
-        #     for (k, item) in enumerate(selectedItems):
-        #         if (self.loadDiskFile(self.fileSystemModel.filePath(item)), pio.importDataFrame):
-        #             progressDlg.setValue(k)
-        # 
-        #         else:
-        #             progressDlg.cancel()
-        #             progressDlg.reset()
-        # 
-        #         if progressDlg.wasCanceled():
-        #             break
-        # 
-        #     if progressDlg.value == 0:
-        #         return False
-        # 
-        #     progressDlg.setValue(nItems)
-        # 
-        # self.workspaceModel.update()
-
-        # return True
-
     @pyqtSlot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
