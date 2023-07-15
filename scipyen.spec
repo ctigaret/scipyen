@@ -90,8 +90,8 @@ def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
     
     """
     parts = [p for p in src_path.split('/') if p not in topdirparts]
-    if isinstance(destination, str):
-        parts.insert(0, destination)
+    # if isinstance(destination, str):
+    #     parts.insert(0, destination)
         
     my_path = name = os.path.join(*parts)
     target_path = os.path.dirname(my_path)
@@ -106,7 +106,7 @@ def DataFiles(topdir, ext, **kw):
     # strip_path = kw.get('strip_path', False)
     as_ext = kw.get("as_ext", True)
     forAnalysis = kw.get("forAnalysis", False)
-    destination = kw.get("destination", None)
+    # destination = kw.get("destination", None)
 
     topdirparts = topdir.split('/')
     
@@ -132,7 +132,8 @@ def DataFiles(topdir, ext, **kw):
     #   dest, src in Analysis.datas (but the order is reversed)
 
     if forAnalysis:
-        return [file2entry(filename, topdirparts, destination=destination) for filename in items]
+        return [file2entry(filename, topdirparts) for filename in items]
+        # return [file2entry(filename, topdirparts, destination=destination) for filename in items]
     
     return TOC(
         file2TOCEntry(filename, topdirparts)
@@ -285,7 +286,12 @@ print(f"jc_hiddenimports = {jc_hiddenimports}")
 datas.extend(jc_datas)
 binaries.extend(jc_binaries)
 hiddenimports.extend(jc_hiddenimports)
-hiddenimports.extend(["python-dateutil", "pyzmq"])
+# hiddenimports.extend(["python-dateutil", "pyzmq"])
+
+zmq_datas, zmq_binaries, zmq_hiddenimports = collect_all("zmq")
+datas.extend(zmq_datas)
+binaries.extend(zmq_binaries)
+hiddenimports.extend(zmq_hiddenimports)
 
 # NOTE: 2023-07-15 10:47:12
 # stuff that the PyInstaller built-in hooks for PyQt5 is definitely missing:

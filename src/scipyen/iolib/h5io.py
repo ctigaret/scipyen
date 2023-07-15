@@ -749,6 +749,8 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
         # now, this might be cached, as it corresponds to a real-life python 
         # object: the neo object's annotations
         annotations = objectFromHDF5Entity(annotations_group)
+    else:
+        annotations = dict()
 
     # NOTE: 2022-10-10 21:04:28
     # the signal data set does not correspond to a final python object; it just
@@ -1103,6 +1105,8 @@ def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
     
     mro = inspect.getmro(target_class)
     
+    # print(f"group2neo: {g}, ({target_class})")
+    
     if neo.core.dataobject.DataObject in mro:
         return group2neoDataObject(g, target_class, cache)
     
@@ -1147,10 +1151,15 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
     # hence, we can use them to store entity → object maps
     # this is useful for dealing with 'soft links' in the HDF5 so we 
     # don't duplicate data upon reading from the file
+    
+    # print(f"objectFromHDF5Entity entity = {entity}")
+    
     if entity in cache:
         return cache[entity]
     
     attrs = attrs2dict(entity.attrs)
+    
+    # print(f"objectFromHDF5Entity attrs = {attrs}")
 
     try:
         type_name = attrs.get("type_name", None)
@@ -1183,6 +1192,9 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
         print(f"entity: {entity.name}")
         traceback.print_exc()
         raise
+    
+    
+    # print(f"objectFromHDF5Entity target_class = {target_class}")
     
     if isinstance(inspect.getattr_static(target_class,"objectFromHDF5Entity", None),
                   prog.CALLABLE_TYPES + (classmethod,)):
@@ -1219,6 +1231,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                     obj = target_class.fromisoformat(val)
                 except Exception as e:
                     traceback.print_exc()
+                    raise
                 
             elif any(k in inspect.getmro(target_class) for k in (int, float, complex)):
                 # NOTE: 2022-10-08 13:20:20
@@ -1237,6 +1250,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                 except:
                     obj = target_class
                     traceback.print_exc()
+                    # raise
             
         else:
             if target_class == pq.Quantity:
@@ -1250,14 +1264,6 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             elif target_class in (vigra.filters.Kernel1D, vigra.filters.Kernel2D):
                 data = np.array(entity)
                 obj = vu.kernelfromarray(data)
-                
-            # elif target_class in (datetime.date, datetime.time, datetime.datetime):
-            #     try:
-            #         val = dataset2string(entity)
-            #         print(f"val {val} decoded {val.decode()}")
-            #         obj = target_class.fromisoformat(val.decode())
-            #     except Exception as e:
-            #         traceback.print_exc()
                 
             else:
                 obj = target_class # for now
@@ -1275,6 +1281,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             obj = target_class()
             for k in entity.keys():
                 obj[k] = objectFromHDF5Entity(entity[k], cache)
+            # print(f"objectFromHDF5Entity {obj.__class__.__name__}: {obj}")
                 
         elif list in mro:
             obj = target_class()
@@ -1311,6 +1318,8 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             obj = target_class # for now
             
     cache[entity] = obj
+    
+    # print(f"objectFromHDF5Entity: obj = {obj}")
     
     return obj
 
@@ -1363,7 +1372,7 @@ def attrs2dict(attrs:h5py.AttributeManager):
                     v = jsonio.loads(v)
                     
         except:
-            print(f"k = {k} v = {v} v.dtype = {v.dtype}")
+            # print(f"k = {k} v = {v} has dtype: {v.dtype if hasattr(v, 'dtype') else 'no'}")
             traceback.print_exc()
             
         ret[k] = v
@@ -2902,7 +2911,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     
 def read_hdf5(h5file:h5py.File):
     ret = dict((k, objectFromHDF5Entity(i)) for k,i in h5file.items())
-    
+    # print(f"\nread_hdf5: ret = {ret}\n")
     if len(ret)==1:
         return [v for v in ret.values()][0]
     

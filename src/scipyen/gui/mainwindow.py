@@ -6036,11 +6036,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if fileReader is None:
                 fileReader = pio.getLoaderForFile(fName)
 
+            # print(f"{self.__class__.__name__}.loadDiskFile: fileReader = {fileReader}")
             if fileReader is None:
                 return False
 
             try:
                 data = fileReader(fName)
+                # print(f"{self.__class__.__name__}.loadDiskFile: data = {data}")
                 if data is not None:
                     if updateUi:
                         # the line below updates workspaceViewer ui
