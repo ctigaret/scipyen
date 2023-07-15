@@ -230,7 +230,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         
         self.tableView.setAlternatingRowColors(True)
-        #self.tableView.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
         self.tableView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.tableView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_table_context_menu_requested)
 
@@ -271,7 +270,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         resizeAllColumsToContextAction = cm.addAction("Resize All Columns To Contents")
         
         resizeAllColumsToContextAction.triggered.connect(self.slot_resizeAllColumnsToContents)
-        #copyColumnContents = cm.addAction("Copy column data")
         
         cm.exec(self.tableView.mapToGlobal(pos))
         

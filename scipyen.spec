@@ -78,9 +78,7 @@ def file2TOCEntry(src_path:str, topdirparts:list, file_category:str="DATA"):
     target_path = os.path.dirname(my_path)
     return target_path, src_path, file_category
 
-# def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
-def file2entry(src_path:str, topdirparts:list, 
-               destination:typing.Optional[str]=None) -> tuple:
+def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
     """Returns a 2-tuple (source_full_path, target_dir)
     To be used in the Analysis constructor, below
     
@@ -90,12 +88,6 @@ def file2entry(src_path:str, topdirparts:list,
         
     topdirparts: a list of directories representing the path to the actual file
     
-    destination: the name of the directory where the entry will be placed;
-        WARNING this is the directory in the ditribution tree, where the file will
-        be placed (including any sub-path below the topdirparts)
-        
-        Optional default is None => the file will be placed in the root directory
-        of the distribution
     """
     parts = [p for p in src_path.split('/') if p not in topdirparts]
     if isinstance(destination, str):
@@ -155,27 +147,27 @@ block_cipher = None
 # expects a list of tuples (src_full_path_or_glob, dest_dir), see NOTE: 2023-06-28 11:08:08
 # "forAnalysis" is a flag indicating that tuples are generated for use by the Analysis object
 # constructed below
-uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True)#, destination="UI") # WARNING must be reflected in core.sysutils.adapt_ui_path
-print(f"uitoc: {uitoc}")
-txttoc = DataFiles('/home/cezar/scipyen/src', ".txt", forAnalysis=True)#, destination="Documentation")
-svgtoc = DataFiles('/home/cezar/scipyen/src', ".svg", forAnalysis=True)#, destination="Resources")
-pngtoc = DataFiles('/home/cezar/scipyen/src', ".png", forAnalysis=True)#, destination="Resources")
-jpgtoc = DataFiles('/home/cezar/scipyen/src', ".jpg", forAnalysis=True)#, destination="Resources")
-giftoc = DataFiles('/home/cezar/scipyen/src', ".fig", forAnalysis=True)#, destination="Resources")
-tifftoc = DataFiles('/home/cezar/scipyen/src', ".tif", forAnalysis=True)#, destination="Resources")
-tifftoc.extend(DataFiles('/home/cezar/scipyen/src', ".tiff", forAnalysis=True))#, destination="Resources"))
-icotoc = DataFiles('/home/cezar/scipyen/src', ".ico", forAnalysis=True)#, destination="Resources")
-xsltoc = DataFiles('/home/cezar/scipyen/src', ".xsl", forAnalysis=True)#, destination="Resources")
-shtoc = DataFiles('/home/cezar/scipyen/src', ".sh", forAnalysis=True)#, destination="Resources")
-qrctoc = DataFiles('/home/cezar/scipyen/src', ".qrc", forAnalysis=True)#, destination="Resources")
-readmetoc = DataFiles('/home/cezar/scipyen/src', "README", as_ext=False, forAnalysis=True)#, destination="Documentation")
-pkltoc = DataFiles('/home/cezar/scipyen/src', ".pkl", forAnalysis=True)#, destination="Data")
-hdftoc = DataFiles('/home/cezar/scipyen/src', ".h5", forAnalysis=True)#, destination="Data")
-hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf5", forAnalysis=True))#, destination="Data"))
-hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf", forAnalysis=True))#, destination="Data"))
-abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True)#, destination="Data")
-atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True)#, destination="Data")
-yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True)#, destination="Configuration")
+uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True) # WARNING must be reflected in core.sysutils.adapt_ui_path
+# print(f"uitoc: {uitoc}")
+txttoc = DataFiles('/home/cezar/scipyen/src', ".txt", forAnalysis=True)
+svgtoc = DataFiles('/home/cezar/scipyen/src', ".svg", forAnalysis=True)
+pngtoc = DataFiles('/home/cezar/scipyen/src', ".png", forAnalysis=True)
+jpgtoc = DataFiles('/home/cezar/scipyen/src', ".jpg", forAnalysis=True)
+giftoc = DataFiles('/home/cezar/scipyen/src', ".fig", forAnalysis=True)
+tifftoc = DataFiles('/home/cezar/scipyen/src', ".tif", forAnalysis=True)
+tifftoc.extend(DataFiles('/home/cezar/scipyen/src', ".tiff", forAnalysis=True))
+icotoc = DataFiles('/home/cezar/scipyen/src', ".ico", forAnalysis=True)
+xsltoc = DataFiles('/home/cezar/scipyen/src', ".xsl", forAnalysis=True)
+shtoc = DataFiles('/home/cezar/scipyen/src', ".sh", forAnalysis=True)
+qrctoc = DataFiles('/home/cezar/scipyen/src', ".qrc", forAnalysis=True)
+readmetoc = DataFiles('/home/cezar/scipyen/src', "README", as_ext=False, forAnalysis=True)
+pkltoc = DataFiles('/home/cezar/scipyen/src', ".pkl", forAnalysis=True)
+hdftoc = DataFiles('/home/cezar/scipyen/src', ".h5", forAnalysis=True)
+hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf5", forAnalysis=True))
+hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf", forAnalysis=True))
+abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True)
+atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True)
+yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True)
 
 # NOTE: 2023-06-28 11:09:08 
 # collect_data_files DOES NOT WORK WITH SCIPYEN BECAUSE SCIPYEN IS NOT 
@@ -289,10 +281,17 @@ hiddenimports.extend(jqc_hiddenimports)
 # when starting external IPython console in Scipyen)
 
 jc_datas, jc_binaries, jc_hiddenimports = collect_all("jupyter_client")
+print(f"jc_hiddenimports = {jc_hiddenimports}")
 datas.extend(jc_datas)
 binaries.extend(jc_binaries)
 hiddenimports.extend(jc_hiddenimports)
 hiddenimports.extend(["python-dateutil", "pyzmq"])
+
+# NOTE: 2023-07-15 10:47:12
+# stuff that the PyInstaller built-in hooks for PyQt5 is definitely missing:
+# kde extensions & plugins (that's OK as we don't have python bindings for it)
+# deepin extensions & plugins (dtk, dde; again, that's OK since we don't have python bindings for these)
+
 
 # if hasNeuron:
 #     nrn_data, nrn_binaries, nrn_hiddenimports = collect_all("neuron")
@@ -304,7 +303,7 @@ hiddenimports.extend(["python-dateutil", "pyzmq"])
 
 # NOTE: 2023-07-14 15:22:26
 # hookspath contains code for pyinstaller hooks called ONLY when the Analyser
-# detects an import in Scipyen code; thse won't work for NEURON stuff....
+# detects an import in Scipyen code; these won't work for NEURON stuff....
 
 a = Analysis(
     ['/home/cezar/scipyen/src/scipyen/scipyen.py'],
