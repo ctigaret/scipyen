@@ -1650,11 +1650,20 @@ def _(obj, axisindex:typing.Union[int, str]):
     
     data = dict((f"cal_{k}", v) for k,v in axiscal.data.items()) # axiscal.data
     
-    return makeAttrDict(key          = axisinfo.key,
-                        typeFlags    = axisinfo.typeFlags,
-                        description  = axisinfo.description, 
-                        resolution   = axisinfo.resolution, 
-                        **data)
+    axdict = {"key": axisinfo.key,
+              "typeFlags": axisinfo.typeFlags,
+              "description": axisinfo.description,
+              "resolution": axisinfo.resolution}
+    
+    axdict.update(data)
+    
+    return makeAttrDict(**axdict)
+    
+    # return makeAttrDict(key          = axisinfo.key,
+    #                     typeFlags    = axisinfo.typeFlags,
+    #                     description  = axisinfo.description, 
+    #                     resolution   = axisinfo.resolution, 
+    #                     **data)
     
 @makeAxisDict.register(vigra.AxisTags)
 def _(obj, axisindex:typing.Union[int, str]):
@@ -1981,7 +1990,8 @@ def _(obj, axisindex):
 
 @safeWrapper
 # def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,axisdict:dict,compression:str="gzip",chunks:bool=None,track_order=True):
-def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,compression:str="gzip",chunks:bool=None,track_order=True):
+def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,
+                  compression:str="gzip",chunks:bool=None,track_order=True):
     """
     Attaches a dimension scale for a specific dimension in a HDF5 Dataset.
     
@@ -2029,6 +2039,7 @@ def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,com
     # in self.writeDataObject) 
     
     axis_dict  = makeAxisDict(obj, dimindex)
+    # print(f"h5io.makeAxisScale axis_dict = {axis_dict}")
     
     axis_dset_name = f"axis_{dimindex}"
     
@@ -2057,9 +2068,11 @@ def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,com
         #     print(f"{key} : {val} ")
         #     axis_dset.attrs[key] = val
         
-        axis_dset.make_scale(axis_dict["name"])
+        axis_name = axis_dict["name"] if "name" in axis_dict else axis_dict["cal_name"] if "cal_name" in axis_dict else axis_dict["key"] if "key" in axis_dict else axis_dict["cal_key"] if "cal_key" in axis_dict else axis_dset_name
+        
+        axis_dset.make_scale(axis_name)
         dset.dims[dimindex].attach_scale(axis_dset)
-        dset.dims[dimindex].label = axis_dict["name"]
+        dset.dims[dimindex].label = axis_name
         
     except Exception as e:
         print(f"\n***\nIn object {type(obj).__name__}:")
@@ -2070,7 +2083,13 @@ def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,com
     return axis_dset
 
 @safeWrapper
-def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:typing.Optional[str]=None,compression:typing.Optional[str]="gzip",chunks:typing.Optional[bool]=None,track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict]=None,**kwargs):# -> typing.Union[h5py.Group, h5py.Dataset]:
+def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,
+                   oname:typing.Optional[str]=None,
+                   compression:typing.Optional[str]="gzip",
+                   chunks:typing.Optional[bool]=None,
+                   track_order:typing.Optional[bool] = True, 
+                   entity_cache:typing.Optional[dict]=None,
+                   **kwargs):# -> typing.Union[h5py.Group, h5py.Dataset]:
     """
     Encodes Python objects into a HDF5 entity (Group or Dataset).
     
@@ -2196,7 +2215,7 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,oname:ty
       
     Pandas DataFrame and Series objects:
         These objects types are converted to a structured array first (see
-        'pandas2Structarray' function); therefore, they will be stpred as a
+        'pandas2Structarray' function); therefore, they will be stored as a
         group, and the data itself as a data set generated on the structured 
         array
         Categorical data information, when present, is also stored as a nested
