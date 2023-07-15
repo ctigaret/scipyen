@@ -101,6 +101,7 @@ def is_kde_x11():
     return get_desktop("session") == "x11" and get_desktop() == "KDE"
 
 def adapt_ui_path(module_path, uifile):
+    """failed attempt to reorganize the UI files in the bundle"""
     return os.path.join(module_path, uifile)
 #     if os.environ.get("SCIPYEN_UI_PATH", None) is None:
 #     
