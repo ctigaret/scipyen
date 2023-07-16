@@ -4061,8 +4061,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def slot_testColorMap(self, item:str):
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
-        if item in colormaps:
-            colorMap = colormaps.get(item)
+        if item in  mpl.colormaps:
+            colorMap =  mpl.colormaps.get(item)
             self.displayFrame(colorMap=colorMap)
           
     @pyqtSlot()
