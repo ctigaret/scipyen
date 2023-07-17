@@ -1266,7 +1266,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         return sw_f
 
     # @processtimefunc
-    def __init__(self, app: QtWidgets.QApplication, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
+    def __init__(self, app: QtWidgets.QApplication, 
+                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
         """Scipyen's main window initializer (constructor).
 
         Parameters:
@@ -1307,6 +1308,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # • QtWidgets.qApp.instance()
         # i.e. the global singleton instance of the QApplication running Scipyen
         self.app = app
+        
+        self._bundled_ = kwargs.pop("bundled", False)
 
         # NOTE: 2022-12-25 10:41:12
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
@@ -4146,19 +4149,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.slot_copyWorkspaceSelection()
         self.console.paste()
 
-#     @pyqtSlot()
-#     @safeWrapper
-#     def slot_loadFileSystemItems(self):
-#         """
-#         Triggered when items in the file system viewer are dragged onto the console.
-#         Will try to load them
-#         """
-#         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes() \
-#                          if item.column() == 0]# list of QModelIndex
-#
-#         if len(selectedItems):
-#             fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
-
     @pyqtSlot()
     @safeWrapper
     def slot_pasteQuotedWorkspaceSelection(self):
@@ -4450,43 +4440,44 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
-        self.actionExternalIPython = QtWidgets.QAction(
-            QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
+        if not self._bundled_:
+            self.actionExternalIPython = QtWidgets.QAction(
+                QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
         
-        self.actionExternalIPython.triggered.connect(
-            self.slot_launchExternalIPython)
+            self.actionExternalIPython.triggered.connect(
+                self.slot_launchExternalIPython)
         
-        self.menuConsoles.addAction(self.actionExternalIPython)
+            self.menuConsoles.addAction(self.actionExternalIPython)
 
-        if has_neuron:
-            self.actionExternalNrnIPython = QtWidgets.QAction(
-                QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
-            self.actionExternalNrnIPython.triggered.connect(
-                self.slot_launchExternalNeuronIPython)
-            self.menuConsoles.addAction(self.actionExternalNrnIPython)
+            if has_neuron:
+                self.actionExternalNrnIPython = QtWidgets.QAction(
+                    QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
+                self.actionExternalNrnIPython.triggered.connect(
+                    self.slot_launchExternalNeuronIPython)
+                self.menuConsoles.addAction(self.actionExternalNrnIPython)
 
-        self.menuWith_Running_Kernel = QtWidgets.QMenu(
-            "With Running Kernel", self)
-        
-        self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
-        
-        self.actionRunning_IPython = QtWidgets.QAction(
-            QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
-        
-        self.actionRunning_IPython.triggered.connect(
-            self.slot_launchExternalRunningIPython)
-        
-        self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
-
-        if has_neuron:
-            self.actionRunning_IPython_for_Neuron = QtWidgets.QAction(
-                QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
+            self.menuWith_Running_Kernel = QtWidgets.QMenu(
+                "With Running Kernel", self)
             
-            self.actionRunning_IPython_for_Neuron.triggered.connect(
-                self.slot_launchExternalRunningIPythonNeuron)
+            self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
             
-            self.menuWith_Running_Kernel.addAction(
-                self.actionRunning_IPython_for_Neuron)
+            self.actionRunning_IPython = QtWidgets.QAction(
+                QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
+            
+            self.actionRunning_IPython.triggered.connect(
+                self.slot_launchExternalRunningIPython)
+            
+            self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
+
+            if has_neuron:
+                self.actionRunning_IPython_for_Neuron = QtWidgets.QAction(
+                    QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
+                
+                self.actionRunning_IPython_for_Neuron.triggered.connect(
+                    self.slot_launchExternalRunningIPythonNeuron)
+                
+                self.menuWith_Running_Kernel.addAction(
+                    self.actionRunning_IPython_for_Neuron)
 
         # self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
@@ -4878,6 +4869,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_systemOpenSelectedFiles(self):
+        """Opens selected file(s) or directory/ies in the system application"""
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                          if item.column() == 0]  # list of QModelIndex
 
@@ -5052,6 +5044,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
     def slot_fileSystemContextMenuRequest(self, point):
+        """Pops up a context menu for the File System viewer.
+        NOTE: The context menu only appears if the collection of selected items
+        contains only items pointing to regular files.
+    """
         cm = QtWidgets.QMenu("Selected Items", self)
 
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
@@ -5388,7 +5384,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_changeDirectory(self.fileSystemModel.filePath(ndx))
 
         else:
-            self.loadFiles([self.fileSystemModel.filePath(ndx)], self._openSelectedFileItemsThreaded)
+            self.loadFiles([self.fileSystemModel.filePath(ndx)], 
+                           self._openSelectedFileItemsThreaded)
             
 
     @pyqtSlot(str)
@@ -5567,38 +5564,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         fileNames = [self.fileSystemModel.filePath(i) for i in selectedItems]
         
-        self.loadFiles(fileNames, self._openSelectedFileItemsThreaded,ioReaderFn = pio.importDataFrame)
-
-        # nItems = len(fileNames)
-        # 
-        # if nItems == 1:
-        #     self.loadDiskFile(fileNames[0], pio.importDataFrame)
-        # 
-        # else:
-        #     progressDlg = QtWidgets.QProgressDialog(
-        #         "Loading data...", "Abort", 0, nItems, self)
-        # 
-        #     progressDlg.setWindowModality(QtCore.Qt.WindowModal)
-        # 
-        #     for (k, item) in enumerate(selectedItems):
-        #         if (self.loadDiskFile(self.fileSystemModel.filePath(item)), pio.importDataFrame):
-        #             progressDlg.setValue(k)
-        # 
-        #         else:
-        #             progressDlg.cancel()
-        #             progressDlg.reset()
-        # 
-        #         if progressDlg.wasCanceled():
-        #             break
-        # 
-        #     if progressDlg.value == 0:
-        #         return False
-        # 
-        #     progressDlg.setValue(nItems)
-        # 
-        # self.workspaceModel.update()
-
-        # return True
+        self.loadFiles(fileNames, self._openSelectedFileItemsThreaded,
+                       ioReaderFn = pio.importDataFrame)
 
     @pyqtSlot()
     @safeWrapper
@@ -5611,35 +5578,46 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if nItems == 0:
             return False
         
-        # NOTE: 2023-05-27 14:48:04
-        # self.loadFiles is inherited from workspace
-        # creates a pgui.ProgressWorkerThreaded to create a file loading loop 
-        # in a separate thread. The actual file loading method that is called 
-        # inside the loop is self._openSelectedFileItemsThreaded. 
+        # NOTE: 2023-07-12 11:52:30
+        # self.loadFiles is inherited from WorkspaceGuiMixin
+        # creates a pgui.WorkerThread that runs a file loading loop 
+        # in a separate thread. The actual file loading loop is executed by 
+        # self._openSelectedFileItemsThreaded. 
         #
         # In turn, self._openSelectedFileItemsThreaded calls self.loadDiskFile
-        # which places the loaded file data in the workspace by one of two 
-        # mechanisms, depending on the value passed for 'updateUi' parameter:
+        # on each file in the selectedItems
         #
-        # 1) When updateUI == True:
-        #   Data is placed in the workspace via the method 
-        #   workspaceModel.bindObjectInNamespace();
+        # The WorkspaceView is populated with the object created as a result of
+        # self.loadDiskFile(…), depending on the value of the updateUi parameter
+        # below, either:
+        # • after each file has been read (updateUi = True):
+        #   Data is placed in the workspace via the method workspaceModel.bindObjectInNamespace();
         #   This will trigger an update of the workspaceModel for each iteration
         #   of the loop - the PROBLEM is that the iteration speed slows down with
-        #   the number of files (number of iterations)
+        #   the number of files (number of iterations) - because the execution
+        #   time scales UP with the number of items in the workspace
         #
-        # 2) When updateUi == False:
-        #   Data is placed DIRECTLY in the workspace ⇒ this is faster, BUT 
-        #   requires a separate post-hoc update to the workspaceModel; 
-        #   NOTE: as of 2023-05-29 23:12:25 this does NOT blocm the UI anymore
+        # • after the worker thread that runs the loop has emitted a signal_Result
+        #   Data is placed DIRECTLY in the workspace ⇒ this is faster, but needs 
+        #   a separate post-hoc update to the workspaceModel; 
+        #   NOTE: as of 2023-05-29 23:12:25 this does NOT block the UI anymore
         #   and the whole process is now more swift
         #
-        # self.loadFiles(selectedItems, self._openSelectedFileItemsThreaded, updateUi=True)
-        
-        # NOTE: 2023-05-29 23:11:05 NOW, WORKS LIKE A CHARM!
+
+        # NOTE: 2023-07-12 11:40:44
+        # Now THIS works like a charm...
+        # NOTE: 2023-07-12 11:50:19
+        # this below using updateUi=False <feels> faster
         self.loadFiles(selectedItems, 
                        self._openSelectedFileItemsThreaded, updateUi=False)
+        # self.loadFiles(selectedItems, 
+        #                self._openSelectedFileItemsThreaded, updateUi=True)
         
+    @safeWrapper
+    def _saveSelectedObjectsThreaded(self, saveFn: typing.Callable):
+        # TODO: replicate the logic in _openSelectedFileItemsThreaded
+        # click into pickling etc.
+        pass
 
     @safeWrapper
     def _openSelectedFileItemsThreaded(self, **kwargs):
@@ -5670,13 +5648,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         OK = True
         
-        self.updateUiWithFileLoad = updateUi # def'ed in WorkspaceGuiMixin
+        # self.updateUiWithFileLoad is def'ed in WorkspaceGuiMixin
+        self.updateUiWithFileLoad = updateUi 
         
         canceled = False
         
         for k, item in enumerate(filePaths):
             # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded ({k}, {item})")
-            OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
+            OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, 
+                                    updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
             if OK and isinstance(progressSignal, QtCore.pyqtBoundSignal):
                 # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded loaded ({k}, {item})")
                 progressSignal.emit(k)
@@ -5730,6 +5710,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(str)
     @safeWrapper
     def slot_systemOpenFileOrFolder(self, fileName):
+        """Opens fileName with the associated system application."""
         if isinstance(fileName, str) and len(fileName.strip()):
             if os.path.exists(fileName):
                 url = QtCore.QUrl.fromLocalFile(fileName)
@@ -6059,11 +6040,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if fileReader is None:
                 fileReader = pio.getLoaderForFile(fName)
 
+            # print(f"{self.__class__.__name__}.loadDiskFile: fileReader = {fileReader}")
             if fileReader is None:
                 return False
 
             try:
                 data = fileReader(fName)
+                # print(f"{self.__class__.__name__}.loadDiskFile: data = {data}")
                 if data is not None:
                     if updateUi:
                         # the line below updates workspaceViewer ui
@@ -7252,50 +7235,50 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # @pyqtSlot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
     @pyqtSlot()
     def slot_fileSystemDataChanged(self, *args, **kwargs):
-        print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
+        # print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
         self._fileSystemChanged_ = True
     
-#     def enableDirectoryWatch(self, on:bool=True):
-#         # if not isinstance(self.dirFileWatcher, QtCore.QFileSystemWatcher):
-#         #     self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
-#         #     self.dirFileWatcher.directoryChanged.connect(self._slot_directoryChanged)
-#             
-#         if on:
-#             self._isDirWatching_ = True
-#             if self.currentDir in self.dirFileWatcher.directories():
-#             # do nothing if diretory already watched
-#                 print(f"{self.__class__.__name__}.enableDirectoryWatch: The directory {self.currentDir} is already being watched")
-#             
-#             else:
-#                 watchedDirs = self.dirFileWatcher.directories()
-#                 if len(watchedDirs) > self._nMaxWatchedDirectories_:
-#                     self.dirFileWatcher.removePath(watchedDirs[0])
-#                     
-#                 self.dirFileWatcher.addPath(self.currentDir)
-#                 
-#         else:
-#             self._isDirWatching_ = False
-#             watchedDirs = self.dirFileWatcher.directories()
-#             if len(watchedDirs):
-#                 self.dirFileWatcher.removePaths(watchedDirs)
-#                 
-#     def watchCurrentDirectory(self):
-#         if not self._isDirWatching_:
-#             return
-#         
-#         if self.currentDir in self.dirFileWatcher.directories():
-#             # do nothing if diretory already watched
-#             print(f"{self.__class__.__name__}.watchCurrentDirectory: The directory {self.currentDir} is already being watched")
-#         
-#         else:
-#             # remove prev watched directory from the file system watcher
-#             # add current directory to the file system watcher
-#             watchedDirs = self.dirFileWatcher.directories()
-#             if len(watchedDirs) > self._nMaxWatchedDirectories_:
-#                 self.dirFileWatcher.removePath(watchedDirs[0])
-#                 
-#             self.dirFileWatcher.addPath(self.currentDir)
-#                 
+    def enableDirectoryWatch(self, on:bool=True):
+        # if not isinstance(self.dirFileWatcher, QtCore.QFileSystemWatcher):
+        #     self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
+        #     self.dirFileWatcher.directoryChanged.connect(self._slot_directoryChanged)
+            
+        if on:
+            self._isDirWatching_ = True
+            if self.currentDir in self.dirFileWatcher.directories():
+            # do nothing if diretory already watched
+                print(f"{self.__class__.__name__}.enableDirectoryWatch: The directory {self.currentDir} is already being watched")
+            
+            else:
+                watchedDirs = self.dirFileWatcher.directories()
+                if len(watchedDirs) > self._nMaxWatchedDirectories_:
+                    self.dirFileWatcher.removePath(watchedDirs[0])
+                    
+                self.dirFileWatcher.addPath(self.currentDir)
+                
+        else:
+            self._isDirWatching_ = False
+            watchedDirs = self.dirFileWatcher.directories()
+            if len(watchedDirs):
+                self.dirFileWatcher.removePaths(watchedDirs)
+                
+    def watchCurrentDirectory(self):
+        if not self._isDirWatching_:
+            return
+        
+        if self.currentDir in self.dirFileWatcher.directories():
+            # do nothing if diretory already watched
+            print(f"{self.__class__.__name__}.watchCurrentDirectory: The directory {self.currentDir} is already being watched")
+        
+        else:
+            # remove prev watched directory from the file system watcher
+            # add current directory to the file system watcher
+            watchedDirs = self.dirFileWatcher.directories()
+            if len(watchedDirs) > self._nMaxWatchedDirectories_:
+                self.dirFileWatcher.removePath(watchedDirs[0])
+                
+            self.dirFileWatcher.addPath(self.currentDir)
+                
         
             
     @pyqtSlot()

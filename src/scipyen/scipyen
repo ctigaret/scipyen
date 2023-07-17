@@ -1,6 +1,8 @@
 #! /bin/sh 
 realscript=`realpath $0`
 scipyendir=`dirname $realscript`
+gitdir=`dirname $scipyendir`
+echo -e "gitdir = $gitdir"
 
 # the line below supplies the shell function 'scipyact' created by make_scripts
 source $HOME/.scipyenrc 

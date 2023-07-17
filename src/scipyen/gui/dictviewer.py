@@ -15,7 +15,7 @@ import math
 #### BEGIN 3rd party modules
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
+# from PyQt5.uic import loadUiType as __loadUiType__
 
 from pyqtgraph import (DataTreeWidget, TableWidget, )
 #from pyqtgraph.widgets.TableWidget import _defersort
@@ -64,6 +64,7 @@ from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel)
 #### BEGIN pict.gui modules
 from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from . import quickdialog
+
 from . import resources_rc
 #### END pict.gui modules
 

@@ -2200,8 +2200,7 @@ def resolveObject(modName, objName):
             return eval(objName, module.__dict__)
         except:
             #traceback.print_exc()
-            print("objName", objName)
-            print("module", module)
+            print(f"prog.resolveObject: objName = {objName}, module = {module}")
             return MISSING
     
     else:

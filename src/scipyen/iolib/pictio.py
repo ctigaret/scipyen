@@ -206,7 +206,12 @@ def loadHDF5File(fName:str):
     """
     # raise NotImplementedError("Not yet...")
     with h5py.File(fName) as h5file:
-        return h5io.read_hdf5(h5file)
+        try:
+            ret = h5io.read_hdf5(h5file)
+        except:
+            traceback.print_exc()
+    # print(f"pictio.loadHDF5File {fName} ⇒ {ret}")
+    return ret
         
     
 # NOTE: 2017-09-21 16:34:21
@@ -1690,14 +1695,13 @@ def getMimeAndFileType(fileName):
                 traceback.print_exc()
                 
     # finally, try python's mimetypes
-    if file_type is None:
-        mime_type, encoding = mimetypes.guess_type(fileName)
-        mime_type = file_type
+    # if file_type is None:
+    #     mime_type, encoding = mimetypes.guess_type(fileName)
+    #     mime_type = file_type
 
             
     # 2) DETERMINE THE MIME TYPE
     # 2.1) try python's mimetypes
-    mime_type, encoding = mimetypes.guess_type(fileName)
     # 2.2) try the pyxdg module
     if mime_type is None and xdgmime: # is not None:
         try:
@@ -1708,6 +1712,10 @@ def getMimeAndFileType(fileName):
         except Exception as e:
             traceback.print_exc()
 
+    mime_type, encoding = mimetypes.guess_type(fileName)
+    if file_type is None:
+        file_type = mime_type
+        
     #print(f"in getMimeAndFileType: mime_type: {mime_type} file_type: {file_type}")
 
     # # 2.2) try the mimetypes module

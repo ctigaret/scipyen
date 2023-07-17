@@ -103,7 +103,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.uic import loadUiType as __loadUiType__
 
-
+import math
 import numpy as np
 import pandas as pd
 from pandas import NA
@@ -160,6 +160,7 @@ from core.traitcontainers import DataBag
 
 from core.strutils import (InflectEngine, get_int_sfx)
 
+from core.sysutils import adapt_ui_path
 
 from imaging.vigrautils import kernel2array
 
@@ -216,8 +217,10 @@ DEPRECATED here, but keep for reference
 """
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+__ui_path__ = adapt_ui_path(__module_path__,'signalviewer.ui')
 
-Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer.ui'))
+# Ui_SignalViewerWindow, QMainWindow = __loadUiType__(os.path.join(__module_path__,'signalviewer.ui'))
+Ui_SignalViewerWindow, QMainWindow = __loadUiType__(__ui_path__)
 
 class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     """ A plotter for multi-sweep signals ("frames" or "segments"), with cursors.
@@ -401,6 +404,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     sig_plot = pyqtSignal(dict, name="sig_plot")
     sig_newEpochInData = pyqtSignal(name="sig_newEpochInData")
     sig_axisActivated = pyqtSignal(int, name="sig_axisActivated")
+    sig_frameDisplayReady = pyqtSignal(name="sig_frameDisplayReady")
     
     closeMe  = pyqtSignal(int)
     frameChanged = pyqtSignal(int)
@@ -481,7 +485,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # • offset is the difference between the view range leftmost point and
         #   the leftmost domain value
         # • factor is the ratio between the vew range and data domain range
-        self._axes_X_view_states_ = list()
+        self._axes_X_view_offsets_scales_ = list()
+        
+        # a cache of x data bounds for all axes
+        self._x_data_bounds_ = list()
+        
+        self._axes_X_view_ranges_ = list()
         
         # define these early
         self._xData_ = None
@@ -720,7 +729,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # list of analog signal names selected from what is available in the current 
         # frame, using the combobox for analog signals
         # this includes signals in numpy arrays
-        self.guiSelectedAnalogSignalEntries = list() # list of signal names sl
+        self.guiSelectedAnalogSignalEntries = list() # list of signal names
         
         # list of irregularly sampled signal names selected from what is available
         # in the current frame, using the combobox for irregularly sampled signals
@@ -849,6 +858,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # NOTE: 2021-11-13 23:24:12
         # signal/slot connections & UI for pg.PlotItem objects are configured in
         # self._prepareAxes_()
+        self.sig_frameDisplayReady.connect(self._slot_post_frameDisplay)
         
         self.sig_plot.connect(self._slot_plot_numeric_data_, type = QtCore.Qt.QueuedConnection)
         
@@ -895,7 +905,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.crosshairCursorColorsAction.triggered.connect(self._slot_setCrosshairCursorColors)
         self.cursorHoverColorAction.triggered.connect(self._slot_setCursorHoverColor)
         self.actionShow_Cursor_Edit_Dialog_When_Created.toggled.connect(self._slot_setEditCursorWhenCreated)
-        # self.actionVerticalCursorsFromEpoch.triggered.connect(self._slot_makeVerticalCursorsFromEpoch)
         self.actionVerticalCursorsFromEpochInCurrentAxis.triggered.connect(self._slot_makeVerticalCursorsFromEpoch)
         self.actionMultiAxisVerticalCursorsFromEpoch.triggered.connect(self._slot_makeMultiAxisVerticalCursorsFromEpoch)
         self.actionMultiAxisVerticalCursorsFromEpoch.setEnabled(False)# BUG/FIXME 2023-06-19 12:21:54
@@ -914,6 +923,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionLink_X_axes.setEnabled(False)
         
         # the actual layout of the plot items (pyqtgraph framework)
+        # its "layout" is a QtWidgets.QGraphicsGridLayout
         self.signalsLayout = pg.GraphicsLayout()
         self.signalsLayout.layout.setVerticalSpacing(0)
 
@@ -935,6 +945,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.viewerWidgetContainer.layout().contentsMargins().setBottom(0)
         self.viewerWidgetContainer.layout().addWidget(self.viewerWidget, 0,0)
     
+        # NOTE: 2023-07-08 23:25:32
+        # self.viewerWidget.ci is the central item of the viewer widgets (a 
+        # pg.GraphicsLayoutWidget object) and contains the signalsLayout (a 
+        # pg.GraphicsLayout object)
+        # We set thsi centrsl item as the "main layout" of the signalviewer, to
+        # which we add:
+        # • a QLabel (plotTitleLabel) on the top (first) row)
+        # • the signals layout on the second row
         self.mainLayout = self.viewerWidget.ci
         self.mainLayout.layout.setVerticalSpacing(0)
         self.mainLayout.layout.setHorizontalSpacing(0)
@@ -954,16 +972,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.analogSignalComboBox.clear()
         self.analogSignalComboBox.setCurrentIndex(0)
-        self.analogSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
-        # self.analogSignalComboBox.textActivated[str].connect(self.slot_analogSignalsComboBoxTextActivated)
+        # self.analogSignalComboBox.currentIndexChanged[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
+        self.analogSignalComboBox.activated[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
         
         self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self._slot_plotAnalogSignalsCheckStateChanged_)
         
         self.irregularSignalComboBox.clear()
         self.irregularSignalComboBox.setCurrentIndex(0)
-        self.irregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
-        # self.irregularSignalComboBox.textActivated[str].connect(self.slot_irregularSignalsComboBoxTextActivated)
+        # self.irregularSignalComboBox.currentIndexChanged[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
+        self.irregularSignalComboBox.activated[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
         
         self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
         self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self._slot_plotIrregularSignalsCheckStateChanged_)
@@ -1153,17 +1171,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
     @property
     def xAxesLinked(self): 
-        # if len(self.axes) > 0:
-        #     # NOTE 2023-05-09 18:21:53 
-        #     # allow for SOME axes to be linked; dump self._xAxesLinked_
-        #     # read link status from vb states
-        #     xLinks = [ax.vb.state["linkedViews"][0] for ax in self.axes]
-        #     allXLinked = not all(v is None for v in xLinks)
-        #     if self._xAxesLinked_ != allXLinked:
-        #         self._xAxesLinked_ = allXLinked
-        #         signalBlocker = QtCore.QSignalBlocker(self.actionLink_X_axes)
-        #         self.actionLink_X_axes.setChecked(self._xAxesLinked_)
-        
+        """This is True when all PlotItems but one have X axes linked"""
         return self._xAxesLinked_
     
     @markConfigurable("XAxesLinked")
@@ -2809,13 +2817,8 @@ anything else       anything else       ❌
         if len(where) == 1:
             where = where[0]
             
-#         print(f"cursorType = {cursorType}")
-#         
-#         print(f"where = {where}")
-            
         self.slot_removeCursors()
         self.displayFrame()
-        #self._plotOverlayFrame_()
         self.addCursors(*where, cursorType=cursorType, xwindow = xwindow, ywindow = ywindow, labels = labels, axis=axis)
         
     @safeWrapper
@@ -2852,7 +2855,6 @@ anything else       anything else       ❌
                         # only makes sense for vertical & crosshair cursor types
                         data_text = []
                         
-                        #if isinstance(cursor.hostItem, pg.PlotItem) and x is not np.nan:
                         dataitems = cursor.hostItem.dataItems
                         
                         for kdata, dataitem in enumerate(dataitems):
@@ -2888,11 +2890,9 @@ anything else       anything else       ❌
                         y = cursor.getY(plotitem)
                         
                         if cursor.cursorTypeName in ("crosshair", "vertical"):
-                            #plot_item_cursor_pos_text.append("X: %f" % x)
                             plot_item_cursor_pos_text.append("X: %f (window: %f)" % (x, cursor.xwindow))
                             
                         if cursor.cursorTypeName in ("crosshair", "horizontal"):
-                            #plot_item_cursor_pos_text.append("Y: %f" % y)
                             plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
                             
                         plot_item_text.append("\n".join(plot_item_cursor_pos_text))
@@ -2936,107 +2936,18 @@ anything else       anything else       ❌
     
         self._update_coordinates_viewer_()
         
-    #def setupLTPCursors(self, LTPOptions, pathway, axis=None):
-        #""" Convenience function for setting up cursors for LTP experiments:
-        
-        #Arguments:
-        #==========
-        
-        #LTPOptions: a dict with the following mandatory key/value pairs:
-        
-            #{'Average': {'Count': 6, 'Every': 6},
-
-            #'Cursors': 
-                #{'Labels':  ['Rbase',
-                            #'Rs',
-                            #'Rin',
-                            #'EPSC0base',
-                            #'EPSC0Peak',
-                            #'EPSC1base',
-                            #'EPSC1peak'],
-
-                #'Pathway0': [0.06,
-                            #0.06579859882206893,
-                            #0.16,
-                            #0.26,
-                            #0.273,
-                            #0.31,
-                            #0.32334583993039734],
-
-                #'Pathway1': [5.06,
-                            #5.065798598822069,
-                            #5.16,
-                            #5.26,
-                            #5.273,
-                            #5.31,
-                            #5.323345839930397],
-
-                #'Windows': [0.01, 0.003, 0.01, 0.01, 0.005, 0.01, 0.005]},
-
-            #'Pathway0': 0,
-
-            #'Pathway1': 1,
-
-            #'Reference': 5,
-
-            #'Signals': ['Im_prim_1', 'Vm_sec_1']}
-            
-        #pathway: int = the pathway for which the cursors are shown: can be 0 or 1
-        
-        #axis: optional default None: an int index into the axis receiving the cursors
-            #(when None, the fist axis i.e. at index 0, is chosen)
-        #"""
-        #if axis is not None:
-            #if isinstance(axis, int):
-                #if axis < 0 or axis >= len(self.axesWithLayoutPositions):
-                    #raise ValueError("When specified, axis must be an integer between 0 and %d" % len(self.axesWithLayoutPositions))
-                
-                #self.currentAxis = axis
-                
-            #else:
-                #raise ValueError("When specified, axis must be an integer between 0 and %d" % len(self.axesWithLayoutPositions))
-            
-        
-        #self.setupCursors("v", LTPOptions["Cursors"]["Pathway%d"%pathway])
-            
     # ### BEGIN PyQt slots
     
-    @pyqtSlot(str)
-    @safeWrapper
-    def slot_analogSignalsComboBoxTextActivated(self, txt):
-        if txt == "Choose":
-            current_txt = self.analogSignalComboBox.currentText()
-            
-            available = [self.analogSignalComboBox.itemText(k) for k in range(1, self.analogSignalComboBox.count()-1)]
-            
-            preSelected = [i for i in self.guiSelectedAnalogSignalEntries if i in available]
-            
-            if len(preSelected) == 0:
-                preSelected = None
-                
-            dlg = ItemsListDialog(parent=self,
-                                       itemsList = available,
-                                       preSelected=preSelected,
-                                       title="Select Analog Signals to Plot",
-                                       modal = True,
-                                       selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
-            
-            if dlg.exec() == 1:
-                sel_items = dlg.selectedItemsText
-                
-                if len(sel_items):
-                    self.guiSelectedAnalogSignalEntries[:] = sel_items[:]
-                    
     @pyqtSlot(int)
     @safeWrapper
     def slot_analogSignalsComboBoxIndexChanged(self, index):
-        # print(f"{self.__class__.__name__}.slot_analogSignalsComboBoxIndexChanged index = {index}")
-        # self.analogSignalComboBox.textActivated[str].disconnect(self.slot_analogSignalsComboBoxTextActivated)
-        # try:
-        #     self.analogSignalComboBox.textActivated[str].disconnect()
-        # except:
-        #     pass
-        
+        """Triggered by a change in Analog signal selection combo box.
+    This combo box is self.analogSignalComboBox"""
+        # FIXME: 2023-07-09 12:12:42
+        # this signal is only triggered when the combo box selection has changed
+        # if you wanted to choose signals again it won't be called, because the 
+        # combo box index has not changed
+        # NOTE: 
         if len(self._frame_analog_map_) == 0:
             return
         
@@ -3044,7 +2955,6 @@ anything else       anything else       ❌
             self.guiSelectedAnalogSignalEntries.clear()
             
         elif index == self.analogSignalComboBox.count()-1: # "Choose" selected
-            # self.guiSelectedAnalogSignalEntries.clear()
             
             available = [self.analogSignalComboBox.itemText(k) for k in range(1, self.analogSignalComboBox.count()-1)]
             
@@ -3065,13 +2975,17 @@ anything else       anything else       ❌
                 
                 if len(sel_items):
                     self.guiSelectedAnalogSignalEntries[:] = sel_items[:]
-                    # self.analogSignalComboBox.textActivated[str].connect(self.slot_analogSignalsComboBoxTextActivated)
                 
                     
         else:
             self.guiSelectedAnalogSignalEntries = [self.analogSignalComboBox.currentText()]
 
-        self._new_frame_ = False # guard against replotting signals when there's no actual frame change
+        # NOTE: 2023-07-09 11:54:06
+        # self._new_frame_ guards against replotting signals when there's no 
+        # actual frame change
+        # used by self._plot_signals_(…), self._plot_events_(…), self._plotSpikeTrains_(…)
+        #
+        self._new_frame_ = False 
         self.displayFrame()
         self._new_frame_ = True
         
@@ -3125,37 +3039,11 @@ anything else       anything else       ❌
     def slot_reportCursorPosition(self, crsId = None):
         self.reportCursors()
         
-    @pyqtSlot(str)
-    @safeWrapper
-    def slot_irregularSignalsComboBoxTextActivated(self, txt):
-        if txt == "Choose":
-            available = [self.irregularSignalComboBox.itemText(k) for k in range(1, self.irregularSignalComboBox.count()-1)]
-            
-            preSelected = [i for i in self.guiSelectedIrregularSignalEntries if i in available]
-            if len(preSelected) == 0:
-                preSelected = None
-
-            dlg = ItemsListDialog(parent=self, 
-                                       itemsList = available, 
-                                       preSelected = preSelected,
-                                       title="Select Irregular Signals to Plot", 
-                                       modal=True,
-                                       selectmode=QtWidgets.QAbstractItemView.ExtendedSelection)
-            
-            if dlg.exec() == 1:
-                sel_items = dlg.selectedItemsText
-                
-                if len(sel_items):
-                    self.guiSelectedIrregularSignalEntries[:] = sel_items[:]
-            
     @pyqtSlot(int)
     @safeWrapper
     def slot_irregularSignalsComboBoxIndexChanged(self, index):
-        # self.irregularSignalComboBox.textActivated[str].connect(self.slot_irregularSignalsComboBoxTextActivated)
-        # try:
-        #     self.irregularSignalComboBox.textActivated[str].disconnect()
-        # except:
-        #     pass
+        """Triggered by a change in Irregular signal selection combo box.
+    This combo box is self.irregularSignalComboBox"""
                 
         if len(self._frame_irregs_map_) == 0 :
             return
@@ -3183,12 +3071,14 @@ anything else       anything else       ❌
                 
                 if len(sel_items):
                     self.guiSelectedIrregularSignalEntries[:] = sel_items[:]
-                    # self.irregularSignalComboBox.textActivated[str].connect(self.slot_irregularSignalsComboBoxTextActivated)
                     
         else:
             self.guiSelectedIrregularSignalEntries = [self.irregularSignalComboBox.currentText()]
     
-        self._new_frame_ = False # guard against replotting signals when there's no actual frame change
+        # NOTE: 2023-07-09 12:00:58
+        # guard against replotting signals when there's no actual frame change
+        # see # NOTE: 2023-07-09 11:54:06
+        self._new_frame_ = False 
         self.displayFrame()
         self._new_frame_ = True
          
@@ -6575,6 +6465,9 @@ Does the behind the scene work of self.setData(...)
                 # observed_var
                 
                 if not self._var_notified_:
+                    # NOTE: 2023-07-09 11:56:22
+                    # see also NOTE: 2023-07-09 11:54:06
+                    # force replotting the data
                     self._new_frame_ = True
                     self.displayFrame()
                     self._new_frame_ = False
@@ -6912,6 +6805,7 @@ signals in the signal collection.
         # NOTE: 2023-05-16 23:04:37,
         # NOTE: 2023-05-16 23:05:22
         # NOTE: 2023-05-16 23:02:20
+        # NOTE: 2023-07-09 11:54:06
         self._new_frame_ = self._current_frame_index_ != val
         self._current_frame_index_ = val
         
@@ -7392,24 +7286,33 @@ signals in the signal collection.
 
     @pyqtSlot(object, object)
     @safeWrapper
-    def _slot_plot_axis_x_range_changed(self, x0, x1):
-        """To update non-data items such as epochs
-        """
-        ax = self.sender()
+    def _slot_plot_axis_x_range_changed(self, vb, x0x1):
+        """Captures changes in the view range on the X axis.
+        Triggered by PlotItem signal sigXRangeChanged.
+        These changes are typically generated using a mouse button pressed in 
+        a Plotitem (signal viewer "axis").
         
-        if ax not in self.axes:
+        """
+        if not isinstance(vb, pg.ViewBox):
             return
         
-        ax_ndx = self.axes.index(ax)
+        if not isinstance(x0x1, tuple) or len(x0x1) != 2:
+            return
         
-        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed ax_ndx = {ax_ndx}, x0 = {x0}, x1 = {x1}")
+        vbAxes = [ax for ax in self.axes if ax.vb == vb]
         
-        if len(self._axes_X_view_states_) != len(self.axes):
-            self._get_axes_X_view_states_()
-        else:
-            self._axes_X_view_states_[ax_ndx] = self._get_axis_X_view_state(ax)
+        if len(vbAxes):
+            vbAxis = vbAxes[0]
             
-        # print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed newState = {self._axes_X_view_states_[ax_ndx]}")
+        else:
+            return
+        
+        ax_ndx = self.axes.index(vbAxis)
+        self._axes_X_view_ranges_[ax_ndx] = x0x1
+        
+        bounds = self._get_axis_data_X_range_(vbAxis)
+        offset_scale = self._calculate_new_X_offset_scale_(bounds, x0x1)
+        self._axes_X_view_offsets_scales_[ax_ndx] = offset_scale
         
         if self.currentFrame in self._cached_epochs_:
             if len(self._cached_epochs_[self.currentFrame]):
@@ -7417,15 +7320,26 @@ signals in the signal collection.
                 
     @pyqtSlot(object)
     def _slot_plot_axis_range_changed_manually(self, value:object):
+        """Triggered by PlotItem's ViewBox sigRangeChangedManually signal"""
         vb = self.sender()
         
+        
+        if value in (pg.ViewBox.RectMode, pg.ViewBox.PanMode):
+            mouseMode = value
+        else:
+            mouseMode = vb.state["mouseMode"]
+            
+        # print(f"{self.__class__.__name__} range changed manually in {mouseMode}")
+
         ax = [ax for ax in self.axes if ax.vb == vb]
         
         if len(ax) == 0:
             return
         
         ax = ax[0]
-        ax.sigXRangeChanged.emit(None, None)
+        ax.sigXRangeChanged.emit(vb, vb.viewRange()[0])
+        # ax.sigXRangeChanged.emit(vb, (math.nan, math.nan))
+        # ax.sigXRangeChanged.emit(None, None)
         
     @safeWrapper
     def refresh(self):
@@ -7481,14 +7395,6 @@ signals in the signal collection.
         Anything else                   ↦ ignored
         
         """
-        # if self.parent().__class__.__name__ == "EventAnalysis" and "Detected events" in self.windowTitle():
-        #     print(f"{self.windowTitle()} - displayFrame")
-        #     stack = inspect.stack()
-        #     for s in stack:
-        #         print(f"\tcaller {s.function} in {s.filename}")
-        
-        # print(f"\n{self.__class__.__name__}[{self.windowTitle()}].displayFrame()")
-        
         if self._yData_ is None:
             # print(f"{self.__class__.__name__} self._yData_ is None")
             self.clear()
@@ -7571,38 +7477,40 @@ signals in the signal collection.
                             ax.addItem(tgt)
                     
                 
-        # NOTE: 2023-05-09 10:41:27
-        # thsi also sets up axes lines visibility & tickmarks
-        self._align_X_range()
-        self._update_axes_spines_()
+        # NOTE: 2023-05-09 10:41:27 connected to _slot_post_frameDisplay
+        # this also sets up axes lines visibility & tickmarks
         
-    def _get_axes_X_view_states_(self):
-        self._axes_X_view_states_.clear()
+        # cache these now (they may be overwritten in slots triggered by mouse
+        # interactions in the plot item)
+        # for kax, ax in enumerate(self.axes):
+        #     bounds = self._get_axis_data_X_range_(ax)
+        #     if any(np.isnan(v) for v in bounds):
+        #         continue
+        #     self._x_data_bounds_[kax] = bounds
+        #     viewXrange = ax.vb.viewRange()[0]
+        #     self._axes_X_view_ranges_[kax] = viewXrange
+        #     offset, scale = self._calculate_new_X_offset_scale_(bounds, viewXrange)
+        #     self._axes_X_view_offsets_scales_[kax] = (offset, scale)
+            
+        self.sig_frameDisplayReady.emit()
         
-        for ax in self.axes:
-            data_x_range = self._get_axis_data_X_range_(ax)
-            
-            if any(v is None for v in data_x_range):
-                self._axes_X_view_states_.append((None, None))
-            
-            else:
-                view_x_range = ax.vb.viewRange()[0]
-                
-                offset = view_x_range[0] - data_x_range[0]
-                
-                viewXspan = view_x_range[1] - view_x_range[0]
-                dataXspan = data_x_range[1] - data_x_range[0]
-                
-                if dataXspan == 0:
-                    factor = 1.0
-                else:
-                    factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
-                
-                self._axes_X_view_states_.append((offset, factor))
-                
-        return self._axes_X_view_states_ # for convenience
-                
-    def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]):
+    def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
+                                       padding:typing.Optional[float] = 0.) -> tuple:
+        """Calculates the X offset and X view scale given X data bounds and view range.
+    Helper function returning a tuple (offset, scale) used in the _align_X_range
+    """
+        # print(f"{self.__class__.__name__}._calculate_new_X_offset_scale_ databounds = {databounds}, viewbounds = {viewbounds}")
+        dspan = databounds[1]-databounds[0]
+        vspan = viewbounds[1]-viewbounds[0]
+        
+        offset = databounds[0] - viewbounds[0] + padding
+        scale = vspan/dspan if dspan != 0 else 1
+        
+        return offset,scale
+        
+    def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
+        """Returns a tuple (offset, scale).
+    When there is no data plottd in the item returns (None, None)"""
         if isinstance(ax, pg.PlotItem):
             if ax not in self.axes:
                 raise ValueError(f"Axis {ax} not found in this viewer")
@@ -7618,24 +7526,63 @@ signals in the signal collection.
         else:
             raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
         
-        data_x_range = self._get_axis_data_X_range_(ax)
+        xd0, xd1 = self._get_axis_data_X_range_(ax)
+        dspan = xd1 - xd0
+        # xv0, xv1 = ax.vb.viewRange()[0]
+        xv0, xv1 = ax.vb.state["viewRange"][0]
+        vspan = xv1 - xv0
         
-        if any(v is None for v in data_x_range):
-            return (None, None)
+        offset = xd0 - xv0
+        scale = vspan/dspan if dspan != 0. else 1.
+        
+        return offset, scale
+    
+    def _get_axis_Y_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
+        if isinstance(ax, pg.PlotItem):
+            if ax not in self.axes:
+                raise ValueError(f"Axis {ax} not found in this viewer")
+            ax_ndx = self.axes.index(ax)
+            
+        elif isinstance(ax, int):
+            if ax not in range(self.axes):
+                raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
+            
+            ax_ndx = ax
+            ax = self.axes[ax_ndx]
+            
         else:
-            view_x_range = ax.vb.viewRange()[0]
-            
-            offset = view_x_range[0] - data_x_range[0]
-            
-            dx = data_x_range[1] - data_x_range[0] if data_x_range[1] != data_x_range[0] else 1.
-            
-            factor = (view_x_range[1] - view_x_range[0]) / dx
-            # factor = (view_x_range[1] - view_x_range[0]) / (data_x_range[1] - data_x_range[0])
-            
-            return (offset, factor)
-            
+            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
         
-    def _get_axis_data_X_range_(self, axis:typing.Union[int, pg.PlotItem]):
+        yd0, yd1 = self._get_axis_data_Y_range_(ax)
+        dspan = yd1 - yd0
+        
+        yv0, yv1 = ax.vb.viewRange()[1]
+        vspan = yv1 - yv0
+        
+        offset = yd0 - yv0
+        scale = vspan/dspan if dspan != 0. else 1.
+        
+        return offset, scale
+    
+    def _get_axis_view_X_range(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
+        if isinstance(axis, int):
+            if axis not in range(len(self.axes)):
+                raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
+            
+            axis = self.axes[axis]
+            
+        elif isinstance(axis, pg.PlotItem):
+            if axis not in self.axes:
+                raise ValueError(f"Axis {axis} is not in this viewer")
+            
+        else:
+            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
+        
+        xv0, xv1 = axis.vb.viewRange()[0]
+        
+        return xv0, xv1
+        
+    def _get_axis_data_X_range_(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
         if isinstance(axis, int):
             if axis not in range(len(self.axes)):
                 raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
@@ -7652,17 +7599,34 @@ signals in the signal collection.
         pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
         
         if len(pdis):
-            items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
+            # xbounds0, xbounds1 = zip(*map(lambda i_ : i_.dataBounds(0), pdis))
+            # NOTE: BUG
+            # the 'dataBounds' method returns None, None if the pdi is not
+            # visible!
+            # NOTE: 2023-07-09 21:09:08
+            # use dataRect() instead
+            xbounds0, xbounds1 = zip(*map(lambda i_ : (i_.dataRect().x(), i_.dataRect().x() + i_.dataRect().width()), pdis))
+            min_x = min(xbounds0)
+            max_x = max(xbounds1)
+            # items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
             
-            min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
-            max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
+            # min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
+            # max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
             
-            return [min_x, max_x]
+            # NOTE: 2023-07-07 13:17:42
+            # when the axis (a pg.PlotItem) is not visibile, neither are its 
+            # plot data items; in turn, then these are NOT visible, their dataBounds(…)
+            # method returns None, None !!!
+            if  min_x is None:
+                min_x = math.nan
+            if max_x is None:
+                max_x =math.nan
+            return min_x, max_x
             
         else:
-            return [None, None]
+            return math.nan, math.nan
         
-    def _get_axis_data_Y_range_(self, axis:typing.Union[int, pg.PlotItem]):
+    def _get_axis_data_Y_range_(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
         if isinstance(axis, int):
             if axis not in range(len(self.axes)):
                 raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
@@ -7679,83 +7643,184 @@ signals in the signal collection.
         pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
         
         if len(pdis):
-            items_min_y, items_max_y = zip(*list((float(np.nanmin(i.yData)), float(np.nanmax(i.yData))) for i in pdis))
-            
-            min_y = items_min_y[0] if isinstance(items_min_y, (tuple, list)) else items_min_y
-            max_y = items_max_y[0] if isinstance(items_max_y, (tuple, list)) else items_max_y
-            
-            return [min_y, max_y]
+            ybounds0, ybounds1 = zip(*map(lambda i_ : i_.dataBounds(1), pdis))
+            min_y = min(ybounds0)
+            max_y = max(ybounds1)
+            return min_y, max_y
+#             items_min_y, items_max_y = zip(*list((float(np.nanmin(i.yData)), float(np.nanmax(i.yData))) for i in pdis))
+#             
+#             min_y = items_min_y[0] if isinstance(items_min_y, (tuple, list)) else items_min_y
+#             max_y = items_max_y[0] if isinstance(items_max_y, (tuple, list)) else items_max_y
+#             
+#             return min_y, max_y
             
         else:
-            return [None, None]
+            return math.nan, math.nan
         
+    def _get_axis_view_Y_range(self, axis:typing.Union[int, pg.PlotItem]) ->tuple:
+        if isinstance(axis, int):
+            if axis not in range(len(self.axes)):
+                raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
+            
+            axis = self.axes[axis]
+            
+        elif isinstance(axis, pg.PlotItem):
+            if axis not in self.axes:
+                raise ValueError(f"Axis {axis} is not in this viewer")
+            
+        else:
+            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
+        
+        yv0, yv1 = axis.vb.viewRange()[1]
+        
+        return yv0, yv1
+    
+    @pyqtSlot()
+    def _slot_post_frameDisplay(self):
+        self._align_X_range()
+        self._update_axes_spines_()
         
         
     def _align_X_range(self, padding:typing.Optional[float] = None):
-        """ Heuristic to align plot items X axis:
-            • if the plotitems have x boundaries that overlap then align them
-                to these boundaries ⇒ will also align the plotitems displaying
-                the events and spiketrain, where data is located WITHIN the 
-                common signal boundaries
+        """ Maintains an X view range for frames with different X data bounds.
+    Necessary to recreate a view range to an axis relative to the axis' X data.
         
-            ∘ then we only plot labels & values on the X axis of the last plotitem, 
-                as a "common" X axis
+    This is intended for the particular case where the X domain in each 'frame' 
+    starts at different values (e.g. sweep 0 starts at time 0 s, sweep 1 starts
+    at 5 s etc). In this case "zooming" in on a signal feature in sweep 0 would 
+    set a view range (in PyQtGraph) falling outside the domain of sweep 1, and so
+    on.
         
-            • when data in the plotitems have non-overlapping X domains, we align 
-            each plotitem on its own domain AND we label the X axis individually
+    This unwanted effect can be prevented by recalculating the X range of the 
+    view based on the current X bounds and the previous view range, via two
+    intermediate values which are independent of the actual sweep X domain:
+    • offset (the difference between the data X start and the view range X start)
+    • scale (> 1 if the view range is larger that the X data range).
+    
+    WARNING: Works best - and is useful- when X data ranges for the plotted 
+    curves in distinct frames are similar, if not identical, even though they 
+    start at distinct values.
+    
+    CAUTION: For best result ensure all axes (Plotitem objects) in the SignalViewer
+    are linked.
         
         """
         if len(self.axes) == 0:
             return
         
-        # update self._axes_X_view_states_
-        if len(self._axes_X_view_states_) == 0:
-            self._get_axes_X_view_states_()
+        if len(self._x_data_bounds_) == 0:
+            self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
+            
+        for ax in self.axes:
+            ax.vb.updateViewRange(True, True)
         
-        if padding is None:
-            padding = self._common_axes_X_padding_
         
-        x0, x1 = zip(*[ax.vb.state["viewRange"][0] for ax in self.signalAxes])
-        xdata0, xdata1 = zip(*[self._get_axis_data_X_range_(ax) for ax in self.signalAxes])
-        
-        minX = min(x0)
-        maxX = max(x1)
-        
-        # BUG/FIXME 2023-06-15 08:49:46 - occasionally (after reestablishing axes)
-        # TypeError: '<' not supported between instances of 'NoneType' and 'float'
-        # FIXED 2023-06-15 10:56:21
-        xdata0 = tuple(x for x in xdata0 if x is not None)
-        xdata1 = tuple(x for x in xdata1 if x is not None)
-        minDataX = min(xdata0) if len(xdata0) else None
-        maxDataX = max(xdata1) if len(xdata1) else None
-        
-        # print(f"{self.__class__.__name__}._align_X_range minX = {minX} ; maxX = {maxX}")
-        # print(f"{self.__class__.__name__}._align_X_range minDataX = {minDataX} ; maxDataX = {maxDataX}")
-        
-        # for ax in self.signalAxes:
-        for kax, ax in enumerate(self.axes):
-            # xLinkedAxes = [ax_ for ax_ in self.axes if ax_ != ax and (ax_.vb.state["linkedViews"][0] is not None and ax_.vb.state["linkedViews"][0]() == ax.vb)]
-            if ax.isVisible() and ax.vb.state["linkedViews"][0] is None:
-                # ax.setXRange(minDataX, maxDataX, padding)
-                if ax.vb.state["autoRange"][0] == False:
-                    # I think by default this is True, so upon the first axis show,
-                    # this will skip this branch and enable full auto-range
-                    offset, scale = self._axes_X_view_states_[kax]
-                    
-                    if minDataX is not None and maxDataX is not None:
-                        if offset is not None and scale is not None:
-                            # print(f"{self.__class__.__name__}._align_X_range :\n\toffset = {offset} ; scale = {scale}")
-                            newX0 = minDataX + offset
-                            newX1 = newX0 + (maxDataX - minDataX) * scale
-                        else:
-                            newX0 = minDataX
-                            newX1 = maxDataX
-                    else:
-                        newX0 = min(x0)
-                        newX1 = max(x1)
-                    # print(f"{self.__class__.__name__}._align_X_range : newX0 = {newX0}, newX1 = {newX1}")
-                    ax.setXRange(newX0, newX1, padding)
+        # print(f"{self.__class__.__name__}._align_X_range axeslinked = {self.xAxesLinked}")
+        if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
+            if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
+                return
+            # NOTE: 2023-07-10 10:55:57 FIXME/TODO
+            # still have to figure to figure out this contingency below:
+            # selecting to show just plot items without autoranging
+            # does not respect the view range previously set by the link target !!!
+            
+#                 # get the axis which is auto-range enabled on X
+#                 # autoXaxes = [ax for ax in self.axes if ax.vb.autoRangeEnabled()[0]]
+#                 
+#                 xLinkAxes = list()
+#                 xLinks = [ax.vb.linkedView(0) for ax in self.axes if isinstance(ax.vb.linkedView(0), pg.ViewBox)]
+#                 if len(xLinks): # is this guaranteed to happen ?!?
+#                     xLinkAxes = list(set([[_ax for _ax in self.axes if _ax.vb == xLink][0] for xLink in xLinks]))
+#                     
+#                 # figure out the following:
+#                 # • if an axis is auto-ranged on X ⇒ continue; else:
+#                 #   ∘ if an axis is X-linked to a target, get the target's viewXrange
+#                 #       and apply it to the axis; else:
+#                 #   ∘ get the topmost X-link target viewX range and apply it to 
+#                 #       the axis
+#                 
+#                 for kax, ax in enumerate(self.axes):
+#                     if ax.vb.autoRangeEnabled()[0]: # ← skip axes auto-ranged on X
+#                         continue
+#                     bounds = self._get_axis_data_X_range_(ax)
+#                     if any(np.isnan(v) for v in bounds): # ← no data
+#                         continue
+#                     xLink = ax.vb.linkedView(0)
+#                     if not isinstance(xLink, pg.ViewBox):
+#                         # get the topmost xLink if this is NOT a linked axis
+#                         # (might happen when individual axes are manually unlinked
+#                         # but self._xAxesLinked_ is not updated, yet there still
+#                         # are at least one link target in the axes)
+#                         xLinkNdx = min([self.axes.index(a) for a in xLinkAxes])
+#                         xLinkAxis = self.axes[xLinkNdx]
+#                         xLink = xLinkAxis.vb
+#                         
+#                     xLinkViewXrange = xLink.viewRange()[0]
+#                     xLinkAxes = [a for a in self.axes if a.vb == xLink]
+#                     if len(xLinkAxes) == 0:
+#                         continue # shouldn't happen
+#                     xLinkAxis = xLinkAxes[0]
+#                     xLinkAxNdx = self.axes.index(xLinkAxis)
+#                     xLinkXBounds = self._get_axis_data_X_range_(xLinkAxis)
+#                     print(f"{kax} bounds {bounds} link {xLinkAxNdx} link X bounds {xLinkXBounds} link Xview {xLinkViewXrange} ")
+#                     offset, scale = self._axes_X_view_offsets_scales_[xLinkAxNdx]
+#                     if any(np.isnan(v) for v in (offset, scale)):
+#                         offset, scale = self._calculate_new_X_offset_scale_(xLinkXBounds, xLinkViewXrange)
+#                     x0,x1 = bounds
+#                     dx1 = x1-x0
+#                     new_vx0 = x0 - offset
+#                     new_view_dx = dx1 * scale
+#                     new_vx1 = new_vx0 + new_view_dx
+#                     print(f"offset = {offset}, scale = {scale}, dx1 = {dx1}, new_vx0 = {new_vx0}, new_view_dx = {new_view_dx}, new_vx1 = {new_vx1}")
+#                     ax.vb.setXRange(new_vx0, new_vx1, padding=0., update=True)
+#                     self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
+#                 return
                 
+        for kax, ax in enumerate(self.axes):
+            # NOTE: 2023-07-10 10:51:10
+            # this loop OK when auto-ranging is disabled across plot items
+            # such as in the case of mouse interaction
+            # still a BUG when showing a linked plot item without its link
+            # target
+            # having them linked still messes up the display of linked plot item
+            # (not target) in isolation
+            # WORKAROUND: for this to work the link target MUST ALSO BE VISIBLE
+            # NOTE: 2023-07-09 21:17:19
+            # this returns the actual data X bounds (see NOTE: 2023-07-09 21:09:08)
+            current_X_bounds = self._get_axis_data_X_range_(ax)
+            if any(np.isnan(v) for v in current_X_bounds): # ← no data !
+                continue
+            
+            xLinkAxis = None
+            xLinkAxisNdx = None
+            xLinkXBounds = None
+            xLinkViewXrange = None
+            xLink = ax.vb.linkedView(0)
+            if isinstance(xLink, pg.ViewBox):
+                ax.vb.blockLink(True)
+                xLink.blockLink(True)
+                aa = [a for a in self.axes if a.vb == xLink]
+                if len(aa):
+                    xLinkAxis = aa[0]
+                    xLinkAxisNdx = self.axes.index(xLinkAxis)
+                    xLinkXBounds = self._get_axis_data_X_range_(ax)
+                    xLinkViewXrange = xLink.viewRange()[0]
+                        
+            current_viewXrange = ax.vb.viewRange()[0] if xLinkViewXrange is None else xLinkViewXrange
+            offset, scale = self._axes_X_view_offsets_scales_[kax] # if xLinkAxisNdx is None else self._axes_X_view_offsets_scales_[xLinkAxisNdx] # ← set by _slot_plot_axis_x_range_changed
+            view_dx = current_viewXrange[1] - current_viewXrange[0]
+            x0,x1 = current_X_bounds if xLinkXBounds is None else xLinkXBounds
+            dx1 = x1-x0
+            new_vx0 = x0 - offset
+            new_view_dx = dx1 * scale
+            new_vx1 = new_vx0 + new_view_dx
+            # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} to set new view range: {new_vx0, new_vx1}")
+            ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
+            if isinstance(xLink, pg.ViewBox):
+                ax.vb.blockLink(False)
+                xLink.blockLink(False)
+            self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
+
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
         
@@ -9306,21 +9371,43 @@ signals in the signal collection.
             self.currentAxis = self.axes[0] if len(self.axes) else None
             
     def linkAllXAxes(self):
-        if len(self.axes) < 1:
+        """Link all PlotItem objects (a.k.a signal viewer 'axes') to the top one.
+        The consequence is that all X axes are linked: a horizontal zoom on any 
+    of them (e.g. using the mouse interaction) triggers an equivalent zoom 
+    in the others.
+        
+    """
+        # WARNING: 2023-07-09 12:21:01
+        # linking an axis disables auto-ranging on that axis
+        if len(self.axes) <= 1:
             return
+        
+        # NOTE: 2023-07-09 15:25:32
+        # link all X axes ot the X axis of the top PlotItem (with index 0)
+        # for ax in self.axes[1:]:
+        #     ax.vb.setXLink(self.axes[0])
 
-        if len(self.signalAxes):
-            for ax in pairwise(self.signalAxes):
-                ax[1].vb.setXLink(ax[0])
-                
-            nonSigAxes = list(filter(lambda x: x not in self.signalAxes, self.axes))
-            
-            for ax in nonSigAxes:
-                ax.vb.setXLink(self.signalAxes[0])
-                
-        else:
-            for ax in pairwise(self.axes):
-                ax[1].vb.setXLink(ax[0])
+        # NOTE: 2023-07-10 12:21:29
+        # this links all axes pairwise (2nd to first, 3rd to 2nd etc)
+        for ax in pairwise(self.axes):
+            ax[1].vb.setXLink(ax[0])
+    
+        # NOTE: 2023-07-09 14:28:00
+        # this links axes pairwise except for the non-signal axes;
+        # not sure this is the best approach
+#         if len(self.signalAxes):
+#             for ax in pairwise(self.signalAxes):
+#                 ax[1].vb.setXLink(ax[0])
+#                 
+#             nonSigAxes = list(filter(lambda x: x not in self.signalAxes, self.axes))
+#             
+#             for ax in nonSigAxes:
+#                 ax.vb.setXLink(self.signalAxes[0])
+#                 
+#         else:
+#             for ax in pairwise(self.axes):
+#                 ax[1].vb.setXLink(ax[0])
+        
         
     def unlinkAllXAxes(self):
         if len(self.axes) < 1:
@@ -9328,10 +9415,6 @@ signals in the signal collection.
         
         for ax in self.axes:
             ax.vb.setXLink(None)
-        
-        # if len(self.axes) > 1:
-        #     for k in range(0, len(self.axes)-1):
-        #         self.axes[k].vb.setXLink(None)
         
     def _setup_axes_(self, _n_signal_axes_:int) -> None:
         """Call this ONCE after parsing the data.
@@ -9360,6 +9443,13 @@ signals in the signal collection.
         ¹ PyQtGraph's PlotItem 
         """
         self._plot_names_.clear()
+        nAxes = _n_signal_axes_ + 2 # how many axes the data requires?
+        
+        # set these up at earliest occasion
+        self._axes_X_view_ranges_ = [[math.nan, math.nan] for k in range(nAxes)]
+        self._x_data_bounds_ = [[math.nan, math.nan] for k in range(nAxes)]
+        # self._axes_X_view_offsets_scales_ = [[math.nan, math.nan] for k in range(nAxes)]
+        self._axes_X_view_offsets_scales_ = [[0., 1.] for k in range(nAxes)]
 
         # retrieve (cache) the events axis and ths spiketrains axis, if they exist
         # check if there are any plotitems in the layout and of these, is 
@@ -9387,7 +9477,6 @@ signals in the signal collection.
         if isinstance(self._spiketrains_axis_, pg.PlotItem):
             self.signalsLayout.removeItem(self._spiketrains_axis_)
             
-        # if len(self.signalAxes) < self._n_signal_axes_:
         if len(self.signalAxes) < _n_signal_axes_:
             # NOTE: 2023-05-09 13:00:18 - create axes as necessary
             # there are fewer signal axes than needed - create here as necessary
@@ -9398,7 +9487,6 @@ signals in the signal collection.
                 self._register_plot_item_name_(plotItem, plotname)
                 plotItem.setVisible(False)
                 
-            # for k in range(len(self.signalAxes), self._n_signal_axes_):
             for k in range(len(self.signalAxes), _n_signal_axes_):
                 # create new PlotItem objects as necessary, add to layout
                 plotname = f"signal_axis_{k}"
@@ -9412,10 +9500,8 @@ signals in the signal collection.
                 self._signal_axes_.append(plotItem)
                 
                 
-        # elif len(self.signalAxes) > self._n_signal_axes_:
         elif len(self.signalAxes) > _n_signal_axes_:
             # more signal axes than necessary
-            # for k in range(self._n_signal_axes_):
             for k in range(_n_signal_axes_):
                 # re-use the ones that are still needed
                 plotname = f"signal_axis_{k}"
@@ -9423,11 +9509,9 @@ signals in the signal collection.
                 self._register_plot_item_name_(plotItem, plotname)
                 
             # remove the rest of them
-            # for plotItem in self.signalAxes[self._n_signal_axes_:]:
             for plotItem in self.signalAxes[_n_signal_axes_:]:
                 self._remove_axes_(plotItem)
                 
-            # self._signal_axes_ = self._signal_axes_[:self._n_signal_axes_]
             self._signal_axes_ = self._signal_axes_[:_n_signal_axes_]
                 
         else: 
@@ -9501,6 +9585,7 @@ signals in the signal collection.
                 self.linkAllXAxes()
             else:
                 self.unlinkAllXAxes()
+                
         
     @pyqtSlot(object)
     @safeWrapper
@@ -9746,15 +9831,14 @@ signals in the signal collection.
         self._plotEpochs_()
                 
     @safeWrapper
-    def clear(self, keepCursors=False):
+    # def clear(self, keepCursors=False):
+    def clear(self):
+        """Clears the display
         """
-        TODO: cache cursors when keepCursors is True
-        at the moment do NOT pass keepCcursor other than False!
-        need to store axis index witht he cursors so that we can restore it ?!?
-        """
-        #self.viewerWidget.clear() # both mpl.Figure and pg.GraphicsLayoutWidget have this method
-        #print("SignalViewer.clear() %s" % self.windowTitle())
-        print(f"{self.__class__.__name__}.clear()")
+        # TODO: cache cursors when keepCursors is True
+        # at the moment do NOT pass keepCcursor other than False!
+        # need to store axis index witht he cursors so that we can restore it ?!?
+        # print(f"{self.__class__.__name__}.clear()")
         self._selected_plot_item_ = None
         self._selected_plot_item_index_ = -1
         self._hovered_plot_item_ = None
@@ -9782,15 +9866,23 @@ signals in the signal collection.
             for c in clist:
                 c.detach()
             
-        if not keepCursors:
-            self._crosshairSignalCursors_.clear() # a dict of SignalCursors mapping str name to cursor object
-            self._verticalSignalCursors_.clear()
-            self._horizontalSignalCursors_.clear()
-            self._cached_cursors_.clear()
-            
-            self.linkedCrosshairCursors = []
-            self.linkedHorizontalCursors = []
-            self.linkedVerticalCursors = []
+        self._crosshairSignalCursors_.clear() # a dict of SignalCursors mapping str name to cursor object
+        self._verticalSignalCursors_.clear()
+        self._horizontalSignalCursors_.clear()
+        self._cached_cursors_.clear()
+        
+        self.linkedCrosshairCursors = []
+        self.linkedHorizontalCursors = []
+        self.linkedVerticalCursors = []
+#         if not keepCursors:
+#             self._crosshairSignalCursors_.clear() # a dict of SignalCursors mapping str name to cursor object
+#             self._verticalSignalCursors_.clear()
+#             self._horizontalSignalCursors_.clear()
+#             self._cached_cursors_.clear()
+#             
+#             self.linkedCrosshairCursors = []
+#             self.linkedHorizontalCursors = []
+#             self.linkedVerticalCursors = []
         
         self.signalNo = 0
         self.frameIndex = [0]

@@ -27,7 +27,6 @@ import xml.dom.minidom
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5
 from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
-from PyQt5.uic import loadUiType as __loadUiType__
 
 
 #### END 3rd party modules

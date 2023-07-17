@@ -710,21 +710,6 @@ class NeoContainerTrait(NeoBaseNeoTrait):
         return characteristics
                 
             
-#     def get_container_lengths(self, obj):
-#         if hasattr(obj, "_container_child_containers"):
-#             ccc = dict(map(lambda c: (c, getattr(obj, c, None)), obj._container_child_containers))
-#             container_child_containers_lenghts = dict((c, len(v) if hasattr(v, "__iter__") else -1) for c,v in ccc.items())
-#         else:
-#             container_child_containers_lenghts = {}
-#             
-#         if hasattr(obj, "_data_child_containers"):
-#             ccc = dict(map(lambda c: (c, getattr(obj, c, None)), obj._data_child_containers))
-#             data_child_containers_lenghts = dict((c, len(v) if hasattr(v, "__iter__") else -1) for c,v in ccc.items())
-#         else:
-#             data_child_containers_lenghts = {}
-#             
-#         return container_child_containers_lenghts, data_child_containers_lenghts
-    
     def compare_elements(self, old_value, new_value):
         try:
             result = super().compare_elements(old_value, new_value)
@@ -1197,7 +1182,7 @@ class QuantityTrait(Instance, ScipyenTraitTypeMixin):
                 # so far silent is True when the observed knows about us
                 # check it we changed and notify
                 # silent = (new_hash == self.hashed)
-                silent = new_value == old_value
+                silent = safe_identity_test(new_value, old_value)
             
         except:
             traceback.print_exc()

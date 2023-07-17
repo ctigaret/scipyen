@@ -1176,6 +1176,7 @@ def json2python(jsonobj):
     
     ret = dict()
     for key, val in jsonobj.items():
+        # print(f"json2python key = {key}; val = {val}")
         if key == "python_type":
             if val == "None":
                 return None
@@ -1221,12 +1222,16 @@ def json2python(jsonobj):
             return inspect.getattr_static(owner, name)
             
         elif key == "python_object":
-            obj_type = resolveObject(val["instance_module"], val["instance_type"])
+            if val["instance_type"] == "dtype":
+                obj_type = np.dtype
+            else:
+                obj_type = resolveObject(val["instance_module"], val["instance_type"])
 
             if obj_type is MISSING:
                 # NOTE: 2021-12-22 23:24:38 
                 # could not import obj_type; try to recreate it here
                 type_factory_spec = val["type_factory"]
+                # print(f"json2python type_factory_spec = {type_factory_spec}")
                 if isinstance(type_factory_spec, dict):
                     signature = type_factory_spec["signature"]
                     type_factory_func = resolveObject(signature["module"], 

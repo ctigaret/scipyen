@@ -35,10 +35,11 @@ from core.datatypes import (Episode, Schedule, TypeEnum)
 import plots.plots as plots
 import core.models as models
 import core.neoutils as neoutils
-
 from core.neoutils import (clear_events, get_index_of_named_signal, is_empty, 
                            concatenate_blocks, concatenate_signals,
                            average_segments)
+
+from core.sysutils import adapt_ui_path
 
 import core.triggerprotocols as tp
 from core.triggerprotocols import (TriggerProtocol,
@@ -104,9 +105,13 @@ LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.
 optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+__ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
+    
 
 #__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"))
-__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
+# __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
+# __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__ui_path__,"LTPWindow.ui"), 
+__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
@@ -1913,7 +1918,7 @@ def segment_synplast_params_v_clamp(s: neo.Segment,
         
         testVm  = Vss - Vbase
 
-    #print("testVm", testVm)
+    # print("testVm", testVm)
     
     Rs     = (testVm / (Irs - Idc)).rescale(pq.Mohm)
     Rin    = (testVm / (Irin - Idc)).rescale(pq.Mohm)

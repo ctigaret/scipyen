@@ -2554,6 +2554,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
 
     @classmethod
     def launch(cls, argv=None, existing:typing.Optional[str]=None, **kwargs):
+        
+        # NOTE: 2023-07-15 21:33:52
         # the launch_instance mechanism in jupyter and qtconsole does not return
         # an instance of this python "app"
         #scipyenvdir = os.getenv("CONDA_PREFIX")
@@ -2585,6 +2587,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # allow launching with an external kernel
         if isinstance(existing, str) and len(existing.strip()):
             app.existing = existing
+            
         app.initialize(argv)
         app.start()
 

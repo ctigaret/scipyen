@@ -100,31 +100,51 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
                   ):
     """Membrane test measurements.
 
-Var-keyword parameters:
-------------------------
-1) passed to signalprocessing.detect_boxcar()
-
-levels_method:str, one of "state_levels" or "kmeans" default is "state_levels"
-box_size:int length of smoothing boxcar default is 0 (no smoothing)
-adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
-
 """
     # check for signals consistency; command MAY BE a scalar (i.e. the amount
     # of Vm change (in voltage-clamp) or injected curent (in current clamp)
     if not isinstance(signal, (neo.AnalogSignal, DataSignal)):
         raise TypeError(f"'signal' expected to be an AnalogSignal or DataSignal; instead, got {type(signal).__name__}")
-    
-    if not isinstance(command, neo.core.basesignal.BaseSignal):
+
+
+    if isinstance(command, neo.core.basesignal.BaseSignal): # analogsignal, or DataSignal
+        # check if both signal and command habe identical domains (or "time base")
+        if command.shape[0] != signal.shape[0]:
+            raise ValueError(f"Signal and command must have same number of samples on axis 0")
+        
+        if command.times.units != signal.times.units and not scq.units_convertible(command.times.units, signal.times.units):
+            raise ValueError(f"Signal and command must have compatible domain units")
+        
+        if command.t_start != signal.t_start:
+            raise ValueError(f"Signal and command must have same start time")
+        
+        if command.sampling_rate != signal.sampling_rate:
+            raise ValueError(f"Signal and command must have same sampling rate")
+        
+    elif not isinstance(command, neo.core.basesignal.BaseSignal):
         if isinstance(command, pq.Quantity) and command.size > 1:
             raise TypeError(f"When not a signal, command was expected to be a scalar Quantity or number")
         
     elif not isinstance(command, numbers.Number):
         raise TypeError(f"When not a signal, command was expected to be a scalar Quantity or number")
     
+    boxwidth = kwargs.pop("boxwidth", None)
+    
+    if isinstance(boxwidth, (tuple, list)) and len(boxwidth) == 2: # lower & upper boxcar widths
+        if not all(isinstance(v, pq.Quantity) and v.size == 1 for v in boxwidth):
+            raise TypeError("'boxwidth' must contain scalar Quantities")
+        
+    elif boxwidth is not None:
+        raise TypeError(f"'boxwidth' expected to be a 2-tuple or None; got {type(boxwidth).__name__} instead")
+    
+    
+    
+    # NOTE: 2023-07-01 22:19:22
+    # detect clamp mode if not specified 
     if not isinstance(clampMode, ephys.ClampMode) or clampMode == ephys.ClampMode.NoClamp:
         if isinstance(command, (neo.core.basesignal.BaseSignal, pq.Quantity)):
-            vc_mode = scq.check_eletrical_current_units(signal) and scq.check_electrical_potential_units(command)
-            ic_mode = scq.check_electrical_potential_units(signal) and scq.check_eletrical_current_units(command)
+            vc_mode = scq.check_electrical_current_units(signal) and scq.check_electrical_potential_units(command)
+            ic_mode = scq.check_electrical_potential_units(signal) and scq.check_electrical_current_units(command)
             
             clampMode = ephys.ClampMode.VoltageClamp if vc_mode else epys.ClampMode.CurrentClamp if ic_mode else ephyc.ClampMode.NoClamp
             
@@ -150,14 +170,14 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
     # hardware or, failing that, on the user assigning the correct units and scaling
     # post-hoc.
     if clampMode == ephys.ClampMode.VoltageClamp:
-        if not scq.check_eletrical_current_units(signal):
+        if not scq.check_electrical_current_units(signal):
             warings.warn(f"'signal' has wrong units ({signal.units}) for VoltageClamp mode.\nThe signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
             klass = type(signal)
             signal = klass(signal.magnitude, units = pq.pA, 
                                          t_start = signal.t_start, sampling_rate = signal.sampling_rate,
                                          name=signal.name)
             
-        if isinstance(command, pq.Quantity):
+        if isinstance(command, pq.Quantity):# scalar Quantity, or Quantity array (including signal)
             if not scq.check_electrical_potential_units(command):
                 if isinstance(command, neo.core.basesignal.BaseSignal):
                     warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
@@ -182,7 +202,7 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
                                          name=signal.name)
             
         if isinstance(command, pq.Quantity):
-            if not scq.check_eletrical_current_units(command):
+            if not scq.check_electrical_current_units(command):
                 if isinstance(command, neo.core.basesignal.BaseSignal):
                     warings.warn(f"'command' has wrong units ({command.units}) for CurrentClamp mode.\nThe command signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
                     klass = type(command)
@@ -213,15 +233,37 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
     # it is more likely for a depolarizing current injection boxcar to elicit APs
     # so better to use a hyperpolarizing one.
     if isinstance(command, neo.core.basesignal.BaseSignal):
-        u, d, test_amplitude, _, _ = sigp.detect_boxcar(command, **kwargs)
+        up_first = kwargs.pop("up_first", True)
+        u, d, test_amplitude, levels, labels, upward = sigp.detect_boxcar(command, up_first=up_first,
+                                                                          **kwargs)
+        
+        if u.size != d.size:
+            raise RuntimeError(f"The 'command' signal should have the same number of state transitions in both directions; currently, there are {d.size} down and {u.size} up transitions")
+        
+        if isinstance(upward, (tuple, list)) and not all(upward[0] == v for v in upward):
+            raise RuntimeError("All boxcars must be in the same direction")
+        
+        if any(v.size > 1 for v in (d,u)): # more than one boxcar detected
+            if boxwidth is None:
+                raise RuntimeError("More than one transition between levels has been detected and no constraints on boxcar width were specified ('boxwidth')")
+            
+            else:
+                if u.size == d.size and all(v == upward[0] for v in upward):
+                    if up_first:
+                        widths = d-u if upward[0] else u-d
+                    else:
+                        widths = u-d if upward[0] else d-u
+                        
+            
+                        
+                    
+                
+        
         if d.ndim > 0:
             d = d[0]
             
         if u.ndim > 0:
             u = u[0]
-            
-        if any(v.size > 1 for v in (d,u)):
-            raise RuntimeError("More than one transition between levels has been detected")
             
         start, stop = (min(d,u), max(d,u))
         
@@ -251,8 +293,36 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
     #   value that is relevant is the amplitude of the test, which was 
     #   determined above)
     
+    if locations is None:
+        if all(v is None for v in (start, stop)):
+            raise TypeError(f"locations must be specified when command is not a signal")
+        
+        if not isinstance(command, neo.core.basesignal.BaseSignal):
+            raise ValueError("When no locations are specified, the command must be a signal object")
+        
+        up_first = kwargs.pop("up_first", True)
+        
+        if not isinstance(up_first, bool):
+            raise TypeError(f"The 'up_first' parameter expected a bool; instead, got {type(up_first).__name__}")
+        
+        kwargs["up_first"] = up_first
+        
+        boxdetect = sigp.detect_boxcar(command, **kwargs)
+        
+        if any(boxdetect[k] is None for k in (1,2)):
+            raise ValueError("The command signal does not appear to contain a boxcar waveform")
+
+        if boxdetect[0].size != boxdetect[1].size:
+            raise ValueError(f"Mismatch between the number of low → high transitions ({boxdetect[0].size}) and that of high → low transitions ({boxdetect[1].size})")
+        
+        nboxcars = min(boxdetect[0].size)
+        
+            
+        
+        
+    
     if not isinstance(locations, (list,tuple)):
-        raise TypeError(f"Expecting a sequence of location")
+        raise TypeError(f"Expecting a sequence of locations")
     
     # check if locations are as many as needed, given the clamping mode
     # (see above)
@@ -264,10 +334,22 @@ adcres, adcrange, adcscale → all floats see signalprocessing.state_levels()
     # the code)
     # 
     # in VoltageClamp mode:
-    #   use the *_difference functions with location 0 and location 1 ⇒ Rs
-    #   use the *_difference functions with location 0 and location 2 ⇒ Rin
+    #   we need three locations: DC, Rs and Rin:
+    #       when command is a signal, and locations are NOT given, we need to
+    #       detect a boxcar waveform in the command; when successful:
+    #       • use the boxcar up as the center of the Rs interval (locaation 1)
+    #       • use the baseline BEFORE the boxcar "up" and up to start of Rs interval
+    #           from above, as the DC location (location 0)
+    #       • use the 1/10 of the boxcar up → boxcar down ending with boxcar down
+    #           as the steady-state, for location 2 (Rin)
+    #            NOTE make this fraction a function parameter
     #
-    # in CurrentClamp mode:
+    #
+    #       for Rs, use the max (if upwards) or nadir (if downward) on location 1
+    #       for DC, use signal mean on location 0
+    #       use the *_difference functions with location 0 and location 2 ⇒ Rin
+    #
+    # in CurrentClamp mode: --  see also passive_Iclamp function; merge here
     #   use the *_difference functions with locations 0 and 2 ⇒ Rin
     #   
     #   use *_difference with locations 0 and 3 to calculate sag
@@ -1756,7 +1838,10 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     return data
     
 
-def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, steadyStateDuration = 0.05 * pq.s, box_size = 0, Iinj=None):
+def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, 
+                   steadyStateDuration = 0.05 * pq.s, 
+                   box_size = 0, 
+                   Iinj=None):
     """
     Square pulse current injection in I-clamp experiments.
     
