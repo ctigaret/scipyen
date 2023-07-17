@@ -11325,6 +11325,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             except:
                 analysisOptions = dict()
                 
+            if analysisOptions is None:
+                analysisOptions = dict()
+                
             if "Discrimination" not in analysisOptions:
                 analysisOptions["Discrimination"] = collections.OrderedDict()
                 analysisOptions["Discrimination"].update(default_options["Discrimination"])
