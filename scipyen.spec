@@ -250,8 +250,11 @@ with open(desktop_file_name, "wt") as desktop_file:
         desktop_file.write(f"{line}\n")
         
 dist_install_script = ["#!/bin/bash",
-                       "ln -b -s scipyen /usr/local/bin/scipyen",
-                       "ln -s -b Scipyen.desktop /usr/share/applications/Scipyen.desktop"]
+                       "mydir=`dirname $0`",
+                       "whereami=`realpath ${mydir}",
+                       "chown -R root:root ${whereami}",
+                       "ln -s -b ${whereami}/scipyen /usr/local/bin/",
+                       "ln -s -b ${whereami}/Scipyen.desktop /usr/share/applications/"]
 
 install_script_tempdir = tempfile.mkdtemp()
 dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
