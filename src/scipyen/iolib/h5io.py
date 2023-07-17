@@ -1448,8 +1448,12 @@ def extract_array_annotations(obj):
         # is a bit misleading), and NOT the same as then number of fields
         # in the ArrayDict !!! (each field is a numpy array)
         # 
-        if array_annotations.length == obj.shape[1]:
-            arrann = dict(array_annotations)
+        
+        # print(f"h5io.extract_array_annotations: obj shape= {obj.shape}, array_annotations = {array_annotations}")
+        arrann = dict(array_annotations)
+            
+        # if array_annotations.length == obj.shape[1]:
+        #     arrann = dict(array_annotations)
                 
     return arrann
                 

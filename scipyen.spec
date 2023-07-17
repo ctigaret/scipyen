@@ -217,9 +217,12 @@ if os.path.isdir(os.path.join(mydir, ".git")):
 product = f"scipyen{namesfx}"
 bundlepath = os.path.join(distpath, product)
 
+print(f"bundlepath = {bundlepath}")
+
 desktoptempdir = tempfile.mkdtemp()
 desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
-desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
+# desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
+desktop_icon_file = "pythonbackend.svg"
 exec_file = os.path.join(bundlepath, "scipyen")
 desktop_file_contents = ["[Desktop Entry]",
 "Type=Application"
@@ -246,7 +249,8 @@ with open(desktop_file_name, "wt") as desktop_file:
     for line in desktop_file_contents:
         desktop_file.write(f"{line}\n")
 
-datas.append((desktop_file_name, '.'))
+datas.append((os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg"), '.'))
+datas.append()
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08

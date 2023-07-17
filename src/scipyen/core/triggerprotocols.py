@@ -51,7 +51,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.datatypes import (is_string, 
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
-from core.quantities import check_time_units
+from core.quantities import check_time_units, units_convertible
 from core.neoutils import (get_index_of_named_signal, remove_events, clear_events,
                            is_same_as, get_events)
 
@@ -1586,7 +1586,10 @@ def detect_trigger_events(x, event_type,
     if not isinstance(use_lo_hi, bool):
         raise TypeError("'use_lo_hi' parameter expected to be a boolean; got %s instead" % type(use_lo_hi).__name__)
    
-    lo_hi, hi_lo,_, _, _ = detect_boxcar(x)
+    # lo_hi, hi_lo, _, _ , _, upward = detect_boxcar(x)
+    boxdetect = detect_boxcar(x)
+    print(f"triggerprotocols.detect_trigger_events boxdetect = {boxdetect}")
+    lo_hi, hi_lo, _ampl, _lvl, _lbl, _up = boxdetect
     
     if all([v is None for v in (lo_hi, hi_lo)]):
         return

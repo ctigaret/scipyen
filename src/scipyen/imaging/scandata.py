@@ -1336,6 +1336,9 @@ class ScanData(BaseScipyenData):
     """Encapsulates data from laser scanning imaging and electrophysiology data.
 
     Work in progress.
+        
+    TODO: 2023-07-17 10:13:17
+        contemplate migration of anaysisOptions (dict) to ScanDataOptions
     
     TODO/FIXME 2018-09-14 10:28:13 - place on back-burner...
     collapse scene and scans data into a multi-channel
@@ -1572,7 +1575,8 @@ class ScanData(BaseScipyenData):
                                 self.metadata, kw))
             
     @safeWrapper
-    def __init__(self, scans=None, scene=None, electrophysiology=None, metadata=None, **kwargs):
+    def __init__(self, scans=None, scene=None, electrophysiology=None, 
+                 metadata=None, **kwargs):
         """Constructs a ScanData object.
         
         Named parameters:
