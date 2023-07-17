@@ -225,7 +225,7 @@ desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
 desktop_icon_file = "pythonbackend.svg"
 exec_file = os.path.join(bundlepath, "scipyen")
 desktop_file_contents = ["[Desktop Entry]",
-"Type=Application"
+"Type=Application",
 "Name[en_GB]=Scipyen",
 "Name=Scipyen",
 "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
@@ -239,7 +239,7 @@ f"Icon={desktop_icon_file}",
 "Path=",
 "StartupNotify=true",
 "Terminal=true",
-"TerminalOptions=\s",
+"TerminalOptions=\s--noclose",
 "X-DBUS-ServiceName=",
 "X-DBUS-StartupType=",
 "X-KDE-SubstituteUID=false",
@@ -248,9 +248,21 @@ f"Icon={desktop_icon_file}",
 with open(desktop_file_name, "wt") as desktop_file:
     for line in desktop_file_contents:
         desktop_file.write(f"{line}\n")
+        
+dist_install_script = ["#!/bin/bash",
+                       "ln -b -s scipyen /usr/local/bin/scipyen",
+                       "ln -s -b Scipyen.desktop /usr/share/applications/Scipyen.desktop"]
 
+install_script_tempdir = tempfile.mkdtemp()
+dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
+
+with open(dist_install_script_name, "wt") as dist_install:
+    for line in dist_install_script:
+        dist_install.write(f"{line}\n")
+        
 datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
 datas.append((desktop_file_name, '.'))
+datas.append((dist_install_script_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
