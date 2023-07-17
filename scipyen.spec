@@ -250,7 +250,7 @@ with open(desktop_file_name, "wt") as desktop_file:
         desktop_file.write(f"{line}\n")
 
 datas.append((os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg"), '.'))
-datas.append()
+datas.append((desktop_file_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
