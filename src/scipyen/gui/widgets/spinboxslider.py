@@ -4,10 +4,13 @@ from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.uic import loadUiType as __loadUiType__
 
+from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+__ui_path__ = adapt_ui_path(__module_path__, "spinboxslider.ui")
 
-Ui_SpinBoxSlider, QWidget = __loadUiType__(os.path.join(__module_path__, "spinboxslider.ui"))
+Ui_SpinBoxSlider, QWidget = __loadUiType__(__ui_path__)
+# Ui_SpinBoxSlider, QWidget = __loadUiType__(os.path.join(__module_path__, "spinboxslider.ui"))
 
 class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     """Compound widget with a QSpinBox and QSlider.

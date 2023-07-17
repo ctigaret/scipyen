@@ -21,7 +21,6 @@ import vigra
 #from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
 from PyQt5 import (QtCore, QtWidgets, QtGui,)
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.uic import loadUiType as __loadUiType__ 
 #### END 3rd party modules
 
 #### BEGIN scipyen modules

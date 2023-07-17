@@ -36,39 +36,30 @@ import math
 from collections import (ChainMap, namedtuple, defaultdict, OrderedDict,)
 from functools import (partial, partialmethod,)
 from enum import (Enum, IntEnum,)
-#from abc import ABCMeta, ABC
 from copy import copy
-#from traitlets.utils.bunch import Bunch
 
 
 #### END core python modules
 
 #### BEGIN 3rd party modules
-#import vigra.pyqt.quickdialog as quickdialog
-# import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
 import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
-
-#print("pgui __name__", __name__, "__module_path__", __module_path__)
 
 #### BEGIN pict.core modules
 from core.traitcontainers import DataBag
 from core.prog import (safeWrapper, deprecated,
                        timefunc, processtimefunc,)
-#from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen
-
 
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
 from . import quickdialog
-from . import resources_rc
+from . import resources_rc # OK this is resources_rc.py
 # NOTE: 2023-07-12 09:23:22 are these needed here? FIXME/TODO
 from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,
                            PlanarGraphics, Point, Quad, Rect, Text, VerticalCursor,
@@ -77,14 +68,6 @@ from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, P
                            __new_planar_graphic__, printQPainterPath)
 
 #### END pict.gui modules
-
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
-
-#Ui_EditColorMapWidget, QWidget = __loadUiType__(os.path.join(__module_path__,"widgets","editcolormap2.ui"))
-
-# Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,"itemslistdialog.ui"))
-
-# Ui_LinearRangeMappingWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "linearrangemappingwidget.ui"))
 
 # FIXME 2023-07-12 09:24:29 TODO
 # from BEGIN to END below move to another module (e.g. guiutils? or scipyen_colormaps?)

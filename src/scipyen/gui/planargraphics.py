@@ -151,7 +151,6 @@ import numpy as np
 from traitlets import Bunch
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
 #### END 3rd party modules
 
 #### BEGIN core modules

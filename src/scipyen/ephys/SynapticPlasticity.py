@@ -65,7 +65,12 @@ from ephys.ltp import PathwayType, SynapticPathway
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
+__ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
+
+
+# __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
+# __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__ui_path__,"LTPWindow.ui"), 
+__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 

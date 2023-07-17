@@ -768,7 +768,7 @@ fi
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
 docdir=${scipyendir}/doc
-installscriptdir=${docdir}/indtall
+installscriptdir=${docdir}/install
 # docdir=`dirname "$installscriptdir"`
 # scipyendir=`dirname "$docdir"`
 scipyensrcdir=${scipyendir}/src/scipyen

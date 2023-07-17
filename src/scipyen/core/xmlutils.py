@@ -30,7 +30,7 @@ import xml.dom.minidom
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5
 from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
-from PyQt5.uic import loadUiType as __loadUiType__
+# from PyQt5.uic import loadUiType as __loadUiType__
 #from datatypes import DataBag
 # NOTE: use Python re instead of QRegExp
 import re

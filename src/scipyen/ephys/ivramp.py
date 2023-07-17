@@ -53,7 +53,7 @@ import gui.signalviewer as sv
 import ephys.ephys as ephys
 #### END pict.ephys modules
 
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
+# __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 #_Ui_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPGUI.ui"))
 

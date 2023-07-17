@@ -206,7 +206,12 @@ def loadHDF5File(fName:str):
     """
     # raise NotImplementedError("Not yet...")
     with h5py.File(fName) as h5file:
-        return h5io.read_hdf5(h5file)
+        try:
+            ret = h5io.read_hdf5(h5file)
+        except:
+            traceback.print_exc()
+    # print(f"pictio.loadHDF5File {fName} ⇒ {ret}")
+    return ret
         
     
 # NOTE: 2017-09-21 16:34:21
