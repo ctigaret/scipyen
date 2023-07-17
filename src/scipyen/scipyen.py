@@ -61,14 +61,17 @@ __version__ = "0.0.1"
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
+__bundled__ = False
+
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     print(f'\nScipyen is running in a PyInstaller bundle with frozen modules: {sys.frozen}; _MEIPASS: {sys._MEIPASS}; __file__: {__file__}\n\n')
-    print("WARNING: External consoles (including NEURON) are currently NOT supported\n\n")
+    # print("WARNING: External consoles (including NEURON) are currently NOT supported\n\n")
     if os.path.isfile(os.path.join(__module_path__, "bundle_origin")):
         with open(os.path.join(__module_path__, "bundle_origin"), "rt", encoding="utf-8") as origin_file:
             for line in origin_file:
                 print(line, end="")
     # os.environ["SCIPYEN_UI_PATH"] = "UI"
+    __bundled__ = True
 else:
     print('Running in a normal Python process\n\n')
     
@@ -164,7 +167,7 @@ def main():
         #import pudb
         
         # 2. initialize main window
-        mainWindow = mainwindow.ScipyenWindow(app)# qsettings = qsettings)
+        mainWindow = mainwindow.ScipyenWindow(app, bundled = __bundled__)# qsettings = qsettings)
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?

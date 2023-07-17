@@ -1266,7 +1266,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         return sw_f
 
     # @processtimefunc
-    def __init__(self, app: QtWidgets.QApplication, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
+    def __init__(self, app: QtWidgets.QApplication, 
+                 parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
         """Scipyen's main window initializer (constructor).
 
         Parameters:
@@ -1307,6 +1308,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # • QtWidgets.qApp.instance()
         # i.e. the global singleton instance of the QApplication running Scipyen
         self.app = app
+        
+        self._bundled_ = kwargs.pop("bundled", False)
 
         # NOTE: 2022-12-25 10:41:12
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
@@ -4437,43 +4440,44 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
-        self.actionExternalIPython = QtWidgets.QAction(
-            QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
+        if not self._bundled_:
+            self.actionExternalIPython = QtWidgets.QAction(
+                QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
         
-        self.actionExternalIPython.triggered.connect(
-            self.slot_launchExternalIPython)
+            self.actionExternalIPython.triggered.connect(
+                self.slot_launchExternalIPython)
         
-        self.menuConsoles.addAction(self.actionExternalIPython)
+            self.menuConsoles.addAction(self.actionExternalIPython)
 
-        if has_neuron:
-            self.actionExternalNrnIPython = QtWidgets.QAction(
-                QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
-            self.actionExternalNrnIPython.triggered.connect(
-                self.slot_launchExternalNeuronIPython)
-            self.menuConsoles.addAction(self.actionExternalNrnIPython)
+            if has_neuron:
+                self.actionExternalNrnIPython = QtWidgets.QAction(
+                    QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
+                self.actionExternalNrnIPython.triggered.connect(
+                    self.slot_launchExternalNeuronIPython)
+                self.menuConsoles.addAction(self.actionExternalNrnIPython)
 
-        self.menuWith_Running_Kernel = QtWidgets.QMenu(
-            "With Running Kernel", self)
-        
-        self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
-        
-        self.actionRunning_IPython = QtWidgets.QAction(
-            QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
-        
-        self.actionRunning_IPython.triggered.connect(
-            self.slot_launchExternalRunningIPython)
-        
-        self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
-
-        if has_neuron:
-            self.actionRunning_IPython_for_Neuron = QtWidgets.QAction(
-                QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
+            self.menuWith_Running_Kernel = QtWidgets.QMenu(
+                "With Running Kernel", self)
             
-            self.actionRunning_IPython_for_Neuron.triggered.connect(
-                self.slot_launchExternalRunningIPythonNeuron)
+            self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
             
-            self.menuWith_Running_Kernel.addAction(
-                self.actionRunning_IPython_for_Neuron)
+            self.actionRunning_IPython = QtWidgets.QAction(
+                QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
+            
+            self.actionRunning_IPython.triggered.connect(
+                self.slot_launchExternalRunningIPython)
+            
+            self.menuWith_Running_Kernel.addAction(self.actionRunning_IPython)
+
+            if has_neuron:
+                self.actionRunning_IPython_for_Neuron = QtWidgets.QAction(
+                    QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
+                
+                self.actionRunning_IPython_for_Neuron.triggered.connect(
+                    self.slot_launchExternalRunningIPythonNeuron)
+                
+                self.menuWith_Running_Kernel.addAction(
+                    self.actionRunning_IPython_for_Neuron)
 
         # self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
         self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)

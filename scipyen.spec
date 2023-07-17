@@ -288,7 +288,7 @@ binaries.extend(jc_binaries)
 hiddenimports.extend(jc_hiddenimports)
 # hiddenimports.extend(["python-dateutil", "pyzmq"])
 
-zmq_datas, zmq_binaries, zmq_hiddenimports = collect_all("zmq")
+zmq_datas, zmq_binaries, zmq_hiddenimports = collect_all("pyzmq")
 datas.extend(zmq_datas)
 binaries.extend(zmq_binaries)
 hiddenimports.extend(zmq_hiddenimports)
