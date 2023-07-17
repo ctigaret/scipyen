@@ -249,7 +249,7 @@ with open(desktop_file_name, "wt") as desktop_file:
     for line in desktop_file_contents:
         desktop_file.write(f"{line}\n")
 
-datas.append((os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg"), '.'))
+datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
 datas.append((desktop_file_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
