@@ -72,8 +72,8 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
                 print(line, end="")
     # os.environ["SCIPYEN_UI_PATH"] = "UI"
     __bundled__ = True
-else:
-    print('Running in a normal Python process\n\n')
+# else:
+#     print('Running in a normal Python process\n\n')
     
 # NOTE: 2021-01-10 13:19:20
 # the same Configuration object holds/merges both the user options and the 

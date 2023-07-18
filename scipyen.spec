@@ -2,6 +2,8 @@
 import io, os, sys, subprocess, shutil, tempfile, typing
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
+from PyInstaller.building.datastruct import Tree
+
 hasNeuron=False
 try:
     import neuron
@@ -136,10 +138,28 @@ def DataFiles(topdir, ext, **kw):
         # return [file2entry(filename, topdirparts, destination=destination) for filename in items]
     
     return TOC(
-        file2TOCEntry(filename, topdirparts)
-        for filename in items
-        if os.path.isfile(filename))
+        file2TOCEntry(filename, topdirparts) for filename in items if os.path.isfile(filename))
 
+def getQt5Plugins():
+    pout = subprocess.run(["qtpaths-qt5", "--plugin-dir"], 
+                          encoding="utf-8", capture_output=True)
+    
+    if pout.returncode != 0:
+        raise RuntimeError(f"The subprocess for qtpaths-qt5 returned {pout.returncode}")
+    
+    plugins_dir = pout.stdout.strip("\n")
+    
+    # items = scanForFiles(plugins_dir, ".so", True)
+    
+#     ret = list()
+#     
+#     pfx = "PyQt5/Qt5/plugins"
+#     
+#     for filename in items:
+        
+    
+    return Tree(root=plugins_dir, prefix="PyQt5/Qt5/plugins", typecode="BINARY")
+    
 block_cipher = None
 
 # uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", strip_path=True)
@@ -312,6 +332,12 @@ datas.extend(zmq_datas)
 binaries.extend(zmq_binaries)
 hiddenimports.extend(zmq_hiddenimports)
 
+qt5plugins_toc = getQt5Plugins()
+
+print(f"qt5plugins_toc = {qt5plugins_toc}")
+
+# binaries.extend(qt5plugins)
+
 # NOTE: 2023-07-15 10:47:12
 # stuff that the PyInstaller built-in hooks for PyQt5 is definitely missing:
 # kde extensions & plugins (that's OK as we don't have python bindings for it)
@@ -382,13 +408,13 @@ exe = EXE(
 )
 coll = COLLECT(
     exe,
-    a.binaries,
+    a.binaries + qt5plugins_toc,
     a.zipfiles,
     a.datas,
     strip=False,
     upx=True,
     upx_exclude=[],
-    name=product, # name of distribution directry (e.g, 'scipyen_dev' etc)
+    name=product, # name of distribution directory (e.g, 'scipyen_dev' etc)
     # name='scipyen',
 )
 

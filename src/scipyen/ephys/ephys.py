@@ -435,8 +435,126 @@ class ElectrodeMode(TypeEnum):
     Tetrode=16          # these are really for 
     LinearArray=32      # local field potentials etc
     MultiElectrodeArray=64 # MEAs on a culture/slice?
+   
+def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
+                    command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
+    """Infers the clamping mode from the units of signal and command"""
+    vc_mode = scq.check_electrical_current_units(signal) and scq.check_electrical_potential_units(command)
+    ic_mode = scq.check_electrical_potential_units(signal) and scq.check_electrical_current_units(command)
     
+            
+    clampMode = ClampMode.VoltageClamp if vc_mode else ClampMode.CurrentClamp if ic_mode else ClampMode.NoClamp
+
+    return clampMode
+
+def checkClampMode(clampMode:ClampMode, signal:typing.Union[neo.AnalogSignal, DataSignal],
+                   command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity, numbers.Number]) -> tuple:
+    """Verifies that the clamping mode in clampMode is applicable to the signal & command.
+Returns the signal and the command, possibly with units modified as expected for the specified clamping mode"""
+    if clampMode == ClampMode.VoltageClamp:
+        if not scq.check_electrical_current_units(signal):
+            warnings.warn(f"'signal' has wrong units ({signal.units}) for VoltageClamp mode.\nThe signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
+            klass = type(signal)
+            signal = klass(signal.magnitude, units = pq.pA, 
+                                         t_start = signal.t_start, sampling_rate = signal.sampling_rate,
+                                         name=signal.name)
+            
+        if isinstance(command, pq.Quantity):# scalar Quantity, or Quantity array (including signal)
+            if not scq.check_electrical_potential_units(command):
+                if isinstance(command, (neo.AnalogSignal, DataSignal)):
+                    warnings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+                    klass = type(command)
+                    command = klass(command.magnitude, units = pq.mV, 
+                                                t_start = command.t_start, sampling_rate = command.sampling_rate,
+                                                name=command.name)
+                    
+                else:
+                    warnings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+                    command = command.magnitude * pq.mV
+                
+        else: # command is a number
+            command = command * pq.mV
+        
+    else: # current clamp mode
+        if not scq.check_electrical_potential_units(signal):
+            warnings.warn(f"'signal' has wrong units ({signal.units}) for CurrentClamp mode.\nThe signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
+            klass = type(signal)
+            signal = klass(signal.magnitude, units = pq.mV, 
+                                         t_start = signal.t_start, sampling_rate = signal.sampling_rate,
+                                         name=signal.name)
+            
+        if isinstance(command, pq.Quantity):
+            if not scq.check_electrical_current_units(command):
+                if isinstance(command, (neo.AnalogSignal, DataSignal)):
+                    warnings.warn(f"'command' has wrong units ({command.units}) for CurrentClamp mode.\nThe command signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
+                    klass = type(command)
+                    command = klass(command.magnitude, units = pq.pA, 
+                                                t_start = command.t_start, sampling_rate = command.sampling_rate,
+                                                name=command.name)
+                    
+                else:
+                    warnings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
+                    command = command.magnitude * pq.pA
+                    
+        else: # command is a number
+            command  = command * pq.pA
+                
+    return signal, command
+
+def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal], 
+                       **kwargs) -> tuple:
+    """Detects or checks the timing and amplitude of the command signal for a membrane test (boxcar).
+Returns a tuple (start, stop, test_amplitude)"""
+    up_first = kwargs.pop("up_first", True)
+    boxduration = kwargs.pop("boxduration", None) # tuple min , max
     
+    if isinstance(boxduration, (tuple, list)) and len(boxduration) == 2: # lower & upper boxcar widths
+        if not all(isinstance(v, pq.Quantity) and v.size == 1 for v in boxduration):
+            raise TypeError("'boxduration' must contain scalar Quantities")
+        
+    elif boxduration is not None:
+        raise TypeError(f"'boxduration' expected to be a 2-tuple or None; got {type(boxduration).__name__} instead")
+    
+    u, d, test_amplitude, levels, labels, upward = sigp.detect_boxcar(command, up_first=up_first,
+                                                                        **kwargs)
+    
+    if u.size != d.size:
+        raise RuntimeError(f"The 'command' signal should have the same number of state transitions in both directions; currently, there are {d.size} down and {u.size} up transitions")
+    
+    if isinstance(upward, (tuple, list)) and not all(upward[0] == v for v in upward):
+        raise RuntimeError("All boxcars must be in the same direction")
+    
+    if any(v.size > 1 for v in (d,u)): # more than one boxcar detected
+        if boxduration is None:
+            raise RuntimeError("More than one transition between levels has been detected and no constraints on boxcar width were specified ('boxduration')")
+        
+        else:
+            if u.size == d.size and all(v == upward[0] for v in upward):
+                if up_first:
+                    widths = d-u if upward[0] else u-d
+                else:
+                    widths = u-d if upward[0] else d-u
+                    
+                ndx = np.where((widths >= boxduration[0]) & (widths <= boxduration[1]))[0]
+                
+                if ndx.size != 1:
+                    raise RuntimeError(f"{ndx.size} boxcars have been detected with width between {boxduration[0]} and {boxduration[1]} when one was expected")
+                
+                ndx = ndx[0]
+                # TODO: 2023-07-18 00:09:39
+                # now, select down & up according to up_first and upward[0]
+                    
+    if d.ndim > 0:
+        d = d[0]
+        
+    if u.ndim > 0:
+        u = u[0]
+        
+    start, stop = (min(d,u), max(d,u))
+    
+    return start, stop, test_amplitude 
+        
+
 def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], start:int = 0, span:int=1, isISI:bool=False):
     """Calculates the reciprocal of an inter-event interval.
     
