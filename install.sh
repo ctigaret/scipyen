@@ -331,9 +331,9 @@ function dopyqt5 ()
                 echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5done
                 echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
                 
-                echo -e "\n\n Installing PyQtDataVisualization\n\n"
-                
-                pip install PyQtDataVisualization
+#                 echo -e "\n\n Installing PyQtDataVisualization\n\n"
+#                 # NOTE: WARNING: 2023-07-19 00:12:27 avoid this !!!! 
+#                 pip install PyQtDataVisualization
             fi
         fi
     fi
@@ -846,10 +846,25 @@ for i in "$@" ; do
             pyqt5)
             reinstall_pyqt5=1
             ;;
+            PyQt5)
+            reinstall_pyqt5=1
+            ;;
             vigra)
             reinstall_vigra=1
             ;;
+            VIGRA)
+            reinstall_vigra=1
+            ;;
+            Vigra)
+            reinstall_vigra=1
+            ;;
             neuron)
+            reinstall_neuron=1
+            ;;    
+            Neuron)
+            reinstall_neuron=1
+            ;;    
+            NEURON)
             reinstall_neuron=1
             ;;    
             pips)
