@@ -3273,8 +3273,6 @@ def _(obj, **kwargs):
             sourceMetaData["annotations"] = dict()
     # ### END
     
-    toCopy = kwargs.pop("copy", True)
-    
     data_child_object_names = [_container_name(s) for s in obj._data_child_objects]
     
     not_kwargs = dict()
@@ -3301,10 +3299,7 @@ def _(obj, **kwargs):
             print(f"*****\nInvalid {container_name} indices ({indices}) for {obj.__class__.__name__} object {getattr(obj, 'name', None)} with {len(container)} {pluralize('element', len(container))} \n*****\n")
             raise
         
-        if toCopy:
-            keep_data = list(make_neo_object(container[k]) for k in keep_ndx) # copy c'tor
-        else:
-            keep_data = list(container[k] for k in keep_ndx) # store a reference
+        keep_data = list(make_neo_object(container[k]) for k in keep_ndx) # copy c'tor
             
         for d in keep_data:
             d.segment = ret

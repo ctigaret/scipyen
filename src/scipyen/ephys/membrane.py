@@ -96,8 +96,7 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
                                              typing.Sequence[typing.Union[Interval, type(MISSING)]]]] = None,
                   clampMode:typing.Optional[ephys.ClampMode] = None,
                   channel:typing.Optional[int] = None,
-                  **kwargs
-                  ):
+                  **kwargs):
     """Membrane test measurements.
 
 """
@@ -128,95 +127,24 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
     elif not isinstance(command, numbers.Number):
         raise TypeError(f"When not a signal, command was expected to be a scalar Quantity or number")
     
-    boxwidth = kwargs.pop("boxwidth", None)
-    
-    if isinstance(boxwidth, (tuple, list)) and len(boxwidth) == 2: # lower & upper boxcar widths
-        if not all(isinstance(v, pq.Quantity) and v.size == 1 for v in boxwidth):
-            raise TypeError("'boxwidth' must contain scalar Quantities")
-        
-    elif boxwidth is not None:
-        raise TypeError(f"'boxwidth' expected to be a 2-tuple or None; got {type(boxwidth).__name__} instead")
-    
-    
     
     # NOTE: 2023-07-01 22:19:22
     # detect clamp mode if not specified 
     if not isinstance(clampMode, ephys.ClampMode) or clampMode == ephys.ClampMode.NoClamp:
         if isinstance(command, (neo.core.basesignal.BaseSignal, pq.Quantity)):
-            vc_mode = scq.check_electrical_current_units(signal) and scq.check_electrical_potential_units(command)
-            ic_mode = scq.check_electrical_potential_units(signal) and scq.check_electrical_current_units(command)
-            
-            clampMode = ephys.ClampMode.VoltageClamp if vc_mode else epys.ClampMode.CurrentClamp if ic_mode else ephyc.ClampMode.NoClamp
-            
+            clampMode = ephys.detectClampMode(signal, command)
             if clampMode not in (ephys.ClampMode.VoltageClamp, ephys.ClampMode.CurrentClamp):
                 raise RuntimeError(f"Cannot determine the clamping mode from the units of signal ({signal.units}) and command ({command.units}). \nPlease specify a valid clampMode (either ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp) manually")
 
         else:
-            raise TypeError(f"Clamping mode ('clampMode') must be specified as ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp")
+            raise TypeError(f"Either specify a clamping mode ('clampMode') as ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp, or padd 'command' as a Python Quantity or signal-like object")
         
-    if clampMode == ephys.ClampMode.NoClamp:
-        raise ValueError(f"For a membrane test, the clamping mode must be either ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp")
-    
-    # check for units correctness, force to correct units (I know you may be 
-    # frowning on that but sometimes the telegraphs don't quite work; so this is
-    # a temporary work-around for this contigency)
-    #
-    # TODO: 2023-06-19 13:08:23 - factor out in an ephys function
-    # this is very important and likely to happen in other scenarios, not just in
-    # the case of the membrane test.
-    # After all, we should be able to determine the clamping mode from the signals
-    # which is possible when the signals have got the units and scaling right.
-    # However, this relies on a telegraph being properly set up in the acquisition
-    # hardware or, failing that, on the user assigning the correct units and scaling
-    # post-hoc.
-    if clampMode == ephys.ClampMode.VoltageClamp:
-        if not scq.check_electrical_current_units(signal):
-            warings.warn(f"'signal' has wrong units ({signal.units}) for VoltageClamp mode.\nThe signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
-            klass = type(signal)
-            signal = klass(signal.magnitude, units = pq.pA, 
-                                         t_start = signal.t_start, sampling_rate = signal.sampling_rate,
-                                         name=signal.name)
-            
-        if isinstance(command, pq.Quantity):# scalar Quantity, or Quantity array (including signal)
-            if not scq.check_electrical_potential_units(command):
-                if isinstance(command, neo.core.basesignal.BaseSignal):
-                    warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
-                    klass = type(command)
-                    command = klass(command.magnitude, units = pq.mV, 
-                                                t_start = command.t_start, sampling_rate = command.sampling_rate,
-                                                name=command.name)
-                    
-                else:
-                    warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
-                    command = command.magnitude * pq.mV
-                
-        else: # command is a number
-            command = command * pq.mV
+    else:
+        if clampMode == ephys.ClampMode.NoClamp:
+            raise ValueError(f"For a membrane test, the clamping mode must be either ephys.ClampMode.VoltageClamp or ephys.ClampMode.CurrentClamp")
+        else:
+            signal, command = ephys.checkClampMode(clampMode, signal, command)
         
-    else: # current clamp mode
-        if not scq.check_electrical_potential_units(signal):
-            warings.warn(f"'signal' has wrong units ({signal.units}) for CurrentClamp mode.\nThe signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
-            klass = type(signal)
-            signal = klass(signal.magnitude, units = pq.mV, 
-                                         t_start = signal.t_start, sampling_rate = signal.sampling_rate,
-                                         name=signal.name)
-            
-        if isinstance(command, pq.Quantity):
-            if not scq.check_electrical_current_units(command):
-                if isinstance(command, neo.core.basesignal.BaseSignal):
-                    warings.warn(f"'command' has wrong units ({command.units}) for CurrentClamp mode.\nThe command signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
-                    klass = type(command)
-                    command = klass(command.magnitude, units = pq.pA, 
-                                                t_start = command.t_start, sampling_rate = command.sampling_rate,
-                                                name=command.name)
-                    
-                else:
-                    warings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
-                    command = command.magnitude * pq.pA
-                    
-        else: # command is a number
-            command  = command * pq.pA
-                
     # figure out:
     # • the timings of the boxcar ⇒ useful when locations are not given;
     #   (not used when command is a scalar quantity and we rely on locations)
@@ -232,45 +160,81 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
     # for curent-clamp, although both directions are mathematically acceptable,
     # it is more likely for a depolarizing current injection boxcar to elicit APs
     # so better to use a hyperpolarizing one.
-    if isinstance(command, neo.core.basesignal.BaseSignal):
-        up_first = kwargs.pop("up_first", True)
-        u, d, test_amplitude, levels, labels, upward = sigp.detect_boxcar(command, up_first=up_first,
-                                                                          **kwargs)
-        
-        if u.size != d.size:
-            raise RuntimeError(f"The 'command' signal should have the same number of state transitions in both directions; currently, there are {d.size} down and {u.size} up transitions")
-        
-        if isinstance(upward, (tuple, list)) and not all(upward[0] == v for v in upward):
-            raise RuntimeError("All boxcars must be in the same direction")
-        
-        if any(v.size > 1 for v in (d,u)): # more than one boxcar detected
-            if boxwidth is None:
-                raise RuntimeError("More than one transition between levels has been detected and no constraints on boxcar width were specified ('boxwidth')")
+    start = kwargs.pop("test_start", None)
+    stop = kwargs.pop("test_stop", None)
+    relative = kwargs.pop("relative_times", True)
+    
+    if any(not isinstance(v, pq.Quantity) or v.size != 1 or scq.check_time_units(v) for v in (start, stop)):
+        if isinstance(command, neo.core.basesignal.BaseSignal):
+            up_first = kwargs.pop("up_first", True)
+            minduration = kwargs.pop("minduration", None)
+            start, stop, test_amplitude = ephys.detectMembraneTest(command, up_first=up_first,
+                                                                   minduration=minduration)
             
-            else:
-                if u.size == d.size and all(v == upward[0] for v in upward):
-                    if up_first:
-                        widths = d-u if upward[0] else u-d
-                    else:
-                        widths = u-d if upward[0] else d-u
-                        
+            if u.size != d.size:
+                raise RuntimeError(f"The 'command' signal should have the same number of state transitions in both directions; currently, there are {d.size} down and {u.size} up transitions")
             
-                        
-                    
+            if isinstance(upward, (tuple, list)) and not all(upward[0] == v for v in upward):
+                raise RuntimeError("All boxcars must be in the same direction")
+            
+            if any(v.size > 1 for v in (d,u)): # more than one boxcar detected
+                if minduration is None:
+                    raise RuntimeError("More than one transition between levels has been detected and no constraints on boxcar width were specified ('minduration')")
                 
-        
-        if d.ndim > 0:
-            d = d[0]
+                else:
+                    if u.size == d.size and all(v == upward[0] for v in upward):
+                        if up_first:
+                            widths = d-u if upward[0] else u-d
+                        else:
+                            widths = u-d if upward[0] else d-u
+                            
+            if d.ndim > 0:
+                d = d[0]
+                
+            if u.ndim > 0:
+                u = u[0]
+                
+            start, stop = (min(d,u), max(d,u))
             
-        if u.ndim > 0:
-            u = u[0]
-            
-        start, stop = (min(d,u), max(d,u))
+        else:
+            raise ValueError(f"When the command is not a signal, the start and stop times of the membrane test must be specified as scalar time quantities")
         
     else: # command is a scalar ⇒ use it as test amplitude (can be negative !!!)
         test_amplitude = command
-        start = stop = None
         
+        if any(not isinstance(v, pq.Quantity) or v.size != 1 or scq.check_time_units(v) for v in (start, stop)):
+            raise ValueError(f"When the command is a scalar, the start and stop times of the membrane test must be specified as scalar time quantities")
+        
+        start, stop = min(start, stop), max(start, stop)
+        
+        if relative == True:
+            if start < 0*pq.s:
+                raise ValueError(f"The test begins at {start} which is BEFORE the signal starts")
+            
+            if start > signal.duration:
+                raise ValueError(f"The test begins at {start} which is BEYOND the signal duration ({signal.duration})")
+            
+            if stop < 0*pq.s:
+                raise ValueError(f"The test ends at {stop} which is BEFORE the signal starts")
+            
+            if stop > signal.duration:
+                raise ValueError(f"The test ends at {stop} which is BEYOND the signal duration ({signal.duration})")
+            
+        else:
+            if start < signal.t_start:
+                raise ValueError(f"The test begins at {start} which is BEFORE the signal starts ({signal.t_start})")
+            if stop < 0*pq.s:
+                raise ValueError(f"The test ends at {stop} which is BEFORE the signal starts ({signal.t_start})")
+            
+            if start > signal.t_stop:
+                raise ValueError(f"The test begins at {start} which is AFTER the signal ends ({signal.t_stop})")
+            
+            if stop > signal.t_stop:
+                raise ValueError(f"The test ends at {stop} which is AFTER the signal ends ({signal.t_stop})")
+            
+        
+            
+            
         
     # figure-out locations:
     # for a membrane test in voltage-clamp we need three locations:

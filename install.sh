@@ -298,7 +298,7 @@ function dopyqt5 ()
         
         # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
         # • change the value of the --jobs option (e.g. half the number of 
-        # cores in your system seems to be  good choice), or
+        # cores in your system seems to be a good choice), or
         # • remove the --jobs option altogether
         if [[ $njobs -gt 0 ]] ; then
             ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
@@ -330,6 +330,10 @@ function dopyqt5 ()
             else
                 echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5done
                 echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
+                
+                echo -e "\n\n Installing PyQtDataVisualization\n\n"
+                
+                pip install PyQtDataVisualization
             fi
         fi
     fi
