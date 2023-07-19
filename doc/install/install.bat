@@ -15,8 +15,8 @@ call conda config --add channels conda-forge || goto eof
 rem  call conda install --prefix %env_name% -y --file %conda_reqs%
 echo Installing jupyter
 call conda install --prefix %env_name% -y jupyter || goto eof
-echo Installing jupyter_cms
-call conda install --prefix %env_name% -y jupyter_cms || goto eof
+rem  echo Installing jupyter_cms
+rem  call conda install --prefix %env_name% -y jupyter_cms || goto eof
 echo Installing color schemes for jupyter qtconsole
 call conda install --prefix %env_name% -y jupyter_qtconsole_colorschemes || goto eof
 echo Installing jupyter themes
