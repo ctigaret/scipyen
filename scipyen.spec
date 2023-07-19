@@ -266,7 +266,7 @@ with open(desktop_file_name, "wt") as desktop_file:
         
 dist_install_script = ["#!/bin/bash",
                        "mydir=`dirname $0`",
-                       "whereami=`realpath ${mydir}",
+                       "whereami=`realpath ${mydir}`",
                        "chown -R root:root ${whereami}",
                        "ln -s -b ${whereami}/scipyen /usr/local/bin/",
                        "ln -s -b ${whereami}/Scipyen.desktop /usr/share/applications/"]
