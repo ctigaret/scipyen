@@ -17,8 +17,8 @@ echo Installing jupyter
 call conda install --prefix %env_name% -y jupyter || goto eof
 rem  echo Installing jupyter_cms
 rem  call conda install --prefix %env_name% -y jupyter_cms || goto eof
-echo Installing color schemes for jupyter qtconsole
-call conda install --prefix %env_name% -y jupyter_qtconsole_colorschemes || goto eof
+rem  echo Installing color schemes for jupyter qtconsole
+rem  call conda install --prefix %env_name% -y jupyter_qtconsole_colorschemes || goto eof
 echo Installing jupyter themes
 call conda install --prefix %env_name% -y jupyterthemes || goto eof
 echo Installing numpy
