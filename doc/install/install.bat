@@ -73,6 +73,8 @@ echo Installing matlab kernel
 call conda install --prefix %env_name% -y matlab_kernel || goto eof
 echo Installing octave kernel
 call conda install --prefix %env_name% -y octave_kernel || goto eof
+echo Installing PyInstaller
+call conda install --prefix %env_name% -y pyinstaller || goto eof
 
 echo Installing additional PyPI packages
 call pip install -r %pip_reqs% || goto eof
