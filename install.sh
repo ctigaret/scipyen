@@ -593,6 +593,7 @@ function make_scipyenrc ()
 # also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
 # readily available to the user, at the console.
 #
+echo -e "\nCreating .scipyenrc\n"
 
 if [[ -z "$VIRTUAL_ENV" ]] ; then
     echo -e "Not in an active environment! Goodbye!\n"
@@ -616,7 +617,7 @@ cat<<END > ${bindir}/scipyact
 scipyact () {
 source ${VIRTUAL_ENV}/bin/activate
 }
-export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
 END
 shopt -u lastpipe
     
@@ -682,7 +683,7 @@ EOF
 IFS=$oldifs
 }
 
-function linkscripts () 
+function make_launch_script () 
 {
 if [[ `id -u` -eq 0 ]] ; then
     target_dir=/usr/local/bin
@@ -698,31 +699,31 @@ fi
 shopt -s lastpipe
 
 # if [[ `id -u` -eq 0 ]] ; then
-cat << END > ${target_dir}/scipyen 
+cat <<END > ${target_dir}/scipyen 
 #! /bin/sh
-if [ -z ${VIRTUAL_ENV} ]; then
+if [ -z \${VIRTUAL_ENV} ]; then
 source ${install_dir}/${virtual_env}/bin/activate
 fi
 git -C $scipyendir rev-parse 2>/dev/null;
-if [[ $? -eq 0 ]]; then
-branch=`git -C $scipyendir branch --show-current`
+if [[ \$? -eq 0 ]]; then
+branch=\`git -C ${scipyendir} branch --show-current\`
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
-echo -e "${RED}WARNING:${NC} Running ${GREEN}${branch}${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
+echo -e "${RED}WARNING:${NC} Running ${GREEN}\${branch}${NC} branch of local scipyen git repository in ${BLUE}$scipyendir${NC} with status:"
 git -C $scipyendir status --short --branch
 fi
 echo -e "\nUsing Python environment in ${VIRTUAL_ENV}\n"
-if [ -z $BROWSER ]; then
-if [ -a $VIRTUAL_ENV/bin/browser ]; then
-source $VIRTUAL_ENV/bin/browser
+if [ -z \$BROWSER ]; then
+if [ -a \$VIRTUAL_ENV/bin/browser ]; then
+source \$VIRTUAL_ENV/bin/browser
 fi
 fi
-export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
 export OUTDATED_IGNORE=1
 a=`which xrdb` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
-if [ $0 == 0 ] ; then
+if [ \$0 == 0 ] ; then
 if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
@@ -1011,14 +1012,14 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
     # make scripts
-    make_scipyenrc
+#     make_scipyenrc
+#     
+#     if [[ `id -u` -ne 0 ]] ; then
+#         # only update bashrc for regular users
+#         update_bashrc
+#     fi
     
-    if [[ `id -u` -ne 0 ]] ; then
-        # only update bashrc for regular users
-        update_bashrc
-    fi
-    
-    linkscripts
+    make_launch_script
     
     make_desktop_entry
     
