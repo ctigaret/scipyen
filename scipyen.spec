@@ -140,7 +140,8 @@ def DataFiles(topdir, ext, **kw):
     return TOC(
         file2TOCEntry(filename, topdirparts) for filename in items if os.path.isfile(filename))
 
-def getQt5Plugins():
+
+def getQt5PluginsDir():
     pout = subprocess.run(["qtpaths-qt5", "--plugin-dir"], 
                           encoding="utf-8", capture_output=True)
     
@@ -149,16 +150,10 @@ def getQt5Plugins():
     
     plugins_dir = pout.stdout.strip("\n")
     
-    # items = scanForFiles(plugins_dir, ".so", True)
-    
-#     ret = list()
-#     
-#     pfx = "PyQt5/Qt5/plugins"
-#     
-#     for filename in items:
-        
-    
-    return Tree(root=plugins_dir, prefix="PyQt5/Qt5/plugins", typecode="BINARY")
+    return plugins_dir
+
+def getQt5Plugins(path):
+    return Tree(root=path, prefix="PyQt5/Qt5/plugins", typecode="BINARY")
     
 block_cipher = None
 
@@ -332,9 +327,11 @@ datas.extend(zmq_datas)
 binaries.extend(zmq_binaries)
 hiddenimports.extend(zmq_hiddenimports)
 
-qt5plugins_toc = getQt5Plugins()
+qt5plugins_dir = getQt5PluginsDir()
 
-print(f"qt5plugins_toc = {qt5plugins_toc}")
+qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
+
+# print(f"qt5plugins_toc = {qt5plugins_toc}")
 
 # binaries.extend(qt5plugins)
 
@@ -408,6 +405,7 @@ exe = EXE(
 )
 coll = COLLECT(
     exe,
+    # a.binaries,
     a.binaries + qt5plugins_toc,
     a.zipfiles,
     a.datas,
