@@ -10,6 +10,7 @@
 # OPTIONAL
 #
 # MANDATORY packages
+pyinstaller
 jupyter     # ✓ (conda install jupyter)
 # The following packages will be downloaded:
 # 
