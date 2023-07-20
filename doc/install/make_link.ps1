@@ -55,7 +55,7 @@ while ( !(Test-Path -Path (Join-Path -Path $p -ChildPath ".git")))
 $repodir=$p
 # echo $repodir
 
-$myScipyenLaunchScript=Join-Path -Path $repodir -ChildPath "scipyen.py"
+$myScipyenLaunchScript=Join-Path -Path $repodir -ChildPath "src\scipyen\scipyen.py"
 $myCondaEnv=$Env:CONDA_PREFIX
 $myAnaconda=$Env:CONDA_PREFIX_1
 $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"

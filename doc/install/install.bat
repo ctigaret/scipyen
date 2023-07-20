@@ -15,10 +15,10 @@ call conda config --add channels conda-forge || goto eof
 rem  call conda install --prefix %env_name% -y --file %conda_reqs%
 echo Installing jupyter
 call conda install --prefix %env_name% -y jupyter || goto eof
-echo Installing jupyter_cms
-call conda install --prefix %env_name% -y jupyter_cms || goto eof
-echo Installing color schemes for jupyter qtconsole
-call conda install --prefix %env_name% -y jupyter_qtconsole_colorschemes || goto eof
+rem  echo Installing jupyter_cms
+rem  call conda install --prefix %env_name% -y jupyter_cms || goto eof
+rem  echo Installing color schemes for jupyter qtconsole
+rem  call conda install --prefix %env_name% -y jupyter_qtconsole_colorschemes || goto eof
 echo Installing jupyter themes
 call conda install --prefix %env_name% -y jupyterthemes || goto eof
 echo Installing numpy
@@ -73,6 +73,8 @@ echo Installing matlab kernel
 call conda install --prefix %env_name% -y matlab_kernel || goto eof
 echo Installing octave kernel
 call conda install --prefix %env_name% -y octave_kernel || goto eof
+echo Installing PyInstaller
+call conda install --prefix %env_name% -y pyinstaller || goto eof
 
 echo Installing additional PyPI packages
 call pip install -r %pip_reqs% || goto eof
