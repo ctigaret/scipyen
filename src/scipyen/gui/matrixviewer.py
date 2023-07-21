@@ -108,7 +108,13 @@ class MatrixViewer(ScipyenViewer):
         if self._data_ is None:
             return
         
-        filePath, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save CSV Document", filter="CSV files (*.csv)")
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        filePath, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save CSV Document", filter="CSV files (*.csv)", **kw)
             
         if len(filePath) > 0:
             pio.writeCsv(self._data_, filePath)

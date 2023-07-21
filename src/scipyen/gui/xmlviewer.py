@@ -508,7 +508,13 @@ class XMLViewer(ScipyenViewer):
         if self._docModel_.domDocument.isNull():
             return
         
-        filePath, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save XML Document", filter="XML files (*.xml)")
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        filePath, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save XML Document", filter="XML files (*.xml)", **kw)
         
         #print("filePath: ", filePath)
         #print("filePath is None: ", filePath is None)

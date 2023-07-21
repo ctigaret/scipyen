@@ -3927,18 +3927,25 @@ anything else       anything else       ❌
         else:
             raise ValueError("Unsupported export file format %s" % file_format)
         
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
         if self._scipyenWindow_ is not None:
             targetDir = self._scipyenWindow_.currentDir
             
             fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,
                                                                 caption="Export figure as %s" % caption_suffix,
                                                                 filter = file_filter,
-                                                                directory = targetDir)
+                                                                directory = targetDir,
+                                                                **kw)
             
         else:
             fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,
                                                                 caption="Export figure as %s" % caption_suffix,
-                                                                filter = file_filter)
+                                                                filter = file_filter, **kw)
             
         if len(fileName) == 0:
             return
