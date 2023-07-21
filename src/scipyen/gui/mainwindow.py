@@ -2440,10 +2440,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # NOTE: 2021-01-30 13:52:58
             # there is no running ExternalIPython instance
             if isinstance(new, str) and new in ("connection", "neuron_ext"):
+                if sys.platform == "win32":
+                    options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+                    kw = {"options":options}
+                else:
+                    kw = {}
                 connection_file, file_type = QtWidgets.QFileDialog.getOpenFileName(self,
                                                                                    "Connect to Existing Kernel",
                                                                                    jupyter_runtime_dir(),
-                                                                                   "Connection file (*.json)")
+                                                                                   "Connection file (*.json)",
+                                                                                   **kw)
                 if not connection_file:
                     return
 
@@ -5811,12 +5817,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_pastePythonScript(self, fileName=None):
         if not isinstance(fileName, str) or len(fileName) == 0:
             targetDir = self.recentDirectories[0]
+            if sys.platform == "win32":
+                options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+                kw = {"options":options}
+            else:
+                kw = {}
             if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
                 fileName = QtWidgets.QFileDialog.getOpenFileName(
-                    self, caption=u"Run python script", filter="Python script (*.py)", directory=targetDir)
+                    self, caption=u"Run python script", filter="Python script (*.py)", directory=targetDir,
+                    **kw)
             else:
                 fileName = QtWidgets.QFileDialog.getOpenFileName(
-                    self, caption=u"Run python script", filter="Python script (*.py)")
+                    self, caption=u"Run python script", filter="Python script (*.py)", **kw)
 
         if len(fileName) > 0:
             if isinstance(fileName, tuple):
@@ -5855,13 +5867,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_runPythonScript(self, fileName=None):
         if not isinstance(fileName, str) or len(fileName) == 0:
             targetDir = self.recentDirectories[0]
+            if sys.platform == "win32":
+                options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+                kw = {"options":options}
+            else:
+                kw = {}
 
             if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
                 fileName = QtWidgets.QFileDialog.getOpenFileName(
-                    self, caption=u"Run python script", filter="Python script (*.py)", directory=targetDir)
+                    self, caption=u"Run python script", filter="Python script (*.py)", directory=targetDir,
+                    **kw)
             else:
                 fileName = QtWidgets.QFileDialog.getOpenFileName(
-                    self, caption=u"Run python script", filter="Python script (*.py)")
+                    self, caption=u"Run python script", filter="Python script (*.py)", **kw)
 
         if len(fileName) > 0:
             if isinstance(fileName, tuple):
@@ -5962,13 +5980,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_selectWorkDir(self, *args):
         targetDir = self.recentDirectories[0]
         caption = "Select Working Directory"
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
-                self, caption=caption, directory=targetDir))
+                self, caption=caption, directory=targetDir, **kw))
             # dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=u'Select Working Directory', directory=targetDir))
         else:
             dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
-                self, caption=caption))
+                self, caption=caption, **kw))
             # dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=u'Select Working Directory'))
 
         if len(dirName) > 0:
@@ -6148,13 +6171,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 targetDir = self.recentDirectories[0]
 
+                if sys.platform == "win32":
+                    options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+                    kw = {"options":options}
+                else:
+                    kw = {}
+
                 if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
                     fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save Image File', filter=fileFilt, directory=targetDir))
+                        self, caption=u'Save Image File', filter=fileFilt, directory=targetDir,
+                        **kw))
 
                 else:
                     fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save Image File', filter=fileFilt))
+                        self, caption=u'Save Image File', filter=fileFilt,
+                        **kw))
 
                 if len(fileName) > 0:
                     data = self.workspace[varname]
@@ -6176,13 +6207,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 fileFilt = ';;'.join(fileFilters)
                 targetDir = self.recentDirectories[0]
 
+                if sys.platform == "win32":
+                    options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+                    kw = {"options":options}
+                else:
+                    kw = {}
+
                 if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
                     fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save Image File', filter=fileFilt, directory=targetDir))
+                        self, caption=u'Save Image File', filter=fileFilt, directory=targetDir,
+                        **kw))
 
                 else:
                     fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save Image File', filter=fileFilt))
+                        self, caption=u'Save Image File', filter=fileFilt,
+                        **kw))
 
                 if len(fileName) > 0:
                     data = self.workspace[varname]
@@ -6234,13 +6273,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         targetDir = self.recentDirectories[0]
 
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             fileName = QtWidgets.QFileDialog.getOpenFileName(
-                self, caption=u'Open File', filter=filesFilterString, directory=targetDir)
+                self, caption=u'Open File', filter=filesFilterString, directory=targetDir, **kw)
 
         else:
             fileName = QtWidgets.QFileDialog.getOpenFileName(
-                self, caption=u'Open File', filter=filesFilterString)
+                self, caption=u'Open File', filter=filesFilterString, **kw)
 
         if len(fileName) > 0:
 
@@ -6933,10 +6978,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         filename = "".join([varname, ".csv"])
 
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(self,
                                                             caption="Export to CSV",
                                                             filter=fileFilter,
-                                                            directory=os.path.join(self.currentDir, filename))
+                                                            directory=os.path.join(self.currentDir, filename),
+                                                            **kw)
 
         if len(filename.strip()) > 0:
             pio.writeCsv(self.workspace[varname], fileName=filename)

@@ -9,27 +9,44 @@ import sys, os
 import atexit, re, inspect, gc, io, traceback, platform
 import faulthandler, warnings
 #import cProfile
+__version__ = "0.0.1"
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+__module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
+
+__bundled__ = False
 
 # has_breeze_resources_for_win32 = False
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    print(f'\nScipyen is running in a PyInstaller bundle with frozen modules: {sys.frozen}; _MEIPASS: {sys._MEIPASS}; __file__: {__file__}\n\n')
+    # print("WARNING: External consoles (including NEURON) are currently NOT supported\n\n")
+    if os.path.isfile(os.path.join(__module_path__, "bundle_origin")):
+        with open(os.path.join(__module_path__, "bundle_origin"), "rt", encoding="utf-8") as origin_file:
+            for line in origin_file:
+                print(line, end="")
+    # os.environ["SCIPYEN_UI_PATH"] = "UI"
+    __bundled__ = True
 
-if sys.platform == "win32" and sys.version_info.minor >= 9:
-    if "CONDA_DEFAULT_ENV" not in os.environ:
-        raise OSError("On windows platform, Scipyen must be run inside a conda environment")
+else:
+
+    if sys.platform == "win32" and sys.version_info.minor >= 9:
+        if "CONDA_DEFAULT_ENV" not in os.environ:
+            raise OSError("On windows platform, unbundled Scipyen must be run inside a conda environment")
 #         import win32api
 #         vigraimpex_mod = "vigraimpex"
 #         path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
 #         os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
 #         lib_environ = os.environ.get("LIB", "")
-#         
-#         
+#
+#
 #         if len(lib_environ.strip()):
 #             libdirs = lib_environ.split(os.pathsep)
 #             for d in libdirs:
 #                 if len(d.strip()) and  os.path.isdir(d):
 #                     os.add_dll_directory(d)
-            
+
     os.environ["QT_API"] = "pyqt5"
-                    
+
     # try:
     #     import breeze_resources
     #     has_breeze_resources_for_win32 = True
@@ -37,7 +54,7 @@ if sys.platform == "win32" and sys.version_info.minor >= 9:
     #     has_breeze_resources_for_win32 = False
 
 
-    
+
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -56,22 +73,7 @@ except:
 from core import scipyen_config
 #### END Scipyen modules
 
-__version__ = "0.0.1"
 
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
-__module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
-
-__bundled__ = False
-
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    print(f'\nScipyen is running in a PyInstaller bundle with frozen modules: {sys.frozen}; _MEIPASS: {sys._MEIPASS}; __file__: {__file__}\n\n')
-    # print("WARNING: External consoles (including NEURON) are currently NOT supported\n\n")
-    if os.path.isfile(os.path.join(__module_path__, "bundle_origin")):
-        with open(os.path.join(__module_path__, "bundle_origin"), "rt", encoding="utf-8") as origin_file:
-            for line in origin_file:
-                print(line, end="")
-    # os.environ["SCIPYEN_UI_PATH"] = "UI"
-    __bundled__ = True
 # else:
 #     print('Running in a normal Python process\n\n')
     

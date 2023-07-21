@@ -667,8 +667,15 @@ class BrushComboBox(QtWidgets.QComboBox):
         customGradientBrushIndices = [k for k, (name,value) in enumerate(self._styles.items()) if isinstance(value, QtGui.QGradient) or name == "Gradient..."]
         
         if index in customTextureBrushIndices:
+            if sys.platform == "win32":
+                options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+                kw = {"options":options}
+            else:
+                kw = {}
+
             filePathName, _ = QtWidgets.QFileDialog.getOpenFileName(self, caption="Open image or pixmap file",
-                                                             filter="Images (*.png *.xpm *.jpg *.jpeg *.gif *.tif *.tiff);;Vector drawing (*.svg);; All files (*.*)")
+                                                             filter="Images (*.png *.xpm *.jpg *.jpeg *.gif *.tif *.tiff);;Vector drawing (*.svg);; All files (*.*)",
+                                                             **kw)
             if len(filePathName) == 0:
                 return
             
