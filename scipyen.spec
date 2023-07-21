@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-import io, os, sys, subprocess, shutil, tempfile, typing
+import io, os, sys, subprocess, shutil, tempfile, typing, pathlib, traceback
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 from PyInstaller.building.datastruct import Tree
@@ -10,6 +10,12 @@ try:
     hasNeuron = True
 except:
     hasNeuron = False
+
+myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
+myfile = pathlib.Path(myfile).absolute()
+scipyen_dir = os.fspath(myfile.parent)
+
+print(f"scipyen_dir = {scipyen_dir}")
 
 # NOTE: 2023-06-26 17:25:32
 # This is for the developer, NOT the final user:
@@ -29,35 +35,39 @@ except:
 #       user@host:> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
 #
 #
+# On windows I use mamba (a faster alternative to <ana>conda) to build a virtual environment (e.g. e:\scipyenv) - best is
+# to use a Miniforge terminal running with as administrator.
+# With that environment activated (see mamba documentation for details), call (e.g. from the root of e: drive):
+# pyinstaller --dist_path e:\scipyen_app\dist --workpath e:\scipyen_app\build --clean --noconfirm e:\scipyen\scipyen_win10.spec
+# NOTE: You may have to modify the paths above to suit your local installation
 # TODO: For more customization contemplate calling pyinstaller as above from a
 # bash script
-
-myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 
 
 if "--distpath" in sys.argv:
     ndx = sys.argv.index("--distpath")
     if ndx < (len(sys.argv) - 1):
         distpath = sys.argv[ndx+1]
-        
+
     else:
         distpath = DEFAULT_DISTPATH
 else:
     distpath = DEFAULT_DISTPATH
 
-if not os.path.isabs(myfile):
-    myfile = os.path.abspath(myfile)
+if not myfile.is_absolute():
+    myfile = myfile.absolute()
+
     
-mydir = os.path.dirname(myfile)
+mydir = myfile.parents[0]
 
 print(f"\nWARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
-def datafile(path, strip_path=True):
-    parts = path.split('/')
-    path = name = os.path.join(*parts)
-    if strip_path:
-        name = os.path.basename(path)
-    return name, path, 'DATA'
+#def datafile(path, strip_path=True):
+    #parts = path.split('/')
+    #path = name = os.path.join(*parts)
+    #if strip_path:
+        #name = os.path.basename(path)
+    #return name, path, 'DATA'
 
 def scanForFiles(path, ext, as_ext:True):
     items = []
@@ -75,10 +85,17 @@ def scanForFiles(path, ext, as_ext:True):
     return items
         
 def file2TOCEntry(src_path:str, topdirparts:list, file_category:str="DATA"):
-    parts = [p for p in path.split('/') if p not in topdirparts]
-    my_path = name = os.path.join(*parts)
-    target_path = os.path.dirname(my_path)
-    return target_path, src_path, file_category
+    if not isinstance(src_path, pathlib.Path):
+        src_path = pathlibPath(src_path)
+
+    parts = [p for p in src_path.parts if p not in topdirparts]
+    #parts = [p for p in path.split('/') if p not in topdirparts]
+    #my_path = name = os.path.join(*parts)
+    #target_path = os.path.dirname(my_path)
+
+    my_path = name = pathlib.Path(parts[0]).joinpath(*parts[1:])
+    target_path = os.fspath(my_path.parent)
+    return target_path, os.fspath(src_path), file_category
 
 def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
     """Returns a 2-tuple (source_full_path, target_dir)
@@ -91,16 +108,26 @@ def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
     topdirparts: a list of directories representing the path to the actual file
     
     """
-    parts = [p for p in src_path.split('/') if p not in topdirparts]
+    if not isinstance(src_path, pathlib.Path):
+        src_path = pathlib.Path(src_path)
+
+    parts = [p for p in src_path.parts if p not in topdirparts]
     # if isinstance(destination, str):
     #     parts.insert(0, destination)
         
-    my_path = name = os.path.join(*parts)
-    target_path = os.path.dirname(my_path)
+    my_path = name = pathlib.Path(parts[0]).joinpath(*parts[1:])
+    #my_path = name = os.path.join(*parts)
+    #target_path = os.path.dirname(my_path)
+    try:
+        target_path = os.fspath(my_path.parent)
+    except:
+        traceback.print_exc()
+        target_path = '.'
+
     if len(target_path) == 0:
         target_path = '.'
         
-    return src_path, target_path
+    return os.fspath(src_path), target_path
     
 
 def DataFiles(topdir, ext, **kw):
@@ -110,7 +137,10 @@ def DataFiles(topdir, ext, **kw):
     forAnalysis = kw.get("forAnalysis", False)
     # destination = kw.get("destination", None)
 
-    topdirparts = topdir.split('/')
+    if not isinstance(topdir, pathlib.Path):
+        topdir = pathlib.Path(topdir)
+
+    topdirparts = topdir.parts
     
     items = scanForFiles(topdir, ext, as_ext)
 
@@ -142,7 +172,12 @@ def DataFiles(topdir, ext, **kw):
 
 
 def getQt5PluginsDir():
-    pout = subprocess.run(["qtpaths-qt5", "--plugin-dir"], 
+    # NOTE: on windows this is qtpaths; on SuSE this is qtpaths-qt5
+    if sys.platform == "win32":
+        qtpaths_exec = "qtpaths"
+    else:
+        qtpaths_exec = "qtpaths-qt5"
+    pout = subprocess.run([qtpaths_exec, "--plugin-dir"],
                           encoding="utf-8", capture_output=True)
     
     if pout.returncode != 0:
@@ -163,27 +198,27 @@ block_cipher = None
 # expects a list of tuples (src_full_path_or_glob, dest_dir), see NOTE: 2023-06-28 11:08:08
 # "forAnalysis" is a flag indicating that tuples are generated for use by the Analysis object
 # constructed below
-uitoc = DataFiles('/home/cezar/scipyen/src', ".ui", forAnalysis=True) # WARNING must be reflected in core.sysutils.adapt_ui_path
-# print(f"uitoc: {uitoc}")
-txttoc = DataFiles('/home/cezar/scipyen/src', ".txt", forAnalysis=True)
-svgtoc = DataFiles('/home/cezar/scipyen/src', ".svg", forAnalysis=True)
-pngtoc = DataFiles('/home/cezar/scipyen/src', ".png", forAnalysis=True)
-jpgtoc = DataFiles('/home/cezar/scipyen/src', ".jpg", forAnalysis=True)
-giftoc = DataFiles('/home/cezar/scipyen/src', ".fig", forAnalysis=True)
-tifftoc = DataFiles('/home/cezar/scipyen/src', ".tif", forAnalysis=True)
-tifftoc.extend(DataFiles('/home/cezar/scipyen/src', ".tiff", forAnalysis=True))
-icotoc = DataFiles('/home/cezar/scipyen/src', ".ico", forAnalysis=True)
-xsltoc = DataFiles('/home/cezar/scipyen/src', ".xsl", forAnalysis=True)
-shtoc = DataFiles('/home/cezar/scipyen/src', ".sh", forAnalysis=True)
-qrctoc = DataFiles('/home/cezar/scipyen/src', ".qrc", forAnalysis=True)
-readmetoc = DataFiles('/home/cezar/scipyen/src', "README", as_ext=False, forAnalysis=True)
-pkltoc = DataFiles('/home/cezar/scipyen/src', ".pkl", forAnalysis=True)
-hdftoc = DataFiles('/home/cezar/scipyen/src', ".h5", forAnalysis=True)
-hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf5", forAnalysis=True))
-hdftoc.extend(DataFiles('/home/cezar/scipyen/src', ".hdf", forAnalysis=True))
-abftoc = DataFiles('/home/cezar/scipyen/src', ".abf", forAnalysis=True)
-atftoc = DataFiles('/home/cezar/scipyen/src', ".atf", forAnalysis=True)
-yamltoc = DataFiles('/home/cezar/scipyen/src', ".yaml", forAnalysis=True)
+uitoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".ui", forAnalysis=True) # WARNING must be reflected in core.sysutils.adapt_ui_path
+#print(f"uitoc: {uitoc}")
+txttoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".txt", forAnalysis=True)
+svgtoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".svg", forAnalysis=True)
+pngtoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".png", forAnalysis=True)
+jpgtoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".jpg", forAnalysis=True)
+giftoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".fig", forAnalysis=True)
+tifftoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".tif", forAnalysis=True)
+tifftoc.extend(DataFiles(os.path.join(scipyen_dir, 'src'), ".tiff", forAnalysis=True))
+icotoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".ico", forAnalysis=True)
+xsltoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".xsl", forAnalysis=True)
+shtoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".sh", forAnalysis=True)
+qrctoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".qrc", forAnalysis=True)
+readmetoc = DataFiles(os.path.join(scipyen_dir, 'src'), "README", as_ext=False, forAnalysis=True)
+pkltoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".pkl", forAnalysis=True)
+hdftoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".h5", forAnalysis=True)
+hdftoc.extend(DataFiles(os.path.join(scipyen_dir, 'src'), ".hdf5", forAnalysis=True))
+hdftoc.extend(DataFiles(os.path.join(scipyen_dir, 'src'), ".hdf", forAnalysis=True))
+abftoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".abf", forAnalysis=True)
+atftoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".atf", forAnalysis=True)
+yamltoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".yaml", forAnalysis=True)
 
 # NOTE: 2023-06-28 11:09:08 
 # collect_data_files DOES NOT WORK WITH SCIPYEN BECAUSE SCIPYEN IS NOT 
@@ -229,58 +264,60 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                         
                     datas.append((origin_file_name, '.'))
                         
-product = f"scipyen{namesfx}"
+platform = sys.platform
+product = f"scipyen{namesfx}_{platform}"
+
 bundlepath = os.path.join(distpath, product)
 
 print(f"bundlepath = {bundlepath}")
+if sys.platform == "linux":
+    desktoptempdir = tempfile.mkdtemp()
+    desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
+    # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
+    desktop_icon_file = "pythonbackend.svg"
+    exec_file = os.path.join(bundlepath, "scipyen")
+    desktop_file_contents = ["[Desktop Entry]",
+    "Type=Application",
+    "Name[en_GB]=Scipyen",
+    "Name=Scipyen",
+    "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
+    "Comment=Scientific Python Environment for Neurophysiology",
+    "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
+    "GenericName=Scientific Python Environment for Neurophysiology",
+    f"Icon={desktop_icon_file}",
+    "Categories=Science;Utilities;",
+    "Exec=%k/scipyen",
+    "MimeType=",
+    "Path=",
+    "StartupNotify=true",
+    "Terminal=true",
+    "TerminalOptions=\s--noclose",
+    "X-DBUS-ServiceName=",
+    "X-DBUS-StartupType=",
+    "X-KDE-SubstituteUID=false",
+    "X-KDE-Username=",
+    ]
+    with open(desktop_file_name, "wt") as desktop_file:
+        for line in desktop_file_contents:
+            desktop_file.write(f"{line}\n")
+            
+    dist_install_script = ["#!/bin/bash",
+                        "mydir=`dirname $0`",
+                        "whereami=`realpath ${mydir}`",
+                        "chown -R root:root ${whereami}",
+                        "ln -s -b ${whereami}/scipyen /usr/local/bin/",
+                        "ln -s -b ${whereami}/Scipyen.desktop /usr/share/applications/"]
 
-desktoptempdir = tempfile.mkdtemp()
-desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
-# desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
-desktop_icon_file = "pythonbackend.svg"
-exec_file = os.path.join(bundlepath, "scipyen")
-desktop_file_contents = ["[Desktop Entry]",
-"Type=Application",
-"Name[en_GB]=Scipyen",
-"Name=Scipyen",
-"Comment[en_GB]=Scientific Python Environment for Neurophysiology",
-"Comment=Scientific Python Environment for Neurophysiology",
-"GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
-"GenericName=Scientific Python Environment for Neurophysiology",
-f"Icon={desktop_icon_file}",
-"Categories=Science;Utilities;",
-"Exec=%k/scipyen",
-"MimeType=",
-"Path=",
-"StartupNotify=true",
-"Terminal=true",
-"TerminalOptions=\s--noclose",
-"X-DBUS-ServiceName=",
-"X-DBUS-StartupType=",
-"X-KDE-SubstituteUID=false",
-"X-KDE-Username=",
-]
-with open(desktop_file_name, "wt") as desktop_file:
-    for line in desktop_file_contents:
-        desktop_file.write(f"{line}\n")
-        
-dist_install_script = ["#!/bin/bash",
-                       "mydir=`dirname $0`",
-                       "whereami=`realpath ${mydir}`",
-                       "chown -R root:root ${whereami}",
-                       "ln -s -b ${whereami}/scipyen /usr/local/bin/",
-                       "ln -s -b ${whereami}/Scipyen.desktop /usr/share/applications/"]
+    install_script_tempdir = tempfile.mkdtemp()
+    dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
 
-install_script_tempdir = tempfile.mkdtemp()
-dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
-
-with open(dist_install_script_name, "wt") as dist_install:
-    for line in dist_install_script:
-        dist_install.write(f"{line}\n")
-        
-datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
-datas.append((desktop_file_name, '.'))
-datas.append((dist_install_script_name, '.'))
+    with open(dist_install_script_name, "wt") as dist_install:
+        for line in dist_install_script:
+            dist_install.write(f"{line}\n")
+            
+    datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
+    datas.append((desktop_file_name, '.'))
+    datas.append((dist_install_script_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
@@ -354,8 +391,8 @@ qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
 # detects an import in Scipyen code; these won't work for NEURON stuff....
 
 a = Analysis(
-    ['/home/cezar/scipyen/src/scipyen/scipyen.py'],
-    pathex=['/home/cezar/scipyen/src/scipyen'], # ← to find the scipyen package
+    [os.path.join(scipyen_dir, 'src/scipyen/scipyen.py')],
+    pathex=[os.path.join(scipyen_dir, 'src/scipyen')], # ← to find the scipyen package
     binaries=binaries,
     # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
     #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
@@ -375,7 +412,7 @@ a = Analysis(
     #        # ('/home/cezar/scipyen/src/imaging', 'imaging'),
     #        ],
     hiddenimports=hiddenimports,
-    hookspath=['/home/cezar/scipyen/src/scipyen/__pyinstaller'],
+    hookspath=[os.path.join(scipyen_dir, 'src/scipyen/__pyinstaller')],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
@@ -386,23 +423,44 @@ a = Analysis(
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='scipyen', # name of the final executable
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
+if sys.platform == "win32":
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='scipyen', # name of the final executable
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=True,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=os.path.join(scipyen_dir, "doc/install/pythonbackend.ico")
+    )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='scipyen', # name of the final executable
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=True,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+    )
+    
 coll = COLLECT(
     exe,
     # a.binaries,
@@ -413,7 +471,6 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name=product, # name of distribution directory (e.g, 'scipyen_dev' etc)
-    # name='scipyen',
 )
 
 if isinstance(tempdir, str) and os.path.isdir(tempdir):
