@@ -270,10 +270,17 @@ class TableEditor(ScipyenViewer):#, Ui_TableEditor):
             targetDir  = os.path.join(targetDir, 
                                  self._docTitle_) + ".csv"
             
-        filePath, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        filePath, _ = QtWidgets.QFileDialog.getSaveFileName(self,
                                                             caption = "Save CSV Document", 
                                                             directory = targetDir,
-                                                            filter="CSV files (*.csv)")
+                                                            filter="CSV files (*.csv)",
+                                                            **kw)
         
         if len(filePath) > 0:
             pio.writeCsv(self._data_, filePath)

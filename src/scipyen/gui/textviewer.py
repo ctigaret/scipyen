@@ -194,8 +194,6 @@ class TextViewer(ScipyenViewer):
                                   fileFilter = fileFilter, 
                                   single=True,save=True)
         
-        # filePath, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Document", filter=fileFilter)
-        
         if len(filePath) > 0:
             writer = QtGui.QTextDocumentWriter(filePath)
             (name, extn) = os.path.splitext(filePath)

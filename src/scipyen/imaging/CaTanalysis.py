@@ -4860,10 +4860,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #targetDir = self._scipyenWindow_.recentDirectories[0]
         targetDir = self._scipyenWindow_.currentDir
         
-        pickleFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        pickleFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                                   caption="Open ScanData file",
                                                                   filter="Pickle Files (*.pkl)",
-                                                                  directory=targetDir)
+                                                                  directory=targetDir, **kw)
         
         if len(pickleFileName) == 0:
             return
@@ -4891,10 +4897,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         
         targetDir = self._scipyenWindow_.currentDir
-        epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        epscatOptionsFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                                          caption="Open EPSCaT Options file", 
                                                                          filter="Pickle Files (*.pkl)",
-                                                                         directory=targetDir)
+                                                                         directory=targetDir, **kw)
         
         if len(epscatOptionsFileName) == 0:
             epscatoptions = scanDataOptions()
@@ -5647,10 +5660,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         targetDir = self._scipyenWindow_.currentDir
         ephysFilesFilter = ";;".join(["Axon files (*.abf)", "Pickle files (*.pkl)"])
         
-        ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self, 
+
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        ephysFileNames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,
                                                                caption="Open electrophysiology files",
                                                                filter = ephysFilesFilter,
-                                                               directory=targetDir)
+                                                               directory=targetDir, **kw)
         blocks = list()
         
         ephysData = None
@@ -7360,10 +7380,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
                     filename = "".join(namelist)
                     
-                    filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
+
+                    if sys.platform == "win32":
+                        options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+                        kw = {"options":options}
+                    else:
+                        kw = {}
+
+                    filename, _ = QtWidgets.QFileDialog.getSaveFileName(self,
                                                                         caption="Export analysis result", 
                                                                         filter=fileFilter,
-                                                                        directory=os.path.join(targetDir, filename))
+                                                                        directory=os.path.join(targetDir, filename),
+                                                                        **kw)
                     
                     if len(filename.strip()) > 0:
                         result.to_csv(filename, na_rep="NA")
@@ -7584,16 +7612,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         fileFilter = "Pickle files (*.pkl)"
             
+
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             fName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
                                                           caption="Save options", 
                                                           filter=fileFilter, 
-                                                          directory=targetDir)
+                                                          directory=targetDir, **kw)
             
         else:
             fName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
                                                           caption="Save options", 
-                                                          filter=fileFilter)
+                                                          filter=fileFilter, **kw)
         pio.savePickleFile(self._data_.analysisOptions, fName)
         
         
@@ -9200,16 +9235,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         fileFilter = "Pickle files (*.pkl)"
             
+
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
         if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
             fName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
                                                           caption="Save scan data", 
                                                           filter=fileFilter, 
-                                                          directory=targetDir)
+                                                          directory=targetDir, **kw)
             
         else:
             fName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
                                                           caption="Save scan data", 
-                                                          filter=fileFilter)
+                                                          filter=fileFilter, **kw)
             
         if len(fName) > 0:
             newVarName, ext = os.path.splitext(os.path.basename(fName))

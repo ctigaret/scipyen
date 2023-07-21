@@ -535,10 +535,17 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         import mimetypes, io
         targetDir = self._scipyenWindow_.currentDir
         
-        pickleFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self, 
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        pickleFileName, _ = QtWidgets.QFileDialog.getOpenFileName(self,
                                                                   caption="Open Experiment file",
                                                                   filter="Pickle Files (*.pkl)",
-                                                                  directory=targetDir)
+                                                                  directory=targetDir,
+                                                                  **kw)
     
     
         if len(pickleFileName) == 0:
@@ -674,12 +681,18 @@ class LTPWindow(ScipyenFrameViewer, __UI_LTPWindow__):
         file_filters = ";; ".join( ["Axon Binary Files (*.abf)"])
         
         
-        
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
         
         # fileNames: list of fully qualified file names
         # fileFilter: the actual file filter used in the dialog
         fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(mainWindow, 
-                                                                       filter=file_filters)
+                                                                       filter=file_filters,
+                                                                       **kw)
 
         if len(fileNames) == 0:
             return

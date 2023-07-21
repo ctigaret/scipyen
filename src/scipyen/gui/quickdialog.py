@@ -91,7 +91,15 @@ class InputFile(FileDialog):
         self.filebrowser.clicked.connect(self.browse)
         
     def browse(self):
-        fn = QtWidgets.QFileDialog.getOpenFileName( "", self.filter, self)
+
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+
+        fn = QtWidgets.QFileDialog.getOpenFileName( "", self.filter, self, **kw)
         if not fn.isNull():
             self.filename.setText(fn)
         
@@ -112,7 +120,13 @@ class OutputFile(FileDialog):
         self.filebrowser.clicked.connect(self.browse)
         
     def browse(self):
-        fn = QtWidgets.QFileDialog.getSaveFileName( self, "Save File", "", self.filter)
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        fn = QtWidgets.QFileDialog.getSaveFileName( self, "Save File", "", self.filter, **kw)
         if not fn.isNull():
             self.filename.setText(fn)
         

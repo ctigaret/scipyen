@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-import io, os, sys, subprocess, shutil, tempfile, typing
+import io, os, sys, subprocess, shutil, tempfile, typing, pathlib, traceback
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 from PyInstaller.building.datastruct import Tree
@@ -41,30 +41,32 @@ scipyen_dir = "e:/scipyen"
 
 myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 
+myfile = pathlib.Path(myfile)
 
 if "--distpath" in sys.argv:
     ndx = sys.argv.index("--distpath")
     if ndx < (len(sys.argv) - 1):
         distpath = sys.argv[ndx+1]
-        
+
     else:
         distpath = DEFAULT_DISTPATH
 else:
     distpath = DEFAULT_DISTPATH
 
-if not os.path.isabs(myfile):
-    myfile = os.path.abspath(myfile)
+if not myfile.is_absolute():
+    myfile = myfile.absolute()
+
     
-mydir = os.path.dirname(myfile)
+mydir = myfile.parents[0]
 
 print(f"\nWARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
-def datafile(path, strip_path=True):
-    parts = path.split('/')
-    path = name = os.path.join(*parts)
-    if strip_path:
-        name = os.path.basename(path)
-    return name, path, 'DATA'
+#def datafile(path, strip_path=True):
+    #parts = path.split('/')
+    #path = name = os.path.join(*parts)
+    #if strip_path:
+        #name = os.path.basename(path)
+    #return name, path, 'DATA'
 
 def scanForFiles(path, ext, as_ext:True):
     items = []
@@ -82,10 +84,17 @@ def scanForFiles(path, ext, as_ext:True):
     return items
         
 def file2TOCEntry(src_path:str, topdirparts:list, file_category:str="DATA"):
-    parts = [p for p in path.split('/') if p not in topdirparts]
-    my_path = name = os.path.join(*parts)
-    target_path = os.path.dirname(my_path)
-    return target_path, src_path, file_category
+    if not isinstance(src_path, pathlib.Path):
+        src_path = pathlibPath(src_path)
+
+    parts = [p for p in src_path.parts if p not in topdirparts]
+    #parts = [p for p in path.split('/') if p not in topdirparts]
+    #my_path = name = os.path.join(*parts)
+    #target_path = os.path.dirname(my_path)
+
+    my_path = name = pathlib.Path(parts[0]).joinpath(*parts[1:])
+    target_path = os.fspath(my_path.parent)
+    return target_path, os.fspath(src_path), file_category
 
 def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
     """Returns a 2-tuple (source_full_path, target_dir)
@@ -98,16 +107,26 @@ def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
     topdirparts: a list of directories representing the path to the actual file
     
     """
-    parts = [p for p in src_path.split('/') if p not in topdirparts]
+    if not isinstance(src_path, pathlib.Path):
+        src_path = pathlib.Path(src_path)
+
+    parts = [p for p in src_path.parts if p not in topdirparts]
     # if isinstance(destination, str):
     #     parts.insert(0, destination)
         
-    my_path = name = os.path.join(*parts)
-    target_path = os.path.dirname(my_path)
+    my_path = name = pathlib.Path(parts[0]).joinpath(*parts[1:])
+    #my_path = name = os.path.join(*parts)
+    #target_path = os.path.dirname(my_path)
+    try:
+        target_path = os.fspath(my_path.parent)
+    except:
+        traceback.print_exc()
+        target_path = '.'
+
     if len(target_path) == 0:
         target_path = '.'
         
-    return src_path, target_path
+    return os.fspath(src_path), target_path
     
 
 def DataFiles(topdir, ext, **kw):
@@ -117,7 +136,10 @@ def DataFiles(topdir, ext, **kw):
     forAnalysis = kw.get("forAnalysis", False)
     # destination = kw.get("destination", None)
 
-    topdirparts = topdir.split('/')
+    if not isinstance(topdir, pathlib.Path):
+        topdir = pathlib.Path(topdir)
+
+    topdirparts = topdir.parts
     
     items = scanForFiles(topdir, ext, as_ext)
 
@@ -150,7 +172,11 @@ def DataFiles(topdir, ext, **kw):
 
 def getQt5PluginsDir():
     # NOTE: on windows this is qtpaths; on SuSE this is qtpaths-qt5
-    pout = subprocess.run(["qtpaths", "--plugin-dir"],
+    if sys.platform == "win32":
+        qtpaths_exec = "qtpaths"
+    else:
+        qtoaths_exec = "qtpaths-qt5"
+    pout = subprocess.run([qtpaths_exec, "--plugin-dir"],
                           encoding="utf-8", capture_output=True)
     
     if pout.returncode != 0:
@@ -172,7 +198,7 @@ block_cipher = None
 # "forAnalysis" is a flag indicating that tuples are generated for use by the Analysis object
 # constructed below
 uitoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".ui", forAnalysis=True) # WARNING must be reflected in core.sysutils.adapt_ui_path
-# print(f"uitoc: {uitoc}")
+#print(f"uitoc: {uitoc}")
 txttoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".txt", forAnalysis=True)
 svgtoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".svg", forAnalysis=True)
 pngtoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".png", forAnalysis=True)

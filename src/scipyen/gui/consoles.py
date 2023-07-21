@@ -902,10 +902,16 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
     def create_tab_with_existing_kernel(self, code=None, **kwargs):
         """create a new frontend attached to an external kernel in a new tab"""
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
         connection_file, file_type = QtWidgets.QFileDialog.getOpenFileName(self,
                                                      "Connect to Existing Kernel",
                                                      jupyter_runtime_dir(),
-                                                     "Connection file (*.json)")
+                                                     "Connection file (*.json)",
+                                                     **kw)
         if not connection_file:
             return False
         
