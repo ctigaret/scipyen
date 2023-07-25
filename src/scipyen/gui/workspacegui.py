@@ -587,9 +587,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             
         ScipyenConfigurable.__init__(self, *args, **kwargs)
         
-        # if sys.platform == "win32":
-        #     if isinstance(self, QtWidgets.QMainWindow):
-        #         pass
+        if sys.platform == "win32":
+            if isinstance(self, QtWidgets.QMainWindow):
+                self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint);
                 
         
     @property
