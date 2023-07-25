@@ -1950,6 +1950,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         assert viewer.ID == wid
         
+    def mousePressEvent(self, evt):
+        if sys.platform == "win32":
+            self.activateWindow()
+        else:
+            super().mousePressEvent(self, evt)
+        
     def activateWindow(self):
         print(f"{self.__class__.__name__}.activateWindow")
         if sys.platform== "win32":
@@ -1958,7 +1964,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
             self.setWindowFlags(flags|QtCore.Qt.WindowStaysOnTopHint);
             self.show();
-            self.setWindowFlags(eFlags);
+            self.setWindowFlags(flags);
             self.show();
             # self.raise_()
         else:
