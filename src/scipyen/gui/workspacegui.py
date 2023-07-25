@@ -606,11 +606,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 self.show();
                 return True
             
-            return super().event(evt)
+            return super(QtWidgets.QMainWindow, self).event(evt)
                 
                 
         else:
-            return super().event(evt)
+            return super(QtWidgets.QMainWindow, self).event(evt)
  
     def activateWindow(self):
         if not isinstance(self, QtWidgets.QMainWindow):
