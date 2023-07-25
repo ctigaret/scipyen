@@ -1955,8 +1955,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if sys.platform== "win32":
             flags = self.windowFlags();
             # self.show(); # Restore from systray
-            self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
-            self.setWindowFlags(flags|Qt::WindowStaysOnTopHint);
+            # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
+            self.setWindowFlags(flags|QtCore.Qt.WindowStaysOnTopHint);
             self.show();
             self.setWindowFlags(eFlags);
             self.show();
