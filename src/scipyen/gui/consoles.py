@@ -3536,6 +3536,24 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.addAction(self.choose_font_act)
         #self.widget.kernel_client.shell_channel.message_received.connect(self.slot_kernel_shell_chnl_msg_recvd)
 
+    #def mousePressEvent(self, evt):
+        #if sys.platform == "win32":
+            #self.activateWindow()
+        #super().mousePressEvent(evt)
+
+    #def activateWindow(self):
+        ## print(f"{self.__class__.__name__}.activateWindow")
+        #super().activateWindow()
+        #if sys.platform== "win32":
+            ## flags = self.windowFlags();
+            ## self.show(); # Restore from systray
+            ## self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
+            ##self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
+            ##self.show();
+            #self.raise_()
+        ##else:
+            ##super().activateWindow()
+
     #@pyqtSlot(object)
     #def slot_kernel_shell_chnl_msg_recvd(self, msg:object):
         #msg["workspace_name"]="Internal"

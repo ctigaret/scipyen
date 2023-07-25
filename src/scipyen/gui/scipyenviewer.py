@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Superclass for Scipyen viewer windows
 """
-import typing, warnings, inspect
+import typing, warnings, inspect, sys
 from dataclasses import MISSING
 from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
@@ -287,6 +287,16 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         # if self.appWindow is self.scipyenWindow: # both attributes inherited from WorkspaceGuiMixin
         #     self.appWindow.registerWindow(self)
+
+    #def mousePressEvent(self, evt):
+        #if sys.platform == "win32":
+            #self.activateWindow()
+        #super().mousePressEvent(evt)
+
+    #def activateWindow(self):
+        #super().activateWindow()
+        #if sys.platform== "win32":
+            #self.raise_()
         
     def getAppMenu(self):
         if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
