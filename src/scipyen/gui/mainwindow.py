@@ -1964,6 +1964,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.setWindowFlags(self._winFlagsCache_);
                 self.show();
                 return True
+            
+            return super().event(evt)
+                
                 
         else:
             return super().event(evt)
