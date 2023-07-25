@@ -1973,7 +1973,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         
     def activateWindow(self):
-        print(f"{self.__class__.__name__}.activateWindow")
+        # print(f"{self.__class__.__name__}.activateWindow")
         if sys.platform== "win32":
             # flags = self.windowFlags();
             # self.show(); # Restore from systray
