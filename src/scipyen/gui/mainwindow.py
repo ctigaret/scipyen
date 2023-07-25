@@ -1545,7 +1545,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #         flags = self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
         #         self.setWindowFlags(flags);
         
-        self._winFlagsCache_ = self.windowFlags()
+        # self._winFlagsCache_ = self.windowFlags()
                 
 
     # BEGIN Properties
@@ -1952,37 +1952,37 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         assert viewer.ID == wid
         
-    def mousePressEvent(self, evt):
-        if sys.platform == "win32":
-            self.activateWindow()
-        else:
-            super().mousePressEvent(self, evt)
-            
-    def event(self, evt):
-        if sys.platform == "win32":
-            if evt == QtCore.QEvent.WindowDeactivate:
-                self.setWindowFlags(self._winFlagsCache_);
-                self.show();
-                return True
-            
-            return super().event(evt)
-                
-                
-        else:
-            return super().event(evt)
-                
-        
-    def activateWindow(self):
-        # print(f"{self.__class__.__name__}.activateWindow")
-        if sys.platform== "win32":
-            # flags = self.windowFlags();
-            # self.show(); # Restore from systray
-            # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
-            self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
-            self.show();
-            # self.raise_()
-        else:
-            super().activateWindow()
+#     def mousePressEvent(self, evt):
+#         if sys.platform == "win32":
+#             self.activateWindow()
+#         else:
+#             super().mousePressEvent(self, evt)
+#             
+#     def event(self, evt):
+#         if sys.platform == "win32":
+#             if evt == QtCore.QEvent.WindowDeactivate:
+#                 self.setWindowFlags(self._winFlagsCache_);
+#                 self.show();
+#                 return True
+#             
+#             return super().event(evt)
+#                 
+#                 
+#         else:
+#             return super().event(evt)
+#                 
+#         
+#     def activateWindow(self):
+#         # print(f"{self.__class__.__name__}.activateWindow")
+#         if sys.platform== "win32":
+#             # flags = self.windowFlags();
+#             # self.show(); # Restore from systray
+#             # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
+#             self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
+#             self.show();
+#             # self.raise_()
+#         else:
+#             super().activateWindow()
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
