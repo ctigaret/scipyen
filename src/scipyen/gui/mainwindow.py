@@ -1953,7 +1953,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def activateWindow(self):
         super().activateWindow()
         if sys.platform== "win32":
-            self.raise_()
+            self.show(); # Restore from systray
+            self.setWindowState(Qt::WindowState::WindowActive); # Bring window to foreground
+            # self.raise_()
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
