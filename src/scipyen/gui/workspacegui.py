@@ -587,6 +587,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             
         ScipyenConfigurable.__init__(self, *args, **kwargs)
         
+        # if sys.platform == "win32":
+        #     if isinstance(self, QtWidgets.QMainWindow):
+        #         pass
+                
+        
     @property
     def scipyenWindow(self):
         """Returns a reference to the main Scipyen window.

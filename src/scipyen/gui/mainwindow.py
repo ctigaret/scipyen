@@ -1946,7 +1946,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
     def activateWindow(self):
         super().activateWindow()
-        if os.platform== "win32":
+        if sys.platform== "win32":
             self.raise_()
 
     @safeWrapper
