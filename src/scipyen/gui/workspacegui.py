@@ -601,7 +601,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             return False
         
         if sys.platform == "win32":
-           if evt == QtCore.QEvent.WindowDeactivate:
+            if evt == QtCore.QEvent.WindowDeactivate:
                 self.setWindowFlags(self._winFlagsCache_);
                 self.show();
                 return True
