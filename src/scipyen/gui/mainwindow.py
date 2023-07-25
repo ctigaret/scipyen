@@ -1963,9 +1963,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if evt == QtCore.QEvent.WindowDeactivate:
                 self.setWindowFlags(self._winFlagsCache_);
                 self.show();
+                return True
                 
         else:
-            super().event(evt)
+            return super().event(evt)
                 
         
     def activateWindow(self):
