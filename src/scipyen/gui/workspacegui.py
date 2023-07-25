@@ -589,7 +589,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         if sys.platform == "win32":
             if isinstance(self, QtWidgets.QMainWindow):
-                flags = self.windowFlags() | QtCore.Qt.MSWindowsOwnDC
+                flags = self.windowFlags() | QtCore.Qt.MSWindowsOwnDC | QtCore.BypassWindowManagerHint
                 self.setWindowFlags(flags);
                 
         
