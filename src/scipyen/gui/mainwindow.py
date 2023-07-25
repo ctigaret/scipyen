@@ -1539,6 +1539,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.currentVarItem = None
         self.currentVarItemName = None
+        
+        if sys.platform == "win32":
+            if isinstance(self, QtWidgets.QMainWindow):
+                self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint);
+                
 
     # BEGIN Properties
 
