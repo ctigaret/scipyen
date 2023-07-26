@@ -7325,14 +7325,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._fileSystemChanged_ = True
     
     def enableDirectoryWatch(self, on:bool=True):
-        # if not isinstance(self.dirFileWatcher, QtCore.QFileSystemWatcher):
-        #     self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
-        #     self.dirFileWatcher.directoryChanged.connect(self._slot_directoryChanged)
-            
         if on:
             self._isDirWatching_ = True
             if self.currentDir in self.dirFileWatcher.directories():
-            # do nothing if diretory already watched
+            # do nothing if directory already watched
                 print(f"{self.__class__.__name__}.enableDirectoryWatch: The directory {self.currentDir} is already being watched")
             
             else:
@@ -7344,6 +7340,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         else:
             self._isDirWatching_ = False
+            self._currentDirCache_.clear()
             watchedDirs = self.dirFileWatcher.directories()
             if len(watchedDirs):
                 self.dirFileWatcher.removePaths(watchedDirs)
