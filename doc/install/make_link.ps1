@@ -63,7 +63,7 @@ $targetPath="cmd.exe"
 $args = "/K $myActivate $myAnaconda && conda activate $myCondaEnv && python -Xfrozen_modules=off $myScipyenLaunchScript"
 # $wdir=Join-Path -Path $Home -ChildPath "Documents"
 # $desktop=$shell.SpecialFolders.Item("AllUsersDesktop")
-$linkPath=Join-Path -Path $desktop -ChildPath "Scipyen.lnk"
+$linkPath=Join-Path -Path $desktop -ChildPath "Scipyen (git).lnk"
 $iconPath=Join-Path -Path $srcdir -ChildPath "pythonbackend.ico"
 # Create desktop shortcut
 $shortcut=$shell.CreateShortcut($linkPath)
