@@ -1064,7 +1064,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     
         func(x, p, /, *args, **kwargs)
     
-    p0: initial values for the model realized by `func`
+    p0: sequence of initial values for the model realized by `func` - in the same
+    order as expected by func
     
     Var-keyword parameters (**kwargs):
     =================================
@@ -1077,7 +1078,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     The following are passed directly to scipy.optimize.least_squares:
     bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
-    diff_step, tr_solver, tr_optoins, jac_sparsity, verbose
+    diff_step, tr_solver, tr_options, jac_sparsity, verbose
     
     (see scipy manual for details)
     

@@ -662,6 +662,26 @@ def Frank_Fuortes2(x, irh, tau, x0):
     
 def Boltzmann(x, p, pos:bool=True):
     """ Realises y = 1/(1+exp(±(x₀ - x)/κ))
+
+    Function parameters:
+    ====================
+    x: float scalar (e.g., membrane voltage)
+    
+    p: array-like, float, with two elements: x₀ and κ (in THIS order)
+    
+    pos: bool, optional (default is True)
+        When True, the function uses a positive exponential argument (e.g. useful
+        to fit an activation curve)
+    
+        When False, the exponential argument is negative (e.g., useful to fit an 
+        inactivation curve)
+    
+    Returns:
+    ========
+    A scalar (e.g., membrane current)
+    
+    Notes:
+    ======
     
     Boltzmann's equation is commonly used to describe the voltage-dependent gating
     of voltage-gated ion channels:
@@ -695,7 +715,13 @@ def Boltzmann(x, p, pos:bool=True):
     V½ is the "half-maximum" voltage - the voltage where ensemble channel 
     current is half the maximum, or where half of the channels are active
     
-    κ is a "slope" factor
+    κ is a "slope" factor; when fitting I-V (or G-V) relationships, κ usually is
+    𝒛𝑹𝑻/𝑭 (e.g., see Cui et al, 1997, J Gen Physiol), where:
+    
+    𝒛  apparent gating charge [C]
+    𝑻  temperature [K]
+    𝑹  molar gas constant 8.31446261815324 [J K⁻¹ mol⁻¹]
+    𝑭  Faraday constant 96485.33212331001 [C mol⁻¹]
 
     NOTE V½ and κ are often different for activation and inactivation
     
@@ -719,22 +745,6 @@ def Boltzmann(x, p, pos:bool=True):
     The equation is also an empyrical model of the "gating" mechanism for 
     voltage dependent channels Naᵥ and Kᵥ in the Hodgkin-Huxley formalism.
      
-    Function parameters:
-    ====================
-    x: scalar (e.g., membrane voltage)
-    
-    p: array-like, with two elements: x₀ and κ (in THIS order)
-    
-    pos: optional (default is True)
-        When True, the function uses a positive exponential argument (e.g. useful
-        to fit an activation curve)
-    
-        When False, the exponential argument is negative (e.g., useful to fit an 
-        inactivation curve)
-    
-    Returns:
-    =======
-    A scalar (e.g., membrane current)
     """
     
     x0, κ = p
