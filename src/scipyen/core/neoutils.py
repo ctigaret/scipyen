@@ -4623,7 +4623,7 @@ def remove_spiketrain(segment:neo.Segment, index:typing.Union[int, str, typing.S
         
             trains = [s for k, s in enumerate(stl) if k not in ndx]
             
-        elif all(isinstance(i, str)):
+        elif all(isinstance(i, str) for i in index):
             trains = [s for s in stl if s.name not in ndx]
         
     

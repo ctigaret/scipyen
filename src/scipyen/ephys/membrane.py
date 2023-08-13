@@ -2275,7 +2275,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     
     if len(ge_value_starts) == 0:
         # bail out gracefully
-        warnings.warn("ap_waveform_roots: cannot find where signla becomes >= %s" % value, RuntimeWarning)
+        warnings.warn("ap_waveform_roots: cannot find where signal becomes >= %s" % value, RuntimeWarning)
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
         
     
@@ -3674,12 +3674,15 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             # up   = time point of the down-up transition
             # inj  = injected current (difference between centroids )
             # label = int array "mask" with 0 for down and 1 for up; same shape as im
-            d, u, inj, c, l = sigp.detect_boxcar(im,
+            u,d, inj, c, l, upward = sigp.detect_boxcar(im,
                                                 method=method,
                                                 box_size=box_size, 
                                                 adcres=adcres,
                                                 adcrange=adcrange,
-                                                adcscale=adcscale)
+                                                adcscale=adcscale) # NOTE: up_first is true by default
+            # print(f"upward: {upward}")
+            # print(f"d: {d}")
+            # print(f"u: {u}")
             
             # d, u, inj, c, l = sigp.parse_step_waveform_signal(im,
             #                                                     method=method,
@@ -3700,7 +3703,8 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                 
             start, stop = (min(d,u), max(d,u))
             
-            if d < u:
+            # if d < u:
+            if not upward:
                 inj *= -1.0
             
             vstep = vm.time_slice(start, stop + tail)
