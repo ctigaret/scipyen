@@ -3683,6 +3683,12 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             # print(f"upward: {upward}")
             # print(f"d: {d}")
             # print(f"u: {u}")
+            # print(f"inj: {inj}, size: {inj.size}, ndim: {inj.ndim}, shape: {inj.shape}")
+            
+            if inj.size == 1:
+                inj = inj.flatten()[0]
+                
+                # print(f"-> inj: {inj}")
             
             # d, u, inj, c, l = sigp.parse_step_waveform_signal(im,
             #                                                     method=method,
@@ -5854,10 +5860,18 @@ def analyse_AP_step_injection_series(data, **kwargs):
             else:
                 im = ImSignal
                 
-            step_result, vstep = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
-                                                           Itimes_relative = Itimes_relative,
-                                                           Itimes_samples = Itimes_samples,
-                                                           **kwargs)
+            try:
+                step_result, vstep = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
+                                                            Itimes_relative = Itimes_relative,
+                                                            Itimes_samples = Itimes_samples,
+                                                            **kwargs)
+                
+            except:
+                # NOTE: 2023-08-14 17:45:52
+                # this usually happens when no current injection is detected in Im
+                print(f"Skipping segment {k} of {name} because of the following exception:")
+                traceback.print_exc()
+                continue
             
             if Iinj is not None:
                 # override the value measured from the Im signal
