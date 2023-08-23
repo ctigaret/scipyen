@@ -455,18 +455,17 @@ class DataListener(QtCore.QObject):
         self.scipyenWindow.enableDirectoryWatch(False)
 
 
-
     @pyqtSlot(object)
     def slot_filesRemoved(self, removedItems):
-        print(f{self.__class__.__name__}.slot_filesRemoved {removedItems})
+        print(f"{self.__class__.__name__}.slot_filesRemoved {removedItems}")
 
     @pyqtSlot(object)
     def slot_filesChanged(self, changedItems):
-        print(f{self.__class__.__name__}.slot_filesChanged {changedItems})
+        print(f"{self.__class__.__name__}.slot_filesChanged {changedItems}")
 
     @pyqtSlot(object)
     def slot_filesNew(self, newItems):
-        print(f{self.__class__.__name__}.slot_filesNew {newItems})
+        print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
 
 
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
