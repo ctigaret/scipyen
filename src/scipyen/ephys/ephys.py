@@ -150,6 +150,7 @@ waveform_signal
 """
 
 #### BEGIN core python modules
+import os, sys
 import collections
 import traceback
 import datetime
@@ -177,7 +178,8 @@ import pyabf
 import matplotlib as mpl
 # import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
-from PyQt5 import QtGui, QtCore
+from PyQt5 import (QtGui, QtCore, QtWidgets)
+from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -436,6 +438,37 @@ class ElectrodeMode(TypeEnum):
     LinearArray=32      # local field potentials etc
     MultiElectrodeArray=64 # MEAs on a culture/slice?
    
+class DataListener(QtCore.QObject):
+    """
+    Dynamically constructs and augments neo.Block data as
+    axon files are created in the current working directory
+    """
+    def __init__(self, scipyenWindow, data:typing.Optional[neo.Block]=None):
+        super().__init__(parent=scipyenWindow)
+        self.scipyenWindow=scipyenWindow
+        self.currentDir = os.getcwd()
+
+    def start(self):
+        self.scipyenWindow.enableDirectoryWatch(True)
+
+    def stop(self):
+        self.scipyenWindow.enableDirectoryWatch(False)
+
+
+
+    @pyqtSlot(object)
+    def slot_filesRemoved(self, removedItems):
+        print(f{self.__class__.__name__}.slot_filesRemoved {removedItems})
+
+    @pyqtSlot(object)
+    def slot_filesChanged(self, changedItems):
+        print(f{self.__class__.__name__}.slot_filesChanged {changedItems})
+
+    @pyqtSlot(object)
+    def slot_filesNew(self, newItems):
+        print(f{self.__class__.__name__}.slot_filesNew {newItems})
+
+
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
     """Infers the clamping mode from the units of signal and command"""
