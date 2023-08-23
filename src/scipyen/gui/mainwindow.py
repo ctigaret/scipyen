@@ -7387,7 +7387,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
     
     """
-        print(f"{self.__class__.__name__}._slot_directoryChanged (from dirFileWatcher) *args {args}, **kwargs {kwargs}")
+        #print(f"{self.__class__.__name__}._slot_directoryChanged (from dirFileWatcher) *args {args}, **kwargs {kwargs}")
         
         if self.fileSystemModel.rootPath() == self.currentDirectory:
             dirItems = dict()
