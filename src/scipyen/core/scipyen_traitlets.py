@@ -606,7 +606,7 @@ class SeriesTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Trait for pandas.Series"
     default_value = pd.Series()
     klass = pd.Series
-    _valid_default = (pd.Series,)
+    _valid_defaults = (pd.Series,)
     
     def __init__(self, value_trait=None, args=None, kw=None, **kwargs):
         

@@ -2192,7 +2192,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             ws = "Internal"
 
         wscol = standard_obj_summary_headers.index("Workspace")
-        typecol = standard_obj_summary_headers.index("Type")
+        typecol = standard_obj_summary_headers.index("Object Type")
 
         ret = dict([(self.item(row, 0).text(), self.item(row, typecol).text()) for row in range(
             self.rowCount()) if self.item(row, wscol) is not None and self.item(row, wscol).text() == ws])
@@ -2218,7 +2218,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             ws = "Internal"
 
         wscol = standard_obj_summary_headers.index("Workspace")
-        typecol = standard_obj_summary_headers.index("Type")
+        typecol = standard_obj_summary_headers.index("Object Type")
 
         ret = [self.item(row, typecol).text() if asStrings else self.item(
             row, typecol) for row in range(self.rowCount()) if self.item(row, wscol).text() == ws]
