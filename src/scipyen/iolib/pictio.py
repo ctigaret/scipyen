@@ -1427,8 +1427,6 @@ def writeCsv(data, fileName=None, header=None):
             print(str(e))
             csvfile.close()
             
-        
-        
     elif isinstance(data, np.ndarray):
         if data.ndim > 2:
             raise NotImplementedError("Exporting a numpy array with more than two dimensions as csv is not supported.")
@@ -1471,6 +1469,9 @@ def writeCsv(data, fileName=None, header=None):
         except Exception as e:
             print(str(e))
             csvfile.close()
+            
+    else:
+        raise NotImplementedError(f"{type(data).__name__} is not yet supported")
             
 def loadXMLFile(fileName):
     if os.path.isfile(fileName):
