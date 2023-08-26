@@ -574,101 +574,72 @@ function doneuron ()
     fi
 }
 
-# function make_scipyenrc () 
-# {
-# # When the installer script is run as regular user, it will create 
-# # ${HOME}/.scipeynrc which allows activation of the virtual python environment
-# # used to run Scipyen.
-# #
-# #
-# # When the script is run as root, it will create a scipyact script in the 
-# # /usr/local/bin (which should be on PATH by default on linux)
-# # TODO/FIXME check for other UN*X platforms (e.g. BSD family)
-# # The ${HOME}/.scipyenrc defines a single bash function - 'scipyact' - which 
-# # when called, activates the virtual environment and optionally sets up a few 
-# # needed environment variables (see below in the code)
-# #
-# # The .scipyenrc script NEEDS TO BE SOURCED (in bash); this is done automatically
-# # by the Scipyen launch bash script ('scipyen'); for convenience, this script is
-# # also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
-# # readily available to the user, at the console.
-# #
-# echo -e "\nCreating .scipyenrc\n"
-# 
-# if [[ -z "$VIRTUAL_ENV" ]] ; then
-#     echo -e "Not in an active environment! Goodbye!\n"
-#     exit 1
-# fi
-# 
-# dt=`date '+%Y-%m-%d_%H-%M-%s'`
-# 
-# if [[ `id -u` -eq 0 ]] ; then
-# py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-# bindir=/usr/local/bin
-# 
-# 
-# if [ -r ${bindir}/scipyact ]; then
-# shopt -s lastpipe
-# echo "Copying ${bindir}/scipyact to ${bindir}/scipyact.$dt"
-# cp ${bindir}/scipyact ${bindir}/scipyact.$dt
-# fi
-# cat<<END > ${bindir}/scipyact
-# #! /bin/bash
-# scipyact () {
-# source ${VIRTUAL_ENV}/bin/activate
-# }
-# export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
-# END
-# shopt -u lastpipe
-#     
-# else
-# py_exec=${python_exec}
-# if [ -r ${HOME}/.scipyenrc ] ; then
-# # make a backup copy of .scipyenrc
-# shopt -s lastpipe
-# echo "Copying ${HOME}/.scipyenrc to ${HOME}/.scipyenrc.$dt"
-# cp ${HOME}/.scipyenrc ${HOME}/.scipyenrc.$dt
-# fi
-# cat<<END > ${HOME}/.scipyenrc
-# scipyact () {
-# source ${VIRTUAL_ENV}/bin/activate
-# }
-# export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
-# END
-# shopt -u lastpipe
-# 
-# fi
-# # scipyenvdir=${VIRTUAL_ENV} # not really needed, right?
-# }
+function make_scipyenrc () 
+{
+# When the installer script is run as regular user, it will create 
+# ${HOME}/.scipeynrc which allows activation of the virtual python environment
+# used to run Scipyen.
+#
+# The .scipyenrc script NEEDS TO BE SOURCED (in bash); this is done automatically
+# by the Scipyen launch bash script ('scipyen'); for convenience, this script is
+# also sourced from ${HOME}/.bashrc in order for the function 'scipyact' to be
+# readily available to the user, at the console.
+#
+echo -e "\nCreating .scipyenrc\n"
 
-# function update_bashrc () 
-# {
-# dt=`date '+%Y-%m-%d_%H-%M-%s'`
-# if [ ! -r ${HOME}/.bashrc ]; then
-# cat<<END > ${HOME}/.bashrc
-# source ${HOME}/.scipyenrc
-# END
-# echo ".bashrc has been created in ${HOME}"
-# echo "Sourcing ${HOME}/.bashrc"
-# source ${HOME}/.bashrc
-# else
-# shopt -s lastpipe
-# # check if .scipyenrc is sourced from .bashrc
-# cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
-# # echo "source_set="$source_set
-# if [ -z "${source_set}" ]; then
-# # .scipyenrc not sourced from .bashrc => backup .bashrc then append a line to
-# # source .scipyenrc in there
-# echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
-# cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
-# echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
-# echo ".bashrc has been modified in ${HOME}"
-# echo "Sourcing ${HOME}/.bashrc"
-# source ${HOME}/.bashrc
-# fi
-# shopt -u lastpipe
-# fi
-# }
+if [[ -z "$VIRTUAL_ENV" ]] ; then
+    echo -e "Not in an active environment! Goodbye!\n"
+    exit 1
+fi
+
+dt=`date '+%Y-%m-%d_%H-%M-%s'`
+
+py_exec=${python_exec}
+if [ -r ${HOME}/.scipyenrc ] ; then
+# make a backup copy of .scipyenrc
+shopt -s lastpipe
+echo "Copying ${HOME}/.scipyenrc to ${HOME}/.scipyenrc.$dt"
+cp ${HOME}/.scipyenrc ${HOME}/.scipyenrc.$dt
+fi
+cat<<END > ${HOME}/.scipyenrc
+scipyact () {
+source ${VIRTUAL_ENV}/bin/activate
+export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
+echo "Python virtual environment in ${VIRTUAL_ENV} is active. To exit the environment call 'deactivate'"
+}
+END
+shopt -u lastpipe
+
+}
+
+function update_bashrc () 
+{
+dt=`date '+%Y-%m-%d_%H-%M-%s'`
+if [ ! -r ${HOME}/.bashrc ]; then
+cat<<END > ${HOME}/.bashrc
+source ${HOME}/.scipyenrc
+END
+echo ".bashrc has been created in ${HOME}"
+echo "Sourcing ${HOME}/.bashrc"
+source ${HOME}/.bashrc
+else
+shopt -s lastpipe
+# check if .scipyenrc is sourced from .bashrc
+cat ${HOME}/.bashrc | grep "source ${HOME}/.scipyenrc" | read source_set
+# echo "source_set="$source_set
+if [ -z "${source_set}" ]; then
+# .scipyenrc not sourced from .bashrc => backup .bashrc, then append a line to
+# source .scipyenrc in there
+echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
+cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
+echo "source ${HOME}/.scipyenrc" >> ${HOME}/.bashrc
+echo ".bashrc has been modified in ${HOME}"
+echo "Sourcing ${HOME}/.bashrc"
+source ${HOME}/.bashrc
+fi
+shopt -u lastpipe
+fi
+}
 
 function get_pyver ()
 {
