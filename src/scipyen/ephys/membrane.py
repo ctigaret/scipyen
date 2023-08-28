@@ -1647,6 +1647,8 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     parameters of the current injection steps i.e. Iinj_0, delta_I, Istart and 
     Istop and pass those to analyse_AP_step_injection_series()
     
+    CAUTION
+    
     Parameters:
     ------------
     
@@ -5265,9 +5267,17 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     
     return ret
 
+def getCurrentInjectionProtocolParametersABF(data:neo.Block, protocolEpochs:tuple):
+    """Parses the current injection steps in a neo.Block
+"""
+    if not isinstance(data, neo.Block):
+        raise TypeError(f"Expecting a neo.Block; instead, got {type(data).__name__}")
+    
+    hold_delay = ephys.getABFHoldDelay(data)
+    
 
-
-def analyse_AP_step_injection_series(data, **kwargs):
+def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, tuple, list], 
+                                     **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
     Detects and analyses action potentials (AP) fired during depolarizing current

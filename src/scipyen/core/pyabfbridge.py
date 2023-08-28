@@ -15,11 +15,16 @@ See also
 • https://swharden.com/pyabf/tutorial/ 
 • https://swharden.com/pyabf/
 
+NOTE: About holding levels and times: (from Clampex help):
+
+"...output is held at the holding level for two "holding" periods at the start 
+and end of each sweep, each 1/64th of the total sweep duration."
+
 
 NOTE: About pyabf EpochSection
 Cezar Tigaret <cezar.tigaret@gmail.com>
 
-The original pyabf code onlt takes into account "regular" digital bit patterns
+The original pyabf code only takes into account "regular" digital bit patterns
 (i.e. 0 and 1) and overlooks the fact that Clampex allows one to specify a
 train of digital outputs PER Epoch PER output channel (Channel#0, #1 etc)
 also using a star ('*') notation, e.g.:
@@ -91,7 +96,7 @@ bytes 6, 7 ⇒ 'regular' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 bytes 8, 9 ⇒ 'starred' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 
 """
-import typing, struct
+import typing, struct, inspect
 import numpy as np
 import pandas as pd
 import quantities as pq
@@ -99,6 +104,7 @@ import neo
 import pyabf
 
 from core import quantities as scq
+from core import datatypes
 from iolib import pictio as pio
 
 from pyabf.abf1.headerV1 import HeaderV1
@@ -107,6 +113,9 @@ from pyabf.abf2.section import Section
 from pyabf.abfReader import AbfReader
 
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
+
+# useful alias:
+ABF = pyabf.ABF
 
 def getABF(obj):
     """
@@ -148,6 +157,90 @@ def getABF(obj):
     else:
         warning.warn(f"{filename} is not an Axon file")
         
+def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dict:
+    """Return a specified ABF section as a dict.
+    The section's type is specified as a string (case-insensitive) which can be
+    one of:
+    'protocol'
+    'adc'
+    'dac'
+    'data'
+    'epochperdac'
+    'epoch'
+    'header'
+    'strings'
+    'syncharray'
+    'tag'
+    'userlist'
+    
+    When sectionType is None (default) the function returns a dict with the values
+    of the abf object data members 
+    
+    
+"""
+    import io
+    reject_funcs = (inspect.ismemberdescriptor,
+                    inspect.ismethod,
+                    inspect.ismethoddescriptor,
+                    inspect.ismethodwrapper,
+                    inspect.ismodule,
+                    inspect.isfunction,
+                    inspect.isasyncgen,
+                    inspect.isabstract,
+                    inspect.isasyncgenfunction,
+                    inspect.isawaitable        ,  
+                    inspect.isbuiltin           , 
+                    inspect.isclass              ,
+                    inspect.iscode               ,
+                    inspect.iscoroutine          ,
+                    inspect.iscoroutinefunction  ,
+                    inspect.isdatadescriptor     ,
+                    inspect.isframe              ,
+                    inspect.isfunction           ,
+                    inspect.isgenerator          ,
+                    inspect.isgeneratorfunction  ,
+                    inspect.isgetsetdescriptor   ,
+                    inspect.ismemberdescriptor   ,
+                    inspect.ismethod             ,
+                    inspect.ismethoddescriptor   ,
+                    inspect.ismethodwrapper      ,
+                    inspect.ismodule             ,
+                    inspect.isroutine            ,
+                    inspect.istraceback          
+                    )
+    
+    if not isinstance(sectionType, str):
+        return datatypes.inspect_members(abf, lambda x: not any(f(x) for f in reject_funcs) and not isinstance(x, property) and not isinstance(x, io.BufferedReader))
+        
+    sectionType = sectionType.lower()
+    if sectionType == "protocol":
+        s = abf._protocolSection
+    elif sectionType == "adc":
+        s = abf._adcSection
+    elif sectionType == "dac":
+        s = abf._dacSection
+    elif sectionType == "data":
+        s = abf._dataSection
+    elif sectionType == "epochperdac":
+        s = abf._epochPerDacSection
+    elif sectionType == "epoch":
+        s = abf._epochSection
+    elif sectionType == "header":
+        s = abf._headerV2 if abf.abfVersion["major"] == 2 else abf._headerV1
+    elif sectionType == "strings":
+        s = abf._stringsSection
+    elif sectionType == "syncharray":
+        s = abf._synchArraySection
+    elif sectionType == "tag":
+        s = abf._tagSection
+    elif sectionType == "userlist":
+        s = abf._userListSection
+    else:
+        raise ValueError(f"Unknown section type {sectionType}")
+
+    return datatypes.inspect_members(s, lambda x: not any(f(x) for f in reject_funcs) and not isinstance(x, property) and not isinstance(x, io.BufferedReader))
+    
+
 def readInt16(fb):
     bytes = fb.read(2)
     values = struct.unpack("h", bytes) # ⇐ this is a tuple! first element is what we need
@@ -180,7 +273,7 @@ def bitListToString(bits:list, star:bool=False):
         ret = ret.replace('1', '*')
     return ret
         
-def getDIGPatterns(abf:pyabf.ABF, dacChannel:typing.Optional[int] = None):
+def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
     # NOTE: 2023-06-24 23:37:33
     # the _protocolSection has the following flags useful in this context:
     # nDigitalEnable: int (0 or 1) → whether D0-D8 are enabled
@@ -359,17 +452,39 @@ def epochTable2DF(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = 
         
         return pd.DataFrame(epochData, index = rowIndex)
     
+def getABFHoldDelay(abf:pyabf.ABF):
+    isABF2 = abf.abfVersion["major"] == 2
+    protocol = getABFsection(abf,"protocol")
+    samplingPeriod = (1/(abf.sampleRate*pq.Hz)).rescale(pq.s)
+    return int(abf.sweepPointCount/64) * samplingPeriod
+
+    
+def getActiveDACChannel(anf:pyabf.ABF) -> int:
+    return abf._protocolSection.nActiveDACChannel
+    
 def getCommandWaveforms(abf: pyabf.ABF, 
                         sweep:typing.Optional[int] = None,
-                        channel:typing.Optional[int] = None,
+                        adcChannel:typing.Optional[int] = None,
+                        dacChannel:typing.Optional[int]=None,
                         absoluteTime:bool=False) -> typing.List[typing.List[neo.AnalogSignal]]:
+    
+    # NOTE: 2023-08-28 15:31:13
+    # each ADC input channels in Clampex is associated with one DAC output
+    # for the most complete configuration, IN0 and IN1 are typically associated with OUT0
+    # IN2 and IN3 are associated with OUT1, etc; here, IN0 and IN2 are the 
+    # primary input channels from the amplifierl; IN1 and IN3 are the secondary
+    # inputs from the amplifier
     
     def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
         x_units = scq.unit_quantity_from_name_or_symbol(abf.sweepUnitsX)
         x = abf.sweepX
         y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
-        y_units = scq.unit_quantity_from_name_or_symbol(y_units_str)
-        y = abf.sweepC # the command waveform for this sweep
+        y_units = scq.unit_quantity_from_name_or_symbol(y_units_str) if isinstance(y_units_str, str) else pq.dimensionless
+        
+        # NOTE: 2023-08-28 15:09:15
+        # the command waveform for this sweep
+        # WARNING: this can be manually overwritten; in this case, all bets are off
+        y = abf.sweepC 
         # y_label = abf.sweepLabelC
         sampling_rate = abf.sampleRate * pq.Hz
         
@@ -385,40 +500,84 @@ def getCommandWaveforms(abf: pyabf.ABF,
         if sweep >= abf.sweepCount:
             raise ValueError(f"Invalid sweep {sweep} for {abf.sweepCount} sweeps")
         
-    if isinstance(channel, int):
-        if channel < 0 :
-            raise ValueError("channel must be >= 0")
-        
-        if channel >= abf.channelCount:
-            raise ValueError(f"Invalid channel {channel} for {abf.channelCount} channels")
+    if isinstance(adcChannel, int):
+        if adcChannel < 0 :
+            raise ValueError("adcChannel must be >= 0")
     
-    ret = []
+        if adcChannel >= abf.channelCount:
+            raise ValueError(f"Invalid ADC channel {adcChannel} for {abf.channelCount} ADC channels")
+        
+    if isinstance(dacChannel, int):
+        if dacchannel < 0:
+            raise ValueError("dacChannel must be >= 0")
+        # if dacChannel >= abf._dacSection._entryCount:
+            # raise ValueError(f"Invalid ADAC channel {dacChannel} for {abf._dacSection._entryCount} DAC channels")
+            
+        # NOTE: the actual number of DAC channels available in the data is len(abf.dacNames)
+        if dacChannel >= len(abf.dacNames):
+            raise ValueError(f"Invalid ADAC channel {dacChannel} for {len(abf.dacNames)} DAC channels")
+    
+    # ret = list()
+    ret = dict()
     if not isinstance(sweep, int):
         for s in range(abf.sweepCount):
-            sweepSignals = []
-            if not isinstance(channel, int):
-                for c in range(abf.channelCount):
-                    abf.setSweep(s, c, absoluteTime)
-                    sweepSignals.append(__f__(abf, c))
+            if not isinstance(adcChannel, int):
+                adcChannelWaves = dict()
+                for chnl in range(abf.channelCount):
+                    abf.setSweep(s, chnl, absoluteTime)
+                    if not isinstance(dacChannel, int):
+                        # for dacChnl in range(abf._dacSection._entryCount):
+                        dacChannelWaves = dict()
+                        for dacChnl in range(len(abf.dacNames)):
+                            dacChannelWaves[abf.dacNames[dacChnl]] = __f__(abf, dacChnl)
+                                            
+                    else:
+                        dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+                        
+                    adcChannelWaves[abf.adcNames[chnl]] = dacChannelWaves
             else:
-                    
                 abf.setSweep(s, channel, absoluteTime)
-                sweepSignals.append(__f__(abf, channel))
-                
-            ret.append(sweepSignals)
+                if not isinstance(dacChannel, int):
+                    dacChannelWaves = dict()
+                    for dacChnl in range(len(abf.dacNames)):
+                        dacChannelWaves[abf.dacNames[dacChnl]] = __f__(abf, dacChnl)
+                                        
+                else:
+                    dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+                    
+                adcChannelWaves = {abf.adcnames[channel]: dacChannelWaves}
+                    
+            ret[f"sweep_{s}"] = adcChannelWaves
             
     else:
-        sweepSignals = []
-        if not isinstance(channel, int):
-            for c in range(abf.channelCount):
-                abf.setSweep(sweep, c, absoluteTime)
-                sweepSignals.append(__f__(abf, c))
+        if not isinstance(adcChannel, int):
+            adcChannelWaves = dict()
+            for adcChnl in range(abf.channelCount):
+                abf.setSweep(sweep, adcChnl, absoluteTime)
+                if not isinstance(dacChannel, int):
+                    # for dacChnl in range(abf._dacSection._entryCount):
+                    dacChannelWaves = dict()
+                    for dacChnl in range(len(abf.dacNames)):
+                        dacChannelWaves[abf.dacNames[dacChnl]] = __f__(abf, dacChnl)
+                                        
+                else:
+                    dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+                    
+                adcChannelWaves[abf.adcNames[chnl]] = dacChannelWaves
                 
         else:
-            abf.setSweep(sweep, channel, absoluteTime)
-            sweepSignals.append(__f__(abf, channel))
+            abf.setSweep(sweep, adcChannel, absoluteTime)
+            if not isinstance(dacChannel, int):
+                # for dacChnl in range(abf._dacSection._entryCount):
+                dacChannelWaves = dict()
+                for dacChnl in range(len(abf.dacNames)):
+                    dacChannelWaves[abf.dacNames[dacChnl]] = __f__(abf, dacChnl)
+                                    
+            else:
+                dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+            adcChannelWaves[abf.adcNames[chnl]] = dacChannelWaves
             
-        ret.append(sweepSignals)
+        ret[f"sweep_{sweep}"] = adcChannelWaves
         
     return ret
             

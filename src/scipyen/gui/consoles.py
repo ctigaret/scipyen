@@ -3427,15 +3427,17 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     historyItemsDropped = pyqtSignal()
     workspaceItemsDropped = pyqtSignal()
     fileSystemItemsDropped = pyqtSignal()
-    #workspaceItemsDropped = pyqtSignal(bool)
     loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
     pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     executed = pyqtSignal()
-    #sig_shell_msg_received = pyqtSignal(object)
     
-    def __init__(self, parent=None):
-        super().__init__(parent=parent)
-        self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
+    def __init__(self, parent=None, **kwargs):
+        scipyenWindow = kwargs.pop("scipyenWindow", None) # take this out for below...
+        super().__init__(parent=parent, **kwargs) # initializes QtWidgets.QMainWindow
+        kwargs["scipyenWindow"] = scipyenWindow # ... then place back in kwargs for WorkspaceGuiMixin
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs) # initializes WorkspaceGuiMixin
+        self.consoleWidget = ScipyenConsoleWidget(mainWindow=self._scipyenWindow_) # from WorkspaceGuiMixin
+        # self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
         self.consoleWidget.setAcceptDrops(True)
         self.setCentralWidget(self.consoleWidget)
         
@@ -3449,7 +3451,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.consoleWidget.loadSettings() # inherited from ScipyenConfigurable
         self.widget = self.consoleWidget
         self.active_frontend = self.consoleWidget
-        WorkspaceGuiMixin.__init__(self, parent=parent)
+        # WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs) # initializes WorkspaceGuiMixin
         self._configureUI_()
         self.loadSettings()
         
@@ -3492,7 +3494,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         available_syntax_styles = get_available_syntax_styles() # defined in this module
         
         if len(available_syntax_styles):
-            #print("ScipyenConsole._configureUI_", self.active_frontend.syntaxStyle)
             self.syntax_style_menu = self.settings_menu.addMenu("Syntax Style")
             
             style_group = QtWidgets.QActionGroup(self)
@@ -3549,31 +3550,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self.settings_menu.addAction(self.set_console_scrollbackAction)
         self.addAction(self.set_console_scrollbackAction)
-        #self.widget.kernel_client.shell_channel.message_received.connect(self.slot_kernel_shell_chnl_msg_recvd)
-
-    #def mousePressEvent(self, evt):
-        #if sys.platform == "win32":
-            #self.activateWindow()
-        #super().mousePressEvent(evt)
-
-    #def activateWindow(self):
-        ## print(f"{self.__class__.__name__}.activateWindow")
-        #super().activateWindow()
-        #if sys.platform== "win32":
-            ## flags = self.windowFlags();
-            ## self.show(); # Restore from systray
-            ## self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
-            ##self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
-            ##self.show();
-            #self.raise_()
-        ##else:
-            ##super().activateWindow()
-
-    #@pyqtSlot(object)
-    #def slot_kernel_shell_chnl_msg_recvd(self, msg:object):
-        #msg["workspace_name"]="Internal"
-        #msg["connection_file"] = ""
-        #self.sig_shell_msg_received.emit(msg)
         
     @pyqtSlot()
     def _slot_listMagics(self):
@@ -3590,8 +3566,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     @pyqtSlot()
     def _slot_saveRawToFile(self):
         self.consoleWidget.select_document() # inherited from qtconsole.ConsoleWidget
-        # text = self.layout().currentWidget().toPlainText()
-        # text = self.layout().currentWidget().toPlainText()
         text = self.consoleWidget._control.toPlainText()
         if len(text.strip()):
             self._saveToFile(text, mode="raw")

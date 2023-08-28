@@ -119,6 +119,7 @@ from core.utilities import (summarize_object_properties,
 import core.data_analysis as anl
 from core.strutils import InflectEngine
 import core.strutils as strutils
+import core.utilities as utilities
 import core.sysutils as sysutils
 import core.curvefitting as crvf
 import core.signalprocessing as sigp
@@ -2700,7 +2701,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #   to run_cell(...))
 
         if not isinstance(self.console, consoles.ScipyenConsole):
-            self.console = consoles.ScipyenConsole(parent=self)
+            self.console = consoles.ScipyenConsole(scipyenWindow=self)
+            # self.console = consoles.ScipyenConsole(parent=self)
             self.console.executed.connect(self.slot_updateHistory)
             self.console.executed.connect(self.slot_updateCwd)
 
@@ -7439,7 +7441,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # which HAS TO BE SETUP when the directory first becomes watched.
             
 
-    def viewObject(self, obj, objname, winType=None, newWindow=False, askForParams=False):
+    def viewObject(self, obj, objname, winType=None, 
+                   newWindow=False, askForParams=False):
         """Actually displays a python object in user's workspace
         Delegates to appropriate viewer according to object type, creates a new
         viewer if necessary.

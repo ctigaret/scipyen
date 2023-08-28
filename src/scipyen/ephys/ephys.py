@@ -174,7 +174,7 @@ from dataclasses import (dataclass, MISSING)
 import numpy as np
 import quantities as pq
 import neo
-import pyabf
+# import pyabf
 import matplotlib as mpl
 # import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
@@ -195,7 +195,7 @@ from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
-from core import pyabfbridge
+from core import pyabfbridge as pab
 from core.utilities import normalized_index
 from core.neoutils import get_index_of_named_signal
 from core import quantities as scq
@@ -224,6 +224,8 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
+
+ABF = pab.ABF # useful alias
 
 class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locations", "name"))):
     """Lightweight functor to calculate a signal measure at a location.
@@ -467,6 +469,176 @@ class DataListener(QtCore.QObject):
     def slot_filesNew(self, newItems):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
 
+def getABFHoldDelay(data:neo.Block):
+    """Returns the duration of holding time before actual sweep start.
+
+    WARNING: Only works with a neo.Block generated from an Axon ABF file.
+    
+    The function first tries to create a pyabf.ABF object using the Axon (ABF)
+    file as indicated in the 'file_origin' attribute of 'data'. 
+
+    When this fails, (usually because the original ABF file cannot be found) the 
+    function will inspect the 'annotations' attribute of 'data' as a fallback.
+    If the data was read from an ABF file using Scipyen's pictio module, then the
+    'annotations' attribute should already contain the relevant information.
+    
+    """    
+    if not isinstance(data, neo.Block):
+        raise TypeError(f"Expecting a neo.Block; instead, got {type(data).__name__}")
+    
+    if "abf_version" not in data.annotations:
+        raise NotImplementedError("Only neo.Block created from ABF files are supported")
+    
+    # TODO/FIXME: 2023-08-27 23:17:53
+    # check this has episodic stimulation mode (which is the only one where DAC waveforms
+    # are enabled)
+    #
+    # for now I assume the mode IS episodic stimulation
+    
+    abf = pab.getABF(data) # try to get the ABF object, fail silently
+    
+    if isinstance(abf, pab.ABF):
+        return pab.getABFHoldDelay(abf)
+    
+    else: # fallback to reading the annotations
+        print(f"Cannot obtain an ABF object from {data.name}; maybe the source file does not exist anymore?")
+        # traceback.print_exc()
+        # abf = None
+        try:
+            isABF2 = data.annotations["fFileSignature"].decode() == "ABF2"
+            if not isABF2:
+                raise NotImplementedError("This function only supports ABF2 version")
+            
+            protocol = data.annotations["protocol"]
+            
+            # NOTE: 2023-08-28 09:35:22
+            # this could be obtained from the analogsignals, but what if someone
+            # corrupts the data by inserting an analog signal with a different 
+            # sampling rate? It seems 'neo' does not have a way to prevent that.
+            samplingPeriod = 1 * pq.s/data.annotations["sampling_rate"]
+            
+            # NOTE: 2023-08-28 09:40:18
+            # the number of points per sweep is calculated as (see pyabf):
+            # dataPointCount / sweepCount / channelCount , where all are properties
+            # of the pyabf.ABF object;
+            # in the annotations, these are stored as follows:
+            # dataPointCount    → ["sections"]["DataSection"]["llNumEntries"]
+            # sweepCount        → ["lActualEpisodes"]
+            # channelCount      → ["sections"]["ADCSection"]["llNumEntries"]
+            sweepPointCount = data.annotations["sections"]["DataSection"]["llNumEntries"] / data.annotations["lActualEpisodes"] / data.annotations["sections"]["ADCSection"]["llNumEntries"]
+            
+            return int(sweepPointCount/64) * samplingPeriod
+
+        except:
+            traceback.print_exc()
+            raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
+        
+def getActiveDACChannel(data:typing.Union[neo.Block, pab.ABF]) -> int:
+    """Returns the index of the active DAC channel.
+
+    WARNING: Only works with a neo.Block generated from an Axon ABF file.
+    
+    The function first tries to create a pyabf.ABF object using the Axon (ABF)
+    file as indicated in the 'file_origin' attribute of 'data'. 
+
+    When this fails, (usually because the original ABF file cannot be found) the 
+    function will inspect the 'annotations' attribute of 'data' as a fallback.
+    If the data was read from an ABF file using Scipyen's pictio module, then the
+    'annotations' attribute should already contain the relevant information.
+    
+    """
+    # NOTE: 2023-08-28 14:59:41
+    # to avoid generating and ABF object every time, we accept ABF objects as
+    # first argument
+    if not isinstance(data, neo.Block):
+        raise TypeError(f"Expecting a neo.Block or a pyabf.ABF object; instead, got a {type(data).__name__}")
+    
+    try:
+        isAxon = data.annotations.get("software", None) == "Axon"
+        if not isAxon:
+            raise NotImplementedError("This function suypports only data recorded with Axon software")
+        isABF2 = data.annotations["fFileSignature"].decode() == "ABF2"
+        if not isABF2:
+            raise NotImplementedError("This function only supports ABF2 version")
+        
+        return data.annotations["protocol"]["nActiveDACChannel"]
+    except:
+        traceback.print_exc()
+        raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
+            
+            
+def getDACCommandWaveforms(data:neo.Block, segmentIndex:typing.Optional[int] = None):
+    """Retrieves the waveforms of the command signal on the active DAC channel.
+    
+    Returns one waveform per sweep (i.e., per neo.Segment) unless segmentIndex
+    if specified, and has a valid int value.
+
+    WARNING: Only works with a neo.Block generated from an Axon ABF file.
+    
+    The function first tries to create a pyabf.ABF object using the Axon (ABF)
+    file as indicated in the 'file_origin' attribute of 'data'. 
+
+    When this fails (usually because the original ABF file cannot be found) the 
+    function will fallback on using information contained in the 'annotations' 
+    attribute and the properties on the analog signals contained in the data.
+    
+    This is OK ONLY if the data was obtained by reading the ABF file using
+    neo.io module via Scipyen's pictio module functions.
+    
+    CAUTION: Using synthetic data (e.g. neo.Block created manually) or data
+    augmented manually (such as by adding manually-created segments and/or signals)
+    will most likely result in an Exception being raised.
+    
+    """
+    def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
+        x_units = scq.unit_quantity_from_name_or_symbol(abf.sweepUnitsX)
+        x = abf.sweepX
+        y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
+        y_units = scq.unit_quantity_from_name_or_symbol(y_units_str)
+        y = abf.sweepC # the command waveform for this sweep
+        # y_label = abf.sweepLabelC
+        sampling_rate = abf.sampleRate * pq.Hz
+        
+        return neo.AnalogSignal(y, units = y_units, 
+                                t_start = x[0] * x_units,
+                                sampling_rate = abf.sampleRate * pq.Hz,
+                                name = y_name)
+        
+    abf = pab.getABF(data) # try to get the ABF object, fail silently
+    if isinstance(abf, pab.ABF):
+        activeDAC = pab.getActiveDACChannel(abf) # do this to avoid constructing a new ABF object every time
+        return pab.getCommandWaveforms(abf, sweep=segmentIndex, channel=activeDAC)
+    
+    else:
+        try:
+            activeDAC = getActiveDACChannel(data)
+            sweepCount = data.annotations["lActualEpisodes"]
+            if sweepCount != len(data.segments):
+                raise RuntimeError(f"The number of segments ({len(data.segments)}) in the 'data' {data.name} is different from what ABF header reports ({sweepCount})")
+            
+            sweepLengths = list()
+            for kseg, seg in enumerate(data.segments):
+                sigLengths = list()
+                for ksig, sig in enumerate(seg.analogsignals):
+                    sigLengths.append(sig.shape[0])
+                    
+                if len(set(sigLenghths)) > 1:
+                    raise NotImplementedError(f"'data' {data.name} having signals of different lengths is not supported")
+                
+                sweepLengths.append(sigLenghts[0])
+                    
+            if not isinstance(segmentIndex, int):
+                # parse the command waveform for each sweep (segment)
+                for kseg, seg in enumerate(data.segments):
+                    arrSize = (sweepLengths[kseg], 1)
+                    
+                    
+                
+                
+            if segmentIndex < 0 or segmentIndex > sweepCount:
+                raise ValueError(f"Invalid segmentIndex {segmentIndex} for {sweepCount} segments")
+        
+    
 
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
@@ -2272,7 +2444,7 @@ class ElectrophysiologyProtocol(object):
         
     WARNING DO NOT USE YET - API under development (i.e. unstable) TODO
     """
-    # TODO/FIXME see if pyabf can be used
+    # TODO/FIXME see if pyabf can be used (via pyabfbridge)
     def __init__(self):
         # possible values for self._data_source_:
         # "Axon", "CEDSignal", "CEDSpike", "Ephus", "NA", "unknown"
