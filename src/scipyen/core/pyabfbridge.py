@@ -96,7 +96,8 @@ bytes 6, 7 ⇒ 'regular' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 bytes 8, 9 ⇒ 'starred' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 
 """
-import typing, struct, inspect
+import typing, struct, inspect, itertools, functools
+from functools import singledispatch
 import numpy as np
 import pandas as pd
 import quantities as pq
@@ -450,21 +451,134 @@ def epochTable2DF(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = 
         
         return pd.DataFrame(epochData, index = rowIndex)
     
-def getABFHoldDelay(abf:pyabf.ABF):
+@singledispatch
+def getABFHoldDelay(obj):
+    """Returns the duration of holding time before actual sweep start.
+
+    WARNING: Only works with a neo.Block generated from an Axon ABF file.
+    
+    The function first tries to create a pyabf.ABF object using the Axon (ABF)
+    file as indicated in the 'file_origin' attribute of 'data'. 
+
+    When this fails, (usually because the original ABF file cannot be found) the 
+    function will inspect the 'annotations' attribute of 'data' as a fallback.
+    If the data was read from an ABF file using Scipyen's pictio module, then the
+    'annotations' attribute should already contain the relevant information.
+    
+    """    
+    raise NotImplementedError(f"not implemented for {type(obj).__name__} objects")
+
+@getABFHoldDelay.register(pyabf.ABF)
+def _(abf:pyabf.ABF):
     isABF2 = abf.abfVersion["major"] == 2
     protocol = getABFsection(abf,"protocol")
     samplingPeriod = (1/(abf.sampleRate*pq.Hz)).rescale(pq.s)
     return int(abf.sweepPointCount/64) * samplingPeriod
 
+@getABFHoldDelay.register(neo.Block)
+def _(data:neo.Block):
+    try:
+        isABF2 = data.annotations["fFileSignature"].decode() == "ABF2"
+        if not isABF2:
+            raise NotImplementedError("This function only supports ABF2 version")
+        
+        protocol = data.annotations["protocol"]
+        
+        # NOTE: 2023-08-28 09:35:22
+        # this could be obtained from the analogsignals, but what if someone
+        # corrupts the data by inserting an analog signal with a different 
+        # sampling rate? It seems 'neo' does not have a way to prevent that.
+        samplingPeriod = 1 * pq.s/data.annotations["sampling_rate"]
+        
+        # NOTE: 2023-08-28 09:40:18
+        # the number of points per sweep is calculated as (see pyabf):
+        # dataPointCount / sweepCount / channelCount , where all are properties
+        # of the pyabf.ABF object;
+        # in the annotations, these are stored as follows:
+        # dataPointCount    → ["sections"]["DataSection"]["llNumEntries"]
+        # sweepCount        → ["lActualEpisodes"]
+        # channelCount      → ["sections"]["ADCSection"]["llNumEntries"]
+        sweepPointCount = data.annotations["sections"]["DataSection"]["llNumEntries"] / data.annotations["lActualEpisodes"] / data.annotations["sections"]["ADCSection"]["llNumEntries"]
+        
+        return int(sweepPointCount/64) * samplingPeriod
+
+    except:
+        traceback.print_exc()
+        raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
+
+@singledispatch
+def getActiveDACChannel(obj) -> int:
+    """Returns the index of the active DAC channel.
+
+    WARNING: Only works with a neo.Block generated from an Axon ABF file.
     
-def getActiveDACChannel(anf:pyabf.ABF) -> int:
+    The function first tries to create a pyabf.ABF object using the Axon (ABF)
+    file as indicated in the 'file_origin' attribute of 'data'. 
+
+    When this fails, (usually because the original ABF file cannot be found) the 
+    function will inspect the 'annotations' attribute of 'data' as a fallback.
+    If the data was read from an ABF file using Scipyen's pictio module, then the
+    'annotations' attribute should already contain the relevant information.
+    
+    """
+    raise NotImplementedError(f"Not implemented for {type(obj).__name)} objects")
+            
+@getActiveDACChannel.register(pyabf.ABF)
+def _(abf:pyabf.ABF) -> int:
     return abf._protocolSection.nActiveDACChannel
     
-def getCommandWaveforms(abf: pyabf.ABF, 
+@getActiveDACChannel.register(neo.Block)
+def _(data:neo.Block) -> int:
+    try:
+        isAxon = data.annotations.get("software", None) == "Axon"
+        if not isAxon:
+            raise NotImplementedError("This function suypports only data recorded with Axon software")
+        isABF2 = data.annotations["fFileSignature"].decode() == "ABF2"
+        if not isABF2:
+            raise NotImplementedError("This function only supports ABF2 version")
+        
+        return data.annotations["protocol"]["nActiveDACChannel"]
+    except:
+        traceback.print_exc()
+        raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
+
+@singledispatch
+def getDACCommandWaveforms(obj, 
                         sweep:typing.Optional[int] = None,
-                        adcChannel:typing.Optional[int] = None,
-                        dacChannel:typing.Optional[int]=None,
-                        absoluteTime:bool=False) -> typing.List[typing.List[neo.AnalogSignal]]:
+                        adcChannel:typing.Optional[typing.Union[int, str]] = None,
+                        dacChannel:typing.Optional[typing.Union[int, str]]=None,
+                        absoluteTime:bool=False) -> dict:
+    """Retrieves the waveforms of the command (DAC) signal.
+    
+    Returns one waveform per sweep (i.e., per neo.Segment) unless segmentIndex
+    if specified, and has a valid int value.
+
+    WARNING: Only works with a neo.Block generated from an Axon ABF file.
+    
+    The function first tries to create a pyabf.ABF object using the Axon (ABF)
+    file as indicated in the 'file_origin' attribute of 'data'. 
+
+    When this fails (usually because the original ABF file cannot be found) the 
+    function will fallback on using information contained in the 'annotations' 
+    attribute and the properties on the analog signals contained in the data.
+    
+    This is OK ONLY if the data was obtained by reading the ABF file using
+    neo.io module via Scipyen's pictio module functions.
+    
+    CAUTION: Using synthetic data (e.g. neo.Block created manually) or data
+    augmented manually (such as by adding manually-created segments and/or signals)
+    will most likely result in an Exception being raised.
+    
+    """
+    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
+
+@getDACCommandWaveforms.register(pyabf.ABF)
+def _(abf: pyabf.ABF, 
+      sweep:typing.Optional[int] = None,
+      adcChannel:typing.Optional[typing.Union[int, str]] = None,
+      dacChannel:typing.Optional[typing.Union[int, str]]=None,
+      absoluteTime:bool=False) -> dict:
+    """Retrieves the waveforms of the command (DAC) signal."""
     
     # NOTE: 2023-08-28 15:31:13
     # each ADC input channels in Clampex is associated with one DAC output
@@ -492,36 +606,49 @@ def getCommandWaveforms(abf: pyabf.ABF,
                                 name = y_name)
         
     if isinstance(sweep, int):
-        if sweep < 0:
-            raise ValueError("sweep must be >= 0")
-        
-        if sweep >= abf.sweepCount:
+        if sweep not in range(abf.sweepCount):
             raise ValueError(f"Invalid sweep {sweep} for {abf.sweepCount} sweeps")
         
-    if isinstance(adcChannel, int):
-        if adcChannel < 0 :
-            raise ValueError("adcChannel must be >= 0")
+    elif sweep is not None:
+        raise TypeError(f"Expecting sweep an int in range {abf.sweepCount} or None; instead, got {type(sweep).__name__}")
     
-        if adcChannel >= abf.channelCount:
-            raise ValueError(f"Invalid ADC channel {adcChannel} for {abf.channelCount} ADC channels")
+        
+    if isinstance(adcChannel, int):
+        if adcChannel not in range(len(abf.adcNames)) :
+            raise ValueError(f"Invalid ADC channel {adcChannel} for {len(abf.adcNames)} ADC channels")
+        
+    elif isinstance(adcChannel, str):
+        if adcChannel not in abf.adcNames:
+            raise ValueError(f"ADC channel {adcChannel} not found; current ADC channels are {abf.adcNames}")
+        
+        adcChannel = abf.adcNames.index(adcChannel)
+        
+    elif adcChannel is not None:
+        raise TypeError(f"adcChannel expected to be an int in range 0 ... {len(abf.adcNames)}, a string in {abf.adcNames}, or None; instead, got {type(adcChannel).__name__}")
+            
         
     if isinstance(dacChannel, int):
-        if dacchannel < 0:
-            raise ValueError("dacChannel must be >= 0")
-        # if dacChannel >= abf._dacSection._entryCount:
-            # raise ValueError(f"Invalid ADAC channel {dacChannel} for {abf._dacSection._entryCount} DAC channels")
-            
-        # NOTE: the actual number of DAC channels available in the data is len(abf.dacNames)
-        if dacChannel >= len(abf.dacNames):
+        if dacChannel not in range(len(abf.dacNames)):
             raise ValueError(f"Invalid ADAC channel {dacChannel} for {len(abf.dacNames)} DAC channels")
+        
+    elif isinstance(dacChannel, str):
+        if dacChannel not in abf.dacNames:
+            raise ValueError(f"DAC channel {dacChannel} not found; current DAC channels are {abf.dacNames}")
+        
+        dacChannel = abf.dacNames.index(dacChannel)
+        
+    elif dacChannel is not None:
+        raise TypeError(f"dacChannel expected to be an int in range 0 ... {len(abf.dacNames)},a string in {abf.dacNames}, or None; instead, got {type(dacChannel).__name__}")
     
     # ret = list()
     ret = dict()
+    
     if not isinstance(sweep, int):
         for s in range(abf.sweepCount):
             if not isinstance(adcChannel, int):
                 adcChannelWaves = dict()
-                for chnl in range(abf.channelCount):
+                # for chnl in range(abf.channelCount):
+                for chnl in range(len(abf.adcNames)):
                     abf.setSweep(s, chnl, absoluteTime)
                     if not isinstance(dacChannel, int):
                         # for dacChnl in range(abf._dacSection._entryCount):
@@ -534,7 +661,7 @@ def getCommandWaveforms(abf: pyabf.ABF,
                         
                     adcChannelWaves[abf.adcNames[chnl]] = dacChannelWaves
             else:
-                abf.setSweep(s, channel, absoluteTime)
+                abf.setSweep(s, adcChannel, absoluteTime)
                 if not isinstance(dacChannel, int):
                     dacChannelWaves = dict()
                     for dacChnl in range(len(abf.dacNames)):
@@ -543,14 +670,15 @@ def getCommandWaveforms(abf: pyabf.ABF,
                 else:
                     dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
                     
-                adcChannelWaves = {abf.adcnames[channel]: dacChannelWaves}
+                adcChannelWaves = {abf.adcNames[adcChannel]: dacChannelWaves}
                     
             ret[f"sweep_{s}"] = adcChannelWaves
             
     else:
         if not isinstance(adcChannel, int):
             adcChannelWaves = dict()
-            for adcChnl in range(abf.channelCount):
+            # for adcChnl in range(abf.channelCount):
+            for adcChnl in range(len(abf.adcNames)):
                 abf.setSweep(sweep, adcChnl, absoluteTime)
                 if not isinstance(dacChannel, int):
                     # for dacChnl in range(abf._dacSection._entryCount):
@@ -573,13 +701,77 @@ def getCommandWaveforms(abf: pyabf.ABF,
                                     
             else:
                 dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+                
             adcChannelWaves[abf.adcNames[chnl]] = dacChannelWaves
             
         ret[f"sweep_{sweep}"] = adcChannelWaves
         
     return ret
             
+@getDACCommandWaveforms.register(neo.Block)
+def _(data:neo.Block,
+      sweep:typing.Optional[int] = None,
+      adcChannel:typing.Optional[typing.Union[int, str]] = None,
+      dacChannel:typing.Optional[typing.Union[int, str]]=None,
+      absoluteTime:bool=False) -> dict:
+
+    def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
+        x_units = scq.unit_quantity_from_name_or_symbol(abf.sweepUnitsX)
+        x = abf.sweepX
+        y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
+        y_units = scq.unit_quantity_from_name_or_symbol(y_units_str)
+        y = abf.sweepC # the command waveform for this sweep
+        # y_label = abf.sweepLabelC
+        sampling_rate = abf.sampleRate * pq.Hz
         
+        return neo.AnalogSignal(y, units = y_units, 
+                                t_start = x[0] * x_units,
+                                sampling_rate = abf.sampleRate * pq.Hz,
+                                name = y_name)
+        
+    # abf = pab.getABF(data) # try to get the ABF object, fail silently
+    if isinstance(data, pab.ABF):
+        # activeDAC = pab.getActiveDACChannel(data) # do this to avoid constructing a new ABF object every time
+        return pab.getCommandWaveforms(data, sweep=segmentIndex, 
+                                       adcChannel=adcChannel, dacChannel=dacChannel,
+                                       absoluteTime = absoluteTime)
+    
+    else:
+        # activeDAC = getActiveDACChannel(data)
+        sweepCount = data.annotations["lActualEpisodes"]
+        if sweepCount != len(data.segments):
+            raise RuntimeError(f"The number of segments ({len(data.segments)}) in the 'data' {data.name} is different from what ABF header reports ({sweepCount})")
+        
+        sweepLengths = list()
+        for kseg, seg in enumerate(data.segments):
+            sigLengths = list()
+            for ksig, sig in enumerate(seg.analogsignals):
+                sigLengths.append(sig.shape[0])
+                
+            if len(set(sigLenghths)) > 1:
+                raise NotImplementedError(f"'data' {data.name} having signals of different lengths is not supported")
+            
+            sweepLengths.append(sigLenghts[0])
+                
+        if not isinstance(segmentIndex, int):
+            # parse the command waveform for each sweep (segment)
+            for kseg, seg in enumerate(data.segments):
+                arrSize = (sweepLengths[kseg], 1)
+                
+                
+            
+            
+        if isinstance(segmentIndex, int):
+            if segmentIndex not in range(sweepCount):
+                raise ValueError(f"Invalid segmentIndex {segmentIndex} for {sweepCount} segments")
+            
+        elif segmentIndex is not None:
+            raise TypeError(f"segmentIndex must be an int or None")
+        
+        
+        # try:
+        
+    
         
             
             
