@@ -521,7 +521,7 @@ def getActiveDACChannel(obj) -> int:
     'annotations' attribute should already contain the relevant information.
     
     """
-    raise NotImplementedError(f"Not implemented for {type(obj).__name)} objects")
+    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
             
 @getActiveDACChannel.register(pyabf.ABF)
 def _(abf:pyabf.ABF) -> int:
