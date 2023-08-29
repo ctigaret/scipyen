@@ -610,33 +610,33 @@ def getDACCommandWaveforms(data:neo.Block, segmentIndex:typing.Optional[int] = N
         return pab.getCommandWaveforms(abf, sweep=segmentIndex, channel=activeDAC)
     
     else:
-        try:
-            activeDAC = getActiveDACChannel(data)
-            sweepCount = data.annotations["lActualEpisodes"]
-            if sweepCount != len(data.segments):
-                raise RuntimeError(f"The number of segments ({len(data.segments)}) in the 'data' {data.name} is different from what ABF header reports ({sweepCount})")
+        activeDAC = getActiveDACChannel(data)
+        sweepCount = data.annotations["lActualEpisodes"]
+        if sweepCount != len(data.segments):
+            raise RuntimeError(f"The number of segments ({len(data.segments)}) in the 'data' {data.name} is different from what ABF header reports ({sweepCount})")
+        
+        sweepLengths = list()
+        for kseg, seg in enumerate(data.segments):
+            sigLengths = list()
+            for ksig, sig in enumerate(seg.analogsignals):
+                sigLengths.append(sig.shape[0])
+                
+            if len(set(sigLenghths)) > 1:
+                raise NotImplementedError(f"'data' {data.name} having signals of different lengths is not supported")
             
-            sweepLengths = list()
+            sweepLengths.append(sigLenghts[0])
+                
+        if not isinstance(segmentIndex, int):
+            # parse the command waveform for each sweep (segment)
             for kseg, seg in enumerate(data.segments):
-                sigLengths = list()
-                for ksig, sig in enumerate(seg.analogsignals):
-                    sigLengths.append(sig.shape[0])
-                    
-                if len(set(sigLenghths)) > 1:
-                    raise NotImplementedError(f"'data' {data.name} having signals of different lengths is not supported")
-                
-                sweepLengths.append(sigLenghts[0])
-                    
-            if not isinstance(segmentIndex, int):
-                # parse the command waveform for each sweep (segment)
-                for kseg, seg in enumerate(data.segments):
-                    arrSize = (sweepLengths[kseg], 1)
-                    
-                    
+                arrSize = (sweepLengths[kseg], 1)
                 
                 
-            if segmentIndex < 0 or segmentIndex > sweepCount:
-                raise ValueError(f"Invalid segmentIndex {segmentIndex} for {sweepCount} segments")
+            
+            
+        if segmentIndex < 0 or segmentIndex > sweepCount:
+            raise ValueError(f"Invalid segmentIndex {segmentIndex} for {sweepCount} segments")
+        # try:
         
     
 

@@ -344,8 +344,6 @@ def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
         
     
-    
-
 def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
                       as_dataFrame:bool=False, allTables:bool=False):
     if not isinstance(x, pyabf.ABF):
