@@ -608,11 +608,47 @@ def _(abf: pyabf.ABF,
         x = abf.sweepX
         y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
         y_units = scq.unit_quantity_from_name_or_symbol(y_units_str) if isinstance(y_units_str, str) else pq.dimensionless
+        abfChannel = abf.sweepChannel # the current channel in the ABF, set when calling abf.setSweep(…)
         
         # NOTE: 2023-08-28 15:09:15
         # the command waveform for this sweep
         # WARNING: this can be manually overwritten; in this case, all bets are off
+        #
+        # NOTE: when not overwritten, sweepC delegates to stimulus.stimulusWaveform
+        # in turn this checks if a waveform is enabled, or if the waveform is
+        # defined in a file;
+        #
+        # the variables nWaveformEnable and nWaveformSource are defined in 
+        #   header (for ABF1)
+        #   dac section (for ABF2)
+        #
+        # nWaveformEnable →   0 (disabled); 
+        #                     1 (enabled)
+        #
+        # nWaveformSource →   0 (no waveform); 
+        #                     1 (defined in the epoch table)
+        #                     2 (defined in a separate file)
+        #
+        # if neither, then this will return a synthetic array filled with the 
+        # holding values - not sure we want this, because, in effect, THERE IS NO
+        # command waveform on that channel... But this information is not available
+        # until one calls sweepC for that channel - so there is no way of knowing this beforehand
+        #
+        # So, instead of calling accessing sweepC (however convenient this may be)
+        # we may want to directly run the actual stimulus code instead
+        # (or call sweepC but then check the 'text' property of the correspdonding
+        # stimulus, which has been updated while calling sweepC) - IMO the design
+        # of pyabf is not ideal...
+        if self.abf.abfVersion["major"] == 1:
+            nWaveformEnable = self.abf._headerV1.nWaveformEnable[self.channel]
+            nWaveformSource = self.abf._headerV1.nWaveformSource[self.channel]
+        elif self.abf.abfVersion["major"] == 2:
+            nWaveformEnable = self.abf._dacSection.nWaveformEnable[self.channel]
+            nWaveformSource = self.abf._dacSection.nWaveformSource[self.channel]
+            
         y = abf.sweepC 
+        
+        # stimText = abf.stimulusByChannel[abfChannel]
         # y_label = abf.sweepLabelC
         sampling_rate = abf.sampleRate * pq.Hz
         
@@ -794,8 +830,9 @@ def _(data:neo.Block,
     
     #
     # CAUTION: 2023-08-30 14:15:11
-    # this is where pyaqbf bridge may be supplying redundant information
+    # this is where pyabf bridge may be supplying redundant information
     dacCount = len(data.annotations["dictEpochInfoPerDAC"])
+    
     
     
         
