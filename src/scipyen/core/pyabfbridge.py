@@ -1,15 +1,21 @@
-"""Bridge to pyabf package
+"""Module to access ABF meta-information.
 
-Requires pyabf.
+This modules provides functionality to access "metadata" (e.g. command waveforms, 
+protocol details) associated with electrophysiology data recorded using Axon 
+hardware and software (pClamp suite/Clampex).
 
-PyABF (https://swharden.com/pyabf/) is not currently used to load Axon ABF files.
-Scipyen uses the neo package (https://neo.readthedocs.io/en/stable/) to represent
+Scipyen uses the neo package (https://neo.readthedocs.io/en/stable/) to read
+signal data from electrophysiology recordings from Axon ABF files and represent 
+it in a coherent system of hierarchical containers, where the electrophysiological
+data is contained in a neo.Block (see Table 1)
 
-This is because all electrophysiology signals are represented in Scipyen as
-objects of the types defined in the neo framework. 
+However, the PyABF (https://swharden.com/pyabf/) package offers complementary
+functionality for a more convenient access to the information in the ABF file
+about the experimental protocol (as defined in Clampex) and hardware
+configuration (ABF "meta-information"). 
 
-However, pyABF does offer complementary functionality to neo package, allowing
-the inspection of acquisition protocol data embedded in an axon file.
+The functions defined in this module use the pyabf package to access the ABF
+meta-information associated with a 
 
 See also 
 • https://swharden.com/pyabf/tutorial/ 
@@ -115,10 +121,20 @@ from pyabf.abfReader import AbfReader
 
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
 
+class ABFAcquisitionMode(datatypes.TypeEnum):
+    """Corresponds to nOperationMode in ABF and annotations"""
+    variable_length_event = 1
+    fixed_length_event = 2
+    gap_free = 3
+    high_speed_oscilloscope = 4 # Not supported by neo, but supported by pyabfbridge!
+    episodic_stimulation = 5
+    
+    
+
 # useful alias:
 ABF = pyabf.ABF
 
-def getABF(obj):
+def getABF(obj:typing.Union[str, neo.Block]):
     """
     Returns a pyabf.ABF object from an ABF file.
     
@@ -625,7 +641,6 @@ def _(abf: pyabf.ABF,
         
     elif adcChannel is not None:
         raise TypeError(f"adcChannel expected to be an int in range 0 ... {len(abf.adcNames)}, a string in {abf.adcNames}, or None; instead, got {type(adcChannel).__name__}")
-            
         
     if isinstance(dacChannel, int):
         if dacChannel not in range(len(abf.dacNames)):
@@ -647,49 +662,45 @@ def _(abf: pyabf.ABF,
         for s in range(abf.sweepCount):
             if not isinstance(adcChannel, int):
                 adcChannelWaves = dict()
-                # for chnl in range(abf.channelCount):
                 for chnl in range(len(abf.adcNames)):
                     abf.setSweep(s, chnl, absoluteTime)
                     if not isinstance(dacChannel, int):
-                        # for dacChnl in range(abf._dacSection._entryCount):
                         dacChannelWaves = dict()
                         for dacChnl in range(len(abf.dacNames)):
-                            dacChannelWaves[abf.dacNames[dacChnl]] = __f__(abf, dacChnl)
+                            dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
                                             
                     else:
-                        dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+                        dacChannelWaves = {f"DAC_{dacChnl}_{abf.dacNames[dacChannel]}": __f__(abf, dacChannel)}
                         
-                    adcChannelWaves[abf.adcNames[chnl]] = dacChannelWaves
+                    adcChannelWaves[f"ADC_{chnl}_{abf.adcNames[chnl]}"] = dacChannelWaves
             else:
                 abf.setSweep(s, adcChannel, absoluteTime)
                 if not isinstance(dacChannel, int):
                     dacChannelWaves = dict()
                     for dacChnl in range(len(abf.dacNames)):
-                        dacChannelWaves[abf.dacNames[dacChnl]] = __f__(abf, dacChnl)
+                        dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
                                         
                 else:
-                    dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+                    dacChannelWaves = {f"DAC_{dacChannel}_{abf.dacNames[dacChannel]}": __f__(abf, dacChannel)}
                     
-                adcChannelWaves = {abf.adcNames[adcChannel]: dacChannelWaves}
+                adcChannelWaves = {f"ADC_{adcChannel}_{abf.adcNames[adcChannel]}": dacChannelWaves}
                     
             ret[f"sweep_{s}"] = adcChannelWaves
             
     else:
         if not isinstance(adcChannel, int):
             adcChannelWaves = dict()
-            # for adcChnl in range(abf.channelCount):
             for adcChnl in range(len(abf.adcNames)):
                 abf.setSweep(sweep, adcChnl, absoluteTime)
                 if not isinstance(dacChannel, int):
-                    # for dacChnl in range(abf._dacSection._entryCount):
                     dacChannelWaves = dict()
                     for dacChnl in range(len(abf.dacNames)):
-                        dacChannelWaves[abf.dacNames[dacChnl]] = __f__(abf, dacChnl)
+                        dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
                                         
                 else:
-                    dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+                    dacChannelWaves = {f"DAC_{dacChannel}_{abf.dacNames[dacChannel]}": __f__(abf, dacChannel)}
                     
-                adcChannelWaves[abf.adcNames[chnl]] = dacChannelWaves
+                adcChannelWaves[f"ADC_{chnl}_{abf.adcNames[chnl]}"] = dacChannelWaves
                 
         else:
             abf.setSweep(sweep, adcChannel, absoluteTime)
@@ -697,12 +708,12 @@ def _(abf: pyabf.ABF,
                 # for dacChnl in range(abf._dacSection._entryCount):
                 dacChannelWaves = dict()
                 for dacChnl in range(len(abf.dacNames)):
-                    dacChannelWaves[abf.dacNames[dacChnl]] = __f__(abf, dacChnl)
+                    dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
                                     
             else:
-                dacChannelWaves = {abf.dacNames[dacChannel]: __f__(abf, dacChannel)}
+                dacChannelWaves = {f"DAC_{dacChannel}_{abf.dacNames[dacChannel]}": __f__(abf, dacChannel)}
                 
-            adcChannelWaves[abf.adcNames[chnl]] = dacChannelWaves
+            adcChannelWaves[f"ADC_{chnl}_{abf.adcNames[chnl]}"] = dacChannelWaves
             
         ret[f"sweep_{sweep}"] = adcChannelWaves
         
@@ -729,48 +740,63 @@ def _(data:neo.Block,
                                 sampling_rate = abf.sampleRate * pq.Hz,
                                 name = y_name)
         
-    # abf = pab.getABF(data) # try to get the ABF object, fail silently
-    if isinstance(data, pab.ABF):
-        # activeDAC = pab.getActiveDACChannel(data) # do this to avoid constructing a new ABF object every time
-        return pab.getCommandWaveforms(data, sweep=segmentIndex, 
-                                       adcChannel=adcChannel, dacChannel=dacChannel,
-                                       absoluteTime = absoluteTime)
+    sweepCount = data.annotations["lActualEpisodes"]
     
-    else:
-        # activeDAC = getActiveDACChannel(data)
-        sweepCount = data.annotations["lActualEpisodes"]
-        if sweepCount != len(data.segments):
-            raise RuntimeError(f"The number of segments ({len(data.segments)}) in the 'data' {data.name} is different from what ABF header reports ({sweepCount})")
+    # NOTE: 2023-08-30 12:15:16
+    # just make sure no segments have been added/removed to the block after it 
+    # has been read from its original ABF file
+    if sweepCount != len(data.segments):
+        raise RuntimeError(f"The number of segments ({len(data.segments)}) in the 'data' {data.name} is different from what ABF header reports ({sweepCount})")
+    
+    if isinstance(sweep, int):
+        if sweep not in range(sweepCount):
+            raise ValueError(f"Invalid sweep {sweep} for {sweepCount} sweeps")
         
-        sweepLengths = list()
-        for kseg, seg in enumerate(data.segments):
-            sigLengths = list()
-            for ksig, sig in enumerate(seg.analogsignals):
-                sigLengths.append(sig.shape[0])
-                
-            if len(set(sigLenghths)) > 1:
-                raise NotImplementedError(f"'data' {data.name} having signals of different lengths is not supported")
-            
-            sweepLengths.append(sigLenghts[0])
-                
-        if not isinstance(segmentIndex, int):
-            # parse the command waveform for each sweep (segment)
-            for kseg, seg in enumerate(data.segments):
-                arrSize = (sweepLengths[kseg], 1)
-                
-                
-            
-            
-        if isinstance(segmentIndex, int):
-            if segmentIndex not in range(sweepCount):
-                raise ValueError(f"Invalid segmentIndex {segmentIndex} for {sweepCount} segments")
-            
-        elif segmentIndex is not None:
-            raise TypeError(f"segmentIndex must be an int or None")
+    elif sweep is not None:
+        raise TypeError(f"Expecting sweep an int in range {sweepCount} or None; instead, got {type(sweep).__name__}")
+    
+    # NOTE: 2023-08-30 12:56:11
+    # number of ADC channels in the file is found in ADCSection.llNumEntries
+    # NOTE: these are the ADC channels USED in the file, NOT ADC channels
+    # available on the DAQ device!!!
+    #
+    # names and units of the ADC channels are placed by AxonRawIO into listADCInfo
+    # (which therefore has same length as the number of ADC channels used in the
+    # ABF file)
+    #
+    # it is therefore easy to figure out names & units (+ scaling etc) ONLY for
+    # those ADC channels that have been used to record data
+    
+    adcCount = data.annotations["sections"]["ADCSection"]["llNumEntries"]
+    adcNames = [i["ADCChNames"].decode() for i in data.annotations["listADCInfo"]]
+    
+    if isinstance(adcChannel, int):
+        if adcChannel not in range(adcCount):
+            raise ValueError(f"Invalid ADC channel {adcChannel} for {adcCount} ADC channels")
+    
+    elif isinstance(adcChannel, str):
+        if adcChannel not in adcNames:
+            raise ValueError(f"ADC channel {adcChannel} not found; current ADC channels are {adcNames}")
         
+        adcChannel = adcNames.index(adcChannel)
         
-        # try:
-        
+    elif adcChannel is not None:
+        raise TypeError(f"adcChannel expected to be an int in range 0 ... {adcCount}, a string in {adcNames}, or None; instead, got {type(adcChannel).__name__}")
+
+    # NOTE: 2023-08-30 12:56:26
+    # For DAC channels the situation is different: we have to dig out which of these
+    # are actually used in the file/experiment, using the epoch info.
+    #
+    # the actual DAC used in each protocol epoch is contained in dictEpochInfoPerDAC:
+    # this maps int keys (DAC number) with a nested dict mapping int key (Epoch number) to 
+    # a sub-nested dict of fields
+    # for each DAC that was ACTUALLY used, this contains a dict (0)
+    
+    #
+    # CAUTION: 2023-08-30 14:15:11
+    # this is where pyaqbf bridge may be supplying redundant information
+    dacCount = len(data.annotations["dictEpochInfoPerDAC"])
+    
     
         
             
