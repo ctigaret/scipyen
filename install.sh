@@ -605,7 +605,7 @@ cat<<END > ${HOME}/.scipyenrc
 scipyact () {
 source ${VIRTUAL_ENV}/bin/activate
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
-echo "Python virtual environment in ${VIRTUAL_ENV} is active. To exit the environment call 'deactivate'"
+echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exit the environment call 'deactivate'"
 }
 END
 shopt -u lastpipe
