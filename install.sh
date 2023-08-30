@@ -609,7 +609,6 @@ echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exi
 }
 END
 shopt -u lastpipe
-
 }
 
 function update_bashrc () 
