@@ -118,6 +118,8 @@ from pyabf.abf1.headerV1 import HeaderV1
 from pyabf.abf2.headerV2 import HeaderV2
 from pyabf.abf2.section import Section
 from pyabf.abfReader import AbfReader
+from pyabf.stimulus import (findStimulusWaveformFile, 
+                            stimulusWaveformFromFile)
 
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
 
@@ -130,9 +132,25 @@ class ABFAcquisitionMode(datatypes.TypeEnum):
     episodic_stimulation = 5
     
     
+class DACWaveformSource(datatypes.TypeEnum):
+    epoch_table: 1
+    waveform_file:2
+    
 
 # useful alias:
 ABF = pyabf.ABF
+
+def __wrap_to_quantity__(x:typing.Union[list, tuple], convert:bool=True):
+    return (x[0], unitStrAsQuantity(x[1])) if convert else x
+
+
+
+def unitStrAsQuantity(x:str, convert:bool=True):
+    return scq.unit_quantity_from_name_or_symbol(x) if convert else x
+
+def sourcedFromABF(x:neo.Block) -> bool:
+    ver = getABFversion(x) # raises AssesrtionError if x is not sourced from ABF
+    return True
 
 def getABF(obj:typing.Union[str, neo.Block]):
     """
@@ -639,16 +657,16 @@ def _(abf: pyabf.ABF,
         # (or call sweepC but then check the 'text' property of the correspdonding
         # stimulus, which has been updated while calling sweepC) - IMO the design
         # of pyabf is not ideal...
-        if self.abf.abfVersion["major"] == 1:
-            nWaveformEnable = self.abf._headerV1.nWaveformEnable[self.channel]
-            nWaveformSource = self.abf._headerV1.nWaveformSource[self.channel]
-        elif self.abf.abfVersion["major"] == 2:
-            nWaveformEnable = self.abf._dacSection.nWaveformEnable[self.channel]
-            nWaveformSource = self.abf._dacSection.nWaveformSource[self.channel]
             
         y = abf.sweepC 
         
-        # stimText = abf.stimulusByChannel[abfChannel]
+        stimObj = abf.stimulusByChannel[abfChannel]
+        
+        if stimObj.text == "DAC waveform is not enabled":
+            y_name += " (disabled)"
+            
+        elif stimObj.text == "DAC waveform is controlled by custom file":
+            y_name += " from file" # TODO 2023-08-31 15:29:15 FIXME get the name of the stimulus file
         # y_label = abf.sweepLabelC
         sampling_rate = abf.sampleRate * pq.Hz
         
@@ -703,6 +721,7 @@ def _(abf: pyabf.ABF,
                     if not isinstance(dacChannel, int):
                         dacChannelWaves = dict()
                         for dacChnl in range(len(abf.dacNames)):
+                            
                             dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
                                             
                     else:
@@ -804,6 +823,7 @@ def _(data:neo.Block,
     # those ADC channels that have been used to record data
     
     adcCount = data.annotations["sections"]["ADCSection"]["llNumEntries"]
+    
     adcNames = [i["ADCChNames"].decode() for i in data.annotations["listADCInfo"]]
     
     if isinstance(adcChannel, int):
@@ -823,20 +843,141 @@ def _(data:neo.Block,
     # For DAC channels the situation is different: we have to dig out which of these
     # are actually used in the file/experiment, using the epoch info.
     #
-    # the actual DAC used in each protocol epoch is contained in dictEpochInfoPerDAC:
-    # this maps int keys (DAC number) with a nested dict mapping int key (Epoch number) to 
-    # a sub-nested dict of fields
-    # for each DAC that was ACTUALLY used, this contains a dict (0)
-    
+    # the actual DAC used in each protocol epoch is contained in the 'dictEpochInfoPerDAC'
+    # of the annotations.
+    #
+    # Structure of the dictEpochInfoPerDAC:
+    #
+    # dictEpochInfoPerDAC maps int keys (DAC number) with a nested dict
+    #   the nested dict maps  key (Epoch number) to a sub-nested dict of fields
+    #
+    # Only the used DACs are included in dictEpochInfoPerDAC.
+    #
+    # So, if the Outputs tab of the protocol editor uses DAC channels 0 and 1 (e.g. 
+    # "Cmd 0" and "Cmd 1")then the dictEpochInfoPerDAC will contain only two
+    # key → value pairs, with keys (int) 0 and 1, each mapped to a sub-nested dict
+    # of epochs describing the parameters sent to the corresponding DAC (0 or 1)
+    #
+    # Now, whether each DAC is used to send a command waveform to the electrode
+    # is configured separately, in the "Epochs" tab of the protocol editor; this 
+    # information is given in the 'listDACInfo'
+    #
+    # listDACInfo is a list of dicts, expected to be ordered by the DAC output channel
     #
     # CAUTION: 2023-08-30 14:15:11
     # this is where pyabf bridge may be supplying redundant information
-    dacCount = len(data.annotations["dictEpochInfoPerDAC"])
+    #
+    usedDacCount = len(data.annotations["dictEpochInfoPerDAC"])
     
+    usedDACIndices = list(data.annotations["dictEpochInfoPerDAC"].keys())
+    
+    # if dacChannel
+    
+@singledispatch
+def getABFversion(obj) -> int:
+    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
+        
+@getABFversion.register(pyabf.ABF)
+def _(obj:pyabf.ABF) -> int:
+    return abf.abfVersion["major"]
+
+@getABFversion.register(neo.Block)
+def _(obj:neo.Block) -> int:
+    abf_version = obj.annotations.get("abf_version", None)
+    assert isinstance(abf_version, float), "Object does not seem to be created from an ABF file"
+    
+    abf_version = int(abf_version)
+    
+    fFileSignature = obj.annotations.get("fFileSignature", None)
+    
+    assert isinstance(fFileSignature, bytes), "Object does not seem to be created from an ABF file"
+    
+    fileSig = fFileSignature.decode()
+    fileSigVersion = int(fileSig[-1])
+    
+    assert abf_version == fileSigVersion, "Mismatch between reported ABF versions; check obejct's annotattions properties"
+    
+    fFileVersionNumber = obj.annotations.get("fFileVersionNumber", None)
+    
+    assert isinstance(fFileVersionNumber, float), "Object does not seem to be created from an ABF file"
+    
+    fileVersionMajor = int(fFileVersionNumber)
+    
+    assert abf_version == fileVersionMajor, "Mismatch between reported ABF versions; check obejct's annotattions properties"
+    
+    return abf_version
+
+@singledispatch
+def usedADCs(obj, useQuantities:bool=True) -> dict:
+    """Returns a mapping of used ADC channel index (int) to pair (name, units).
+
+    Units are returned as a python Quantity if useQuantities is True, else as
+    a string (units symbol)
+"""
+    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
+    
+@usedADCs.register(pyabf.ABF)
+def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
+    return dict(map(lambda x: (x, __wrap_to_quantity__(obj._getAdcNameAndUnits(x), useQuantities)), 
+                    obj._adcSection.nADCNum))
+
+@usedADCs.register(neo.Block)
+def _(obj:neo.Block, useQuantities:bool=True) -> dict:
+    assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
+    return dict(map(lambda x: (x, (obj.annotations["listADCInfo"][x]["ADCChNames"].decode(),
+                                   unitStrAsQuantity(obj.annotations["listADCInfo"][x]["ADCChUnits"].decode(), useQuantities))),
+range(obj.annotations["sections"]["ADCSection"]["llNumEntries"])))
+
+@singledispatch
+def usedDACs(obj, useQuantities:bool=True) -> dict:
+    """Returns a mapping of used DAC channel index (int) to pair (name, units)
+
+    Units are returned as a python Quantity if useQuantities is True, else as
+    a string (units symbol)
+"""
+    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
+
+@usedDACs.register(pyabf.ABF)
+def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
+    return dict(map(lambda d: (d, __wrap_to_quantity__(obj._getDacNameAndUnits(d), useQuantities)),
+                    filter(lambda x: obj._dacSection.nWaveformEnable[x]> 0, obj._dacSection.nDACNum)))
+    
+@usedDACs.register(neo.Block)
+def _(obj:neo.Block, useQuantities:bool=True) -> dict:
+    assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
+    
+    return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),
+                    filter(lambda x: x["nWaveformEnable"] > 0, obj.annotations["listDACInfo"])))
+    
+@singledispatch    
+def isDACWaveformEnabled(obj, channel:int) -> bool:
+    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
+            
+@isDACWaveformEnabled.register(pyabf.ABF)
+def _(obj, dacChannel:int) -> bool:
+    abf_version = getABFversion(obj)
+    assert abf_version in (1,2), f"Unsupported ABF version {abf_version}"
+    
+    section = obj._headerV1 if abf_version == 1 else obj._dacSection
+    
+    return obj._dacSection.nWaveformEnable[dacChannel] == 1
+    
+@isDACWaveformEnabled.register(neo.Block)
+def _(obj, channel:int) -> bool:
+    assertFromABFmsg = "Object does not seem to be created from an ABF file"
+    abf_version = getABFversion(obj)
+    assert abf_version in (1,2), f"Unsupported ABF version {abf_version}"
+    
+    epochInfoPerDAC = data.annotations.get("dictEpochInfoPerDAC", None)
+    
+    assert isinstance(epochInfoPerDAC, dict) , assertFromABFmsg
+    
+    assert channel in epochInfoPerDAC.keys(), f"ADC channel {channel} if not used"
+    
+    channelEpochInfoPerDac = epochInfoPerDAC[channel]
     
     
         
-            
-            
-        
+    
+    
         
