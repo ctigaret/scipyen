@@ -610,7 +610,7 @@ def getDACCommandWaveforms(obj,
 def _(abf: pyabf.ABF, 
       sweep:typing.Optional[int] = None,
       adcChannel:typing.Optional[typing.Union[int, str]] = None,
-      dacChannel:typing.Optional[typing.Union[int, str]]=None,
+      dacChannel:typing.Optional[typing.Union[int, str]] = None,
       absoluteTime:bool=False) -> dict:
     """Retrieves the waveforms of the command (DAC) signal."""
     
@@ -682,32 +682,37 @@ def _(abf: pyabf.ABF,
     elif sweep is not None:
         raise TypeError(f"Expecting sweep an int in range {abf.sweepCount} or None; instead, got {type(sweep).__name__}")
     
-        
+    ADCs = usedADCs(abf)
+    ADCnames = tuple(x[1] for x in ADCs.values())
+    DACs = usedDACs(abf)
+    DACnames = tuple(x[1] for x in DACs.values())
+    
     if isinstance(adcChannel, int):
-        if adcChannel not in range(len(abf.adcNames)) :
-            raise ValueError(f"Invalid ADC channel {adcChannel} for {len(abf.adcNames)} ADC channels")
+        # if adcChannel not in range(len(abf.adcNames)) :
+        if adcChannel not in ADCs.keys() :
+            raise ValueError(f"Invalid ADC channel {adcChannel} for ADC channels {tuple(ADCs.keys())}")
         
     elif isinstance(adcChannel, str):
-        if adcChannel not in abf.adcNames:
-            raise ValueError(f"ADC channel {adcChannel} not found; current ADC channels are {abf.adcNames}")
+        if adcChannel not in ADCnames:
+            raise ValueError(f"ADC channel {adcChannel} not found; current ADC channels are {ADCnames}")
         
-        adcChannel = abf.adcNames.index(adcChannel)
+        adcChannel = ADCs[ADCnames.index(adcChannel)]
         
     elif adcChannel is not None:
-        raise TypeError(f"adcChannel expected to be an int in range 0 ... {len(abf.adcNames)}, a string in {abf.adcNames}, or None; instead, got {type(adcChannel).__name__}")
+        raise TypeError(f"adcChannel expected to be an int in {tuple(ADCs.keys())}, a string in {ADCnames}, or None; instead, got {type(adcChannel).__name__}")
         
     if isinstance(dacChannel, int):
-        if dacChannel not in range(len(abf.dacNames)):
-            raise ValueError(f"Invalid ADAC channel {dacChannel} for {len(abf.dacNames)} DAC channels")
+        if dacChannel not in tuple(DACs.keys()):
+            raise ValueError(f"Invalid ADAC channel {dacChannel} for DAC channels {tuple(DACs.keys())}")
         
     elif isinstance(dacChannel, str):
-        if dacChannel not in abf.dacNames:
-            raise ValueError(f"DAC channel {dacChannel} not found; current DAC channels are {abf.dacNames}")
+        if dacChannel not in DACnames:
+            raise ValueError(f"DAC channel {dacChannel} not found; current DAC channels are {DACnames}")
         
-        dacChannel = abf.dacNames.index(dacChannel)
+        dacChannel = DACs[DACnames.index(dacChannel)]
         
     elif dacChannel is not None:
-        raise TypeError(f"dacChannel expected to be an int in range 0 ... {len(abf.dacNames)},a string in {abf.dacNames}, or None; instead, got {type(dacChannel).__name__}")
+        raise TypeError(f"dacChannel expected to be an int in {tuple(DACs.keys())},a string in {DACnames}, or None; instead, got {type(dacChannel).__name__}")
     
     # ret = list()
     ret = dict()
@@ -716,59 +721,62 @@ def _(abf: pyabf.ABF,
         for s in range(abf.sweepCount):
             if not isinstance(adcChannel, int):
                 adcChannelWaves = dict()
-                for chnl in range(len(abf.adcNames)):
+                # for chnl in range(len(abf.adcNames)):
+                for chnl in ADCs:
                     abf.setSweep(s, chnl, absoluteTime)
                     if not isinstance(dacChannel, int):
                         dacChannelWaves = dict()
-                        for dacChnl in range(len(abf.dacNames)):
-                            
-                            dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
+                        # for dacChnl in range(len(abf.dacNames)):
+                        for dacChnl in DACs:
+                            dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][1]}"] = __f__(abf, dacChnl)
                                             
                     else:
-                        dacChannelWaves = {f"DAC_{dacChnl}_{abf.dacNames[dacChannel]}": __f__(abf, dacChannel)}
+                        dacChannelWaves = {f"DAC_{dacChnl}_{DACs[dacChnl][1]}": __f__(abf, dacChannel)}
                         
-                    adcChannelWaves[f"ADC_{chnl}_{abf.adcNames[chnl]}"] = dacChannelWaves
+                    adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][1]}"] = dacChannelWaves
             else:
                 abf.setSweep(s, adcChannel, absoluteTime)
                 if not isinstance(dacChannel, int):
                     dacChannelWaves = dict()
                     for dacChnl in range(len(abf.dacNames)):
-                        dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
+                        dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][1]}"] = __f__(abf, dacChnl)
                                         
                 else:
-                    dacChannelWaves = {f"DAC_{dacChannel}_{abf.dacNames[dacChannel]}": __f__(abf, dacChannel)}
+                    dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChnl][1]}": __f__(abf, dacChannel)}
                     
-                adcChannelWaves = {f"ADC_{adcChannel}_{abf.adcNames[adcChannel]}": dacChannelWaves}
+                adcChannelWaves = {f"ADC_{adcChannel}_{ADCs[adcChannel][1]}": dacChannelWaves}
                     
             ret[f"sweep_{s}"] = adcChannelWaves
             
     else:
         if not isinstance(adcChannel, int):
             adcChannelWaves = dict()
-            for adcChnl in range(len(abf.adcNames)):
+            # for adcChnl in range(len(abf.adcNames)):
+            for adcChnl in ADCs:
                 abf.setSweep(sweep, adcChnl, absoluteTime)
                 if not isinstance(dacChannel, int):
                     dacChannelWaves = dict()
-                    for dacChnl in range(len(abf.dacNames)):
-                        dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
+                    for dacChnl in DACs:
+                        dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][1]}"] = __f__(abf, dacChnl)
                                         
                 else:
-                    dacChannelWaves = {f"DAC_{dacChannel}_{abf.dacNames[dacChannel]}": __f__(abf, dacChannel)}
+                    dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChnl][1]}": __f__(abf, dacChannel)}
                     
-                adcChannelWaves[f"ADC_{chnl}_{abf.adcNames[chnl]}"] = dacChannelWaves
+                adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][1]}"] = dacChannelWaves
                 
         else:
             abf.setSweep(sweep, adcChannel, absoluteTime)
             if not isinstance(dacChannel, int):
                 # for dacChnl in range(abf._dacSection._entryCount):
                 dacChannelWaves = dict()
-                for dacChnl in range(len(abf.dacNames)):
-                    dacChannelWaves[f"DAC_{dacChnl}_{abf.dacNames[dacChnl]}"] = __f__(abf, dacChnl)
+                # for dacChnl in range(len(abf.dacNames)):
+                for dacChnl in DACs:
+                    dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][1]}"] = __f__(abf, dacChnl)
                                     
             else:
-                dacChannelWaves = {f"DAC_{dacChannel}_{abf.dacNames[dacChannel]}": __f__(abf, dacChannel)}
+                dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][1]}": __f__(abf, dacChannel)}
                 
-            adcChannelWaves[f"ADC_{chnl}_{abf.adcNames[chnl]}"] = dacChannelWaves
+            adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][1]}"] = dacChannelWaves
             
         ret[f"sweep_{sweep}"] = adcChannelWaves
         
