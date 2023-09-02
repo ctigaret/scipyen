@@ -133,8 +133,9 @@ class ABFAcquisitionMode(datatypes.TypeEnum):
     
     
 class DACWaveformSource(datatypes.TypeEnum):
-    epoch_table: 1
-    waveform_file:2
+    none     = 0
+    epochs   = 1
+    wavefile = 2
     
 
 # useful alias:
@@ -575,7 +576,7 @@ def _(data:neo.Block) -> int:
     except:
         traceback.print_exc()
         raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
-
+    
 @singledispatch
 def getDACCommandWaveforms(obj, 
                         sweep:typing.Optional[int] = None,
@@ -663,6 +664,9 @@ def _(abf: pyabf.ABF,
         stimObj = abf.stimulusByChannel[abfChannel]
         
         if stimObj.text == "DAC waveform is not enabled":
+            # NOTE: 2023-09-02 22:41:41
+            # this happens when there is no Epoch defined in the Epoch Table
+            # for the given ADC/DAC channels combination
             y_name += " (disabled)"
             
         elif stimObj.text == "DAC waveform is controlled by custom file":
@@ -683,9 +687,9 @@ def _(abf: pyabf.ABF,
         raise TypeError(f"Expecting sweep an int in range {abf.sweepCount} or None; instead, got {type(sweep).__name__}")
     
     ADCs = usedADCs(abf)
-    ADCnames = tuple(x[1] for x in ADCs.values())
+    ADCnames = tuple(x[0] for x in ADCs.values())
     DACs = usedDACs(abf)
-    DACnames = tuple(x[1] for x in DACs.values())
+    DACnames = tuple(x[0] for x in DACs.values())
     
     if isinstance(adcChannel, int):
         # if adcChannel not in range(len(abf.adcNames)) :
@@ -728,23 +732,23 @@ def _(abf: pyabf.ABF,
                         dacChannelWaves = dict()
                         # for dacChnl in range(len(abf.dacNames)):
                         for dacChnl in DACs:
-                            dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][1]}"] = __f__(abf, dacChnl)
+                            dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
                                             
                     else:
-                        dacChannelWaves = {f"DAC_{dacChnl}_{DACs[dacChnl][1]}": __f__(abf, dacChannel)}
+                        dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
                         
-                    adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][1]}"] = dacChannelWaves
+                    adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][0]}"] = dacChannelWaves
             else:
                 abf.setSweep(s, adcChannel, absoluteTime)
                 if not isinstance(dacChannel, int):
                     dacChannelWaves = dict()
                     for dacChnl in range(len(abf.dacNames)):
-                        dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][1]}"] = __f__(abf, dacChnl)
+                        dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
                                         
                 else:
-                    dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChnl][1]}": __f__(abf, dacChannel)}
+                    dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
                     
-                adcChannelWaves = {f"ADC_{adcChannel}_{ADCs[adcChannel][1]}": dacChannelWaves}
+                adcChannelWaves = {f"ADC_{adcChannel}_{ADCs[adcChannel][0]}": dacChannelWaves}
                     
             ret[f"sweep_{s}"] = adcChannelWaves
             
@@ -757,12 +761,12 @@ def _(abf: pyabf.ABF,
                 if not isinstance(dacChannel, int):
                     dacChannelWaves = dict()
                     for dacChnl in DACs:
-                        dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][1]}"] = __f__(abf, dacChnl)
+                        dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
                                         
                 else:
-                    dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChnl][1]}": __f__(abf, dacChannel)}
+                    dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
                     
-                adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][1]}"] = dacChannelWaves
+                adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][0]}"] = dacChannelWaves
                 
         else:
             abf.setSweep(sweep, adcChannel, absoluteTime)
@@ -771,12 +775,12 @@ def _(abf: pyabf.ABF,
                 dacChannelWaves = dict()
                 # for dacChnl in range(len(abf.dacNames)):
                 for dacChnl in DACs:
-                    dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][1]}"] = __f__(abf, dacChnl)
+                    dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
                                     
             else:
-                dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][1]}": __f__(abf, dacChannel)}
+                dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
                 
-            adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][1]}"] = dacChannelWaves
+            adcChannelWaves[f"ADC_{adcChannel}_{ADCs[adcChannel][0]}"] = dacChannelWaves
             
         ret[f"sweep_{sweep}"] = adcChannelWaves
         
@@ -934,7 +938,7 @@ def _(obj:neo.Block, useQuantities:bool=True) -> dict:
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
     return dict(map(lambda x: (x, (obj.annotations["listADCInfo"][x]["ADCChNames"].decode(),
                                    unitStrAsQuantity(obj.annotations["listADCInfo"][x]["ADCChUnits"].decode(), useQuantities))),
-range(obj.annotations["sections"]["ADCSection"]["llNumEntries"])))
+                    range(obj.annotations["sections"]["ADCSection"]["llNumEntries"])))
 
 @singledispatch
 def usedDACs(obj, useQuantities:bool=True) -> dict:
@@ -948,14 +952,14 @@ def usedDACs(obj, useQuantities:bool=True) -> dict:
 @usedDACs.register(pyabf.ABF)
 def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
     return dict(map(lambda d: (d, __wrap_to_quantity__(obj._getDacNameAndUnits(d), useQuantities)),
-                    filter(lambda x: obj._dacSection.nWaveformEnable[x]> 0, obj._dacSection.nDACNum)))
+                    filter(lambda x: obj._dacSection.nWaveformEnable[x] and obj._dacSection.nWaveformSource[x] > 0, obj._dacSection.nDACNum)))
     
 @usedDACs.register(neo.Block)
 def _(obj:neo.Block, useQuantities:bool=True) -> dict:
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
     
     return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),
-                    filter(lambda x: x["nWaveformEnable"] > 0, obj.annotations["listDACInfo"])))
+                    filter(lambda x: x["nWaveformEnable"] > 0 and x["nWaveformSource"] > 0, obj.annotations["listDACInfo"])))
     
 @singledispatch    
 def isDACWaveformEnabled(obj, channel:int) -> bool:
