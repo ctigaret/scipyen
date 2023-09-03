@@ -26,6 +26,70 @@ NOTE: About holding levels and times: (from Clampex help):
 "...output is held at the holding level for two "holding" periods at the start 
 and end of each sweep, each 1/64th of the total sweep duration."
 
+NOTE: 2023-09-03 22:26:46 About the 'Waveform' tab in Clampex Protocol Editor
+The tabs in the bottom row (Channel #0 → 7) corresponds each to one DAC output
+channel (4 for digidata 1440 series, 8 for digidata 1550 series)
+
+NOTE: About various abf attributes and their correspondence to the neo axon_info
+(annotations)
+
+abf.channelCount == abf._adcSection._entryCount → the number of ADC channels
+    used (checked in the protocol editor's 'Inputs' tab) → the number of ABF 
+    (input) channels
+    
+    = annotations["sections"]["ADCSection"]["llNumEntries"]
+    = len(annotations["listADCInfo"])
+    
+abf.stimulusFilefolder fully wualified path (str) where the stimulus file may be
+    (is used); by default this is the same folder as the one where the recorded 
+    data is stored
+    
+    
+NOTE: 2023-09-03 22:34:25 abf._dacSection:
+
+• nDACNum: list of DAC output channels by number (0-7, see NOTE: 2023-09-03 22:26:46)
+    length is 4 (DigiData 1440) or 8 (DigiData 1550) - the number of output DACs
+    available (either used or not)
+    
+        = annotations["sections"]["DACSection"]["llNumEntries"]
+        = len(annotations["listDACInfo"])
+        
+    nDACNum[κ] = annotations["listDACInfo"][κ]["nDACNum"]
+    
+• nWaveformEnable → list of int flags indicating if the DAC is used to generate
+    a command waveform (1) or not (0); same length as nDACNum
+    
+        a DAC is used if "Analog waveform" is checked in the Waveform tab of the
+        protocol editor corresponding to the output channel corresponding to 
+        the current channel tab in the bottom row, see NOTE: 2023-09-03 22:26:46
+    
+    nWaveformEnable[κ] = annotations["listDACInfo"][κ]["nWaveformEnable"]
+    
+• nWaveformSource → list of int flags indicating the source of the DAC command
+    waveform; same length as nDACNum; values: 
+    0 = no waveform defined (regardless of the vaue of nWaveformEnable)
+    
+    1 = waveform generated using the Waveform tab epochs specifiers
+    
+    2 = waveform generated using a source (ABF or ATF) file
+    
+    nWaveformSource[κ] = annotations["listDACInfo"][κ]["nWaveformSource"]
+    
+• lDACFilePathIndex  → list of int flags with the index into the strings section,
+    for the name of a stimulus waveform file for the DAC with nWaveformSource == 2,
+    see above
+    
+    set to 0 if no external waveform file is used
+    
+    WARNING: This is the path as defined in the protocol; pyabf will try to 
+    locate it as if it was run on the same machine where the acquisition was 
+    performed; failing that, will try to locate it in the folder given by the 
+    pyabf.ABF constructor parameter "stimulusFilefolder"; failing that, it will
+    try the folder of the recorded ABF file (usef to construct the pyabf.AB object)
+    and finally, will issue a warning.
+    
+    lDACFilePathIndex[κ] = annotations["listDACInfo"][κ]["lDACFilePathIndex"]
+
 
 NOTE: About pyabf EpochSection
 Cezar Tigaret <cezar.tigaret@gmail.com>
@@ -576,6 +640,7 @@ def _(data:neo.Block) -> int:
     except:
         traceback.print_exc()
         raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
+    
     
 @singledispatch
 def getDACCommandWaveforms(obj, 
