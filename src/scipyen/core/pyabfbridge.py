@@ -30,8 +30,13 @@ NOTE: 2023-09-03 22:26:46 About the 'Waveform' tab in Clampex Protocol Editor
 The tabs in the bottom row (Channel #0 → 7) corresponds each to one DAC output
 channel (4 for digidata 1440 series, 8 for digidata 1550 series)
 
-NOTE: About various abf attributes and their correspondence to the neo axon_info
-(annotations)
+NOTE: About ABF object attributes and their correspondence to the neo axon_info
+(which Scipyen places in the neo.Block 'annotations' attribute)
+
+abf.sweepCount == abf._headerV2.lActualEpisodes == abf._protocolSection.lEpisodesPerRun
+
+    = annotations["lActualEpisodes"]
+    = annotations["protocol"]["lEpisodesPerRun"]
 
 abf.channelCount == abf._adcSection._entryCount → the number of ADC channels
     used (checked in the protocol editor's 'Inputs' tab) → the number of ABF 
@@ -40,9 +45,9 @@ abf.channelCount == abf._adcSection._entryCount → the number of ADC channels
     = annotations["sections"]["ADCSection"]["llNumEntries"]
     = len(annotations["listADCInfo"])
     
-abf.stimulusFilefolder fully wualified path (str) where the stimulus file may be
-    (is used); by default this is the same folder as the one where the recorded 
-    data is stored
+abf.stimulusFilefolder : str, the fully qualifies path to the folder where the 
+    stimulus file may be (if used); by default this is the same folder as the
+    one where the recorded data is stored
     
     
 NOTE: 2023-09-03 22:34:25 abf._dacSection:
@@ -196,10 +201,38 @@ class ABFAcquisitionMode(datatypes.TypeEnum):
     episodic_stimulation = 5
     
     
-class DACWaveformSource(datatypes.TypeEnum):
+class ABFDACWaveformSource(datatypes.TypeEnum):
     none     = 0
     epochs   = 1
     wavefile = 2
+    
+class ABFEpochType(datatypes.TypeEnum):
+    Off = 0
+    Step = 1
+    Ramp = 2
+    Pulse = 3
+    Triangular = 4
+    Cosine = 5
+    Biphasic = 7
+    
+    # def epochTypeStr(self):
+    #     if self.epochType == 0:
+    #         return "Off"
+    #     elif self.epochType == 1:
+    #         return "Step"
+    #     elif self.epochType == 2:
+    #         return "Ramp"
+    #     elif self.epochType == 3:
+    #         return "Pulse"
+    #     elif self.epochType == 4:
+    #         return "Tri"
+    #     elif self.epochType == 5:
+    #         return "Cos"
+    #     elif self.epochType == 7:
+    #         return "BiPhsc"
+    #     else:
+    #         return "Unknown"
+
     
 
 # useful alias:
@@ -312,28 +345,28 @@ def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dic
     if not isinstance(sectionType, str):
         return datatypes.inspect_members(abf, lambda x: not any(f(x) for f in reject_funcs) and not isinstance(x, property) and not isinstance(x, io.BufferedReader))
         
-    sectionType = sectionType.lower()
-    if sectionType == "protocol":
+    sType = sectionType.lower()
+    if sType == "protocol":
         s = abf._protocolSection
-    elif sectionType == "adc":
+    elif sType == "adc":
         s = abf._adcSection
-    elif sectionType == "dac":
+    elif sType == "dac":
         s = abf._dacSection
-    elif sectionType == "data":
+    elif sType == "data":
         s = abf._dataSection
-    elif sectionType == "epochperdac":
+    elif sType == "epochperdac":
         s = abf._epochPerDacSection
-    elif sectionType == "epoch":
+    elif sType == "epoch":
         s = abf._epochSection
-    elif sectionType == "header":
+    elif sType == "header":
         s = abf._headerV2 if abf.abfVersion["major"] == 2 else abf._headerV1
-    elif sectionType == "strings":
+    elif sType == "strings":
         s = abf._stringsSection
-    elif sectionType == "syncharray":
+    elif sType == "syncharray":
         s = abf._synchArraySection
-    elif sectionType == "tag":
+    elif sType == "tag":
         s = abf._tagSection
-    elif sectionType == "userlist":
+    elif sType == "userlist":
         s = abf._userListSection
     else:
         raise ValueError(f"Unknown section type {sectionType}")
