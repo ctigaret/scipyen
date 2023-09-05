@@ -439,6 +439,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     defaultCursorsShowValue = False
     defaultXAxesLinked = False
+    defaultXGrid = False
+    defaultYGrid = False
+    
 
     mpl_prop_cycle = plt.rcParams['axes.prop_cycle']
     
@@ -778,6 +781,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._cursorLabelPrecision_ = self.defaultCursorLabelPrecision
         self._cursorsShowValue_ = self.defaultCursorsShowValue
         self._xAxesLinked_ = self.defaultXAxesLinked
+        self._xGridOn_ = self.defaultXGrid
+        self._yGridOn_ = self.defaultYGrid
+        
         #### END generic plot options
         
         # NOTE: 2021-08-25 09:42:54
@@ -921,6 +927,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.actionLink_X_axes.toggled.connect(self._slot_setXAxesLinked)
         self.actionLink_X_axes.setEnabled(False)
+        
+        self.actionShow_X_grid.toggled.connect(self._slot_showXgrid)
+        self.actionShow_X_grid.setEnabled(False)
+        
+        self.actionShow_Y_grid.toggled.connect(self._slot_showYgrid)
+        self.actionShow_Y_grid.setEnabled(False)
+        
         
         # the actual layout of the plot items (pyqtgraph framework)
         # its "layout" is a QtWidgets.QGraphicsGridLayout
@@ -1169,6 +1182,39 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["CursorLabelPrecision"] = self._cursorLabelPrecision_
             
+    @property
+    def xGrid(self) -> bool:
+        return self._xGridOn_
+    
+    @markConfigurable("XGrid")
+    @xGrid.setter
+    def xGrid(self, value:bool):
+        self._xGridOn_ = value == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionShow_X_grid)
+        self.actionShow_X_grid.setChecked(self._xGridOn_)
+            
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["XGrid"] = self._xGridOn_
+        
+        self._showXGrid(self._xGridOn_)
+        
+    @property
+    def yGrid(self) -> bool:
+        return self._yGridOn_
+    
+    @markConfigurable("YGrid")
+    @xGrid.setter
+    def yGrid(self, value:bool):
+        self._yGridOn_ = value == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionShow_Y_grid)
+        self.actionShow_Y_grid.setChecked(self._yGridOn_)
+            
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["YGrid"] = self._yGridOn_
+            
+        self._showYGrid(self._yGridOn_)
+        
+        
     @property
     def xAxesLinked(self): 
         """This is True when all PlotItems but one have X axes linked"""
@@ -7272,7 +7318,15 @@ signals in the signal collection.
         return [c for c in self._crosshairSignalCursors_.values()]
     
     @pyqtSlot(bool)
-    def _slot_setXAxesLinked(self, value):
+    def _slot_showXgrid(self, value:bool):
+        self.xGrid = value
+    
+    @pyqtSlot(bool)
+    def _slot_showYgrid(self, value:bool):
+        self.yGrid = value
+    
+    @pyqtSlot(bool)
+    def _slot_setXAxesLinked(self, value:bool):
         self.xAxesLinked = value == True
         
     @pyqtSlot(bool)
@@ -9397,6 +9451,14 @@ signals in the signal collection.
         if self.currentAxis == plotItem:
             self.currentAxis = self.axes[0] if len(self.axes) else None
             
+    def _showXGrid(self, value:bool):
+        for ax in self.axes:
+            ax.showGrid(x=value)
+        
+    def _showYGrid(self, value:bool):
+        for ax in self.axes:
+            ax.showGrid(y=value)
+        
     def linkAllXAxes(self):
         """Link all PlotItem objects (a.k.a signal viewer 'axes') to the top one.
         The consequence is that all X axes are linked: a horizontal zoom on any 
@@ -9607,12 +9669,21 @@ signals in the signal collection.
                 
         if len(self.axes):
             self.actionLink_X_axes.setEnabled(True)
-            
             if self.xAxesLinked:
                 self.linkAllXAxes()
             else:
                 self.unlinkAllXAxes()
                 
+            self.actionShow_X_grid.setEnabled(True)
+            self._slot_showXgrid(self.xGrid)
+            self.actionShow_Y_grid.setEnabled(True)
+            self._slot_showYgrid(self.yGrid)
+            
+        else:
+            self.actionLink_X_axes.setEnabled(False)
+            self.actionShow_X_grid.setEnabled(False)
+            self.actionShow_Y_grid.setEnabled(False)
+            
         
     @pyqtSlot(object)
     @safeWrapper
