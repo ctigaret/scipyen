@@ -3667,14 +3667,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if all([isinstance(self.workspace[v], (pd.DataFrame, pd.Series, neo.basesignal.BaseSignal, neo.SpikeTrain, np.ndarray))] for v in varnames):
             if not any([isinstance(self.workspace[v], np.ndarray) and self.workspace[v].ndim > 2 for v in varnames]):
                 exportCSVAction = cm.addAction(
-                    "Export selected variables to CSV")
+                    "Export as CSV")
                 exportCSVAction.triggered.connect(self.slot_multiExportToCsv)
                 exportCSVAction.setToolTip(
-                    "Export variables as separate comma-separated ASCII files")
+                    "Export as comma-separated ASCII files")
                 exportCSVAction.setStatusTip(
-                    "Export variables as comma-separated ASCII file")
+                    "Export as comma-separated ASCII file")
                 exportCSVAction.setWhatsThis(
-                    "Export variables as comma-separated ASCII file")
+                    "Export as comma-separated ASCII file")
                 exportCSVAction.hovered.connect(
                     self._slot_showActionStatusMessage_)
 

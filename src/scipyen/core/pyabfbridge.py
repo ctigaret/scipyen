@@ -294,13 +294,13 @@ def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dic
     """Return a specified ABF section as a dict.
     The section's type is specified as a string (case-insensitive) which can be
     one of:
-    'protocol'
     'adc'
     'dac'
     'data'
-    'epochperdac'
     'epoch'
+    'epochperdac'
     'header'
+    'protocol'
     'strings'
     'syncharray'
     'tag'
