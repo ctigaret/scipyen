@@ -30,6 +30,29 @@ NOTE: 2023-09-03 22:26:46 About the 'Waveform' tab in Clampex Protocol Editor
 The tabs in the bottom row (Channel #0 → 7) corresponds each to one DAC output
 channel (4 for digidata 1440 series, 8 for digidata 1550 series)
 
+NOTE: 2023-09-06 23:19:29 About the Epochs table
+
+The epoch table is dynamically created by pyabf when a pyabf.ABF object is 
+initialized. PyABF represents an epoch table as a pyabf.waveform.EpochTable
+object, for a specific DAC channel index. See getABFEpochsTable(…) in this module.
+
+An EpochTable stores pyabf.waveform.Epoch objects (NOT neo.Epoch !!!) created
+using the information in "epochs per dac" section.
+
+In neo.Blocks read from ABF files using neo, the epoch table can be constructed 
+from annotations dict (WARNING do NOT confuse this epoch table with neo.Epoch
+objects!).
+
+In particular, the dictEpochInfoPerDAC contains the Epoch information for each 
+defined epochs:
+
+abf._epochPerDacSection.nEpochType: int - see ABFEpochType enum type in this module
+
+
+
+
+
+
 NOTE: About ABF object attributes and their correspondence to the neo axon_info
 (which Scipyen places in the neo.Block 'annotations' attribute)
 
@@ -45,14 +68,26 @@ abf.channelCount == abf._adcSection._entryCount → the number of ADC channels
     = annotations["sections"]["ADCSection"]["llNumEntries"]
     = len(annotations["listADCInfo"])
     
+abf.channelList == list(range(abf.channelcount)) list of channel indices
+    
 abf.stimulusFilefolder : str, the fully qualifies path to the folder where the 
     stimulus file may be (if used); by default this is the same folder as the
     one where the recorded data is stored
     
+abf.holdingCommand: list with nDAC channel elements; holds the holding value in 
+    each DAC (whether the DAC it is used or not)
+    
+    this is effectivelyan alias to abf._dacSection.fDACHoldinglevel
+    
+    len(abf.holdingCommand) = abf._dacSection._entryCount = len(annotations["listDACInfo"])
+    
+    abf.holdingCommand[κ] = annotations["listDACInfo"][κ]["fDACHoldinglevel"]
+    
     
 NOTE: 2023-09-03 22:34:25 abf._dacSection:
 
-• nDACNum: list of DAC output channels by number (0-7, see NOTE: 2023-09-03 22:26:46)
+• nDACNum: list of DAC output channels by number: (0-3 for Digitdata 1440 series,
+    0-7 for Digidata 1550 series, see also NOTE: 2023-09-03 22:26:46)
     length is 4 (DigiData 1440) or 8 (DigiData 1550) - the number of output DACs
     available (either used or not)
     
@@ -60,6 +95,14 @@ NOTE: 2023-09-03 22:34:25 abf._dacSection:
         = len(annotations["listDACInfo"])
         
     nDACNum[κ] = annotations["listDACInfo"][κ]["nDACNum"]
+    
+• fDACHoldinglevel: list of holding levels, one per DAC channel
+
+    fDACHoldinglevel[κ] = annotations["listDACInfo"][κ]["fDACHoldinglevel"]
+    
+• nInterEpisodeLevel: list of interepisode levels for each DAC channel
+
+    nInterEpisodeLevel[κ] = annotations["listDACInfo"][κ]["nInterEpisodeLevel"]
     
 • nWaveformEnable → list of int flags indicating if the DAC is used to generate
     a command waveform (1) or not (0); same length as nDACNum
@@ -478,7 +521,8 @@ def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
         
     
 def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
-                      as_dataFrame:bool=False, allTables:bool=False):
+                      dacChannel:typing.Optional[int] = None,
+                      as_dataFrame:bool=False, allTables:bool=False) -> list:
     if not isinstance(x, pyabf.ABF):
         raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
     
@@ -491,10 +535,17 @@ def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
         x.setSweep(sweep)
         # NOTE: 2022-03-04 15:30:22
         # only return the epoch tables that actually contain any non-OFF epochs (filtered here)
-        if allTables:
-            etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+        if isinstance(dacChannel, int):
+            if dacChannel not in x._dacSection.nDACNum:
+                raise ValueError(f"Invalid DAC channel index (dacChannel) {dacChannel}; current DAC channel indices are {x._dacSection.nDACNum}")
+            
+            etables = [pyabf.waveform.EpochTable(x, dacChannel)] # WARNING: 2023-09-06 23:36:28 may be an empty EpochTable
         else:
-            etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+            if allTables:
+                etables = list(pyabf.waveform.EpochTable(x, c) for c in x._dacSection.nDACNum)
+                # etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+            else:
+                etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
             
         if as_dataFrame:
             etables = [epochTable2DF(e, x) for e in etables]
@@ -504,10 +555,17 @@ def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
     else:
         for sweep in range(x.sweepCount):
             x.setSweep(sweep)
-            if allTables:
-                etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+            if isinstance(dacChannel, int):
+                if dacChannel not in x._dacSection.nDACNum:
+                    raise ValueError(f"Invalid DAC channel index (dacChannel) {dacChannel}; current DAC channel indices are {x._dacSection.nDACNum}")
+                
+                etables = [pyabf.waveform.EpochTable(x, dacChannel)] # WARNING: 2023-09-06 23:36:28 may be an empty EpochTable
             else:
-                etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+                if allTables:
+                    etables = list(pyabf.waveform.EpochTable(x, c) for c in x._dacSection.nDACNum)
+                    # etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+                else:
+                    etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
                 
             if as_dataFrame:
                 etables = [epochTable2DF(e, x) for e in etables]
