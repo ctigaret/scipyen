@@ -49,7 +49,103 @@ defined epochs:
 abf._epochPerDacSection.nEpochType: int - see ABFEpochType enum type in this module
 
 
+Epoch section:
+==============
+nEpochDigitalOutput: list with as many elements as the numebr of epochs defined
+    in the protocol
+    
+For now, ABF epochs are ot be constructed using the pyabf package - namely, the
+pyabf.waveform.Epoch class. 
 
+TODO: consider writing our own DAQEpoch class containing a common protocol 
+interface for ABF and CED Signal data -> to be specialzed (subclassed) into
+ABFEpoch and CEDSignalEpoch
+
+
+A pyabf.waveform.Epoch can be constructed using the information contained in 
+the 'annotations' attribute of a neo.Block generated forman ABF file via the
+neo.io.axonio/neo.io.axonrawio modules.
+
+WARNING: Eppoch attribute names are case sensitive, so make sure you type 
+"epochType", not "epochtype". 
+
+The annotations["dictEpochInfoPerDAC"] is the go-to place for most of the 
+information you need. For digital patterns, the information is held in 
+annotations["EpochInfo"].
+
+Be aware that dictEpochInfoPerDAC is keyed on the int DAC number (or output 
+channel index); the DAC index key is mapped to a nested dict keyed on the int
+epoch number (corresponding to the epoch hnumber also mapped to the "nEpochNum"
+key of this nested dict).
+
+Therefore, to access the information for the 𝒏ᵗʰ epoch on the 𝒎ᵗᴴ DAC (output)
+you select:
+
+annotations["dictEpochInfoPerDAC"][𝒎][𝒏][<key:str>], see examples below:
+
+epoch = pab.pyabf.waveform.Epoch()
+
+epoch.epochNumber = annotations["dictEpochInfoPerDAC"][0][0]["nEpochNum"]
+# NOTE: alternatively: epoch.epochNumber = annotations["EpochInfo"][0]["nEpochNum"]
+
+epoch.epochType = annotations["dictEpochInfoPerDAC"][0][0]["nEpochType"]
+
+epoch.level = annotations["dictEpochInfoPerDAC"][0][0]["fEpochInitLevel"]
+
+epoch.levelDelta = annotations["dictEpochInfoPerDAC"][0][0]["fEpochLevelInc"]
+
+epoch.duration = annotations["dictEpochInfoPerDAC"][0][0]["lEpochInitDuration"]
+
+epoch.durationDelta = annotations["dictEpochInfoPerDAC"][0][0]["lEpochDurationInc"]
+
+epoch.pulsePeriod = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulsePeriod"]
+
+epoch.pulseWidth = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulseWidth"]
+
+# NOTE: for digital pattern things are a bit more complicated:
+
+BEGIN Excerpt from Clampex help:
+Set the digital output bit patterns for individual epochs in each of these rows.  
+
+The four character positions in each cell correspond to, from left to right,
+Digital OUT channels 3, 2, 1, 0 (for Digital bit pattern #3-0) and Digital OUT 
+channels 7, 6, 5, 4 (for Digital bit pattern #7-4).
+
+    To set a channel HIGH, place a 1 in the appropriate position.
+    To set a channel LOW, place a 0 in the appropriate position.
+    To have a pulse train delivered on a channel, enter an asterisk, <Shift+8>, 
+    in the appropriate channel.
+
+When a train is selected you must enter train period and pulse width values in 
+the cells below.  These values are shared with any analog trains in the epoch. 
+Behavior of and terminology for digital trains is the same as for analog Pulse trains.
+
+Digital trains are inverted by unchecking the Active HI logic for digital trains
+check box, above the table.    
+END Excerpt from Clampex help
+    
+1. ALL DAC channels are available in the protocol editor, but 
+only ONE DAC channel can associate a digital output at any time.
+
+However, turning on "Alternate digital outputs" allows one to set digital output
+patterns on up to TWO DACs (which will be used on alternative Sweeps in the Run).
+
+2. Digital output specification follows a relatively simple pattern in Clampex:
+    ∘ there are two banks of four bits (total of 8 bits) 3-0 and 7-4 (yes, in 
+    reverse order, I guess this is "little endian")
+
+    ∘ for each bank the user may enter a sequence of four digits (0 or 1) to 
+    turn OFF or ON the output in the corresponding position of the digit, e.g.:
+    
+    0001 => digital output 0 is ON, outputs 3,2,1 are OFF
+    
+    When a digital output is ON, this generates a digital PULSE (TTL) with
+    the duration specified in the corresponding epoch number in dictEpochInfoPerDAC
+    
+    ∘ WARNING: This is NOT correctly read in pyabf: at any position, the user CAN
+    place an asterisk ('*') instead or 0 or 1, which signifies that digital output
+    corresponding to the position of the asterisk is supposed to generate a PULSE
+    TRAIN 
 
 
 
@@ -450,6 +546,12 @@ def bitListToString(bits:list, star:bool=False):
     return ret
         
 def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
+    """Creates a representation of the digital pattern associated with a DAC channel.
+
+    Requires access to the original ABF file, because we are using our own
+    algorithm to decode digital output trains.
+
+    """
     # NOTE: 2023-06-24 23:37:33
     # the _protocolSection has the following flags useful in this context:
     # nDigitalEnable: int (0 or 1) → whether D0-D8 are enabled
@@ -464,8 +566,6 @@ def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
     #   then the alternative pattern is applied on Channel 0 !
     epochsDigitalPattern = dict()
     
-    
-    
     with open(abf.abfFilePath, 'rb') as fb:
         epochSection = abf._epochSection
         nEpochs = epochSection._entryCount
@@ -478,13 +578,16 @@ def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
         epochDigitalAlt = [None] * nEpochs
         epochDigitalStarredAlt = [None] * nEpochs
         
+        # TODO: 2023-09-07 10:18:14
+        # use THIS in our own ABFEpoch class; might want to augment neo.io.rawio.axonrawio
+        # OR write a new axon raw io class...
         for i in range(nEpochs):
             fb.seek(epochSection._byteStart + i * epochSection._entrySize)
             epochNumber = readInt16(fb)
-            epochDig = readInt16(fb)
-            epochDigS = readInt16(fb)
-            epochDig_alt = readInt16(fb)
-            epochDigS_alt = readInt16(fb)
+            epochDig = readInt16(fb) # reads the step digital pattern (0s and 1s, for ditigal steps)
+            epochDigS = readInt16(fb) # reads the starred digital pattern (for digital pulse trains)
+            epochDig_alt = readInt16(fb) # reads the alternative step digital pattern
+            epochDigS_alt = readInt16(fb) # reads the alternative digital pulse trains
             epochNumbers[i] = epochNumber
             epochDigital[i] = epochDig
             epochDigitalStarred[i] = epochDigS
