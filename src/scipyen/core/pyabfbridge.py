@@ -235,7 +235,7 @@ NOTE: 2023-09-03 22:34:25 abf._dacSection:
     lDACFilePathIndex[κ] = annotations["listDACInfo"][κ]["lDACFilePathIndex"]
 
 
-NOTE: About pyabf EpochSection
+NOTE: About pyabf EpochSection - Digital patterns
 Cezar Tigaret <cezar.tigaret@gmail.com>
 
 The original pyabf code only takes into account "regular" digital bit patterns
@@ -246,6 +246,18 @@ also using a star ('*') notation, e.g.:
 Digital out #3-0: 00*0 
 
 etc...
+
+In contrast, axonrawio is more accurate, as it stores the digital pattern as 
+int values in EpochInfo dict::
+
+nDigitalValue -> the steps logic for banks 7-4 and 3-0
+nAlternateDigitalValue -> the alternative steps logic for banks 7-4 and 3-0
+    
+nDigitalTrainValue -> the trains logic for banks 7-4 and 3-0
+nAlternateDigitalTrainValue -> the alternative trains logic for banks 7-4 and 3-0
+
+Whether the alternate values are enabled or not is given by 
+nAlternateDigitalOutputState = 0 or 1 in the protocol dict
 
 The difference between a "regular" digital bit flag (e.g. 0010) and a 'starred'
 one is that the 'regular' one generates a digital signal (TTL) lasting as 
@@ -346,6 +358,7 @@ class ABFDACWaveformSource(datatypes.TypeEnum):
     wavefile = 2
     
 class ABFEpochType(datatypes.TypeEnum):
+    Unknown = -1
     Off = 0
     Step = 1
     Ramp = 2
@@ -372,7 +385,18 @@ class ABFEpochType(datatypes.TypeEnum):
     #     else:
     #         return "Unknown"
 
-    
+class ABFEpoch:
+    def __init__(self):
+        self.epochNumber = -1
+        self.epochType = ABFEpochType.Unknown
+        self.level = -1
+        self.levelDelta = -1
+        self.duration = -1
+        self.durationDelta = -1
+        self.digitalPattern = None
+        self.pulsePeriod = -1
+        self.pulseWidth = -1
+        self.dacNum = -1
 
 # useful alias:
 ABF = pyabf.ABF
@@ -525,7 +549,7 @@ def valToBitList(value:int, bitCount:int = DIGITAL_OUTPUT_COUNT,
     # I think DIGITAL_OUTPUT_COUNT should be abf._protocolSection.nDigitizerSynchDigitalOuts 
     # but I'm not sure...
     value = int(value)
-    binString = bin(value)[2:].zfill(bitCount)
+    binString = bin(value)[2:].zfill(bitCount) # first two chars are always '0b'
     bits = list(binString)
     if as_bool:
         bits = [True if int(x) == 1 else False for x in bits]
@@ -536,7 +560,7 @@ def valToBitList(value:int, bitCount:int = DIGITAL_OUTPUT_COUNT,
     if reverse:
         bits.reverse()
     if breakout:
-        return bits[4:], bits [0:4]
+        return bits[4:], bits [0:4] # bank 3-0, bank 7-4
     return bits
 
 def bitListToString(bits:list, star:bool=False):
@@ -545,11 +569,30 @@ def bitListToString(bits:list, star:bool=False):
         ret = ret.replace('1', '*')
     return ret
         
-def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
+@singledispatch
+def getDIGPatterns(o, channel:typing.Optional[int] = None,
+                   reverse_banks:bool=False, wrap:bool=False):
+    raise NotImplementedError(f"This function does not support objects of {type(o).__name__} type")
+
+@getDIGPatterns.register(pyabf.ABF)
+def _(abf:pyabf.ABF, channel:typing.Optional[int] = None,
+                   reverse_banks:bool=False, 
+                   wrap:bool=False):
     """Creates a representation of the digital pattern associated with a DAC channel.
 
     Requires access to the original ABF file, because we are using our own
     algorithm to decode digital output trains.
+
+    Returns a mapping (dict) with 
+
+    Key                     ↦   Value:
+    =======================================
+    int (Epoch number)      ↦   mapping (dict) str ↦ list
+
+    The nested dict maps:
+    str ("pattern" or "alternate") ↦ list of int (0 or 1) or the character '*'
+                                in the bit order 0-7 (DigiData 1550 series) or
+                                0-3 (DigiData 1440 series) 
 
     """
     # NOTE: 2023-06-24 23:37:33
@@ -565,6 +608,9 @@ def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
     #   applied on the channels 1 and higher; when this is Channel 1 (or higher)
     #   then the alternative pattern is applied on Channel 0 !
     epochsDigitalPattern = dict()
+    
+    # reverses the banks => 7-4 then 3-0
+    banks = [1,0] if reverse_banks else [0,1]
     
     with open(abf.abfFilePath, 'rb') as fb:
         epochSection = abf._epochSection
@@ -595,34 +641,51 @@ def getDIGPatterns(abf:pyabf.ABF, channel:typing.Optional[int] = None):
             epochDigitalStarredAlt[i] = epochDigS_alt
             
             epochDict = dict()
-            d = valToBitList(epochDig, as_bool=True)
-            s = valToBitList(epochDigS, as_bool=True)
-            da = valToBitList(epochDig_alt, as_bool=True)
-            sa = valToBitList(epochDigS_alt, as_bool=True)
+            
+            # each of these is a list of two lists (DIG bank 3-0 and DIG bank 7-4)
+            d = valToBitList(epochDig, as_bool=True)        # steps
+            s = valToBitList(epochDigS, as_bool=True)       # pulses (starred)
+            da = valToBitList(epochDig_alt, as_bool=True)   # alternative steps
+            sa = valToBitList(epochDigS_alt, as_bool=True)  # alternative pulses
+            
+            print(f"epochDig = {epochDig} ⇒ {d}")
+            print(f"epochDigS = {epochDigS} ⇒ {s}")
+            print(f"epochDig_alt = {epochDig_alt} ⇒ {da}")
+            print(f"epochDigS_alt = {epochDigS_alt} ⇒ {sa}")
+            
+            # digitalPattern = [0] * abf._protocolSection.nDigitizerSynchDigitalOuts
             
             digitalPattern = list()
-            for k in range(2):
+            
+            # for k in range(2): # two banks
+            for k in banks: 
                 pattern = list()
                 for i in range(len(d[k])):
                     val = 1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0
                     pattern.append(val)
                     
-                digitalPattern.append(pattern)
+                if wrap:
+                    digitalPattern.extend(pattern)
+                else:
+                    digitalPattern.append(pattern)
                     
             alternateDigitalPattern = list()
-            for k in range(2):
+            # for k in range(2):
+            for k in banks:
                 pattern = list()
                 for i in range(len(da[k])):
                     val = 1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0
                     pattern.append(val)
                     
-                alternateDigitalPattern.append(pattern)
+                if wrap:
+                    alternateDigitalPattern.extend(pattern)
+                else:
+                    alternateDigitalPattern.append(pattern)
                 
             epochsDigitalPattern[epochNumber] = {"pattern": digitalPattern, "alternate": alternateDigitalPattern}
                     
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
         
-    
 def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
                       dacChannel:typing.Optional[int] = None,
                       as_dataFrame:bool=False, allTables:bool=False) -> list:

@@ -685,6 +685,13 @@ class TypeEnum(IntEnum):
     
     @classmethod
     def type(cls, t):
+        """Returns the enum type corresponding to `t`, where
+        `t` can be:
+        • str: the name / symbol associated with the type in the enum
+        • int: the value associated with the type in the enum
+        
+        
+        """
         if isinstance(t, str):
             if t in cls.names():
                 return [_t for _t in cls if _t.name == t][0]
