@@ -21,136 +21,30 @@ See also
 • https://swharden.com/pyabf/tutorial/ 
 • https://swharden.com/pyabf/
 
-NOTE: About holding levels and times: (from Clampex help):
+0. Useful pyabf functions to be used even without an ABF object:
+================================================================
+pyabf.names.getDigitizerName(int)
 
-"...output is held at the holding level for two "holding" periods at the start 
-and end of each sweep, each 1/64th of the total sweep duration."
-
-NOTE: 2023-09-03 22:26:46 About the 'Waveform' tab in Clampex Protocol Editor
-The tabs in the bottom row (Channel #0 → 7) corresponds each to one DAC output
-channel (4 for digidata 1440 series, 8 for digidata 1550 series)
-
-NOTE: 2023-09-06 23:19:29 About the Epochs table
-
-The epoch table is dynamically created by pyabf when a pyabf.ABF object is 
-initialized. PyABF represents an epoch table as a pyabf.waveform.EpochTable
-object, for a specific DAC channel index. See getABFEpochsTable(…) in this module.
-
-An EpochTable stores pyabf.waveform.Epoch objects (NOT neo.Epoch !!!) created
-using the information in "epochs per dac" section.
-
-In neo.Blocks read from ABF files using neo, the epoch table can be constructed 
-from annotations dict (WARNING do NOT confuse this epoch table with neo.Epoch
-objects!).
-
-In particular, the dictEpochInfoPerDAC contains the Epoch information for each 
-defined epochs:
-
-abf._epochPerDacSection.nEpochType: int - see ABFEpochType enum type in this module
-
-
-Epoch section:
-==============
-nEpochDigitalOutput: list with as many elements as the numebr of epochs defined
-    in the protocol
+    the argument is abf._protocolSection.nDigitizerType which is the same as
+    annotations["protocol"]["nDigitizerType"]
     
-For now, ABF epochs are ot be constructed using the pyabf package - namely, the
-pyabf.waveform.Epoch class. 
-
-TODO: consider writing our own DAQEpoch class containing a common protocol 
-interface for ABF and CED Signal data -> to be specialzed (subclassed) into
-ABFEpoch and CEDSignalEpoch
-
-
-A pyabf.waveform.Epoch can be constructed using the information contained in 
-the 'annotations' attribute of a neo.Block generated forman ABF file via the
-neo.io.axonio/neo.io.axonrawio modules.
-
-WARNING: Eppoch attribute names are case sensitive, so make sure you type 
-"epochType", not "epochtype". 
-
-The annotations["dictEpochInfoPerDAC"] is the go-to place for most of the 
-information you need. For digital patterns, the information is held in 
-annotations["EpochInfo"].
-
-Be aware that dictEpochInfoPerDAC is keyed on the int DAC number (or output 
-channel index); the DAC index key is mapped to a nested dict keyed on the int
-epoch number (corresponding to the epoch hnumber also mapped to the "nEpochNum"
-key of this nested dict).
-
-Therefore, to access the information for the 𝒏ᵗʰ epoch on the 𝒎ᵗᴴ DAC (output)
-you select:
-
-annotations["dictEpochInfoPerDAC"][𝒎][𝒏][<key:str>], see examples below:
-
-epoch = pab.pyabf.waveform.Epoch()
-
-epoch.epochNumber = annotations["dictEpochInfoPerDAC"][0][0]["nEpochNum"]
-# NOTE: alternatively: epoch.epochNumber = annotations["EpochInfo"][0]["nEpochNum"]
-
-epoch.epochType = annotations["dictEpochInfoPerDAC"][0][0]["nEpochType"]
-
-epoch.level = annotations["dictEpochInfoPerDAC"][0][0]["fEpochInitLevel"]
-
-epoch.levelDelta = annotations["dictEpochInfoPerDAC"][0][0]["fEpochLevelInc"]
-
-epoch.duration = annotations["dictEpochInfoPerDAC"][0][0]["lEpochInitDuration"]
-
-epoch.durationDelta = annotations["dictEpochInfoPerDAC"][0][0]["lEpochDurationInc"]
-
-epoch.pulsePeriod = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulsePeriod"]
-
-epoch.pulseWidth = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulseWidth"]
-
-# NOTE: for digital pattern things are a bit more complicated:
-
-BEGIN Excerpt from Clampex help:
-Set the digital output bit patterns for individual epochs in each of these rows.  
-
-The four character positions in each cell correspond to, from left to right,
-Digital OUT channels 3, 2, 1, 0 (for Digital bit pattern #3-0) and Digital OUT 
-channels 7, 6, 5, 4 (for Digital bit pattern #7-4).
-
-    To set a channel HIGH, place a 1 in the appropriate position.
-    To set a channel LOW, place a 0 in the appropriate position.
-    To have a pulse train delivered on a channel, enter an asterisk, <Shift+8>, 
-    in the appropriate channel.
-
-When a train is selected you must enter train period and pulse width values in 
-the cells below.  These values are shared with any analog trains in the epoch. 
-Behavior of and terminology for digital trains is the same as for analog Pulse trains.
-
-Digital trains are inverted by unchecking the Active HI logic for digital trains
-check box, above the table.    
-END Excerpt from Clampex help
+    supports values in range(8)
     
-1. ALL DAC channels are available in the protocol editor, but 
-only ONE DAC channel can associate a digital output at any time.
-
-However, turning on "Alternate digital outputs" allows one to set digital output
-patterns on up to TWO DACs (which will be used on alternative Sweeps in the Run).
-
-2. Digital output specification follows a relatively simple pattern in Clampex:
-    ∘ there are two banks of four bits (total of 8 bits) 3-0 and 7-4 (yes, in 
-    reverse order, I guess this is "little endian")
-
-    ∘ for each bank the user may enter a sequence of four digits (0 or 1) to 
-    turn OFF or ON the output in the corresponding position of the digit, e.g.:
+    in pyabf this function populates abf._protocolSection.sDigitizerName
     
-    0001 => digital output 0 is ON, outputs 3,2,1 are OFF
+pyabf.names.getTelegraphName(int)
+
+    the argument is abf._adcSection.nTelegraphInstrument[ADC_index], the same as
+    annotations["listADCInfo"][ADC_index]["nTelegraphInstrument"]
     
-    When a digital output is ON, this generates a digital PULSE (TTL) with
-    the duration specified in the corresponding epoch number in dictEpochInfoPerDAC
+    supports values in range(27)
     
-    ∘ WARNING: This is NOT correctly read in pyabf: at any position, the user CAN
-    place an asterisk ('*') instead or 0 or 1, which signifies that digital output
-    corresponding to the position of the asterisk is supposed to generate a PULSE
-    TRAIN 
+    in pyabf this function populates abf._adcSection.sTelegraphInstrument
 
-
-
-NOTE: About ABF object attributes and their correspondence to the neo axon_info
-(which Scipyen places in the neo.Block 'annotations' attribute)
+1. ABF object attributes and their correspondence to the neo axon_info
+========================================================================
+ABF information is placed in the neo.Block 'annotations' attribute upon loading
+in Scipyen.
 
 abf.sweepCount == abf._headerV2.lActualEpisodes == abf._protocolSection.lEpisodesPerRun
 
@@ -179,8 +73,10 @@ abf.holdingCommand: list with nDAC channel elements; holds the holding value in
     
     abf.holdingCommand[κ] = annotations["listDACInfo"][κ]["fDACHoldinglevel"]
     
-    
-NOTE: 2023-09-03 22:34:25 abf._dacSection:
+
+2. Information about the DAC channels
+=====================================
+abf._dacSection
 
 • nDACNum: list of DAC output channels by number: (0-3 for Digitdata 1440 series,
     0-7 for Digidata 1550 series, see also NOTE: 2023-09-03 22:26:46)
@@ -235,29 +131,56 @@ NOTE: 2023-09-03 22:34:25 abf._dacSection:
     lDACFilePathIndex[κ] = annotations["listDACInfo"][κ]["lDACFilePathIndex"]
 
 
-NOTE: About pyabf EpochSection - Digital patterns
-Cezar Tigaret <cezar.tigaret@gmail.com>
 
-The original pyabf code only takes into account "regular" digital bit patterns
-(i.e. 0 and 1) and overlooks the fact that Clampex allows one to specify a
-train of digital outputs PER Epoch PER output channel (Channel#0, #1 etc)
-also using a star ('*') notation, e.g.:
-
-Digital out #3-0: 00*0 
-
-etc...
-
-In contrast, axonrawio is more accurate, as it stores the digital pattern as 
-int values in EpochInfo dict::
-
-nDigitalValue -> the steps logic for banks 7-4 and 3-0
-nAlternateDigitalValue -> the alternative steps logic for banks 7-4 and 3-0
+3. Digital outputs (and patterns)
+==================================
     
-nDigitalTrainValue -> the trains logic for banks 7-4 and 3-0
-nAlternateDigitalTrainValue -> the alternative trains logic for banks 7-4 and 3-0
+3.1. ALL DAC channels are available in the protocol editor, but 
+only ONE DAC channel can associate a digital output at any time.
 
-Whether the alternate values are enabled or not is given by 
-nAlternateDigitalOutputState = 0 or 1 in the protocol dict
+However, turning on "Alternate digital outputs" allows one to set digital output
+patterns on up to TWO DACs (which will be used on alternative Sweeps in the Run).
+
+3.2. Digital output specification follows a relatively simple pattern in 
+Clampex:
+    ∘ there are two banks of four bits (total of 8 bits) 3-0 and 7-4 (yes, in 
+    reverse order, I guess this is "little endian")
+
+    ∘ for each bank the user may enter a sequence of four digits (0 or 1) to 
+    turn OFF or ON the output in the corresponding position of the digit, e.g.:
+    
+    0001 => digital output 0 is ON, outputs 3,2,1 are OFF
+    
+    When a digital output is ON, this generates a digital PULSE (TTL) with
+    the duration specified in the corresponding epoch number in dictEpochInfoPerDAC
+    
+    ∘ WARNING: This is NOT correctly read in pyabf: at any position, the user CAN
+    place an asterisk ('*') instead or 0 or 1, which signifies that digital output
+    corresponding to the position of the asterisk is supposed to generate a PULSE
+    TRAIN; see below for details.
+
+BEGIN Excerpt from Clampex help:
+
+Set the digital output bit patterns for individual epochs in each of these rows.  
+
+The four character positions in each cell correspond to, from left to right,
+Digital OUT channels 3, 2, 1, 0 (for Digital bit pattern #3-0) and Digital OUT 
+channels 7, 6, 5, 4 (for Digital bit pattern #7-4).
+
+    To set a channel HIGH, place a 1 in the appropriate position.
+    To set a channel LOW, place a 0 in the appropriate position.
+    To have a pulse train delivered on a channel, enter an asterisk, <Shift+8>, 
+    in the appropriate channel.
+
+When a train is selected you must enter train period and pulse width values in 
+the cells below.  These values are shared with any analog trains in the epoch. 
+Behavior of and terminology for digital trains is the same as for analog Pulse trains.
+
+Digital trains are inverted by unchecking the Active HI logic for digital trains
+check box, above the table.    
+
+END Excerpt from Clampex help
+
 
 The difference between a "regular" digital bit flag (e.g. 0010) and a 'starred'
 one is that the 'regular' one generates a digital signal (TTL) lasting as 
@@ -303,13 +226,16 @@ Moreover, both the 'regular' and the 'starred' digital outputs are subject to
 This means that digital bit patterns in Channel#0 and Channel#1 can be different 
 (NOTE: this only applies to Channel #0 and #1; Channel #2 and higher will
 take the same pattern as Channel#1)
+
 This allows alternate (i.e. interleaved) application of distinct patterns of
 TTL during a run, provided there are at least two sweeps.
 
 (When this option if unchecked, the digital bit pattern for Channel#1 is disabled)
 
-Also, NOTE that in reality the "principal" channel is the one where the "Digital
-outputs" checkbox is checked
+Also, NOTE that in reality the "principal" ABF channel is the one where the 
+"Digital outputs" checkbox is checked.
+
+
 
 All these are stored in the ABF v2 file as follows:
 
@@ -320,6 +246,117 @@ bytes 2, 3 ⇒ 'regular' bit pattern (read by pyabf)
 bytes 4, 5 ⇒ 'starred' bit pattern Channel#0 (NOT read by pyabf)
 bytes 6, 7 ⇒ 'regular' bit pattern Channel#1 (alternate) (NOT read by pyabf)
 bytes 8, 9 ⇒ 'starred' bit pattern Channel#1 (alternate) (NOT read by pyabf)
+
+
+The original pyabf code only takes into account "regular" digital bit patterns
+(i.e. 0 and 1) and overlooks the fact that Clampex allows one to specify a
+train of digital outputs PER Epoch PER output channel (Channel#0, #1 etc)
+also using a star ('*') notation, e.g.:
+
+Digital out #3-0: 00*0 
+
+etc...
+
+In contrast, axonrawio is more accurate, as it stores the digital pattern as 
+int values in EpochInfo dict::
+
+nDigitalValue -> the steps logic for banks 7-4 and 3-0
+nAlternateDigitalValue -> the alternative steps logic for banks 7-4 and 3-0
+    
+nDigitalTrainValue -> the trains logic for banks 7-4 and 3-0
+nAlternateDigitalTrainValue -> the alternative trains logic for banks 7-4 and 3-0
+
+Whether the alternate values are enabled or not is given by 
+nAlternateDigitalOutputState = 0 or 1 in the protocol dict
+
+4. Protocol Epochs
+===================
+NOTE: 2023-09-06 23:19:29 About the Epochs table
+
+The epoch table is dynamically created by pyabf when a pyabf.ABF object is 
+initialized. PyABF represents an epoch table as a pyabf.waveform.EpochTable
+object, for a specific DAC channel index. See getABFEpochsTable(…) in this module.
+
+An EpochTable stores pyabf.waveform.Epoch objects (NOT neo.Epoch !!!) created
+using the information in "epochs per dac" section.
+
+In neo.Blocks read from ABF files using neo, the epoch table can be constructed 
+from annotations dict (WARNING do NOT confuse this epoch table with neo.Epoch
+objects!).
+
+In particular, the dictEpochInfoPerDAC contains the Epoch information for each 
+defined epochs:
+
+abf._epochPerDacSection.nEpochType: int - see ABFEpochType enum type in this module
+
+
+4.1 Epoch section:
+==================
+nEpochDigitalOutput: list with as many elements as the number of epochs defined
+    in the protocol
+    
+TODO: consider writing our own DAQEpoch class containing a common protocol 
+interface for ABF and CED Signal data -> to be specialzed (subclassed) into
+ABFEpoch and CEDSignalEpoch
+
+NOTE: About holding levels and times: (from Clampex help):
+
+"...output is held at the holding level for two "holding" periods at the start 
+and end of each sweep, each 1/64th of the total sweep duration."
+
+NOTE: 2023-09-03 22:26:46 About the 'Waveform' tab in Clampex Protocol Editor
+The tabs in the bottom row (Channel #0 → 7) corresponds each to one DAC output
+channel (4 for digidata 1440 series, 8 for digidata 1550 series)
+
+A pyabf.waveform.Epoch can be constructed using the information contained in 
+the 'annotations' attribute of a neo.Block generated forman ABF file via the
+neo.io.axonio/neo.io.axonrawio modules.
+
+WARNING: Eppoch attribute names are case sensitive, so make sure you type 
+"epochType", not "epochtype". 
+
+The annotations["dictEpochInfoPerDAC"] is the go-to place for most of the 
+information you need. For digital patterns, the information is held in 
+annotations["EpochInfo"].
+
+Be aware that dictEpochInfoPerDAC is keyed on the int DAC number (or output 
+channel index); the DAC index key is mapped to a nested dict keyed on the int
+epoch number (corresponding to the epoch hnumber also mapped to the "nEpochNum"
+key of this nested dict).
+
+Therefore, to access the information for the 𝒏ᵗʰ epoch on the 𝒎ᵗᴴ DAC (output)
+you select:
+
+annotations["dictEpochInfoPerDAC"][𝒎][𝒏][<key:str>], see examples below:
+
+epoch = pab.pyabf.waveform.Epoch()
+
+epoch.epochNumber = annotations["dictEpochInfoPerDAC"][0][0]["nEpochNum"]
+# NOTE: alternatively: epoch.epochNumber = annotations["EpochInfo"][0]["nEpochNum"]
+
+epoch.epochType = annotations["dictEpochInfoPerDAC"][0][0]["nEpochType"]
+
+epoch.level = annotations["dictEpochInfoPerDAC"][0][0]["fEpochInitLevel"]
+
+epoch.levelDelta = annotations["dictEpochInfoPerDAC"][0][0]["fEpochLevelInc"]
+
+epoch.duration = annotations["dictEpochInfoPerDAC"][0][0]["lEpochInitDuration"]
+
+epoch.durationDelta = annotations["dictEpochInfoPerDAC"][0][0]["lEpochDurationInc"]
+
+epoch.pulsePeriod = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulsePeriod"]
+
+epoch.pulseWidth = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulseWidth"]
+
+# NOTE: for digital pattern things are a bit more complicated:
+
+5. Protocol section
+===================
+annotations["protocol"]["nActiveDACChannel"]
+abf._protocolSection.nActiveDACChannel
+
+    index of the DACchannel where "Digital outputs" is enabled in the Waveform
+    tab of the protocol editor
 
 """
 import typing, struct, inspect, itertools, functools
@@ -341,6 +378,7 @@ from pyabf.abfReader import AbfReader
 from pyabf.stimulus import (findStimulusWaveformFile, 
                             stimulusWaveformFromFile)
 
+# This is 8 for DigiData 1550 series, and 4 for DigiData 1440 series
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
 
 class ABFAcquisitionMode(datatypes.TypeEnum):
@@ -400,6 +438,17 @@ class ABFEpoch:
 
 # useful alias:
 ABF = pyabf.ABF
+
+def epochLetter(epochNumber:int):
+    # from pyabf.waveform.Epoch
+    if epochNumber < 0:
+        return "?"
+    letter = ""
+    while epochNumber >= 0:
+        letter += chr(epochNumber % 26 + 65)
+        epochNumber -= 26
+        
+    return letter
 
 def __wrap_to_quantity__(x:typing.Union[list, tuple], convert:bool=True):
     return (x[0], unitStrAsQuantity(x[1])) if convert else x
