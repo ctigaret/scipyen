@@ -653,13 +653,11 @@ def bitListToString(bits:list, star:bool=False):
     return ret
         
 @singledispatch
-def getDIGPatterns(o, channel:typing.Optional[int] = None,
-                   reverse_banks:bool=False, wrap:bool=False):
+def getDIGPatterns(o, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=False) -> dict:
     raise NotImplementedError(f"This function does not support objects of {type(o).__name__} type")
 
 @getDIGPatterns.register(neo.Block)
-def _(obj:neo.Block, channel:typing.Optional[int] = None,
-      reverse_banks:bool=False, wrap:bool=False):
+def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=False) -> dict:
     
     # check of this neo.Block was read from an ABF file
     sourcedFromABF(obj)
@@ -695,8 +693,10 @@ def _(obj:neo.Block, channel:typing.Optional[int] = None,
                 
             if wrap:
                 digitalPattern.extend(pattern)
+                if pack_str:
+                    digitalPattern = "".join(map(str, digitalPattern))
             else:
-                digitalPattern.append(pattern)
+                digitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
                     
         alternateDigitalPattern = list()
         # for k in range(2):
@@ -708,17 +708,17 @@ def _(obj:neo.Block, channel:typing.Optional[int] = None,
                 
             if wrap:
                 alternateDigitalPattern.extend(pattern)
+                if pack_str:
+                    alternateDigitalPattern = "".join(map(str, alternateDigitalPattern))
             else:
-                alternateDigitalPattern.append(pattern)
+                alternateDigitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
         
         epochsDigitalPattern[epochNumber] = {"pattern": digitalPattern, "alternate": alternateDigitalPattern}
                 
     return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
 
 @getDIGPatterns.register(pyabf.ABF)
-def _(abf:pyabf.ABF, channel:typing.Optional[int] = None,
-                   reverse_banks:bool=False, 
-                   wrap:bool=False):
+def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=False) -> dict:
     """Creates a representation of the digital pattern associated with a DAC channel.
 
     Requires access to the original ABF file, because we are using our own
@@ -817,8 +817,10 @@ def _(abf:pyabf.ABF, channel:typing.Optional[int] = None,
                     
                 if wrap:
                     digitalPattern.extend(pattern)
+                    if pack_str:
+                        digitalPattern = "".join(map(str, digitalPattern))
                 else:
-                    digitalPattern.append(pattern)
+                    digitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
                     
             alternateDigitalPattern = list()
             # for k in range(2):
@@ -830,8 +832,10 @@ def _(abf:pyabf.ABF, channel:typing.Optional[int] = None,
                     
                 if wrap:
                     alternateDigitalPattern.extend(pattern)
+                    if pack_str:
+                        alternateDigitalPattern = "".join(map(str, alternateDigitalPattern))
                 else:
-                    alternateDigitalPattern.append(pattern)
+                    alternateDigitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
                 
             epochsDigitalPattern[epochNumber] = {"pattern": digitalPattern, "alternate": alternateDigitalPattern}
                     
