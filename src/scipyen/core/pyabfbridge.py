@@ -21,6 +21,10 @@ See also
 • https://swharden.com/pyabf/tutorial/ 
 • https://swharden.com/pyabf/
 
+NOTE: About ADCs and DACs
+These are defined in the Lab bench, together with their telegraphing (if a 
+telegraphed is configured). 
+
 0. Useful pyabf functions to be used even without an ABF object:
 ================================================================
 pyabf.names.getDigitizerName(int)
@@ -228,12 +232,14 @@ This means that digital bit patterns in Channel#0 and Channel#1 can be different
 take the same pattern as Channel#1)
 
 This allows alternate (i.e. interleaved) application of distinct patterns of
-TTL during a run, provided there are at least two sweeps.
+TTL during a run, provided there are at least two sweeps:
+
+DIG enabled on channel:
+
+0 ⇒ DIG output is disabled on Channel #1 UNLESSS Alternate Digital Outputs is enabled;
+this is the value of nAlternateDigitalOutputState in protocol section
 
 (When this option if unchecked, the digital bit pattern for Channel#1 is disabled)
-
-Also, NOTE that in reality the "principal" ABF channel is the one where the 
-"Digital outputs" checkbox is checked.
 
 
 
@@ -357,6 +363,29 @@ abf._protocolSection.nActiveDACChannel
 
     index of the DACchannel where "Digital outputs" is enabled in the Waveform
     tab of the protocol editor
+    
+abf._protocolSection attributes / annotations["protocol"] key:str ↦ value:Number pairs:
+
+nAlternateDACOutputState        0, 1    ⇐ "Alternate Waveforms" unchecked, checked
+(when 1 presumes both Channel #0 and Channel #1 are used/active)
+
+nAlternateDigitalOutputState    0, 1    ⇐ "Alternate Digital Outputs" unckecked, checked
+
+Analog Waveform checked on Channel #0, 
+Digital Outputs chacked on Channel #0, with 
+    Active high logic checked ⇒ nDigitalTrainActiveLogic = 1
+    Intersweep bit pattern: Use Holding (Use holding / Use last epoch)
+    Alternate Digital Outputs: checked ⇒ nAlternateDigitalOutputState = 1
+    Alternate Waveforms ⇒ nAlternate
+
+    nActiveDACChannel  = 0
+    nDigitalDACChannel = 0
+    nDigitalHolding    = 0 (Use holding)
+    nDigitalInterEpisode = 0
+    
+
+    
+    
 
 """
 import typing, struct, inspect, itertools, functools
