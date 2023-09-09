@@ -359,7 +359,7 @@ epoch.pulsePeriod = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulsePeriod"
 
 epoch.pulseWidth = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulseWidth"]
 
-# NOTE: for digital pattern things are a bit more complicated:
+# NOTE: for digital pattern things are a bit more complicated; see getDIGPatterns(…)
 
 5. Protocol section
 ===================
