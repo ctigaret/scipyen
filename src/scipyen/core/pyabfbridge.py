@@ -275,6 +275,11 @@ nAlternateDigitalTrainValue -> the alternative trains logic for banks 7-4 and 3-
 Whether the alternate values are enabled or not is given by 
 nAlternateDigitalOutputState = 0 or 1 in the protocol dict
 
+Total number of DIG outs:
+
+nDigitizerSynchDigitalOuts -> for step TTLs
+ndigitizerTotalDigitalOuts -> for step + pulse train TTLs
+
 4. Protocol Epochs
 ===================
 NOTE: 2023-09-06 23:19:29 About the Epochs table
@@ -389,7 +394,7 @@ Digital Outputs chacked on Channel #0, with
 
 """
 import typing, struct, inspect, itertools, functools
-from functools import singledispatch
+from functools import singledispatch, partial
 import numpy as np
 import pandas as pd
 import quantities as pq
@@ -488,7 +493,7 @@ def unitStrAsQuantity(x:str, convert:bool=True):
     return scq.unit_quantity_from_name_or_symbol(x) if convert else x
 
 def sourcedFromABF(x:neo.Block) -> bool:
-    ver = getABFversion(x) # raises AssesrtionError if x is not sourced from ABF
+    ver = getABFversion(x) # raises AssertionError if x is not sourced from ABF
     return True
 
 def getABF(obj:typing.Union[str, neo.Block]):
@@ -652,6 +657,64 @@ def getDIGPatterns(o, channel:typing.Optional[int] = None,
                    reverse_banks:bool=False, wrap:bool=False):
     raise NotImplementedError(f"This function does not support objects of {type(o).__name__} type")
 
+@getDIGPatterns.register(neo.Block)
+def _(obj:neo.Block, channel:typing.Optional[int] = None,
+      reverse_banks:bool=False, wrap:bool=False):
+    
+    # check of this neo.Block was read from an ABF file
+    sourcedFromABF(obj)
+    
+    epochsDigitalPattern = dict()
+    
+    # reverses the banks => 7-4 then 3-0
+    banks = [1,0] if reverse_banks else [0,1]
+    
+    nSynchDIGBits = obj.annotations["protocol"]["nDigitizerSynchDigitalOuts"]
+    nAlternateDIGBits = obj.annotations["protocol"]["nDigitizerTotalDigitalOuts"] - nSynchDIGBits
+
+    getSynchBitList = partial(valToBitList, bitCount = nSynchDIGBits,
+                                as_bool=True)
+    
+    getAlternateBitList = partial(valToBitList, bitCount = nAlternateDIGBits,
+                                    as_bool = True)
+    
+    for epoch_info in obj.annotations["EpochInfo"]:
+        epochNumber = epoch_info["nEpochNum"]
+        d = getSynchBitList(epoch_info["nDigitalValue"])
+        s = getSynchBitList(epoch_info["nDigitalTrainValue"])
+        da = getAlternateBitList(epoch_info["nAlternateDigitalValue"])
+        sa = getAlternateBitList(epoch_info["nAlternateDigitalTrainValue"])
+        
+        digitalPattern = list()
+        
+        for k in banks: 
+            pattern = list()
+            for i in range(len(d[k])):
+                val = 1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0
+                pattern.append(val)
+                
+            if wrap:
+                digitalPattern.extend(pattern)
+            else:
+                digitalPattern.append(pattern)
+                    
+        alternateDigitalPattern = list()
+        # for k in range(2):
+        for k in banks:
+            pattern = list()
+            for i in range(len(da[k])):
+                val = 1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0
+                pattern.append(val)
+                
+            if wrap:
+                alternateDigitalPattern.extend(pattern)
+            else:
+                alternateDigitalPattern.append(pattern)
+        
+        epochsDigitalPattern[epochNumber] = {"pattern": digitalPattern, "alternate": alternateDigitalPattern}
+                
+    return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
+
 @getDIGPatterns.register(pyabf.ABF)
 def _(abf:pyabf.ABF, channel:typing.Optional[int] = None,
                    reverse_banks:bool=False, 
@@ -693,14 +756,24 @@ def _(abf:pyabf.ABF, channel:typing.Optional[int] = None,
     with open(abf.abfFilePath, 'rb') as fb:
         epochSection = abf._epochSection
         nEpochs = epochSection._entryCount
-        epochNumbers = [None] * nEpochs
-        epochDigital = [None] * nEpochs
-        epochDigitalStarred = [None] * nEpochs
+        # epochNumbers = [None] * nEpochs
+        # epochDigital = [None] * nEpochs
+        # epochDigitalStarred = [None] * nEpochs
         
         # NOTE: When these are populated, then abf._protocolSection.nAlternateDigitalOutputState
         # SHOULD be 1 (but we don't check for this here)
         epochDigitalAlt = [None] * nEpochs
         epochDigitalStarredAlt = [None] * nEpochs
+        
+        nSynchDIGBits = abf._protocolSection.nDigitizerSynchDigitalOuts
+        nAlternateDIGBits = abf._protocolSection.nDigitizerTotalDigitalOuts - nSynchDIGBits
+        
+        getSynchBitList = partial(valToBitList, bitCount = nSynchDIGBits,
+                                  as_bool=True)
+        
+        getAlternateBitList = partial(valToBitList, bitCount = nAlternateDIGBits,
+                                      as_bool = True)
+        
         
         # TODO: 2023-09-07 10:18:14
         # use THIS in our own ABFEpoch class; might want to augment neo.io.rawio.axonrawio
@@ -712,24 +785,24 @@ def _(abf:pyabf.ABF, channel:typing.Optional[int] = None,
             epochDigS = readInt16(fb) # reads the starred digital pattern (for digital pulse trains)
             epochDig_alt = readInt16(fb) # reads the alternative step digital pattern
             epochDigS_alt = readInt16(fb) # reads the alternative digital pulse trains
-            epochNumbers[i] = epochNumber
-            epochDigital[i] = epochDig
-            epochDigitalStarred[i] = epochDigS
-            epochDigitalAlt[i] = epochDig_alt
-            epochDigitalStarredAlt[i] = epochDigS_alt
+            # epochNumbers[i] = epochNumber
+            # epochDigital[i] = epochDig
+            # epochDigitalStarred[i] = epochDigS
+            # epochDigitalAlt[i] = epochDig_alt
+            # epochDigitalStarredAlt[i] = epochDigS_alt
             
             epochDict = dict()
             
             # each of these is a list of two lists (DIG bank 3-0 and DIG bank 7-4)
-            d = valToBitList(epochDig, as_bool=True)        # steps
-            s = valToBitList(epochDigS, as_bool=True)       # pulses (starred)
-            da = valToBitList(epochDig_alt, as_bool=True)   # alternative steps
-            sa = valToBitList(epochDigS_alt, as_bool=True)  # alternative pulses
+            d = getSynchBitList(epochDig)           # steps
+            s = getSynchBitList(epochDigS)          # pulses (starred)
+            da = getAlternateBitList(epochDig_alt)  # alternative steps
+            sa = getAlternateBitList(epochDigS_alt) # alternative pulses
             
-            print(f"epochDig = {epochDig} ⇒ {d}")
-            print(f"epochDigS = {epochDigS} ⇒ {s}")
-            print(f"epochDig_alt = {epochDig_alt} ⇒ {da}")
-            print(f"epochDigS_alt = {epochDigS_alt} ⇒ {sa}")
+            # print(f"epochDig = {epochDig} ⇒ {d}")
+            # print(f"epochDigS = {epochDigS} ⇒ {s}")
+            # print(f"epochDig_alt = {epochDig_alt} ⇒ {da}")
+            # print(f"epochDigS_alt = {epochDigS_alt} ⇒ {sa}")
             
             # digitalPattern = [0] * abf._protocolSection.nDigitizerSynchDigitalOuts
             
