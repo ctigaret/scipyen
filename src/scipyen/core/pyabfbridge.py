@@ -4,17 +4,19 @@ This modules provides functionality to access "metadata" (e.g. command waveforms
 protocol details) associated with electrophysiology data recorded using Axon 
 hardware and software (pClamp suite/Clampex).
 
-Scipyen uses the neo package (https://neo.readthedocs.io/en/stable/) to read
-signal data from electrophysiology recordings from Axon ABF files and represent 
-it in a coherent system of hierarchical containers, where the electrophysiological
-data is contained in a neo.Block (see Table 1)
+Scipyen uses primarily the neo package (https://neo.readthedocs.io/en/stable/) 
+to read signal data from electrophysiology recordings from Axon ABF files and
+represent it in a coherent system of hierarchical containers, where the 
+electrophysiological data is contained in a neo.Block. In addition, associated 
+"meta-information" (e.g. channels/hardware configuration, protocols) are stored 
+by Scipyen in the 'annotations' attribute of the neo.Block generated after 
+reading an ABF file.
 
-However, the PyABF (https://swharden.com/pyabf/) package offers complementary
-functionality for a more convenient access to the information in the ABF file
-about the experimental protocol (as defined in Clampex) and hardware
-configuration (ABF "meta-information"). 
+The PyABF (https://swharden.com/pyabf/) package complements the functionality
+for accesssing this "meta-information". 
 
-The functions defined in this module use the pyabf package to access the ABF
+This module defines functions uing the pyabf package to access the meta-information
+information nuse the pyabf package to access the ABF
 meta-information associated with a 
 
 See also 
@@ -469,6 +471,12 @@ class ABFEpoch:
         self.pulsePeriod = -1
         self.pulseWidth = -1
         self.dacNum = -1
+        
+class ABFEpochTable:
+    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block], channel:int):
+        if isinstance(obj, neo.Block):
+            assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
+        
 
 # useful alias:
 ABF = pyabf.ABF
@@ -484,10 +492,10 @@ def epochLetter(epochNumber:int):
         
     return letter
 
+def getABFEpochTable()
+
 def __wrap_to_quantity__(x:typing.Union[list, tuple], convert:bool=True):
     return (x[0], unitStrAsQuantity(x[1])) if convert else x
-
-
 
 def unitStrAsQuantity(x:str, convert:bool=True):
     return scq.unit_quantity_from_name_or_symbol(x) if convert else x
@@ -619,7 +627,6 @@ def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dic
 
     return datatypes.inspect_members(s, lambda x: not any(f(x) for f in reject_funcs) and not isinstance(x, property) and not isinstance(x, io.BufferedReader))
     
-
 def readInt16(fb):
     bytes = fb.read(2)
     values = struct.unpack("h", bytes) # ⇐ this is a tuple! first element is what we need
@@ -660,7 +667,7 @@ def getDIGPatterns(o, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=F
 def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=False) -> dict:
     
     # check of this neo.Block was read from an ABF file
-    sourcedFromABF(obj)
+    assert sourcedFromABF(obj), "Object does not appear to have been sourced from an ABF file"
     
     epochsDigitalPattern = dict()
     
@@ -841,7 +848,14 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=Fa
                     
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
         
-def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
+@singledispatch
+def getABFEpochsTable(o, sweep:typing.Optional[int]=None,
+                      dacChannel:typing.Optional[int] = None,
+                      as_dataFrame:bool=False, allTables:bool=False) -> list:
+    raise NotImplementedError(f"This function does not support {type(o).__name__} objects")
+
+@getABFEpochsTable.register(pyabf.ABF)
+def _(x:pyabf.ABF, sweep:typing.Optional[int]=None,
                       dacChannel:typing.Optional[int] = None,
                       as_dataFrame:bool=False, allTables:bool=False) -> list:
     if not isinstance(x, pyabf.ABF):
@@ -895,12 +909,6 @@ def getABFEpochsTable(x:pyabf.ABF, sweep:typing.Optional[int]=None,
             
     return sweepTables
     
-#     if as_dataFrame:
-#         return list(epochTable2DF(e, x) for e in etables)
-#     
-#     return etables
-    # return [e for e in etables if len(e.epochs)]
-
 def epochTable2DF(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None):
     """Returns a pandas.DataFrame with the data from the epoch table 'x'
     """
