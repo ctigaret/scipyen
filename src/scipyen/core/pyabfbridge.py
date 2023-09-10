@@ -82,6 +82,15 @@ abf.holdingCommand: list with nDAC channel elements; holds the holding value in
 
 2. Information about the DAC channels
 =====================================
+
+The available DAC channels (whether selected for use or not) are shown in the
+bottom tabs of the Protocol editor (Waveform tab) and are determined based on 
+the digitizer type set up with the Configure > Digitizer menu item.
+
+The names, aliases and scales of the DAC channels are configured using 
+Configure > Lab Bench menu item and, optionally, the 
+Configure > Telegraphed Instrument menu item.
+
 abf._dacSection
 
 • nDACNum: list of DAC output channels by number: (0-3 for Digitdata 1440 series,
@@ -136,18 +145,143 @@ abf._dacSection
     
     lDACFilePathIndex[κ] = annotations["listDACInfo"][κ]["lDACFilePathIndex"]
 
+3. Protocol Epochs
+===================
+By design, a DAC channel outputs a command waveform defined discretely using a
+number of epochs.
+
+For a given DAC channel, the number of epochs is the same in all sweeps in a run
+and the parameters of the 𝒏ᵗʰ epoch are the same across all sweeps¹:
+
+• type ('Off', 'Step', 'Ramp', 'Pulse', 'Triangular', 'Cosine', 'Biphasic')
+
+• inter-sweep holding level
+
+• initial command level ("First level") and increment ("Delta level")
+
+    The actual command value (or level) is:
+    "First level" + sweep counter × "Delta level"
+
+• initial duration ("First duration") and duration increment ("Delta
+duration")  
+
+    The actual epoch duration in each sweep is:
+    "First duration" + sweep counter × "Delta duration", with sweep counter 
+    starting at 0
+    
+• digital pattern²
+
+• high logic for digital outputs
+
+¹The exception to this rule is when "Alternate Waveforms" is enabled, such that
+even sweep numbers use the epochs defined in DAC Channel #0 and odd sweep numbers
+use the epiochs defined on DAC Channel #1. When this option is switched off, and 
+both first two DAC channels (#0 and #1) are configured with a waveform, these 
+waveforms are sent to the amplifier in every sweep, on their corresponding DAC
+outputs!
+
+²Unless "Alternate Digital Outputs" is enabled, in which case the digital output
+for that epoch alternates between even and odd sweeps. The main digital pattern 
+is set on DAC Channel #0, whereas the alternative pattern is set on Channel #1.
+
+From a Scipyen programming point of view, the consequences are:
+• if "Alternate Waveform" is OFF, the epoch table for a given DAC channel is THE
+ SAME for all sweeps in a run.
+• if "Alternate Waveform" is ON, the epoch table for a given DAC channel is the 
+one defined on Channel #0 on even sweep numbers, and on Channel #1 for odd sweep
+numbers
 
 
-3. Digital outputs (and patterns)
+
+NOTE: 2023-09-06 23:19:29 About the Epochs table
+
+The epoch table is dynamically created by pyabf when a pyabf.ABF object is 
+initialized. PyABF represents an epoch table as a pyabf.waveform.EpochTable
+object, for a specific DAC channel index. See getABFEpochsTable(…) in this module.
+
+An EpochTable stores pyabf.waveform.Epoch objects (NOT neo.Epoch !!!) created
+using the information in "epochs per dac" section.
+
+In neo.Blocks read from ABF files using neo, the epoch table can be constructed 
+from annotations dict (WARNING do NOT confuse this epoch table with neo.Epoch
+objects!).
+
+In particular, the dictEpochInfoPerDAC contains the Epoch information for each 
+defined epochs:
+
+abf._epochPerDacSection.nEpochType: int - see ABFEpochType enum type in this module
+
+
+3.1 Epoch section:
+==================
+nEpochDigitalOutput: list with as many elements as the number of epochs defined
+    in the protocol
+    
+TODO: consider writing our own DAQEpoch class containing a common protocol 
+interface for ABF and CED Signal data -> to be specialzed (subclassed) into
+ABFEpoch and CEDSignalEpoch
+
+NOTE: About holding levels and times: (from Clampex help):
+
+"...output is held at the holding level for two "holding" periods at the start 
+and end of each sweep, each 1/64th of the total sweep duration."
+
+NOTE: 2023-09-03 22:26:46 About the 'Waveform' tab in Clampex Protocol Editor
+The tabs in the bottom row (Channel #0 → 7) corresponds each to one DAC output
+channel (4 for digidata 1440 series, 8 for digidata 1550 series)
+
+A pyabf.waveform.Epoch can be constructed using the information contained in 
+the 'annotations' attribute of a neo.Block generated forman ABF file via the
+neo.io.axonio/neo.io.axonrawio modules.
+
+WARNING: Epoch attribute names are case sensitive, so make sure you type 
+"epochType", not "epochtype". 
+
+The annotations["dictEpochInfoPerDAC"] is the go-to place for most of the 
+information you need. For digital patterns, the information is held in 
+annotations["EpochInfo"].
+
+Be aware that dictEpochInfoPerDAC is keyed on the int DAC number (or output 
+channel index); the DAC index key is mapped to a nested dict keyed on the int
+epoch number (corresponding to the epoch hnumber also mapped to the "nEpochNum"
+key of this nested dict).
+
+Therefore, to access the information for the 𝒏ᵗʰ epoch on the 𝒎ᵗᴴ DAC (output)
+you select:
+
+annotations["dictEpochInfoPerDAC"][𝒎][𝒏][<key:str>], see examples below:
+
+epoch = pab.pyabf.waveform.Epoch()
+
+epoch.epochNumber = annotations["dictEpochInfoPerDAC"][0][0]["nEpochNum"]
+# NOTE: alternatively: epoch.epochNumber = annotations["EpochInfo"][0]["nEpochNum"]
+
+epoch.epochType = annotations["dictEpochInfoPerDAC"][0][0]["nEpochType"]
+
+epoch.level = annotations["dictEpochInfoPerDAC"][0][0]["fEpochInitLevel"]
+
+epoch.levelDelta = annotations["dictEpochInfoPerDAC"][0][0]["fEpochLevelInc"]
+
+epoch.duration = annotations["dictEpochInfoPerDAC"][0][0]["lEpochInitDuration"]
+
+epoch.durationDelta = annotations["dictEpochInfoPerDAC"][0][0]["lEpochDurationInc"]
+
+epoch.pulsePeriod = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulsePeriod"]
+
+epoch.pulseWidth = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulseWidth"]
+
+# NOTE: for digital patterns see below
+
+4. Digital outputs (and patterns)
 ==================================
     
-3.1. ALL DAC channels are available in the protocol editor, but 
+4.1. ALL DAC channels are available in the protocol editor, but 
 only ONE DAC channel can associate a digital output at any time.
 
 However, turning on "Alternate digital outputs" allows one to set digital output
 patterns on up to TWO DACs (which will be used on alternative Sweeps in the Run).
 
-3.2. Digital output specification follows a relatively simple pattern in 
+4.2. Digital output specification follows a relatively simple pattern in 
 Clampex:
     ∘ there are two banks of four bits (total of 8 bits) 3-0 and 7-4 (yes, in 
     reverse order, I guess this is "little endian")
@@ -282,87 +416,6 @@ Total number of DIG outs:
 nDigitizerSynchDigitalOuts -> for step TTLs
 ndigitizerTotalDigitalOuts -> for step + pulse train TTLs
 
-4. Protocol Epochs
-===================
-NOTE: 2023-09-06 23:19:29 About the Epochs table
-
-The epoch table is dynamically created by pyabf when a pyabf.ABF object is 
-initialized. PyABF represents an epoch table as a pyabf.waveform.EpochTable
-object, for a specific DAC channel index. See getABFEpochsTable(…) in this module.
-
-An EpochTable stores pyabf.waveform.Epoch objects (NOT neo.Epoch !!!) created
-using the information in "epochs per dac" section.
-
-In neo.Blocks read from ABF files using neo, the epoch table can be constructed 
-from annotations dict (WARNING do NOT confuse this epoch table with neo.Epoch
-objects!).
-
-In particular, the dictEpochInfoPerDAC contains the Epoch information for each 
-defined epochs:
-
-abf._epochPerDacSection.nEpochType: int - see ABFEpochType enum type in this module
-
-
-4.1 Epoch section:
-==================
-nEpochDigitalOutput: list with as many elements as the number of epochs defined
-    in the protocol
-    
-TODO: consider writing our own DAQEpoch class containing a common protocol 
-interface for ABF and CED Signal data -> to be specialzed (subclassed) into
-ABFEpoch and CEDSignalEpoch
-
-NOTE: About holding levels and times: (from Clampex help):
-
-"...output is held at the holding level for two "holding" periods at the start 
-and end of each sweep, each 1/64th of the total sweep duration."
-
-NOTE: 2023-09-03 22:26:46 About the 'Waveform' tab in Clampex Protocol Editor
-The tabs in the bottom row (Channel #0 → 7) corresponds each to one DAC output
-channel (4 for digidata 1440 series, 8 for digidata 1550 series)
-
-A pyabf.waveform.Epoch can be constructed using the information contained in 
-the 'annotations' attribute of a neo.Block generated forman ABF file via the
-neo.io.axonio/neo.io.axonrawio modules.
-
-WARNING: Eppoch attribute names are case sensitive, so make sure you type 
-"epochType", not "epochtype". 
-
-The annotations["dictEpochInfoPerDAC"] is the go-to place for most of the 
-information you need. For digital patterns, the information is held in 
-annotations["EpochInfo"].
-
-Be aware that dictEpochInfoPerDAC is keyed on the int DAC number (or output 
-channel index); the DAC index key is mapped to a nested dict keyed on the int
-epoch number (corresponding to the epoch hnumber also mapped to the "nEpochNum"
-key of this nested dict).
-
-Therefore, to access the information for the 𝒏ᵗʰ epoch on the 𝒎ᵗᴴ DAC (output)
-you select:
-
-annotations["dictEpochInfoPerDAC"][𝒎][𝒏][<key:str>], see examples below:
-
-epoch = pab.pyabf.waveform.Epoch()
-
-epoch.epochNumber = annotations["dictEpochInfoPerDAC"][0][0]["nEpochNum"]
-# NOTE: alternatively: epoch.epochNumber = annotations["EpochInfo"][0]["nEpochNum"]
-
-epoch.epochType = annotations["dictEpochInfoPerDAC"][0][0]["nEpochType"]
-
-epoch.level = annotations["dictEpochInfoPerDAC"][0][0]["fEpochInitLevel"]
-
-epoch.levelDelta = annotations["dictEpochInfoPerDAC"][0][0]["fEpochLevelInc"]
-
-epoch.duration = annotations["dictEpochInfoPerDAC"][0][0]["lEpochInitDuration"]
-
-epoch.durationDelta = annotations["dictEpochInfoPerDAC"][0][0]["lEpochDurationInc"]
-
-epoch.pulsePeriod = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulsePeriod"]
-
-epoch.pulseWidth = annotations["dictEpochInfoPerDAC"][0][0]["lEpochPulseWidth"]
-
-# NOTE: for digital pattern things are a bit more complicated; see getDIGPatterns(…)
-
 5. Protocol section
 ===================
 annotations["protocol"]["nActiveDACChannel"]
@@ -460,6 +513,11 @@ class ABFEpochType(datatypes.TypeEnum):
     #         return "Unknown"
 
 class ABFEpoch:
+    """Encapsulates an ABF Epoch.
+    Similar to pyabf.waveform.Epoch.
+    
+    Takes into account digital train pulses.
+    """
     def __init__(self):
         self.epochNumber = -1
         self.epochType = ABFEpochType.Unknown
@@ -473,9 +531,36 @@ class ABFEpoch:
         self.dacNum = -1
         
 class ABFEpochTable:
-    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block], channel:int):
+    """Encapsulates and ABF Epoch Table
+    Similar to pyabf.waveform.EpochTable but uses Quantities in the relevant places
+    and generates command waveforms and digital patterns when required.
+    Also takes into account digital train pulses ("starred" patterns).
+    """
+    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block], dacChannel:int,
+                 sweep:typing.Optional[int] = None):
         if isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
+            
+        if isinstance(obj, pyabf.ABF):
+            self.dacName = abf.dacNames[dacChannel]
+            self.dacUnits = sqc.unit_quantity_from_name_or_symbol(abf.dacUnits[dacChannel])
+            self.nDataPointsPerSweep = obj.sweepPointCount
+            self.nDigitalOutputs = obj._dacSection._entryCount
+            self.samplingRate = float(obj.dataRate) * pq.Hz
+            self.holdingLevel = float(obj._dacSection.fDACHoldingLevel[dacChannel]) * self.dacUnits
+        else:
+            self.dacName = obj.annotations["listDACInfo"][dacChannel]["DACChNames"].decode()
+            self.dacUnits = scq.unit_quantity_from_name_or_symbol(obj.annotations["listDACInfo"][dacChannel]["DACChUnits"].decode())
+
+            nSweeps = obj.annotations["protocol"]["lEpisodesPerRun"]
+            nADCChannels = obj.annotations["sections"]["ADCSection"]["llNumEntries"]
+            nTotalDataPoints = obj.annotations["sections"]["DataSection"]["llNumEntries"]
+            self.nDataPointsPerSweep = int(nTotalDataPoints/nSweeps/nADCChannels)
+            
+            self.nDigitalOutputs = obj.annotations["sections"]["DACSection"]["llNumEntries"]
+            self.samplingRate = float(obj.annotations["sampling_rate"]) * pq.Hz
+            self.holdingLevel = float(obj.annotations["listDACInfo"][dacChannel]["fDACHoldinglevel"]) * self.dacUnits
+            
         
 
 # useful alias:
@@ -492,7 +577,8 @@ def epochLetter(epochNumber:int):
         
     return letter
 
-def getABFEpochTable()
+def getABFEpochTable():
+    pass
 
 def __wrap_to_quantity__(x:typing.Union[list, tuple], convert:bool=True):
     return (x[0], unitStrAsQuantity(x[1])) if convert else x
@@ -861,8 +947,8 @@ def _(x:pyabf.ABF, sweep:typing.Optional[int]=None,
     if not isinstance(x, pyabf.ABF):
         raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
     
-    
     sweepTables = list()
+    
     if isinstance(sweep, int):
         if sweep < 0 or sweep >= x.sweepCount:
             raise ValueError(f"Invalid sweep {sweep} for {x.sweepCount} sweeps")
@@ -898,7 +984,6 @@ def _(x:pyabf.ABF, sweep:typing.Optional[int]=None,
             else:
                 if allTables:
                     etables = list(pyabf.waveform.EpochTable(x, c) for c in x._dacSection.nDACNum)
-                    # etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
                 else:
                     etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
                 
@@ -921,7 +1006,8 @@ def epochTable2DF(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = 
     
     rowIndex = ["Type", "First Level", "Delta Level", "First Duration (points)", "Delta Duration (points)",
                 "First duration (ms)", "Delta Duration (ms)",
-                "Digital Pattern #3-0", "Digital Pattern #7-4", "Train Period (points)", "Pulse Width (points)",
+                "Digital Pattern #3-0", "Digital Pattern #7-4", 
+                "Train Period (points)", "Pulse Width (points)",
                 "Train Period (ms)", "Pulse Width (ms)"]
     
     # prepare lists to hold values for each epoch
@@ -1392,7 +1478,7 @@ def _(obj:neo.Block) -> int:
     fileSig = fFileSignature.decode()
     fileSigVersion = int(fileSig[-1])
     
-    assert abf_version == fileSigVersion, "Mismatch between reported ABF versions; check obejct's annotattions properties"
+    assert abf_version == fileSigVersion, "Mismatch between reported ABF versions; check obejct's annotations properties"
     
     fFileVersionNumber = obj.annotations.get("fFileVersionNumber", None)
     
@@ -1400,7 +1486,7 @@ def _(obj:neo.Block) -> int:
     
     fileVersionMajor = int(fFileVersionNumber)
     
-    assert abf_version == fileVersionMajor, "Mismatch between reported ABF versions; check obejct's annotattions properties"
+    assert abf_version == fileVersionMajor, "Mismatch between reported ABF versions; check obejct's annotations properties"
     
     return abf_version
 
