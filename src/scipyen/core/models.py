@@ -22,21 +22,26 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def generic_exp_decay(x, y0, α, x0, τ):
+def generic_exp_decay(x, parameters):
     """Realizes y = α × exp(-(x-x₀)/τ) + y₀
     
-    NOTE: Python 3 only supports a subset of the unicode character set for 
-    identifiers (or variable names). 
+    x: independent variable (e.g., time)
+    parameters: sequence of floats: y₀ (offset), α (scale), x₀ (onset), τ (time constant)
     
-    For example, the following are invalid variable names: 'a₀' or 'α₀', although
-    they MAY be used in documetation; on the other hand the following ARE valid:
-    'a0', 'a_0', 'α0', or 'α_0'
-
-    To insert unicode characters in variable names in Scipyen's console, use
-    '\'followed by 'Tab' key (and if necessary, press 'Tab' a second time).
-    
-    This works as well in jupyter qtconsole, but not in plain python REPL
     """
+
+#     NOTE: Python 3 only supports a subset of the unicode character set for 
+#     identifiers (or variable names). 
+#     
+#     For example, the following are invalid variable names: 'a₀' or 'α₀', although
+#     they MAY be used in documetation; on the other hand the following ARE valid:
+#     'a0', 'a_0', 'α0', or 'α_0'
+# 
+#     To insert unicode characters in variable names in Scipyen's console, use
+#     '\'followed by 'Tab' key (and if necessary, press 'Tab' a second time).
+#     
+#     This works as well in jupyter qtconsole, but not in plain python REPL
+    y0, α, x0, τ = parameters
     
     return α * np.exp(-(x-x0)/τ) + y0
 

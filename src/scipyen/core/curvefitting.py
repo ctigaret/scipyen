@@ -592,6 +592,10 @@ def fit_Event_model(data, p0, **kwargs):
         raise TypeError("bounds expected a 2-tuple or a 2-element list")
     
     def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
+        """ x: sequence of model params
+            t: independent variable
+            y: the data (dependent variable)
+        """
         yf = models.Clements_Bekkers_97(t, x)
         
         ret = y-yf
