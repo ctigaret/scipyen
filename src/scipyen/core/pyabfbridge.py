@@ -519,16 +519,80 @@ class ABFEpoch:
     Takes into account digital train pulses.
     """
     def __init__(self):
-        self.epochNumber = -1
-        self.epochType = ABFEpochType.Unknown
-        self.level = -1
-        self.levelDelta = -1
-        self.duration = -1
-        self.durationDelta = -1
-        self.digitalPattern = None
-        self.pulsePeriod = -1
-        self.pulseWidth = -1
-        self.dacNum = -1
+        self._epochNumber_ = -1
+        self._epochType_ = ABFEpochType.Unknown
+        self._level_ = None # -1 * pq.dimensionless
+        self._levelDelta_ = None # -1 * pq.dimensionless
+        # self._duration_ = None # -1 * pq.dimensionless
+        self._duration_ = 0 * pq.s
+        # self._durationDelta_ = None # -1 * pq.dimensionless
+        self._durationDelta_ = 0 * pq.s
+        self._digitalPattern_ = None
+        self._pulsePeriod_ = None # -1
+        self._pulseWidth_ = None # -1
+        self._dacNum_ = -1
+        
+    @property
+    def epochLetter(self):
+        return epochLetter(self.epochNumber)
+    
+    @property
+    def epochNumber(self) -> int:
+        return self._epochNumber_
+    
+    @epochNumber.setter
+    def epochNumber(self, val:int):
+        self._epochNumber_ = val
+        
+    @property
+    def epochType(self) -> ABFEpochType:
+        return self._epochType_
+    
+    @epochType.setter
+    def epochType(self, val:typing.Union[ABFEpochType, str, int]):
+        
+        if isinstance(val, ABFEpochType):
+            self._epochType_ = val
+            
+        elif isinstance(val, (str, int)):
+            if (isinstance(val, str) and val not in ABFEpochType.names()) or (isinstance(val, int) and val not in ABFEpochType.values()):
+                raise ValueError(f"Unknown ABF Epoch type {val}'")
+            
+            self._epochType_ = ABFEpochType.type(val)
+                
+        else:
+            raise TypeError(f"Expecting a str, int, or an ABFEpochType; instead, got{type(val).__name__}")
+            
+    @property
+    def level(self) -> pq.Quantity:
+        return self._level_
+    
+    @firstLevel.setter
+    # def level(self, val:typing.Union[float, pq.Quantity]):
+    def firstLevel(self, val:pq.Quantity):
+        self._level_ = val
+        
+    @property
+    def deltaLevel(self) -> pq.Quantity:
+        return self._levelDelta_
+    
+    @deltaLevel.setter
+    def deltalevel(self, val:pq.Quantity):
+        self._levelDelta_ = val
+        
+    def nSamples(self, sampling_rate:pq.Quantity):
+        assert isinstance(sampling_rate, pq.Quantity) and scq.check_time_units(1./sampling_rate), f"sampling rate {sampling_rate} is not a frequency quantity"
+        return self._duration_ms_ * sampling_rate * 1000
+    
+    @property
+    def duration(self):
+        return self._duration_
+    
+    @duration.setter
+    def duration(self, val:pq.Quantity):
+        assert isinstance(val, pq.Quantity) and scq.check_time_units(val), f"{val} is not a time quantity"
+        self._duration_ = val
+        
         
 class ABFEpochTable:
     """Encapsulates and ABF Epoch Table
@@ -538,19 +602,31 @@ class ABFEpochTable:
     """
     def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block], dacChannel:int,
                  sweep:typing.Optional[int] = None):
-        if isinstance(obj, neo.Block):
-            assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-            
         if isinstance(obj, pyabf.ABF):
-            self.dacName = abf.dacNames[dacChannel]
-            self.dacUnits = sqc.unit_quantity_from_name_or_symbol(abf.dacUnits[dacChannel])
-            self.nDataPointsPerSweep = obj.sweepPointCount
-            self.nDigitalOutputs = obj._dacSection._entryCount
-            self.samplingRate = float(obj.dataRate) * pq.Hz
-            self.holdingLevel = float(obj._dacSection.fDACHoldingLevel[dacChannel]) * self.dacUnits
-        else:
-            self.dacName = obj.annotations["listDACInfo"][dacChannel]["DACChNames"].decode()
-            self.dacUnits = scq.unit_quantity_from_name_or_symbol(obj.annotations["listDACInfo"][dacChannel]["DACChUnits"].decode())
+            abfVer = obj.abfVersion["major"]
+            if abfVer == 1:
+                if dacChannel > 1:
+                    dacChannel = 0
+                self.nInterEpisodeLevel = bool(obj._headerV1.nInterEpisodeLevel[dacChannel])
+            elif abfVer == 2:
+                if dacChannel not in obj._dacSection.nDACNum:
+                    raise ValueError(f"Invalid DAC channel index {dacChannel}")
+                self.DACName = obj.dacNames[dacChannel]
+                self.DACUnits = sqc.unit_quantity_from_name_or_symbol(obj.dacUnits[dacChannel])
+                self.nDataPointsPerSweep = obj.sweepPointCount
+                self.nDigitalOutputs = obj._dacSection._entryCount
+                self.samplingRate = float(obj.dataRate) * pq.Hz
+                self.DACHoldingLevel = float(obj._dacSection.fDACHoldingLevel[dacChannel]) * self.DACUnits
+                self.nInterEpisodeLevel = bool(obj._dacSection.nInterEpisodeLevel[dacChannel])
+            else:
+                raise NotImplementedError(f"ABF version {abfVer} is not supported")
+            
+        elif isinstance(obj, neo.Block):
+            assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
+            if dacChannel not in (c["nDACNum"] for c in obj.annotations["listDACInfo"]):
+                raise ValueError(f"Invalid DAC channel index {dacChannel}")
+            self.DACName = obj.annotations["listDACInfo"][dacChannel]["DACChNames"].decode()
+            self.DACUnits = scq.unit_quantity_from_name_or_symbol(obj.annotations["listDACInfo"][dacChannel]["DACChUnits"].decode())
 
             nSweeps = obj.annotations["protocol"]["lEpisodesPerRun"]
             nADCChannels = obj.annotations["sections"]["ADCSection"]["llNumEntries"]
@@ -559,9 +635,42 @@ class ABFEpochTable:
             
             self.nDigitalOutputs = obj.annotations["sections"]["DACSection"]["llNumEntries"]
             self.samplingRate = float(obj.annotations["sampling_rate"]) * pq.Hz
-            self.holdingLevel = float(obj.annotations["listDACInfo"][dacChannel]["fDACHoldinglevel"]) * self.dacUnits
+            self.DACHoldingLevel = float(obj.annotations["listDACInfo"][dacChannel]["fDACHoldinglevel"]) * self.DACUnits
+            self.nInterEpisodeLevel = bool(obj.annotations["listDACInfo"][dacChannel]["nInterEpisodeLevel"])
+        else:
+            raise TypeError(f"Expecting an ABF or a neo.Block sourced from an ABF file; instead, got {type(obj).__name__}")
+    
+        if np.abs(self.DACHoldingLevel).magnitude > 1e6:
+            self.DACHoldingLevel = np.nan * self.DACUnits
+        elif np.abs(self.DACHoldingLevel).magnitude > 0 and np.abs(self.DACHoldingLevel).magnitude < 1e-6:
+            self.DACHoldingLevel = 0.0 * self.DACUnits
             
+        self._epochs_ = list()
         
+        self._init_epochs_(obj)
+        
+    def _init_epochs_(self, obj):
+        if isinstance(obj, pyabf.ABF):
+            self._init_epochs_abf_(obj)
+            
+        else:
+            
+    def _init_epochs_abf_(self, obj):
+        if obj.abfVersion["major"] == 1:
+            assert len(obj._headerV1.nEpochType) == 20, f"Expecting 20 memory slots for epoch info; instead got {len(obj._headerV1.nEpochType)}"
+            
+            for i in range(20):
+                epoch = ABFEpoch()
+                epoch.epochNumber = i % 10
+                epoch.epochType = obj._headerV1.nEpochType[i]
+                epoch.firstLevel = obj._headerV1.fEpochInitLevel[i] * self.DACUnits
+                epoch.deltaLevel = obj._headerV1.fEpochLevelInc[i] * self.DACUnits
+        
+        
+            
+    @property
+    def returnToHold(self) -> bool:
+        return self.nInterEpisodeLevel
 
 # useful alias:
 ABF = pyabf.ABF
