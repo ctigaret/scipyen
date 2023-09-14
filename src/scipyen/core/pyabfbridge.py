@@ -524,12 +524,12 @@ class ABFEpoch:
         self._level_ = None # -1 * pq.dimensionless
         self._levelDelta_ = None # -1 * pq.dimensionless
         # self._duration_ = None # -1 * pq.dimensionless
-        self._duration_ = 0 * pq.s
+        self._duration_ = 0 * pq.ms
         # self._durationDelta_ = None # -1 * pq.dimensionless
-        self._durationDelta_ = 0 * pq.s
+        self._durationDelta_ = 0 * pq.ms
         self._digitalPattern_ = None
-        self._pulsePeriod_ = None # -1
-        self._pulseWidth_ = None # -1
+        self._pulsePeriod_ = np.nan * pq.ms
+        self._pulseWidth_ = np.nan * pq.ms
         self._dacNum_ = -1
         
     @property
@@ -564,12 +564,18 @@ class ABFEpoch:
             raise TypeError(f"Expecting a str, int, or an ABFEpochType; instead, got{type(val).__name__}")
             
     @property
-    def level(self) -> pq.Quantity:
+    def firstLevel(self) -> pq.Quantity:
         return self._level_
     
     @firstLevel.setter
     # def level(self, val:typing.Union[float, pq.Quantity]):
-    def firstLevel(self, val:pq.Quantity):
+    def firstLevel(self, val:typing.Optional[pq.Quantity] = None):
+        if isinstance(val, pq.Quantity):
+            assert (scq.check_electrical_current_units(val) or scq.check_electrical_potential_units(val)), f"Expecting a quantity in A or V; instead, got {val}"
+            
+        else:
+            self._levelDelta_ = None
+            
         self._level_ = val
         
     @property
@@ -577,12 +583,19 @@ class ABFEpoch:
         return self._levelDelta_
     
     @deltaLevel.setter
-    def deltalevel(self, val:pq.Quantity):
+    def deltaLevel(self, val:typing.Optional[pq.Quantity]= None):
+        if isinstance(val, pq.Quantity):
+            assert (scq.check_electrical_current_units(val) or scq.check_electrical_potential_units(val)), f"Expecting a quantity in A or V; instead, got {val}"
+            if self.firstLevel is None:
+                raise RuntimeError("'firstLevel' property must be set before 'deltaLevel'")
+            else:
+                assert scq.units_convertible(self._level_, val), f"Value units ({val.units}) are incompaibl with firstLevel units ({self._level_.units})"
+        
         self._levelDelta_ = val
         
     def nSamples(self, sampling_rate:pq.Quantity):
         assert isinstance(sampling_rate, pq.Quantity) and scq.check_time_units(1./sampling_rate), f"sampling rate {sampling_rate} is not a frequency quantity"
-        return self._duration_ms_ * sampling_rate * 1000
+        return self._duration_.rescale(pq.s) * sampling_rate
     
     @property
     def duration(self):
@@ -608,9 +621,14 @@ class ABFEpochTable:
                 if dacChannel > 1:
                     dacChannel = 0
                 self.nInterEpisodeLevel = bool(obj._headerV1.nInterEpisodeLevel[dacChannel])
+                self.dacChannel = dacChannel
+                
             elif abfVer == 2:
                 if dacChannel not in obj._dacSection.nDACNum:
                     raise ValueError(f"Invalid DAC channel index {dacChannel}")
+                
+                self.dacChannel = dacChannel
+                
                 self.DACName = obj.dacNames[dacChannel]
                 self.DACUnits = sqc.unit_quantity_from_name_or_symbol(obj.dacUnits[dacChannel])
                 self.nDataPointsPerSweep = obj.sweepPointCount
@@ -625,6 +643,7 @@ class ABFEpochTable:
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
             if dacChannel not in (c["nDACNum"] for c in obj.annotations["listDACInfo"]):
                 raise ValueError(f"Invalid DAC channel index {dacChannel}")
+            self.dacChannel = dacChannel
             self.DACName = obj.annotations["listDACInfo"][dacChannel]["DACChNames"].decode()
             self.DACUnits = scq.unit_quantity_from_name_or_symbol(obj.annotations["listDACInfo"][dacChannel]["DACChUnits"].decode())
 
@@ -642,6 +661,7 @@ class ABFEpochTable:
     
         if np.abs(self.DACHoldingLevel).magnitude > 1e6:
             self.DACHoldingLevel = np.nan * self.DACUnits
+            
         elif np.abs(self.DACHoldingLevel).magnitude > 0 and np.abs(self.DACHoldingLevel).magnitude < 1e-6:
             self.DACHoldingLevel = 0.0 * self.DACUnits
             
@@ -654,23 +674,73 @@ class ABFEpochTable:
             self._init_epochs_abf_(obj)
             
         else:
+            pass
             
     def _init_epochs_abf_(self, obj):
-        if obj.abfVersion["major"] == 1:
+        abfVer = obj.abfVersion["major"]
+        epochs = list()
+        
+        if abfVer == 1:
             assert len(obj._headerV1.nEpochType) == 20, f"Expecting 20 memory slots for epoch info; instead got {len(obj._headerV1.nEpochType)}"
             
             for i in range(20):
                 epoch = ABFEpoch()
-                epoch.epochNumber = i % 10
+                epoch.epochNumber = i % 10 # first -> 0-9: channel 0; last 0-9 -> channel 1
                 epoch.epochType = obj._headerV1.nEpochType[i]
                 epoch.firstLevel = obj._headerV1.fEpochInitLevel[i] * self.DACUnits
                 epoch.deltaLevel = obj._headerV1.fEpochLevelInc[i] * self.DACUnits
+                epoch.duration = (obj._headerV1.lEpochInitDuration[i] * pq.ms)#.rescale(pq.s)
+                epoch.durationDelta = (abf._headerV1.lEpochDurationInc[i] * pq.ms)#.rescale(pq.s)
+                epoch.pulsePeriod = 0 * pq.ms # not supported in ABF1
+                epoch.pulseWidth = 0 * pq.ms # not supported in ABF1
+                epochs.append(epoch)
+                
+            if self.dacChannel == 0:
+                self._epochs_ = epochs[0:10]
+            elif self.dacChannel == 1:
+                self._epochs_ = epochs[10:20]
+            else:
+                warnings.debug("ABF1 does not support stimulus waveforms >2 DACs")
+                self._epochs_.clear()
+                
+        elif abfVer == 2:
+            
+            # the epoch table is stored in _epochPerDacSection
+            for i, epochDacNum in enumerate(obj._epochPerDacSection.nDACNum):
+                if epochDacNum != self.dacChannel:
+                    continue
+                epoch = Epoch()
+                epoch.epochNumber = obj._epochPerDacSection.nEpochNum[i]
+                epoch.epochType = obj._epochPerDacSection.nEpochType[i]
+                epoch.level = obj._epochPerDacSection.fEpochInitLevel[i]
+                epoch.levelDelta = obj._epochPerDacSection.fEpochLevelInc[i]
+                epoch.durationDelta = obj._epochPerDacSection.lEpochDurationInc[i]
+                epoch.duration = obj._epochPerDacSection.lEpochInitDuration[i]
+                epoch.pulsePeriod = obj._epochPerDacSection.lEpochPulsePeriod[i]
+                epoch.pulseWidth = obj._epochPerDacSection.lEpochPulseWidth[i]
+
+                if epochDacNum == abf._protocolSection.nActiveDACChannel:
+                    iCh = len(epochs)
+                    digitalOutValue = abf._epochSection.nEpochDigitalOutput[iCh]
+                    epoch.digitalPattern = self._valToBitList(digitalOutValue)
+                else:
+                    epoch.digitalPattern = self._valToBitList(0)
+                epochs.append(epoch)
+
+            
+        else:
+            raise NotImplementedError(f"ABf version {abfVer} is not supported")
+                
         
         
             
     @property
     def returnToHold(self) -> bool:
         return self.nInterEpisodeLevel
+    
+    @property
+    def epochs(self) -> list:
+        return self._epochs_
 
 # useful alias:
 ABF = pyabf.ABF
