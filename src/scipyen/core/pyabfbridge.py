@@ -527,7 +527,10 @@ class ABFEpoch:
         self._duration_ = 0 * pq.ms
         # self._durationDelta_ = None # -1 * pq.dimensionless
         self._durationDelta_ = 0 * pq.ms
-        self._digitalPattern_ = None
+        self._digitalPattern_ = tuple()
+        self._alternateDigitalPattern_ = tuple()
+        self._useAltPattern_ = False
+        self._useAltDIGOutState_ = False
         self._pulsePeriod_ = np.nan * pq.ms
         self._pulseWidth_ = np.nan * pq.ms
         self._dacNum_ = -1
@@ -606,6 +609,43 @@ class ABFEpoch:
         assert isinstance(val, pq.Quantity) and scq.check_time_units(val), f"{val} is not a time quantity"
         self._duration_ = val
         
+    @property
+    def digitalPattern(self) -> tuple:
+        return self._digitalPattern_
+    
+    @digitalPattern.setter
+    def digitalPattern(self, val:tuple):
+        # TODO: 2023-09-14 15:55:11
+        # check the argument
+        self._digitalPattern_ = val
+        
+    @property
+    def alternateDigitalPattern(self) -> tuple:
+        return self._alternateDigitalPattern_
+    
+    @alternateDigitalPattern.setter
+    def alternateDigitalPattern(self, val:tuple):
+        # TODO: 2023-09-14 15:55:58
+        # check the argument
+        self._alternateDigitalPattern_ = val
+        
+    @property
+    def useAlternateDigitalPattern(self) -> bool:
+        return self._useAltPattern_
+    
+    @useAlternateDigitalPattern.setter
+    def useAlternateDigitalPattern(self, val:bool):
+        self._useAltPattern_ = val == True
+        
+    @property
+    def useAlternateDigitalOutputState(self) -> bool:
+        return self._useAltDIGOutState_
+    
+    @useAlternateDigitalOutputState.setter
+    def useAlternateDigitalOutputState(self, val:bool):
+        self._useAltDIGOutState_ = val == True
+        
+        
         
 class ABFEpochTable:
     """Encapsulates and ABF Epoch Table
@@ -677,6 +717,7 @@ class ABFEpochTable:
             pass
             
     def _init_epochs_abf_(self, obj):
+        # NOTE: no digital patterns in ABFv1 ?
         abfVer = obj.abfVersion["major"]
         epochs = list()
         
@@ -697,6 +738,7 @@ class ABFEpochTable:
                 
             if self.dacChannel == 0:
                 self._epochs_ = epochs[0:10]
+                
             elif self.dacChannel == 1:
                 self._epochs_ = epochs[10:20]
             else:
@@ -704,11 +746,14 @@ class ABFEpochTable:
                 self._epochs_.clear()
                 
         elif abfVer == 2:
+            digPatterns = getDIGPatterns(obj)
             
             # the epoch table is stored in _epochPerDacSection
             for i, epochDacNum in enumerate(obj._epochPerDacSection.nDACNum):
                 if epochDacNum != self.dacChannel:
                     continue
+                
+                
                 epoch = Epoch()
                 epoch.epochNumber = obj._epochPerDacSection.nEpochNum[i]
                 epoch.epochType = obj._epochPerDacSection.nEpochType[i]
@@ -718,13 +763,26 @@ class ABFEpochTable:
                 epoch.duration = obj._epochPerDacSection.lEpochInitDuration[i]
                 epoch.pulsePeriod = obj._epochPerDacSection.lEpochPulsePeriod[i]
                 epoch.pulseWidth = obj._epochPerDacSection.lEpochPulseWidth[i]
+                epoch.useAlternateDigitalOutputState = obj._protocolSection.nAlternateDigitalOutputState
 
-                if epochDacNum == abf._protocolSection.nActiveDACChannel:
-                    iCh = len(epochs)
-                    digitalOutValue = abf._epochSection.nEpochDigitalOutput[iCh]
-                    epoch.digitalPattern = self._valToBitList(digitalOutValue)
-                else:
-                    epoch.digitalPattern = self._valToBitList(0)
+                if epochDacNum == obj._protocolSection.nActiveDACChannel:
+                    epoch.digitalPattern = digPatterns[epoch.epochNumber]["main"]
+                    epoch.alternateDigitalPattern = digPatterns[epoch.epochNUmber]["alternate"]
+                    
+                    # TODO: 2023-09-14 16:00:06
+                    # figure out if the epoch is using an alternate pattern or 
+                    # not
+                    #
+                    # I guess this relies on:
+                    # 1. whether alternate Digital outouts are used: prrotocolSection.nAlternateDigitalOutputState
+                    # 2. current sweep number (odd/even) with even numbers (0,2,4, etc)
+                    #   using the main pattern, and the odd numbers (1,3,5, etc)
+                    #   using the aplternate pattern
+                    # iCh = len(epochs)
+                    # digitalOutValue = abf._epochSection.nEpochDigitalOutput[iCh]
+                    # epoch.digitalPattern = self._valToBitList(digitalOutValue)
+                # else:
+                #     epoch.digitalPattern = self._valToBitList(0)
                 epochs.append(epoch)
 
             
@@ -925,11 +983,78 @@ def bitListToString(bits:list, star:bool=False):
     return ret
         
 @singledispatch
-def getDIGPatterns(o, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=False) -> dict:
+def getDIGPatterns(o, reverse_banks:bool=False, wrap:bool=False, 
+                   pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
+    """Access the digital patterns of bit flags associated with the Epochs.
+
+    Returns a mapping epoch_number:int ↦ nested mapping of key:str ↦ pair of 4-tuples of int or '*' elements
+
+    Key                     ↦   Value:
+    =======================================
+    int (Epoch number)      ↦   mapping (dict) str ↦ list
+
+    The nested dict maps:
+    str ("main" or "alternate") ↦ list of int (0 or 1) or the character '*'
+                                in the bit order 0-7 (DigiData 1550 series) or
+                                0-3 (DigiData 1440 series) 
+
+    The inner mapping keys can be one of the following:
+    'main'      ↦ the main pattern
+    'alternate' ↦ the alternate pattern
+
+    Each pattern is a 4-tuple (for ABF1) or a pair of 4-tuples (for ABF2), 
+    where a 4-tuple represents the bit value (0 or 1, or '*' for pulse train) 
+    for the corresponding DIG channel index
+
+    NOTE: Below, the number of DIG channels (and banks) depends on the ditigizer:
+
+    DigiData 1440 series: DIG channels (3, 2, 1, 0) i.e. one bank of 4 bits
+    
+    DigiData 1550 series: DIG channels ((3, 2, 1, 0) , (7, 6, 5, 4)) i.e. two 
+                        banks of 4 bits
+
+    Parameters:
+    ===========
+    o: pyabf.ABF object, or neo.Block
+        NOTE when 'o' is an ABF object, the original ABF file needs to be 
+        accessible as indicated by the 'abfFilePath' attribute of the ABF object
+
+    reverse_banks: bool, optional (default is False)
+        When True, the order of the banks will be reversed: 
+
+        (7,6,5,4) followed by (3,2,1,0)
+
+    wrap: bool, optional (default is False)
+        By default, the function returns the bits flags as to separate banks:
+        (3,2,1,0) and (7,6,5,4)
+
+        When True, the bit flags will be wrapped in a single 8-tuple, as:
+
+        (7,6,5,4,3,2,1,0) when reverse_banks is True
+
+        (0,1,2,3,4,5,6,7) when reverse_banks is False (default)
+
+    pack_str: bool, optional (default is False)
+        When True, the tuples willl contain string representations, e.g.:
+
+        (0,0,0,0) becomes '0000'
+
+        (0,1,0,'*') becomes '010*'  
+
+        etc.
+
+    epoch_num: int; optional, default is None
+        By default the function returns the digital bit patterns for all the epochs
+
+        When specified, this parameter causes the function to return the digital
+        bit pattern for the specified epoch number.
+
+    """
     raise NotImplementedError(f"This function does not support objects of {type(o).__name__} type")
 
 @getDIGPatterns.register(neo.Block)
-def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=False) -> dict:
+def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False, 
+      pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
     
     # check of this neo.Block was read from an ABF file
     assert sourcedFromABF(obj), "Object does not appear to have been sourced from an ABF file"
@@ -950,6 +1075,8 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=Fa
     
     for epoch_info in obj.annotations["EpochInfo"]:
         epochNumber = epoch_info["nEpochNum"]
+        if isinstance(epoch_num, int) and epoch_num != epochNumber:
+            continue
         d = getSynchBitList(epoch_info["nDigitalValue"])
         s = getSynchBitList(epoch_info["nDigitalTrainValue"])
         da = getAlternateBitList(epoch_info["nAlternateDigitalValue"])
@@ -958,39 +1085,43 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=Fa
         digitalPattern = list()
         
         for k in banks: 
-            pattern = list()
-            for i in range(len(d[k])):
-                val = 1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0
-                pattern.append(val)
+            pattern = tuple(1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0 for i in range(len(d[k])))
                 
             if wrap:
+                if not reverse_banks:
+                    pattern = tuple(reversed(pattern))
+
                 digitalPattern.extend(pattern)
+                
                 if pack_str:
                     digitalPattern = "".join(map(str, digitalPattern))
             else:
                 digitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
+                
+        digitalPattern = tuple(digitalPattern)
                     
         alternateDigitalPattern = list()
-        # for k in range(2):
+
         for k in banks:
-            pattern = list()
-            for i in range(len(da[k])):
-                val = 1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0
-                pattern.append(val)
-                
+            pattern = tuple(1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0 for i in range(len(da[k])))
             if wrap:
+                if not reverse_banks:
+                    pattern = tuple(reversed(pattern))
                 alternateDigitalPattern.extend(pattern)
                 if pack_str:
                     alternateDigitalPattern = "".join(map(str, alternateDigitalPattern))
             else:
                 alternateDigitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
+                
+        alternateDigitalPattern = tuple(alternateDigitalPattern)
         
-        epochsDigitalPattern[epochNumber] = {"pattern": digitalPattern, "alternate": alternateDigitalPattern}
+        epochsDigitalPattern[epochNumber] = {"main": digitalPattern, "alternate": alternateDigitalPattern}
                 
     return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
 
 @getDIGPatterns.register(pyabf.ABF)
-def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=False) -> dict:
+def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, 
+      pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
     """Creates a representation of the digital pattern associated with a DAC channel.
 
     Requires access to the original ABF file, because we are using our own
@@ -1003,7 +1134,7 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=Fa
     int (Epoch number)      ↦   mapping (dict) str ↦ list
 
     The nested dict maps:
-    str ("pattern" or "alternate") ↦ list of int (0 or 1) or the character '*'
+    str ("main" or "alternate") ↦ list of int (0 or 1) or the character '*'
                                 in the bit order 0-7 (DigiData 1550 series) or
                                 0-3 (DigiData 1440 series) 
 
@@ -1034,8 +1165,8 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=Fa
         
         # NOTE: When these are populated, then abf._protocolSection.nAlternateDigitalOutputState
         # SHOULD be 1 (but we don't check for this here)
-        epochDigitalAlt = [None] * nEpochs
-        epochDigitalStarredAlt = [None] * nEpochs
+        # epochDigitalAlt = [None] * nEpochs
+        # epochDigitalStarredAlt = [None] * nEpochs
         
         nSynchDIGBits = abf._protocolSection.nDigitizerSynchDigitalOuts
         nAlternateDIGBits = abf._protocolSection.nDigitizerTotalDigitalOuts - nSynchDIGBits
@@ -1057,11 +1188,10 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=Fa
             epochDigS = readInt16(fb) # reads the starred digital pattern (for digital pulse trains)
             epochDig_alt = readInt16(fb) # reads the alternative step digital pattern
             epochDigS_alt = readInt16(fb) # reads the alternative digital pulse trains
-            # epochNumbers[i] = epochNumber
-            # epochDigital[i] = epochDig
-            # epochDigitalStarred[i] = epochDigS
-            # epochDigitalAlt[i] = epochDig_alt
-            # epochDigitalStarredAlt[i] = epochDigS_alt
+            
+            if isinstance(epoch_num, int) and epoch_num != epochNUumber:
+                # skip if requesting for a specific epoch
+                continue
             
             epochDict = dict()
             
@@ -1071,45 +1201,45 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False, pack_str:bool=Fa
             da = getAlternateBitList(epochDig_alt)  # alternative steps
             sa = getAlternateBitList(epochDigS_alt) # alternative pulses
             
-            # print(f"epochDig = {epochDig} ⇒ {d}")
-            # print(f"epochDigS = {epochDigS} ⇒ {s}")
-            # print(f"epochDig_alt = {epochDig_alt} ⇒ {da}")
-            # print(f"epochDigS_alt = {epochDigS_alt} ⇒ {sa}")
-            
-            # digitalPattern = [0] * abf._protocolSection.nDigitizerSynchDigitalOuts
             
             digitalPattern = list()
             
             # for k in range(2): # two banks
             for k in banks: 
-                pattern = list()
-                for i in range(len(d[k])):
-                    val = 1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0
-                    pattern.append(val)
+                pattern = tuple(1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0 for i in range(len(d[k])))
                     
                 if wrap:
+                    if not reverse_banks:
+                        pattern = tuple(reversed(pattern))
+
                     digitalPattern.extend(pattern)
+
                     if pack_str:
                         digitalPattern = "".join(map(str, digitalPattern))
                 else:
                     digitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
                     
+            digitalPattern = tuple(digitalPattern)
+                    
             alternateDigitalPattern = list()
-            # for k in range(2):
+
             for k in banks:
-                pattern = list()
-                for i in range(len(da[k])):
-                    val = 1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0
-                    pattern.append(val)
+                pattern = tuple(1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0 for i in range(len(da[k])))
                     
                 if wrap:
+                    if not reverse_banks:
+                        pattern = tuple(reversed(pattern))
+
                     alternateDigitalPattern.extend(pattern)
+
                     if pack_str:
                         alternateDigitalPattern = "".join(map(str, alternateDigitalPattern))
                 else:
                     alternateDigitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
+                    
+            alternateDigitalPattern = tuple(alternateDigitalPattern)
                 
-            epochsDigitalPattern[epochNumber] = {"pattern": digitalPattern, "alternate": alternateDigitalPattern}
+            epochsDigitalPattern[epochNumber] = {"main": digitalPattern, "alternate": alternateDigitalPattern}
                     
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
         
