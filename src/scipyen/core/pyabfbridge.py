@@ -714,7 +714,29 @@ class ABFEpochTable:
             self._init_epochs_abf_(obj)
             
         else:
-            pass
+            assert self.dacChannel in obj.annotations["dictEpochInfoPerDAC"], f"DAC channel {self.dacChannel} is not used"
+            
+            # epochNums = list(obj.annotations["dictEpochInfoPerDAC"][self.dacChannel].keys())
+            digPatterns = getDIGPatterns(obj)
+            dacEpochDict = obj.annotations["dictEpochInfoPerDAC"][self.dacChannel]
+            epochs = list()
+            for epochNum, epochDict in dacEpochDict.items():
+                epoch = Epoch()
+                epoch.epochNumber = epochNum
+                epoch.epochType = epochDict["nEpochType"]
+                epoch.level = epochDict["fEpochInitLevel"] * self.DACUnits
+                epoch.levelDelta = epochDict["fEpochLevelInc"] * self.DACUnits
+                epoch.duration = (epochDict["lEpochInitDuration"] / self.samplingRate).rescale(pq.ms)
+                epoch.durationDelta = (epochDict["lEpochDurationInc"] / self.samplingRate).rescale(pq.ms)
+                epoch.pulsePeriod = (epochDict["lEpochPulsePeriod"] / self.samplingRate).rescale(pq.ms)
+                epoch.pulseWidth = (epochDict["lEpochPulseWidth"] / self.samplingRate).rescale(pq.ms)
+                epoch.useAlternateDigitalOutputState = bool(obj.annotations["protocol"]["nAlternateDigitalOutputState"])
+                
+                if self.dacChannel == obj.annotations["protocol"]["nActiveDACChannel"]:
+                    epoch.digitalPattern = digPatterns[epoch.epochNumber]["main"]
+                    epoch.alternateDigitalPattern = digpatterns[epoch.epochNumber]["alternate"]
+            
+                epochs.append(epoch)
             
     def _init_epochs_abf_(self, obj):
         # NOTE: no digital patterns in ABFv1 ?
@@ -730,8 +752,8 @@ class ABFEpochTable:
                 epoch.epochType = obj._headerV1.nEpochType[i]
                 epoch.firstLevel = obj._headerV1.fEpochInitLevel[i] * self.DACUnits
                 epoch.deltaLevel = obj._headerV1.fEpochLevelInc[i] * self.DACUnits
-                epoch.duration = (obj._headerV1.lEpochInitDuration[i] * pq.ms)#.rescale(pq.s)
-                epoch.durationDelta = (abf._headerV1.lEpochDurationInc[i] * pq.ms)#.rescale(pq.s)
+                epoch.duration = (obj._headerV1.lEpochInitDuration[i] / self.samplingRate).rescale(pq.ms)
+                epoch.durationDelta = (abf._headerV1.lEpochDurationInc[i] / self.samplingRate).rescale(pq.ms)
                 epoch.pulsePeriod = 0 * pq.ms # not supported in ABF1
                 epoch.pulseWidth = 0 * pq.ms # not supported in ABF1
                 epochs.append(epoch)
@@ -750,20 +772,23 @@ class ABFEpochTable:
             
             # the epoch table is stored in _epochPerDacSection
             for i, epochDacNum in enumerate(obj._epochPerDacSection.nDACNum):
+                # FIXME: 2023-09-14 22:49:09
+                # for alternate DIG outputs you need TWO DACs even if only one
+                # DAC channel is used!
+                # RESOLVED?: you DO NOT need this info here
                 if epochDacNum != self.dacChannel:
                     continue
-                
-                
+
                 epoch = Epoch()
                 epoch.epochNumber = obj._epochPerDacSection.nEpochNum[i]
                 epoch.epochType = obj._epochPerDacSection.nEpochType[i]
-                epoch.level = obj._epochPerDacSection.fEpochInitLevel[i]
-                epoch.levelDelta = obj._epochPerDacSection.fEpochLevelInc[i]
-                epoch.durationDelta = obj._epochPerDacSection.lEpochDurationInc[i]
-                epoch.duration = obj._epochPerDacSection.lEpochInitDuration[i]
-                epoch.pulsePeriod = obj._epochPerDacSection.lEpochPulsePeriod[i]
-                epoch.pulseWidth = obj._epochPerDacSection.lEpochPulseWidth[i]
-                epoch.useAlternateDigitalOutputState = obj._protocolSection.nAlternateDigitalOutputState
+                epoch.level = obj._epochPerDacSection.fEpochInitLevel[i] * self.DACUnits
+                epoch.levelDelta = obj._epochPerDacSection.fEpochLevelInc[i] * self.DACUnits
+                epoch.duration = (obj._epochPerDacSection.lEpochInitDuration[i] / self.samplingRate).rescale(pq.ms)
+                epoch.durationDelta = (obj._epochPerDacSection.lEpochDurationInc[i] / self.samplingRate).rescale(pq.ms)
+                epoch.pulsePeriod = (obj._epochPerDacSection.lEpochPulsePeriod[i] / self.samplingRate).rescale(pq.ms)
+                epoch.pulseWidth = (obj._epochPerDacSection.lEpochPulseWidth[i] / self.samplingRate).rescale(pq.ms)
+                epoch.useAlternateDigitalOutputState = bool(obj._protocolSection.nAlternateDigitalOutputState)
 
                 if epochDacNum == obj._protocolSection.nActiveDACChannel:
                     epoch.digitalPattern = digPatterns[epoch.epochNumber]["main"]
