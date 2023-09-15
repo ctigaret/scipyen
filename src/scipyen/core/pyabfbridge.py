@@ -527,10 +527,10 @@ class ABFEpoch:
         self._duration_ = 0 * pq.ms
         # self._durationDelta_ = None # -1 * pq.dimensionless
         self._durationDelta_ = 0 * pq.ms
-        self._digitalPattern_ = tuple()
+        self._mainDigitalPattern_ = tuple()
         self._alternateDigitalPattern_ = tuple()
         self._useAltPattern_ = False
-        self._useAltDIGOutState_ = False
+        self._altDIGOutState_ = False
         self._pulsePeriod_ = np.nan * pq.ms
         self._pulseWidth_ = np.nan * pq.ms
         self._dacNum_ = -1
@@ -610,14 +610,14 @@ class ABFEpoch:
         self._duration_ = val
         
     @property
-    def digitalPattern(self) -> tuple:
-        return self._digitalPattern_
+    def mainDigitalPattern(self) -> tuple:
+        return self._mainDigitalPattern_
     
-    @digitalPattern.setter
-    def digitalPattern(self, val:tuple):
+    @mainDigitalPattern.setter
+    def mainDigitalPattern(self, val:tuple):
         # TODO: 2023-09-14 15:55:11
         # check the argument
-        self._digitalPattern_ = val
+        self._mainDigitalPattern_ = val
         
     @property
     def alternateDigitalPattern(self) -> tuple:
@@ -638,12 +638,17 @@ class ABFEpoch:
         self._useAltPattern_ = val == True
         
     @property
-    def useAlternateDigitalOutputState(self) -> bool:
-        return self._useAltDIGOutState_
+    def hasAlternateDigitalOutputState(self) -> bool:
+        return self._altDIGOutState_
     
-    @useAlternateDigitalOutputState.setter
-    def useAlternateDigitalOutputState(self, val:bool):
-        self._useAltDIGOutState_ = val == True
+    @hasAlternateDigitalOutputState.setter
+    def hasAlternateDigitalOutputState(self, val:bool):
+        self._altDIGOutState_ = val == True
+        
+    @property
+    def digitalPattern(self) -> tuple:
+        """Read-only"""
+        return self.alternateDigitalPattern if (self.hasAlternateDigitalOutputState and self.useAlternateDigitalPattern) else self.mainDigitalPattern
         
         
         
@@ -730,11 +735,15 @@ class ABFEpochTable:
                 epoch.durationDelta = (epochDict["lEpochDurationInc"] / self.samplingRate).rescale(pq.ms)
                 epoch.pulsePeriod = (epochDict["lEpochPulsePeriod"] / self.samplingRate).rescale(pq.ms)
                 epoch.pulseWidth = (epochDict["lEpochPulseWidth"] / self.samplingRate).rescale(pq.ms)
-                epoch.useAlternateDigitalOutputState = bool(obj.annotations["protocol"]["nAlternateDigitalOutputState"])
+                epoch.hasAlternateDigitalOutputState = bool(obj.annotations["protocol"]["nAlternateDigitalOutputState"])
                 
                 if self.dacChannel == obj.annotations["protocol"]["nActiveDACChannel"]:
-                    epoch.digitalPattern = digPatterns[epoch.epochNumber]["main"]
+                    epoch.mainDigitalPattern = digPatterns[epoch.epochNumber]["main"]
                     epoch.alternateDigitalPattern = digpatterns[epoch.epochNumber]["alternate"]
+                    if obj.annotations["listDACInfo"][self.dacChannel]["nWaveformEnable"] == 1:
+                        epoch.useAlternateDigitalPattern = True
+                    else:
+                        epoch.useAlternateDigitalPattern = False
             
                 epochs.append(epoch)
             
@@ -788,11 +797,15 @@ class ABFEpochTable:
                 epoch.durationDelta = (obj._epochPerDacSection.lEpochDurationInc[i] / self.samplingRate).rescale(pq.ms)
                 epoch.pulsePeriod = (obj._epochPerDacSection.lEpochPulsePeriod[i] / self.samplingRate).rescale(pq.ms)
                 epoch.pulseWidth = (obj._epochPerDacSection.lEpochPulseWidth[i] / self.samplingRate).rescale(pq.ms)
-                epoch.useAlternateDigitalOutputState = bool(obj._protocolSection.nAlternateDigitalOutputState)
+                epoch.hasAlternateDigitalOutputState = bool(obj._protocolSection.nAlternateDigitalOutputState)
 
                 if epochDacNum == obj._protocolSection.nActiveDACChannel:
-                    epoch.digitalPattern = digPatterns[epoch.epochNumber]["main"]
+                    epoch.mainDigitalPattern = digPatterns[epoch.epochNumber]["main"]
                     epoch.alternateDigitalPattern = digPatterns[epoch.epochNUmber]["alternate"]
+                    if obj._dacSection.nWaveformEnable[self.dacChannel] == 1:
+                        epoch.useAlternateDigitalPattern = False
+                    else:
+                        epoch.useAlternateDigitalPattern = True
                     
                     # TODO: 2023-09-14 16:00:06
                     # figure out if the epoch is using an alternate pattern or 

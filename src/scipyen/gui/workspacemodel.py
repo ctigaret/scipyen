@@ -796,28 +796,28 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         # print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
 
-    @pyqtSlot(dict)
-    def _slot_internalVariableChanged_(self, change):
-        """Connected (and triggered by) self.internalVariableChanged Qt signal.
-        Launches an UI update for each workspace model in a loop, which is
-        executed asynchronously inside a QRunnable.
-        DEPRECATED
-        """
-        name = change.name
-        # print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change.name}: {change.change_type})")
-
-        displayed_var_names = set(self.getDisplayedVariableNames())
-        user_shell_var_names = set(self.shell.user_ns.keys())
-
-        change_type = change.get("change_type", change.type)
-        
-        worker = pgui.GuiWorker(self._updateFromMonitor_, name, 
-                                displayed_var_names, user_shell_var_names,
-                                change_type)
-        
-        worker.signals.signal_Result.connect(self._slot_updateModelFromMonitor_)
-        
-        self.threadpool.start(worker)
+#     @pyqtSlot(dict)
+#     def _slot_internalVariableChanged_(self, change):
+#         """Connected (and triggered by) self.internalVariableChanged Qt signal.
+#         Launches an UI update for each workspace model in a loop, which is
+#         executed asynchronously inside a QRunnable.
+#         DEPRECATED
+#         """
+#         name = change.name
+#         print(f"\n{self.__class__.__name__}._slot_internalVariableChanged_({change.name}: {change.change_type})")
+# 
+#         displayed_var_names = set(self.getDisplayedVariableNames())
+#         user_shell_var_names = set(self.shell.user_ns.keys())
+# 
+#         change_type = change.get("change_type", change.type)
+#         
+#         worker = pgui.GuiWorker(self._updateFromMonitor_, name, 
+#                                 displayed_var_names, user_shell_var_names,
+#                                 change_type)
+#         
+#         worker.signals.signal_Result.connect(self._slot_updateModelFromMonitor_)
+#         
+#         self.threadpool.start(worker)
 
     def _updateFromMonitor_(self, name: str, 
                             displayed_var_names: set, user_shell_var_names: set,
@@ -848,7 +848,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @pyqtSlot(tuple)
     def _slot_updateModelFromMonitor_(self, value):
         name, alteration = value
-        # print(f"\n{self.__class__.__name__}._slot_updateModelFromMonitor_ {name} {alteration.name}")
+        print(f"\n{self.__class__.__name__}._slot_updateModelFromMonitor_ {name} {alteration.name}")
         if isinstance(alteration, WorkspaceVarChange):
             # calls a callback to affect the model ⇒ the viewer UI
             self._varChanges_callbacks_[alteration](name)
@@ -1467,7 +1467,42 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         current_dir = os.getcwd()
         self.workingDir.emit(current_dir)
         
-    def _generateModelItemForObject_(self, propdict: dict, editable: typing.Optional[bool] = False, elidetip: typing.Optional[bool] = False, background: typing.Optional[QtGui.QBrush] = None, foreground: typing.Optional[QtGui.QBrush] = None):
+    @pyqtSlot(str)
+    def _slot_itemGuiObjectTitleChanged(self, val:str):
+        """For dynamic update of 1st line of tooltip of items representing a QWidget"""
+        obj = self.sender()
+        if not isinstance(obj, QtWidgets.QWidget):
+            return
+        
+        # print(f"{self.__class__.__name__}._slot_itemGuiObjectTitleChanged obj: {obj}, str: {val}")
+        
+        
+        item = self.getItemForObject(obj)
+        
+        if not isinstance(item, QtGui.QStandardItem):
+            return
+        
+        ttip = item.toolTip()
+        # print(f"{self.__class__.__name__}._slot_itemGuiObjectTitleChanged item toolTip: {ttip}")
+        
+        wtitle = f"Window: {obj.windowTitle()}"
+        components = ttip.split("\n")
+        components.insert(0, wtitle)
+        wspace_name = components[-1]
+        w = max(get_text_width(wtitle) * 2, get_text_width(wspace_name) * 2)
+        # w = get_text_width(wspace_name) * 2
+        tooltip = "\n".join(components)
+        ttip = "\n".join([get_elided_text(s, w)
+                            for s in components[:-1]] + [wspace_name])
+        item.setToolTip(ttip)
+        item.setStatusTip(tooltip)
+        item.setWhatsThis(tooltip)
+        
+    def _generateModelItemForObject_(self, propdict: dict, 
+                                     editable: typing.Optional[bool] = False, 
+                                     elidetip: typing.Optional[bool] = False, 
+                                     background: typing.Optional[QtGui.QBrush] = None, 
+                                     foreground: typing.Optional[QtGui.QBrush] = None):
         # print(f"_generateModelItemForObject_ propdict = {propdict}")
         item = QtGui.QStandardItem(propdict["display"])
 
@@ -1495,14 +1530,18 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         return item
 
     @safeWrapper
-    def generateRowContents(self, dataname: str, data: object, namespace: str = "Internal"):
+    def generateRowContents(self, dataname: str, 
+                            data: object, 
+                            namespace: str = "Internal"):
         # print("generateRowContents", dataname, data, namespace)
         obj_props = summarize_object_properties(
             dataname, data, namespace=namespace)
         # print("generateRowContents obj_props", obj_props)
         return self.genRowFromPropDict(obj_props)
 
-    def genRowFromPropDict(self, obj_props: dict, background: typing.Optional[QtGui.QBrush] = None, foreground: typing.Optional[QtGui.QBrush] = None):
+    def genRowFromPropDict(self, obj_props: dict, 
+                           background: typing.Optional[QtGui.QBrush] = None, 
+                           foreground: typing.Optional[QtGui.QBrush] = None):
         """Returns a row of QStandardItems
         """
         # print(f"genRowFromPropDict obj_props = {obj_props}")
@@ -1525,6 +1564,24 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         return [self.item(row, col).text() if asStrings else self.item(row, col) for col in range(self.columnCount())]
 
+    def getItemForObject(self, obj):
+        """Returns a model item for the object.
+        If the object is not currrently in the workspace will return None.
+        Only works for displayed (and displayable) variables.
+        """
+        
+        names_objs = list((n,o) for n,o in self.shell.user_ns.items() if o is obj)
+        
+        if len(names_objs) == 0:
+            return
+        
+        name, o = names_objs[0]
+        
+        ndx = self.getRowIndexForVarname(name)
+        
+        if isinstance(ndx, int):
+            return self.item(ndx, 0)
+        
     def getRowIndexForVarname(self, varname, regVarNames=None):
         """Returns the row index for the variable symbol 'varname'
 
@@ -1650,6 +1707,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # generate model view row contents for existing item
             v_row = self.generateRowContents(dataname, data)
             self.updateRow(row, v_row)
+            # if isinstance(data, QtWidgets.QWidget):
+            #     data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
 
     def updateRowFromProps(self, row, obj_props, background=None):
         """
@@ -1698,7 +1757,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #         self.removeRow(row)
 
     @pyqtSlot(dict, str, str)
-    def removeRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
+    def removeRowForVariable2(self, ns: dict, 
+                              dataname: str, 
+                              ns_name: str = "Internal"):
         # if isinstance(ns_name, str):
         #     if len(ns_name.strip()) == 0:
         #         ns_name = "Internal"
@@ -1708,6 +1769,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns_name)
+        
+        data = self.shell.user_ns.get(dataname, None)
+        
+        if isinstance(data, QtWidgets.QWidget):
+            data.windowTitleChanged.disconnect()
 
         if row == -1:
             return
@@ -1748,6 +1814,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # generate model view row contents
         v_row = self.generateRowContents(dataname, data)
+        # if isinstance(data, QtWidgets.QWidget):
+        #     data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
         self.appendRow(v_row)  # append the row to the model
 
     def clearTable(self):

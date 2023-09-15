@@ -31,6 +31,7 @@ import vigra
 import pyqtgraph # for their own eq operator
 #import language_tool_python
 
+from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 # try:
 #     from pyqtgraph import eq # not sure is needed
 # except:
@@ -2650,6 +2651,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     fqual = ".".join([objcls.__module__, clsname])
     ttip = ".".join([typemodulename, typename])
+    
+    if isinstance(obj, QtWidgets.QMainWindow):
+        ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
     
     wspace_name = "Namespace: %s" % namespace
     
