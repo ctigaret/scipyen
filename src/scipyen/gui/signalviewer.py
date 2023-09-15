@@ -1112,7 +1112,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("EditCursorWhenCreated", "qt")
     @editCursorUponCreation.setter
     def editCursorUponCreation(self, value:bool):
-        self._editCursorOnCreation_ = True
+        self._editCursorOnCreation_ = value == True
+        sigBlocker = QtCore.QSignalBlocker(self.actionShow_Cursor_Edit_Dialog_When_Created)
+        self.actionShow_Cursor_Edit_Dialog_When_Created.setChecked(self._editCursorOnCreation_)
     
     @property
     def visibleDocks(self):
@@ -7331,6 +7333,7 @@ signals in the signal collection.
         
     @pyqtSlot(bool)
     def _slot_setEditCursorWhenCreated(self, value):
+        # print(f"{self.__class__.__name__}._slot_setEditCursorWhenCreated {value}")
         self.editCursorUponCreation = value == True
             
     @pyqtSlot(bool)
@@ -7536,6 +7539,8 @@ signals in the signal collection.
                     c.x = dataxmin + relX
                     
                 if not c.isVertical:
+                    # print(f"{self.__class__.__name__}.displayFrame for cursor in axis {k}: cursor type {c.cursorType}, coordinates: {c.y}; bounds: {c.yBounds()}")
+                    yBounds = c.yBounds()
                     relY = c.y - c.yBounds()[0]
                     c.setBounds()
                     c.y = dataymin+relY
