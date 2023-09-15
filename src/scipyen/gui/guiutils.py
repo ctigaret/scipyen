@@ -1,6 +1,7 @@
 """Various helpers for GUI
 """
 import typing, warnings, math
+import numpy as np
 from core.utilities import get_least_pwr10
 from PyQt5 import (QtCore, QtWidgets, QtGui)
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
@@ -101,6 +102,7 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
     Unless there is data plotted, this does not rely on PlotItem.viewRange()  
     because this extends outside of the data domain and data range.
     """
+    [[vxmin, vxmax], [vymin, vymax]] = item.viewRange()
     plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem) and all(v is not None for v in (i.xData, i.yData))]
     if len(plotDataItems): # no data plotted
         mfun = lambda x: -np.inf if x is None else x
@@ -108,12 +110,27 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
         
         xmin = min(map(mfun, [min(p.xData) for p in plotDataItems]))
         xmax = max(map(pfun, [max(p.xData) for p in plotDataItems]))
-                
         ymin = min(map(mfun, [min(p.yData) for p in plotDataItems]))
         ymax = max(map(pfun, [max(p.yData) for p in plotDataItems]))
+        
+        if np.isinf(xmin) or np.isnan(xmin):
+            xmin = vxmin
+            
+        if np.isinf(xmax) or np.isnan(xmax):
+            xmax = vxmax
+            
+        if np.isinf(ymin) or np.isnan(ymin):
+            ymin = vymin
+        
+        if np.isinf(ymax) or np.isnan(ymax):
+            ymax = vymax
             
     else:
-        [[xmin, xmax], [ymin,ymax]] = item.viewRange()
+        xmin = vxmin
+        xmax = vxmax
+        ymin = vymin
+        ymax = vymax
+        # [[xmin, xmax], [ymin, ymax]] = item.viewRange()
         
     return [[xmin, xmax], [ymin, ymax]]
     

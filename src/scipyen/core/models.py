@@ -22,7 +22,8 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-def generic_exp_decay(x, parameters):
+# def generic_exp_decay(x, parameters):
+def generic_exp_decay(x, y0, α, x0, τ):
     """Realizes y = α × exp(-(x-x₀)/τ) + y₀
     
     x: independent variable (e.g., time)
@@ -41,7 +42,7 @@ def generic_exp_decay(x, parameters):
 #     '\'followed by 'Tab' key (and if necessary, press 'Tab' a second time).
 #     
 #     This works as well in jupyter qtconsole, but not in plain python REPL
-    y0, α, x0, τ = parameters
+    # y0, α, x0, τ = parameters
     
     return α * np.exp(-(x-x0)/τ) + y0
 
