@@ -439,6 +439,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     defaultCursorsShowValue = False
     defaultXAxesLinked = False
+    defaultXGrid = False
+    defaultYGrid = False
+    
 
     mpl_prop_cycle = plt.rcParams['axes.prop_cycle']
     
@@ -778,6 +781,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._cursorLabelPrecision_ = self.defaultCursorLabelPrecision
         self._cursorsShowValue_ = self.defaultCursorsShowValue
         self._xAxesLinked_ = self.defaultXAxesLinked
+        self._xGridOn_ = self.defaultXGrid
+        self._yGridOn_ = self.defaultYGrid
+        
         #### END generic plot options
         
         # NOTE: 2021-08-25 09:42:54
@@ -921,6 +927,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.actionLink_X_axes.toggled.connect(self._slot_setXAxesLinked)
         self.actionLink_X_axes.setEnabled(False)
+        
+        self.actionShow_X_grid.toggled.connect(self._slot_showXgrid)
+        self.actionShow_X_grid.setEnabled(False)
+        
+        self.actionShow_Y_grid.toggled.connect(self._slot_showYgrid)
+        self.actionShow_Y_grid.setEnabled(False)
+        
         
         # the actual layout of the plot items (pyqtgraph framework)
         # its "layout" is a QtWidgets.QGraphicsGridLayout
@@ -1169,6 +1182,39 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["CursorLabelPrecision"] = self._cursorLabelPrecision_
             
+    @property
+    def xGrid(self) -> bool:
+        return self._xGridOn_
+    
+    @markConfigurable("XGrid")
+    @xGrid.setter
+    def xGrid(self, value:bool):
+        self._xGridOn_ = value == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionShow_X_grid)
+        self.actionShow_X_grid.setChecked(self._xGridOn_)
+            
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["XGrid"] = self._xGridOn_
+        
+        self._showXGrid(self._xGridOn_)
+        
+    @property
+    def yGrid(self) -> bool:
+        return self._yGridOn_
+    
+    @markConfigurable("YGrid")
+    @xGrid.setter
+    def yGrid(self, value:bool):
+        self._yGridOn_ = value == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionShow_Y_grid)
+        self.actionShow_Y_grid.setChecked(self._yGridOn_)
+            
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["YGrid"] = self._yGridOn_
+            
+        self._showYGrid(self._yGridOn_)
+        
+        
     @property
     def xAxesLinked(self): 
         """This is True when all PlotItems but one have X axes linked"""
@@ -1991,18 +2037,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         taken = set()
         
-        for x in sig_ndx_names:
+        sep=":"
+        
+        for k, x in enumerate(sig_ndx_names):
             if x[1] in taken:
-                entry_name = counter_suffix(x[1], taken, sep = " ")
+                entry_name = counter_suffix(x[1], taken, sep = sep)
             else:
                 entry_name = x[1]
             
             taken.add(entry_name)
             
-            base, ctr = get_int_sfx(entry_name, sep = " ")
+            base, ctr = get_int_sfx(entry_name, sep = sep)
             
             if isinstance(ctr, int) and ctr > 0:
                 entry_name = " ".join([base, f"({ctr})"])
+                
+            # print(f"{self.__class__.__name__}._gen_signal_ndx_name_map_() signal {k}: sig_ndx_name = {x}; base = {base}; ctr = {ctr}; entry_name = {entry_name}")
                 
             mapping[entry_name] = x
             
@@ -5652,7 +5702,6 @@ anything else       anything else       ❌
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
                 
-                
         elif isinstance(y, (neo.core.IrregularlySampledSignal,  IrregularlySampledDataSignal)):
             x = None
             self._cached_title = getattr(y, "name", None)
@@ -5814,15 +5863,15 @@ anything else       anything else       ❌
             # 
             if not issubclass(y.dtype.type, np.number):
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot arrays with dtype {y.dtype.type.__name__}")
-                return False, None, None
+                return False, None, None, 0
             
             if y.ndim > 3: 
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot data with {y.ndim} dimensions")
-                return False, None, None
+                return False, None, None, 0
             
             if y.ndim < 1:
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", "Cannot plot a scalar")
-                return False, None, None
+                return False, None, None, 0
             
             # self._xData_ = None
             # self._yData_ = y
@@ -5928,7 +5977,7 @@ anything else       anything else       ❌
                     # different from signalChannelAxis
                     if frameAxis != self.signalChannelAxis:
                         self.criticalMessage(f"Set data ({y.__class__.__name__})", "For 2D arrays, frame axis index %d must be the same as the channel axis index (%d)" % (frameAxis, self.signalChannelAxis))
-                        return False, None, None
+                        return False, None, None, 0
                     
                     self.frameAxis = frameAxis
                     
@@ -5958,11 +6007,11 @@ anything else       anything else       ❌
                 # channel → data    → frame
                 if isinstance(signalChannelAxis, int) and signalChannelAxis not in range(-1*(y.ndim), y.ndim):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"signalChannelAxis {signalChannelAxis} out of range for array with {y.ndim} dimensions")
-                    return False, None, None
+                    return False, None, None, 0
                 
                 if isinstance(frameAxis, int) and frameAxis not in range(-1*(y.ndim), y.ndim):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"frameAxis {frameAxis} out of range for array with {y.ndim} dimensions")
-                    return False, None, None
+                    return False, None, None, 0
                 
                 if signalChannelAxis is None:
                     if frameAxis is None:
@@ -5994,7 +6043,7 @@ anything else       anything else       ❌
                         
                 elif frameAxis == signalChannelAxis:
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"frameAxis and signalChannelAxis cannot have the same index {frameAxis}")
-                    return False, None, None
+                    return False, None, None, 0
                     # raise TypeError("For 3D arrays the frame axis must be specified")
                 
                 
@@ -6039,18 +6088,18 @@ anything else       anything else       ❌
                 if isinstance(x, (tuple, list)):
                     if len(x) != y.shape[self.dataAxis]:
                         self.criticalMessage(f"Set data ({y.__class__.__name__})", "The supplied signal domain (x) must have the same size as the data axis %s" % self.dataAxis)
-                        return False, None, None
+                        return False, None, None, 0    
                     
                     x = np.array(x)
                     
                 elif isinstance(x, np.ndarray):
                     if not is_vector(x):
                         self.criticalMessage(f"Set data ({y.__class__.__name__})", "The supplied signal domain (x) must be a vector")
-                        return False, None, None
+                        return False, None, None, 0
                     
                     if len(x) != y.shape[self.dataAxis]:
                         self.criticalMessage(f"Set data ({y.__class__.__name__})", "The supplied signal domain (x) must have the same size as the data axis %s" % self.dataAxis)
-                        return False, None, None
+                        return False, None, None, 0
                     
                     if not is_column_vector(x):
                         x = x.T # x left unchanged if 1D
@@ -6068,7 +6117,7 @@ anything else       anything else       ❌
             # TODO 2020-03-08 11:05:06
             # code for sequence of neo.SpikeTrain, and sequence of neo.Event
             self.separateSignalChannels         = separateSignalChannels
-            self.singleFrame                    = singleFrame # force all arrays in a sequence as a multiaxis single frame
+            self.singleFrame                    = singleFrame # ??? force all arrays in a sequence as a multiaxis single frame
             
             if self.singleFrame:
                 self.separateSignalChannels = False # avoid any confusions
@@ -6128,7 +6177,6 @@ anything else       anything else       ❌
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
                 
-            
             elif all([isinstance(i, neo.Segment) for i in y]):
                 # NOTE: 2019-11-30 09:35:42 
                 # treat this as the segments attribute of a neo.Block
@@ -6307,14 +6355,14 @@ anything else       anything else       ❌
             elif all([isinstance(i, np.ndarray) for i in y]):
                 if not all(i.ndim <= 2 for i in y):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"Cannot plot sequences containing arrays with more than two dimensions")
-                    return False, None, None
+                    return False, None, None, 0
                     
                 if signalChannelAxis is None:
                     signalChannelAxis = 1 # the default
                     
                 elif signalChannelAxis not in (0,1):
                     self.criticalMessage(f"Set data ({y.__class__.__name__})", f"signalChannelAxis expected an int () or 1) or None")
-                    return False, None, None
+                    return False, None, None, 0
                     
                 self.signalChannelAxis = signalChannelAxis
                 self.dataAxis = 1 if self.signalChannelAxis == 0 else 0
@@ -6350,12 +6398,12 @@ anything else       anything else       ❌
             else:
                 self.criticalMessage(f"Set data ({y.__class__.__name__})", 
                                      "Can only plot a list of 1D vigra filter kernels, 1D/2D numpy arrays, or neo-like signals")
-                return False, None, None
+                return False, None, None, 0
             
         else:
             self.criticalMessage(f"Set data ({y.__class__.__name__})", 
                                  f"Plotting is not implemented for {type(y).__name__} data types")
-            return False, None, None
+            return False, None, None, 0
         
         return True, x, y, _n_signal_axes_
     
@@ -6480,35 +6528,6 @@ Does the behind the scene work of self.setData(...)
                     self._new_frame_ = False
                 else:
                     self._var_notified_ = False
-                
-#                 if isinstance(showFrame, int):
-#                     if showFrame < 0:
-#                         showFrame = 0
-#                         
-#                     elif showFrame > self._number_of_frames_:
-#                         showFrame = self._number_of_frames_ - 1
-#                         
-#                     self._current_frame_index_ = showFrame
-#                     
-#                 else:
-#                     if self._current_frame_index_ not in self.frameIndex:
-#                         self._current_frame_index_ = self.frameIndex[-1]
-#                         
-#                 if isinstance(plotStyle, str):
-#                     self.plotStyle = plotStyle
-#                     
-#                 elif isinstance(style, str):
-#                     self.plotStyle = style
-#                     
-#                 self._frames_spinBoxSlider_.range = range(self._number_of_frames_)
-#                 self._frames_spinBoxSlider_.setValue(self._current_frame_index_)
-#                 
-#                 # NOTE: 2022-11-01 10:37:06
-#                 # overwrites self.docTitle set by self._parse_data_
-#                 if isinstance(doc_title, str) and len(doc_title.strip()):
-#                     self.docTitle = doc_title
-#                 else:
-#                     self.docTile = self._cached_title
                 
                 self.frameChanged.emit(self._current_frame_index_)
                 
@@ -6757,7 +6776,8 @@ signals in the signal collection.
         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False) # ?!?
         
         if uiParamsPrompt:
-            # TODO 2023-01-18 08:48:13 - what for?
+            # TODO 2023-01-18 08:48:13 - finalize self._ui_getViewParams
+            # this is to open up dialog for parameters
             pass
             # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
             
@@ -6784,6 +6804,52 @@ signals in the signal collection.
             
         if get_focus:
             self.activateWindow()
+            
+    def _ui_getViewParams(self, doc_title, frameAxis, signalChannelAxis,
+                          frameIndex, signalIndex, signalChannelIndex,
+                          irregularSignalIndex, irregularSignalChannelAxis, 
+                          irregularSignalChannelIndex,
+                          separateSignalChannels, separatechannelsIn,singleFrame):
+        """ Parameters to prompt for (via quickdialog.StringInput unless specified):
+        NOTE 1: below, a value of None can be specified as the string "None"
+        NOTE 2: a bool value can be specified as "frue" or "false" (case-insensitive)
+            or as an int (0, or 1)
+        doc_title: str
+        frameAxis: int or None
+        signalChannelAxis: int, str, or None  NOTE: cannot supply vigra.AxisInfo;
+        frameIndex: int, tuple, list, range, slice, None
+        signalIndex: str, int, tuple, list, range, slice, None
+        signalChannelIndex: int, tuple, list, range, slice, None
+        irregularSignalIndex: str, int, tuple, list, range, slice, None
+        irregularSignalChannelAxis: int, None
+        irregularSignalChannelIndex: int, tuple, list, range, slice, None
+        separateSignalChannels: bool ← CheckBox
+        separateChannelsIn: "axes" "frames" ← HChoice
+        singleFrame:bool ← CheckBox
+        get_focus: bool ← CheckBox
+        showFrame: int or None
+        
+        
+    """
+        # WARNING: not supported: 
+        # plotStyle: str NOTE: for now, only "plot" is supported
+        # interval
+        d = qd.QuickDialog(self, "View parameters")
+        d.promptWidgets = []
+        doc_title_prompt = qd.StringInput(d, "Data name")
+        doc_title_prompt.variable.setClearButtonEnabled(True)
+        doc_title_prompt.variable.redoAvailable = True
+        doc_title_prompt.variable.undoAvailable = True
+        d.promptWidgets.append(doc_title_prompt)
+        
+        doc_title_prompt.setText(doc_title)
+        frameAxis_prompt = qd.StringInput(d, "Frame axis")
+        frameAxis_prompt.variable.setClearButtonEnabled(True)
+        frameAxis_prompt.variable.redoAvailable = True
+        frameAxis_prompt.variable.undoAvailable = True
+        d.promptWidgets.append(frameAxis_prompt)
+        
+        # TODO 2023-08-27 15:10:03 finalize me !!!
             
     @property
     def currentFrame(self):
@@ -7252,7 +7318,15 @@ signals in the signal collection.
         return [c for c in self._crosshairSignalCursors_.values()]
     
     @pyqtSlot(bool)
-    def _slot_setXAxesLinked(self, value):
+    def _slot_showXgrid(self, value:bool):
+        self.xGrid = value
+    
+    @pyqtSlot(bool)
+    def _slot_showYgrid(self, value:bool):
+        self.yGrid = value
+    
+    @pyqtSlot(bool)
+    def _slot_setXAxesLinked(self, value:bool):
         self.xAxesLinked = value == True
         
     @pyqtSlot(bool)
@@ -8180,7 +8254,7 @@ signals in the signal collection.
         
         self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
     
-    @_plot_data_.register
+    @_plot_data_.register(neo.Segment)
     def _(self, obj:neo.Segment, *args, **kwargs):
         """Plots a neo.Segment.
         Plots the signals (optionally the selected ones) present in a segment, 
@@ -8238,7 +8312,7 @@ signals in the signal collection.
             
         self.currentFrameAnnotations = {type(obj).__name__ : obj.annotations}
         
-    @_plot_data_.register
+    @_plot_data_.register(neo.core.spiketrainlist.SpikeTrainList)
     def _(self, obj:neo.core.spiketrainlist.SpikeTrainList, *args, **kwargs):
         self._plotSpikeTrains_(obj)
         self.currentFrameAnnotations = {type(obj).__name__: [st.annotations for st in obj]}
@@ -9377,6 +9451,14 @@ signals in the signal collection.
         if self.currentAxis == plotItem:
             self.currentAxis = self.axes[0] if len(self.axes) else None
             
+    def _showXGrid(self, value:bool):
+        for ax in self.axes:
+            ax.showGrid(x=value)
+        
+    def _showYGrid(self, value:bool):
+        for ax in self.axes:
+            ax.showGrid(y=value)
+        
     def linkAllXAxes(self):
         """Link all PlotItem objects (a.k.a signal viewer 'axes') to the top one.
         The consequence is that all X axes are linked: a horizontal zoom on any 
@@ -9587,12 +9669,21 @@ signals in the signal collection.
                 
         if len(self.axes):
             self.actionLink_X_axes.setEnabled(True)
-            
             if self.xAxesLinked:
                 self.linkAllXAxes()
             else:
                 self.unlinkAllXAxes()
                 
+            self.actionShow_X_grid.setEnabled(True)
+            self._slot_showXgrid(self.xGrid)
+            self.actionShow_Y_grid.setEnabled(True)
+            self._slot_showYgrid(self.yGrid)
+            
+        else:
+            self.actionLink_X_axes.setEnabled(False)
+            self.actionShow_X_grid.setEnabled(False)
+            self.actionShow_Y_grid.setEnabled(False)
+            
         
     @pyqtSlot(object)
     @safeWrapper

@@ -248,7 +248,7 @@ def get_int_sfx(s:str, sep:str = "_", use_re:bool=False) -> typing.Tuple[str, in
             # return s, None
         
         sfx = parts[-1]
-        base = sep.join(parts[-1])
+        base = sep.join(parts[:-1])
     
     try:
         sfx = int(sfx)

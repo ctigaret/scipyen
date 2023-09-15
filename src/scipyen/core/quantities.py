@@ -1,3 +1,23 @@
+"""
+This modules complements the Quantities package with additional unit quantities
+and exposes some much needed constants (as shorthand¹, but NOTE that values are
+slightly different - TODO/FIXME):
+R   : universal gas constant (molar gas constant)  8.31446261815324 * J/(K mol)
+F   : Faraday constant 96485.33212331001 C/mol
+qe  : elementary charge 1.602176634e-19 C
+N_A : Avogadro constant 6.02214076e23 mol⁻¹
+    (NAME avoids clashes with pandas.NA "not available" type)
+
+¹ NOTE: These are aready contained in the "constants" module of the Quantities 
+package, as UnitConstant objects, but some are bound to rather "verbose" symbols
+e.g.:
+
+pq.constants.R
+pq.constants.Faraday_constant
+pq.constants.e
+pq.constants.Avogadro_constant
+
+"""
 import inspect, typing, traceback, warnings
 from math import (log, inf, nan)
 from pandas import NA
@@ -251,6 +271,19 @@ for cq in __custom_quantities__:
 
 del(cq, _pqpfx) # better keep __custom_quantities__
 # del(__custom_quantities__, cq, _pqpfx)
+
+# universal gas constant
+R = 8.31446261815324 * pq.J/(pq.K * pq.mol)
+
+# Faraday constant
+F = 96485.33212331001 * pq.C/pq.mol
+
+# elementary charge
+qe = 1.602176634e-19 * pq.C
+
+# Avogadro constant
+N_A = 6.02214076e23 * pq.mol**(-1)
+
 
 def testme():
     print(__file__, __name__)

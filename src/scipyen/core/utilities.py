@@ -69,7 +69,7 @@ HASHRANDSEED = random.randrange(4294967295)
 # total_size
 
 standard_obj_summary_headers = ["Name","Workspace",
-                                "Type","Data Type", 
+                                "Object Type","Data Type (DType)", 
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
                                 ]
@@ -2725,8 +2725,10 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     if ismemberdescriptor(obj):
         ttip += " (member descriptor)"
             
-    ttip += f"\n({fqual})"
-    result["Type"] = {"display": tt, "tooltip": "type: %s" % ttip}
+    # ttip += f"\n({fqual})"
+    ttip += f"\n{fqual}"
+    # result["Object Type"] = {"display": tt, "tooltip": "type: %s" % ttip}
+    result["Object Type"] = {"display": tt, "tooltip": ttip}
     
     # these get assigned values below
     dtypestr = ""
@@ -2826,8 +2828,11 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsztip = "memory size: "
             
         elif isinstance(obj, pd.Series):
+            dtype = obj.dtype
             dtypestr = "%s" % obj.dtype
-            dtypetip = "dtype: "
+            dtypetip = f"{type(dtype).__module__}.{type(dtype).__name__}"
+            # dtypetip = ""
+            # dtypetip = "dtype: "
 
             sz = "%s" % obj.size
             sizetip = "size: "
@@ -2855,8 +2860,11 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsztip = "memory size: "
             
         elif isinstance(obj, np.ndarray):
+            dtype = obj.dtype
             dtypestr = str(obj.dtype)
-            dtypetip = "dtype: "
+            dtypetip = f"{type(dtype).__module__}.{type(dtype).__name__}"
+            # dtypetip = ""
+            # dtypetip = "dtype: "
             
             if obj.size > 0:
                 try:
@@ -2920,7 +2928,8 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        result["Data Type"]     = {"display": dtypestr,     "tooltip" : "%s%s" % (dtypetip, dtypestr)}
+        result["Data Type (DType)"]     = {"display": dtypestr,     "tooltip" : dtypetip}
+        # result["Data Type (DType)"]     = {"display": dtypestr,     "tooltip" : "%s%s" % (dtypetip, dtypestr)}
         result["Workspace"]     = {"display": namespace,    "tooltip" : "Location: %s kernel namespace" % namespace}
         result["Minimum"]       = {"display": datamin,      "tooltip" : "%s%s" % (mintip, datamin)}
         result["Maximum"]       = {"display": datamax,      "tooltip" : "%s%s" % (maxtip, datamax)}

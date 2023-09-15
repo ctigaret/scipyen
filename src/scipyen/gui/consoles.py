@@ -382,7 +382,22 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             value = QtCore.Qt.LayoutDirectionAuto
                 
         self._control.setLayoutDirection(value)
-        self.custom_page_control.setLayoutDirection(value) # doesn't work !
+        self.custom_page_control.setLayoutDirection(value) # doesn't work !?
+        
+    def guiSetScrollBack(self):
+        value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
+                                             value = self.scrollBackSize, min = -1)
+        if ok:
+            self.scrollBackSize = value
+        
+    @property
+    def scrollBackSize(self):
+        return self.buffer_size
+    
+    @markConfigurable("Scrollback", "qt")
+    @scrollBackSize.setter
+    def scrollBackSize(self, value:int):
+        self.buffer_size = value
         
     @property
     def fontFamily(self):
@@ -850,7 +865,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
         if ok:
             self.active_frontend.font = selectedFont
-        
+            
         
     def _load_settings_(self):
         #print("ExternalConsoleWindow._load_settings_()")
@@ -3409,25 +3424,20 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 #pass
             
 class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
-    # TODO Menu bar and toolbar for the following functionalities:
-    # 1) console appearance:
-    # * colors
-    # * syntaxStyle
-    # * fonts
-    # * scrollbar position
-    # 2) copy/paste
     historyItemsDropped = pyqtSignal()
     workspaceItemsDropped = pyqtSignal()
     fileSystemItemsDropped = pyqtSignal()
-    #workspaceItemsDropped = pyqtSignal(bool)
     loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
     pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
     executed = pyqtSignal()
-    #sig_shell_msg_received = pyqtSignal(object)
     
-    def __init__(self, parent=None):
-        super().__init__(parent=parent)
-        self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
+    def __init__(self, parent=None, **kwargs):
+        scipyenWindow = kwargs.pop("scipyenWindow", None) # take this out for below...
+        super().__init__(parent=parent, **kwargs) # initializes QtWidgets.QMainWindow
+        kwargs["scipyenWindow"] = scipyenWindow # ... then place back in kwargs for WorkspaceGuiMixin
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs) # initializes WorkspaceGuiMixin
+        self.consoleWidget = ScipyenConsoleWidget(mainWindow=self._scipyenWindow_) # from WorkspaceGuiMixin
+        # self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
         self.consoleWidget.setAcceptDrops(True)
         self.setCentralWidget(self.consoleWidget)
         
@@ -3441,7 +3451,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.consoleWidget.loadSettings() # inherited from ScipyenConfigurable
         self.widget = self.consoleWidget
         self.active_frontend = self.consoleWidget
-        WorkspaceGuiMixin.__init__(self, parent=parent)
+        # WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs) # initializes WorkspaceGuiMixin
         self._configureUI_()
         self.loadSettings()
         
@@ -3484,7 +3494,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         available_syntax_styles = get_available_syntax_styles() # defined in this module
         
         if len(available_syntax_styles):
-            #print("ScipyenConsole._configureUI_", self.active_frontend.syntaxStyle)
             self.syntax_style_menu = self.settings_menu.addMenu("Syntax Style")
             
             style_group = QtWidgets.QActionGroup(self)
@@ -3534,13 +3543,13 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self.settings_menu.addAction(self.choose_font_act)
         self.addAction(self.choose_font_act)
-        #self.widget.kernel_client.shell_channel.message_received.connect(self.slot_kernel_shell_chnl_msg_recvd)
-
-    #@pyqtSlot(object)
-    #def slot_kernel_shell_chnl_msg_recvd(self, msg:object):
-        #msg["workspace_name"]="Internal"
-        #msg["connection_file"] = ""
-        #self.sig_shell_msg_received.emit(msg)
+        
+        self.set_console_scrollbackAction = QtWidgets.QAction("Console scroll back",
+                                                              self, shortcut=ctrl+"L",
+                                                              triggered = self.set_scrollBack)
+        
+        self.settings_menu.addAction(self.set_console_scrollbackAction)
+        self.addAction(self.set_console_scrollbackAction)
         
     @pyqtSlot()
     def _slot_listMagics(self):
@@ -3557,8 +3566,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     @pyqtSlot()
     def _slot_saveRawToFile(self):
         self.consoleWidget.select_document() # inherited from qtconsole.ConsoleWidget
-        # text = self.layout().currentWidget().toPlainText()
-        # text = self.layout().currentWidget().toPlainText()
         text = self.consoleWidget._control.toPlainText()
         if len(text.strip()):
             self._saveToFile(text, mode="raw")
@@ -3607,6 +3614,10 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.consoleWidget.saveSettings() # inherited from ScipyenConfigurable
         super(WorkspaceGuiMixin, self).saveSettings()
         
+    def set_scrollBack(self):
+        if self.active_frontend and hasattr(self.active_frontend, "guiSetScrollBack"):
+            self.active_frontend.guiSetScrollBack()
+        
     def choose_font(self):
         currentFont = self.consoleFont
         selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
@@ -3642,3 +3653,14 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def kernel_manager(self):
         return self.consoleWidget.kernel_manager
     
+    @property
+    def consoleScrollBack(self):
+        if self.active_frontend:
+            return self.active_frontend.scrollBackSize
+        
+    @consoleScrollBack.setter
+    def consoleScrollBack(self, val:int):
+        if self.active_frontend:
+            self.active_frontend.scrollBackSize = val
+        
+        

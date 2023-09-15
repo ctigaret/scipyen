@@ -550,7 +550,14 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         ws = self.appWindow.workspace
         return get_symbol_in_namespace(data, ws)        
     
-    def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, title="", *args, **kwargs):
+    def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 title="", *args, **kwargs):
+        """WorkspaceGuiMixin initializer
+    NOTE: 2023-08-26 22:23:33 - new supported keyword: 'scipyenWindow'
+    to specify the Scipyen's main window
+    when this parameter is missing, the 'classical behaviour' applies, i.e.
+    the 'parent' parameter is checked to see whether itselt is Scipyen main window
+    """
         self._scipyenWindow_ = None
         
         self._fileLoadWorker_ = None
@@ -562,7 +569,12 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         self.loopControl = {"break":False}
         self.updateUiWithFileLoad = True
         
-        if isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
+        scipyenWindow = kwargs.pop("scipyenWindow", None)
+        
+        if isinstance(scipyenWindow, QtWidgets.QMainWindow) and type(scipyenWindow).__name__ == "ScipyenWindow":
+            self._scipyenWindow_ = scipyenWindow
+            
+        elif isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
             self._scipyenWindow_   = parent
             
         else:
@@ -586,6 +598,45 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self.setWindowTitle(title)  
             
         ScipyenConfigurable.__init__(self, *args, **kwargs)
+        
+        # self._winFlagsCache_ = None
+        
+        # if sys.platform == "win32":
+        #     if isinstance(self, QtWidgets.QMainWindow):
+        #         self._winFlagsCache_ = self.windowFlags()
+                # flags = self.windowFlags() | QtCore.Qt.MSWindowsOwnDC | QtCore.Qt.BypassWindowManagerHint
+                # self.setWindowFlags(flags);
+                
+                
+#     def event(self, evt):
+#         if not isinstance(self, QtWidgets.QMainWindow):
+#             return False
+#         
+#         if sys.platform == "win32":
+#             if evt == QtCore.QEvent.WindowDeactivate:
+#                 self.setWindowFlags(self._winFlagsCache_);
+#                 self.show();
+#                 return True
+#             
+#             return super(QtWidgets.QMainWindow, self).event(evt)
+#                 
+#                 
+#         else:
+#             return super(QtWidgets.QMainWindow, self).event(evt)
+#  
+#     def activateWindow(self):
+#         if not isinstance(self, QtWidgets.QMainWindow):
+#             return
+#         if sys.platform== "win32":
+#             # flags = self.windowFlags();
+#             # self.show(); # Restore from systray
+#             # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
+#             self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
+#             self.show();
+#             # self.raise_()
+#         else:
+#             super().activateWindow()
+
         
     @property
     def scipyenWindow(self):
@@ -688,7 +739,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         
         """
-        # return self._scipyenWindow_
+        if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+            return self._scipyenWindow_
+        
         p = self.parent()
         
         if isinstance(p, QtWidgets.QMainWindow):
