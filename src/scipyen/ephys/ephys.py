@@ -150,6 +150,7 @@ waveform_signal
 """
 
 #### BEGIN core python modules
+import os, sys
 import collections
 import traceback
 import datetime
@@ -173,11 +174,12 @@ from dataclasses import (dataclass, MISSING)
 import numpy as np
 import quantities as pq
 import neo
-import pyabf
+# import pyabf
 import matplotlib as mpl
 # import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
-from PyQt5 import QtGui, QtCore
+from PyQt5 import (QtGui, QtCore, QtWidgets)
+from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -193,7 +195,7 @@ from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
-from core import pyabfbridge
+from core import pyabfbridge as pab
 from core.utilities import normalized_index
 from core.neoutils import get_index_of_named_signal
 from core import quantities as scq
@@ -222,6 +224,8 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
+
+ABF = pab.ABF # useful alias
 
 class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locations", "name"))):
     """Lightweight functor to calculate a signal measure at a location.
@@ -436,6 +440,35 @@ class ElectrodeMode(TypeEnum):
     LinearArray=32      # local field potentials etc
     MultiElectrodeArray=64 # MEAs on a culture/slice?
    
+class DataListener(QtCore.QObject):
+    """
+    Dynamically constructs and augments neo.Block data as
+    axon files are created in the current working directory
+    """
+    def __init__(self, scipyenWindow, data:typing.Optional[neo.Block]=None):
+        super().__init__(parent=scipyenWindow)
+        self.scipyenWindow=scipyenWindow
+        self.currentDir = os.getcwd()
+
+    def start(self):
+        self.scipyenWindow.enableDirectoryWatch(True)
+
+    def stop(self):
+        self.scipyenWindow.enableDirectoryWatch(False)
+
+
+    @pyqtSlot(object)
+    def slot_filesRemoved(self, removedItems):
+        print(f"{self.__class__.__name__}.slot_filesRemoved {removedItems}")
+
+    @pyqtSlot(object)
+    def slot_filesChanged(self, changedItems):
+        print(f"{self.__class__.__name__}.slot_filesChanged {changedItems}")
+
+    @pyqtSlot(object)
+    def slot_filesNew(self, newItems):
+        print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
+
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
     """Infers the clamping mode from the units of signal and command"""
@@ -2240,7 +2273,7 @@ class ElectrophysiologyProtocol(object):
         
     WARNING DO NOT USE YET - API under development (i.e. unstable) TODO
     """
-    # TODO/FIXME see if pyabf can be used
+    # TODO/FIXME see if pyabf can be used (via pyabfbridge)
     def __init__(self):
         # possible values for self._data_source_:
         # "Axon", "CEDSignal", "CEDSpike", "Ephus", "NA", "unknown"

@@ -4623,7 +4623,7 @@ def remove_spiketrain(segment:neo.Segment, index:typing.Union[int, str, typing.S
         
             trains = [s for k, s in enumerate(stl) if k not in ndx]
             
-        elif all(isinstance(i, str)):
+        elif all(isinstance(i, str) for i in index):
             trains = [s for s in stl if s.name not in ndx]
         
     
@@ -6488,8 +6488,9 @@ def average_segments_in_block(data, **kwargs):
         
     return ret
         
+# def average_blocks_old(*args, **kwargs):
 @safeWrapper
-def average_blocks_old(*args, **kwargs):
+def average_blocks(*args, **kwargs):
     """Generates a block containing a list of averaged AnalogSignal data from the *args.
     FIXME/TODO: revisit this
     Parameters:
@@ -6685,7 +6686,8 @@ def average_blocks_old(*args, **kwargs):
         # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
         raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
     
-    ret.segments = average_segments_old(segments, count=n, every=m, analog_index=analog_index)
+    # ret.segments = average_segments_old(segments, count=n, every=m, analog_index=analog_index)
+    ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
     
     ret.annotations["Averaged"] = dict()
     ret.annotations["Averaged"]["Count"] = n

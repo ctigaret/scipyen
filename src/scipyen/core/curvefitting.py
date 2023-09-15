@@ -592,6 +592,10 @@ def fit_Event_model(data, p0, **kwargs):
         raise TypeError("bounds expected a 2-tuple or a 2-element list")
     
     def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
+        """ x: sequence of model params
+            t: independent variable
+            y: the data (dependent variable)
+        """
         yf = models.Clements_Bekkers_97(t, x)
         
         ret = y-yf
@@ -1064,7 +1068,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     
         func(x, p, /, *args, **kwargs)
     
-    p0: initial values for the model realized by `func`
+    p0: sequence of initial values for the model realized by `func` - in the same
+    order as expected by func
     
     Var-keyword parameters (**kwargs):
     =================================
@@ -1077,7 +1082,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     The following are passed directly to scipy.optimize.least_squares:
     bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
-    diff_step, tr_solver, tr_optoins, jac_sparsity, verbose
+    diff_step, tr_solver, tr_options, jac_sparsity, verbose
     
     (see scipy manual for details)
     

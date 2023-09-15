@@ -1647,6 +1647,8 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     parameters of the current injection steps i.e. Iinj_0, delta_I, Istart and 
     Istop and pass those to analyse_AP_step_injection_series()
     
+    CAUTION
+    
     Parameters:
     ------------
     
@@ -2275,7 +2277,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     
     if len(ge_value_starts) == 0:
         # bail out gracefully
-        warnings.warn("ap_waveform_roots: cannot find where signla becomes >= %s" % value, RuntimeWarning)
+        warnings.warn("ap_waveform_roots: cannot find where signal becomes >= %s" % value, RuntimeWarning)
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
         
     
@@ -3674,12 +3676,21 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             # up   = time point of the down-up transition
             # inj  = injected current (difference between centroids )
             # label = int array "mask" with 0 for down and 1 for up; same shape as im
-            d, u, inj, c, l = sigp.detect_boxcar(im,
+            u,d, inj, c, l, upward = sigp.detect_boxcar(im,
                                                 method=method,
                                                 box_size=box_size, 
                                                 adcres=adcres,
                                                 adcrange=adcrange,
-                                                adcscale=adcscale)
+                                                adcscale=adcscale) # NOTE: up_first is true by default
+            # print(f"upward: {upward}")
+            # print(f"d: {d}")
+            # print(f"u: {u}")
+            # print(f"inj: {inj}, size: {inj.size}, ndim: {inj.ndim}, shape: {inj.shape}")
+            
+            if inj.size == 1:
+                inj = inj.flatten()[0]
+                
+                # print(f"-> inj: {inj}")
             
             # d, u, inj, c, l = sigp.parse_step_waveform_signal(im,
             #                                                     method=method,
@@ -3700,7 +3711,8 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                 
             start, stop = (min(d,u), max(d,u))
             
-            if d < u:
+            # if d < u:
+            if not upward:
                 inj *= -1.0
             
             vstep = vm.time_slice(start, stop + tail)
@@ -5255,9 +5267,17 @@ def collect_Iclamp_steps(block, VmSignal = "Vm_prim_1", ImSignal = "Im_sec_1", h
     
     return ret
 
+def getCurrentInjectionProtocolParametersABF(data:neo.Block, protocolEpochs:tuple):
+    """Parses the current injection steps in a neo.Block
+"""
+    if not isinstance(data, neo.Block):
+        raise TypeError(f"Expecting a neo.Block; instead, got {type(data).__name__}")
+    
+    hold_delay = ephys.getABFHoldDelay(data)
+    
 
-
-def analyse_AP_step_injection_series(data, **kwargs):
+def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, tuple, list], 
+                                     **kwargs):
     """ Action potential (AP) detection and analysis in I-clamp experiment.
     
     Detects and analyses action potentials (AP) fired during depolarizing current
@@ -5850,10 +5870,18 @@ def analyse_AP_step_injection_series(data, **kwargs):
             else:
                 im = ImSignal
                 
-            step_result, vstep = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
-                                                           Itimes_relative = Itimes_relative,
-                                                           Itimes_samples = Itimes_samples,
-                                                           **kwargs)
+            try:
+                step_result, vstep = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
+                                                            Itimes_relative = Itimes_relative,
+                                                            Itimes_samples = Itimes_samples,
+                                                            **kwargs)
+                
+            except:
+                # NOTE: 2023-08-14 17:45:52
+                # this usually happens when no current injection is detected in Im
+                print(f"Skipping segment {k} of {name} because of the following exception:")
+                traceback.print_exc()
+                continue
             
             if Iinj is not None:
                 # override the value measured from the Im signal

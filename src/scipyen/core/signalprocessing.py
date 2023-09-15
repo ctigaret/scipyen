@@ -2745,7 +2745,7 @@ NOTES:
         # print(f"threshold = {minampli*sig.units}")
         
         if np.all(np.abs(amplitude) < minampli):
-            return (None, None, None, None, None)
+            return (None, None, None, None, None, None)
             
         code, cdist = cluster.vq.vq(sig, sorted(cbook)) # use un-filtered signal here
         

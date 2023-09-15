@@ -685,6 +685,13 @@ class TypeEnum(IntEnum):
     
     @classmethod
     def type(cls, t):
+        """Returns the enum type corresponding to `t`, where
+        `t` can be:
+        • str: the name / symbol associated with the type in the enum
+        • int: the value associated with the type in the enum
+        
+        
+        """
         if isinstance(t, str):
             if t in cls.names():
                 return [_t for _t in cls if _t.name == t][0]
@@ -929,7 +936,22 @@ def inspect_members(obj, predicate=None):
     
     names = tuple(n for n in dir(obj) if n not in skips and all(not n.startswith(s) for s in specials))
     
-    mb = tuple((n, getattr(obj, n, None)) for n in names)
+    mbi = tuple((k, n, inspect.getattr_static(obj, n, None)) for k,n in enumerate(names))
+    
+    mb = list()
+    
+    for k, mbi_name, mbi_obj in mbi:
+        try:
+            v = getattr(obj, mbi_name)
+        except:
+            # print(f"Cannot parse member {k}: {mbi_name} which is a {type(mbi_obj)}")
+            # traceback.print_exc()
+            v = mbi_obj
+            
+        mb.append((mbi_name, v))
+        
+    
+    # mb = tuple((n, getattr(obj, n, None)) for n in names)
     
     if inspect.isfunction(predicate):
         mb = tuple(filter(lambda x: predicate(x[1]), mb))

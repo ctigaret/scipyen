@@ -119,6 +119,7 @@ from core.utilities import (summarize_object_properties,
 import core.data_analysis as anl
 from core.strutils import InflectEngine
 import core.strutils as strutils
+import core.utilities as utilities
 import core.sysutils as sysutils
 import core.curvefitting as crvf
 import core.signalprocessing as sigp
@@ -1539,6 +1540,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.currentVarItem = None
         self.currentVarItemName = None
+        
+        # if sys.platform == "win32":
+        #     if isinstance(self, QtWidgets.QMainWindow):
+        #         flags = self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+        #         self.setWindowFlags(flags);
+        
+        self._winFlagsCache_ = self.windowFlags()
+                
 
     # BEGIN Properties
 
@@ -1944,10 +1953,36 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         assert viewer.ID == wid
         
-    def activateWindow(self):
-        super().activateWindow()
-        if os.platform== "win32":
-            self.raise_()
+    #def event(self, evt):
+        #if sys.platform == "win32":
+            #if evt == QtCore.QEvent.WindowDeactivate:
+                #self.setWindowFlags(self._winFlagsCache_);
+                ##self.show();
+                #return True
+
+            #return super().event(evt)
+
+
+        #else:
+            #return super().event(evt)
+
+    #def mousePressEvent(self, evt):
+        #if sys.platform == "win32":
+            #self.activateWindow()
+        #super().mousePressEvent(evt)
+
+    #def activateWindow(self):
+        ## print(f"{self.__class__.__name__}.activateWindow")
+        ##super().activateWindow()
+        #if sys.platform== "win32":
+            ## flags = self.windowFlags();
+            ## self.show(); # Restore from systray
+            ## self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
+            #self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
+            #self.show();
+            ##self.raise_()
+        #else:
+            #super().activateWindow()
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
@@ -2666,7 +2701,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #   to run_cell(...))
 
         if not isinstance(self.console, consoles.ScipyenConsole):
-            self.console = consoles.ScipyenConsole(parent=self)
+            self.console = consoles.ScipyenConsole(scipyenWindow=self)
+            # self.console = consoles.ScipyenConsole(parent=self)
             self.console.executed.connect(self.slot_updateHistory)
             self.console.executed.connect(self.slot_updateCwd)
 
@@ -3631,14 +3667,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if all([isinstance(self.workspace[v], (pd.DataFrame, pd.Series, neo.basesignal.BaseSignal, neo.SpikeTrain, np.ndarray))] for v in varnames):
             if not any([isinstance(self.workspace[v], np.ndarray) and self.workspace[v].ndim > 2 for v in varnames]):
                 exportCSVAction = cm.addAction(
-                    "Export selected variables to CSV")
+                    "Export as CSV")
                 exportCSVAction.triggered.connect(self.slot_multiExportToCsv)
                 exportCSVAction.setToolTip(
-                    "Export variables as separate comma-separated ASCII files")
+                    "Export as comma-separated ASCII files")
                 exportCSVAction.setStatusTip(
-                    "Export variables as comma-separated ASCII file")
+                    "Export as comma-separated ASCII file")
                 exportCSVAction.setWhatsThis(
-                    "Export variables as comma-separated ASCII file")
+                    "Export as comma-separated ASCII file")
                 exportCSVAction.hovered.connect(
                     self._slot_showActionStatusMessage_)
 
@@ -7291,14 +7327,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._fileSystemChanged_ = True
     
     def enableDirectoryWatch(self, on:bool=True):
-        # if not isinstance(self.dirFileWatcher, QtCore.QFileSystemWatcher):
-        #     self.dirFileWatcher = QtCore.QFileSystemWatcher(parent = self)
-        #     self.dirFileWatcher.directoryChanged.connect(self._slot_directoryChanged)
-            
         if on:
             self._isDirWatching_ = True
             if self.currentDir in self.dirFileWatcher.directories():
-            # do nothing if diretory already watched
+            # do nothing if directory already watched
                 print(f"{self.__class__.__name__}.enableDirectoryWatch: The directory {self.currentDir} is already being watched")
             
             else:
@@ -7310,6 +7342,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         else:
             self._isDirWatching_ = False
+            self._currentDirCache_.clear()
             watchedDirs = self.dirFileWatcher.directories()
             if len(watchedDirs):
                 self.dirFileWatcher.removePaths(watchedDirs)
@@ -7356,7 +7389,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
     
     """
-        print(f"{self.__class__.__name__}._slot_directoryChanged (from dirFileWatcher) *args {args}, **kwargs {kwargs}")
+        #print(f"{self.__class__.__name__}._slot_directoryChanged (from dirFileWatcher) *args {args}, **kwargs {kwargs}")
         
         if self.fileSystemModel.rootPath() == self.currentDirectory:
             dirItems = dict()
@@ -7408,7 +7441,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # which HAS TO BE SETUP when the directory first becomes watched.
             
 
-    def viewObject(self, obj, objname, winType=None, newWindow=False, askForParams=False):
+    def viewObject(self, obj, objname, winType=None, 
+                   newWindow=False, askForParams=False):
         """Actually displays a python object in user's workspace
         Delegates to appropriate viewer according to object type, creates a new
         viewer if necessary.

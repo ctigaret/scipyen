@@ -272,6 +272,7 @@ class DataViewer(ScipyenViewer):
                                     dataTypeStr=type(obj_tuple[1]).__name__, 
                                     # dataTypeStr=self._dataTypeStr_, 
                                     hideRoot=self.hideRoot)
+            self.docTitle = obj_tuple[0]
             
             for k in range(self.treeWidget.topLevelItemCount()):
                 self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
