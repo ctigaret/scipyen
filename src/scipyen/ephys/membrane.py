@@ -2057,7 +2057,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
 
     tau_m = popt[3]
     
-    xx = np.linspace(float(vsag10_90.t_start), float(ssT0), (float(ssT0)-float(vsag10_90.t_start))/vm.sampling_period)
+    xx = np.linspace(float(vsag10_90.t_start), float(ssT0), int((float(ssT0)-float(vsag10_90.t_start))/vm.sampling_period))
     #xx = np.linspace(float(vsag10_90.times[0]), float(vsag10_90.times[-1]), vm.shape[0])
     
     yy = models.generic_exp_decay(xx, *popt)

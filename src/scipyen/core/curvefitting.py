@@ -26,6 +26,7 @@ from . import tiwt
 from . import models
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core import datatypes
+from core import prog
 #from .patchneo import *
 #### END pict.core modules
 
@@ -1141,8 +1142,31 @@ def fit_model(data, func, p0, *args, **kwargs):
     fargs       = kwargs.pop("fargs",       tuple())
     fkwargs     = kwargs.pop("fkwargs",     dict())
     
-    def __cost_fun__(x, t, y, *args, **kwargs):  # returns residuals
-        yf = func(t, x, *fargs, **fkwargs)
+    # def __cost_fun__(x0, t, y, *args, **kwargs):  # returns residuals
+    def __cost_fun__(x0, t, y):  # returns residuals
+        # func = model function passed in the params to fit_model
+        # t = independent variable (e.g. time; this is `x` in the main body of fit-model!)
+        # x0 = sequence with initial values for the model parameters!
+        # CAUTION: the model function `func` signature MIGHT expect these parameters
+        # to be passed unpacked (i.e. individually)
+        #
+        # So here we have two accepted signatures:
+        #   func(t, x0, *args, **kwargs) -> TWO named parameters
+        #   OR
+        #   func(t, *args, **kwargs) -> ONE named parameter (with initial parameter
+        #       values contained in *args)
+        # the lines below adapt for that
+        sig = prog.signature2Dict(func)
+        namedPars = list(sig["named"].keys())
+        if len(sig["named"]) == 2:
+            par2 = sig["named"][namedPars[1]]
+            if isinstance(par2[1], typing._UnionGenericAlias):
+                # function expects a sequence of parameters
+                yf = func(t, x0, *fargs, **fkwargs)
+            else:
+                # function may expect a single model parameter
+                myargs = []
+        yf = func(t, x0, *fargs, **fkwargs)
         
         ret = y-yf
         
@@ -1175,7 +1199,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         ydata = data[realDataNdx]
         xdata = x[realDataNdx]
     
-    x0 = p0
+    x0 = p0 # sequence of initial values for the model parameters
     lo = list()
     up = list()
     
