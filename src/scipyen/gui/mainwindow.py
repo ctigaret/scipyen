@@ -114,8 +114,9 @@ from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_attribute, filterfalse_attribute)
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
-                            safe_identity_test, unique, index_of, gethash,
-                            NestedFinder, normalized_index)
+                            safe_identity_test, unique, index_of, 
+                            gethash, NestedFinder, normalized_index,
+                            reverse_mapping_lookup)
 import core.data_analysis as anl
 from core.strutils import InflectEngine
 import core.strutils as strutils
@@ -2046,7 +2047,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             wClass = winClass.replace("&", "")
 
             if wClass not in list(v.__name__ for v in self.viewers):
-                raise ValueError("Unexpected viewer class name %s" % wClass)
+                raise ValueError(f"Unexpected viewer class name{wClass}")
 
             win_classes = list(
                 filter(lambda x: x.__name__ == wClass, self.viewers))
@@ -2055,27 +2056,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 winClass = win_classes[0]
 
             else:
-                raise ValueError("Unexpected viewer class name %s" % wClass)
+                raise ValueError(f"Unexpected viewer class name {wClass}")
 
         elif not isinstance(winClass, (type, sip.wrappertype)):
-            raise TypeError(
-                "Expecting a type or sip.wrappertype; got %s instead" % type(winClass).__name__)
+            raise TypeError(f"Expecting a type or sip.wrappertype; got {type(winClass).__name__} instead")
 
         else:
             if winClass not in self.viewers:
-                raise ValueError("Unexpected viewer class %s" %
-                                 winClass.__name__)
-
-        win_title = kwargs.pop("win_title", winClass.__name__)
-        win_title, counter_suffix = validate_varname(
-            win_title, self.workspace, return_counter=True)
-
-        # print(f"{self.__class__.__name__} win_title = {win_title}, counter_suffix = {counter_suffix}")
-
-        kwargs["win_title"] = win_title
-
-        if "parent" not in kwargs:
-            kwargs["parent"] = self
+                raise ValueError(f"Unexpected viewer class {winClass.__name__}")
 
         if winClass is mpl.figure.Figure:
             fig_kwargs = dict()
@@ -2090,13 +2078,32 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             workspace_win_varname = f"Figure{win.number}"
 
         else:
+            win_title = kwargs.pop("win_title", winClass.__name__)
+            # print(f"{self.__class__.__name__} win_title = {win_title}, counter_suffix = {counter_suffix}")
+
+            # kwargs["win_title"] = win_title
+            if "parent" not in kwargs:
+                kwargs["parent"] = self
             win = winClass(*args, **kwargs)
+
+            variables = dict([item for item in self.shell.user_ns.items(
+                ) if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
+
+            varnames = reverse_mapping_lookup(variables, win)
+            
+            listedWindows = [self.workspace[n] for n in varnames if type(self.workspace[n]) == winType]
+
+            if win not in listedWindows:
+                win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
+            
+            win.winTitle = win_title
             win.ID = counter_suffix
             workspace_win_varname = strutils.str2symbol(win_title)
 
         self.registerWindow(win)  # required !
         # self.workspace[workspace_win_varname] = win
         # self.workspaceModel.update()
+        # print(f"{self.__class__.__name__}.newViewer workspace_win_varname = {workspace_win_varname}")
         self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)
 
         return win
@@ -3459,8 +3466,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # TODO separate menu for variables in remote namespaces
             return
 
-        self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
-            ndx)
+        self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(ndx)
 
         try:
             obj = self.workspace[self.currentVarItemName]
@@ -3475,12 +3481,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.raiseWindow(obj)
 
             else:
-                askForParams = bool(
-                    QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
-                newWindow = bool(
-                    QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+                askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+                
+                newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
 
-                if not self.viewVar(self.currentVarItemName, newWindow=newWindow, askForParams=askForParams):
+                if not self.viewVar(self.currentVarItemName, newWindow=newWindow, 
+                                    askForParams=askForParams):
                     # if no handler exists, then view (display) object in console
                     self.console.execute(self.currentVarItemName)
                     
@@ -7196,7 +7202,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         varNames = list()
 
         for i in indexList:
-            item. varname = self._getWorkspaceVarItemAndName_(i)
+            item, varname = self._getWorkspaceVarItemAndName_(i)
             if not self.viewVar(varname, True):
                 self.console.execute(varname)
 
@@ -7287,7 +7293,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.console.execute(varname)
 
     # , useSignalViewerForNdArrays=True):
-    def viewVar(self, varname, newWindow=False, winType=None, askForParams=False):
+    def viewVar(self, varname, newWindow=False, winType=None, 
+                askForParams=False):
         """Displays a variable in the workspace.
         The variable is selected by its name
         """
@@ -7513,12 +7520,26 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             win = self.currentViewers[winType]
 
             # is this win shown in the workspace viewer?
-            listedVarNames = self.workspaceModel.getDisplayedVariableNames()
+            # BUG 2023-09-16 08:59:37
+            # when the workspace viewer is populated asynchronously, the below
+            # query may happen before the variable name was displayed in 
+            # workpace viewer, thus causing an increment (and a reasignment of symbols)
+            # listedVarNames = self.workspaceModel.getDisplayedVariableNames()
+            # listedWindows = [self.workspace[n] for n in listedVarNames if type(self.workspace[n]) == winType]
             
-            listedWindows = [self.workspace[n] for n in listedVarNames if type(self.workspace[n]) == winType]
+            variables = dict([item for item in self.shell.user_ns.items(
+                ) if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
             
-            # if len(listedWindows) and win not in listedWindows:
-            if len(listedWindows) == 0 or win not in listedWindows:
+            varnames = reverse_mapping_lookup(variables, win)
+            
+            listedWindows = [self.workspace[n] for n in varnames if type(self.workspace[n]) == winType]
+            
+            # print(f"{self.__class__.__name__}.viewObject listedWindows = {listedWindows}")
+            # print(f"{self.__class__.__name__}.viewObject win : {win}; title: {win.windowTitle()}")
+            # print(f"{self.__class__.__name__}.viewObject win is listed {win in listedWindows}")
+            
+            # if len(listedWindows) == 0 or win not in listedWindows:
+            if win not in listedWindows:
                 # create a binding in the workspace
                 win_title = winType.__name__
                 win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)

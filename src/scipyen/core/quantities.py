@@ -832,7 +832,7 @@ def check_electrical_current_units(value):
     
     ref = pq.A
     
-    return value._reference.dimensionality == ref.dimensionality
+    return value._reference.dimensionality == ref._reference.dimensionality
 
 def check_electrical_potential_units(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
@@ -840,7 +840,7 @@ def check_electrical_potential_units(value):
     
     ref = pq.V
     
-    return value._reference.dimensionality == ref.dimensionality
+    return value._reference.dimensionality == ref._reference.dimensionality
     
 def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     """Calculates the conversion factor from y units to x units.

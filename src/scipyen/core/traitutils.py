@@ -121,6 +121,8 @@ def traitlet_set(instance, obj, value):
     try:
         #silent = new_value is old_value
         if silent:
+            if isinstance(new_value, QtCore.QObject):
+                return
             new_hash = gethash(new_value)
             #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
             #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)

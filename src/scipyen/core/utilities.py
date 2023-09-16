@@ -2577,10 +2577,9 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     
     Returns:
     ========
-    The key mapped to 'y', if the mapping is unique, else a tuple of keys that
-    map to the same value in 'y'.
-    
-    Returns None if 'y' is not found among x.values()
+    A tuple containing the key (if the mapping is unique) or the keys
+    mapped to 'y'. This tuple may be empty if 'y' not found among 
+    x.values()
     
     """
     #from .traitcontainers import (DataBag, Bunch, )
@@ -2594,15 +2593,18 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
         testincluded = y in x.values()
     
     if testincluded:
-        
         ret = [name for name, val in x.items() if safe_identity_test(y, val)]
         # ret = [name for name, val in x.items() if (np.all(y == val) if (isinstance(y, np.ndarray) or isinstance(val, np.ndarray)) else y == val)]
         
-        if len(ret) == 1:
-            return ret[0]
+        return tuple(ret)
         
-        elif len(ret) > 1:
-            return tuple(ret)
+#         if len(ret) == 1:
+#             return ret[0]
+#         
+#         elif len(ret) > 1:
+#             return tuple(ret)
+    else:
+        return tuple()
     
 def summarize_object_properties(objname, obj, namespace="Internal"):
     """Returns a dict with object properties for display in Scipyen workspace.

@@ -673,8 +673,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         return True
         
-    def bindObjectInNamespace(self, varname:str, data:typing.Any, hidden:bool=False,
-                namespace:typing.Optional[dict] = None):
+    def bindObjectInNamespace(self, varname:str, 
+                              data:typing.Any, hidden:bool=False,
+                              namespace:typing.Optional[dict] = None):
         """Binds an object to a symbol, in the specified namespace.
         Unless the symbol is flagged as 'hidden', the object will be summarized
         in the workspace viewer, and changes to its contents may be automatically
@@ -1416,6 +1417,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         observed_varnames = set(self.internalVariablesMonitor.keys())
         # varnames that have been removed 
         del_vars = observed_varnames - current_user_varnames
+        
+        # print(f"{self.__class__.__name__}._updateModel_ del_vars = {del_vars}")
 
         # 3.2. now, remove these from the DataBag of observed variables (self.internalVariablesMonitor)
         #
@@ -1457,7 +1460,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
         
         # NOTE: 2023-06-05 20:59:00
-        # connection to self._slot_updateModelAsync_
+        # connected to self._slot_updateModelAsync_
         self.sig_startAsyncUpdate.emit(self.shell.user_ns)
         
         self.lastExecutionResult = None
@@ -1707,6 +1710,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # generate model view row contents for existing item
             v_row = self.generateRowContents(dataname, data)
             self.updateRow(row, v_row)
+            
+            # BUG: 2023-09-16 09:55:11
+            # this causes a rename to the variables, which shouldn't happen; the
+            # BUG is subtle and related to how the variables are assigned to symbols
+            # in the workspace - clearly a flaw in how I designed all of this...
             # if isinstance(data, QtWidgets.QWidget):
             #     data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
 
@@ -1814,6 +1822,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # generate model view row contents
         v_row = self.generateRowContents(dataname, data)
+        # BUG: 2023-09-16 09:55:11
+        # this causes a rename to the variables, which shouldn't happen; the
+        # BUG is subtle and related to how the variables are assigned to symbols
+        # in the workspace - clearly a flaw in how I designed all of this...
         # if isinstance(data, QtWidgets.QWidget):
         #     data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
         self.appendRow(v_row)  # append the row to the model
