@@ -1479,24 +1479,38 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         
         # print(f"{self.__class__.__name__}._slot_itemGuiObjectTitleChanged obj: {obj}, str: {val}")
         
-        
         item = self.getItemForObject(obj)
         
         if not isinstance(item, QtGui.QStandardItem):
             return
         
+    
         ttip = item.toolTip()
-        # print(f"{self.__class__.__name__}._slot_itemGuiObjectTitleChanged item toolTip: {ttip}")
         
         wtitle = f"Window: {obj.windowTitle()}"
+        
+        # print(f"{self.__class__.__name__}._slot_itemGuiObjectTitleChanged item ttip: {ttip}, wtitle: {wtitle}")
+        
         components = ttip.split("\n")
-        components.insert(0, wtitle)
+        if components[0].startswith("Window:"):
+            components[0] = wtitle
+        else:
+            components.insert(0, wtitle)
         wspace_name = components[-1]
         w = max(get_text_width(wtitle) * 2, get_text_width(wspace_name) * 2)
         # w = get_text_width(wspace_name) * 2
         tooltip = "\n".join(components)
         ttip = "\n".join([get_elided_text(s, w)
                             for s in components[:-1]] + [wspace_name])
+        
+        # print(f"{self.__class__.__name__}._slot_itemGuiObjectTitleChanged item toolTip: {tooltip}, ttip: {ttip}")
+        # return
+        
+        # NOTE: 2023-09-16 18:31:13
+        # block self from emitting itemChanged (triggered whenever some item has
+        # changed), to prevent symbol mangling in the workspace
+        signalBlocker = QtCore.QSignalBlocker(self)
+        
         item.setToolTip(ttip)
         item.setStatusTip(tooltip)
         item.setWhatsThis(tooltip)
@@ -1715,8 +1729,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # this causes a rename to the variables, which shouldn't happen; the
             # BUG is subtle and related to how the variables are assigned to symbols
             # in the workspace - clearly a flaw in how I designed all of this...
-            # if isinstance(data, QtWidgets.QWidget):
-            #     data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
+            if isinstance(data, QtWidgets.QWidget):
+                data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
 
     def updateRowFromProps(self, row, obj_props, background=None):
         """
@@ -1739,7 +1753,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # for col in range(self.columnCount()):
             for col in range(1, self.columnCount()):
                 # NOTE: 2021-07-28 10:42:17
-                # ATTENTION this emits itemChange signal thereby will trigger
+                # ATTENTION this emits itemChanged signal thereby will trigger
                 # code for displayed name change
                 self.setItem(rowindex, col, newrowdata[col])
 
@@ -1826,8 +1840,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # this causes a rename to the variables, which shouldn't happen; the
         # BUG is subtle and related to how the variables are assigned to symbols
         # in the workspace - clearly a flaw in how I designed all of this...
-        # if isinstance(data, QtWidgets.QWidget):
-        #     data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
+        if isinstance(data, QtWidgets.QWidget):
+            data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
         self.appendRow(v_row)  # append the row to the model
 
     def clearTable(self):

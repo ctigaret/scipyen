@@ -457,7 +457,7 @@ import neo
 import pyabf
 
 from core import quantities as scq
-from core import datatypes
+from core import datatypes, strutils
 from iolib import pictio as pio
 
 from pyabf.abf1.headerV1 import HeaderV1
@@ -563,7 +563,6 @@ class ABFEpoch:
         return self._level_
     
     @firstLevel.setter
-    # def level(self, val:typing.Union[float, pq.Quantity]):
     def firstLevel(self, val:typing.Optional[pq.Quantity] = None):
         if isinstance(val, pq.Quantity):
             assert (scq.check_electrical_current_units(val) or scq.check_electrical_potential_units(val)), f"Expecting a quantity in A or V; instead, got {val}"
@@ -618,6 +617,10 @@ class ABFEpoch:
     def pulsePeriod(self, val):
         assert isinstance(val, pq.Quantity) and scq.check_time_units(val), f"{val} is not a time quantity"
         self._pulsePeriod_ = val
+        
+    @property
+    def pulseFrequency(self):
+        return (1/self.pulsePeriod).rescale(pq.Hz)
         
     @property
     def pulseWidth(self):
@@ -677,7 +680,8 @@ class ABFEpochTable:
     and generates command waveforms and digital patterns when required.
     Also takes into account digital train pulses ("starred" patterns).
     """
-    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block], dacChannel:int,
+    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block], 
+                 dacChannel:int,
                  sweep:typing.Optional[int] = None):
         if isinstance(obj, pyabf.ABF):
             abfVer = obj.abfVersion["major"]
@@ -693,8 +697,10 @@ class ABFEpochTable:
                 
                 self.dacChannel = dacChannel
                 
-                self.DACName = obj.dacNames[dacChannel]
-                self.DACUnits = sqc.unit_quantity_from_name_or_symbol(obj.dacUnits[dacChannel])
+                dacName = obj.dacNames[dacChannel] if dacChannel in obj.dacNames else ""
+                dacUnits = obj.dacUnits[dacChannel] if dacChannel in obj.dacUnits else "mV"
+                self.DACName = dacName 
+                self.DACUnits = scq.unit_quantity_from_name_or_symbol(dacUnits)
                 self.nDataPointsPerSweep = obj.sweepPointCount
                 self.nDigitalOutputs = obj._dacSection._entryCount
                 self.samplingRate = float(obj.dataRate) * pq.Hz
@@ -738,43 +744,36 @@ class ABFEpochTable:
             self._init_epochs_abf_(obj)
             
         else:
-            assert self.dacChannel in obj.annotations["dictEpochInfoPerDAC"], f"DAC channel {self.dacChannel} is not used"
+            # assert self.dacChannel in obj.annotations["dictEpochInfoPerDAC"], f"DAC channel {self.dacChannel} is not used"
             
             # epochNums = list(obj.annotations["dictEpochInfoPerDAC"][self.dacChannel].keys())
             digPatterns = getDIGPatterns(obj)
-            dacEpochDict = obj.annotations["dictEpochInfoPerDAC"][self.dacChannel]
-            epochs = list()
-            for epochNum, epochDict in dacEpochDict.items():
-                epoch = ABFEpoch()
-                epoch.epochNumber = epochNum
-                epoch.epochType = epochDict["nEpochType"]
-                epoch.firstLevel = epochDict["fEpochInitLevel"] * self.DACUnits
-                epoch.levelDelta = epochDict["fEpochLevelInc"] * self.DACUnits
-                epoch.firstDuration = (epochDict["lEpochInitDuration"] / self.samplingRate).rescale(pq.ms)
-                epoch.deltaDuration = (epochDict["lEpochDurationInc"] / self.samplingRate).rescale(pq.ms)
-                epoch.pulsePeriod = (epochDict["lEpochPulsePeriod"] / self.samplingRate).rescale(pq.ms)
-                epoch.pulseWidth = (epochDict["lEpochPulseWidth"] / self.samplingRate).rescale(pq.ms)
-                epoch.hasAlternateDigitalOutputState = bool(obj.annotations["protocol"]["nAlternateDigitalOutputState"])
+            if self.dacChannel in obj.annotations["dictEpochInfoPerDAC"]:
+                dacEpochDict = obj.annotations["dictEpochInfoPerDAC"][self.dacChannel]
+                epochs = list()
+                for epochNum, epochDict in dacEpochDict.items():
+                    epoch = ABFEpoch()
+                    epoch.epochNumber = epochNum
+                    epoch.epochType = epochDict["nEpochType"]
+                    epoch.firstLevel = epochDict["fEpochInitLevel"] * self.DACUnits
+                    epoch.deltaLevel = epochDict["fEpochLevelInc"] * self.DACUnits
+                    epoch.firstDuration = (epochDict["lEpochInitDuration"] / self.samplingRate).rescale(pq.ms)
+                    epoch.deltaDuration = (epochDict["lEpochDurationInc"] / self.samplingRate).rescale(pq.ms)
+                    epoch.pulsePeriod = (epochDict["lEpochPulsePeriod"] / self.samplingRate).rescale(pq.ms)
+                    epoch.pulseWidth = (epochDict["lEpochPulseWidth"] / self.samplingRate).rescale(pq.ms)
+                    epoch.hasAlternateDigitalOutputState = bool(obj.annotations["protocol"]["nAlternateDigitalOutputState"])
+                    
+                    if self.dacChannel == obj.annotations["protocol"]["nActiveDACChannel"] or epoch.hasAlternateDigitalOutputState:
+                        epoch.mainDigitalPattern = digPatterns[epoch.epochNumber]["main"]
+                        epoch.alternateDigitalPattern = digPatterns[epoch.epochNumber]["alternate"]
+                        if obj.annotations["listDACInfo"][self.dacChannel]["nWaveformEnable"] == 1:
+                            epoch.useAlternateDigitalPattern = False
+                        else:
+                            epoch.useAlternateDigitalPattern = True
                 
-                # epoch.mainDigitalPattern = digPatterns[epoch.epochNumber]["main"]
-                # epoch.alternateDigitalPattern = digPatterns[epoch.epochNumber]["alternate"]
-                #
-                # if obj.annotations["listDACInfo"][self.dacChannel]["nWaveformEnable"] == 1:
-                #     epoch.useAlternateDigitalPattern = True
-                # else:
-                #     epoch.useAlternateDigitalPattern = False
+                    epochs.append(epoch)
                 
-                if self.dacChannel == obj.annotations["protocol"]["nActiveDACChannel"] or epoch.hasAlternateDigitalOutputState:
-                    epoch.mainDigitalPattern = digPatterns[epoch.epochNumber]["main"]
-                    epoch.alternateDigitalPattern = digPatterns[epoch.epochNumber]["alternate"]
-                    if obj.annotations["listDACInfo"][self.dacChannel]["nWaveformEnable"] == 1:
-                        epoch.useAlternateDigitalPattern = False
-                    else:
-                        epoch.useAlternateDigitalPattern = True
-            
-                epochs.append(epoch)
-                
-            self._epochs_ = epochs
+                self._epochs_ = epochs
             
     def _init_epochs_abf_(self, obj):
         # NOTE: no digital patterns in ABFv1 ?
@@ -821,42 +820,31 @@ class ABFEpochTable:
                 epoch.epochNumber = obj._epochPerDacSection.nEpochNum[i]
                 epoch.epochType = obj._epochPerDacSection.nEpochType[i]
                 epoch.firstLevel = obj._epochPerDacSection.fEpochInitLevel[i] * self.DACUnits
-                epoch.levelDelta = obj._epochPerDacSection.fEpochLevelInc[i] * self.DACUnits
+                epoch.deltaLevel = obj._epochPerDacSection.fEpochLevelInc[i] * self.DACUnits
                 epoch.firstDuration = (obj._epochPerDacSection.lEpochInitDuration[i] / self.samplingRate).rescale(pq.ms)
                 epoch.deltaDuration = (obj._epochPerDacSection.lEpochDurationInc[i] / self.samplingRate).rescale(pq.ms)
                 epoch.pulsePeriod = (obj._epochPerDacSection.lEpochPulsePeriod[i] / self.samplingRate).rescale(pq.ms)
                 epoch.pulseWidth = (obj._epochPerDacSection.lEpochPulseWidth[i] / self.samplingRate).rescale(pq.ms)
                 epoch.hasAlternateDigitalOutputState = bool(obj._protocolSection.nAlternateDigitalOutputState)
 
-                if epochDacNum == obj._protocolSection.nActiveDACChannel:
+                if epochDacNum == obj._protocolSection.nActiveDACChannel or epoch.hasAlternateDigitalOutputState:
                     epoch.mainDigitalPattern = digPatterns[epoch.epochNumber]["main"]
-                    epoch.alternateDigitalPattern = digPatterns[epoch.epochNUmber]["alternate"]
+                    epoch.alternateDigitalPattern = digPatterns[epoch.epochNumber]["alternate"]
                     if obj._dacSection.nWaveformEnable[self.dacChannel] == 1:
                         epoch.useAlternateDigitalPattern = False
                     else:
                         epoch.useAlternateDigitalPattern = True
                     
-                    # TODO: 2023-09-14 16:00:06
-                    # figure out if the epoch is using an alternate pattern or 
-                    # not
-                    #
-                    # I guess this relies on:
-                    # 1. whether alternate Digital outouts are used: prrotocolSection.nAlternateDigitalOutputState
-                    # 2. current sweep number (odd/even) with even numbers (0,2,4, etc)
-                    #   using the main pattern, and the odd numbers (1,3,5, etc)
-                    #   using the aplternate pattern
-                    # iCh = len(epochs)
-                    # digitalOutValue = abf._epochSection.nEpochDigitalOutput[iCh]
-                    # epoch.digitalPattern = self._valToBitList(digitalOutValue)
-                # else:
-                #     epoch.digitalPattern = self._valToBitList(0)
                 epochs.append(epoch)
+                
+            self._epochs_ = epochs
 
         else:
             raise NotImplementedError(f"ABf version {abfVer} is not supported")
             
     @property
     def returnToHold(self) -> bool:
+        """When True, the command waveform returns to self.DACHoldingLevel after the last defined epoch"""
         return self.nInterEpisodeLevel
     
     @property
@@ -942,35 +930,91 @@ class ABFEpochTable:
         rowIndex = ["Type", "First Level", "Delta Level",
                     "First duration", "Delta Duration",
                     "Digital Pattern #3-0", "Digital Pattern #7-4", 
-                    "Train Period", "Pulse Width"]
+                    "Train Period", "Train Rate", "Pulse Width"]
         
         epochData = dict()
         
         for i, epoch in enumerate(self.epochs):
-            epValues = np.array([epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
-                                 epoch.firstDuration, epoch.deltaDuration,
-                                 "".join(map(str, epoch.digitalPattern[0])), 
-                                 "".join(map(str, epoch.digitalPattern[1])),
-                                 epoch.pulsePeriod, epoch.pulseWidth])
+            epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
+                        epoch.firstDuration, epoch.deltaDuration,
+                        "".join(map(str, epoch.digitalPattern[0])), 
+                        "".join(map(str, epoch.digitalPattern[1])),
+                        epoch.pulsePeriod, epoch.pulseFrequency,
+                        epoch.pulseWidth]
             
             epochData[epoch.epochLetter] = epValues
             
         return pd.DataFrame(epochData, index = rowIndex)
+    
+    def getEpoch(self, e:typing.Union[str, int]):
+        if isinstance(e, str):
+            e = epochNumberFromLetter(e)
+            
+        if e < 0 or e >= len(self.epochs):
+            return
         
+        return self.epochs[e]
+    
+    @property
+    def holdingTime(self) -> pq.Quantity:
+        samplingPeriod = (1/self.samplingRate).rescale(pq.s)
+        return int(self.nDataPointsPerSweep/64) * samplingPeriod
+    
+    def stimulusWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
+        waveform = neo.AnalogSignal(np.full((self.nDataPointsPerSweep, 1), 0.),
+                                    units = self.DACUnits, t_start = 0*pq.s,
+                                    sampling_rate = self.samplingRate,
+                                    name = self.DACName)
+        # if len(self.epochs) == 0:
+        #     return waveform
+        
+        t0 = t1 = self.holdingTime.rescale(pq.s)
+        
+        for epoch in self.epochs:
+            actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+            actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
+
+            t1 = t0 + actualDuration
+            
+            # TODO 2023-09-17 00:06:08
+            # other epoch types as well
+            
+            # TODO: 2023-09-17 00:19:50
+            # take account of alternate waveforms -> FIXME define relevant attribute in __init__ !!!
+            if epoch.epochType == ABFEpochType.Step:
+                tt = np.array([t0,t1])*pq.s
+                ndx = waveform.time_index(tt)
+                waveform[ndx[0]:ndx[1]+1,0] = actualLevel
+                
+            t0 = t1
+            
+                
+        return waveform
+    
+    def digitalWaveform(self) -> neo.AnalogSignal:
+        # TODO: 2023-09-17 00:20:07
+        pass
+        
+        
+        
+        
+def epochNumberFromLetter(x:str) -> int:
+    """The inverse function of epochLetter()"""
+    from core import strutils
+    return strutils.lettersToOrdinal(x)
 
 def epochLetter(epochNumber:int):
+    from core import strutils
+    return strutils.ordinalToLetters(epochNumber)
     # from pyabf.waveform.Epoch
-    if epochNumber < 0:
-        return "?"
-    letter = ""
-    while epochNumber >= 0:
-        letter += chr(epochNumber % 26 + 65)
-        epochNumber -= 26
-        
-    return letter
-
-def getABFEpochTable():
-    pass
+#     if epochNumber < 0:
+#         return "?"
+#     letter = ""
+#     while epochNumber >= 0:
+#         letter += chr(epochNumber % 26 + 65)
+#         epochNumber -= 26
+#         
+#     return letter
 
 def __wrap_to_quantity__(x:typing.Union[list, tuple], convert:bool=True):
     return (x[0], unitStrAsQuantity(x[1])) if convert else x
@@ -1023,7 +1067,7 @@ def getABF(obj:typing.Union[str, neo.Block]):
         warning.warn(f"{filename} is not an Axon file")
         
 def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dict:
-    """Return a specified ABF section as a dict.
+    """Return a specific section from a pyabf.ABF object, as a dict.
     The section's type is specified as a string (case-insensitive) which can be
     one of:
     'adc'
@@ -1399,12 +1443,12 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
         
 @singledispatch
-def getABFEpochsTable(o, sweep:typing.Optional[int]=None,
+def getABFEpochTable(o, sweep:typing.Optional[int]=None,
                       dacChannel:typing.Optional[int] = None,
                       as_dataFrame:bool=False, allTables:bool=False) -> list:
     raise NotImplementedError(f"This function does not support {type(o).__name__} objects")
 
-@getABFEpochsTable.register(pyabf.ABF)
+@getABFEpochTable.register(pyabf.ABF)
 def _(x:pyabf.ABF, sweep:typing.Optional[int]=None,
                       dacChannel:typing.Optional[int] = None,
                       as_dataFrame:bool=False, allTables:bool=False) -> list:
@@ -1457,6 +1501,12 @@ def _(x:pyabf.ABF, sweep:typing.Optional[int]=None,
             sweepTables.append(etables)
             
     return sweepTables
+
+@getABFEpochTable.register(neo.Block)
+def _(x:neo.Block, sweep:typing.Optional[int]=None,
+                      dacChannel:typing.Optional[int] = None,
+                      as_dataFrame:bool=False, allTables:bool=False) -> list:
+    pass
     
 @singledispatch
 def epochTable2DF(obj, src) -> pd.DataFrame:
@@ -1575,7 +1625,7 @@ def _(data:neo.Block):
         # of the pyabf.ABF object;
         # in the annotations, these are stored as follows:
         # dataPointCount    → ["sections"]["DataSection"]["llNumEntries"]
-        # sweepCount        → ["lActualEpisodes"]
+        # sweepCount        → ["lActualEpisodes"] = ["protocol"]["lEpisodesPerRun"]
         # channelCount      → ["sections"]["ADCSection"]["llNumEntries"]
         sweepPointCount = data.annotations["sections"]["DataSection"]["llNumEntries"] / data.annotations["lActualEpisodes"] / data.annotations["sections"]["ADCSection"]["llNumEntries"]
         

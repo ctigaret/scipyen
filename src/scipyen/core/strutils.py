@@ -8,6 +8,7 @@ import sys
 import typing
 import keyword
 import string
+import itertools
 import ast
 import re as _re
 from numbers import (Number, Real,)
@@ -75,7 +76,62 @@ The regexp metacharacters are:
     
 """
     return isinstance(s, str) and any(c in s for c in REGEXP_METACHARACTERS)
-        
+
+def ordinalToLetters(x:int, upperCase:bool=True):
+    """Returns a string given an integer ordinal `x`.
+
+    The string is the element with index `x` from the complete ascii sequence¹
+    extended with its own cartesian product i.e.:
+    'A', 'B', … 'B', 'AA', 'AB', … 'ZZ'
+
+
+    E.g., 0 → 'A', 30 → 'AE', etc … up to 701 → 'ZZ'
+
+    Returns '?' if x < 0 or x >= 702
+
+    ¹⁾ Either upper (default) or lower case, depending on the value of the 
+    `upperCase` parameter.
+
+"""
+    if x < 0:
+        return '?'
+    
+    l = list(string.ascii_uppercase if upperCase else string.ascii_lowercase)
+    
+    ll = list(itertools.product(l,l))
+    
+    l.extend(ll)
+    
+    if x >= len(l):
+        return "?"
+    
+    return "".join(list(l[x]))
+
+ordinal2letters = ordinalToLetters
+
+def lettersToOrdinal(x:str):
+    """The inverse of ordinalToLetters.
+    Case-insensitive.
+
+    Returns -1 if `x` is nto of the form '𝒙' or '𝒙𝒚' where 𝒙 and 𝒚 are characters
+    in the complete ascii set (upper or lower case)
+    """
+
+    x = tuple(x.lower())
+    
+    l = list(string.ascii_lowercase)
+    
+    ll = list(itertools.product(l,l))
+    
+    l.extend(ll)
+    
+    if x not in l:
+        return -1
+    
+    return l.index(x)
+
+letters2ordinal = lettersToOrdinal
+    
 def str2sequence(s:str) -> typing.List[str]:
     """Parses the string representation of a sequence into a sequence of strings"""
     possibleSequence = False

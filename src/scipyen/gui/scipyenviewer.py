@@ -16,6 +16,7 @@ from core.utilities import safeWrapper
 #                            saveWindowSettings, loadWindowSettings)
 from .workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
+from gui.workspacemodel import WorkspaceModel
 from core import sysutils
 from iolib import pictio as pio
 from pandas import NA
@@ -284,6 +285,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self._wm_id_ = int(self.winId())
         
         self._app_menu_ = self.getAppMenu()
+        
+        # if hasattr(self._scipyenWindow_, "workspaceModel") and isinstance(self._scipyenWindow_.workspaceModel, WorkspaceModel):
+        #     self.windowTitleChanged.connect(self._scipyenWindow_.workspaceModel._slot_itemGuiObjectTitleChanged)
         
         # if self.appWindow is self.scipyenWindow: # both attributes inherited from WorkspaceGuiMixin
         #     self.appWindow.registerWindow(self)
