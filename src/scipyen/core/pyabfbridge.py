@@ -685,6 +685,19 @@ class ABFDACConfiguration:
     and generates command waveforms and digital patterns when required.
     Also takes into account digital train pulses ("starred" patterns).
     """
+    # NOTE: 2023-09-17 23:41:15
+    # index of the DAC where Digital output IS enabled is given by 
+    #   annotations["protocol"]["nActiveDACChannel"]
+    #       (counter-intuitive: expecting to see this from nDigitalDACChannel and nDigitalEnable
+    #       but these seem to be 0 and 1 regardless of which DAC has waveform enebaled and dig enabled)
+    #
+    # index of the DAC where waveform is enabled is the κ index in annotations["listDACInfo"],
+    # where 
+    #   annotations["listDACInfo"][κ]["nWaveformEnable"] == 1
+    # 
+    # there are the following possibilities:
+    # Alt waveform  | Alt Dig | DAC waveform enabled | DAC Digital output enabled
+    #----------------------------------------------------------------------------
     def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block], 
                  dacChannel:int,
                  sweep:typing.Optional[int] = None):
@@ -713,10 +726,11 @@ class ABFDACConfiguration:
                 self._samplingRate_ = float(obj.dataRate) * pq.Hz
                 self._dacHoldingLevel_ = float(obj._dacSection.fDACHoldingLevel[dacChannel]) * self._dacUnits_
                 self._interEpisodeLevel_ = bool(obj._dacSection.nInterEpisodeLevel[dacChannel])
+                self._waveformEnabled_ = bool(obj._dacSection.nWaveformEnable)
+                # self._digOutEnabled_ = self._dacChannel_ == obj._protocolSection.nDigitalEnable
+                self._digOutEnabled_ = self._dacChannel_ == obj._protocolSection.nActiveDACChannel
                 self._hasAltDigOutState_ = bool(obj._protocolSection.nAlternateDigitalOutputState)
                 self._hasAltDacOutState_ = bool(obj._protocolSection.nAlternateDACOutputState)
-                self._waveformEnabled_ = bool(obj._dacSection.nWaveformEnable)
-                self._digOutEnabled_ = self._dacChannel_ == obj._protocolSection.nDigitalEnable
             else:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
             
@@ -736,12 +750,12 @@ class ABFDACConfiguration:
             self._nDigitalOutputs_ = obj.annotations["sections"]["DACSection"]["llNumEntries"]
             self._samplingRate_ = float(obj.annotations["sampling_rate"]) * pq.Hz
             self._dacHoldingLevel_ = float(obj.annotations["listDACInfo"][dacChannel]["fDACHoldingLevel"]) * self._dacUnits_
+            
             self._interEpisodeLevel_ = bool(obj.annotations["listDACInfo"][dacChannel]["nInterEpisodeLevel"])
+            self._waveformEnabled_ = bool(obj.annotations["listDACInfo"][self._dacChannel_]["nWaveformEnable"])
+            self._digOutEnabled_ = self._dacChannel_ == obj.annotations["protocol"]["nActiveDACChannel"])
             self._hasAltDigOutState_ = bool(obj.annotations["protocol"]["nAlternateDigitalOutputState"])
             self._hasAltDacOutState_ = bool(obj.annotations["protocol"]["nAlternateDACOutputState"])
-            self._waveformEnabled_ = bool(obj.annotations["listDACInfo"][self._dacChannel_]["nWaveformEnable"])
-            self._digOutEnabled_ =bool()
-            self._isActiveDACChannel_ = self._dacChannel_ == obj.annotations["protocol"]["nActiveDACChannel"]
         else:
             raise TypeError(f"Expecting an ABF or a neo.Block sourced from an ABF file; instead, got {type(obj).__name__}")
     
