@@ -712,22 +712,22 @@ def name_from_unit(u, as_key:bool=False):
                     if len(physQuants):
                         physQname = physQuants[0]
                         if physQname == "electromagnetism":
-                            if "ampere" in d_name:
+                            if "ampere" in d_name.lower():
                                 return "Current" if not as_key else "I"
                             
-                            if "coulomb" in d_name:
+                            if "coulomb" in d_name.lower():
                                 return "Charge" if not as_key else "Q"
                             
-                            if "farad" in d_name:
+                            if "farad" in d_name.lower():
                                 return "Capacitance" if not as_key else "C"
                             
-                            if "volt" in d_name:
+                            if "volt" in d_name.lower():
                                 return "Potential" if not as_key else "Psi"
                                 
-                            if "siemens" in d_name:
+                            if "siemens" in d_name.lower():
                                 return "Conductance" if not as_key else "G"
                                 
-                            if "ohm" in d_name:
+                            if "ohm" in d_name.lower():
                                 return "Resistance" if not as_key else "R"
                                 
                         return physQname.capitalize() if not as_key else physQname[0].upper()
@@ -911,3 +911,9 @@ def unit_quantity_from_name_or_symbol(s):
             
         return ret
         
+def nSamples(t:pq.Quantity, s:pq.Quantity) -> int:
+    """Returns the number of samples in a time interval `t` for sampling rate `s`"""
+    assert isinstance(t, pq.Quantity) and check_time_units(t), f"{t} should be a time quantity (i.e. a 'duration')"
+    assert isinstance(s, pq.Quantity) and check_time_units(1./s), f"sampling rate {s} is not a frequency quantity"
+    return int(t.rescale(pq.s) * s.rescale(pq.Hz))
+    
