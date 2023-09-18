@@ -2587,8 +2587,9 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     
     vals = list(x.values()) # bypass the errors raise when comparing np.arrays
     
-    if any(isinstance(v, np.ndarray) for v in vals) or isinstance(y, np.ndarray):
+    if any(isinstance(v, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)) for v in vals) or isinstance(y, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)):
         testincluded = any(safe_identity_test(y,v) for v in vals)
+        
     else:
         testincluded = y in x.values()
     
