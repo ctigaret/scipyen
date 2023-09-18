@@ -897,7 +897,7 @@ class ABFDACConfiguration:
             
     @property
     def returnToHold(self) -> bool: 
-        """When True, the command waveform returns to self._dacHoldingLevel_ after the last defined epoch"""
+        """When False, the command waveform returns to self._dacHoldingLevel_ after the last defined epoch"""
         return self._interEpisodeLevel_
     
     @returnToHold.setter
@@ -1248,13 +1248,22 @@ class ABFDACConfiguration:
                                     sampling_rate = self._samplingRate_,
                                     name = self._dacName_)
         
-        waveform = neo.AnalogSignal(np.full((self._nDataPointsPerSweep_, 1), float(self.dacHoldingLevel.magnitude)),
+        holdingLevel = float(self.dacHoldingLevel.magnitude)
+        waveform = neo.AnalogSignal(np.full((self._nDataPointsPerSweep_, 1), float(holdingLevel)),
                                     units = self._dacUnits_, t_start = 0*pq.s,
                                     sampling_rate = self._samplingRate_,
                                     name = self._dacName_)
         
         if self.analogWaveformSource == ABFDACWaveformSource.epochs:
+            if len(epochs) == 0:
+                return waveform
+            
             t0 = t1 = self.holdingTime.rescale(pq.s)
+            
+            epochsEndLevels = [e.firstLevel + sweep * epoch.deltaLevel for e in self.epochs]
+            
+            prevLevel = holdingLevel
+            
             
             for epoch in self.epochs:
                 actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
@@ -1272,6 +1281,8 @@ class ABFDACConfiguration:
                     ndx = waveform.time_index(tt)
                     waveform[ndx[0]:ndx[1]+1,0] = actualLevel
                     
+                prevLevel = actualLevel
+                
                 t0 = t1
         
         else:
