@@ -1972,18 +1972,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             #self.activateWindow()
         #super().mousePressEvent(evt)
 
-    #def activateWindow(self):
-        ## print(f"{self.__class__.__name__}.activateWindow")
-        ##super().activateWindow()
-        #if sys.platform== "win32":
-            ## flags = self.windowFlags();
-            ## self.show(); # Restore from systray
-            ## self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
-            #self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
-            #self.show();
-            ##self.raise_()
-        #else:
-            #super().activateWindow()
+    def activateWindow(self):
+        # print(f"{self.__class__.__name__}.activateWindow")
+        #super().activateWindow()
+        if sys.platform== "win32":
+            self.windowHandle().raise_()
+            # flags = self.windowFlags();
+            # self.show(); # Restore from systray
+            # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
+            # self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
+            # self.show();
+            #self.raise_()
+        else:
+            super().activateWindow()
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):

@@ -223,7 +223,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # from the global appmenu(*) - as expected, I guess.
         #
         # The actual problem is that when the window is shown again (e.g. by 
-        # calling any of the show(), setVisible(),  raise_(), activateWidow()
+        # calling any of the show(), setVisible(),  raise_(), activateWindow()
         # methods) its menubar is not shown again in the global menu
         # 
         # *) or the "system-wide menu bar"
@@ -297,10 +297,11 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             #self.activateWindow()
         #super().mousePressEvent(evt)
 
-    #def activateWindow(self):
-        #super().activateWindow()
-        #if sys.platform== "win32":
-            #self.raise_()
+    def activateWindow(self):
+        if sys.platform== "win32":
+            self.windowHandle().raise_()
+        else:
+            super().activateWindow()
         
     def getAppMenu(self):
         if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
