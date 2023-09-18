@@ -1060,6 +1060,107 @@ class ABFDACConfiguration:
     def epochPulseCount(self, epoch:ABFEpoch, sweep:int = 0) -> int:
         return int(self.epochActualDuration(epoch,sweep)/epoch.pulsePeriod)
     
+    def epochWaveform(self, epoch:ABFEpoch, previousLevel:pq.Quantity, 
+                      sweep:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
+        actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+        epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
+        actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
+        
+        # print(f"self.__class__.__name__}.epochWaveform epoch {epoch.epochNumber} ({epoch.epochLetter}) type {epoch.epochType} sample count {epochSamplesCount}")
+        
+        if epoch.epochType == ABFEpochType.Step:
+            wave = actualLevel if lastLevelOnly else np.full([epochSamplesCount, 1], float(actualLevel)) * self.dacUnits
+        
+        elif epoch.epochType == ABFEpochType.Ramp:
+            wave = actualLevel if lastLevelOnly else np.linspace(previousLevel, actualLevel, epochSamplesCount)[:,np.newaxis]
+            
+        elif epoch.epochType == ABFEpochType.Pulse:
+            pulsePeriod = self.epochPulsePeriodSamples(epoch)
+            pulseSamples = self.epochPulseWidthSamples(epoch)
+            pulseCount = self.epochPulseCount(epoch)
+            
+            if lastLevelOnly:
+                wave = actualLevel
+            else:
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.dacUnits
+                
+                for pulse in range(pulseCount):
+                    p1 = int(pulsePeriod * pulse)
+                    p2 = int(p1 + pulseSamples)
+                    wave[p1:p2] = actualLevel
+                        
+        elif epoch.epochType == ABFEpochType.Triangular:
+            pulsePeriod = self.epochPulsePeriodSamples(epoch)
+            pulseSamples = self.epochPulseWidthSamples(epoch)
+            pulseCount = self.epochPulseCount(epoch)
+            
+            if lastLevelOnly:
+                wave = actualLevel
+            else:
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.dacUnits
+                            
+                for pulse in range(pulseCount):
+                    p1 = int(pulsePeriod * pulse)
+                    p2 = int(p1 + pulseSamples)
+                    p3 = int(p1 + pulsePeriod)
+                    
+                    wave[p1:p2] = np.linspace(previousLevel, actualLevel, pulseSamples)[:,np.newaxis]
+                    wave[p2:p3] = np.linspace(actualLevel, previousLevel, int(pulsePeriod - pulseSamples))[:,np.newaxis]
+            
+        elif epoch.epochType == ABFEpochType.Cosine:
+            if lastLevelOnly:
+                wave = actualLevel
+            else:
+                pulseCount = self.epochPulseCount(epoch)
+                levelDelta = float(actualLevel) - float(previousLevel)
+                values = np.linspace(0, 2*pulseCount*np.pi, epochSamplesCount) + np.pi
+                cosines = (np.cos(values) * levelDelta / 2 + levelDelta/2 ) * self.dacUnits + previousLevel
+                wave = cosines[:, np.newaxis]
+            
+        elif epoch.epochType == ABFEpochType.Biphasic:
+            pulsePeriod = self.epochPulsePeriodSamples(epoch)
+            pulseSamples = self.epochPulseWidthSamples(epoch)
+            pulseCount = self.epochPulseCount(epoch)
+            levelDelta = actualLevel - previousLevel
+            
+            if lastLevelOnly:
+                wave = actualLevel
+            else:
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.dacUnits
+                # waveform[ndx[0]:ndx[1],0] = previousLevel
+                
+                for pulse in range(pulseCount):
+                    p1 = int(pulsePeriod * pulse)
+                    p3 = int(p1 + pulseSamples)
+                    p2 = int((p1+p3)/2)
+                    wave[p1:p2] = previousLevel + levelDelta
+                    wave[p2:p3] = previousLevel - levelDelta
+                    # waveform[p1:p2,0] = previousLevel + levelDelta
+                    # waveform[p2:p3,0] = previousLevel - levelDelta
+            
+        else:
+            wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.dacUnits
+            
+        return wave
+    
+    def getPreviousSweepLastEpochLevel(self, sweep:int) -> pq.Quantity:
+        # FIXME: 2023-09-18 23:34:27
+        # this can become very expensive for many sweeps!
+        if len(self.epochs) == 0 or sweep == 0:
+            return self.dacHoldingLevel
+        
+        if self.returnToHold:
+            prevLevel = self.dacHoldingLevel
+            for s in range(sweep):
+                for e in self.epochs:
+                    prevLevel = self.epochWaveform(e, prevLevel, s, True)
+                    
+            return prevLevel
+        
+        return self.dacHoldingLevel
+            
+            
+    
     def epochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) ->tuple:
         """Returns the digital pattern that WOULD be output by the epoch.
         This depends, simultaneously, on the following conditions:
@@ -1228,7 +1329,6 @@ class ABFDACConfiguration:
         return int(self._nDataPointsPerSweep_/64) * samplingPeriod
     
     def dacAnalogWaveform(self, sweep:int) -> neo.AnalogSignal:
-        
         return self.dacCommandWaveform(sweep)
     
     def dacCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
@@ -1248,42 +1348,117 @@ class ABFDACConfiguration:
                                     sampling_rate = self._samplingRate_,
                                     name = self._dacName_)
         
-        holdingLevel = float(self.dacHoldingLevel.magnitude)
-        waveform = neo.AnalogSignal(np.full((self._nDataPointsPerSweep_, 1), float(holdingLevel)),
-                                    units = self._dacUnits_, t_start = 0*pq.s,
-                                    sampling_rate = self._samplingRate_,
-                                    name = self._dacName_)
+        # holdingLevel = float(self.dacHoldingLevel.magnitude)
         
         if self.analogWaveformSource == ABFDACWaveformSource.epochs:
-            if len(epochs) == 0:
-                return waveform
+            
+            if len(self.epochs) == 0:
+                return neo.AnalogSignal(np.full((self._nDataPointsPerSweep_, 1), float(holdingLevel)),
+                                        units = self._dacUnits_, t_start = 0*pq.s,
+                                        sampling_rate = self._samplingRate_,
+                                        name = self._dacName_)
+            
+            if sweep > 0 and self.returnToHold:
+                # is the waveform of a subsequent sweep is sought, and returnToHold
+                # is True, then we need the level of the last epoch in the "previous"
+                # sweep
+                # previousLevel = self.epochs[-1].firstLevel + self.epochs[-1].deltaLevel * (sweep-1)
+                previousLevel = self.getPreviousSweepLastEpochLevel(sweep)
+            else:
+                previousLevel = self.dacHoldingLevel
+            
+            waveform = neo.AnalogSignal(np.full((self._nDataPointsPerSweep_, 1), float(previousLevel)),
+                                        units = self._dacUnits_, t_start = 0*pq.s,
+                                        sampling_rate = self._samplingRate_,
+                                        name = self._dacName_)
             
             t0 = t1 = self.holdingTime.rescale(pq.s)
             
-            epochsEndLevels = [e.firstLevel + sweep * epoch.deltaLevel for e in self.epochs]
-            
-            prevLevel = holdingLevel
-            
-            
             for epoch in self.epochs:
                 actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+                epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
                 actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
 
                 t1 = t0 + actualDuration
+                tt = np.array([t0,t1])*pq.s
+                ndx = waveform.time_index(tt)
+                
+                wave = self.epochWaveform(epoch, previousLevel, sweep)
+                
+                waveform[ndx[0]:ndx[1],0] = wave
+                
+                previousLevel = actualLevel
+                t0 = t1
+                
+            if self.returnToHold:
+                waveform[ndx[1]:, 0] = previousLevel
                 
                 # TODO 2023-09-17 00:06:08
-                # other epoch types as well
-                
-                # TODO: 2023-09-17 00:19:50
-                # take account of alternate waveforms -> FIXME define relevant attribute in __init__ !!!
-                if epoch.epochType == ABFEpochType.Step:
-                    tt = np.array([t0,t1])*pq.s
-                    ndx = waveform.time_index(tt)
-                    waveform[ndx[0]:ndx[1]+1,0] = actualLevel
+#                 # other epoch types as well
+#                 
+#                 # TODO: 2023-09-17 00:19:50
+#                 # take account of alternate waveforms -> FIXME define relevant attribute in __init__ !!!
+#                 if epoch.epochType == ABFEpochType.Step:
+#                     # print(f"self.__class__.__name__}.dacCommandWaveform epoch {epoch.epochNumber} ({epoch.epochLetter}) type {epoch.epochType}\n\tStep samples: {ndx[1]-ndx[0]}, sample count {epochSamplesCount}")
+#                     waveform[ndx[0]:ndx[1],0] = actualLevel
+#                     
+#                 elif epoch.epochType == ABFEpochType.Ramp:
+#                     waveform[ndx[0]:ndx[1],0] = np.linspace(previousLevel, actualLevel, epochSamplesCount)[:, np.newaxis]# * self.dacUnits
+#                     
+#                 elif epoch.epochType == ABFEpochType.Pulse:
+#                     pulsePeriod = self.epochPulsePeriodSamples(epoch)
+#                     pulseSamples = self.epochPulseWidthSamples(epoch)
+#                     pulseCount = self.epochPulseCount(epoch)
+#                     
+#                     waveform[ndx[0]:ndx[1],0] = previousLevel
+#                     
+#                     for pulse in range(pulseCount):
+#                         p1 = int(pulsePeriod * pulse) + ndx[0]
+#                         p2 = int(p1 + pulseSamples)
+#                         waveform[p1:p2,0] = actualLevel
+#                         
+#                 elif epoch.epochType == ABFEpochType.Triangular:
+#                     pulsePeriod = self.epochPulsePeriodSamples(epoch)
+#                     pulseSamples = self.epochPulseWidthSamples(epoch)
+#                     pulseCount = self.epochPulseCount(epoch)
+#                     
+#                     waveform[ndx[0]:ndx[1],0] = previousLevel
+#                     
+#                     for pulse in range(pulseCount):
+#                         p1 = int(pulsePeriod * pulse) + ndx[0]
+#                         p2 = int(p1 + pulseSamples)
+#                         p3 = int(p1 + pulsePeriod)
+#                         
+#                         waveform[p1:p2,0] = np.linspace(previousLevel, actualLevel, pulseSamples)[:,np.newaxis]
+#                         waveform[p2:p3,0] = np.linspace(actualLevel, previousLevel, int(pulsePeriod - pulseSamples))[:,np.newaxis]
+#                         
+#                 elif epoch.epochType == ABFEpochType.Cosine:
+#                     # print(f"{self.__class__.__name__}.dacCommandWaveform epoch {epoch.epochNumber} ({epoch.epochLetter}) type {epoch.epochType}")
+#                     pulseCount = self.epochPulseCount(epoch)
+#                     levelDelta = float(actualLevel) - float(previousLevel)
+#                     values = np.linspace(0, 2*pulseCount*np.pi, epochSamplesCount) + np.pi
+#                     cosines = (np.cos(values) * levelDelta / 2 + levelDelta/2 ) * self.dacUnits + previousLevel
+#                     waveform[ndx[0]:ndx[1],0] = cosines[:, np.newaxis]
+#                     
+#                 elif epoch.epochType == ABFEpochType.Biphasic:
+#                     pulsePeriod = self.epochPulsePeriodSamples(epoch)
+#                     pulseSamples = self.epochPulseWidthSamples(epoch)
+#                     pulseCount = self.epochPulseCount(epoch)
+#                     levelDelta = actualLevel - previousLevel
+#                     
+#                     waveform[ndx[0]:ndx[1],0] = previousLevel
+#                     
+#                     for pulse in range(pulseCount):
+#                         p1 = int(pulsePeriod * pulse) + ndx[0]
+#                         p3 = int(p1 + pulseSamples)
+#                         p2 = int((p1+p3)/2)
+#                         waveform[p1:p2,0] = previousLevel + levelDelta
+#                         waveform[p2:p3,0] = previousLevel - levelDelta
                     
-                prevLevel = actualLevel
-                
-                t0 = t1
+                # if epoch.epochType != ABFEpochType.Biphasic:
+                #     previousLevel = actualLevel
+                    
+                # t0 = t1
         
         else:
             # TODO: 2023-09-18 15:44:03
