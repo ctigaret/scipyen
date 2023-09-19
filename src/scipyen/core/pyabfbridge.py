@@ -73,7 +73,7 @@ abf.stimulusFilefolder : str, the fully qualifies path to the folder where the
 abf.holdingCommand: list with nDAC channel elements; holds the holding value in 
     each DAC (whether the DAC it is used or not)
     
-    this is effectivelyan alias to abf._dacSection.fDACHoldingLevel
+    this is effectively an alias to abf._dacSection.fDACHoldingLevel
     
     len(abf.holdingCommand) = abf._dacSection._entryCount = len(annotations["listDACInfo"])
     
@@ -723,7 +723,6 @@ class ABFDACConfiguration:
                 self._dacName_ = dacName 
                 self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
                 self._nDataPointsPerSweep_ = obj.sweepPointCount
-                self._nDigitalOutputs_ = obj._dacSection._entryCount
                 self._samplingRate_ = float(obj.dataRate) * pq.Hz
                 self._dacHoldingLevel_ = float(obj._dacSection.fDACHoldingLevel[dacChannel]) * self._dacUnits_
                 self._interEpisodeLevel_ = bool(obj._dacSection.nInterEpisodeLevel[dacChannel])
@@ -740,10 +739,13 @@ class ABFDACConfiguration:
                     self._waveformSource_ = ABFDACWaveformSource.none
                     
                 
-                # digital (TTL) waveform flags:
+                # digital (TTL) waveform flags & parameters:
+                self._nDigitalOutputs_ = obj._dacSection._entryCount
                 self._digOutEnabled_ = self._dacChannel_ == obj._protocolSection.nActiveDACChannel
                 self._hasAltDigOutState_ = bool(obj._protocolSection.nAlternateDigitalOutputState)
-                
+                self._digTrainActiveHi_ = bool(obj._protocolSection.nDigitalTrainActiveLogic)
+                self._digHolding_ = obj._protocolSection.nDigitalHolding
+                self._digUseLastEpochHolding_ = bool(obj._protocolSection.nDigitalInterEpisode)
             else:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
             
@@ -760,7 +762,6 @@ class ABFDACConfiguration:
             nTotalDataPoints = obj.annotations["sections"]["DataSection"]["llNumEntries"]
             self._nDataPointsPerSweep_ = int(nTotalDataPoints/nSweeps/nADCChannels)
             
-            self._nDigitalOutputs_ = obj.annotations["sections"]["DACSection"]["llNumEntries"]
             self._samplingRate_ = float(obj.annotations["sampling_rate"]) * pq.Hz
             self._dacHoldingLevel_ = float(obj.annotations["listDACInfo"][dacChannel]["fDACHoldingLevel"]) * self._dacUnits_
             self._interEpisodeLevel_ = bool(obj.annotations["listDACInfo"][dacChannel]["nInterEpisodeLevel"])
@@ -775,9 +776,13 @@ class ABFDACConfiguration:
             else:
                 self._waveformSource_ = ABFDACWaveformSource.none
                 
-            # digital (TTL) waveform flags:
+            # digital (TTL) waveform flags & parameters:
+            self._nDigitalOutputs_ = obj.annotations["sections"]["DACSection"]["llNumEntries"]
             self._digOutEnabled_ = self._dacChannel_ == obj.annotations["protocol"]["nActiveDACChannel"]
             self._hasAltDigOutState_ = bool(obj.annotations["protocol"]["nAlternateDigitalOutputState"])
+            self._digTrainActiveHi_ = bool(obj.annotations["protocol"]["nDigitalTrainActiveLogic"])
+            self._digHolding_ = obj.annotations["protocol"]["nDigitalHolding"]
+            self._digUseLastEpochHolding_ = bool(obj.annotations["protocol"]["nDigitalInterEpisode"])
         else:
             raise TypeError(f"Expecting an ABF or a neo.Block sourced from an ABF file; instead, got {type(obj).__name__}")
     
@@ -894,15 +899,27 @@ class ABFDACConfiguration:
 
         else:
             raise NotImplementedError(f"ABf version {abfVer} is not supported")
+        
+    @property
+    def digitalTrainActiveLogic(self) -> bool:
+        return self._digTrainActiveHi_
+    
+    @property
+    def digitalHolding(self) -> int:
+        return self._digHolding_
+    
+    @property
+    def  digitalUseLastEpochHolding(self) -> bool:
+        return self._digUseLastEpochHolding_
             
     @property
     def returnToHold(self) -> bool: 
         """When False, the command waveform returns to self._dacHoldingLevel_ after the last defined epoch"""
         return self._interEpisodeLevel_
     
-    @returnToHold.setter
-    def returnToHold(self, val:bool):
-        self._interEpisodeLevel_ = val == True
+    # @returnToHold.setter
+    # def returnToHold(self, val:bool):
+    #     self._interEpisodeLevel_ = val == True
     
     @property
     def epochs(self) -> list:
@@ -1217,10 +1234,12 @@ class ABFDACConfiguration:
                 if altDig:
                     # this DAC has dig output enabled, hence during
                     # an experiment it will output NOTHING if either 
-                    # alternateDigitalPattern is disabled OLR sweep number 
+                    # alternateDigitalPattern is disabled OR sweep number 
                     # is even
                     #
-                    dig_3_0 = dig_7_4 = [0,0,0,0]
+                    dig_3_0 = epoch.digitalPattern(True)[0]
+                    dig_7_4 = epoch.digitalPattern(True)[1]
+                    # dig_3_0 = dig_7_4 = [0,0,0,0]
                 else:
                     # this DAC has dig output enabled, hence during
                     # an experiment it will output the main digital pattern
@@ -1231,7 +1250,7 @@ class ABFDACConfiguration:
                     dig_7_4 = epoch.digitalPattern()[1]
             else:
                 # For a DAC where dig output is DISabled, the DAC is simply
-                # a placeholder fo the alternate digital output of the epoch, 
+                # a placeholder for the alternate digital output of the epoch, 
                 # (and these TTLs will be sent out) ONLY if alternateDigitalPattern
                 # is enabled AND sweep number is odd
                 #
@@ -1491,6 +1510,9 @@ class ABFDACConfiguration:
         t0 = t1 = self.holdingTime.rescale(pq.s)
         
         for epoch in self.epochs:
+            pulsePeriod = self.epochPulsePeriodSamples(epoch)
+            pulseSamples = self.epochPulseWidthSamples(epoch)
+            pulseCount = self.epochPulseCount(epoch)
             pass # TODO 2023-09-18 15:12:40
         
         
