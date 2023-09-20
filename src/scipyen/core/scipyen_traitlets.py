@@ -855,13 +855,17 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
                 silent=False
                 
             if silent:
-                silent = bool(new_value.dtype == old_value.dtype)
+                if all(hasattr(x, "dtype") for x in (new_value, old_value)):
+                    silent = bool(new_value.dtype == old_value.dtype)
+                
                 
             if silent:
-                silent = bool(new_value.ndim == old_value.ndim)
+                if all(hasattr(x, "ndim") for x in (new_value, old_value)):
+                    silent = bool(new_value.ndim == old_value.ndim)
                 
             if silent:
-                silent = bool(new_value.shape == old_value.shape)
+                if all(hasattr(x, "shape") for x in (new_value, old_value)):
+                    silent = bool(new_value.shape == old_value.shape)
                 
             if silent:
                 silent = bool(np.all(new_value == old_value))
@@ -948,8 +952,10 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
     
     def compare_element(self, x,y):
         result = False
+        
         if all(isinstance(v, np.ndarray) for v in (x,y)):
             result = x.shape == y.shape
+            
             if result:
                 result = x.dtype == y.dtype
                 
@@ -1279,6 +1285,10 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
                 silent=False
                 
             if silent:
+                if all(hasattr(x, "dtype") for x in (new_value, old_value)):
+                    silent = new_value.dtype == old_value.dtype
+                
+            if silent:
                 silent = self.compare_elements(old_value, new_value)
                 
             # print(f"\n{self.__class__.__name__}<NeoDataObjectTrait>[{self.name}] compare_elements → {silent}")
@@ -1602,6 +1612,10 @@ class QuantityTrait(Instance, ScipyenTraitTypeMixin):
         try:
             if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
                 silent=False
+                
+            if silent:
+                if all(hasattr(x, "dtype") for x in (new_value, old_value)):
+                    silent = new_value.dtype == old_value.dtype
                 
             if silent:
                 # so far silent is True when the observed knows about us
