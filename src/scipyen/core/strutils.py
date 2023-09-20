@@ -117,7 +117,7 @@ def lettersToOrdinal(x:str):
     in the complete ascii set (upper or lower case)
     """
 
-    x = tuple(x.lower())
+    x = "".join(tuple(x.lower()))
     
     l = list(string.ascii_lowercase)
     

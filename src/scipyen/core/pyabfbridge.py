@@ -650,8 +650,8 @@ class ABFEpoch:
 #     @property
 #     def useAlternateDigitalPattern(self) -> bool:
 #         # TODO 2023-09-17 09:36:51
-#         # shouldn't this better be in the ABFDACConfiguration ?
-#         # I think this logic should be handled by the ABFDACConfiguration 
+#         # shouldn't this better be in the ABFOutputsConfiguration ?
+#         # I think this logic should be handled by the ABFOutputsConfiguration 
 #         # instance that owns the ABFEpoch
 #         return self._useAltPattern_
 #     
@@ -674,16 +674,23 @@ class ABFEpoch:
         
         
         
-class ABFDACConfiguration:
-    """configuration of a DAC channel in pClamp/Clampex ABF files.
+class ABFOutputsConfiguration:
+    """Configuration of a DAC channel and digital outputs in pClamp/Clampex ABF files.
         
-    An ABFDACConfiguration contains the information related to the use of a DAC 
-    channel; in Clampex this is  - corrresponds to the Waveform tab of the Clampex protocol editor when the corresponding
-    Channel # tab is selected.
+    An ABFOutputsConfiguration contains the information related to the use of a 
+    particular DAC channel (between 0 and the maximum number of DAC outputs of 
+    your DAQ hardware - 1, e.g., for DigiData series 1550 there are 8 DAC channels,
+    hence a DAC channel can be between 0 and 7).
+    
+    An ABFOutputsConfiguration object encapsulates information accessed through
+    the Waveform tab of the Clampex protocol editor, with a Channel tab selected
+    for the specified DAC channel.
         
-    Similar to pyabf.waveform.EpochTable but uses Quantities in the relevant places
-    and generates command waveforms and digital patterns when required.
-    Also takes into account digital train pulses ("starred" patterns).
+    This information includes Epoch waveforms AND digital output configuration
+        (i.e, pulses or trains).
+        
+    The class only makes sense for episodic stimulation experiments in Clampex.
+        
     """
     # NOTE: 2023-09-17 23:41:15
     # index of the DAC where Digital output IS enabled is given by 
@@ -1000,7 +1007,7 @@ class ABFDACConfiguration:
 #         txt += " ".join([x.rjust(pad) for x in pulseWidths])+"\n"
 #         return txt.strip('\n')
 #     
-    def epochTable(self, sweep:int = 0):
+    def epochsTable(self, sweep:int = 0):
         """Returns the Epochs definition(s) as a Pandas DataFrame.
         
         Regarding the command and digital outputs, this reflects the actual 
@@ -1079,6 +1086,8 @@ class ABFDACConfiguration:
     
     def epochWaveform(self, epoch:ABFEpoch, previousLevel:pq.Quantity, 
                       sweep:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
+        """Realizes the waveform associated with a single epoch in the 
+        Channel tab, inside the Waveform tab of the Clampex Protocol Editor"""
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
         actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
@@ -1293,7 +1302,7 @@ class ABFDACConfiguration:
     def dacChannel(self) -> int:
         """The index of the DAC channel configured in this object.
         Read-only. 
-        An instance of ABFDACConfiguration is 'linked' to the same
+        An instance of ABFOutputsConfiguration is 'linked' to the same
         DAC channel throughtout its lifetime; therefore this property can only 
         be set at construction time.
         
@@ -1347,7 +1356,7 @@ class ABFDACConfiguration:
         samplingPeriod = (1/self._samplingRate_).rescale(pq.s)
         return int(self._nDataPointsPerSweep_/64) * samplingPeriod
     
-    def dacAnalogWaveform(self, sweep:int) -> neo.AnalogSignal:
+    def analogWaveform(self, sweep:int) -> neo.AnalogSignal:
         return self.dacCommandWaveform(sweep)
     
     def dacCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
@@ -1499,9 +1508,13 @@ class ABFDACConfiguration:
                 
         return waveform
     
-    def dacDigitalWaveform(self, sweep:int=0, DIG:int = 0) -> neo.AnalogSignal:
-        assert DIG in range(self.digitalOutputsCount), f"Invalid digital output channel {DIG} for {self.digitalOutputsCount} channels "
+    def digitalWaveform(self, sweep:int=0, digChannel:int = 0) -> neo.AnalogSignal:
+        """Realizes the digital output waveform (pulses, trains) emitted when
+        this DAC channel is active"""
+        assert digChannel in range(self.digitalOutputsCount), f"Invalid digital output channel {digChannel} for {self.digitalOutputsCount} channels "
         
+        # altDig = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+ 
         waveform = neo.AnalogSignal(np.full((self._nDataPointsPerSweep_, 1), 0.),
                                     units = self._dacUnits_, t_start = 0*pq.s,
                                     sampling_rate = self._samplingRate_,
@@ -1513,9 +1526,17 @@ class ABFDACConfiguration:
             pulsePeriod = self.epochPulsePeriodSamples(epoch)
             pulseSamples = self.epochPulseWidthSamples(epoch)
             pulseCount = self.epochPulseCount(epoch)
-            pass # TODO 2023-09-18 15:12:40
-        
-        
+            digPattern = self.epochDigitalPattern(epoch, sweep)
+            digPattern = digPattern[1] + digPattern[0]
+            
+            digChannelFlag = digPattern[-digChannel-1]
+            
+            print(f"{self.__class__.__name__}.digitalWaveform sweep {sweep}, digChannel {digChannel} in epoch {epoch.epochLetter}: digChannelFlag {digChannelFlag}")
+            
+            if digChannelFlag == "*": # pulse train!
+                pass
+            elif digChannelFlag == 1: # single TTL pulse (step-like)
+                pass
         
         
         
