@@ -53,6 +53,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 #### BEGIN pict.core modules
 #from core import neo
 #from core import patchneo
+
+from core import pyabfbridge as pab
+
 from core import (xmlutils, strutils, datasignal)
 
 
@@ -1020,8 +1023,21 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
         
         #protocol_sweeps = axonIO.read_protocol()
         axon_info = axonIO._axon_info
+        
+        # augment axon_info with missing bits that pyabf can actually get
+        # I know this is a bit redundant and duplicates some data, but it simpler
+        # than tweaking axonrawio in neo package...
+        abf = pab.getABF(fileName)
+        abfEpochSection = pab.getABFsection(abf, "epoch") # needed for DIG holding levels
+        abfStringsSection = pab.getABFsection(abf, "strings") # needed for indexed strings, containing inter alia the name of a stimulus file (when used)
+        
+        axon_info["sections"]["EpochSection"].update(abfEpochSection)
+        axon_info["sections"]["StringsSection"]["IndexedStrings"] = abfStringsSection["_indexedStrings"]
+        
+        
         axon_info["t_starts"] = axonIO._t_starts
         axon_info["sampling_rate"] = axonIO._sampling_rate
+        
         
         data.annotate(**axon_info)
         

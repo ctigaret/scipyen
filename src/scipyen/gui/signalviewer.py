@@ -9365,9 +9365,11 @@ signals in the signal collection.
                 y_nan_ndx = np.isnan(y_)
                 yy = y_
                 
-                if isinstance(y_, pq.Quantity):
-                    yy[y_nan_ndx] = -np.inf*y_.units
+                if isinstance(y_, pq.Quantity): # quantities are always np.dtype(float) ?!?
+                    yy[y_nan_ndx] = -np.inf * y_.units
                 else:
+                    if yy.dtype == np.dtype(int):
+                        yy = yy.astype(np.dtype(float))
                     yy[y_nan_ndx] = -np.inf
                     
                 if x_ is not None:
