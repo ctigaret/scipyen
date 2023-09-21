@@ -31,6 +31,7 @@ import vigra
 import pyqtgraph # for their own eq operator
 #import language_tool_python
 
+from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 # try:
 #     from pyqtgraph import eq # not sure is needed
 # except:
@@ -2576,10 +2577,9 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     
     Returns:
     ========
-    The key mapped to 'y', if the mapping is unique, else a tuple of keys that
-    map to the same value in 'y'.
-    
-    Returns None if 'y' is not found among x.values()
+    A tuple containing the key (if the mapping is unique) or the keys
+    mapped to 'y'. This tuple may be empty if 'y' not found among 
+    x.values()
     
     """
     #from .traitcontainers import (DataBag, Bunch, )
@@ -2587,21 +2587,25 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     
     vals = list(x.values()) # bypass the errors raise when comparing np.arrays
     
-    if any(isinstance(v, np.ndarray) for v in vals) or isinstance(y, np.ndarray):
+    if any(isinstance(v, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)) for v in vals) or isinstance(y, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)):
         testincluded = any(safe_identity_test(y,v) for v in vals)
+        
     else:
         testincluded = y in x.values()
     
     if testincluded:
-        
         ret = [name for name, val in x.items() if safe_identity_test(y, val)]
         # ret = [name for name, val in x.items() if (np.all(y == val) if (isinstance(y, np.ndarray) or isinstance(val, np.ndarray)) else y == val)]
         
-        if len(ret) == 1:
-            return ret[0]
+        return tuple(ret)
         
-        elif len(ret) > 1:
-            return tuple(ret)
+#         if len(ret) == 1:
+#             return ret[0]
+#         
+#         elif len(ret) > 1:
+#             return tuple(ret)
+    else:
+        return tuple()
     
 def summarize_object_properties(objname, obj, namespace="Internal"):
     """Returns a dict with object properties for display in Scipyen workspace.
@@ -2650,6 +2654,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     fqual = ".".join([objcls.__module__, clsname])
     ttip = ".".join([typemodulename, typename])
+    
+    if isinstance(obj, QtWidgets.QMainWindow):
+        ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
     
     wspace_name = "Namespace: %s" % namespace
     

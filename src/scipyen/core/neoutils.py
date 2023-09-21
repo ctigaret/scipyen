@@ -7159,7 +7159,6 @@ def sampling_rate_or_period(rate, period):
     
     return rate
 
-
 @safeWrapper
 def parse_acquisition_metadata(data:neo.Block, configuration:[type(None), dict] = None):
     """ TODO Parses metadata from electrophysiology acquisition data.

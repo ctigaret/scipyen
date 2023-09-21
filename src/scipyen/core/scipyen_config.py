@@ -663,7 +663,7 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
     setter_name (str) is the name of the read-write property or method that takes
         the value of the QSettings 'key' in Scipyen.conf as sole argument.
         
-    As defined in QorkspaceGuiMixin, '_qtcfg' is a nested Bunch:
+    As defined in WorkspaceGuiMixin, '_qtcfg' is a nested Bunch:
     
     {"WindowSize":       {"getter":"size",        "setter":"resize"},
      "WindowPosition":   {"getter":"pos",         "setter":"move"},
@@ -896,6 +896,46 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
             default = val
             
             newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
+            # print(f"group {gname} key_prefix {key_prefix} confname {confname} newval {newval}")
+            
+            # NOTE: 2023-09-18 11:38:33
+            # Compensate for the situation where the window position or geometry
+            # stored in the configuration would place it off screen.
+            # 
+            # This is the case when Scipyen is sed on a machine which occasionally 
+            # is connected to a supplementary monitor ("screen"): after running
+            # Scipyen on, say, two monitors, and with windows shown on the 
+            # second monitor, these windows would be painted off-screen if 
+            # Scipyen would be relaunched after disconnecting the supplementary
+            # monitor. This is can happen when the machine is, say a laptop
+            # which only occasionally gets connected to a second (external) monitor.
+            #
+            # The code below finds out if the stored window position coordinates 
+            # (either as a WindowPosition QtCore.QPoint, or as the X,Y coordinates
+            # in WindowGeometry QtCore.QRect) go beyond the boundaries of the 
+            # virtual geometry of the desktop. It then resets the offending 
+            # coordinate to the minimum value available.
+            if confname in ("WindowPosition", "WindowGeometry"):
+                availableVirtGeom = QtGui.QGuiApplication.primaryScreen().availableVirtualGeometry()
+                
+                if newval.x() > availableVirtGeom.x() + availableVirtGeom.width():
+                    newX = availableVirtGeom.x()
+                else:
+                    newX = newval.x()
+                    
+                if newval.y() > availableVirtGeom.y() + availableVirtGeom.height():
+                    newY = availableVirtGeom.y()
+                else:
+                    newY = newval.y()
+                    
+                if confname == "WindowPosition":
+                    newval = QtCore.QPoint(newX, newY)
+                    
+                else:
+                    newW = newval.width()
+                    newH = newval.height()
+                    
+                    newval = QtCore.QRect(newX, newY, newW, newH)
             
             if isinstance(setter, property):
                 config_setter = getattr(setter.fset, "configurable_setter")
@@ -1009,7 +1049,7 @@ class ScipyenConfigurable(object):
     Implements functionality to deal with non-Qt settings made persistent across
     Scipyen sessions.
     
-    Provides common functionality for Scipyen's QWindow-based GUI classes (as
+    Provides common functionality for Scipyen's QMainWindow-based GUI classes (as
     long as they inherit from ScipyenConfigurable as well, either directly, or
     indirectly via WorkspaceGuiMixin)
     
@@ -1366,13 +1406,6 @@ class ScipyenConfigurable(object):
                         except Exception as e:
                             traceback.print_exc()
                             continue
-#                         getset = cfg.get(k, {})
-#                         settername = getset.get("setter", None)
-#                         
-#                         if not isinstance(settername, str) or len(settername.strip()) == 0:
-#                             continue
-#                         
-#                         self._assign_trait_from_config_(settername, v.get())
                     
         if issubclass(self.__class__, QtWidgets.QWidget):
             self.loadWindowSettings() 

@@ -407,9 +407,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         2.1) Auguments ScipyenConfigurable with standard Qt configurables for
         :classes: derived from Qt QMainWindow and QWidget: size, position, 
-        geometry and state (for QWindow-based :classes: only)
+        geometry and state (for QMainWindow-based :classes: only)
         
-    3) Distinction between QWindow objects that are direct children of Scipyen's
+    3) Distinction between QMainWindow objects that are direct children of Scipyen's
     main window (so-called "top-level" windows) and those that are children of 
     one of Scipyen's 'apps'.
         Top-level windows include viewers launched directly by double-clicking
