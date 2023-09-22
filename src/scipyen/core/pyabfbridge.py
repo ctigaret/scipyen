@@ -566,6 +566,15 @@ class ABFEpoch:
                 
         else:
             raise TypeError(f"Expecting a str, int, or an ABFEpochType; instead, got{type(val).__name__}")
+        
+    @property
+    def type(self) -> ABFEpochType:
+        """Alias to self.epochType"""
+        return self.epochType
+    
+    @type.setter
+    def type(self, val:typing.Union[ABFEpochType, str, int]):
+        self.epochType = val
             
     @property
     def typeName(self) -> str:
@@ -1203,31 +1212,80 @@ class ABFOutputsConfiguration:
         
         return self.epochs[e]
     
-    
     def epochRelativeStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
-        """Starting time of the epoch, relative to sweep start"""
+        """Starting time of the epoch, relative to sweep start.
+        WARNING: Does NOT take into account the holding time (1/64 of sweep samples),
+        therefore the respoonse to the epoch's waveform, as recorded in the ADC 
+        signal, will appear delayed relative to the epoch's start by the holding time.
+        
+        Depending what you need, you may want to use self.epochActualRelativeStartTime
+        
+        """
         # NOTE: 2023-09-22 15:39:13
         # below, the sweep index is REQUIRED to calculate the actual epoch duration
         # 
         units = epoch.firstDuration.units
         return np.sum([self.epochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units
+    
+    def epochActualRelativeStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
+        """Starting time of the epoch, relative to sweep start.
+        Takes into account the holding time (1/64 sweep samples, in Clampex)
+        
+        """
+        units = epoch.firstDuration.units
+        return np.sum([self.epochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units + self.holdingTime
         
     def epochRelativeStartSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
-        """Number of samples from the statr of the sweep to the start of epoch"""
+        """Number of samples from the start of the sweep to the start of epoch.
+        WARNING: Like self.epochRelativeStartTime, does NOT take into account 
+        the holding time; you may want to use self.epochActualRelativeStartsSamples
+        
+        
+        """
         return np.sum([self.epochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]])
+    
+    def epochActualRelativeStartSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+        return np.sum([self.epochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]]) + self.holdingSampleCount
         
     def epochStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
-        """Starting time of the epoch, relative to the start of recording"""
-        units = epoch.firstDuration.units
+        """Starting time of the epoch, relative to the start of recording.
+        WARNING: Does NOT take into account the holding time (1/64 of sweep samples),
+        therefore the respoonse to the epoch's waveform, as recorded in the ADC 
+        signal, will appear delayed relative to the epoch's start by the holding time.
+        
+        Depending what you need, you may want to use self.epochActualStartTime
+        """
+        # units = epoch.firstDuration.units
         return self.epochRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
     
+    def epochActualStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
+        """Starting time of the epoch, relative to the start of recording.
+        Takes into account the sweep holding time.
+        """
+        return self.epochActualRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
+        
     def epochStartSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+        """Number of samples from start fo recording to the epoch.
+        WARNING: Like self.epochStartSamples, does NOT take into account 
+        the holding time; you may want to use self.epochActualStartSamples.
+        
+        """
         return self.epochRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
+    def epochActualStartSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+        """Number of samples from start fo recording to the epoch.
+        Takes into account the sweep holding time.
+        """
+        return self.epochActualRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
+    
     def epochActualDuration(self, epoch:ABFEpoch, sweep:int=0) -> pq.Quantity:
+        """Actual epoch duration (in ms) for the given sweep.
+        Takes into account first duration and delta duration"""
         return epoch.firstDuration + sweep * epoch.deltaDuration
         
     def epochActualDurationSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+        """Actual epoch duration (in samples) for the given sweep.
+        Takes into account first duration and delta duration"""
         return scq.nSamples(self.epochActualDuration(epoch, sweep), self.samplingRate)
     
     def epochFirstDurationSamples(self, epoch:ABFEpoch) -> int:
@@ -1550,6 +1608,11 @@ class ABFOutputsConfiguration:
         
         """
         return self._dacChannel_
+    
+    @property
+    def number(self) -> int:
+        """Alias to self.dacChannel"""
+        return self.dacChannel
 
     @property
     def dacName(self) -> str:
@@ -1558,10 +1621,20 @@ class ABFOutputsConfiguration:
         return self._dacName_
     
     @property
+    def name(self) -> str:
+        """Alias to self.dacName"""
+        return self.dacName
+    
+    @property
     def dacUnits(self) -> pq.Quantity:
         """Read-only; can only be set up at initialization (construction)
         and stays the same throughout the lifetime of the object"""
         return self._dacUnits_
+    
+    @property
+    def units(self) -> pq.Quantity:
+        """Alias to self.dacUnits"""
+        return self.dacUnits
     
     @property
     def sweepSampleCount(self) -> int:
@@ -1604,10 +1677,10 @@ class ABFOutputsConfiguration:
     """
         return self.protocol.holdingTime
     
-    def analogWaveform(self, sweep:int) -> neo.AnalogSignal:
+    def analogWaveform(self, sweep:int=0) -> neo.AnalogSignal:
         return self.dacCommandWaveform(sweep)
     
-    def commandWaveform(self, sweep:int) -> neo.AnalogSignal:
+    def commandWaveform(self, sweep:int=0) -> neo.AnalogSignal:
         return self.dacCommandWaveform(sweep)
     
     def dacCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 

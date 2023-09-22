@@ -1922,10 +1922,6 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         else:
             raise TypeError("incompatible base epoch specification: %s", baseEpoch)
 
-    # elif not isinstance(baseEpoch, neo.Epoch):
-    #     raise TypeError("incompatible base epoch specification: %s", baseEpoch)
-
-    
     # 2) sort out the steady-state epoch parameter
     if isinstance(ssEpoch, (tuple, list)):
         if all([isinstance(v, numbers.Real) for v in ssEpoch]):
@@ -1941,13 +1937,11 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         else:
             raise TypeError("incompatible steady-state epoch specification: %s", ssEpoch)
         
-    # elif not isinstance(ssEpoch neo.Epoch):
-    #     raise TypeError("incompatible steady-state epoch specification: %s", baseEpoch)
-
     # 3) get transition times from injected current, attempt to sort out
     # baseline and steady-state epochs using these transition times and
     # steadyStateDuration parameter, if needed
     if isinstance(im, neo.AnalogSignal):
+        # injected current passed as a signal here => infer amplitude, start & stop times
         # NOTE: 2017-08-30 21:53:33
         # there are only two states
         #
@@ -2016,13 +2010,15 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         Iinj = np.diff(centroids.ravel()) * im.units
         
     elif isinstance(im, (tuple, list)) and len(im) == 3:
+        # im passed as a sequence of 3 values: amplitude, t start, t stop
+        
         Iinj = im[0]
         assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.units_convertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
         
-        I_t0 = im[1]
+        I_t0 = im[1] # I start
         assert isinstance(I_t0, pq.Quantity) and I_t0.size == 1 and scq.units_convertible(I_t0.units, pq.s), f"im[1] expected to be a time scalar; got {im[1]} instead"
         
-        I_t1 = im[2]
+        I_t1 = im[2] # I stop
         assert isinstance(I_t1, pq.Quantity) and I_t1.size == 1 and scq.units_convertible(I_t1.units, pq.s), f"im[2] expected to be a time scalar; got {im[2]} instead"
         
         if baseEpoch is None:
@@ -2043,6 +2039,14 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
             ssT0 = ssEpoch.times[0]
             ssT1 = ssT0 + ssEpoch.durations[0]
 
+        if baseT0 < 0*pq.s:
+            # use a shorter duration for baselines < steadyStateDuration
+            # i.e. begin at sweep start
+            baseT0 = 0*pq.s
+            
+        assert ssT0 > baseT1, "baseline and steay state epochs overlap"
+        
+        
     elif isinstance(im, pq.Quantity):
         Iinj = im
         
@@ -3111,8 +3115,8 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=st
     """
 
     if isinstance(data, dict): 
-        if all(v in data.keys() for v in ["Depolarising_steps", "Injected_current"]):
-            steps = data["Depolarising_steps"]
+        if all(v in data.keys() for v in ["Current_injection_steps", "Injected_current"]):
+            steps = data["Current_injection_steps"]
         else:
             raise ValueError("Data does not seem to be an AP analysis result")
 
@@ -5646,6 +5650,11 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         This parameter prevents the fast passive rising phase of the Vm at the
         start of current injection from being flagged as an AP (and similarly, 
         for other fast-rising events)
+
+    passive_analysis: bool, default is False
+        When True, then the function will analyze the passive membrane properties
+        for those sweeps with hypoperpolarizing current injection steps, where 
+        Iinj < 0
         
 
     NOTE: See analyse_AP_step_injection_sweep() documentation for details
@@ -5765,6 +5774,9 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     genotype = kwargs.pop("genotype", "NA")
     sex = kwargs.pop("sex", "M")
     age = kwargs.pop("age", "NA")
+    passive_analysis = kwargs.pop("passive_analysis", False)
+    
+    # print(f"analyse_AP_step_injection_series: passive_analysis = {passive_analysis}")
     
     if isinstance(age, pq.Quantity):
         if not any([age.dimensionality == ref.dimensionality for ref in [pq.day, pq.month, pq.year] ]):
@@ -5943,7 +5955,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     ret["Genotype"] = genotype
     ret["Sex"] = sex
     ret["Treatment"] = treatment
-    ret["Depolarising_steps"] = list()
+    ret["Current_injection_steps"] = list()
     
     kwargs["VmSignal"] = VmSignal
     
@@ -5956,10 +5968,16 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 im = ImSignal
                 
             try:
-                step_result, vstep = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
+                sweep_result = analyse_AP_step_injection_sweep(segment, ImSignal = im, 
                                                             Itimes_relative = Itimes_relative,
                                                             Itimes_samples = Itimes_samples,
+                                                            passive_analysis = passive_analysis,
                                                             **kwargs)
+                if passive_analysis:
+                    step_result, vstep, passive_result = sweep_result
+                else:
+                    step_result, vstep = sweep_result
+                    passive_result = None
                 
             except:
                 # NOTE: 2023-08-14 17:45:52
@@ -5977,9 +5995,11 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             segment_result["Name"] = segment.name
             segment_result["AP_analysis"] = step_result
             segment_result["Vm_signal"] = vstep
+            segment_result["Passive_properties"] = passive_result
             
             
-            ret["Depolarising_steps"].append(segment_result)
+            # ret["Depolarising_steps"].append(segment_result)
+            ret["Current_injection_steps"].append(segment_result)
         
     
         seg_times = [s.analogsignals[0].t_start for s in segments]
@@ -5990,7 +6010,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         
         if Iinj is None:
             # use the measured value
-            _inj = [seg_res["AP_analysis"]["Injected_current"] for seg_res in ret["Depolarising_steps"]]
+            _inj = [seg_res["AP_analysis"]["Injected_current"] for seg_res in ret["Current_injection_steps"]]
             Iinj = np.array(_inj) * _inj[0].units
             
         i_units = Iinj[0].units
@@ -6024,7 +6044,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         apThr = list()
         apLatency = list()
         
-        for seg_res in ret["Depolarising_steps"]:
+        for seg_res in ret["Current_injection_steps"]:
             if isinstance(seg_res["AP_analysis"]["AP_train"], neo.SpikeTrain) and len(seg_res["AP_analysis"]["AP_train"]):
                 val = seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"]
                 if val is None:
@@ -6040,15 +6060,15 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 
         apThr = (np.array(apThr))[:,np.newaxis] * vstep.units
         
-        #apThr = [seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"][0] for seg_res in ret["Depolarising_steps"]]
+        #apThr = [seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"][0] for seg_res in ret["Current_injection_steps"]]
         
-        #apLatency = [seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"][0].t_start for seg_res in ret["Depolarising_steps"]]
+        #apLatency = [seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"][0].t_start for seg_res in ret["Current_injection_steps"]]
         
-        apFrequency = [seg_res["AP_analysis"]["Mean_AP_Frequency"] for seg_res in ret["Depolarising_steps"]]
+        apFrequency = [seg_res["AP_analysis"]["Mean_AP_Frequency"] for seg_res in ret["Current_injection_steps"]]
         
         #f_units = apFrequency[0].units
         
-        nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Depolarising_steps"]]
+        nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Current_injection_steps"]]
         
         # print(f"Iinj = {Iinj}")
         # print(f"apThr = {apThr}")
@@ -6194,7 +6214,7 @@ def test_for_rheobase_latency(data, minsteps=3):
         
         "Injected_current"
         "First_AP_latency"
-        "Depolarising_steps"
+        "Current_injection_steps"
         "Delta_I_step"
         
         With the exception of Delta_I_step, all other keys must map to iterables 
@@ -6204,10 +6224,10 @@ def test_for_rheobase_latency(data, minsteps=3):
             "Injected_current" and "First_AP_latency" are 
                 neo.IrregularlySampledSignal objects
         
-            "Depolarising_steps" is a list of dictionaries as output by a call
+            "Current_injection_steps" is a list of dictionaries as output by a call
                 to analyse_AP_step_injection_sweep().
         
-    b) The number of "Depolarising_steps" with at least one AP detected >= minsteps
+    b) The number of "Current_injection_steps" with at least one AP detected >= minsteps
         
     
     Parameters:
@@ -6223,7 +6243,7 @@ def test_for_rheobase_latency(data, minsteps=3):
     ok = False
     
     try:
-        ok = len([s for s in data["Depolarising_steps"] if (s["AP_analysis"]["Number_of_APs"] > 0 and s["AP_analysis"]["AP_train"] is not None) ] ) >= minsteps
+        ok = len([s for s in data["Current_injection_steps"] if (s["AP_analysis"]["Number_of_APs"] > 0 and s["AP_analysis"]["AP_train"] is not None) ] ) >= minsteps
         
     except:
         return False
@@ -6321,7 +6341,7 @@ def report_AP_analysis(data, name=None):
             print("data does not seem to be an AP analysis summary")
             return summary, params, waveforms
         
-    elif all([v in data for v in ("Depolarising_steps", "rheobase_analysis")]):
+    elif all([v in data for v in ("Current_injection_steps", "rheobase_analysis")]):
         data = data["rheobase_analysis"]
     
     else:
@@ -6402,8 +6422,20 @@ def report_AP_analysis(data, name=None):
     
     return summary, params, waveforms
 
-def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "Vm_prim_1", ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", Itimes_relative:bool = True,Itimes_samples:bool = False,**kwargs):
-    """AP Train analysis in a sweep (segment) of I-clamp experiments
+def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "Vm_prim_1", 
+                                    ImSignal:typing.Union[int, str, tuple] = "Im_sec_1", 
+                                    Itimes_relative:bool = True,
+                                    Itimes_samples:bool = False,
+                                    passive_analysis:bool=False,
+                                    **kwargs):
+    """AP Train analysis in a sweep (segment) of I-clamp experiments.
+    APs are triggered by a depolarizing current injection step during the sweep.
+    
+    The sweep is often part of a sequence of sweeps with current injection of 
+    increasing magnitude, where the first sweep(s) may actually be hyperpolarizing.
+    In this case, a hyperpolarizing injection MAY be used to determine the 
+    passive membrane properties.
+    
     
     Positional parameters:
     ---------------------
@@ -6456,6 +6488,10 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         
         When True, this implies the resolved times are relative to VmSingal
         start time.
+    
+    passive_analysis: bool default False
+        When True, enables analysis of passive membrane properties for those
+        sweeps where the current injection is hyperpolarizing
     
     Var-keyword parameters (kwargs):
     --------------------------------
@@ -6615,6 +6651,12 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
             
     
     rtol, atol, return_all → see detect_AP_rises
+    
+    Passed to passive_Iclamp (when passive_analysis is True)
+    -------------------------
+    steadyStateDuration: scalar time Quantity, default is 50 * pq.ms
+    box_size: int, default is 0; size of a boxcar filter, see passive_iclamp for details
+    NOTE: the epochs are determined from the im (analogsignal or triplet of Iinj, start, stop)
             
     
         
@@ -6630,8 +6672,11 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     vstep : neo.AnalogSignal; 
         contains the time slice of the Vm signal, encompassing  the AP train
     
+    passive: a dict with the result from  passive_Iclamp (if 'passive_analysis' parameter is True)
+    
     References:
     -----------
+    For AP detection algorithm, please see:
     
     Naundorf et al (2006). Unique features of action potential initiation in 
         cortical neurons. Nature 440, 1060–1063.
@@ -6646,7 +6691,10 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     adcrange                = kwargs.pop("adcrange", 10)
     adcscale                = kwargs.pop("adcscale", 1e3) # (mV -> V)
     smooth_window           = kwargs.pop("smooth_window", 5)
+    steadyStateDuration     = kwargs.pop("steadyStateDuration", 0.05*pq.s)
+    box_size                = kwargs.pop("box_size", 0)
     
+    # print(f"analyse_AP_step_injection_sweep: passive_analysis = {passive_analysis}")
     kwargs.pop("return_all", None) # remove the debugging parameter
     
     # NOTE: 2019-05-03 13:08:48
@@ -6671,6 +6719,8 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
                 
     
+    passive_measure_names = ["BaselineVm", "SteadyStateVm", "VSag", "VRebound", "Rin", "Capacitance", "Tau", "VmFit", "VmFiltered"]
+    
     vstep, Ihold, Iinj, istep = extract_AP_train(vm,im,
                                     tail=tail,
                                     method=method,
@@ -6682,6 +6732,16 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                                     resample_with_rate=resample_with_rate,
                                     Itimes_relative = Itimes_relative,
                                     Itimes_samples = Itimes_samples)
+    if passive_analysis:
+        if Iinj < 0 * pq.pA:
+            passive_measures = passive_Iclamp(vm, im, steadyStateDuration = steadyStateDuration,
+                                            box_size = box_size)
+            passive = dict(zip(passive_measure_names, passive_measures))
+        else:
+            passive = dict(zip(passive_measure_names, [np.nan] * len(passive_measure_names)))
+            passive["VmFit"] = None
+            passive["VmFiltered"] = None
+        
     
     
     # print(f"analyse_AP_step_injection_sweep: istep = {istep}")
@@ -6774,7 +6834,9 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     
     result["Waveform_signals"] = ap_waveform_signals
     
-    return result, vstep
+    # result["Passive_analysis"] = passive
+    
+    return (result, vstep, passive) if passive_analysis else (result, vstep)
 
 def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     """Extracts AHPs from averaged trials at a given Iinj.
