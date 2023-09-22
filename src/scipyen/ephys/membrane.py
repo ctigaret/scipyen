@@ -1804,86 +1804,149 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
     return data
     
 
-def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None, 
+def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list], 
+                   baseEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
+                   ssEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
                    steadyStateDuration = 0.05 * pq.s, 
-                   box_size = 0, 
-                   Iinj=None):
+                   box_size = 0):
     """
     Square pulse current injection in I-clamp experiments.
     
-    vm: analogsignal with Vm in I-clamp
-    im: analogsignal with Im command (injected current) - mandatory unless 
-            Iinj is given
+    Typically, this is a hyperpolarizing current injection step.
     
-    baseEpoch: neo.Epoch, or sequence of t_start, t_stop time points
-                baseline before current injection (optional, default is None) 
-                needed when im is None
-                
-                when a sequence of time points, these may be python quantities in
-                units compatible with vm.times.units
-                
-    ssEpoch:    steady state Vm epoch (optional, default is None)
-                ends when current injection ends
-                needed when im is None
-                
-    injEpoch:   
+    vm: analogsignal with Vm recorded in current clamp
     
+    im: analogsignal with Im command (injected current in current clamp) 
+
+        OR :
+            a triplet of scalar pq.Quantity objects in the FOLLOWING order:
+            current amplitude (in pA or scalable to pA)
+            start_time (in pq.s or pq.ms) - start time of current injection
+            stop_time  (in pq.s or pq.ms) - stop time of current injection
+    
+        OR: a scalar quantity object with units scalale to pq.A
+    
+    baseEpoch¹: neo.Epoch, or sequence of t_start, t_stop time points for the
+                baseline before current injection (optional, default is None).
+    
+                When a neo.Epoch,this must contain a single time/duration pair
+        
+                Mandatory when im is just a scalar current quantity.
+    
+                
+    ssEpoch¹:   steady state Vm epoch (optional, default is None) for the 
+                steady-state membrane potential DURING the current injection;
+                
+                typically, this ends with the current injection
+                
+                When a neo.Epoch,this must contain a single time/duration pair
+        
+                Mandatory when im is just a scalar current quantity.
+                
+                Taken as is - it is the caller's responsiblity to ensure the
+                times falls on the right regions of the signal.
+                
+
     steadyStateDuration: scalar or python quantity
                 use to calculate the interval for Vm average on baseline and
-                during the steady-state hyperpolarization
-                default is 0.05 * pq.s
+                for the steady-state hyperpolarization (i.e. ms BEFORE the END
+                of the current injection) when the two epochs above are NOT
+                given
+    
+                Requires im to be an analog signal, or a triplet of scalars (see above)
+    
+                default is 0.05 * pq.s (50 ms)
     
     box_size: int scalar (default 0) size of the boxcar window for filtering 
     
-    Iinj : None or python Quantity: the amount of injected current; needed only
-        when im is None
+    ¹ NOTE the neo.Epochs are created manually in the signal viewer, to delineate
+        the ACTUAL baseline and steady-state periods of the membrane voltage
+        respectively, before current injection starts and before current injection
+        ends.
     
+        These should NOT be identical to the ABF epochs in the protocol, where
+        the first epoch is the recording baseline, and the second one is the epoch
+        corresponding to the ENTIRE duration of the current injection step.
+    
+        The base line "epoch" may be shorter than the first ABF epoch, but must
+        "fall" before the current injection step.
+    
+        The steady-state "epoch" needs be defined somewhere closer to the end of
+        the current injection step and to be much shorted than the duration of 
+        the step (in order to ensure it really "falls" during the steady-state).
+    
+    
+    Returns:
+    ========
+    
+    A tuple with the following :
+    
+    baseline Vm:            pq.Quantity, mV
+    
+    steady-state Vm:        pq.Quantity, mV
+    
+    sag Vm:                 pq.Quantity, mV
+    
+    rebound Vm:             pq.Quantity, mV
+    
+    input resistance Rᵢₙ:   pq.Quantity in MΩ
+        calculated on the difference between baseline and steady-state Vm
+    
+    capacitance:            pq.Quantity in pF
+        calculated as τ / Rin (see τ below)
+    
+    membrane time constant τ: pq.Quantity in ms
+    
+    vfit:                   dict with the result of fitting the initial Vm 
+                            change to a single exponential decay model
+
+    v_flt:                  neo.AnalogSignal - the filtered version of the vm
+                            signal
     """
     
     from scipy.signal import boxcar, convolve
     
+    baseT0 = baseT1 = ssT0 = ssT1 = None
     
+    # 1) sort out the baseline epoch parameter - this is the epoch BEFORE
+    # current injection
     if isinstance(baseEpoch, (tuple, list)):
         if all([isinstance(v, numbers.Real) for v in baseEpoch]):
-            t_start = baseEpoch[0]
-            duration = t_stop - t_start
-            baseEpoch = neo.Epoch(times = t_start * vm.times.units,
-                                  durations = duration * vm.times.units)
+            t0, t1 = baseEpoch
+            baseEpoch = neo.Epoch(times = t0 * vm.times.units, durations = (t1-t0) * vm.times.units)
             
         elif all([(isinstance(v, pq.Quantity) and units_convertible(v, vm.times)) for v in baseEpoch]):
-            times = baseEpoch[0]
-            durations = baseEpoch[1]-baseEpoch[0]
-            baseEpoch = neo.Epoch(times=times, durations=durations)
+            t0, t1 = baseEpoch
+            baseEpoch = neo.Epoch(times = t0, durations = (t1-t0))
             
         else:
             raise TypeError("incompatible base epoch specification: %s", baseEpoch)
 
+    # elif not isinstance(baseEpoch, neo.Epoch):
+    #     raise TypeError("incompatible base epoch specification: %s", baseEpoch)
+
     
+    # 2) sort out the steady-state epoch parameter
     if isinstance(ssEpoch, (tuple, list)):
         if all([isinstance(v, numbers.Real) for v in ssEpoch]):
-            t_start = ssEpoch[0]
+            t0, t1 = ssEpoch
             duration = t_stop - t_start
-            ssEpoch = neo.Epoch(times = t_start * vm.times.units,
-                                  durations = duration * vm.times.units)
+            ssEpoch = neo.Epoch(times = t0 * vm.times.units,
+                                  durations = (t1-t0) * vm.times.units)
             
         elif all([(isinstance(v, pq.Quantity) and units_convertible(v, vm.times)) for v in ssEpoch]):
-            times = ssEpoch[0]
-            durations = ssEpoch[1]-ssEpoch[0]
-            ssEpoch = neo.Epoch(times=times, durations=durations)
+            t0, t1 = ssEpoch
+            ssEpoch = neo.Epoch(times=t0, durations=(t1-t0))
             
         else:
-            raise TypeError("incompatible base epoch specification: %s", ssEpoch)
+            raise TypeError("incompatible steady-state epoch specification: %s", ssEpoch)
+        
+    # elif not isinstance(ssEpoch neo.Epoch):
+    #     raise TypeError("incompatible steady-state epoch specification: %s", baseEpoch)
 
-        
-    if box_size > 0 :
-        window = boxcar(box_size)/box_size
-        v_flt = convolve(np.squeeze(vm), window, mode="same", method = "fft")
-        v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = 1/vm.sampling_period)
-    else:
-        v_flt = vm
-        
-    # 1) get transition times from injected current
-    
+    # 3) get transition times from injected current, attempt to sort out
+    # baseline and steady-state epochs using these transition times and
+    # steadyStateDuration parameter, if needed
     if isinstance(im, neo.AnalogSignal):
         # NOTE: 2017-08-30 21:53:33
         # there are only two states
@@ -1896,7 +1959,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
         # for a NEGATIVE waveform (i.e., HYPERPOLARIZING current injection):
         #
         #   the high state is the baseline state (therefore expected to be found at
-        #   the beginning and and at the end of the waveform)
+        #   the beginning and at the end of the waveform)
         #
         #   the low state is the actual injection pulse
         #
@@ -1910,15 +1973,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
         centroids, cnt, edg, rng = sigp.state_levels(im, levels = 0.5)
         centroids = np.array(centroids).T[:,np.newaxis]
         
-        #[low, high]
-        
-        #centroids, dist = cluster.vq.kmeans(im, 2)
-        
         label, dst = cluster.vq.vq(im, centroids)
-        
-        #centroids, label = cluster.vq.kmeans2(im, 2) 
-        
-        #print("centroids ", centroids)
         
         # two states:
         
@@ -1931,54 +1986,95 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
         #print("down ", down)
         #print("up ", up)
         
-        # upward deflection is earlier than downward deflection 
-        # for a depolarizing current pulse
+        # for a depolarizing current pulse upward deflection PRECEDES the
+        # downward deflection 
         if down > up:
             raise RuntimeError("For passive membrane properties, a hyperpolarizing current injection is expected")
         
         if baseEpoch is None:
+            # infer baseEpoch from the current injection waveform (ie. BEFORE the step)
             baseT1 = np.min([down, up]) * pq.s # because down and up are quantities and this strips their units away!
             baseT0 = baseT1 - steadyStateDuration
-            
         else:
-            baseT0 = baseEpoch.times
-            baseT1 = baseT0 + baseEpoch.durations
+            assert isinstance(baseEpoch, neo.Epoch), "Expecting baseEpoch a neo.Epoch or None, by now"
+            baseT0 = baseEpoch.times[0]
+            baseT1 = baseT0 + baseEpoch.durations[0]
             
         if ssEpoch is None:
+            # infer steay-state epoch from the current injection waveform (i.e
+            # corresponding to the steady-state duration BEFORE the end of the step)
             ssT1 = np.max([down, up]) * pq.s # because down and up are quantities and this strips their units away!
             ssT0 = ssT1 - steadyStateDuration
+            
         else:
-            ssT0 = ssEpoch.times
-            ssT1 = ssT0 + ssEpoch.durations
+            assert isinstance(ssEpoch, neo.Epoch), "Expecting ssEpoch a neo.Epoch or None, by now"
+            ssT0 = ssEpoch.times[0]
+            ssT1 = ssT0 + ssEpoch.durations[0]
+
+
         # the amount of injected Im
         Iinj = np.diff(centroids.ravel()) * im.units
+        
+    elif isinstance(im, (tuple, list)) and len(im) == 3:
+        Iinj = im[0]
+        assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.units_convertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
+        
+        I_t0 = im[1]
+        assert isinstance(I_t0, pq.Quantity) and I_t0.size == 1 and scq.units_convertible(I_t0.units, pq.s), f"im[1] expected to be a time scalar; got {im[1]} instead"
+        
+        I_t1 = im[2]
+        assert isinstance(I_t1, pq.Quantity) and I_t1.size == 1 and scq.units_convertible(I_t1.units, pq.s), f"im[2] expected to be a time scalar; got {im[2]} instead"
+        
+        if baseEpoch is None:
+            baseT1 = I_t0
+            baseT0 = I_t0 - steadyStateDuration
+            
+        else:
+            assert isinstance(baseEpoch, neo.Epoch), "Expecting baseEpoch a neo.Epoch or None, by now"
+            baseT0 = baseEpoch.times[0]
+            baseT1 = baseT0 + baseEpoch.durations[0]
+            
+        if ssEpoch is None:
+            ssT1 = I_t1
+            ssT0 = I_t1 - steadyStateDuration
 
-    else:
+        else:
+            assert isinstance(ssEpoch, neo.Epoch), "Expecting ssEpoch a neo.Epoch or None, by now"
+            ssT0 = ssEpoch.times[0]
+            ssT1 = ssT0 + ssEpoch.durations[0]
+
+    elif isinstance(im, pq.Quantity):
+        Iinj = im
+        
+        if isinstance(Iinj, numbers.Real):
+            Iinj = Iinj * pq.pA
+            
+        assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.units_convertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
+
         if not isinstance(baseEpoch, neo.Epoch):
             raise ValueError("base epoch must be specified")
         
+        # whe an epoch WAS specified, we take it as given i.e. as indicating the 
+        # ACTUAL baseine or steady-state epochs used for analysis
+        baseT0 = baseEpoch.times
+        baseT1 = baseT0 + baseEpoch.durations
+
         if not isinstance(ssEpoch, neo.Epoch):
             raise ValueError("steady-state epoch (ssEpoch) must be specified")
             
-        if Iinj is None:
-            raise ValueError("Iinj must be specified")
-        
-        elif isinstance(Iinj, numbers.Real):
-            Iinj = Iinj * pq.pA
-            
-        elif isinstance(Iinj, pq.Quantity):
-            if not units_convertible(Iinj, pq.pA):
-                raise TypeError("Iinj is invalid: %s" % Iinj)
-            
-        else:
-            raise TypeError("incompatible Iinj specified: %s" % Iinj)
-        
-        baseT0 = baseEpoch.times
-        baseT1 = baseT0 + baseEpoch.durations
         
         ssT0 = ssEpoch.times
         ssT1 = ssT0 + ssEpoch.durations
-            
+
+    else:
+        raise TypeError("im must be specified as a analog signal, current quantity, or triplet of current, t_start and t_stop quantities")
+    
+    if box_size > 0 :
+        window = boxcar(box_size)/box_size
+        v_flt = convolve(np.squeeze(vm), window, mode="same", method = "fft")
+        v_flt = neo.AnalogSignal(v_flt[:,np.newaxis], units = vm.units, t_start = vm.t_start, sampling_rate = 1/vm.sampling_period)
+    else:
+        v_flt = vm
         
     vmin = vm.min()
     
@@ -2005,14 +2101,7 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
     vsagmin = vsagrise.min()
     vsagmax = vsagrise.max()
     
-    #print("vsagmin ", vsagmin)
-    #print("vsagmax ", vsagmax)
-    
-    #print(vsagmin == vsag)
-    
     vsagrange = vsagmin - vsagmax
-    
-    #print(vsagrange)
     
     # NOTE: if we use state_levels, below, we actually get a better fit & sag separation
     
@@ -2072,9 +2161,6 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
     t0 = vsag10_90_extended_fit.t_stop - 0.05*pq.s
     t1 = vsag10_90_extended_fit.t_stop
     
-    #print("t0 ", t0, "t1 ", t1)
-    
-    
     vinf = vsag10_90_extended_fit.time_slice(t0, t1).mean() # "tail" of vfit (at "infinity")
     
     vfit = dict()
@@ -2083,13 +2169,15 @@ def passive_Iclamp(vm, im=None, ssEpoch=None, baseEpoch=None,
     vfit["fitted_segment"] = vsag10_90
     vfit["Vextrapolated"] = vinf
     
-    Rin = np.abs((vss - vbase) / Iinj).rescale(pq.ohm)
-    Rss = np.abs((vinf - vbase) / Iinj).rescale(pq.ohm)
+    Rin = np.abs((vss - vbase) / Iinj).rescale(pq.Mohm)
+    Rss = np.abs((vinf - vbase) / Iinj).rescale(pq.Mohm)
     
-    time_constant = popt[-1] * pq.s
+    time_constant = (popt[-1] * pq.s).rescale(pq.ms)
     
+    capacitance = (time_constant / Rin).rescale(pq.pF)
     
-    return vbase, vss, vsag, vrebound, Rin, Rss, time_constant, vfit, v_flt
+    # return vbase, vss, vsag, vrebound, Rin, Rss, capacitance, time_constant, vfit, v_flt
+    return vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt
 
 
 def PassiveMembranePropertiesAnalysis(block:neo.Block, 
@@ -5382,7 +5470,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         at the same time t0.
         
     Itimes_samples: bool, default is False; when True, this flag indicates that
-        Istart and Istop (when given) are numbers of samples (form the start of
+        Istart and Istop (when given) are numbers of samples (from the start of
         the sweep).
         
     Iinj: None (default), or sequence of current injection values. When not None,
@@ -5459,9 +5547,6 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         called from signalprocessing.detect_boxcar() 
         
         Used only when method is "state_levels"
-        
-    thr: floating point scalar: the minimum value of dV/dt of the Vm waveform to
-        be considered an action potential (default is 10) -- parameter is passed to detect_AP_waveforms_in_train()
         
     before, after: floating point scalars, or Python Quantity objects in time 
         units convertible to the time units used by VmSignal.
@@ -5743,7 +5828,6 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             finally:
                 del(cframe)
         
-    #kwargs["ImSignal"] = ImSignal # use this for each segmentm, below!
     kwargs["thr"] = thr
     
     Iinj_0 = kwargs.pop("Iinj_0", None)
@@ -5771,8 +5855,6 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         
     elif Iinj_0 is not None:
         raise TypeError("Iinj_0 must be scalar float or quantity, or None; got %s instead" % type(Iinj_0).__name__)
-    
-    #kwargs["Iinj_0"] = Iinj_0
     
     if isinstance(delta_I, (float, int)):
         delta_I = delta_I * pq.pA
@@ -6433,12 +6515,14 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         The length of the window will be adjusted if the signal is upsampled.
         
     thr: floating point scalar: the minimum value of dV/dt of the Vm waveform to
-        be considered an action potential (default is 10) -- parameter is passed to detect_AP_waveforms_in_train()
+        be considered an action potential (default is 10) -- parameter is passed
+        to detect_AP_waveforms_in_train()
         
     before, after: floating point scalars, or Python Quantity objects in time 
         units convertible to the time units used by VmSignal.
         interval of the VmSignal data, respectively, before and after the actual
-        AP in the returned AP waveforms -- parameters are passed to detect_AP_waveforms_in_train()
+        AP in the returned AP waveforms -- parameters are passed to 
+        detect_AP_waveforms_in_train()
         
         defaults are:
         before: 1e-3
@@ -6520,15 +6604,15 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     Passed to detect_AP_rises
     -------------------------
     vm_thr: scalar: putative events (APs) that do not cross this threshold will be 
-                discarded (optional, default is 0)
-                
-                This parameter prevents flagging the passive rising phase of the Vm
-                at the start of the current injection as being an AP.
+            discarded (optional, default is 0)
             
-                It will also result in no AP waveforms being detected in poor 
-                recordings (e.g., where the APs do not seem to cross the 0 mV 
-                likely due to bad & leaky current clamp).
-                
+            This parameter prevents flagging the passive rising phase of the Vm
+            at the start of the current injection as being an AP.
+        
+            It will also result in no AP waveforms being detected in poor 
+            recordings (e.g., where the APs do not seem to cross the 0 mV 
+            likely due to bad & leaky current clamp).
+            
     
     rtol, atol, return_all → see detect_AP_rises
             
