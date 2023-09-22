@@ -5366,7 +5366,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         signal of the segment
     
     delta_I: python quantity (pA), float scalar, or None; current injection 
-        increment. ΔI
+        increment (ΔI)
         When None (defaut) the value will be determined from the Im signal
         
     Istart, Istop: time quantities for current step injection, or None
@@ -5801,6 +5801,9 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     
     if ImSignal is None:
         # needs Iinj, or  (Iinj_0, delta_I)
+        # NOTE: 2023-09-22 09:37:22
+        # OR use pyabfbridge to get the command waveforms
+        # available since Sept 2023
         if Iinj is None:
             # needs Iinj_0 and delta_I
             if all([v is not None for v in (Iinj_0, delta_I)]):

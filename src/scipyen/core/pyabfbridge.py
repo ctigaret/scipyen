@@ -617,6 +617,8 @@ class ABFEpoch:
         
     @property
     def pulseFrequency(self):
+        if float(self.pulsePeriod) == 0.:
+            return 0*pq.Hz
         return (1/self.pulsePeriod).rescale(pq.Hz)
         
     @property
@@ -756,6 +758,9 @@ class ABFOutputsConfiguration:
                 digHolds = list(map(bool, obj._epochSection.nEpochDigitalOutput)) # 3,2,1,0,7,6,5,4
                 self._digHoldingValue_ = list(reversed(digHolds[0:4])) + list(reversed(digHolds[4:]))
                 self._digUseLastEpochHolding_ = bool(obj._protocolSection.nDigitalInterEpisode)
+                
+                # general prrotocol data:
+                # TODO: move to ABDProtocol class!
             else:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
             
@@ -947,89 +952,10 @@ class ABFOutputsConfiguration:
         """When False, the command waveform returns to self._dacHoldingLevel_ after the last defined epoch"""
         return self._interEpisodeLevel_
     
-    # @returnToHold.setter
-    # def returnToHold(self, val:bool):
-    #     self._interEpisodeLevel_ = val == True
-    
     @property
     def epochs(self) -> list:
         return self._epochs_
 
-#     def text(self, sweep:int = 0):
-#         """
-#         Given a list of epochs, return a text string formatted to look similarly
-#         (but not identical) to the epoch table displayed as plain text in ClampFit.
-#         
-#         
-#         Regarding the command and digital outputs, this reflects the actual 
-#         DAC and DIG outputs for the specified sweep.
-#         
-#         """
-# 
-#         # create a copy of the epochs list we can modify
-#         epochList = self.epochs
-# 
-#         # remove empty epochs
-#         epochList = [x for x in epochList if x.firstDuration > 0*pq.ms]
-# 
-#         # prepare lists to hold values for each epoch
-#         epochCount = len(epochList)
-#         epochLetters = [''] * epochCount
-#         epochTypes = [''] * epochCount
-#         epochLevels = [''] * epochCount
-#         epochLevelsDelta = [''] * epochCount
-#         durations = [''] * epochCount
-#         durationsDelta = [''] * epochCount
-#         durationsSamples = [''] * epochCount
-#         durationsDeltaSampless = [''] * epochCount
-#         digitalPatternLs = [''] * epochCount
-#         digitalPatternHs = [''] * epochCount
-#         trainPeriods = [''] * epochCount
-#         pulseWidths = [''] * epochCount
-# 
-#         # populate values for each epoch
-#         pointsPerMsec = self._samplingRate_*1000
-#         for i, epoch in enumerate(epochList):
-#             assert isinstance(epoch, ABFEpoch)
-#             if epoch.typeName in (ABFEpochType.Unknown, ABFEpochType.Off):
-#                 continue
-#             epochLetters[i] = epoch.epochLetter
-#             epochTypes[i] = epoch.typeName
-#             epochLevels[i] = f"{epoch.firstLevel}"
-#             epochLevelsDelta[i] = f"{epoch.deltaLevel}"
-#             durations[i] = f"{epoch.firstDuration} ({epoch.nSamples(epoch.firstDuration, self._samplingRate_)} samples)"
-#             durationsDelta[i] = f"{epoch.deltaDuration} ({epoch.nSamples(epoch.deltaDuration, self._samplingRate_)} samples)"
-#             digitalPatternLs[i] = "".join(map(str, epoch.digitalPattern[0]))
-#             digitalPatternHs[i] = "".join(map(str, epoch.digitalPattern[1]))
-#             trainPeriods[i] = f"{epoch.pulsePeriod} ({epoch.nSamples(epoch.pulsePeriod, self._samplingRate_)} samples)"
-#             pulseWidths[i] = f"{epoch.pulseWidth} ({epoch.nSamples(epoch.pulseWidth, self._samplingRate_)} samples)"
-# 
-#         # convert list of epoch values to a formatted string
-#         padLabel = 25
-#         pad = 10
-#         txt = ""
-#         txt += "EPOCH".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in epochLetters])+"\n"
-#         txt += "Type".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in epochTypes])+"\n"
-#         txt += "First Level ".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in epochLevels])+"\n"
-#         txt += "Delta Level ".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in epochLevelsDelta])+"\n"
-#         txt += "First Duration ".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in durations])+"\n"
-#         txt += "Delta Duration ".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in durationsDelta])+"\n"
-#         txt += "Digital Pattern #3-0 ".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in digitalPatternLs])+"\n"
-#         txt += "Digital Pattern #7-4 ".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in digitalPatternHs])+"\n"
-#         txt += "Train Period ".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in trainPeriods])+"\n"
-#         txt += "Pulse Width ".rjust(padLabel)
-#         txt += " ".join([x.rjust(pad) for x in pulseWidths])+"\n"
-#         return txt.strip('\n')
-#     
     def epochsTable(self, sweep:int = 0):
         """Returns the Epochs definition(s) as a Pandas DataFrame.
         
@@ -1085,12 +1011,15 @@ class ABFOutputsConfiguration:
         
         return self.epochs[e]
     
+    def epochStart(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
+        pass
+        # sweepStart = 
+    
     def epochActualDuration(self, epoch:ABFEpoch, sweep:int=0) -> pq.Quantity:
         return epoch.firstDuration + sweep * epoch.deltaDuration
         
     def epochActualDurationSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
         return scq.nSamples(self.epochActualDuration(epoch, sweep), self._samplingRate_)
-        
     
     def epochFirstDurationSamples(self, epoch:ABFEpoch) -> int:
         return scq.nSamples(epoch.firstDuration, self._samplingRate_)
@@ -1105,6 +1034,8 @@ class ABFOutputsConfiguration:
         return scq.nSamples(epoch.pulsePeriod, self._samplingRate_)
     
     def epochPulseCount(self, epoch:ABFEpoch, sweep:int = 0) -> int:
+        if float(epoch.pulsePeriod) == 0.:
+            return 0
         return int(self.epochActualDuration(epoch,sweep)/epoch.pulsePeriod)
     
     def epochAnalogWaveform(self, epoch:ABFEpoch, previousLevel:pq.Quantity, 
