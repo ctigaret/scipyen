@@ -3195,6 +3195,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
     
     iinj: neo.AnalogSignal with the actual current injection step 
                 (without any tail that might have been added to sig)
+    
             or a tuple (t_start, t_stop) in pq.s: the start/stop times of the 
             injection step
     
@@ -3281,6 +3282,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
     intervals = np.ediff1d(starts)
     
     if use_min_isi:
+        # print(f"extract_AP_waveforms: use_min_isi: {use_min_isi}, iinj = {iinj}")
         if len(intervals):
             after = intervals.min()
             
@@ -3801,18 +3803,19 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             if any(v.size > 1 for v in (d,u)):
                 raise RuntimeError("More than one transition between levels has been detected")
                 
-            start, stop = (min(d,u), max(d,u))
+            istart, istop = (min(d,u), max(d,u))
             
             # if d < u:
             if not upward:
                 inj *= -1.0
             
-            vstep = vm.time_slice(start, stop + tail)
-            istep = im.time_slice(start, stop + tail)
+            i_timings = [istart,istop]
+            vstep = vm.time_slice(istart, istop + tail)
+            imstep = im.time_slice(istart, istop + tail)
             
             # print(f"extract_AP_train: start = {start}, stop = {stop}")
                 
-            Ihold = istep.mean()
+            Ihold = imstep.mean()
             
         except:
             print("Cannot parse current injection signal; use manually entered Ihold, start and stop times instead\n\n\n")
@@ -3868,7 +3871,8 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             istop = im[2] + vm.t_start
             
         vstep = vm.time_slice(istart, istop + tail)
-        istep = [istart, istop]
+        i_timings = [istart, istop]
+        imstep = None
     
     # resample the Vm signal (the sliced one)
     if resample_with_period is not None:
@@ -3880,7 +3884,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         if vstep.size == 0:
             raise RuntimeError("Check resampling; new period requested was %s and the resampled signal has vanished" % resample_with_period)
         
-    return vstep, Ihold, inj, istep
+    return vstep, Ihold, inj, imstep, i_timings
 
 def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s, min_fast_rise_duration=None, rtol=1e-5, atol = 1e-8, vm_thr=0):
     """Detects AP waveform time starts in an AP train elicited by step depolarizing current injection.
@@ -4018,6 +4022,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
                 
     iinj:       neo.AnalogSignal with the actual current injection step 
                 (without any tail that might have been added to sig)
+    
+                or a tuple with start/stop times for current injection
     
     thr :       scalar;
                 the rate of Vm rise threshold for AP detection (in V/s)
@@ -4453,6 +4459,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     
     # ### BEGIN Collect the AP waveforms
     #
+    # print(f"detect_AP_waveforms_in_train: iinj = {iinj}")
     ap_waves = extract_AP_waveforms(sig, iinj, ap_fast_rise_start_times, before=before, after=after, use_min_isi=use_min_detected_isi)
     
     ## ap_waveform_signals is a list of neo.AnalogSignals!
@@ -6721,7 +6728,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     
     passive_measure_names = ["BaselineVm", "SteadyStateVm", "VSag", "VRebound", "Rin", "Capacitance", "Tau", "VmFit", "VmFiltered"]
     
-    vstep, Ihold, Iinj, istep = extract_AP_train(vm,im,
+    vstep, Ihold, Iinj, istep, i_timings = extract_AP_train(vm,im,
                                     tail=tail,
                                     method=method,
                                     box_size=box_size, 
@@ -6770,8 +6777,9 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # ap_train is always a SpikeTrain, even if empty
     kwargs["t_start"] = vm.t_start
     kwargs["t_stop"] = vm.t_stop
+    
     # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
-    ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, istep, **kwargs)
+    ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
     # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
     
     result = collections.OrderedDict() #dict()
@@ -6794,6 +6802,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         segment.spiketrains.append(ap_train)
         
     result["Injected_current"] = Iinj
+    result["Injection_timings"] = i_timings
     result["Ihold"] = Ihold
     result["AP_train"] = ap_train
     
