@@ -7,7 +7,7 @@ Harmonize the API (this is the role of the upcoming modelfitting.py module)
 """
 
 #### BEGIN core python modules
-import os, sys, traceback, warnings, numbers, collections
+import os, sys, traceback, warnings, numbers, collections, typing
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -605,8 +605,6 @@ def fit_Event_model(data, p0, **kwargs):
     
     # not used here, but remove it from kwargs anyway
     args        = kwargs.pop("args",        ()) 
-    
-    
     
     # find out where NaNs are in data
     realDataNdx = ~np.isnan(data)
