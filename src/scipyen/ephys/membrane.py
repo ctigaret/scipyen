@@ -3478,7 +3478,8 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
     
     return waves
 
-def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, atol = 1e-8, return_all=False):
+def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, 
+                    rtol = 1e-5, atol = 1e-8, return_all=False):
     # NOTE: 2019-11-29 16:49:14
     # use a Vm threshold to discard "aberrant" events
     
@@ -3498,7 +3499,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     # to be higher than a "ground truth" threshold (~ -60 mV) -- cumbersome
     #
     # 3) template matching (correlation) with a template AP waveform (synthetic or otherwise)
-    #   -- needs constructing a templkate waveform selected by user.
+    #   -- needs constructing a template waveform selected by user.
     #
     # 4) give a minimum value of AP ISI or duration of the putative AP waveform
     
@@ -3596,7 +3597,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     # 1) get the logical index where dv/dt >= threshold -- as in NOTE: 2019-04-25 09:22:13
     # but do not use any condition d2v/dt2 as it is too wobbly
     fast_rise_starts = (dsdt.magnitude[:,] >= dsdt_thr)
-    # 2) as in NOTE: 2019-04-25 09:22:13 get the loical flags for the starts of
+    # 2) as in NOTE: 2019-04-25 09:22:13 get the logical flags for the starts of
     # the regions of dv/dt >= threshold
     fast_rise_start_flags = np.ediff1d(np.asfarray(fast_rise_starts), to_begin = 0) == 1 
     
@@ -3615,13 +3616,16 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     # the following _DROPS_ signal.t_stop at the end of the array
     fast_rise_start_times = fast_rise_start_times[accept_flags] 
     
-    # this shuould also preclude the use of a minisi condition
+    # this should also preclude the use of a min_isi condition
+    
     # ### END NOTE: 2019-11-29 16:40:34 New algorithm
     
     # NOTE: 2019-04-29 09:52:03
     # to find out when the fast rising phase of the waveform ends we get the time
     # of the next local maximum in the dsdt waveform slice following each fast 
     # rise start time;
+    #
+    # preallocate
     fast_rise_stop_times    = np.full_like(fast_rise_start_times, np.nan)
     
     # NOTE: 2019-04-29 11:13:46
@@ -3630,10 +3634,17 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
     # while d2vdt2 waveform is negative, but these conditions are likely to be
     # to met simultaneously met at several time points along the waveforms meaning
     # we'll have to pick the only first of such occurrence, which involves more CPU work
+    #
+    # preallocate
     peak_times              = np.full_like(fast_rise_start_times, np.nan)
     
     for k, t in enumerate(fast_rise_start_times):
         #print("detect_AP_rises k: %s,  t=%s" % (k,t))
+        
+        # NOTE: 2023-09-24 11:02:07
+        # start is fast_rise_start_times[k]
+        # stop  is fast_rise_start_times[k+1], or signal stop time (for the last AP)
+        
         if t < s.t_start:
             # this won't ever happen would it?
             t = s.t_start
@@ -3641,10 +3652,10 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
         if k < len(fast_rise_start_times)-1:
             t1 = fast_rise_start_times[k+1]
             
-        else: # avoid going past the end in fast_rise_start_times
+        else: # avoid going past the end in fast_rise_start_times - see NOTE: 2023-09-24 11:02:07
             t1 = s.t_stop
             
-        wave = s.time_slice(t, t1)
+        wave  = s.time_slice(t, t1)
         dwave = dsdt.time_slice(t, t1)
         
         ndx = dwave.argmax()
@@ -3652,7 +3663,8 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0, rtol = 1e-5, at
         
         peak_ndx = wave.argmax()
             
-        peak_times[k] = s.times[peak_ndx]
+        # peak_times[k] = s.times[peak_ndx] # BUG 2023-09-24 11:06:27 - reports an earlier time
+        peak_times[k] = wave.times[peak_ndx]
         
     return fast_rise_start_times, fast_rise_stop_times, peak_times#, waves, dwaves
         
@@ -3907,16 +3919,47 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         
     return vstep, Ihold, inj, imstep, i_timings
 
-def detect_AP_waveform_times(sig, thr=10, smooth_window=5, min_ap_isi= 6e-3*pq.s, min_fast_rise_duration=None, rtol=1e-5, atol = 1e-8, vm_thr=0):
-    """Detects AP waveform time starts in an AP train elicited by step depolarizing current injection.
+def detect_AP_waveform_times(sig, thr=10, smooth_window=5, 
+                             min_ap_isi= 6e-3*pq.s, 
+                             min_fast_rise_duration=None, 
+                             rtol = 1e-5, 
+                             atol = 1e-8, 
+                             vm_thr=0):
+    """Detects AP waveform timings in an AP train elicited by a step of depolarizing current injection.
     
     Detection is done primarily via thresholding on the 1st derivative of the Vm signal
     
     Parameters:
     ===========
     sig: neo.AnalogSignal with the Vm data
+    
     thr: scalar, detection threshold on the dV/dt
-    smooth_window: scalar int, the size of boxcar smoothig window (default is 5)
+    
+    smooth_window: scalar int, the size of boxcar smoothing window (default is 5)
+    
+    min_ap_isi: minimum interval between two successive APs (default 6 ms)
+        When two putative APs are "detected" within an interval smaller than this, 
+        the second putative AP is discarded
+    
+    min_fast_rise_duration: pq.Quantity (in s) minimum duration of an AP upstroke; 
+        used to discard Vm fluctuations that have AP-like rates of change, and 
+        therefore "detected" as APs, but their rising phase is too short; 
+    
+        An example is the upstroke of the Vm at the beginning of the depolarizing
+        current injection step, where dV/dt may be larger than 'thr'.
+
+        the default value is:
+    
+        (10**(np.floor(np.log10(sig.sampling_period.rescale(pq.s).magnitude)) + 1)) * pq.s
+    
+        which is corresponds roughly t0 ten sampling periods
+    
+        rtol, atol: float = relative (1e-5) and absolute (1e-8) tolerances used 
+            in numeric functions
+    
+        vm_thr: float = membrane voltage used to reject putative "detected" APs 
+            that do not cross this threshold defalt is 0 (mV)
+    
     """
     
     from scipy.signal import boxcar
@@ -6903,8 +6946,6 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # result["Passive_analysis"] = passive
     
     return (result, vstep, passive) if passive_analysis else (result, vstep)
-
-def 
 
 def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     """Extracts AHPs from averaged trials at a given Iinj.
