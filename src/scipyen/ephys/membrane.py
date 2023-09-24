@@ -1409,7 +1409,7 @@ def rheobase_latency(*args, **kwargs):
     plot: boolean, default False:
         When True, plots the fitted curve
         
-    minsteps: int (default3) minimum number or current injection steps to use
+    minsteps: int (default 3) minimum number or current injection steps to use
         
     The following are passed directly to fit_Frank_Fuortes() function:
     
@@ -1471,15 +1471,16 @@ def rheobase_latency(*args, **kwargs):
                 (see NOTE (2))
         
     NOTE (1):
-        The original equation (1) is used for the determination of the 
-        membrane time-constant from strength-latency relationship.
+        Equation (1) is used for the determination of the membrane time-constant 
+        from strength-latency relationship.
         
         Irh/I = 1 - exp(-t/tau)                                         (1)
         
             where Irh (rheobase curent) is measured experimentally as the 
-            smallest I value where AP are fired.
+            smallest value of depolarizing somatic current injection (I) that 
+            triggers at least one AP.
             
-        In practice, the following equation is used:
+        In practice, we use equation (2):
         
         Irh/I = 1 - exp(-(t-t0)/tau)                                    (2)
             
@@ -1809,10 +1810,26 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                    ssEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None, 
                    steadyStateDuration = 0.05 * pq.s, 
                    box_size = 0):
-    """
-    Square pulse current injection in I-clamp experiments.
+    """Measurement of passive membrane properties.
     
-    Typically, this is a hyperpolarizing current injection step.
+    Uses membrane potential recorded during sweeps containins a step of somatic 
+    hyperpolarizing current injection. 
+
+    The current injection step should occur some time after the beginning of the
+    sweep so that a baseline membrane voltage is recorded, and should last long
+    enough for the membrane voltage to reach a stable steady-state during the
+    injection step.
+    
+    The sweep should be long enough to allow the membrane voltage to relax 
+    back to baseline after the current injection step has ended.
+    
+    For theoretical details please see, e.g.:
+    
+    Tamagnini et al, (2015) Frontiers in Cellular Neuroscience, 9, 
+        doi: 10.3389/fncel.2015.00372
+    
+    Parameters:
+    ===========
     
     vm: analogsignal with Vm recorded in current clamp
     
@@ -1897,9 +1914,13 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     
     membrane time constant τ: pq.Quantity in ms
     
-    vfit:                   dict with the result of fitting the initial Vm 
-                            change to a single exponential decay model
-
+    vfit:                   dict with the result of fitting the Vm downstroke
+                            to a single exponential decay model (the Vm downstroke
+                            follows immediately the start of hyperpolarizing current)
+    
+                            NOTE: The fit is performed on the 10%-90% of the Vm
+                            downstroke to avoid fitting the Vsag downstroke.
+    
     v_flt:                  neo.AnalogSignal - the filtered version of the vm
                             signal
     """
@@ -6132,8 +6153,22 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         traceback.print_exc()
         
     
-def plot_rheobase_latency(data, xstart=None, xend=None):
-    #import models
+def plot_rheobase_latency(data, 
+                          xstart:typing.Optional[typing.Union[float, str]]="auto", 
+                          xend:typing.Optional[typing.Union[float, str]]="auto"):
+    """Plots rheobase-latency curve determined from rheobase-latency analysis.
+    
+    Parameters:
+    ===========
+    data: a dictionary as output by rheobase_latency(…) or analyse_AP_step_injection_series(…)
+    xstart: minimum latency (the Frank-Fuortes model generates a hyperbola which may look
+            wiord in its entirety)
+            float, string, or None
+    
+            When a string, the only supported value is "auto"
+    
+    xend: like xstart, for the maximum latency in the plot
+    """
     
     if not isinstance(data, dict):
         raise TypeError("Expecting a dict; got %s instead" % type(data).__name__)
@@ -6152,8 +6187,11 @@ def plot_rheobase_latency(data, xstart=None, xend=None):
         else:
             raise ValueError("data does not seem to contain a rheobase-latency fit")
         
-    elif all([v in data for v in ("I", "Latency", "Irh")]):
+    elif all([v in data for v in ("I", "Latency", "Irh", "Name", "fitrheo")]):
         if "fit" not in data or not isinstance(data["fit"], dict):
+            raise ValueError("data does not seem to contain a rheobase-latency fit")
+        
+        if data["Name"] != "rheobase_latency_analysis":
             raise ValueError("data does not seem to contain a rheobase-latency fit")
             
         
@@ -6166,16 +6204,27 @@ def plot_rheobase_latency(data, xstart=None, xend=None):
         x = data["Latency"].magnitude
         y = data["I"].magnitude
         
-        if all([x is None for x in (xstart, xend)]):
-            x1 = data["fit"]["x"]
-            y1 = data["fit"]["y"]
+        if all(isinstance(x, numbers.Number) for x in (xstart, xend)) and all([np.isinf(x) for x in (xstart, xend)]):
+            ndx = ~np.isnan(data["fit"]["x"])
+            x1 = data["fit"]["x"][ndx]
+            y1 = data["fit"]["y"][ndx]
+            
             
         else:
             if xstart is None:
                 xstart = 0
                 
-            if xend is None:
+            elif xstart == "auto":
+                xstart = x[y.argmax()]
+                
+            elif not isinstance(xstart, (float, int)):
+                raise TypeError(f"'xstart' expected to be None, a float (in s) or the string 'auto'; got {xstart} instead")
+            
+            if xend in (None, "auto"):
                 xend = np.nanmax(x)
+                
+            elif not isinstance(xend, (float, int)):
+                raise TypeError(f"'xend' expected to be None, a float (in s) or the string 'auto'; got {xend} instead")
                 
             #print("xstart", xstart, "xend", xend)
             
@@ -6741,9 +6790,17 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                                     Itimes_samples = Itimes_samples)
     if passive_analysis:
         if Iinj < 0 * pq.pA:
-            passive_measures = passive_Iclamp(vm, im, steadyStateDuration = steadyStateDuration,
+            vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt = passive_Iclamp(vm, im, steadyStateDuration = steadyStateDuration,
                                             box_size = box_size)
+            
+            # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
+            vsag -= vss
+            vrebound -= vbase
+            
+            passive_measures = (vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt)
+            
             passive = dict(zip(passive_measure_names, passive_measures))
+            
         else:
             passive = dict(zip(passive_measure_names, [np.nan] * len(passive_measure_names)))
             passive["VmFit"] = None
@@ -6751,7 +6808,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         
     
     
-    # print(f"analyse_AP_step_injection_sweep: istep = {istep}")
+    # print(f"analyse_AP_step_injection_sweep: istep = {istep}, i_timings = {i_timings}")
     
     # adjust the smooth window for the new sampling_period
     if smooth_window > 0:
@@ -6846,6 +6903,8 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # result["Passive_analysis"] = passive
     
     return (result, vstep, passive) if passive_analysis else (result, vstep)
+
+def 
 
 def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     """Extracts AHPs from averaged trials at a given Iinj.
