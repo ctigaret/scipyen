@@ -2,14 +2,14 @@
 """Processing of electrophysiology signal data.
 """
 #### BEGIN core python modules
-import sys, traceback, inspect, numbers, typing, datetime
+import sys, traceback, inspect, numbers, typing, datetime, dataclasses
 import warnings
 import os, pickle
 import collections
 import itertools
 import math
 from copy import deepcopy
-from dataclasses import MISSING
+from dataclasses import (dataclass, asdict, MISSING)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -84,6 +84,240 @@ import iolib.pictio as pio
 #### BEGIN pict.ephys modules
 import ephys.ephys as ephys
 #### END pict.ephys modules
+
+AP_WIDTH_CODES =   {0: "AP_durations_V_0",
+                    1: "AP_durations_V_onset",
+                    2: "AP_durations_V_half_max",
+                    3: "AP_durations_V_third_max",
+                    4: "AP_durations_V_quart_max"}
+
+
+@dataclass
+class MembranePropertiesAnalysisParameters:
+    # biological sample parameters
+    cell:str = "c01"
+    # identifier for this cell; there may be more than one cell from the same animal
+    #
+    # NOTE: the rules for constructing a cell ID are up to you, BUT:
+    #   1) be consistent
+    #   2) should contain ONLY alphanumeric characters and underscore ('_')
+    #   3) should NOT begin with a digit or underscore ('_')
+    # 
+    
+    source:str = "test" 
+    # identifier for the cell source: this may a (meaningful) combination of:
+    #   animal ID,
+    #   experimental date
+    #   cortex region
+    #
+    #   e.g. TS2_1234567_01_02_22_VisCx_
+    #
+    # NOTE: the rules for naming the source are up to you, BUT:
+    #   1) be consistent
+    #   2) should contain ONLY alphanumeric characters and underscore ('_')
+    #   3) should NOT begin with a digit or underscore ('_')
+    
+    
+    sex:str = "f"
+    # ID of animal sex; one of "f", "m", "na" (case-insensitive)
+    #
+    
+    genotype:str = "het"
+    # genotype of the animal - keep it simple
+    #
+    # NOTE: avoid strings like (+/-, TSNeo/-, etc) as they don't play well when
+    # importing data in, say, R
+    # These are entirely conventional, and, within the same line of genetic 
+    # animal model they would have a well-defined meaning
+    #
+    
+    age:str = "NA"
+    # animale age - almost free-form string, see NOTE for animal ID - keep it
+    #   simple, yet meaningful, and indicate units (e.g. 3_mo, or 20_d, or 1_yr)
+    #
+    # NOTE: these are simply for a quick information; in the future Scipyen will
+    # provide a more standardized way to store this information, hopefully more
+    # suitable to some sort of database management
+    
+    postnatal:bool = True
+    # this is only useful for recordings spanning animal models and cultures
+    # leave as is, for now
+    #
+    
+    treatment:str = "veh"
+    # this is only useful when drugs were applied to the slice/cell; 
+    # the string may contain dosage or concentration, and maybe duration,
+    #   e.g. 'Nim_10uM_5_min'
+    #
+    # NOTE: in the future Scipyen will provide a standardized way to store 
+    # treatment manipulation (e.g drug dosage, duration, phase of experiment when
+    # drug is applied, etc), hopefully more suitable to some sort of database 
+    # management.
+
+    # Electrophysiology recording parameters: <- These are important and need to
+    # reflect the Clampex protocol used.
+    
+    
+    VmSignal:typing.Union[str, int] = "Vm_prim_0"  
+    # The name or index of the actual membrane voltage signal.
+    # the name depends on how the ADC signals were named in Clampex's Lab bench.
+    #
+    # When not sure, just use the int index (e.g. 0 for the first signal, etc.)
+    # just inspect the data (neo.Block) in SignalViewer to see which signal is the 
+    # one carrying a copy of the currrent injection command
+    # 
+
+    ImSignal:typing.Union[str, int] = "Im_sec_0"   
+    # The name of the signal representing the membrane current - this depends on
+    # how the ADC signals were named in Clampex's Lab bench
+    #
+    # When not sure, just use the int index (e.g. 1 for the second signal, etc.)
+    # just inspect the data (neo.Block) in SignalViewer to see which signal is the 
+    # one carrying a copy of the currrent injection command
+    #
+    # If such signal is NOT found, then set 'useEmbeddedProtocol' to True
+    # 
+    # NOTE: This signal is the secondary output signal (when the
+    # amplitifer is in IC mode, this signal ≊ injected current) and is recorded
+    # only if the correspnodiong am output is plugged into an analog input of the
+    # DAQ board
+    #
+    # Here, it is used to infer the intensity and timings of the current injection
+    # in each sweep.
+    #
+    # Alternatively, one should set 'useEmbeddedProtocol' to True
+    #
+    # This parameter is use only if 'useEmbeddedProtocol' is False, see below
+    #
+
+    useEmbeddedProtocol:bool = True 
+    # Flag indicating whether to use the ABF protocol information embedded in the 
+    # data (stored in ABF files) to infer the timings and amplitude of the current 
+    # injection steps. This data is also propagated in the neo.Block annotations
+    # attribute upon reading an ABF file, and Scipyen can now handle this 
+    # automatically.
+    #
+    # WARNING when this is True, this requires the latest build of Scipyen
+    #
+
+    CurrentInjectionEpochIndex:int = 1
+    # index of the ABF epoch in the protocol that defines the current injection
+    # step (typically this is epoch 1 i.e., the second epoch)
+    #
+    # NOTE: Currently this is not used; the code in batch_primary_analysis tries
+    # to infer the relevant epoch using the protocol information reconstructed 
+    # from the neo.Block data.
+    #
+
+    dV_dt_thr:pq.Quantity = dataclasses.field(default_factory = lambda: 10 * pq.V/pq.s)  # this is the default; change values here
+    # This is the dV/dt threshold for AP detection: an Vm change faster than
+    # this value is considered to belong to the start of an AP upstroke.
+    #
+    # By default, this is now 10 * pq.V/pq.s but you may want/need to change it
+    # to suit your cells. Just change the numeric value, leave units as they are.
+    #
+    # A value of 20 was historic (Tamagnini et al) but overestimates the start 
+    # time of the AP (and hence its onset)!!!
+
+    min_Vm_AP:pq.Quantity = dataclasses.field(default_factory = lambda: 0 * pq.mV)  # this is the default; change values here
+    # Threshold of membrane voltage that needs to be crossed by the upstroke
+    # in order to be considered an AP (anything below that is a "false positive"
+    # for a detection based on dV/dt threshold).
+    # 
+    # This is necessary because depending on the quality of the record and the 
+    # current injection intensity, some fluctuations in the Vm may happen at a 
+    # rate faster than 'dV_dt_thr' given above and therefore be "false positives"
+    # when detection is based on dV/dt threshold.
+    #
+    # Notably, this may happen:
+    #   • AT THE START of a large injection step, when the Vm raises passively 
+    #   but still quite fast, before it settles to a slower-rising phase which 
+    #   will trigger a true AP once is gets above the biological Vm threshold.
+    #
+    #   • when the recording is poor/leaky, and (some) APs are severely blunted
+    #   CAUTION: if you find this value needs to be too low, you should question
+    #   the quality of the data)
+    #
+    # The default here (0 mV) is large enough to drop the "false positives" at
+    # the start of the current injection step, yet small enough to capture APs
+    # that don't fully reach their expected peak values (~ +20 mV or more).
+    #
+    # Perhaps not relevant for your study, but some dendritic spikes CAN propagate
+    # at the soma and "look" like APs that don't cross this threshold.
+    #
+
+    freq_bounds:np.ndarray = dataclasses.field(default_factory = lambda: np.array([10, 40, 80, 120, ]) * pq.Hz)  # this is the default; change values here
+    # this is needed to set up the 1ˢᵗ ISI frequency bands;
+    # you may want to change these if you find that too many cells are not firing at
+    # the frequencies you are after
+    #
+    # just edit the values between brackets ([])
+    #
+
+    width_code:int = 3  
+    # where to measure the AP width - see WIDTH_CODES above; my default is ⅓ of max
+    # to measure AP width at half-max (½ of max) set this to 2
+
+    ssDuration:pq.Quantity = dataclasses.field(default_factory = lambda: 50 * pq.ms)   # this is the default; change values here
+    # duration of a window to calculate the mean baseline and
+    #   the mean steady-state Vm for passive properties
+    #
+    # for baseline, this window ends with the start time of 
+    #   the hyperpolarizing current injection step
+    #
+    # for steady-state, this window ends with the stop time
+    #   of the hyperpolarizing current injection
+    #
+    # in both cases, the window starts at the stop time from
+    #   above MINUS the ssDuration
+    #   (in case you wonder, it avoids the rebound because
+    #    the rebound occurs, if at all, AFTER the hyperpolarizing 
+    #    current injection was stopped)
+    #
+                            
+    box_size:int = 0            
+    # int: duration (size) of a boxcar filter applied to the Vm before
+    # passive properties analysis
+    #
+                            
+    average_passive_results:bool = True  
+    # flag indicating how to measure passive properties
+    # when there are replicates of current injection steps:
+    #
+    # When True: the script reports the mean of 
+    # the values of Tau, Rin,capacitance Vsag, Vrebound, etc
+    # across the replicates
+    #
+    # When False: the script will determine these
+    # parameters on the averaged Vm signal (obtained
+    # by averaging the Vm signal across the replicates)
+    #
+                       
+    Irh_factor:int  = 1
+    # int: the injected current expressed as Irheobase × Irh_factor
+    # to collate AP instantaneous frequencies, amplitudes, and fastAHPs
+    #
+    # e.g. to get these at TWICE the rheobase current, 
+    # set Irh_factor = 2
+    #
+    # there is nothing wrong (in principle) to use 
+    # an Irh_factor = 1 or larger (assuming larger currents
+    # have been used)
+    #
+    
+    nAPs:int = 5
+    # number of first APs in the train, for AP widths
+    #
+    
+    isi_start:int = 0
+    isi_span:int = 1
+    # these two define the boundary for the ISI used in frequency banding
+    # the defaults (0 and 1) represent the first ISI (i.e., between AP0 and AP1)
+    # if you want the ISI between, say first and the third APs, then set 
+    # isi_start = 0
+    # isi_span = 3
+    #
+
 
 # NOTE: 2023-06-12 16:09:45
 # measure_Rs_Rin must be defined early so that it can be picked up by the with_doc
@@ -1925,7 +2159,9 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                             signal
     """
     
-    from scipy.signal import boxcar, convolve
+    # from scipy.signal import boxcar, convolve
+    from scipy.signal import convolve
+    from scipy.signal.windows import boxcar
     
     baseT0 = baseT1 = ssT0 = ssT1 = None
     
@@ -3596,6 +3832,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     # slightly modified detection algorithm:
     # 1) get the logical index where dv/dt >= threshold -- as in NOTE: 2019-04-25 09:22:13
     # but do not use any condition d2v/dt2 as it is too wobbly
+    # print(f"detect_AP_rises dsdt_thr = {dsdt_thr}")
     fast_rise_starts = (dsdt.magnitude[:,] >= dsdt_thr)
     # 2) as in NOTE: 2019-04-25 09:22:13 get the logical flags for the starts of
     # the regions of dv/dt >= threshold
@@ -3606,6 +3843,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     # __array_finalize__ will append its own (dimensionless); hence we correct
     # this by multiplying the result with the signal's times units
     fast_rise_start_times = np.append(s.times[fast_rise_start_flags], s.t_stop) * s.times.units
+    # print(f"detect_AP_rises fast_rise_start_times = {fast_rise_start_times}")
     
     # 4)  now use the start times pairwise to slice the original Vm signal;
     # we retain thse start times which begin a segment of the signal that overshoots
@@ -3615,6 +3853,8 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
 
     # the following _DROPS_ signal.t_stop at the end of the array
     fast_rise_start_times = fast_rise_start_times[accept_flags] 
+    # print(f"\t-> accepted fast_rise_start_times = {fast_rise_start_times}")
+    
     
     # this should also preclude the use of a min_isi condition
     
@@ -3720,9 +3960,9 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
         
     box_size: int >= 0; default is 0.
     
-        size of the boxcar (scipy.signal.boxcar) used for filtering the Im signal
-        containing the current injection rectangular waveform, before detecting 
-        the waveform boundaries (t_start & t_stop)
+        size of the boxcar (scipy.signal.windows.boxcar) used for filtering the 
+        Im signal containing the current injection rectangular waveform, before 
+        detecting the waveform boundaries (t_start & t_stop)
         
         default is 0 (no boxcar filtering)
         
@@ -3904,6 +4144,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             istop = im[2] + vm.t_start
             
         vstep = vm.time_slice(istart, istop + tail)
+        # print(f"extract_AP_train: vstep.t_start = {vstep.t_start}, vstep.t_stop = {vstep.t_stop}")
         i_timings = [istart, istop]
         imstep = None
     
@@ -4038,6 +4279,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     else:
         d2v_dt2_smooth = d2v_dt2
         
+    # print(f"detect_AP_waveform_times thr = {thr}")
     ap_rises = detect_AP_rises(sig,
                                 dv_dt_smooth,
                                 d2v_dt2_smooth,
@@ -4046,6 +4288,8 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
                                 vm_thr=vm_thr)
     
     ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_peak_times = ap_rises
+    
+    # print(f"detect_AP_waveform_times ap_fast_rise_start_times = {ap_fast_rise_start_times}")
     
     if ap_fast_rise_start_times is None:
         ap_fast_rise_durations = None
@@ -4337,7 +4581,9 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     """
     import scipy.interpolate
     from scipy.interpolate import PchipInterpolator as pchip
-    from scipy.signal import boxcar, convolve
+    # from scipy.signal import boxcar, convolve
+    from scipy.signal import convolve
+    from scipy.signal.windows import boxcar
     
     #### BEGIN parse parameters
     # make sure before & after are quantities with compatible time units
@@ -4451,6 +4697,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     #### BEGIN Detect APs by thresholding on the 1st derivative of the Vm signal
     #
     
+    # print(f"detect_AP_waveforms_in_train: thr = {thr}")
+    
     #print(f"detect_AP_waveforms_in_train: vm_thr = {vm_thr}")
     ap_waveform_times = detect_AP_waveform_times(sig, thr=thr, 
                                                  smooth_window=smooth_window,
@@ -4461,6 +4709,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
 
     ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = ap_waveform_times
     
+    # print(f"detect_AP_waveforms_in_train: sig.units = {sig.units}")
     # ### END detect APs by thresholding
     
     train_annotations = dict()
@@ -4491,6 +4740,10 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     
     # indexing vector for the AP starts in the actual Vm trace
     sig_AP_start_index = [sig.time_index(t) for t in ap_fast_rise_start_times]
+    
+    # print(f"detect_AP_waveforms_in_train: ap_fast_rise_start_times = {ap_fast_rise_start_times}")
+    # print(f"detect_AP_waveforms_in_train: AP_start_index = {sig_AP_start_index}")
+    # print(f"detect_AP_waveforms_in_train: sig at AP_start_index = {sig.magnitude[sig_AP_start_index]}")
     
     #### BEGIN Collect AP values
     # See nested BEGIN - END comments for what are these
@@ -5913,6 +6166,8 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         
     kwargs["thr"] = thr
     
+    # print(f"\n\nanalyse_AP_step_injection_series thr = {kwargs['thr']}")
+    
     Iinj_0 = kwargs.pop("Iinj_0", None)
     delta_I = kwargs.pop("delta_I", None)
     
@@ -6032,7 +6287,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     
     try:
         for k, segment in enumerate(segments):
-            #print("segment %d" %k)
+            # print(f"\n\t-> ### analyse_AP_step_injection_series: sweep {k}: ###\n")
             if isinstance(Iinj, pq.Quantity):
                 im = (Iinj[k], Istart, Istop)
             else:
@@ -6820,6 +7075,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     
     passive_measure_names = ["BaselineVm", "SteadyStateVm", "VSag", "VRebound", "Rin", "Capacitance", "Tau", "VmFit", "VmFiltered"]
     
+    # print(f"\nanalyse_AP_step_injection_sweep box_size = {box_size}")
     vstep, Ihold, Iinj, istep, i_timings = extract_AP_train(vm,im,
                                     tail=tail,
                                     method=method,
@@ -6836,9 +7092,13 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
             vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt = passive_Iclamp(vm, im, steadyStateDuration = steadyStateDuration,
                                             box_size = box_size)
             
+            # # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
+            # vsag -= vss
+            # vrebound -= vbase
+            
             # represent vsag and vrebound relative to their bases (vss abd vbase, respectively)
-            vsag -= vss
-            vrebound -= vbase
+            vsag = abs(((vsag-vss)/vss).magnitude) * 100
+            vrebound = abs(((vrebound-vbase)/vss).magnitude) * 100
             
             passive_measures = (vbase, vss, vsag, vrebound, Rin, capacitance, time_constant, vfit, v_flt)
             
@@ -6854,15 +7114,20 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # print(f"analyse_AP_step_injection_sweep: istep = {istep}, i_timings = {i_timings}")
     
     # adjust the smooth window for the new sampling_period
+    # print(f"analyse_AP_step_injection_sweep smooth_window = {smooth_window}")
+    
     if smooth_window > 0:
+        # should be 1.0 if both resample_with_period or resample_with_rate are None
         upsampling = (vm.sampling_period.rescale(pq.s) / vstep.sampling_period.rescale(pq.s)).magnitude.flatten()[0]
         
+        # print(f"\t-> upsampling = {upsampling}")
         smooth_window = int(smooth_window * upsampling)
         
         if smooth_window % 2 == 0:
             smooth_window += 1
             
         kwargs["smooth_window"] = smooth_window
+        # print(f"\t-> new smooth_window = {smooth_window}")
             
         
     #Ihold = im.time_slice(d, im.t_stop).mean()
@@ -6878,6 +7143,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     kwargs["t_start"] = vm.t_start
     kwargs["t_stop"] = vm.t_stop
     
+    # print(f"analyse_AP_step_injection_sweep kwargs thr {kwargs['thr']}")
     # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
     ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
     # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
