@@ -566,10 +566,10 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     # or the internal console to script execution and adding of script file to
     # the internal scripts list  here.
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, scipyenWindow=None):
         super(ScriptManager, self).__init__(parent)
         self.setupUi(self)
-        WorkspaceGuiMixin.__init__(self, parent=parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent,scipyenWindow=scipyenWindow)
         self._configureUI_()
 
         self.setWindowTitle("Scipyen Script Manager")
@@ -855,8 +855,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         item = self.scriptsTable.item(row, 1).text()
 
         self.signal_pasteScript.emit(item)
-
-
+        
 # NOTE 2019-09-12 09:34:31
 # Beginning to consolidate variable handling in the GUI framework
 # TODO: make this configurable (a mime type-like mechanism?)
