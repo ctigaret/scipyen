@@ -4326,7 +4326,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #         win[1].close()
 
         if sys.platform == "win32":
-            QtWidgets.QApplication.closeAllwindows()
+            QtWidgets.QApplication.closeAllWindows()
             
         evt.accept()
 
