@@ -293,9 +293,9 @@ class MembranePropertiesAnalysisParameters:
     # by averaging the Vm signal across the replicates)
     #
                        
-    Irh_factor:int  = 1
+    rheobase_factor:int  = 1
     # int: the injected current expressed as Irheobase × Irh_factor
-    # to collate AP instantaneous frequencies, amplitudes, and fastAHPs
+    # to collate AP instantaneous frequencies, amplitudes, fastAHPs, etc.
     #
     # e.g. to get these at TWICE the rheobase current, 
     # set Irh_factor = 2
@@ -305,6 +305,30 @@ class MembranePropertiesAnalysisParameters:
     # have been used)
     #
     
+    test_Iinj:pq.Quantity = dataclasses.field(default_factory = lambda: 300 * pq.pA)
+    # current injection where to collect AP instantaneous frequencies, amplitudes,
+    # aterspikepotentials, etc   
+    #
+    # Typically this would be something like rheobase_factor × Irheobase, BUT:
+    # a) you may not always know the Irh when doing this analysis
+    # b) the protocol may not include an injection step at rheobase_factor × Irheobase
+    # therefore you may decide to use a higher value that rheobase_factor × Irheobase
+    #
+
+    minAPs_for_active_properties:int = 10
+    # int
+    # minimum number of APs in the train for general active properties (i.e.
+    # AP instantaneous frequencies, amplitudes, aterspikepotentials, etc) for 
+    # things like adaptation and attenuation, measured at test_Iinj
+    #
+    # If the number of APs at test_Iinj is less than this number, missing
+    # values are NaNs.
+    #
+    # If the number of APs at test_Iinj is larger than this number, the excess
+    # APs will be discarded.
+    
+
+
     nAPs:int = 5
     # number of first APs in the train, for AP widths
     #
@@ -317,6 +341,12 @@ class MembranePropertiesAnalysisParameters:
     # isi_start = 0
     # isi_span = 3
     #
+    
+    fAHP_window:pq.Quantity = dataclasses.field(default_factory = lambda: 3 * pq.ms)
+    # window duration for afterspike fAHP analysis
+    
+    ADP_window:pq.Quantity = dataclasses.field(default_factory = lambda: 6 * pq.ms)
+    # window duration for afterspike ADP analysis
 
 
 # NOTE: 2023-06-12 16:09:45
@@ -1519,7 +1549,7 @@ def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100)
     if len(ii) == 0:
         return
     
-    # make sure injected currents are in ascnding order
+    # make sure injected currents are in ascending order
     i_sort = np.argsort(ii) # get an indexing vector for sorting
     
     ii = ii[i_sort].flatten() # sorted currents
@@ -1785,6 +1815,8 @@ def rheobase_latency(*args, **kwargs):
             return None
         
     xstart = kwargs.get("xstart", 0)
+    
+    # print(f"rheobase_latency: \n\tIinj_mean = {Iinj_mean.magnitude} \n\tlatencies_mean = {latencies_mean.magnitude}")
     
     if isinstance(xstart, pq.Quantity):
         if not units_convertible(xstart, latencies_mean.units):
@@ -3153,8 +3185,6 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
                                                    age=age, dataname=dataname, protocol_name=protocol_name,
                                                    ref_vm = ref_vm,
                                                    ref_vm_relative_onset = ref_vm_relative_onset)
-    
-    #print(ap_report.Record)
     
     return ap_result, ap_report, ap_waves, ap_dvdt, ap_d2vdt2
     
@@ -5913,6 +5943,13 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         rtol: 1e-5
         atol: 1e-8
                 
+    reTime:bool, default is True.
+        When True, the afterspike potential waveforms are all set to start at 0 s
+    
+    fAHP_window:pq.Quantity window duration for fAHP analysis; default is 3 * pq.ms
+    
+    ADP_window:pq.Quantity window duration for ADP analysis; default is 6 * pq.ms
+
     use_min_detected_isi: boolean, default True
     
         When True, individual AP waveforms cropped from the Vm signal "sig" will
@@ -6945,6 +6982,13 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         defaults are:
         rtol: 1e-5
         atol: 1e-8
+    
+    reTime:bool, default is True.
+        When True, the afterspike potential waveforms are all set to start at 0 s
+    
+    fAHP_window:pq.Quantity window duration for fAHP analysis; default is 3 * pq.ms
+    
+    ADP_window:pq.Quantity window duration for ADP analysis; default is 6 * pq.ms
                 
     use_min_detected_isi: boolean, default True
     
@@ -7047,6 +7091,9 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     smooth_window           = kwargs.pop("smooth_window", 5)
     steadyStateDuration     = kwargs.pop("steadyStateDuration", 0.05*pq.s)
     box_size                = kwargs.pop("box_size", 0)
+    relTime                 = kwargs.pop("relTime", True)
+    fAHP_window             = kwargs.pop("fAHP_window", 3 * pq.ms)
+    ADP_window              = kwargs.pop("ADP_window", 6 * pq.ms)
     
     # print(f"analyse_AP_step_injection_sweep: passive_analysis = {passive_analysis}")
     kwargs.pop("return_all", None) # remove the debugging parameter
@@ -7209,9 +7256,125 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     
     result["Waveform_signals"] = ap_waveform_signals
     
-    # result["Passive_analysis"] = passive
+    result["Afterspike_potentials"] = dict()
+    
+    fAHP_amplitudes = None
+    ADP_amplitudes = None
+    
+    # print(f"fAHP_window = {fAHP_window}\nADP_window = {ADP_window}")
+    
+    asp_waves = list()
+    
+    if ap_train.size > 0:
+        startTimes = (ap_train.times.magnitude.flatten() + ap_train.annotations["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
+        startNdx = [w.time_index(t) for w, t in zip(ap_waveform_signals, startTimes)]
+            
+        asp_waves = [w[int(k):] for w, k in zip(ap_waveform_signals, startNdx)]
+        
+        if relTime:
+            for w in asp_waves:
+                w.t_start = 0 * ap_train.times.units
+                
+        
+        ahpWstop = [w.t_start + fAHP_window if w.t_start + fAHP_window < w.t_stop else w.t_stop for w in asp_waves]
+        adpWstop = [w.t_start + ADP_window  if w.t_start + ADP_window  < w.t_stop else w.t_stop for w in asp_waves]
+        
+        ahpTimes = startTimes
+        
+        asp_waves_endpoints = np.array([w[-1] for w in asp_waves]).flatten()
+        
+        
+        ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() for w, t in zip(asp_waves, ahpWstop)])
+        
+        # print(f"asp_waves_endpoints shape {asp_waves_endpoints.shape}")
+        # print(f"ahpPeakValues shape {ahpPeakValues.shape}")
+        
+        onsetVms = ap_train.annotations["AP_onset_Vm"].magnitude.flatten()
+        
+        # First condition for a fAHP:
+        # the minimum value ("trough") needs to be smaller than last value of the waveform
+        # (else, set this to the corresponding onset Vm -> ahpAmpli becomes 0)
+        #
+        # NOTE BUG 2023-09-25 13:11:12 FIXME
+        # this is problematic when the AP is unique and end of waveform ends well below the trough...
+        # badAHPndx = ahpPeakValues >= asp_waves_endpoints
+        # # print(f"badAHPndx = {badAHPndx}")
+        # ahpPeakValues[badAHPndx] = onsetVms[badAHPndx]
+        
+        ahpAmplis = ahpPeakValues - onsetVms
+        
+        # Second condition for a fAHP:
+        # amplitude (calculated by subtracting the AP onset Vm from the trough value) must be <=0
+        # enerything else set to 0
+        ahpAmplis[ahpAmplis > 0] = 0.
+        
+        adpPeakValues = np.array([w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max() for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
+        
+        # First condition for an ADP:
+        # the maximum value ("peak") is larger than last value of the waveform
+        # (else, set to the corr4sponding onset Vm -> adpAmpli becomes 0)
+        badADPndx = adpPeakValues <= asp_waves_endpoints
+        adpPeakValues[badADPndx] = onsetVms[badADPndx]
+        
+        adpAmplis = adpPeakValues - onsetVms
+        
+        # Second condition for an ADP:
+        # amplitude (calcuated by subtracting the AP onset Vm from the peak value) must be >= 0
+        # enerything else set to 0
+        adpAmplis[(adpAmplis < 0)] = 0.
+        
+        fAHP_amplitudes = neo.IrregularlySampledSignal(startTimes, ahpAmplis, units = ap_waveform_signals[0].units,
+                                                       name="fAHP Amplitude")
+        
+        ADP_amplitudes = neo.IrregularlySampledSignal(startTimes, adpAmplis, units = ap_waveform_signals[0].units,
+                                                      name = "ADP Amplitude")
+        
+        
+    result["Afterspike_potentials"]["fAHP_amplitudes"] = fAHP_amplitudes
+    result["Afterspike_potentials"]["ADP_amplitudes"] = ADP_amplitudes
+    result["Afterspike_potentials"]["Waveforms"] = asp_waves
     
     return (result, vstep, passive) if passive_analysis else (result, vstep)
+
+def extract_afterSpikePotentials(data:dict, Iinj:pq.Quantity, 
+                                 atol:float = 1e0, rtol:float = 1e-1, 
+                                 relTime:bool=True) -> typing.Optional[list]:
+    """Retuns the after spike potential waveforms at given Iinj.
+    
+    Does NOT analyse these waveforms.
+    
+    """
+    assert isinstance(data, dict) and (all(k in data) for k in ["Injected_current", "Current_injection_steps"]), f"Data is not a primary analysis of AP trains during depolarising current injection"
+    
+    stepFlags = np.isclose(data["Injected_current"].magnitude, Iinj.magnitude,
+                           atol = atol, rtol = rtol)
+    if not np.any(stepFlags):
+        warnings.warn(f"No steps with current injection close to {Iinj} found within absolute and relative tolerances of {atol} and {rtol}, respectively. Bailing out...")
+        return
+    
+    ndx = np.where(stepFlags)[0]
+    if ndx.size > 1:
+        warnings.warn(f"Too many ({ndx.size}) steps with current injection close to {Iinj} were found within absolute and relative tolerances of {atol} and {rtol}, respectively.  Bailing out...")
+        return
+    
+    step = data["Current_injection_steps"][int(ndx[0])]
+    analysis = step["AP_analysis"]
+    
+    train = analysis["AP_train"]
+    durationsAtOnset = analysis["AP_durations_V_onset"]
+    onsetVm = analysis["AP_onset_Vm"]
+    apWaves = analysis["Waveform_signals"]
+    
+    startTimes = (train.times.magnitude.flatten() + durationsAtOnset.magnitude.flatten()) * pq.s
+    startNdx = [w.time_index(t) for w, t in zip(apWaves, startTimes)]
+    
+    waves = [w[int(k):] for w, k in zip(apWaves, startNdx)]
+    
+    if relTime:
+        for w in waves:
+            w.t_start = 0*pq.s
+    
+    return waves
 
 def extract_AHPs(*data_blocks, step_index, Vm_index, Iinj_index, name_prefix):
     """Extracts AHPs from averaged trials at a given Iinj.
