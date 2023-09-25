@@ -6891,7 +6891,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             else:
                 fname = os.path.splitext(fileName)[0]
-                cmd = "run -i -n -t '%s'" % fname
+                #fname = fname.replace(" ", "\ ")
+                #cmd = "run -i -n -t '%s'" % fname
+                if sys.platform == "win32":
+                    cmd = f'run -i -n -t "{fname}"'
+                else:
+                    cmd = f"run -i -n -t '{fname}'"
 
                 try:
                     self.workspaceModel.preExecute()
