@@ -5794,10 +5794,41 @@ def aggregate_signals(*args, name_prefix:str, collectSD:bool=True, collectSEM:bo
 
     return ret
     
-    
-  
 @safeWrapper
-def average_signals(*args, fun=np.mean):
+def average_irregular_signals(*args, fun = np.mean, name:typing.Optional[str]=None):
+    if len(args) == 0:
+        return
+    
+    if len(args) == 1 and isinstance(args[0], (list, tuple)) and all([isinstance(a, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)) for a in args[0]]):
+        args = args[0]
+    
+    assert all(isinstance(a, neo.IrregularlySampledSignal) for a in args) or all(isinstance(a, IrregularlySampledDataSignal) for a in args), "This function only supports all neo.IrregularlySampledSignal OR all IrregularlySampledDataSignal objects (no mixing of types)"
+    
+    if any([s.size != args[0].size for s in args]):
+        raise ValueError("Signals must have identical size")
+        
+    if any([s.shape != args[0].shape for s in args]):
+        raise ValueError("Signals must have identical shape")
+    
+    if any([s.shape[1]>1 for s in args]):
+        raise ValueError("Expecting single-channel signals only")
+    
+    if any(not np.all(s.times == args[0].times) for s in args):
+        raise ValueError("Signal must have identical domains")
+    
+    if not isinstance(name, str) or len(name.strip()) == 0:
+        name = "Averaged signal"
+        
+    data = fun(np.concatenate([a.magnitude for a in args], axis=1), axis=1)
+    
+    return args[0].__class__(args[0].times, data, units = args[0].units, 
+                             time_units = args[0].times.units,
+                             dtype = args[0].dtype,
+                             name=name,
+                             description = "Averaged signal")
+    
+@safeWrapper
+def average_signals(*args, fun=np.mean, name:typing.Optional[str]=None):
     """ Returns an AnalogSignal containing the element-by-element average of several neo.AnalogSignals.
     All signals must be single-channel and have compatible shapes and sampling rates.
     """
@@ -5805,10 +5836,13 @@ def average_signals(*args, fun=np.mean):
     if len(args) == 0:
         return
     
-    if len(args) == 1 and isinstance(args[0], (list, tuple)) and all([isinstance(a, neo.core.analogsignal.AnalogSignal) for a in args[0]]):
+    if len(args) == 1 and isinstance(args[0], (list, tuple)) and all([isinstance(a, (neo.core.analogsignal.AnalogSignal, DataSignal)) for a in args[0]]):
         args = args[0]
 
-    #ret = args[0].copy() # it will inherit t_start, t_stop, name, annotations, sampling_rate
+    assert all(isinstance(a, neo.AnalogSignal) for a in args) or all(isinstance(a, DataSignal) for a in args), "This function only supports all neo.AnalogSignal OR all DataSignal objects (no mixing of types)"
+
+    if any([s.size != args[0].size for s in args]):
+        raise ValueError("Signals must have identical size")
     
     if any([s.shape != args[0].shape for s in args]):
         raise ValueError("Signals must have identical shape")
@@ -5816,14 +5850,20 @@ def average_signals(*args, fun=np.mean):
     if any([s.shape[1]>1 for s in args]):
         raise ValueError("Expecting single-channel signals only")
     
+    if any(not np.all(s.times == args[0].times) for s in args):
+        raise ValueError("Signal must have identical domains")
+    
     data = fun(np.concatenate(args, axis=1), axis=1).magnitude
     
-    # if not isinstance(ret_signal, neo.AnalogSignal):
-    ret_signal = neo.AnalogSignal(data, 
+    if not isinstance(name, str) or len(name.strip()) == 0:
+        name = "Averaged signal"
+    
+    ret_signal = args[0].__class__(data, 
                                 units = args[0].units,
                                 t_start = args[0].t_start,
                                 sampling_rate = args[0].sampling_rate,
-                                description = "Averaged signal")
+                                description = "Averaged signal",
+                                name = name)
     
     return ret_signal
 

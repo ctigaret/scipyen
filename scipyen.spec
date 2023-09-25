@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import io, os, sys, subprocess, shutil, tempfile, typing, pathlib, traceback
+import string, datetime
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 from PyInstaller.building.datastruct import Tree
@@ -265,7 +266,14 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                     datas.append((origin_file_name, '.'))
                         
 platform = sys.platform
-product = f"scipyen{namesfx}_{platform}"
+now = datetime.datetime.now()
+year = f"{now.year}"[-2:]
+month = f"{string.ascii_lowercase[now.month-1]}"
+day = f"{now.day}"
+hr = f"{now.hour}"
+mn = f"{now.minute}"
+sc = f"{now.second}"
+product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
 
