@@ -215,7 +215,40 @@ def get_CB_scale_for_unit_amplitude(β, τ_rise, τ_decay, x0=0.):
     
     return peak/yₘ
     
+def CBsum(x, parameters):
+    """Realizes a sum of two Clements_Bekkers_97 functions, on x.
+    
+    Let 𝒙 a 1D domain vector:
+    
+        𝒚₀ = α + β₀ * (1 - exp(-(x-x₀₀)/τ₀₀)) ⋅ exp(-(x-x₀₀)/τ₁₀)
+        𝒚₁ = 0 + β₁ * (1 - exp(-(x-x₀₀)/τ₀₁)) ⋅ exp(-(x-x₀₁)/τ₁₁)
+    
+    Then:
+    
+        𝒚 = 𝒚₀ + 𝒚₁
+        
+    Empyrical model that can be used for fitting a compound AHP/ADP waveform.
 
+    Parameters:
+    ===========
+    
+    x: 1D domain vector (typically, time)
+    
+    parameters: a sequence (tuple, list) of model parameters in the following
+        order:
+    
+        α, β₀, x₀₀, τ₀₀, τ₁₀, β₁, x₀₁, τ₀₁, τ₁₁
+
+    """
+    
+    y0 = Clements_Bekkers_97(x, parameters[:5])
+    
+    y1 = Clements_Bekkers_97(x, (0., ) + tuple(parameters[5:])) # because this still expects five params
+    
+    return y0 + y1
+    
+    
+    
 def exp_rise_multi_decay(x, parameters, returnDecays = False):
     """ Realization of a transient signal with a single exponential rise (r) and
         n exponential decays (d1..dn), at an onset (delay) x0 and a given 
@@ -568,7 +601,7 @@ def gaussianSum1D(x, *args, **kwargs):
     
     for n 1D Gaussian curves
     
-    If packed in a sequence, it can be unpacked by assing it as a starred expression
+    If packed in a sequence, it can be unpacked by passing it as a starred expression
     in the function call.
     
     keyword parameters:

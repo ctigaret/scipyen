@@ -6891,7 +6891,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             else:
                 fname = os.path.splitext(fileName)[0]
-                cmd = "run -i -n -t '%s'" % fname
+                #fname = fname.replace(" ", "\ ")
+                #cmd = "run -i -n -t '%s'" % fname
+                if sys.platform == "win32":
+                    cmd = f'run -i -n -t "{fname}"'
+                else:
+                    cmd = f"run -i -n -t '{fname}'"
 
                 try:
                     self.workspaceModel.preExecute()
@@ -7570,7 +7575,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 xlabel = "" if times_units_str == "dimensionless" else f"{cq.name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
                 name = obj.name
                 if name is None or len(name.strip()) == 0:
-                    name = cq.name_from_unit(obj.units.dimensionality.string)
+                    name = cq.name_from_unit(obj.units.dimensionality)
+                    # name = cq.name_from_unit(obj.units.dimensionality.string)
                 ylabel = f"{name} ({obj.units.dimensionality.string})"
                 plt.xlabel(xlabel)
                 plt.ylabel(ylabel)

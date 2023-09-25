@@ -1570,24 +1570,47 @@ class IrregularlySampledDataSignal(BaseSignal):
         '''
         Equality test (==)
         '''
+        from core import quantities as scq
+        if isinstance(other, self.__class__):
+            if len(self) != len(other):
+                return False
+            
+            if self.ndim != other.ndim:
+                return False
+            
+            if self.shape != other.shape:
+                return False
+            
+            return (super(IrregularlySampledDataSignal, self).__eq__(other).all() and
+                    (self.times == other.times).all())
         
-        if len(self) != len(other):
-            return False
+        elif isinstance(other, (float)):
+            return self.magnitude == other
+            
+        elif isinstance(other, pq.Quantity):
+            if other.size == 1:
+                if not scq.units_convertible(other.units, self.units):
+                    ret = np.full_like(self, False)
+                else:
+                    ret = self.magnitude == (other.rescale(self.units)).magnitude
+                    
+                return ret
+                    
+            else:
+                if other.size != self.size:
+                    return False
+                
+                if other.shape != self.shape:
+                    return False
+                
+                if not scq.units_convertible(other.units, self.units):
+                    ret = np.full_like(self, False)
+                else:
+                    ret = self.magnitude == (other.rescale(self.units)).magnitude1
         
-        if self.ndim != other.ndim:
-            return False
-        
-        if self.shape != other.shape:
-            return False
-        
-        return (super(IrregularlySampledDataSignal, self).__eq__(other).all() and
-                (self.times == other.times).all())
-
-        #if (self.origin != other.origin or
-                #self.sampling_rate != other.sampling_rate):
-            #return False
-        
-        #return super(DataSignal, self).__eq__(other)
+                return ret
+            
+        return False
 
     def __rsub__(self, other, *args):
         '''
@@ -1634,7 +1657,8 @@ class IrregularlySampledDataSignal(BaseSignal):
     __radd__ = __add__
     __rmul__ = __sub__
     
-    def mean(self, interpolation=None):
+    # def mean(self, axis:typing.Optional[int] = None, interpolation:bool=None):
+    def mean(self, interpolation:bool=None):
         """
         TODO interpolation
         """
@@ -1886,7 +1910,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         after a mathematical operation.
         '''
         #print(op)
-        self._check_consistency(other)
+        # self._check_consistency(other)
         f = getattr(super(IrregularlySampledDataSignal, self), op)
         new_signal = f(other, *args)
         new_signal._copy_data_complement(self)
