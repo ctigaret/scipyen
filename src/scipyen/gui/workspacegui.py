@@ -571,6 +571,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         scipyenWindow = kwargs.pop("scipyenWindow", None)
         
+        appWindow = kwargs.pop("appWindow", None)
+        
+        
         if isinstance(scipyenWindow, QtWidgets.QMainWindow) and type(scipyenWindow).__name__ == "ScipyenWindow":
             self._scipyenWindow_ = scipyenWindow
             
@@ -593,7 +596,15 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                     if "ScipyenWindow" in f[0].f_globals:
                         self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                         break
-                
+                    
+        self._appWindow_ = None
+        
+        if isinstance(appWindow, QtWidgets.QMainWindow) and type(appWindow).__name__ != "ScipyenWindow":
+            self._appWindow_ = appWindow
+            
+        else:
+            self._appWindow_ = self._scipyenWindow_
+                    
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)  
             
@@ -739,13 +750,14 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         
         """
-        if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-            return self._scipyenWindow_
-        
-        p = self.parent()
-        
-        if isinstance(p, QtWidgets.QMainWindow):
-            return p
+        return self._appWindow_
+#         if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and type(self._scipyenWindow_).__name__ == "ScipyenWindow":
+#             return self._scipyenWindow_
+#         
+#         p = self.parent()
+#         
+#         if isinstance(p, QtWidgets.QMainWindow):
+#             return p
     
     @safeWrapper
     def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]], title:str="Import from workspace", single:bool=True, preSelected:typing.Optional[str]=None, with_varName:bool=False):
