@@ -4300,6 +4300,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     def slot_Quit(self):
         self.close()
+            
 
     def closeEvent(self, evt):
         if self.external_console is not None:
@@ -4324,6 +4325,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #     if win[1] is not self:
         #         win[1].close()
 
+        if sys.platform == "win32":
+            QtWidgets.QApplication.closeAllwindows()
+            
         evt.accept()
 
     def saveWindowSettings(self):
