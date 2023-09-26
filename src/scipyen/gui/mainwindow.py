@@ -1418,8 +1418,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.setupUi(self)
 
         # WindowManager.__init__(self, parent=self)
-        WorkspaceGuiMixin.__init__(self, parent=self)  # , settings=settings)
-        self.scriptsManager = ScriptManager(parent=self)
+        if sys.platform == "win32":
+            WorkspaceGuiMixin.__init__(self, parent=None)  # , settings=settings)
+            self.scriptsManager = ScriptManager(parent=None)
+        else:
+            WorkspaceGuiMixin.__init__(self, parent=self)  # , settings=settings)
+            self.scriptsManager = ScriptManager(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(
             self._slot_runPythonScriptFromManager)
         self.scriptsManager.signal_importScript[str].connect(
