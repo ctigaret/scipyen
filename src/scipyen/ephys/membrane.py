@@ -293,6 +293,11 @@ class MembranePropertiesAnalysisParameters:
     # by averaging the Vm signal across the replicates)
     #
                        
+    fitrheo:bool = False
+    # bool
+    # indicate if rheobase analysis should also estimate a fitted rheobase value
+    #
+
     rheobase_factor:int  = 1
     # int: the injected current expressed as Irheobase × Irh_factor
     # to collate AP instantaneous frequencies, amplitudes, fastAHPs, etc.
@@ -327,8 +332,6 @@ class MembranePropertiesAnalysisParameters:
     # If the number of APs at test_Iinj is larger than this number, the excess
     # APs will be discarded.
     
-
-
     nAPs:int = 5
     # number of first APs in the train, for AP widths
     #
@@ -5845,6 +5848,10 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         (one segment for each value of depolarizing current intensity).
         
         This parameter is ignored when data has lees than minsteps segments
+
+    fitrheo:boolean, default False
+        When True, and rheo is True, the function will estimate rheobase current
+        from latency vs Iinj curve.
         
     minsteps: int (default is 3)
         minimum number of curent injection steps where APs were triggered, for
@@ -6476,10 +6483,14 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         elif rheo and len(ret["First_AP_latency"]) > 0 and len(ret["First_AP_latency"]) == len(ret["Injected_current"]) and \
             not np.all(np.isnan(ret["First_AP_latency"])):
             # further consistency checks
-            ret["rheobase_analysis"] = rheobase_latency(ret, **rheoargs)
-            
-            if plot_rheo and ret["rheobase_analysis"] is not None:
-                plot_rheobase_latency(ret["rheobase_analysis"])
+            try:
+                ret["rheobase_analysis"] = rheobase_latency(ret, **rheoargs)
+                
+                if plot_rheo and ret["rheobase_analysis"] is not None:
+                    plot_rheobase_latency(ret["rheobase_analysis"])
+            except:
+                traceback.print_exc()
+                print(f"\n\n *** rheobase_latency using 'fitrheo# {fitrheo} encountered and Error (see above); check data or toggle 'fitrheo'")
             
         return ret
     
@@ -7095,6 +7106,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     fAHP_window             = kwargs.pop("fAHP_window", 3 * pq.ms)
     ADP_window              = kwargs.pop("ADP_window", 6 * pq.ms)
     
+    
     # print(f"analyse_AP_step_injection_sweep: passive_analysis = {passive_analysis}")
     kwargs.pop("return_all", None) # remove the debugging parameter
     
@@ -7305,14 +7317,14 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         
         # Second condition for a fAHP:
         # amplitude (calculated by subtracting the AP onset Vm from the trough value) must be <=0
-        # enerything else set to 0
+        # everything else set to 0
         ahpAmplis[ahpAmplis > 0] = 0.
         
         adpPeakValues = np.array([w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max() for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
         
         # First condition for an ADP:
         # the maximum value ("peak") is larger than last value of the waveform
-        # (else, set to the corr4sponding onset Vm -> adpAmpli becomes 0)
+        # (else, set to the corresponding onset Vm -> adpAmpli becomes 0)
         badADPndx = adpPeakValues <= asp_waves_endpoints
         adpPeakValues[badADPndx] = onsetVms[badADPndx]
         
@@ -7320,7 +7332,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         
         # Second condition for an ADP:
         # amplitude (calcuated by subtracting the AP onset Vm from the peak value) must be >= 0
-        # enerything else set to 0
+        # everything else set to 0
         adpAmplis[(adpAmplis < 0)] = 0.
         
         fAHP_amplitudes = neo.IrregularlySampledSignal(startTimes, ahpAmplis, units = ap_waveform_signals[0].units,

@@ -566,10 +566,10 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     # or the internal console to script execution and adding of script file to
     # the internal scripts list  here.
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, scipyenWindow=None):
         super(ScriptManager, self).__init__(parent)
         self.setupUi(self)
-        WorkspaceGuiMixin.__init__(self, parent=parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent,scipyenWindow=scipyenWindow)
         self._configureUI_()
 
         self.setWindowTitle("Scipyen Script Manager")
@@ -855,8 +855,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
         item = self.scriptsTable.item(row, 1).text()
 
         self.signal_pasteScript.emit(item)
-
-
+        
 # NOTE 2019-09-12 09:34:31
 # Beginning to consolidate variable handling in the GUI framework
 # TODO: make this configurable (a mime type-like mechanism?)
@@ -1419,8 +1418,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.setupUi(self)
 
         # WindowManager.__init__(self, parent=self)
-        WorkspaceGuiMixin.__init__(self, parent=self)  # , settings=settings)
-        self.scriptsManager = ScriptManager(parent=self)
+        if sys.platform == "win32":
+            WorkspaceGuiMixin.__init__(self, parent=None)  # , settings=settings)
+            self.scriptsManager = ScriptManager(parent=None)
+        else:
+            WorkspaceGuiMixin.__init__(self, parent=self)  # , settings=settings)
+            self.scriptsManager = ScriptManager(parent=self)
         self.scriptsManager.signal_executeScript[str].connect(
             self._slot_runPythonScriptFromManager)
         self.scriptsManager.signal_importScript[str].connect(
@@ -4300,6 +4303,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     def slot_Quit(self):
         self.close()
+            
 
     def closeEvent(self, evt):
         if self.external_console is not None:
@@ -4324,6 +4328,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #     if win[1] is not self:
         #         win[1].close()
 
+        if sys.platform == "win32":
+            QtWidgets.QApplication.closeAllWindows()
+            
         evt.accept()
 
     def saveWindowSettings(self):

@@ -9712,7 +9712,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
     def _init_viewer_(self, winFactory, configTag, winSetup, winTitle, docTitle, nFrames):
         #print(f"{self.__class__.__name__}._init_viewer_: winFactory = {winFactory}")
-        win = winFactory(win_title=winTitle, doc_title=docTitle, parent=self, configTag=configTag)
+        # win = winFactory(win_title=winTitle, doc_title=docTitle, parent=self, configTag=configTag)
+        win = winFactory(win_title=winTitle, doc_title=docTitle, appWindow=self, configTag=configTag)
         #print(f"{self.__class__.__name__}._init_viewer_: win = {win}")
         #print(f"{self.__class__.__name__}._init_viewer_: winSetup = {winSetup}")
         if inspect.isfunction(winSetup):
@@ -9827,6 +9828,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         section: str, one of: 
             "electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
             "scansBlock", "sceneBlock", "scans", "scene"
+        
+        Returns:
+        ========
+        
+        wname, viewers, winFactory, winSetup
+        
         """
             #"electrophysiology" "ephys", "scansProfiles", "sceneProfiles", 
             #"scansBlock", "sceneBlock", "scans", "scene", "protocols"

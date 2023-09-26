@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Superclass for Scipyen viewer windows
 """
-import typing, warnings, inspect, sys
+import typing, warnings, inspect, sys, platform, os
 from dataclasses import MISSING
 from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
@@ -185,6 +185,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             derived subclass.
         """
         #print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
+        if sys.platform == "win32" or os.name == "nt" or platform.uname().system == "Windows":
+            parent = None
+            
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, on=False)
