@@ -39,7 +39,7 @@ print(f"scipyen_dir = {scipyen_dir}")
 # On windows I use mamba (a faster alternative to <ana>conda) to build a virtual environment (e.g. e:\scipyenv) - best is
 # to use a Miniforge terminal running with as administrator.
 # With that environment activated (see mamba documentation for details), call (e.g. from the root of e: drive):
-# pyinstaller --dist_path e:\scipyen_app\dist --workpath e:\scipyen_app\build --clean --noconfirm e:\scipyen\scipyen_win10.spec
+# pyinstaller --dist_path e:\scipyen_app\dist --workpath e:\scipyen_app\build --clean --noconfirm e:\scipyen\scipyen.spec
 # NOTE: You may have to modify the paths above to suit your local installation
 # TODO: For more customization contemplate calling pyinstaller as above from a
 # bash script
@@ -421,7 +421,7 @@ a = Analysis(
     #        ],
     hiddenimports=hiddenimports,
     hookspath=[os.path.join(scipyen_dir, 'src/scipyen/__pyinstaller')],
-    hooksconfig={},
+    hooksconfig={"matplotlib":{"backends":"all"}, "exclude_module": "PySide2"},
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
