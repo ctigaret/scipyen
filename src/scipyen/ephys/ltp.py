@@ -906,7 +906,7 @@ class LTPOnline(object):
             return paired[0]
         
     def abfForRsv(self, rsv:pathlib.Path):
-        paired = [f for f in self._filesQueue_ if f.suffix == ".abf" anf f.stem == rsv.stem and f.parent == rsv.parent]
+        paired = [f for f in self._filesQueue_ if f.suffix == ".abf" and f.stem == rsv.stem and f.parent == rsv.parent]
         if len(paired):
             return paired[0]
         
