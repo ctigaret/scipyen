@@ -1755,7 +1755,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def currentDirectory(self, value:typing.Union[str, pathlib.Path]):
         self._currentDir_ = value
         
-        if self.watchCurrentDirectory:
+        if self.watchingCurrentDirectory:
             watchedDirs = self.dirFileWatcher.directories()
             if len(watchedDirs):
                 self.dirFileWatcher.removePaths(watchedDirs)
@@ -1770,11 +1770,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.dirFileWatcher.addPath(self.currentDir)
             
     @property
-    def watchCurrentDirectory(self):
+    def watchingCurrentDirectory(self):
         return self._isDirWatching_
     
-    @watchCurrentDirectory.setter
-    def watchCurrentDirectory(self, value:bool):
+    @watchingCurrentDirectory.setter
+    def watchingCurrentDirectory(self, value:bool):
         self._isDirWatching_ = value == True
         
         watchedDirs = self.dirFileWatcher.directories()

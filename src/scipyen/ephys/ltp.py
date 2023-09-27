@@ -739,16 +739,136 @@ class SynapticPlasticityData(BaseScipyenData):
     #     pass
     
 class LTPOnline(object):
+    # TODO: 2023-09-27 15:42:11
+    # the CurrentDirectoryFileWatcher should also know about the directory
+    # being watched; unlink from mainWindow changing of work dir i.e, keep
+    # watching the same directory even if the user navigates somewhere else in
+    # Scipyen's main window => needs change in mainwindow (ScipyenWindow) code
+    #------------------------------------------------------------------------
+    # we need to watch out for new files output by clampex
+    #
+    # these can be an xyz.abf file and/or xyz.rsv file
+    #
+    # it seems like an rsv file is always created, regardless of
+    #   whether the protocol enables automatic analysis in other
+    #   programs or uses multiple runs per trial (thus only saving the
+    #   averaged data)
+    #
+    #   the rsv file is temporary; when its is created, Clampex also
+    #   created an abf file with the same name, in the working directory
+    #   such that the only rsv file present is paired with the newly created
+    #   abf file.
+
+    #   when an xyz.rsv and xyz.abf are newly created:
+    #       IF they have the same path (without extension) =>
+    #       the rsv file is a temporary store for ABF data in
+    #       its paired abf file => we do not read the abf file until
+    #       the rsv file has been removed (by Clampex)
+    #
+    #
+    # my tests so far using the mainWindow.dirFileWatcher indicate
+    # that the rsv file is created BEFORE its paired abf file
+    #
+    # but I don't think this is guaranteed?
+    #
+    # here is a typical sequence of events during a Clampex run
+    #   ScipyenWindow._slot_directoryChanged newItems = {'base_0002.rsv'}
+    #   ScipyenWindow._slot_directoryChanged newItems = {'base_0002.abf'}
+    #   ScipyenWindow._slot_directoryChanged removedItems = {'base_0002.rsv'}
+    #   ScipyenWindow._slot_directoryChanged changedItems = ('base_0002.abf',)
+    #
+    # So, basically this means that
+    #
+    #   1) at the start of a trial Clampex creates the rsv file THEN the ABF file
+    #   2) during the trial data is (probably) stored in the rsv file (although
+    #       there is nothing in the file system to indicate this has changed)
+    #   3) at end of trial, Clampex:
+    #   3.1) removes the rsv file => file removed signal above
+    #   3.2) writes the recorded (and maybe averaged¹) data to the abf file
+    #       => file changed signal above
+    #
+    #       ¹ NOTE: when the trial has > 1 runs
+    #
+    #  Algorithm:
+    #
+    # when a new rsv file is received, it is pushed (append) in the queue
+    # when a new abf file is received:
+    #   push it to the queue (append)
+    #       check to see if it is paired with an abf file in the queue
+    #       for now assume it isn't => wait for a paired abf to arrive
+    #   check if it is paired with an rsv in the queue =>
+    #       if it isn't then wait until a paired rsv arrives
+    #       (for now assume it is paired with the rsv file added just before it)
+    # when the latest rsv file is removed:
+    #       wait for the paired abf file to change
+    #       exit the rsv from the queue
+    # when the paired abf file has changed => do stuff with it:
+    #       if it is the first one (i.e., first trial²) in the experiment:
+    #           parse the protocol for membrane test and a digital pulse train
+    #           of one or two pulses ->:
+    #               extract the membrane test timings and intensity from the
+    #                   comand waveform
+    #               figure out if there are alernate pathways (they SHOULD be)
+    #               extract the digital train pulses; if pulse count is 2, figure
+    #                   out if this is a paired pulse (i;e in the same pathway)
+    #                   or a test for crosstalk
+    #
+    #           expect two sweeps (one per pathway) -> plot them in separate
+    #               signal viewer windows
+    #
+    #           use the parsed protocol or the user's configuration³ to set up
+    #               cursors
+    #
+    #           if the protocol says averaging in use then measure Rs Rin, DC,
+    #               and EPSC amplitude(s)
+    #
+    #                   distribute the results to the same (if paired pulse) or
+    #                   alternative dathways  (crosstalk test)
+    #
+    #                   plot the point in separate signal viewers
+    #
+    #           else:
+    #               the user config should mention how to average
+    #               as more files are loaded, perform the average, then
+    #                   measure on the final result, as above
+    #               save the final result
+    #
+    #       else
+    #           parse the protocol as above, check against the already created one
+    #           check protocol is the same
+    #           measure as above
+    #
+    # When eperiment is stopped, stop the session (manually)
+    #
+    # ² NOTE: how to determine that ?!? the counter may not always start at 0000!
+    #
+    # ³ NOTE: decide what a configuration should look like: numbers for coordinates,
+    #       cursor objects, epochs, etc? - should it be passed to the __init__,
+    #       or read from a file, etc?
+    #
     def __init__(self, scipyenWindow:QtWidgets.QMainWindow):
         if type(scipyenWindow).__name__ != 'ScipyenWindow':
             raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(scipyenWindow).__name__}")
 
         self._scipyenWindow_ = scipyenWindow
 
+        if self._scipyenWindow_.watchingCurrentDirectory and len(self._scipyenWindow_.dirFileWatcher.directories()):
+            self._watchedDir_ = self._scipyenWindow_.dirFileWatcher.directories()[0]
+        else:
+            self._watchedDir_ = '.'
+
+
+        self._filesQueue_ = collections.deque()
+
         self._dirWatcher_ = CurrentDirectoryFileWatcher(emitterWindow = self._scipyenWindow_)
 
-    def newFiles(self, val):
-        pass
+    def newFiles(self, val:typing.Union[list, tuple, str]):
+        if isinstance(val (tuple, list)) and len(val):
+            fileName = os.path.join(self._watchedDir_, val[0])
+        elif isinstance(val, str) and len(val):
+            fileName = os.path.join(self._watchedDir_, val)
+
+        self._filesQueue_.append(val)
 
 def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
     """Helper function for the SynapticPathway factory function
