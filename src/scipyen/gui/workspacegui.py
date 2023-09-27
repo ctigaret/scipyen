@@ -23,7 +23,7 @@ import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
 
-class CurrentDirectoryFileWatcher(QtCore.QObject):
+class DirectoryFileWatcher(QtCore.QObject):
     def __init__(self, parent=None, emitterWindow = None,
                  cbDict:typing.Optional[dict] = dict(newFiles = None, changedFiles = None, removedFiles = None)):
         super().__init__(parent=parent)

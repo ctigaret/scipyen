@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #### BEGIN core python modules
-import os, sys, traceback, inspect, numbers, warnings
+import os, sys, traceback, inspect, numbers, warnings, pathlib
 import functools, itertools
 import collections, enum
 import typing, types
@@ -89,7 +89,7 @@ import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 from gui.cursors import SignalCursor
-from gui.workspacegui import CurrentDirectoryFileWatcher
+from gui.workspacegui import DirectoryFileWatcher
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -740,7 +740,7 @@ class SynapticPlasticityData(BaseScipyenData):
     
 class LTPOnline(object):
     # TODO: 2023-09-27 15:42:11
-    # the CurrentDirectoryFileWatcher should also know about the directory
+    # the DirectoryFileWatcher should also know about the directory
     # being watched; unlink from mainWindow changing of work dir i.e, keep
     # watching the same directory even if the user navigates somewhere else in
     # Scipyen's main window => needs change in mainwindow (ScipyenWindow) code
@@ -846,29 +846,70 @@ class LTPOnline(object):
     #       cursor objects, epochs, etc? - should it be passed to the __init__,
     #       or read from a file, etc?
     #
-    def __init__(self, scipyenWindow:QtWidgets.QMainWindow):
+    def __init__(self, scipyenWindow:QtWidgets.QMainWindow,
+                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
         if type(scipyenWindow).__name__ != 'ScipyenWindow':
             raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(scipyenWindow).__name__}")
 
         self._scipyenWindow_ = scipyenWindow
-
-        if self._scipyenWindow_.watchingCurrentDirectory and len(self._scipyenWindow_.dirFileWatcher.directories()):
-            self._watchedDir_ = self._scipyenWindow_.dirFileWatcher.directories()[0]
+        
+        if directory is None:
+            self._watchedDir_ = pathlib.Path(self._scipyenWindow_.currentDir)
+            
+        elif isinstance(directory, str):
+            self._watchedDir_ = pathlib.Path(directory)
+            
         else:
-            self._watchedDir_ = '.'
-
-
+            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+        
+        
         self._filesQueue_ = collections.deque()
 
-        self._dirWatcher_ = CurrentDirectoryFileWatcher(emitterWindow = self._scipyenWindow_)
+        self._dirWatcher_ = DirectoryFileWatcher(emitterWindow = self._scipyenWindow_)
+        
+        self._scipyenWindow_.enableDirectoryMonitor(self._watchedDir_, True)
+        
+        self._pendingAbf_ = None
+        
+    def __del__(self):
+        if self._scipyenWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._scipyenWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+            
+        super().__del__()
 
-    def newFiles(self, val:typing.Union[list, tuple, str]):
-        if isinstance(val (tuple, list)) and len(val):
-            fileName = os.path.join(self._watchedDir_, val[0])
-        elif isinstance(val, str) and len(val):
-            fileName = os.path.join(self._watchedDir_, val)
+    def newFiles(self, val:pathlib.Path):
+#         if isinstance(val (tuple, list)) and len(val) and all(isinstance(v, pathlib.Path) for v in val):
+#             for f in val:
+#                 if f.parent == self._watchedDir_ and f.suffix in (".rsv", ".abf"):
+#                     self._filesQueue_.append(f)
+#                     
+#         elif isinstance(val, pathlib.Path) and val.parent == self._watchedDir_ and val.suffix in (".rsv", ".abf"):
+#             self._filesQueue_.append(val)
+        
+        if isinstance(val, pathlib.Path) and val.parent == self._watchedDir_ and val.suffix in (".rsv", ".abf"):
+            self._filesQueue_.append(val)
+            
+            if val.suffix == ".rsv":
+                pairedAbf = self.abfForRsv(val)
+                if isinstance(pairedAbf, pathlib.Path):
+                    self._pendingAbf_ = pairedAbf
+                    
+            elif val.suffix == ".abf":
+                pairedRsv = self.rsvForABF(val)
+                if isinstance(pairedRsv, pathlib.Path):
+                    self._pendingAbf_ = val
 
-        self._filesQueue_.append(val)
+    def rsvForABF(self, abf:pathlib.Path):
+        """Returns the rsv file paired with the abf"""
+        paired = [f for f in self._filesQueue_ if f.suffix == ".rsv" and f.stem == abf.stem and f.parent == abf.parent]
+        if len(paired):
+            return paired[0]
+        
+    def abfForRsv(self, rsv:pathlib.Path):
+        paired = [f for f in self._filesQueue_ if f.suffix == ".abf" anf f.stem == rsv.stem and f.parent == rsv.parent]
+        if len(paired):
+            return paired[0]
+        
 
 def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
     """Helper function for the SynapticPathway factory function
