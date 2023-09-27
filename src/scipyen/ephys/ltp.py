@@ -89,6 +89,7 @@ import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 from gui.cursors import SignalCursor
+from gui.workspacegui import CurrentDirectoryFileWatcher
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -204,7 +205,7 @@ class PathwayEpisode(Episode):
     """
 Specification of an episode in a synaptic pathway.
 
-An "episode" is a series of sweeps recorded during a specific set of 
+An "episode" is a series of sweeps recorded during a specific set of
 experimental conditions -- possibly, a subset of a larger experiment where
 several conditions were applied in sequence.
 
@@ -213,23 +214,23 @@ All sweeps in the episode must have been recorded during the same conditions.
 NOTE: A Pathway Episode does NOT store any data; it only stores indices into
 segments (a.k.a sweeps) of a neo.Block object containing the data.
 
-It can be used to create a new such Block object from source neo.Blocks - 
+It can be used to create a new such Block object from source neo.Blocks -
 i.e., passing it to the neoutils.concatenate_blocks(...) function.
 
 
 Examples:
 =========
 
-1) A response recorded without drug, followed by a response recorded in the 
-presence of a drug, then followed by a drug wash-out are all three distinct 
+1) A response recorded without drug, followed by a response recorded in the
+presence of a drug, then followed by a drug wash-out are all three distinct
 "episodes".
 
-2) Segments recorded while testing for cross-talk between synaptic pathways, 
+2) Segments recorded while testing for cross-talk between synaptic pathways,
 (and therefore, where the paired pulses are crossed between pathways) is a
-distinct episode from one where each segment contains responses from the 
+distinct episode from one where each segment contains responses from the
 same synaptic pathway
 
-The sweeps in PathwayEpisode are a sequence of neo.Segment objects, where 
+The sweeps in PathwayEpisode are a sequence of neo.Segment objects, where
 objects where each synaptic pathway has contributed data for a neo.Segment
 inside the Block.
 
@@ -246,68 +247,68 @@ of the source data.
 • response : int or str - respectively, the index or the name of the
     analog signal in each sweep, containing the pathway-specific synaptic
     response
-    
+
     NOTE: During an experiment, the recording may switch between episodes with
-    different clamping modes, or electrode modes (see below). This results in 
+    different clamping modes, or electrode modes (see below). This results in
     episodes with different response and command signals. Therefore we attach
     this information here, instead of the SynapticPathway instance to which this
     episode belongs to.`
-    
+
 • analogStimulus : int or str - index or name of the analog signal containing
-    voltage- or current-clamp command signal (or None); such a signal is 
+    voltage- or current-clamp command signal (or None); such a signal is
     typically recorded - when available - by feeding the secondary output of
     the amplifier into an ADC input in the acquisition board.
-    
+
 • digitalStimulus: int or str - index or name of the analog signal containing
     a recorded version of the triggers for extracellular stimulation.
-    
-    When available, these are triggers sent to stimulus isolation boxes to 
+
+    When available, these are triggers sent to stimulus isolation boxes to
     elicit an extracellular stimulus.
-    
+
     The triggers themselves are typically TTL signals, either taken directly
     from the acquisition board digital output, or "emulated" by an analog
     (DAC) output containing a rectangulare wave of 5 V amplitude.
-    
+
     In either case, these triggers can be routed into an ADC input of the
     acquisition board, for recording (e.g., using a BNC "tee" splitter).
-    
+
 •   electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.Field)
-    
+
     NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
     using the same electrode during an experiment (i.e. either Field, *Patch, or
-    or Sharp). 
+    or Sharp).
 
-    This attribute allows for episodes with distinct electrode 'mode' for the 
+    This attribute allows for episodes with distinct electrode 'mode' for the
     same pathway.
-    
+
 • clampMode: ephys.ClampMode (default is ClampMode.NoClamp)
     The recording "mode" - no clamping, voltage clamp or current clamp.
-    
-    NOTE: Even though a pathway may have been recorded with the same electrode 
-    mode throughout an experiment, one may switch between different clamping modes, 
-    where it makes sense, e.g., voltage clamp during tracking and current clamp 
+
+    NOTE: Even though a pathway may have been recorded with the same electrode
+    mode throughout an experiment, one may switch between different clamping modes,
+    where it makes sense, e.g., voltage clamp during tracking and current clamp
     during conditioning.
-    
+
     This attribute helps distinguish episodes with different clamping modes.
-    
-• xtalk: optional, a list of SynapticPathways or None (default); can also be an 
+
+• xtalk: optional, a list of SynapticPathways or None (default); can also be an
     empty list (same as if it was None)
-    
+
     Only used for 'virtual' synaptic pathways where the recording tests for
     the cross-talk between two 'real' pathways using paired-pulse stimulation.
-    
-    Indicates the order in which each pathway was stimulated during the 
+
+    Indicates the order in which each pathway was stimulated during the
     paired-pulse.
-    
-• pathways: optional, a list of SynapticPathways or None (default); can also be 
+
+• pathways: optional, a list of SynapticPathways or None (default); can also be
     an empty list (same as if it was None).
-    
+
     Indicates the SynapticPathways to which this episode applies. Typically,
-    an episode applied to a single pathway. However, there are situations where 
+    an episode applied to a single pathway. However, there are situations where
     an episode involving more pathways is meaningful, e.g., where additional
     pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
     test, or during conditioning in order to test for 'associativity')
-    
+
 ---
 
 ¹Exceptions are possible:
@@ -315,7 +316,7 @@ of the source data.
         Oren et al, (2009) J. Neurosci 29(4):939
         Maier et al, (2011) Neuron, DOI 10.1016/j.neuron.2011.08.016
     ∘ switch between field recording and patch clamp or sharp electrode recordings
-     (theoretically possible, but then one may also think of this as being two 
+     (theoretically possible, but then one may also think of this as being two
     distinct pathways)
     
 """
@@ -737,6 +738,18 @@ class SynapticPlasticityData(BaseScipyenData):
     # def __reduce__(self): # TODO
     #     pass
     
+class LTPOnline(object):
+    def __init__(self, scipyenWindow:QtWidgets.QMainWindow):
+        if type(scipyenWindow).__name__ != 'ScipyenWindow':
+            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(scipyenWindow).__name__}")
+
+        self._scipyenWindow_ = scipyenWindow
+
+        self._dirWatcher_ = CurrentDirectoryFileWatcher(emitterWindow = self._scipyenWindow_)
+
+    def newFiles(self, val):
+        pass
+
 def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
     """Helper function for the SynapticPathway factory function
     args: list of neo.Blocks

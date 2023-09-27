@@ -7451,8 +7451,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         self._currentDirCache_[i] = dirItems[i]
                     
             else:
-                txt = f"{self.__class__.__name__}._slot_directoryChanged first cache = {dirItems}\n"
-                self.console.writeText(txt)
+                #txt = f"{self.__class__.__name__}._slot_directoryChanged first cache = {dirItems}\n"
+                #self.console.writeText(txt)
                 self._currentDirCache_.update(dirItems)
                 self.sig_newItemsInCurrentDir.emit(tuple(dirItems.keys()))
                 

@@ -24,33 +24,66 @@ from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
 
 class CurrentDirectoryFileWatcher(QtCore.QObject):
-    def __init__(self, parent=None, emitterWindow = None):
+    def __init__(self, parent=None, emitterWindow = None,
+                 cbDict:typing.Optional[dict] = dict(newFiles = None, changedFiles = None, removedFiles = None)):
+        super().__init__(parent=parent)
         self._newFiles_      = list()
         self._removedFiles_  = list()
         self._changedFiles_  = list()
-        
+        self._callbacksDict_ = None
+
+        if isinstance(cbDict, dict) and all(x in cbDict.keys() for x in ("newFiles",
+                                                                         "changedFiles",
+                                                                         "removedFiles")):
+            self._callbacksDict_ = cbDict
+
         if isinstance(emitterWindow, QtWidgets.QMainWindow):
             if all(hasattr(emitterWindow, x) and isinstance(inspect.getattr_static(emitterWindow, x), QtCore.pyqtSignal) for x in ("sig_newItemsInCurrentDir",
                                                                                                                                    "sig_itemsRemovedFromCurrentDir",
                                                                                                                                    "sig_itemsChangedInCurrentDir")):
                 self._source_ = emitterWindow
                 self._source_.sig_newItemsInCurrentDir.connect(self.slot_newFiles)
-                self._source_.sig_itemsRemovedFromCurrentDirCurrentDir.connect(self.slot_filesRemoved)
+                self._source_.sig_itemsRemovedFromCurrentDir.connect(self.slot_filesRemoved)
                 self._source_.sig_itemsChangedInCurrentDir.connect(self.slot_filesChanged)
         
+    @property
+    def callbacks(self) -> typing.Optional[dict]:
+        return self._callbacksDict_
+
+    @callbacks.setter
+    def callbacks(self, value:typing.Optional[dict]):
+        if isinstance(value, dict) and all(x in cbDict.keys() for x in ("newFiles",
+                                                                         "changedFiles",
+                                                                         "removedFiles")):
+            pass
+
     @pyqtSlot(tuple)
     def slot_filesRemoved(self, value):
         self._removedFiles_[:] = value[:]
-        
-    
+        if hasattr(self._source_, "console"):
+            txt = f"removed {self._removedFiles_}\n"
+            self._source_.console.writeText(txt)
+
+            if isinstance(self._callbacksDict_, dict) :
+                pass
+
+
     @pyqtSlot(tuple)
     def slot_filesChanged(self, value):
         self._changedFiles_[:] = value[:]
-        
-    
+        if hasattr(self._source_, "console"):
+            txt = f"changed {self._changedFiles_}\n"
+            self._source_.console.writeText(txt)
+
+
+
     @pyqtSlot(tuple)
     def slot_newFiles(self, value):
         self._newFiles_[:] = value[:]
+        if hasattr(self._source_, "console"):
+            txt = f"new {self._newFiles_}\n"
+            self._source_.console.writeText(txt)
+        
         
     
 
