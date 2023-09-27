@@ -23,6 +23,37 @@ import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
 
+class CurrentDirectoryFileWatcher(QtCore.QObject):
+    def __init__(self, parent=None, emitterWindow = None):
+        self._newFiles_      = list()
+        self._removedFiles_  = list()
+        self._changedFiles_  = list()
+        
+        if isinstance(emitterWindow, QtWidgets.QMainWindow):
+            if all(hasattr(emitterWindow, x) and isinstance(inspect.getattr_static(emitterWindow, x), QtCore.pyqtSignal) for x in ("sig_newItemsInCurrentDir",
+                                                                                                                                   "sig_itemsRemovedFromCurrentDir",
+                                                                                                                                   "sig_itemsChangedInCurrentDir")):
+                self._source_ = emitterWindow
+                self._source_.sig_newItemsInCurrentDir.connect(self.slot_newFiles)
+                self._source_.sig_itemsRemovedFromCurrentDirCurrentDir.connect(self.slot_filesRemoved)
+                self._source_.sig_itemsChangedInCurrentDir.connect(self.slot_filesChanged)
+        
+    @pyqtSlot(tuple)
+    def slot_filesRemoved(self, value):
+        self._removedFiles_[:] = value[:]
+        
+    
+    @pyqtSlot(tuple)
+    def slot_filesChanged(self, value):
+        self._changedFiles_[:] = value[:]
+        
+    
+    @pyqtSlot(tuple)
+    def slot_newFiles(self, value):
+        self._newFiles_[:] = value[:]
+        
+    
+
 class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
     sig_wm_inspect_done = pyqtSignal(name="sig_wm_inspect_done")
     

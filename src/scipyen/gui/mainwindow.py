@@ -7429,26 +7429,30 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 changedItems = tuple(i[0] for i in dirItems.items() if (i[0] in self._currentDirCache_ and (i[1].st_size != self._currentDirCache_[i[0]].st_size or i[1].st_mtime_ns != self._currentDirCache_[i[0]].st_mtime_ns)))
                 
                 if len(removedItems):
-                    print(f"{self.__class__.__name__}._slot_directoryChanged removedItems = {removedItems}")
+                    txt = f"{self.__class__.__name__}._slot_directoryChanged removedItems = {removedItems}\n"
+                    self.console.writeText(txt)
                     for i in removedItems:
                         self._currentDirCache_.pop(i)
                         
                     self.sig_itemsRemovedFromCurrentDir.emit(tuple(removedItems))
                     
                 if len(newItems):
-                    print(f"{self.__class__.__name__}._slot_directoryChanged newItems = {newItems}")
+                    txt = f"{self.__class__.__name__}._slot_directoryChanged newItems = {newItems}\n"
+                    self.console.writeText(txt)
                     for i in newItems:
                         self._currentDirCache_[i] = dirItems[i]
                     self.sig_newItemsInCurrentDir.emit(tuple(newItems))
                     
                 if len(changedItems):
-                    print(f"{self.__class__.__name__}._slot_directoryChanged changedItems = {changedItems}")
+                    txt = f"{self.__class__.__name__}._slot_directoryChanged changedItems = {changedItems}\n"
+                    self.console.writeText(txt)
                     self.sig_itemsChangedInCurrentDir.emit(changedItems)
                     for i in changedItems:
                         self._currentDirCache_[i] = dirItems[i]
                     
             else:
-                print(f"{self.__class__.__name__}._slot_directoryChanged first cache = {dirItems}")
+                txt = f"{self.__class__.__name__}._slot_directoryChanged first cache = {dirItems}\n"
+                self.console.writeText(txt)
                 self._currentDirCache_.update(dirItems)
                 self.sig_newItemsInCurrentDir.emit(tuple(dirItems.keys()))
                 

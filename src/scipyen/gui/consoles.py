@@ -3221,7 +3221,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
             self._insert_plain_text_into_buffer(cursor, dedent(text))
             
     @safeWrapper
-    def writeText(self, text):
+    def writeText(self, text:typing.Union[str, typing.List[str], typing.Tuple[tuple]]):
         """Writes a text in console buffer
         """
         if isinstance(text, str):
@@ -3424,6 +3424,9 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 #pass
             
 class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
+    # NOTE: 2023-09-27 12:55:24 TODO
+    # to implements julia-style propgress indicators;
+    # see/adapt qtconsole.console_widget code -> in ScipyenConsoleWidget
     historyItemsDropped = pyqtSignal()
     workspaceItemsDropped = pyqtSignal()
     fileSystemItemsDropped = pyqtSignal()
