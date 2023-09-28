@@ -62,11 +62,11 @@ else:
 from PyQt5 import (QtCore, QtWidgets, QtGui, )
 import sip
 hasQDarkTheme = False
-# try:
-#     import qdarktheme
-#     hasQDarkTheme = True
-# except:
-#     pass
+try:
+    import qdarktheme
+    hasQDarkTheme = True
+except:
+    pass
 
 # NOTE: 2023-09-28 22:12:25 
 # this does the trick on windows -  now my local breeze icons are available
@@ -173,6 +173,7 @@ def main():
         if sys.platform == "win32":
             if hasQDarkTheme:
                 qdarktheme.setup_theme("auto")
+                qdarktheme.enable_hi_dpi()
                 QtGui.QIcon.setThemeName("breeze-dark")
             else:
                 windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
