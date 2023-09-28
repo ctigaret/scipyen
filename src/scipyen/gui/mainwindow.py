@@ -277,6 +277,9 @@ try:
 except:
     pass
 # END pyqtdarktheme
+
+
+
 # from IPython.lib.deepreload import reload as dreload
 
 # from IPython.core.autocall import ZMQExitAutocall
@@ -1310,8 +1313,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # i.e. the global singleton instance of the QApplication running Scipyen
         self.app = app
         
-        self._bundled_ = kwargs.pop("bundled", False)
-
+        self._pyinstaller_bundled_ = kwargs.pop("pyinstaller_bundled", False)
+        
         # NOTE: 2022-12-25 10:41:12
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
         self.plugins = dict()
@@ -4430,6 +4433,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
         '''
+        
+        # get the location of the gui module
+        import gui
+        
+        guipath = pathlib.Path(gui.__file__) # path to the gui module incl. the py source
+        guidir = guipath.parent
+        iconsdir = guidir / "resources" / "icons"
+        
+        themePaths = QtGui.QIcon.themeSearchPaths()
+        themePaths.append(str(iconsdir))
+        QtGui.QIcon.setThemeSearchPaths(themePaths)
+        
         self.setDockNestingEnabled(True)
 
         # NOTE: 2021-04-15 10:12:33 TODO
@@ -4485,7 +4500,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
-        if not self._bundled_:
+        if not self._pyinstaller_bundled_:
             self.actionExternalIPython = QtWidgets.QAction(
                 QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
         
