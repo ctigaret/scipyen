@@ -91,6 +91,8 @@ if sys.platform == "win32":
         QtGui.QIcon.setThemeSearchPaths(themePaths)
         # QtGui.QIcon.setThemeName("breeze-dark") 
     
+QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 
 #### END 3rd party modules
 
@@ -157,8 +159,8 @@ def main():
         sip.setdestroyonexit(True) # better leave to default
         
         # NOTE: 2021-08-17 10:07:11 is this needed?
-        QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-        QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+        # QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+        # QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
         
         # BEGIN 
         # 1. create the pyqt5 app
