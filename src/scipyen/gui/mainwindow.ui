@@ -47,7 +47,7 @@
      <x>0</x>
      <y>0</y>
      <width>938</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -539,7 +539,11 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Open System Terminal</string>
          </property>
          <property name="icon">
-          <iconset theme="utilities-terminal"/>
+          <iconset theme="utilities-terminal">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -558,7 +562,11 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Open File Manager</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open-folder"/>
+          <iconset theme="document-open-folder">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -577,7 +585,11 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Open Parent Folder in File Manager</string>
          </property>
          <property name="icon">
-          <iconset theme="go-parent-folder"/>
+          <iconset theme="go-parent-folder">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -1124,7 +1136,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionOpen_System_Terminal">
    <property name="icon">
-    <iconset theme="utilities-terminal"/>
+    <iconset theme="utilities-terminal">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Open System Terminal</string>
