@@ -68,15 +68,28 @@ try:
 except:
     pass
 
-mpath = pathlib.Path(__module_path__)
+# NOTE: 2023-09-28 22:12:25 
+# this does the trick on windows -  now my local breeze icons are available
+# so we keep with those (they're too nice, anyway!)
+#
+# works in conjunction with code at NOTE: 2023-09-28 22:06:54
+#
+#
+# on linux, we rely on platform-level modules, which get packed by pyinstaller
+# when building the bundle
+#
+# MAYBE TODO/FIXME 2023-09-28 22:17:16 MAY
+# try a similar trick for linux
+if sys.platform == "win32":
+    mpath = pathlib.Path(__module_path__)
 
-iconsdir = mpath / "gui" / "resources" / "icons"
+    iconsdir = mpath / "gui" / "resources" / "icons"
 
-if iconsdir.is_dir():
-    themePaths = QtGui.QIcon.themeSearchPaths()
-    themePaths.append(str(iconsdir))
-    QtGui.QIcon.setThemeSearchPaths(themePaths)
-    QtGui.QIcon.setThemeName("breeze-dark") # NOTE: 2023-09-28 22:12:25 this does the trick on windows
+    if iconsdir.is_dir():
+        themePaths = QtGui.QIcon.themeSearchPaths()
+        themePaths.append(str(iconsdir))
+        QtGui.QIcon.setThemeSearchPaths(themePaths)
+        # QtGui.QIcon.setThemeName("breeze-dark") 
     
 
 #### END 3rd party modules
