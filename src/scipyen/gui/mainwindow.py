@@ -4794,7 +4794,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.dirFwdBtn.released.connect(self.slot_goToNextDir)
         # self.selDirBtn.released.connect(self.slot_selectDir)
         self.selDirBtn.released.connect(self.slot_selectWorkDir)
-
+        
+        # NOTE: 2023-09-28 12:13:22
+        self.openTermBtn.released.connect(self.slot_openCurrentDirInSystemTerminal)
+        self.systemOpenFolderBtn.released.connect(self.slot_systemOpenCurrentFolder)
+        self.systemOpenParentFolderBtn.released.connect(self.slot_systemOpenParentFolder2)
+        
         self.viewFilesFilterToolBtn.released.connect(self.slot_showFilesFilter)
         self.hideFilesFilterToolBtn.released.connect(self.slot_hideFilesFilter)
 
@@ -4911,7 +4916,26 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_systemOpenCurrentFolder(self):
         targetDir = self.fileSystemModel.rootPath()
         self.slot_systemOpenFileOrFolder(targetDir)
-
+        
+    @pyqtSlot()
+    @safeWrapper
+    def slot_openCurrentDirInSystemTerminal(self):
+        dest = str(pathlib.Path(self.currentDir))
+        terminal = desktoputils.get_system_terminal_executable()
+        if sys.platform == "win32":
+            subprocess.run(["start", terminal, "/k", "pushd", dest], shell=True)
+        elif sys.platform == "linux":
+            # subprocess.run(["xterm", "-e", "'cd", dest, "&&", "/bin/bash'"], shell=True)
+            if terminal == "konsole":
+                subprocess.run([terminal, "--subprocess", "--workdir", dest], shell=True)
+            elif terminal == "xterm":
+                subprocess.run([terminal, "-e", "'cd", dest, "&&", "/bin/bash'"], shell=True)
+            else:
+                warnings.warn(f"Launching {terminal} is not yet supported")
+                
+        else:
+            warnings.warn(f"Launching a terminal on {sys.platform} is not yet supported")
+        
     @pyqtSlot()
     @safeWrapper
     def slot_systemOpenSelectedFiles(self):
@@ -5797,6 +5821,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         for folder in parentFolders:
             self.slot_systemOpenFileOrFolder(folder)
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_systemOpenParentFolder2(self):
+        """Opens the parent directory of the current directory, in system app"""
+        dest = str(pathlib.Path(self.currentDir).parent)
+        if os.path.exists(dest):
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(f"file://{dest}"))
 
     @pyqtSlot(str)
     @safeWrapper

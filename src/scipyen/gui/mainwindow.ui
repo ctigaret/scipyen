@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>812</width>
+    <width>938</width>
     <height>595</height>
    </rect>
   </property>
@@ -46,8 +46,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>812</width>
-     <height>28</height>
+     <width>938</width>
+     <height>30</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -521,6 +521,63 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="openTermBtn">
+         <property name="toolTip">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="statusTip">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="whatsThis">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="text">
+          <string>Open System Terminal</string>
+         </property>
+         <property name="icon">
+          <iconset theme="utilities-terminal"/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="systemOpenFolderBtn">
+         <property name="toolTip">
+          <string>Open current folder in system file manager</string>
+         </property>
+         <property name="statusTip">
+          <string>Open current folder in system file manager</string>
+         </property>
+         <property name="whatsThis">
+          <string>Open current folder in system file manager</string>
+         </property>
+         <property name="text">
+          <string>Open File Manager</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-open-folder"/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="systemOpenParentFolderBtn">
+         <property name="toolTip">
+          <string>Opens parent directory of working directory in system file manager</string>
+         </property>
+         <property name="statusTip">
+          <string>Opens parent directory of working directory in system file manager</string>
+         </property>
+         <property name="whatsThis">
+          <string>Opens parent directory of working directory in system file manager</string>
+         </property>
+         <property name="text">
+          <string>Open Parent Folder in File Manager</string>
+         </property>
+         <property name="icon">
+          <iconset theme="go-parent-folder"/>
          </property>
         </widget>
        </item>
@@ -1063,6 +1120,17 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="whatsThis">
     <string>When a viewer is closed , also remove it from the user workspace</string>
+   </property>
+  </action>
+  <action name="actionOpen_System_Terminal">
+   <property name="icon">
+    <iconset theme="utilities-terminal"/>
+   </property>
+   <property name="text">
+    <string>Open System Terminal</string>
+   </property>
+   <property name="toolTip">
+    <string>Open system terminal in current folder</string>
    </property>
   </action>
  </widget>

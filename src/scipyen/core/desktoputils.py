@@ -105,7 +105,29 @@ def get_trash_icon_name():
         
     return "user-trash"
         
-
+def get_system_terminal_executable():
+    # TODO: 2023-09-28 12:41:32 FIXME
+    # store shell in global configuration
+    # cascade through available options e.g. by calling
+    #   on windows:
+    #       out = subprocess.run(["where", shell], shell=True, capture_output=True)
+    #   on linux:
+    #       out = subprocess.run(["which", shell], shell=True, capture_output=True)
+    #   and test that out.returncode == 0 (i.e. success)
+    #
+    #   while iterating through a list of available shells
+    #
+    #   on windows: powershell, wt, cmd
+    #   on linux:   xterm, konsole, gnome-terminal, qterminal, lxterminal, rxvt, rxvt-unicode. 
+    if sys.platform == "win32":
+        return "cmd"
+    elif sys.platform == "linux":
+        return "konsole" # MY OWN default, for now
+        # return "xterm" # good default, for now
+    else:
+        warnings.warn(f"{sys.platform} platform is not yet supported")
+        
+        
 def get_desktop_places():
     """Collect user places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
