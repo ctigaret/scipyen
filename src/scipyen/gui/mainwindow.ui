@@ -493,11 +493,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="viewFilesFilterToolBtn">
          <property name="text">
-          <string/>
+          <string>Filter...</string>
          </property>
          <property name="icon">
-          <iconset theme="view-filter">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="view-filter"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -766,11 +765,10 @@ NOTE: you can click anywhere in the row to select</string>
              <string>Hide file filter</string>
             </property>
             <property name="text">
-             <string/>
+             <string>Hide</string>
             </property>
             <property name="icon">
-             <iconset theme="window-close">
-              <normaloff>.</normaloff>.</iconset>
+             <iconset theme="window-close"/>
             </property>
             <property name="autoRaise">
              <bool>true</bool>
