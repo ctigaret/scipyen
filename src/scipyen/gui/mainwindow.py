@@ -1627,12 +1627,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._current_GUI_style_name = val
         
         if sys.platform == "win32":
-            windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-            _,_,v,_ = windowColor.getHsv()
-            if v > 128:
-                QtGui.QIcon.setThemeName("breeze")
-            else:
+            if hasQDarkTheme:
                 QtGui.QIcon.setThemeName("breeze-dark")
+            else:
+                windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+                _,_,v,_ = windowColor.getHsv()
+                if v > 128:
+                    QtGui.QIcon.setThemeName("breeze")
+                else:
+                    QtGui.QIcon.setThemeName("breeze-dark")
             
 
     @property
