@@ -68,6 +68,9 @@ try:
 except:
     pass
 
+QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+
 # NOTE: 2023-09-28 22:12:25 
 # this does the trick on windows -  now my local breeze icons are available
 # so we keep with those (they're too nice, anyway!)
@@ -91,8 +94,6 @@ if sys.platform == "win32":
         QtGui.QIcon.setThemeSearchPaths(themePaths)
         # QtGui.QIcon.setThemeName("breeze-dark") 
     
-QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 
 #### END 3rd party modules
 
