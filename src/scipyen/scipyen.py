@@ -76,7 +76,7 @@ if iconsdir.is_dir():
     themePaths = QtGui.QIcon.themeSearchPaths()
     themePaths.append(str(iconsdir))
     QtGui.QIcon.setThemeSearchPaths(themePaths)
-    QtGui.QIcon.setThemeName("breeze-dark")
+    QtGui.QIcon.setThemeName("breeze-dark") # NOTE: 2023-09-28 22:12:25 this does the trick on windows
     
 
 #### END 3rd party modules
@@ -151,19 +151,19 @@ def main():
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
         
-        # if hasQDarkTheme and sys.platform == "win32":
+        # NOTE: 2023-09-28 22:06:54
+        # this should be necessary only on windows platform
+        # see also NOTE: 2023-09-28 22:12:25
+        #
+        # On linux we rely on platform plugins (which also get bundled when
+        # building a pyinstaller bundle, as per scipyen.spec)
         if sys.platform == "win32":
-            # NOTE: 2023-09-28 22:06:54
-            # this should be necessary only on windows platform
             if hasQDarkTheme:
                 qdarktheme.setup_theme("auto")
                 QtGui.QIcon.setThemeName("breeze-dark")
             else:
                 QtGui.QIcon.setThemeName("breeze")
             
-        # else:
-        #     if __bundled__:
-        
         # NOTE: 2023-01-08 00:48:47
         # avoid global menus - must be called AFTER we have an instance of app!
         # QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
