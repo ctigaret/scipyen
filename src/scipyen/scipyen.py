@@ -68,7 +68,7 @@ try:
 except:
     pass
 
-mpath = pathlib.Path(__module_path__).parent
+mpath = pathlib.Path(__module_path__)
 
 iconsdir = mpath / "gui" / "resources" / "icons"
 
