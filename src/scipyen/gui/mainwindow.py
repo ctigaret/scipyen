@@ -5856,7 +5856,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         dest = str(pathlib.Path(self.currentDir).parent)
         print(f"{self.__class__.__name__}.slot_systemOpenParentFolder2: dest = {dest}")
         if os.path.exists(dest):
-            print(f"\t{self._-class__.__name__} OK")
+            print(f"\t{self.__class__.__name__} OK")
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(f"file://{dest}"))
 
     @pyqtSlot(str)
