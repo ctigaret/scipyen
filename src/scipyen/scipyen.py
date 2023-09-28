@@ -62,11 +62,11 @@ else:
 from PyQt5 import (QtCore, QtWidgets, QtGui, )
 import sip
 hasQDarkTheme = False
-try:
-    import qdarktheme
-    hasQDarkTheme = True
-except:
-    pass
+# try:
+#     import qdarktheme
+#     hasQDarkTheme = True
+# except:
+#     pass
 
 # NOTE: 2023-09-28 22:12:25 
 # this does the trick on windows -  now my local breeze icons are available
@@ -175,7 +175,14 @@ def main():
                 qdarktheme.setup_theme("auto")
                 QtGui.QIcon.setThemeName("breeze-dark")
             else:
-                QtGui.QIcon.setThemeName("breeze")
+                windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+                _,_,v,_ = windowColor.getHsv()
+                if v > 128:
+                    QtGui.QIcon.setThemeName("breeze")
+                else:
+                    QtGui.QIcon.setThemeName("breeze-dark")
+                
+                # QtGui.QIcon.setThemeName("breeze")
             
         # NOTE: 2023-01-08 00:48:47
         # avoid global menus - must be called AFTER we have an instance of app!
