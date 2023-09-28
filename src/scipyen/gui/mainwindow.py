@@ -4435,15 +4435,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         '''
         
         # get the location of the gui module
-        import gui
-        
-        guipath = pathlib.Path(gui.__file__) # path to the gui module incl. the py source
-        guidir = guipath.parent
-        iconsdir = guidir / "resources" / "icons"
-        
-        themePaths = QtGui.QIcon.themeSearchPaths()
-        themePaths.append(str(iconsdir))
-        QtGui.QIcon.setThemeSearchPaths(themePaths)
+#         import gui
+#         
+#         guipath = pathlib.Path(gui.__file__) # path to the gui module incl. the py source
+#         guidir = guipath.parent
+#         iconsdir = guidir / "resources" / "icons"
+#         
+#         themePaths = QtGui.QIcon.themeSearchPaths()
+#         themePaths.append(str(iconsdir))
+#         QtGui.QIcon.setThemeSearchPaths(themePaths)
         
         self.setDockNestingEnabled(True)
 

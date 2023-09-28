@@ -4,9 +4,9 @@
 
 #### BEGIN core python modules
 
-import sys, os
+import sys, os, platform, pathlib
 
-import atexit, re, inspect, gc, io, traceback, platform
+import atexit, re, inspect, gc, io, traceback
 import faulthandler, warnings
 #import cProfile
 __version__ = "0.0.1"
@@ -67,6 +67,18 @@ try:
     hasQDarkTheme = True
 except:
     pass
+
+mpath = pathlib.Path(__module_path__).parent
+
+iconsdir = mpath / "gui" / "resources" / "icons"
+
+if iconsdir.is_dir():
+    themePaths = QtGui.QIcon.themeSearchPaths()
+    themePaths.append(str(iconsdir))
+    QtGui.QIcon.setThemeSearchPaths(themePaths)
+    QtGui.QIcon.setThemeName("breeze-dark")
+    
+
 #### END 3rd party modules
 
 #### BEGIN Scipyen modules
@@ -133,14 +145,24 @@ def main():
         
         # NOTE: 2021-08-17 10:07:11 is this needed?
         QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-        
+        QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
         
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
         
-        if hasQDarkTheme and sys.platform == "win32":
-            qdarktheme.setup_theme("auto")
+        # if hasQDarkTheme and sys.platform == "win32":
+        if sys.platform == "win32":
+            # NOTE: 2023-09-28 22:06:54
+            # this should be necessary only on windows platform
+            if hasQDarkTheme:
+                qdarktheme.setup_theme("auto")
+                QtGui.QIcon.setThemeName("breeze-dark")
+            else:
+                QtGui.QIcon.setThemeName("breeze")
+            
+        # else:
+        #     if __bundled__:
         
         # NOTE: 2023-01-08 00:48:47
         # avoid global menus - must be called AFTER we have an instance of app!
