@@ -113,9 +113,29 @@ if sys.platform == "win32":
             QtGui.QIcon.setThemeName("breeze")
         else:
             QtGui.QIcon.setThemeName("breeze-dark")
+            
+        # FIXME 2023-09-28 23:22:31 BUG
+        # github merry-go-round replaces svg symbolic links (linux) with 
+        # simple text files containing the name of the target - this causes 
+        # the qt-svg plugin to sill out tons of error messages
+        # TODO: either
+        # 1) figure out how to ignore these symbolic links on Windows
+        # 2) figure out how to ignore the qt-svg error messages
+        #
+        # I prefer the first option; a contrived solution is to store on git hub
+        # an archive of the icon directories, and ignore the icons directories in 
+        # .gitignore
+        # unfortunately, this means that after each git pull we'd have to manually
+        # expand these directory, onse something has changed
+        #
+        # 3) incorporate these icons in qrc and resources.py files
+        # the problem with that is that the py and qrc files sizes easily 
+        # get over the file size limit in github, unless I somehow break down
+        # these into a qrc/py resource files for each subdirectory - brrr...
+        #
+        # until then, on Windows we will have to put up with the qt-svg messages
+        # for now...
         
-        # QtGui.QIcon.setThemeName("breeze")
-
 #### END 3rd party modules
 
 #### BEGIN Scipyen modules
