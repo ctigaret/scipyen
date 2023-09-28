@@ -496,7 +496,8 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Filter...</string>
          </property>
          <property name="icon">
-          <iconset theme="view-filter"/>
+          <iconset theme="view-filter">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -516,29 +517,6 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
          <property name="icon">
           <iconset theme="document-open">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="openTermBtn">
-         <property name="toolTip">
-          <string>Open system terminal in current folder</string>
-         </property>
-         <property name="statusTip">
-          <string>Open system terminal in current folder</string>
-         </property>
-         <property name="whatsThis">
-          <string>Open system terminal in current folder</string>
-         </property>
-         <property name="text">
-          <string>Open System Terminal</string>
-         </property>
-         <property name="icon">
-          <iconset theme="utilities-terminal">
            <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
@@ -585,6 +563,29 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
          <property name="icon">
           <iconset theme="go-parent-folder">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="openTermBtn">
+         <property name="toolTip">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="statusTip">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="whatsThis">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="text">
+          <string>Open System Terminal</string>
+         </property>
+         <property name="icon">
+          <iconset theme="utilities-terminal">
            <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
@@ -768,7 +769,8 @@ NOTE: you can click anywhere in the row to select</string>
              <string>Hide</string>
             </property>
             <property name="icon">
-             <iconset theme="window-close"/>
+             <iconset theme="window-close">
+              <normaloff>.</normaloff>.</iconset>
             </property>
             <property name="autoRaise">
              <bool>true</bool>
