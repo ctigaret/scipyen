@@ -5854,7 +5854,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_systemOpenParentFolder2(self):
         """Opens the parent directory of the current directory, in system app"""
         dest = str(pathlib.Path(self.currentDir).parent)
-        print(f"{self.__class__.__name__}.slot_systemOpenParentFolder2: dest = {dest})
+        print(f"{self.__class__.__name__}.slot_systemOpenParentFolder2: dest = {dest}")
         if os.path.exists(dest):
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(f"file://{dest}"))
 
