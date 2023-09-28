@@ -71,26 +71,6 @@ except:
 QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
 QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 
-# NOTE: 2023-09-28 22:06:54
-# this should be necessary only on windows platform
-# see also NOTE: 2023-09-28 22:12:25
-#
-# On linux we rely on platform plugins (which also get bundled when
-# building a pyinstaller bundle, as per scipyen.spec)
-if sys.platform == "win32":
-    if hasQDarkTheme:
-        qdarktheme.setup_theme("auto")
-        qdarktheme.enable_hi_dpi()
-        QtGui.QIcon.setThemeName("breeze-dark")
-    else:
-        windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-        _,_,v,_ = windowColor.getHsv()
-        if v > 128:
-            QtGui.QIcon.setThemeName("breeze")
-        else:
-            QtGui.QIcon.setThemeName("breeze-dark")
-        
-        # QtGui.QIcon.setThemeName("breeze")
 
 # NOTE: 2023-09-28 22:12:25 
 # this does the trick on windows -  now my local breeze icons are available
@@ -115,6 +95,26 @@ if sys.platform == "win32":
         QtGui.QIcon.setThemeSearchPaths(themePaths)
         # QtGui.QIcon.setThemeName("breeze-dark") 
     
+# NOTE: 2023-09-28 22:06:54
+# this should be necessary only on windows platform
+# see also NOTE: 2023-09-28 22:12:25
+#
+# On linux we rely on platform plugins (which also get bundled when
+# building a pyinstaller bundle, as per scipyen.spec)
+if sys.platform == "win32":
+    if hasQDarkTheme:
+        # qdarktheme.setup_theme("auto")
+        qdarktheme.enable_hi_dpi()
+        QtGui.QIcon.setThemeName("breeze-dark")
+    else:
+        windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+        _,_,v,_ = windowColor.getHsv()
+        if v > 128:
+            QtGui.QIcon.setThemeName("breeze")
+        else:
+            QtGui.QIcon.setThemeName("breeze-dark")
+        
+        # QtGui.QIcon.setThemeName("breeze")
 
 #### END 3rd party modules
 
@@ -189,6 +189,11 @@ def main():
         app = QtWidgets.QApplication(sys.argv)
         
             
+        if sys.platform == "win32":
+            if hasQDarkTheme:
+                qdarktheme.setup_theme("auto")
+
+
         # NOTE: 2023-01-08 00:48:47
         # avoid global menus - must be called AFTER we have an instance of app!
         # QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
