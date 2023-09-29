@@ -30,6 +30,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
+import core.pyabfbridge as pab
 import core.datatypes  
 from core.datatypes import (Episode, Schedule, TypeEnum)
 import plots.plots as plots
@@ -846,13 +847,27 @@ class LTPOnline(object):
     #       cursor objects, epochs, etc? - should it be passed to the __init__,
     #       or read from a file, etc?
     #
-    def __init__(self, emitterWindow:QtWidgets.QMainWindow,
+
+    test_protocol_properties = ("activeDACChannelIndex",
+                                "nSweeps",
+                                "acquisitionMode",
+                                "samplingRate",
+                                "alternateDigitalOutputStateEnabled",
+                                "alternateDACOutputStateEnabled")
+
+    def __init__(self, emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
+
+        wsp = wf.user_workspace()
+
+        if emitterWindow is None:
+            self._emitterWindow_ = wsp["mainwindow"]
+
         if type(emitterWindow).__name__ != 'ScipyenWindow':
             raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(scipyenWindow).__name__}")
 
         self._emitterWindow_ = emitterWindow
-        
+
         if directory is None:
             self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
             
@@ -866,7 +881,7 @@ class LTPOnline(object):
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
         
-        self._filesQueue_ = collections.deque()
+        # self._filesQueue_ = collections.deque()
 
         # cbDict = dict(newFiles = self.newFiles, changedFiles = self.changedFiles,
         #               removedFiles = self.removedFiles)
@@ -879,70 +894,205 @@ class LTPOnline(object):
 
         self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
         
-        self._pendingAbf_ = dict() # pathlib.Path are hashable; hence we use the ABF as key ↦ RSV
-        
+        self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
+
+        self._latestAbf_ = None # last ABF file to have been created by Clampex
+
+        self._abfProtocol_ = None
+
+        # TODO: 2023-09-29 13:57:13
+        # make this an intelligent thing - use SynapticPathway, PathwayEpisodes, etc.
+        #
+        # for now, baseline & chase are just one or two neo.Blocks
+        self._data_ = dict(baseline = dict(path0 = neo.Block(), path1 = neo.Block()),
+                           conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
+                           chase = dict(path0 = neo.Block(), path1 = neo.Block()))
+
+        self._viewer_path0_Records = self._emitterWindow_.newViewer(sv.SignalViewer)
+        self._viewer_path0_Amplitudes = self._emitterWindow_.newViewer(sv.SignalViewer)
+        self._viewer_path1_Records = self._emitterWindow_.newViewer(sv.SignalViewer)
+        self._viewer_path1_Amplitudes = self._emitterWindow_.newViewer(sv.SignalViewer)
+
+        self._viewer_Rseries = self._emitterWindow_.newViewer(sv.SignalViewer)
+        self._viewer_DC = self._emitterWindow_.newViewer(sv.SignalViewer)
+
+
     def __del__(self):
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-            
+
         super().__del__()
 
-    def newFiles(self, val:pathlib.Path):
-        print(f"{self.__class__.__name__}.newFiles {val}")
+    @property
+    def data(self) -> dict:
+        return self._data_
+
+    def stop(self):
+        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+
+    def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
+        if self._emitterWindow_ is None:
+            raise ValueError("You must set an emiter window first...")
+
+        if directory is None:
+            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
+
+        elif isinstance(directory, str):
+            self._watchedDir_ = pathlib.Path(directory)
+
+        elif isinstance(directory, pathlib.Path):
+            self._watchedDir_ = directory
+
+        else:
+            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+
+        self._dirWatcher_.directory = self._watchedDir_
+
+        self._pending_.clear() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
+
+        self._latestAbf_ = None # last ABF file to have been created by Clampex
+
+        self._abfProtocol_ = None
+
+        self._data_["baseline"]["path0"].segments.clear()
+        self._data_["baseline"]["path1"].segments.clear()
+        self._data_["chase"]["path0"].segments.clear()
+        self._data_["chase"]["path1"].segments.clear()
+        self._data_["conditioning"]["path0"].segments.clear()
+        self._data_["conditioning"]["path1"].segments.clear()
+
+    def newFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
+        # print(f"{self.__class__.__name__}.newFiles {val}")
+        self._pending_.clear()
+        self._latestAbf_ = None
         if all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
-            self._filesQueue_.extend(val)
-            
+            # self._filesQueue_.extend(val)
+
             rsv = [v for v in val if v.suffix == ".rsv"]
             abf = [v for v in val if v.suffix == ".abf"]
-            
+
             # start of acquisition creates exactly one of each
-            if len(rsv) != len(abf) or len(abf) != 1: 
+            if len(rsv) != len(abf) or len(abf) != 1:
                 return
-            
+
             rsv = rsv[0]
             abf = abf[0]
-            
+
             # and both must have same stem
-            # 
+            #
             if rsv.stem != abf.stem:
                 return
-            
-            self._pendingAbf_[abf] = rsv
 
-            # for v in val:
-            #     if v.suffix == ".rsv":
-            #         pairedAbf = self.abfForRsv(val)
-            #         if isinstance(pairedAbf, pathlib.Path):
-            #             prevPaired = reverse_mapping_lookup(self._pendingAbf_, v)
-            #             # if len(prevPaired) == 1:
-            #             # if self._pendingAbf_["rsv"] != v:
-            #             #     self._pendingAbf_["rsv"] = v
-            #             #     self._pendingAbf_["abf"] = pairedAbf
-            #             # else:
-            # 
-            # 
-            #     elif val.suffix == ".abf":
-            #         pairedRsv = self.rsvForABF(val)
-            #         if isinstance(pairedRsv, pathlib.Path):
-            #             self._pendingAbf_ = val
+            self._pending_[rsv] = abf
 
-    def changedFiles(self, val:pathlib.Path):
-        print(f"{self.__class__.__name__}.changedFiles {val}")
+            print(f"{self.__class__.__name__}._pending_ {self._pending_}\n")
 
-    def removedFiles(self, val:pathlib.Path):
-        print(f"{self.__class__.__name__}.removedFiles {val}")
+    def changedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
+        print(f"{self.__class__.__name__}.changedFiles {val}\n")
+        print(f"\tlatestAbf = {self._latestAbf_}\n")
+        if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
+            return
+
+        # if len(val) > 1:
+        #     # CAUTION!
+        #     return
+
+        changed = val[0]
+
+        # expecting to see an ABf files changed by clampex AFTER removal of its
+        # paired rsv
+
+        if changed == self._latestAbf_:
+            print(f"{self.__class__.__name__} do something with this file: {changed}")
+            self.processAbfFile(changed)
+
+        self._latestAbf_ = None
+        self._pending_.clear()
+
+    def removedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
+        print(f"{self.__class__.__name__}.removedFiles {val}\n")
+
+        if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
+            return
+
+        # if len(val) > 1:
+        #     # CAUTION!
+        #     return
+
+        removed = val[0]
+
+        # expecting the rsv file to be removed by Clampex at this stage
+        print(f"{self.__class__.__name__}.removedFiles pending = {self._pending_}")
+        if removed.suffix == ".rsv":
+            if removed in self._pending_:
+                self._latestAbf_ = self._pending_[removed]
+                print(f"\tlatest = {self._latestAbf_}")
+                self._pending_.clear()
+
+    def processAbfFile(self, abfFile):
+        abfRun = pio.loadAxonFile(abfFile)
+        protocol = pab.ABFProtocol(abfRun)
+
+        # NOTE: 2023-09-29 14:12:56
+        # we need:
+        #
+        # 1) the recording mode must be the same, either:
+        #   VoltageClamp, CurrentClamp, or NoClamp (i=0), for field recordings
+        #
+        # 2) on the active DAC index there must be epochs:
+        #   2.a) for patch clamp experiments:
+        #       2.a.0) optional baseline step epoch with firstLevel == 0 and deltaLevel == 0
+        #           alternatively the next epoch must start at First Duration > 0
+        #       2.a.1) for membrane test: step epoch with firstLevel != 0, in :
+        #           [mV] for VoltageClamp,
+        #           [pA] for CurrentClamp
 
 
-    def rsvForABF(self, abf:pathlib.Path):
-        """Returns the rsv file paired with the abf"""
-        paired = [f for f in self._filesQueue_ if f.suffix == ".rsv" and f.stem == abf.stem and f.parent == abf.parent]
-        if len(paired):
-            return paired[0]
-        
-    def abfForRsv(self, rsv:pathlib.Path):
-        paired = [f for f in self._filesQueue_ if f.suffix == ".abf" and f.stem == rsv.stem and f.parent == rsv.parent]
-        if len(paired):
-            return paired[0]
+        if self._abfProtocol_ is None: # FIXME: 2023-09-29 14:32:24 see next line
+            # make the condition here that data blocks have no segments
+            self._abfProtocol_ = protocol
+
+        # else:
+        #     # make sure protocols are compatible
+        #     assert all(getattr(protocol, x, None) == getattr(self._abfProtocol_, x, None)), "Abf files have incompatible protocols"
+
+        # WARNING this is bogus code - it runs, but what it does in only part of
+        # what this object is intended to do
+
+        # TODO: 2023-09-29 14:23:21
+        # check that the abf has as many segments as advertised in the protocol
+        if len(abfRun.segments) != self._abfProtocol_.nSweeps:
+            warnings.warn(f"abf has {len(abfRun.segments)} but protocol says {self._abfProtocol_.nSweeps}")
+            # return
+
+        if len(abfRun.segments) == 1:
+            # => single pathway! CAUTION may backfire when recording is interrupted in Clampex
+            # TODO: for now we just populate the baseline
+            # but in the real world we need to distinguish between various episodes
+            self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
+
+            self._viewer_path0_Records.view(self._data_["baseline"]["path0"],showFrame = len(self._data_["baseline"]["path0"].segments)-1)
+
+        elif len(abfRun.segments) == 2: # WARNING we only support two laternative pathways
+            self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
+            self._viewer_path0_Records.view(self._data_["baseline"]["path0"],showFrame = len(self._data_["baseline"]["path0"].segments)-1)
+            self._data_["baseline"]["path1"].segments.append(abfRun.segments[1])
+            self._viewer_path1_Records.view(self._data_["baseline"]["path1"],showFrame = len(self._data_["baseline"]["path1"].segments)-1)
+
+
+
+
+#     def rsvForABF(self, abf:pathlib.Path):
+#         """Returns the rsv file paired with the abf"""
+#         paired = [f for f in self._filesQueue_ if f.suffix == ".rsv" and f.stem == abf.stem and f.parent == abf.parent]
+#         if len(paired):
+#             return paired[0]
+#
+#     def abfForRsv(self, rsv:pathlib.Path):
+#         paired = [f for f in self._filesQueue_ if f.suffix == ".abf" and f.stem == rsv.stem and f.parent == rsv.parent]
+#         if len(paired):
+#             return paired[0]
         
 
 def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:

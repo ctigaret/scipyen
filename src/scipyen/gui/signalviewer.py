@@ -6543,7 +6543,19 @@ Does the behind the scene work of self.setData(...)
             
     @with_doc(_set_data_, use_header=True)
     @safeWrapper
-    def setData(self, x, /, y = None, doc_title:(str, type(None)) = None, frameAxis:(int, str, vigra.AxisInfo, type(None)) = None, signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, separateChannelsIn:str="axes", singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None, plotStyle:str = "plot", get_focus:bool = False, showFrame = None, *args, **kwargs):
+    def setData(self, x, /, y = None, doc_title:(str, type(None)) = None,
+                frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
+                signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
+                frameIndex:(int, tuple, list, range, slice, type(None)) = None,
+                signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
+                signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
+                irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
+                irregularSignalChannelAxis:(int, type(None)) = None,
+                irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
+                separateSignalChannels:bool = False, separateChannelsIn:str="axes",
+                singleFrame:bool=False, interval:(tuple, list, neo.Epoch, type(None)) = None,
+                plotStyle:str = "plot", get_focus:bool = False,
+                showFrame = None, *args, **kwargs):
         """Plot data in SignalViewer.
         
 Positional parameters:

@@ -956,9 +956,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     sig_refreshRecentFilesMenu = pyqtSignal()
     sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
     
-    sig_newItemsInCurrentDir = pyqtSignal(tuple, name="sig_newItemsInCurrentDir")
-    sig_itemsRemovedFromCurrentDir = pyqtSignal(tuple, name="sig_itemsRemovedFromCurrentDir")
-    sig_itemsChangedInCurrentDir = pyqtSignal(tuple, name="sig_itemsChangedInCurrentDir")
+    sig_newItemsInMonitoredDir = pyqtSignal(tuple, name="sig_newItemsInMonitoredDir")
+    sig_itemsRemovedFromMonitoredDir = pyqtSignal(tuple, name="sig_itemsRemovedFromMonitoredDir")
+    sig_itemsChangedInMonitoredDir = pyqtSignal(tuple, name="sig_itemsChangedInMonitoredDir")
 
     _instance = None
 
@@ -2046,6 +2046,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         *args, **kwargs: passed directly to the constructor (__init__ function)
             of the winClass
 
+        Returns:
+        ========
+
+        The viewer instance; NOTE: this instance is also created in the workspace
+        as a "top-level" viewer.
 
         """
         # NOTE: 2021-07-08 14:52:44
@@ -3261,7 +3266,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_newViewer(self):
-        """Slot for opening a list of viewer types (no used)
+        """Slot for opening a list of viewer types (currently not used)
         """
         # viewer_type_names = [v.__name__ for v in gui_viewers]
         viewer_type_names = list(v.__name__ for v in self.viewers)
@@ -7477,19 +7482,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.dirFileMonitor.addPath(str(directory))
             # self.dirFileMonitor.addPath(self.currentDir)
 
-#         if on:
-#             self._isDirWatching_ = True
-#             if self.currentDir in self.dirFileMonitor.directories():
-#             # do nothing if directory already watched
-#                 print(f"{self.__class__.__name__}.enableDirectoryMonitor: The directory {self.currentDir} is already being watched")
-#             
-#             else:
-#                 watchedDirs = self.dirFileMonitor.directories()
-#                 if len(watchedDirs) > self._nMaxWatchedDirectories_:
-#                     self.dirFileMonitor.removePath(watchedDirs[0])
-#                     
-#                 self.dirFileMonitor.addPath(self.currentDir)
-                
     def watchCurrentDirectory(self):
         if not self._isDirWatching_:
             return
@@ -7530,7 +7522,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
     """
         #print(f"{self.__class__.__name__}._slot_monitoredDirectoryChanged (from dirFileMonitor) *args {args}, **kwargs {kwargs}")
-        directories = [pathlib.Path(d) for d in self.dirFileMonitor.directories()]
+        directories = utilities.unique([pathlib.Path(d) for d in self.dirFileMonitor.directories()])
         
         for d in directories:
             if d in self._monitoredDirsCache_:
@@ -7541,25 +7533,25 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 changedItems = tuple(i[0] for i in self._monitoredDirsCache_[d].items() if i[0] in currentItems and i[0].stat() != i[1])
                 
                 if len(removedItems):
-                    txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged removedItems = {removedItems}\n"
-                    self.console.writeText(txt)
+                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged removedItems = {removedItems}\n"
+                    # self.console.writeText(txt)
                     for i in removedItems:
                         self._monitoredDirsCache_[d].pop(i, None)
                         
-                    self.sig_itemsRemovedFromCurrentDir.emit(tuple(i for i in removedItems))
+                    self.sig_itemsRemovedFromMonitoredDir.emit(tuple(i for i in removedItems))
                     
                 if len(newItems):
-                    txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged newItems = {newItems}\n"
-                    self.console.writeText(txt)
+                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged newItems = {newItems}\n"
+                    # self.console.writeText(txt)
                     for i in newItems:
                         self._monitoredDirsCache_[d][i] = i.stat()
                         
-                    self.sig_newItemsInCurrentDir.emit(tuple(i for i in newItems))
+                    self.sig_newItemsInMonitoredDir.emit(tuple(i for i in newItems))
                     
                 if len(changedItems):
-                    txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged changedItems = {changedItems}\n"
-                    self.console.writeText(txt)
-                    self.sig_itemsChangedInCurrentDir.emit(changedItems)
+                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged changedItems = {changedItems}\n"
+                    # self.console.writeText(txt)
+                    self.sig_itemsChangedInMonitoredDir.emit(changedItems)
                     for i in changedItems:
                         self._monitoredDirsCache_[d][i] = i.stat()
                 

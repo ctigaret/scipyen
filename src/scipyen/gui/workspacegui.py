@@ -26,9 +26,9 @@ import gui.pictgui as pgui
 class DirectoryFileWatcher(QtCore.QObject):
     """Bounces signals/slots to bound methods in an observer
     """
-    required_sigs = ("sig_newItemsInCurrentDir",
-                     "sig_itemsRemovedFromCurrentDir",
-                     "sig_itemsChangedInCurrentDir")
+    required_sigs = ("sig_newItemsInMonitoredDir",
+                     "sig_itemsRemovedFromMonitoredDir",
+                     "sig_itemsChangedInMonitoredDir")
 
     required_observer_methods = ("newFiles",
                                  "changedFiles",
@@ -48,9 +48,9 @@ class DirectoryFileWatcher(QtCore.QObject):
         if isinstance(emitter, QtCore.QObject):
             if all(hasattr(emitter, x) and isinstance(inspect.getattr_static(emitter, x), QtCore.pyqtSignal) for x in self.required_sigs):
                 self._source_ = emitter
-                self._source_.sig_newItemsInCurrentDir.connect(self.slot_newFiles)
-                self._source_.sig_itemsRemovedFromCurrentDir.connect(self.slot_filesRemoved)
-                self._source_.sig_itemsChangedInCurrentDir.connect(self.slot_filesChanged)
+                self._source_.sig_newItemsInMonitoredDir.connect(self.slot_newFiles)
+                self._source_.sig_itemsRemovedFromMonitoredDir.connect(self.slot_filesRemoved)
+                self._source_.sig_itemsChangedInMonitoredDir.connect(self.slot_filesChanged)
 
 
         if all(hasattr(observer, x) and (inspect.isfunction(inspect.getattr_static(observer, x)) and inspect.ismethod(getattr(observer, x))) for x in self.required_observer_methods):
@@ -71,6 +71,28 @@ class DirectoryFileWatcher(QtCore.QObject):
 
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+
+    @property
+    def directory(self) -> typing.Optional[pathlib.Path]:
+        return self._watchedDir_
+
+    @directory.setter
+    def directory(self, val):
+        if directory is None:
+            if isinstance(self._source_, QtCore.QObject) and hasattr(self._source_, "currentDir"):
+                if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
+                    self._watchedDir_ = pathlib.Path(self._source_.currentDir).absolute()
+            # else:
+            #     self._watchedDir_ = None
+
+        elif isinstance(val, str):
+            self._watchedDir_ = pathlib.Path(val)
+
+        elif isinstance(val, pathlib.Path):
+            self._watchedDir_ = val
+
+        else:
+            raise TypeError(f"Expecting a str, a pathlib.Path, or None; instead, got {type(val).__name__}")
 
 
     @property
@@ -95,11 +117,14 @@ class DirectoryFileWatcher(QtCore.QObject):
             warnings.warn(f"invalid watched directory {self._watchedDir_}")
             return
 
-        files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
+        files = [v for v in value if v.parent == self._watchedDir_]
+        # NOTE: is_file() would return False here because file was removed !
+        # files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
         self._removedFiles_[:] = files[:] # may clear this; below we only send if not empty
-        if hasattr(self._source_, "console"):
-            txt = f"{self.__class__.__name__}.slot_filesRemoved {self._removedFiles_}\n"
-            self._source_.console.writeText(txt)
+
+        # if hasattr(self._source_, "console"):
+        #     txt = f"{self.__class__.__name__}.slot_filesRemoved {self._removedFiles_}\n"
+        #     self._source_.console.writeText(txt)
 
         if len(files):
             if self.observer is not None :
@@ -120,9 +145,9 @@ class DirectoryFileWatcher(QtCore.QObject):
         files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
         self._changedFiles_[:] = files[:] # may clear this; below we only send if not empty
 
-        if hasattr(self._source_, "console"):
-            txt = f"{self.__class__.__name__}.slot_filesChanged {self._changedFiles_}\n"
-            self._source_.console.writeText(txt)
+        # if hasattr(self._source_, "console"):
+        #     txt = f"{self.__class__.__name__}.slot_filesChanged {self._changedFiles_}\n"
+        #     self._source_.console.writeText(txt)
 
         if len(files):
             if self.observer is not None :
@@ -145,9 +170,9 @@ class DirectoryFileWatcher(QtCore.QObject):
 
         self._newFiles_[:] = files[:] # may clear this; below we only send if not empty
 
-        if hasattr(self._source_, "console"):
-            txt = f"{self.__class__.__name__}.slot_newFiles {self._newFiles_}\n"
-            self._source_.console.writeText(txt)
+        # if hasattr(self._source_, "console"):
+        #     txt = f"{self.__class__.__name__}.slot_newFiles {self._newFiles_}\n"
+        #     self._source_.console.writeText(txt)
 
         if len(files):
             if self.observer is not None :

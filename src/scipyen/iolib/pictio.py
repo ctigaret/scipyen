@@ -929,7 +929,7 @@ def loadAxonTextFile(fileName:str):
     
     #return result
 
-def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, dict]=False, signal_group_mode:typing.Optional[str]="split-all"):
+def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_segment:typing.Union[bool, dict]=False, signal_group_mode:typing.Optional[str]="split-all"):
     """Loads a binary Axon file (*.abf).
     
     Parameters:
@@ -992,8 +992,14 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
         
     """
     
-    if not os.path.isfile(fileName):
-        raise OSError("File %s not found" % fileName)
+    if isinstance(fileName, str) and not os.path.isfile(fileName):
+        raise OSError(f"File {fileName} not found")
+
+    elif isinstance(fileName, pathlib.Path):
+        if not fileName.is_file():
+            raise OSError(f"File {fileName} not found")
+
+        fileName = str(fileName)
     
     data = neo.Block()
     axon_info = dict()
