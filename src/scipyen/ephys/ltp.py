@@ -891,23 +891,40 @@ class LTPOnline(object):
         print(f"{self.__class__.__name__}.newFiles {val}")
         if all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
             self._filesQueue_.extend(val)
+            
+            rsv = [v for v in val if v.suffix == ".rsv"]
+            abf = [v for v in val if v.suffix == ".abf"]
+            
+            # start of acquisition creates exactly one of each
+            if len(rsv) != len(abf) or len(abf) != 1: 
+                return
+            
+            rsv = rsv[0]
+            abf = abf[0]
+            
+            # and both must have same stem
+            # 
+            if rsv.stem != abf.stem:
+                return
+            
+            self._pendingAbf_[abf] = rsv
 
-            for v in val:
-                if v.suffix == ".rsv":
-                    pairedAbf = self.abfForRsv(val)
-                    if isinstance(pairedAbf, pathlib.Path):
-                        prevPaired = reverse_mapping_lookup(self._pendingAbf_, v)
-                        # if len(prevPaired) == 1:
-                        # if self._pendingAbf_["rsv"] != v:
-                        #     self._pendingAbf_["rsv"] = v
-                        #     self._pendingAbf_["abf"] = pairedAbf
-                        # else:
-
-
-                elif val.suffix == ".abf":
-                    pairedRsv = self.rsvForABF(val)
-                    if isinstance(pairedRsv, pathlib.Path):
-                        self._pendingAbf_ = val
+            # for v in val:
+            #     if v.suffix == ".rsv":
+            #         pairedAbf = self.abfForRsv(val)
+            #         if isinstance(pairedAbf, pathlib.Path):
+            #             prevPaired = reverse_mapping_lookup(self._pendingAbf_, v)
+            #             # if len(prevPaired) == 1:
+            #             # if self._pendingAbf_["rsv"] != v:
+            #             #     self._pendingAbf_["rsv"] = v
+            #             #     self._pendingAbf_["abf"] = pairedAbf
+            #             # else:
+            # 
+            # 
+            #     elif val.suffix == ".abf":
+            #         pairedRsv = self.rsvForABF(val)
+            #         if isinstance(pairedRsv, pathlib.Path):
+            #             self._pendingAbf_ = val
 
     def changedFiles(self, val:pathlib.Path):
         print(f"{self.__class__.__name__}.changedFiles {val}")
