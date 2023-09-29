@@ -1774,19 +1774,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def monitoredDirectories(self):
         return self.dirFileMonitor.directories()
 
-    def isDirectoryMonitored(self, directory:typing.Optional[typing.Union[str, pathlib.Path]]):
+    def isDirectoryMonitored(self, directory:typing.Optional[typing.Union[str, pathlib.Path]]=None):
+        # print(f"{self.__class__.__name__}.isDirectoryMonitored {directory}")
         if directory is None:
-            return pathlib.Path(self.currentDir).absolute() in self.dirFileMonitor.directories()
-        
+            # print(f"\t{self.__class__.__name__}.isDirectoryMonitored {pathlib.Path(self.currentDir).absolute()}")
+            return str(pathlib.Path(self.currentDir).absolute()) in self.dirFileMonitor.directories()
+
         if not isinstance(directory, (str, pathlib.Path)):
             return False
-        
+
         if isinstance(directory, str):
             directory = pathlib.Path(directory)
-            
+
         if not directory.exists() or not directory.is_dir():
             return False
-        
+
         return str(directory) in self.dirFileMonitor.directories()
     
 #     @property
@@ -7401,10 +7403,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_fileSystemDataChanged(self, *args, **kwargs): # TODO 2023-09-27 22:43:52 revisit this
         # print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
         self._fileSystemChanged_ = True
-    
+
     def enableDirectoryMonitor(self, directory:typing.Optional[typing.Union[str, pathlib.Path]]=None,
                              on:bool=True):
-        # NOTE: 2023-09-27 18:02:22 
+        # NOTE: 2023-09-27 18:02:22
         # unlink this from directory navigation in Scipyen
         # specify the directory to listen to...
         #
@@ -7413,25 +7415,27 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(directory, bool):
             on = directory
             directory = None
-            
+
         if directory is None:
             directory = self.currentDir
-            
+
         # NOTE: 2023-09-27 21:17:06
         # make sure we operate on pathlib.Path objects
         #
         if not isinstance(directory, (str, pathlib.Path)):
             raise TypeError(f"Expecting a directory; instead, got {type(directory).__name__}")
-        
+
         if isinstance(directory, str):
             directory = pathlib.Path(directory)
-            
+
         if not directory.exists() or not directory.is_dir():
             raise ValueError(f"The specified directory {directory} does not exist")
-            
+
         if not directory.is_absolute():
             directory = directory.absolute()
-        
+
+        # print(f"{self.__class__.__name__}.enableDirectoryMonitor directory = {directory}; will monitor = {on}" )
+
         if not on: # => remove this directory from the monitoring system & return
             # self._isDirWatching_ = False
             # self._monitoredDirsCache_.clear()

@@ -24,66 +24,134 @@ from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
 
 class DirectoryFileWatcher(QtCore.QObject):
-    def __init__(self, parent=None, emitterWindow = None,
-                 cbDict:typing.Optional[dict] = dict(newFiles = None, changedFiles = None, removedFiles = None)):
+    """Bounces signals/slots to bound methods in an observer
+    """
+    required_sigs = ("sig_newItemsInCurrentDir",
+                     "sig_itemsRemovedFromCurrentDir",
+                     "sig_itemsChangedInCurrentDir")
+
+    required_observer_methods = ("newFiles",
+                                 "changedFiles",
+                                 "removedFiles")
+
+    def __init__(self, parent=None, emitter = None,
+                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
+                 observer:typing.Optional[object] = None):
         super().__init__(parent=parent)
-        self._newFiles_      = list()
-        self._removedFiles_  = list()
-        self._changedFiles_  = list()
-        self._callbacksDict_ = None
+        self._newFiles_     = list()
+        self._removedFiles_ = list()
+        self._changedFiles_ = list()
+        self._source_       = None
+        self._observer_     = None
+        self._watchedDir_   = None
 
-        if isinstance(cbDict, dict) and all(x in cbDict.keys() for x in ("newFiles",
-                                                                         "changedFiles",
-                                                                         "removedFiles")):
-            self._callbacksDict_ = cbDict
-
-        if isinstance(emitterWindow, QtWidgets.QMainWindow):
-            if all(hasattr(emitterWindow, x) and isinstance(inspect.getattr_static(emitterWindow, x), QtCore.pyqtSignal) for x in ("sig_newItemsInCurrentDir",
-                                                                                                                                   "sig_itemsRemovedFromCurrentDir",
-                                                                                                                                   "sig_itemsChangedInCurrentDir")):
-                self._source_ = emitterWindow
+        if isinstance(emitter, QtCore.QObject):
+            if all(hasattr(emitter, x) and isinstance(inspect.getattr_static(emitter, x), QtCore.pyqtSignal) for x in self.required_sigs):
+                self._source_ = emitter
                 self._source_.sig_newItemsInCurrentDir.connect(self.slot_newFiles)
                 self._source_.sig_itemsRemovedFromCurrentDir.connect(self.slot_filesRemoved)
                 self._source_.sig_itemsChangedInCurrentDir.connect(self.slot_filesChanged)
-        
-    @property
-    def callbacks(self) -> typing.Optional[dict]:
-        return self._callbacksDict_
 
-    @callbacks.setter
-    def callbacks(self, value:typing.Optional[dict]):
-        if isinstance(value, dict) and all(x in cbDict.keys() for x in ("newFiles",
-                                                                         "changedFiles",
-                                                                         "removedFiles")):
-            pass
+
+        if all(hasattr(observer, x) and (inspect.isfunction(inspect.getattr_static(observer, x)) and inspect.ismethod(getattr(observer, x))) for x in self.required_observer_methods):
+            self._observer_ = observer
+
+        if directory is None:
+            if isinstance(self._source_, QtCore.QObject) and hasattr(self._source_, "currentDir"):
+                if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
+                    self._watchedDir_ = pathlib.Path(self._source_.currentDir).absolute()
+            # else:
+            #     self._watchedDir_ = None
+
+        elif isinstance(directory, str):
+            self._watchedDir_ = pathlib.Path(directory)
+
+        elif isinstance(directory, pathlib.Path):
+            self._watchedDir_ = directory
+
+        else:
+            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+
+
+    @property
+    def observer(self) -> object:
+        return self._observer_
+
+    @observer.setter
+    def observer(self, value:typing.Optional[typing.Any]=None):
+        if all(hasattr(value, x) and (inspect.isfunction(inspect.getattr_static(value, x)) and inspect.ismethod(getattr(value, x))) for x in self.required_observer_methods):
+            self._observer_ = value
+        else:
+            self._observer_ = None
 
     @pyqtSlot(tuple)
     def slot_filesRemoved(self, value):
-        self._removedFiles_[:] = value[:]
+        # Check all items in value are files and are in the same parent directory
+        if not all(isinstance(v, pathlib.Path) for v in value):
+            warnings.warn(f"Should have received a tuple of pathlib.Path objects only!")
+            return
+
+        if not isinstance(self._watchedDir_, pathlib.Path) or not self._watchedDir_.is_dir() or not self._watchedDir_.exists():
+            warnings.warn(f"invalid watched directory {self._watchedDir_}")
+            return
+
+        files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
+        self._removedFiles_[:] = files[:] # may clear this; below we only send if not empty
         if hasattr(self._source_, "console"):
-            txt = f"removed {self._removedFiles_}\n"
+            txt = f"{self.__class__.__name__}.slot_filesRemoved {self._removedFiles_}\n"
             self._source_.console.writeText(txt)
 
-            if isinstance(self._callbacksDict_, dict) :
-                pass
+        if len(files):
+            if self.observer is not None :
+                self.observer.removedFiles(self._removedFiles_)
 
 
     @pyqtSlot(tuple)
     def slot_filesChanged(self, value):
-        self._changedFiles_[:] = value[:]
+        # Check all items in value are files and are in the same parent directory
+        if not all(isinstance(v, pathlib.Path) for v in value):
+            warnings.warn(f"Should have received a tuple of pathlib.Path objects only!")
+            return
+
+        if not isinstance(self._watchedDir_, pathlib.Path) or not self._watchedDir_.is_dir() or not self._watchedDir_.exists():
+            warnings.warn(f"invalid watched directory {self._watchedDir_}")
+            return
+
+        files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
+        self._changedFiles_[:] = files[:] # may clear this; below we only send if not empty
+
         if hasattr(self._source_, "console"):
-            txt = f"changed {self._changedFiles_}\n"
+            txt = f"{self.__class__.__name__}.slot_filesChanged {self._changedFiles_}\n"
             self._source_.console.writeText(txt)
 
+        if len(files):
+            if self.observer is not None :
+                self.observer.changedFiles(self._changedFiles_)
 
 
     @pyqtSlot(tuple)
     def slot_newFiles(self, value):
-        self._newFiles_[:] = value[:]
+        """"""
+        # Check all items in value are files and are in the same parent directory
+        if not all(isinstance(v, pathlib.Path) for v in value):
+            warnings.warn(f"Should have received a tuple of pathlib.Path objects only!")
+            return
+
+        if not isinstance(self._watchedDir_, pathlib.Path) or not self._watchedDir_.is_dir() or not self._watchedDir_.exists():
+            warnings.warn(f"invalid watched directory {self._watchedDir_}")
+            return
+
+        files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
+
+        self._newFiles_[:] = files[:] # may clear this; below we only send if not empty
+
         if hasattr(self._source_, "console"):
-            txt = f"new {self._newFiles_}\n"
+            txt = f"{self.__class__.__name__}.slot_newFiles {self._newFiles_}\n"
             self._source_.console.writeText(txt)
-        
+
+        if len(files):
+            if self.observer is not None :
+                self.observer.newFiles(self._newFiles_)
         
     
 

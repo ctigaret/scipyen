@@ -846,18 +846,21 @@ class LTPOnline(object):
     #       cursor objects, epochs, etc? - should it be passed to the __init__,
     #       or read from a file, etc?
     #
-    def __init__(self, scipyenWindow:QtWidgets.QMainWindow,
+    def __init__(self, emitterWindow:QtWidgets.QMainWindow,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
-        if type(scipyenWindow).__name__ != 'ScipyenWindow':
+        if type(emitterWindow).__name__ != 'ScipyenWindow':
             raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(scipyenWindow).__name__}")
 
-        self._scipyenWindow_ = scipyenWindow
+        self._emitterWindow_ = emitterWindow
         
         if directory is None:
-            self._watchedDir_ = pathlib.Path(self._scipyenWindow_.currentDir)
+            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
             
         elif isinstance(directory, str):
             self._watchedDir_ = pathlib.Path(directory)
+
+        elif isinstance(directory, pathlib.Path):
+            self._watchedDir_ = directory
             
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
@@ -865,39 +868,53 @@ class LTPOnline(object):
         
         self._filesQueue_ = collections.deque()
 
-        self._dirWatcher_ = DirectoryFileWatcher(emitterWindow = self._scipyenWindow_)
+        # cbDict = dict(newFiles = self.newFiles, changedFiles = self.changedFiles,
+        #               removedFiles = self.removedFiles)
+
+        self._dirWatcher_ = DirectoryFileWatcher(emitter = self._emitterWindow_,
+                                                 directory = self._watchedDir_,
+                                                 observer = self)
         
-        self._scipyenWindow_.enableDirectoryMonitor(self._watchedDir_, True)
+        print(f"{self.__class__.__name__}.__init__ to watch: {self._watchedDir_}")
+
+        self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
         
-        self._pendingAbf_ = None
+        self._pendingAbf_ = dict() # pathlib.Path are hashable; hence we use the ABF as key ↦ RSV
         
     def __del__(self):
-        if self._scipyenWindow_.isDirectoryMonitored(self._watchedDir_):
-            self._scipyenWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
             
         super().__del__()
 
     def newFiles(self, val:pathlib.Path):
-#         if isinstance(val (tuple, list)) and len(val) and all(isinstance(v, pathlib.Path) for v in val):
-#             for f in val:
-#                 if f.parent == self._watchedDir_ and f.suffix in (".rsv", ".abf"):
-#                     self._filesQueue_.append(f)
-#                     
-#         elif isinstance(val, pathlib.Path) and val.parent == self._watchedDir_ and val.suffix in (".rsv", ".abf"):
-#             self._filesQueue_.append(val)
-        
-        if isinstance(val, pathlib.Path) and val.parent == self._watchedDir_ and val.suffix in (".rsv", ".abf"):
-            self._filesQueue_.append(val)
-            
-            if val.suffix == ".rsv":
-                pairedAbf = self.abfForRsv(val)
-                if isinstance(pairedAbf, pathlib.Path):
-                    self._pendingAbf_ = pairedAbf
-                    
-            elif val.suffix == ".abf":
-                pairedRsv = self.rsvForABF(val)
-                if isinstance(pairedRsv, pathlib.Path):
-                    self._pendingAbf_ = val
+        print(f"{self.__class__.__name__}.newFiles {val}")
+        if all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
+            self._filesQueue_.extend(val)
+
+            for v in val:
+                if v.suffix == ".rsv":
+                    pairedAbf = self.abfForRsv(val)
+                    if isinstance(pairedAbf, pathlib.Path):
+                        prevPaired = reverse_mapping_lookup(self._pendingAbf_, v)
+                        # if len(prevPaired) == 1:
+                        # if self._pendingAbf_["rsv"] != v:
+                        #     self._pendingAbf_["rsv"] = v
+                        #     self._pendingAbf_["abf"] = pairedAbf
+                        # else:
+
+
+                elif val.suffix == ".abf":
+                    pairedRsv = self.rsvForABF(val)
+                    if isinstance(pairedRsv, pathlib.Path):
+                        self._pendingAbf_ = val
+
+    def changedFiles(self, val:pathlib.Path):
+        print(f"{self.__class__.__name__}.changedFiles {val}")
+
+    def removedFiles(self, val:pathlib.Path):
+        print(f"{self.__class__.__name__}.removedFiles {val}")
+
 
     def rsvForABF(self, abf:pathlib.Path):
         """Returns the rsv file paired with the abf"""
