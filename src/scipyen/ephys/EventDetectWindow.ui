@@ -883,7 +883,7 @@
   </action>
   <action name="actionOpen_Event_Template">
    <property name="icon">
-    <iconset theme="template">
+    <iconset theme="document-new-from-template">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -895,7 +895,7 @@
   </action>
   <action name="actionImport_Event_Template">
    <property name="icon">
-    <iconset theme="template">
+    <iconset theme="document-new-from-template">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -982,7 +982,7 @@
   </action>
   <action name="actionClear_default_Event_Template">
    <property name="icon">
-    <iconset theme="remove">
+    <iconset theme="list-remove">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1096,7 +1096,7 @@
   </action>
   <action name="actionUse_default_location_for_persistent_event_template">
    <property name="icon">
-    <iconset theme="mark-location">
+    <iconset theme="edit-paste-in-place">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1276,7 +1276,7 @@
   </action>
   <action name="actionLoad_default_event_Template">
    <property name="icon">
-    <iconset theme="template">
+    <iconset theme="document-new-from-template">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
