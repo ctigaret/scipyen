@@ -1078,7 +1078,7 @@
   </action>
   <action name="actionView_results">
    <property name="icon">
-    <iconset theme="quickview">
+    <iconset theme="view-visible">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
