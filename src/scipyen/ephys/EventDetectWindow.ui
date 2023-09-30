@@ -925,7 +925,7 @@
   </action>
   <action name="actionPlot_Data">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="labplot-xy-curve-segments">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1192,7 +1192,7 @@
   </action>
   <action name="actionPlot_detected_events">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="tag">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
