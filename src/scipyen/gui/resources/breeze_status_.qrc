@@ -1,8 +1,8 @@
 <!DOCTYPE RCC><RCC version="1.0">
 	<qresource>
-		<file alias="icons/breeze/status/16/../../actions/16/view-refresh.svg">icons/breeze/status/16/appointment-recurring.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/notifications.svg">icons/breeze/status/16/appointment-reminder.svg</file>
-		<file alias="icons/breeze/status/16/audio-volume-muted.svg">icons/breeze/status/16/audio-off.svg</file>
+		<file alias="icons/breeze/status/16/appointment-recurring.svg">icons/breeze/status/16/../../actions/16/view-refresh.svg</file>
+		<file alias="icons/breeze/status/16/appointment-reminder.svg">icons/breeze/status/16/../../actions/16/notifications.svg</file>
+		<file alias="icons/breeze/status/16/audio-off.svg">icons/breeze/status/16/audio-volume-muted.svg</file>
 		<file>icons/breeze/status/16/audio-on.svg</file>
 		<file>icons/breeze/status/16/audio-ready.svg</file>
 		<file>icons/breeze/status/16/audio-volume-high.svg</file>
@@ -33,16 +33,16 @@
 		<file>icons/breeze/status/16/battery-090.svg</file>
 		<file>icons/breeze/status/16/battery-100-charging.svg</file>
 		<file>icons/breeze/status/16/battery-100.svg</file>
-		<file alias="icons/breeze/status/16/battery-010-charging.svg">icons/breeze/status/16/battery-caution-charging.svg</file>
-		<file alias="icons/breeze/status/16/battery-010.svg">icons/breeze/status/16/battery-caution.svg</file>
-		<file alias="icons/breeze/status/16/battery-000-charging.svg">icons/breeze/status/16/battery-empty-charging.svg</file>
-		<file alias="icons/breeze/status/16/battery-000.svg">icons/breeze/status/16/battery-empty.svg</file>
-		<file alias="icons/breeze/status/16/battery-100-charging.svg">icons/breeze/status/16/battery-full-charging.svg</file>
-		<file alias="icons/breeze/status/16/battery-100.svg">icons/breeze/status/16/battery-full.svg</file>
-		<file alias="icons/breeze/status/16/battery-070-charging.svg">icons/breeze/status/16/battery-good-charging.svg</file>
-		<file alias="icons/breeze/status/16/battery-070.svg">icons/breeze/status/16/battery-good.svg</file>
-		<file alias="icons/breeze/status/16/battery-040-charging.svg">icons/breeze/status/16/battery-low-charging.svg</file>
-		<file alias="icons/breeze/status/16/battery-040.svg">icons/breeze/status/16/battery-low.svg</file>
+		<file alias="icons/breeze/status/16/battery-caution-charging.svg">icons/breeze/status/16/battery-010-charging.svg</file>
+		<file alias="icons/breeze/status/16/battery-caution.svg">icons/breeze/status/16/battery-010.svg</file>
+		<file alias="icons/breeze/status/16/battery-empty-charging.svg">icons/breeze/status/16/battery-000-charging.svg</file>
+		<file alias="icons/breeze/status/16/battery-empty.svg">icons/breeze/status/16/battery-000.svg</file>
+		<file alias="icons/breeze/status/16/battery-full-charging.svg">icons/breeze/status/16/battery-100-charging.svg</file>
+		<file alias="icons/breeze/status/16/battery-full.svg">icons/breeze/status/16/battery-100.svg</file>
+		<file alias="icons/breeze/status/16/battery-good-charging.svg">icons/breeze/status/16/battery-070-charging.svg</file>
+		<file alias="icons/breeze/status/16/battery-good.svg">icons/breeze/status/16/battery-070.svg</file>
+		<file alias="icons/breeze/status/16/battery-low-charging.svg">icons/breeze/status/16/battery-040-charging.svg</file>
+		<file alias="icons/breeze/status/16/battery-low.svg">icons/breeze/status/16/battery-040.svg</file>
 		<file>icons/breeze/status/16/battery-missing.svg</file>
 		<file>icons/breeze/status/16/call-incoming.svg</file>
 		<file>icons/breeze/status/16/call-missed.svg</file>
@@ -50,7 +50,7 @@
 		<file>icons/breeze/status/16/camera-off.svg</file>
 		<file>icons/breeze/status/16/camera-on.svg</file>
 		<file>icons/breeze/status/16/camera-ready.svg</file>
-		<file alias="icons/breeze/status/16/../../places/16/folder-cloud.svg">icons/breeze/status/16/cloudstatus.svg</file>
+		<file alias="icons/breeze/status/16/cloudstatus.svg">icons/breeze/status/16/../../places/16/folder-cloud.svg</file>
 		<file>icons/breeze/status/16/crow-translate-tray.svg</file>
 		<file>icons/breeze/status/16/data-error.svg</file>
 		<file>icons/breeze/status/16/data-information.svg</file>
@@ -63,8 +63,8 @@
 		<file>icons/breeze/status/16/firewall-applet.svg</file>
 		<file>icons/breeze/status/16/image-missing.svg</file>
 		<file>icons/breeze/status/16/input-caps-on.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/irc-channel-active.svg">icons/breeze/status/16/irc-channel-joined.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/irc-channel-inactive.svg">icons/breeze/status/16/irc-channel-parted.svg</file>
+		<file alias="icons/breeze/status/16/irc-channel-joined.svg">icons/breeze/status/16/../../actions/16/irc-channel-active.svg</file>
+		<file alias="icons/breeze/status/16/irc-channel-parted.svg">icons/breeze/status/16/../../actions/16/irc-channel-inactive.svg</file>
 		<file>icons/breeze/status/16/kdeconnect-tray.svg</file>
 		<file>icons/breeze/status/16/media-playback-paused.svg</file>
 		<file>icons/breeze/status/16/media-playback-playing.svg</file>
@@ -77,14 +77,14 @@
 		<file>icons/breeze/status/16/microphone-sensitivity-low.svg</file>
 		<file>icons/breeze/status/16/microphone-sensitivity-medium.svg</file>
 		<file>icons/breeze/status/16/microphone-sensitivity-muted.svg</file>
-		<file alias="icons/breeze/status/16/user-online.svg">icons/breeze/status/16/pidgin-tray-available.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-user-away.svg">icons/breeze/status/16/pidgin-tray-away.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-user-busy.svg">icons/breeze/status/16/pidgin-tray-busy.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/mail-mark-unread.svg">icons/breeze/status/16/pidgin-tray-email.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-invisible-user.svg">icons/breeze/status/16/pidgin-tray-invisible.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-user-offline.svg">icons/breeze/status/16/pidgin-tray-offline.svg</file>
-		<file alias="icons/breeze/status/16/user-idle.svg">icons/breeze/status/16/pidgin-tray-pending.svg</file>
-		<file alias="icons/breeze/status/16/user-idle.svg">icons/breeze/status/16/pidgin-tray-xa.svg</file>
+		<file alias="icons/breeze/status/16/pidgin-tray-available.svg">icons/breeze/status/16/user-online.svg</file>
+		<file alias="icons/breeze/status/16/pidgin-tray-away.svg">icons/breeze/status/16/../../actions/16/im-user-away.svg</file>
+		<file alias="icons/breeze/status/16/pidgin-tray-busy.svg">icons/breeze/status/16/../../actions/16/im-user-busy.svg</file>
+		<file alias="icons/breeze/status/16/pidgin-tray-email.svg">icons/breeze/status/16/../../actions/16/mail-mark-unread.svg</file>
+		<file alias="icons/breeze/status/16/pidgin-tray-invisible.svg">icons/breeze/status/16/../../actions/16/im-invisible-user.svg</file>
+		<file alias="icons/breeze/status/16/pidgin-tray-offline.svg">icons/breeze/status/16/../../actions/16/im-user-offline.svg</file>
+		<file alias="icons/breeze/status/16/pidgin-tray-pending.svg">icons/breeze/status/16/user-idle.svg</file>
+		<file alias="icons/breeze/status/16/pidgin-tray-xa.svg">icons/breeze/status/16/user-idle.svg</file>
 		<file>icons/breeze/status/16/rotation-allowed.svg</file>
 		<file>icons/breeze/status/16/rotation-locked-landscape.svg</file>
 		<file>icons/breeze/status/16/rotation-locked-portrait.svg</file>
@@ -105,23 +105,23 @@
 		<file>icons/breeze/status/16/task-process-2.svg</file>
 		<file>icons/breeze/status/16/task-process-3.svg</file>
 		<file>icons/breeze/status/16/task-process-4.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/view-refresh.svg">icons/breeze/status/16/task-recurring.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/notifications.svg">icons/breeze/status/16/task-reminder.svg</file>
+		<file alias="icons/breeze/status/16/task-recurring.svg">icons/breeze/status/16/../../actions/16/view-refresh.svg</file>
+		<file alias="icons/breeze/status/16/task-reminder.svg">icons/breeze/status/16/../../actions/16/notifications.svg</file>
 		<file>icons/breeze/status/16/temperature-cold.svg</file>
 		<file>icons/breeze/status/16/temperature-normal.svg</file>
 		<file>icons/breeze/status/16/temperature-warm.svg</file>
-		<file alias="icons/breeze/status/16/user-online.svg">icons/breeze/status/16/user-available.svg</file>
-		<file alias="icons/breeze/status/16/user-idle.svg">icons/breeze/status/16/user-away-extended.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-user-away.svg">icons/breeze/status/16/user-away.svg</file>
+		<file alias="icons/breeze/status/16/user-available.svg">icons/breeze/status/16/user-online.svg</file>
+		<file alias="icons/breeze/status/16/user-away-extended.svg">icons/breeze/status/16/user-idle.svg</file>
+		<file alias="icons/breeze/status/16/user-away.svg">icons/breeze/status/16/../../actions/16/im-user-away.svg</file>
 		<file>icons/breeze/status/16/user-idle.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-user-busy.svg">icons/breeze/status/16/user-busy.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-invisible-user.svg">icons/breeze/status/16/user-invisible.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-user-offline.svg">icons/breeze/status/16/user-offline.svg</file>
-		<file alias="icons/breeze/status/16/../../actions/16/im-user-online.svg">icons/breeze/status/16/user-online.svg</file>
+		<file alias="icons/breeze/status/16/user-busy.svg">icons/breeze/status/16/../../actions/16/im-user-busy.svg</file>
+		<file alias="icons/breeze/status/16/user-invisible.svg">icons/breeze/status/16/../../actions/16/im-invisible-user.svg</file>
+		<file alias="icons/breeze/status/16/user-offline.svg">icons/breeze/status/16/../../actions/16/im-user-offline.svg</file>
+		<file alias="icons/breeze/status/16/user-online.svg">icons/breeze/status/16/../../actions/16/im-user-online.svg</file>
 		<file>icons/breeze/status/22/TeamViewer.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/view-refresh.svg">icons/breeze/status/22/appointment-recurring.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/notifications.svg">icons/breeze/status/22/appointment-reminder.svg</file>
-		<file alias="icons/breeze/status/22/audio-volume-muted.svg">icons/breeze/status/22/audio-off.svg</file>
+		<file alias="icons/breeze/status/22/appointment-recurring.svg">icons/breeze/status/22/../../actions/22/view-refresh.svg</file>
+		<file alias="icons/breeze/status/22/appointment-reminder.svg">icons/breeze/status/22/../../actions/22/notifications.svg</file>
+		<file alias="icons/breeze/status/22/audio-off.svg">icons/breeze/status/22/audio-volume-muted.svg</file>
 		<file>icons/breeze/status/22/audio-on.svg</file>
 		<file>icons/breeze/status/22/audio-ready.svg</file>
 		<file>icons/breeze/status/22/audio-volume-high.svg</file>
@@ -152,16 +152,16 @@
 		<file>icons/breeze/status/22/battery-090.svg</file>
 		<file>icons/breeze/status/22/battery-100-charging.svg</file>
 		<file>icons/breeze/status/22/battery-100.svg</file>
-		<file alias="icons/breeze/status/22/battery-010-charging.svg">icons/breeze/status/22/battery-caution-charging.svg</file>
-		<file alias="icons/breeze/status/22/battery-010.svg">icons/breeze/status/22/battery-caution.svg</file>
-		<file alias="icons/breeze/status/22/battery-000-charging.svg">icons/breeze/status/22/battery-empty-charging.svg</file>
-		<file alias="icons/breeze/status/22/battery-000.svg">icons/breeze/status/22/battery-empty.svg</file>
-		<file alias="icons/breeze/status/22/battery-100-charging.svg">icons/breeze/status/22/battery-full-charging.svg</file>
-		<file alias="icons/breeze/status/22/battery-100.svg">icons/breeze/status/22/battery-full.svg</file>
-		<file alias="icons/breeze/status/22/battery-070-charging.svg">icons/breeze/status/22/battery-good-charging.svg</file>
-		<file alias="icons/breeze/status/22/battery-070.svg">icons/breeze/status/22/battery-good.svg</file>
-		<file alias="icons/breeze/status/22/battery-040-charging.svg">icons/breeze/status/22/battery-low-charging.svg</file>
-		<file alias="icons/breeze/status/22/battery-040.svg">icons/breeze/status/22/battery-low.svg</file>
+		<file alias="icons/breeze/status/22/battery-caution-charging.svg">icons/breeze/status/22/battery-010-charging.svg</file>
+		<file alias="icons/breeze/status/22/battery-caution.svg">icons/breeze/status/22/battery-010.svg</file>
+		<file alias="icons/breeze/status/22/battery-empty-charging.svg">icons/breeze/status/22/battery-000-charging.svg</file>
+		<file alias="icons/breeze/status/22/battery-empty.svg">icons/breeze/status/22/battery-000.svg</file>
+		<file alias="icons/breeze/status/22/battery-full-charging.svg">icons/breeze/status/22/battery-100-charging.svg</file>
+		<file alias="icons/breeze/status/22/battery-full.svg">icons/breeze/status/22/battery-100.svg</file>
+		<file alias="icons/breeze/status/22/battery-good-charging.svg">icons/breeze/status/22/battery-070-charging.svg</file>
+		<file alias="icons/breeze/status/22/battery-good.svg">icons/breeze/status/22/battery-070.svg</file>
+		<file alias="icons/breeze/status/22/battery-low-charging.svg">icons/breeze/status/22/battery-040-charging.svg</file>
+		<file alias="icons/breeze/status/22/battery-low.svg">icons/breeze/status/22/battery-040.svg</file>
 		<file>icons/breeze/status/22/battery-missing.svg</file>
 		<file>icons/breeze/status/22/call-incoming.svg</file>
 		<file>icons/breeze/status/22/call-missed.svg</file>
@@ -169,12 +169,12 @@
 		<file>icons/breeze/status/22/camera-off.svg</file>
 		<file>icons/breeze/status/22/camera-on.svg</file>
 		<file>icons/breeze/status/22/camera-ready.svg</file>
-		<file alias="icons/breeze/status/22/../../places/22/folder-cloud.svg">icons/breeze/status/22/cloudstatus.svg</file>
-		<file alias="icons/breeze/status/22/haguichi-connected.svg">icons/breeze/status/22/com.github.ztefn.haguichi-connected.svg</file>
-		<file alias="icons/breeze/status/22/haguichi-connecting-1.svg">icons/breeze/status/22/com.github.ztefn.haguichi-connecting-1.svg</file>
-		<file alias="icons/breeze/status/22/haguichi-connecting-2.svg">icons/breeze/status/22/com.github.ztefn.haguichi-connecting-2.svg</file>
-		<file alias="icons/breeze/status/22/haguichi-connecting-3.svg">icons/breeze/status/22/com.github.ztefn.haguichi-connecting-3.svg</file>
-		<file alias="icons/breeze/status/22/haguichi-disconnected.svg">icons/breeze/status/22/com.github.ztefn.haguichi-disconnected.svg</file>
+		<file alias="icons/breeze/status/22/cloudstatus.svg">icons/breeze/status/22/../../places/22/folder-cloud.svg</file>
+		<file alias="icons/breeze/status/22/com.github.ztefn.haguichi-connected.svg">icons/breeze/status/22/haguichi-connected.svg</file>
+		<file alias="icons/breeze/status/22/com.github.ztefn.haguichi-connecting-1.svg">icons/breeze/status/22/haguichi-connecting-1.svg</file>
+		<file alias="icons/breeze/status/22/com.github.ztefn.haguichi-connecting-2.svg">icons/breeze/status/22/haguichi-connecting-2.svg</file>
+		<file alias="icons/breeze/status/22/com.github.ztefn.haguichi-connecting-3.svg">icons/breeze/status/22/haguichi-connecting-3.svg</file>
+		<file alias="icons/breeze/status/22/com.github.ztefn.haguichi-disconnected.svg">icons/breeze/status/22/haguichi-disconnected.svg</file>
 		<file>icons/breeze/status/22/data-error.svg</file>
 		<file>icons/breeze/status/22/data-information.svg</file>
 		<file>icons/breeze/status/22/data-success.svg</file>
@@ -190,7 +190,7 @@
 		<file>icons/breeze/status/22/disk-quota-low.svg</file>
 		<file>icons/breeze/status/22/disk-quota.svg</file>
 		<file>icons/breeze/status/22/dropboxstatus-busy.svg</file>
-		<file alias="icons/breeze/status/22/dropboxstatus-logo.svg">icons/breeze/status/22/dropboxstatus-busy2.svg</file>
+		<file alias="icons/breeze/status/22/dropboxstatus-busy2.svg">icons/breeze/status/22/dropboxstatus-logo.svg</file>
 		<file>icons/breeze/status/22/dropboxstatus-idle.svg</file>
 		<file>icons/breeze/status/22/dropboxstatus-logo.svg</file>
 		<file>icons/breeze/status/22/dropboxstatus-x.svg</file>
@@ -217,9 +217,9 @@
 		<file>icons/breeze/status/22/input-keyboard-virtual-on.svg</file>
 		<file>icons/breeze/status/22/input-touchpad-off.svg</file>
 		<file>icons/breeze/status/22/input-touchpad-on.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/edit-download.svg">icons/breeze/status/22/install.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/irc-channel-active.svg">icons/breeze/status/22/irc-channel-joined.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/irc-channel-inactive.svg">icons/breeze/status/22/irc-channel-parted.svg</file>
+		<file alias="icons/breeze/status/22/install.svg">icons/breeze/status/22/../../actions/22/edit-download.svg</file>
+		<file alias="icons/breeze/status/22/irc-channel-joined.svg">icons/breeze/status/22/../../actions/22/irc-channel-active.svg</file>
+		<file alias="icons/breeze/status/22/irc-channel-parted.svg">icons/breeze/status/22/../../actions/22/irc-channel-inactive.svg</file>
 		<file>icons/breeze/status/22/kdeconnect-tray.svg</file>
 		<file>icons/breeze/status/22/media-playback-paused.svg</file>
 		<file>icons/breeze/status/22/media-playback-playing.svg</file>
@@ -346,14 +346,14 @@
 		<file>icons/breeze/status/22/network-wireless-connected-50.svg</file>
 		<file>icons/breeze/status/22/network-wireless-connected-75.svg</file>
 		<file>icons/breeze/status/22/network-wireless-disconnected.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/notifications.svg">icons/breeze/status/22/task-reminder.svg</file>
-		<file alias="icons/breeze/status/22/user-idle.svg">icons/breeze/status/22/user-away-extended.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/im-user-busy.svg">icons/breeze/status/22/user-busy.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/im-user-offline.svg">icons/breeze/status/22/user-offline.svg</file>
-		<file alias="icons/breeze/status/22/network-mobile-100.svg">icons/breeze/status/22/network-mobile-on.svg</file>
-		<file alias="icons/breeze/status/22/network-wired-unavailable.svg">icons/breeze/status/22/network-wired-disconnected.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-100.svg">icons/breeze/status/22/nm-nm-signal-100.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-75.svg">icons/breeze/status/22/nm-nm-signal-75.svg</file>
+		<file alias="icons/breeze/status/22/task-reminder.svg">icons/breeze/status/22/../../actions/22/notifications.svg</file>
+		<file alias="icons/breeze/status/22/user-away-extended.svg">icons/breeze/status/22/user-idle.svg</file>
+		<file alias="icons/breeze/status/22/user-busy.svg">icons/breeze/status/22/../../actions/22/im-user-busy.svg</file>
+		<file alias="icons/breeze/status/22/user-offline.svg">icons/breeze/status/22/../../actions/22/im-user-offline.svg</file>
+		<file alias="icons/breeze/status/22/network-mobile-on.svg">icons/breeze/status/22/network-mobile-100.svg</file>
+		<file alias="icons/breeze/status/22/network-wired-disconnected.svg">icons/breeze/status/22/network-wired-unavailable.svg</file>
+		<file alias="icons/breeze/status/22/nm-nm-signal-100.svg">icons/breeze/status/22/network-wireless-connected-100.svg</file>
+		<file alias="icons/breeze/status/22/nm-nm-signal-75.svg">icons/breeze/status/22/network-wireless-connected-75.svg</file>
 		<file>icons/breeze/status/22/redshift-status-day.svg</file>
 		<file>icons/breeze/status/22/redshift-status-off.svg</file>
 		<file>icons/breeze/status/22/redshift-status-on.svg</file>
@@ -388,29 +388,29 @@
 		<file>icons/breeze/status/22/update-low.svg</file>
 		<file>icons/breeze/status/22/update-medium.svg</file>
 		<file>icons/breeze/status/22/update-none.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-25.svg">icons/breeze/status/22/nm-nm-signal-25.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/tools-report-bug.svg">icons/breeze/status/22/script-error.svg</file>
+		<file alias="icons/breeze/status/22/nm-nm-signal-25.svg">icons/breeze/status/22/network-wireless-connected-25.svg</file>
+		<file alias="icons/breeze/status/22/script-error.svg">icons/breeze/status/22/../../actions/22/tools-report-bug.svg</file>
 		<file>icons/breeze/status/22/user-idle.svg</file>
-		<file alias="icons/breeze/status/22/network-wired-unavailable.svg">icons/breeze/status/22/network-offline.svg</file>
+		<file alias="icons/breeze/status/22/network-offline.svg">icons/breeze/status/22/network-wired-unavailable.svg</file>
 		<file>icons/breeze/status/22/video-card-inactive.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-100.svg">icons/breeze/status/22/network-wireless-signal-excellent.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-75.svg">icons/breeze/status/22/network-wireless-signal-good.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-00.svg">icons/breeze/status/22/network-wireless-signal-none.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-50.svg">icons/breeze/status/22/network-wireless-signal-ok.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-25.svg">icons/breeze/status/22/network-wireless-signal-weak.svg</file>
-		<file alias="icons/breeze/status/22/network-wired-unavailable.svg">icons/breeze/status/22/nm-no-connection.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/view-refresh.svg">icons/breeze/status/22/task-recurring.svg</file>
-		<file alias="icons/breeze/status/22/user-online.svg">icons/breeze/status/22/user-available.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/im-user-away.svg">icons/breeze/status/22/user-away.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/im-invisible-user.svg">icons/breeze/status/22/user-invisible.svg</file>
-		<file alias="icons/breeze/status/22/../../actions/22/im-user-online.svg">icons/breeze/status/22/user-online.svg</file>
-		<file alias="icons/breeze/status/22/network-wired-activated.svg">icons/breeze/status/22/nm-device-wired.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-00.svg">icons/breeze/status/22/nm-nm-signal-00.svg</file>
-		<file alias="icons/breeze/status/22/network-wireless-connected-50.svg">icons/breeze/status/22/nm-nm-signal-50.svg</file>
+		<file alias="icons/breeze/status/22/network-wireless-signal-excellent.svg">icons/breeze/status/22/network-wireless-connected-100.svg</file>
+		<file alias="icons/breeze/status/22/network-wireless-signal-good.svg">icons/breeze/status/22/network-wireless-connected-75.svg</file>
+		<file alias="icons/breeze/status/22/network-wireless-signal-none.svg">icons/breeze/status/22/network-wireless-connected-00.svg</file>
+		<file alias="icons/breeze/status/22/network-wireless-signal-ok.svg">icons/breeze/status/22/network-wireless-connected-50.svg</file>
+		<file alias="icons/breeze/status/22/network-wireless-signal-weak.svg">icons/breeze/status/22/network-wireless-connected-25.svg</file>
+		<file alias="icons/breeze/status/22/nm-no-connection.svg">icons/breeze/status/22/network-wired-unavailable.svg</file>
+		<file alias="icons/breeze/status/22/task-recurring.svg">icons/breeze/status/22/../../actions/22/view-refresh.svg</file>
+		<file alias="icons/breeze/status/22/user-available.svg">icons/breeze/status/22/user-online.svg</file>
+		<file alias="icons/breeze/status/22/user-away.svg">icons/breeze/status/22/../../actions/22/im-user-away.svg</file>
+		<file alias="icons/breeze/status/22/user-invisible.svg">icons/breeze/status/22/../../actions/22/im-invisible-user.svg</file>
+		<file alias="icons/breeze/status/22/user-online.svg">icons/breeze/status/22/../../actions/22/im-user-online.svg</file>
+		<file alias="icons/breeze/status/22/nm-device-wired.svg">icons/breeze/status/22/network-wired-activated.svg</file>
+		<file alias="icons/breeze/status/22/nm-nm-signal-00.svg">icons/breeze/status/22/network-wireless-connected-00.svg</file>
+		<file alias="icons/breeze/status/22/nm-nm-signal-50.svg">icons/breeze/status/22/network-wireless-connected-50.svg</file>
 		<file>icons/breeze/status/24/TeamViewer.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/view-refresh.svg">icons/breeze/status/24/appointment-recurring.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/notifications.svg">icons/breeze/status/24/appointment-reminder.svg</file>
-		<file alias="icons/breeze/status/24/audio-volume-muted.svg">icons/breeze/status/24/audio-off.svg</file>
+		<file alias="icons/breeze/status/24/appointment-recurring.svg">icons/breeze/status/24/../../actions/24/view-refresh.svg</file>
+		<file alias="icons/breeze/status/24/appointment-reminder.svg">icons/breeze/status/24/../../actions/24/notifications.svg</file>
+		<file alias="icons/breeze/status/24/audio-off.svg">icons/breeze/status/24/audio-volume-muted.svg</file>
 		<file>icons/breeze/status/24/audio-on.svg</file>
 		<file>icons/breeze/status/24/audio-ready.svg</file>
 		<file>icons/breeze/status/24/audio-volume-high.svg</file>
@@ -441,16 +441,16 @@
 		<file>icons/breeze/status/24/battery-090.svg</file>
 		<file>icons/breeze/status/24/battery-100-charging.svg</file>
 		<file>icons/breeze/status/24/battery-100.svg</file>
-		<file alias="icons/breeze/status/24/battery-010-charging.svg">icons/breeze/status/24/battery-caution-charging.svg</file>
-		<file alias="icons/breeze/status/24/battery-010.svg">icons/breeze/status/24/battery-caution.svg</file>
-		<file alias="icons/breeze/status/24/battery-000-charging.svg">icons/breeze/status/24/battery-empty-charging.svg</file>
-		<file alias="icons/breeze/status/24/battery-000.svg">icons/breeze/status/24/battery-empty.svg</file>
-		<file alias="icons/breeze/status/24/battery-100-charging.svg">icons/breeze/status/24/battery-full-charging.svg</file>
-		<file alias="icons/breeze/status/24/battery-100.svg">icons/breeze/status/24/battery-full.svg</file>
-		<file alias="icons/breeze/status/24/battery-070-charging.svg">icons/breeze/status/24/battery-good-charging.svg</file>
-		<file alias="icons/breeze/status/24/battery-070.svg">icons/breeze/status/24/battery-good.svg</file>
-		<file alias="icons/breeze/status/24/battery-040-charging.svg">icons/breeze/status/24/battery-low-charging.svg</file>
-		<file alias="icons/breeze/status/24/battery-040.svg">icons/breeze/status/24/battery-low.svg</file>
+		<file alias="icons/breeze/status/24/battery-caution-charging.svg">icons/breeze/status/24/battery-010-charging.svg</file>
+		<file alias="icons/breeze/status/24/battery-caution.svg">icons/breeze/status/24/battery-010.svg</file>
+		<file alias="icons/breeze/status/24/battery-empty-charging.svg">icons/breeze/status/24/battery-000-charging.svg</file>
+		<file alias="icons/breeze/status/24/battery-empty.svg">icons/breeze/status/24/battery-000.svg</file>
+		<file alias="icons/breeze/status/24/battery-full-charging.svg">icons/breeze/status/24/battery-100-charging.svg</file>
+		<file alias="icons/breeze/status/24/battery-full.svg">icons/breeze/status/24/battery-100.svg</file>
+		<file alias="icons/breeze/status/24/battery-good-charging.svg">icons/breeze/status/24/battery-070-charging.svg</file>
+		<file alias="icons/breeze/status/24/battery-good.svg">icons/breeze/status/24/battery-070.svg</file>
+		<file alias="icons/breeze/status/24/battery-low-charging.svg">icons/breeze/status/24/battery-040-charging.svg</file>
+		<file alias="icons/breeze/status/24/battery-low.svg">icons/breeze/status/24/battery-040.svg</file>
 		<file>icons/breeze/status/24/battery-missing.svg</file>
 		<file>icons/breeze/status/24/call-incoming.svg</file>
 		<file>icons/breeze/status/24/call-missed.svg</file>
@@ -458,12 +458,12 @@
 		<file>icons/breeze/status/24/camera-off.svg</file>
 		<file>icons/breeze/status/24/camera-on.svg</file>
 		<file>icons/breeze/status/24/camera-ready.svg</file>
-		<file alias="icons/breeze/status/24/../../places/24/folder-cloud.svg">icons/breeze/status/24/cloudstatus.svg</file>
-		<file alias="icons/breeze/status/24/haguichi-connected.svg">icons/breeze/status/24/com.github.ztefn.haguichi-connected.svg</file>
-		<file alias="icons/breeze/status/24/haguichi-connecting-1.svg">icons/breeze/status/24/com.github.ztefn.haguichi-connecting-1.svg</file>
-		<file alias="icons/breeze/status/24/haguichi-connecting-2.svg">icons/breeze/status/24/com.github.ztefn.haguichi-connecting-2.svg</file>
-		<file alias="icons/breeze/status/24/haguichi-connecting-3.svg">icons/breeze/status/24/com.github.ztefn.haguichi-connecting-3.svg</file>
-		<file alias="icons/breeze/status/24/haguichi-disconnected.svg">icons/breeze/status/24/com.github.ztefn.haguichi-disconnected.svg</file>
+		<file alias="icons/breeze/status/24/cloudstatus.svg">icons/breeze/status/24/../../places/24/folder-cloud.svg</file>
+		<file alias="icons/breeze/status/24/com.github.ztefn.haguichi-connected.svg">icons/breeze/status/24/haguichi-connected.svg</file>
+		<file alias="icons/breeze/status/24/com.github.ztefn.haguichi-connecting-1.svg">icons/breeze/status/24/haguichi-connecting-1.svg</file>
+		<file alias="icons/breeze/status/24/com.github.ztefn.haguichi-connecting-2.svg">icons/breeze/status/24/haguichi-connecting-2.svg</file>
+		<file alias="icons/breeze/status/24/com.github.ztefn.haguichi-connecting-3.svg">icons/breeze/status/24/haguichi-connecting-3.svg</file>
+		<file alias="icons/breeze/status/24/com.github.ztefn.haguichi-disconnected.svg">icons/breeze/status/24/haguichi-disconnected.svg</file>
 		<file>icons/breeze/status/24/data-error.svg</file>
 		<file>icons/breeze/status/24/data-information.svg</file>
 		<file>icons/breeze/status/24/data-success.svg</file>
@@ -479,7 +479,7 @@
 		<file>icons/breeze/status/24/disk-quota-low.svg</file>
 		<file>icons/breeze/status/24/disk-quota.svg</file>
 		<file>icons/breeze/status/24/dropboxstatus-busy.svg</file>
-		<file alias="icons/breeze/status/24/dropboxstatus-logo.svg">icons/breeze/status/24/dropboxstatus-busy2.svg</file>
+		<file alias="icons/breeze/status/24/dropboxstatus-busy2.svg">icons/breeze/status/24/dropboxstatus-logo.svg</file>
 		<file>icons/breeze/status/24/dropboxstatus-idle.svg</file>
 		<file>icons/breeze/status/24/dropboxstatus-logo.svg</file>
 		<file>icons/breeze/status/24/dropboxstatus-x.svg</file>
@@ -506,9 +506,9 @@
 		<file>icons/breeze/status/24/input-keyboard-virtual-on.svg</file>
 		<file>icons/breeze/status/24/input-touchpad-off.svg</file>
 		<file>icons/breeze/status/24/input-touchpad-on.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/edit-download.svg">icons/breeze/status/24/install.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/irc-channel-active.svg">icons/breeze/status/24/irc-channel-joined.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/irc-channel-inactive.svg">icons/breeze/status/24/irc-channel-parted.svg</file>
+		<file alias="icons/breeze/status/24/install.svg">icons/breeze/status/24/../../actions/24/edit-download.svg</file>
+		<file alias="icons/breeze/status/24/irc-channel-joined.svg">icons/breeze/status/24/../../actions/24/irc-channel-active.svg</file>
+		<file alias="icons/breeze/status/24/irc-channel-parted.svg">icons/breeze/status/24/../../actions/24/irc-channel-inactive.svg</file>
 		<file>icons/breeze/status/24/kdeconnect-tray.svg</file>
 		<file>icons/breeze/status/24/media-playback-paused.svg</file>
 		<file>icons/breeze/status/24/media-playback-playing.svg</file>
@@ -635,14 +635,14 @@
 		<file>icons/breeze/status/24/network-wireless-connected-50.svg</file>
 		<file>icons/breeze/status/24/network-wireless-connected-75.svg</file>
 		<file>icons/breeze/status/24/network-wireless-disconnected.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/notifications.svg">icons/breeze/status/24/task-reminder.svg</file>
-		<file alias="icons/breeze/status/24/user-idle.svg">icons/breeze/status/24/user-away-extended.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/im-user-busy.svg">icons/breeze/status/24/user-busy.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/im-user-offline.svg">icons/breeze/status/24/user-offline.svg</file>
-		<file alias="icons/breeze/status/24/network-mobile-100.svg">icons/breeze/status/24/network-mobile-on.svg</file>
-		<file alias="icons/breeze/status/24/network-wired-unavailable.svg">icons/breeze/status/24/network-wired-disconnected.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-100.svg">icons/breeze/status/24/nm-nm-signal-100.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-75.svg">icons/breeze/status/24/nm-nm-signal-75.svg</file>
+		<file alias="icons/breeze/status/24/task-reminder.svg">icons/breeze/status/24/../../actions/24/notifications.svg</file>
+		<file alias="icons/breeze/status/24/user-away-extended.svg">icons/breeze/status/24/user-idle.svg</file>
+		<file alias="icons/breeze/status/24/user-busy.svg">icons/breeze/status/24/../../actions/24/im-user-busy.svg</file>
+		<file alias="icons/breeze/status/24/user-offline.svg">icons/breeze/status/24/../../actions/24/im-user-offline.svg</file>
+		<file alias="icons/breeze/status/24/network-mobile-on.svg">icons/breeze/status/24/network-mobile-100.svg</file>
+		<file alias="icons/breeze/status/24/network-wired-disconnected.svg">icons/breeze/status/24/network-wired-unavailable.svg</file>
+		<file alias="icons/breeze/status/24/nm-nm-signal-100.svg">icons/breeze/status/24/network-wireless-connected-100.svg</file>
+		<file alias="icons/breeze/status/24/nm-nm-signal-75.svg">icons/breeze/status/24/network-wireless-connected-75.svg</file>
 		<file>icons/breeze/status/24/redshift-status-day.svg</file>
 		<file>icons/breeze/status/24/redshift-status-off.svg</file>
 		<file>icons/breeze/status/24/redshift-status-on.svg</file>
@@ -677,25 +677,25 @@
 		<file>icons/breeze/status/24/update-low.svg</file>
 		<file>icons/breeze/status/24/update-medium.svg</file>
 		<file>icons/breeze/status/24/update-none.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-25.svg">icons/breeze/status/24/nm-nm-signal-25.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/tools-report-bug.svg">icons/breeze/status/24/script-error.svg</file>
+		<file alias="icons/breeze/status/24/nm-nm-signal-25.svg">icons/breeze/status/24/network-wireless-connected-25.svg</file>
+		<file alias="icons/breeze/status/24/script-error.svg">icons/breeze/status/24/../../actions/24/tools-report-bug.svg</file>
 		<file>icons/breeze/status/24/user-idle.svg</file>
-		<file alias="icons/breeze/status/24/network-wired-unavailable.svg">icons/breeze/status/24/network-offline.svg</file>
+		<file alias="icons/breeze/status/24/network-offline.svg">icons/breeze/status/24/network-wired-unavailable.svg</file>
 		<file>icons/breeze/status/24/video-card-inactive.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-100.svg">icons/breeze/status/24/network-wireless-signal-excellent.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-75.svg">icons/breeze/status/24/network-wireless-signal-good.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-00.svg">icons/breeze/status/24/network-wireless-signal-none.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-50.svg">icons/breeze/status/24/network-wireless-signal-ok.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-25.svg">icons/breeze/status/24/network-wireless-signal-weak.svg</file>
-		<file alias="icons/breeze/status/24/network-wired-unavailable.svg">icons/breeze/status/24/nm-no-connection.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/view-refresh.svg">icons/breeze/status/24/task-recurring.svg</file>
-		<file alias="icons/breeze/status/24/user-online.svg">icons/breeze/status/24/user-available.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/im-user-away.svg">icons/breeze/status/24/user-away.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/im-invisible-user.svg">icons/breeze/status/24/user-invisible.svg</file>
-		<file alias="icons/breeze/status/24/../../actions/24/im-user-online.svg">icons/breeze/status/24/user-online.svg</file>
-		<file alias="icons/breeze/status/24/network-wired-activated.svg">icons/breeze/status/24/nm-device-wired.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-00.svg">icons/breeze/status/24/nm-nm-signal-00.svg</file>
-		<file alias="icons/breeze/status/24/network-wireless-connected-50.svg">icons/breeze/status/24/nm-nm-signal-50.svg</file>
+		<file alias="icons/breeze/status/24/network-wireless-signal-excellent.svg">icons/breeze/status/24/network-wireless-connected-100.svg</file>
+		<file alias="icons/breeze/status/24/network-wireless-signal-good.svg">icons/breeze/status/24/network-wireless-connected-75.svg</file>
+		<file alias="icons/breeze/status/24/network-wireless-signal-none.svg">icons/breeze/status/24/network-wireless-connected-00.svg</file>
+		<file alias="icons/breeze/status/24/network-wireless-signal-ok.svg">icons/breeze/status/24/network-wireless-connected-50.svg</file>
+		<file alias="icons/breeze/status/24/network-wireless-signal-weak.svg">icons/breeze/status/24/network-wireless-connected-25.svg</file>
+		<file alias="icons/breeze/status/24/nm-no-connection.svg">icons/breeze/status/24/network-wired-unavailable.svg</file>
+		<file alias="icons/breeze/status/24/task-recurring.svg">icons/breeze/status/24/../../actions/24/view-refresh.svg</file>
+		<file alias="icons/breeze/status/24/user-available.svg">icons/breeze/status/24/user-online.svg</file>
+		<file alias="icons/breeze/status/24/user-away.svg">icons/breeze/status/24/../../actions/24/im-user-away.svg</file>
+		<file alias="icons/breeze/status/24/user-invisible.svg">icons/breeze/status/24/../../actions/24/im-invisible-user.svg</file>
+		<file alias="icons/breeze/status/24/user-online.svg">icons/breeze/status/24/../../actions/24/im-user-online.svg</file>
+		<file alias="icons/breeze/status/24/nm-device-wired.svg">icons/breeze/status/24/network-wired-activated.svg</file>
+		<file alias="icons/breeze/status/24/nm-nm-signal-00.svg">icons/breeze/status/24/network-wireless-connected-00.svg</file>
+		<file alias="icons/breeze/status/24/nm-nm-signal-50.svg">icons/breeze/status/24/network-wireless-connected-50.svg</file>
 		<file>icons/breeze/status/32/battery-000-charging.svg</file>
 		<file>icons/breeze/status/32/battery-000.svg</file>
 		<file>icons/breeze/status/32/battery-010-charging.svg</file>
@@ -726,18 +726,18 @@
 		<file>icons/breeze/status/32/rotation-allowed.svg</file>
 		<file>icons/breeze/status/32/rotation-locked-landscape.svg</file>
 		<file>icons/breeze/status/32/rotation-locked-portrait.svg</file>
-		<file alias="icons/breeze/status/32/../../actions/32/view-refresh.svg">icons/breeze/status/32/task-recurring.svg</file>
-		<file alias="icons/breeze/status/32/../../actions/32/view-refresh.svg">icons/breeze/status/32/appointment-recurring.svg</file>
-		<file alias="icons/breeze/status/32/battery-010-charging.svg">icons/breeze/status/32/battery-caution-charging.svg</file>
-		<file alias="icons/breeze/status/32/battery-010.svg">icons/breeze/status/32/battery-caution.svg</file>
-		<file alias="icons/breeze/status/32/battery-000-charging.svg">icons/breeze/status/32/battery-empty-charging.svg</file>
-		<file alias="icons/breeze/status/32/battery-000.svg">icons/breeze/status/32/battery-empty.svg</file>
-		<file alias="icons/breeze/status/32/battery-100-charging.svg">icons/breeze/status/32/battery-full-charging.svg</file>
-		<file alias="icons/breeze/status/32/battery-100.svg">icons/breeze/status/32/battery-full.svg</file>
-		<file alias="icons/breeze/status/32/battery-070-charging.svg">icons/breeze/status/32/battery-good-charging.svg</file>
-		<file alias="icons/breeze/status/32/battery-070.svg">icons/breeze/status/32/battery-good.svg</file>
-		<file alias="icons/breeze/status/32/battery-030-charging.svg">icons/breeze/status/32/battery-low-charging.svg</file>
-		<file alias="icons/breeze/status/32/battery-030.svg">icons/breeze/status/32/battery-low.svg</file>
+		<file alias="icons/breeze/status/32/task-recurring.svg">icons/breeze/status/32/../../actions/32/view-refresh.svg</file>
+		<file alias="icons/breeze/status/32/appointment-recurring.svg">icons/breeze/status/32/../../actions/32/view-refresh.svg</file>
+		<file alias="icons/breeze/status/32/battery-caution-charging.svg">icons/breeze/status/32/battery-010-charging.svg</file>
+		<file alias="icons/breeze/status/32/battery-caution.svg">icons/breeze/status/32/battery-010.svg</file>
+		<file alias="icons/breeze/status/32/battery-empty-charging.svg">icons/breeze/status/32/battery-000-charging.svg</file>
+		<file alias="icons/breeze/status/32/battery-empty.svg">icons/breeze/status/32/battery-000.svg</file>
+		<file alias="icons/breeze/status/32/battery-full-charging.svg">icons/breeze/status/32/battery-100-charging.svg</file>
+		<file alias="icons/breeze/status/32/battery-full.svg">icons/breeze/status/32/battery-100.svg</file>
+		<file alias="icons/breeze/status/32/battery-good-charging.svg">icons/breeze/status/32/battery-070-charging.svg</file>
+		<file alias="icons/breeze/status/32/battery-good.svg">icons/breeze/status/32/battery-070.svg</file>
+		<file alias="icons/breeze/status/32/battery-low-charging.svg">icons/breeze/status/32/battery-030-charging.svg</file>
+		<file alias="icons/breeze/status/32/battery-low.svg">icons/breeze/status/32/battery-030.svg</file>
 		<file>icons/breeze/status/48/dialog-warning.svg</file>
 		<file>icons/breeze/status/64/dialog-error.svg</file>
 		<file>icons/breeze/status/64/dialog-information.svg</file>
@@ -763,83 +763,83 @@
 		<file>icons/breeze/status/panel/knemo-wireless-transmit.svg</file>
 		<file>icons/breeze/status/symbolic/appointment-missed-symbolic.svg</file>
 		<file>icons/breeze/status/symbolic/appointment-soon-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-caution-charging.svg">icons/breeze/status/symbolic/battery-caution-charging-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-empty-charging.svg">icons/breeze/status/symbolic/battery-empty-charging-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-empty.svg">icons/breeze/status/symbolic/battery-empty-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-full-charging.svg">icons/breeze/status/symbolic/battery-full-charged-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-full-charging.svg">icons/breeze/status/symbolic/battery-full-charging-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-full.svg">icons/breeze/status/symbolic/battery-full-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-good-charging.svg">icons/breeze/status/symbolic/battery-good-charging-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-good.svg">icons/breeze/status/symbolic/battery-good-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-low-charging.svg">icons/breeze/status/symbolic/battery-low-charging-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-low.svg">icons/breeze/status/symbolic/battery-low-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-missing.svg">icons/breeze/status/symbolic/battery-missing-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/call-incoming.svg">icons/breeze/status/symbolic/call-incoming-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/call-missed.svg">icons/breeze/status/symbolic/call-missed-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/call-outgoing.svg">icons/breeze/status/symbolic/call-outgoing-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/object-unlocked.svg">icons/breeze/status/symbolic/changes-allow-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/object-locked.svg">icons/breeze/status/symbolic/changes-prevent-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/object-unlocked.svg">icons/breeze/status/symbolic/channel-insecure-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/object-locked.svg">icons/breeze/status/symbolic/channel-secure-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/tools-report-bug.svg">icons/breeze/status/symbolic/computer-fail-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/image-loading-symbolic.svg">icons/breeze/status/symbolic/content-loading-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/error.svg">icons/breeze/status/symbolic/dialog-error-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/messagebox_warning.svg">icons/breeze/status/symbolic/dialog-warning-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../places/16/folder-open.svg">icons/breeze/status/symbolic/folder-open-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/symbolic/view-more-horizontal-symbolic.svg">icons/breeze/status/symbolic/image-loading-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/mail-attachment.svg">icons/breeze/status/symbolic/mail-attachment-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/mail-read.svg">icons/breeze/status/symbolic/mail-read-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/mail-replied.svg">icons/breeze/status/symbolic/mail-replied-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/mail-unread.svg">icons/breeze/status/symbolic/mail-unread-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/media-playlist-consecutive-symbolic.svg">icons/breeze/status/symbolic/media-playlist-consecutive-symbolic-rtl.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/media-repeat-playlist-amarok.svg">icons/breeze/status/symbolic/media-playlist-consecutive-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/media-playlist-repeat-song-symbolic.svg">icons/breeze/status/symbolic/media-playlist-repeat-song-symbolic-rtl.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/media-repeat-track-amarok.svg">icons/breeze/status/symbolic/media-playlist-repeat-song-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/media-playlist-repeat-symbolic.svg">icons/breeze/status/symbolic/media-playlist-repeat-symbolic-rtl.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/media-playlist-repeat.svg">icons/breeze/status/symbolic/media-playlist-repeat-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/media-playlist-shuffle-symbolic.svg">icons/breeze/status/symbolic/media-playlist-shuffle-symbolic-rtl.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/media-playlist-shuffle.svg">icons/breeze/status/symbolic/media-playlist-shuffle-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/microphone-sensitivity-high.svg">icons/breeze/status/symbolic/microphone-sensitivity-high-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/microphone-sensitivity-low.svg">icons/breeze/status/symbolic/microphone-sensitivity-low-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/microphone-sensitivity-medium.svg">icons/breeze/status/symbolic/microphone-sensitivity-medium-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/microphone-sensitivity-muted.svg">icons/breeze/status/symbolic/microphone-sensitivity-muted-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../22/network-offline.svg">icons/breeze/status/symbolic/network-offline-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../emblems/16/rating-unrated.svg">icons/breeze/status/symbolic/non-starred-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../emblems/16/rating-unrated.svg">icons/breeze/status/symbolic/rating-unrated.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/rotation-locked-landscape.svg">icons/breeze/status/symbolic/rotation-locked-landscape-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/rotation-locked-portrait.svg">icons/breeze/status/symbolic/rotation-locked-portrait-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/security-high.svg">icons/breeze/status/symbolic/security-high-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/auth-sim-locked.svg">icons/breeze/status/symbolic/auth-sim-locked-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/battery-caution.svg">icons/breeze/status/symbolic/battery-caution-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-caution-charging-symbolic.svg">icons/breeze/status/symbolic/../16/battery-caution-charging.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-empty-charging-symbolic.svg">icons/breeze/status/symbolic/../16/battery-empty-charging.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-empty-symbolic.svg">icons/breeze/status/symbolic/../16/battery-empty.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-full-charged-symbolic.svg">icons/breeze/status/symbolic/../16/battery-full-charging.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-full-charging-symbolic.svg">icons/breeze/status/symbolic/../16/battery-full-charging.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-full-symbolic.svg">icons/breeze/status/symbolic/../16/battery-full.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-good-charging-symbolic.svg">icons/breeze/status/symbolic/../16/battery-good-charging.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-good-symbolic.svg">icons/breeze/status/symbolic/../16/battery-good.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-low-charging-symbolic.svg">icons/breeze/status/symbolic/../16/battery-low-charging.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-low-symbolic.svg">icons/breeze/status/symbolic/../16/battery-low.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-missing-symbolic.svg">icons/breeze/status/symbolic/../16/battery-missing.svg</file>
+		<file alias="icons/breeze/status/symbolic/call-incoming-symbolic.svg">icons/breeze/status/symbolic/../16/call-incoming.svg</file>
+		<file alias="icons/breeze/status/symbolic/call-missed-symbolic.svg">icons/breeze/status/symbolic/../16/call-missed.svg</file>
+		<file alias="icons/breeze/status/symbolic/call-outgoing-symbolic.svg">icons/breeze/status/symbolic/../16/call-outgoing.svg</file>
+		<file alias="icons/breeze/status/symbolic/changes-allow-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/object-unlocked.svg</file>
+		<file alias="icons/breeze/status/symbolic/changes-prevent-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/object-locked.svg</file>
+		<file alias="icons/breeze/status/symbolic/channel-insecure-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/object-unlocked.svg</file>
+		<file alias="icons/breeze/status/symbolic/channel-secure-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/object-locked.svg</file>
+		<file alias="icons/breeze/status/symbolic/computer-fail-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/tools-report-bug.svg</file>
+		<file alias="icons/breeze/status/symbolic/content-loading-symbolic.svg">icons/breeze/status/symbolic/image-loading-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/dialog-error-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/error.svg</file>
+		<file alias="icons/breeze/status/symbolic/dialog-warning-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/messagebox_warning.svg</file>
+		<file alias="icons/breeze/status/symbolic/folder-open-symbolic.svg">icons/breeze/status/symbolic/../../places/16/folder-open.svg</file>
+		<file alias="icons/breeze/status/symbolic/image-loading-symbolic.svg">icons/breeze/status/symbolic/../../actions/symbolic/view-more-horizontal-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/mail-attachment-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/mail-attachment.svg</file>
+		<file alias="icons/breeze/status/symbolic/mail-read-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/mail-read.svg</file>
+		<file alias="icons/breeze/status/symbolic/mail-replied-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/mail-replied.svg</file>
+		<file alias="icons/breeze/status/symbolic/mail-unread-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/mail-unread.svg</file>
+		<file alias="icons/breeze/status/symbolic/media-playlist-consecutive-symbolic-rtl.svg">icons/breeze/status/symbolic/media-playlist-consecutive-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/media-playlist-consecutive-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/media-repeat-playlist-amarok.svg</file>
+		<file alias="icons/breeze/status/symbolic/media-playlist-repeat-song-symbolic-rtl.svg">icons/breeze/status/symbolic/media-playlist-repeat-song-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/media-playlist-repeat-song-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/media-repeat-track-amarok.svg</file>
+		<file alias="icons/breeze/status/symbolic/media-playlist-repeat-symbolic-rtl.svg">icons/breeze/status/symbolic/media-playlist-repeat-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/media-playlist-repeat-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/media-playlist-repeat.svg</file>
+		<file alias="icons/breeze/status/symbolic/media-playlist-shuffle-symbolic-rtl.svg">icons/breeze/status/symbolic/media-playlist-shuffle-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/media-playlist-shuffle-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/media-playlist-shuffle.svg</file>
+		<file alias="icons/breeze/status/symbolic/microphone-sensitivity-high-symbolic.svg">icons/breeze/status/symbolic/../16/microphone-sensitivity-high.svg</file>
+		<file alias="icons/breeze/status/symbolic/microphone-sensitivity-low-symbolic.svg">icons/breeze/status/symbolic/../16/microphone-sensitivity-low.svg</file>
+		<file alias="icons/breeze/status/symbolic/microphone-sensitivity-medium-symbolic.svg">icons/breeze/status/symbolic/../16/microphone-sensitivity-medium.svg</file>
+		<file alias="icons/breeze/status/symbolic/microphone-sensitivity-muted-symbolic.svg">icons/breeze/status/symbolic/../16/microphone-sensitivity-muted.svg</file>
+		<file alias="icons/breeze/status/symbolic/network-offline-symbolic.svg">icons/breeze/status/symbolic/../22/network-offline.svg</file>
+		<file alias="icons/breeze/status/symbolic/non-starred-symbolic.svg">icons/breeze/status/symbolic/../../emblems/16/rating-unrated.svg</file>
+		<file alias="icons/breeze/status/symbolic/rating-unrated.svg">icons/breeze/status/symbolic/../../emblems/16/rating-unrated.svg</file>
+		<file alias="icons/breeze/status/symbolic/rotation-locked-landscape-symbolic.svg">icons/breeze/status/symbolic/../16/rotation-locked-landscape.svg</file>
+		<file alias="icons/breeze/status/symbolic/rotation-locked-portrait-symbolic.svg">icons/breeze/status/symbolic/../16/rotation-locked-portrait.svg</file>
+		<file alias="icons/breeze/status/symbolic/security-high-symbolic.svg">icons/breeze/status/symbolic/../16/security-high.svg</file>
+		<file alias="icons/breeze/status/symbolic/auth-sim-locked-symbolic.svg">icons/breeze/status/symbolic/../16/auth-sim-locked.svg</file>
+		<file alias="icons/breeze/status/symbolic/battery-caution-symbolic.svg">icons/breeze/status/symbolic/../16/battery-caution.svg</file>
 		<file>icons/breeze/status/symbolic/printer-error-symbolic.svg</file>
 		<file>icons/breeze/status/symbolic/printer-warning-symbolic.svg</file>
 		<file>icons/breeze/status/symbolic/process-working-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/security-low.svg">icons/breeze/status/symbolic/security-low-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/security-medium.svg">icons/breeze/status/symbolic/security-medium-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../emblems/16/rating.svg">icons/breeze/status/symbolic/starred-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/user-available.svg">icons/breeze/status/symbolic/user-available-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/auth-sim-missing.svg">icons/breeze/status/symbolic/auth-sim-missing-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/im-user.svg">icons/breeze/status/symbolic/avatar-default-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/security-low-symbolic.svg">icons/breeze/status/symbolic/../16/security-low.svg</file>
+		<file alias="icons/breeze/status/symbolic/security-medium-symbolic.svg">icons/breeze/status/symbolic/../16/security-medium.svg</file>
+		<file alias="icons/breeze/status/symbolic/starred-symbolic.svg">icons/breeze/status/symbolic/../../emblems/16/rating.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-available-symbolic.svg">icons/breeze/status/symbolic/../16/user-available.svg</file>
+		<file alias="icons/breeze/status/symbolic/auth-sim-missing-symbolic.svg">icons/breeze/status/symbolic/../16/auth-sim-missing.svg</file>
+		<file alias="icons/breeze/status/symbolic/avatar-default-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/im-user.svg</file>
 		<file>icons/breeze/status/symbolic/semi-starred-symbolic-rtl.svg</file>
 		<file>icons/breeze/status/symbolic/semi-starred-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/im-invisible-user.svg">icons/breeze/status/symbolic/user-invisible-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/hint.svg">icons/breeze/status/symbolic/user-not-tracked-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/im-user-offline.svg">icons/breeze/status/symbolic/user-offline-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/user-away-extended.svg">icons/breeze/status/symbolic/user-status-pending-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../places/16/user-trash.svg">icons/breeze/status/symbolic/user-trash-full-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/edit-undo.svg">icons/breeze/status/symbolic/view-wrapped-symbolic-rtl.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/edit-redo.svg">icons/breeze/status/symbolic/view-wrapped-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/knotes_alarm.svg">icons/breeze/status/symbolic/alarm-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/audio-volume-high.svg">icons/breeze/status/symbolic/audio-volume-high-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/audio-volume-low.svg">icons/breeze/status/symbolic/audio-volume-low-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/audio-volume-medium.svg">icons/breeze/status/symbolic/audio-volume-medium-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/audio-volume-muted.svg">icons/breeze/status/symbolic/audio-volume-muted-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/document-print.svg">icons/breeze/status/symbolic/printer-printing-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/rotation-allowed.svg">icons/breeze/status/symbolic/rotation-allowed-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/rotation-locked-portrait.svg">icons/breeze/status/symbolic/rotation-locked-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/object-locked.svg">icons/breeze/status/symbolic/system-lock-screen-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/im-user-away.svg">icons/breeze/status/symbolic/user-away-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../../actions/16/im-user-busy.svg">icons/breeze/status/symbolic/user-busy-symbolic.svg</file>
-		<file alias="icons/breeze/status/symbolic/../16/user-idle.svg">icons/breeze/status/symbolic/user-idle-symbolic.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-invisible-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/im-invisible-user.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-not-tracked-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/hint.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-offline-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/im-user-offline.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-status-pending-symbolic.svg">icons/breeze/status/symbolic/../16/user-away-extended.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-trash-full-symbolic.svg">icons/breeze/status/symbolic/../../places/16/user-trash.svg</file>
+		<file alias="icons/breeze/status/symbolic/view-wrapped-symbolic-rtl.svg">icons/breeze/status/symbolic/../../actions/16/edit-undo.svg</file>
+		<file alias="icons/breeze/status/symbolic/view-wrapped-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/edit-redo.svg</file>
+		<file alias="icons/breeze/status/symbolic/alarm-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/knotes_alarm.svg</file>
+		<file alias="icons/breeze/status/symbolic/audio-volume-high-symbolic.svg">icons/breeze/status/symbolic/../16/audio-volume-high.svg</file>
+		<file alias="icons/breeze/status/symbolic/audio-volume-low-symbolic.svg">icons/breeze/status/symbolic/../16/audio-volume-low.svg</file>
+		<file alias="icons/breeze/status/symbolic/audio-volume-medium-symbolic.svg">icons/breeze/status/symbolic/../16/audio-volume-medium.svg</file>
+		<file alias="icons/breeze/status/symbolic/audio-volume-muted-symbolic.svg">icons/breeze/status/symbolic/../16/audio-volume-muted.svg</file>
+		<file alias="icons/breeze/status/symbolic/printer-printing-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/document-print.svg</file>
+		<file alias="icons/breeze/status/symbolic/rotation-allowed-symbolic.svg">icons/breeze/status/symbolic/../16/rotation-allowed.svg</file>
+		<file alias="icons/breeze/status/symbolic/rotation-locked-symbolic.svg">icons/breeze/status/symbolic/../16/rotation-locked-portrait.svg</file>
+		<file alias="icons/breeze/status/symbolic/system-lock-screen-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/object-locked.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-away-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/im-user-away.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-busy-symbolic.svg">icons/breeze/status/symbolic/../../actions/16/im-user-busy.svg</file>
+		<file alias="icons/breeze/status/symbolic/user-idle-symbolic.svg">icons/breeze/status/symbolic/../16/user-idle.svg</file>
 	</qresource>
 </RCC>

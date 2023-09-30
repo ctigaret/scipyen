@@ -13,28 +13,28 @@
 		<file>icons/breeze-dark/applets/22/hands-free.svg</file>
 		<file>icons/breeze-dark/applets/22/hifi.svg</file>
 		<file>icons/breeze-dark/applets/22/portable.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../devices/22/smartphone.svg">icons/breeze-dark/applets/22/handset.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../devices/22/audio-headphones.svg">icons/breeze-dark/applets/22/headphone.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../devices/22/audio-headset.svg">icons/breeze-dark/applets/22/headset.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../devices/22/audio-card.svg">icons/breeze-dark/applets/22/internal.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../devices/22/audio-input-microphone.svg">icons/breeze-dark/applets/22/microphone.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../status/22/audio-volume-high.svg">icons/breeze-dark/applets/22/speaker.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../devices/22/video-television.svg">icons/breeze-dark/applets/22/tv.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../actions/22/user-identity.svg">icons/breeze-dark/applets/22/user-identity.svg</file>
-		<file alias="icons/breeze-dark/applets/22/../../devices/22/camera-web.svg">icons/breeze-dark/applets/22/webcam.svg</file>
+		<file alias="icons/breeze-dark/applets/22/handset.svg">icons/breeze-dark/applets/22/../../devices/22/smartphone.svg</file>
+		<file alias="icons/breeze-dark/applets/22/headphone.svg">icons/breeze-dark/applets/22/../../devices/22/audio-headphones.svg</file>
+		<file alias="icons/breeze-dark/applets/22/headset.svg">icons/breeze-dark/applets/22/../../devices/22/audio-headset.svg</file>
+		<file alias="icons/breeze-dark/applets/22/internal.svg">icons/breeze-dark/applets/22/../../devices/22/audio-card.svg</file>
+		<file alias="icons/breeze-dark/applets/22/microphone.svg">icons/breeze-dark/applets/22/../../devices/22/audio-input-microphone.svg</file>
+		<file alias="icons/breeze-dark/applets/22/speaker.svg">icons/breeze-dark/applets/22/../../status/22/audio-volume-high.svg</file>
+		<file alias="icons/breeze-dark/applets/22/tv.svg">icons/breeze-dark/applets/22/../../devices/22/video-television.svg</file>
+		<file alias="icons/breeze-dark/applets/22/user-identity.svg">icons/breeze-dark/applets/22/../../actions/22/user-identity.svg</file>
+		<file alias="icons/breeze-dark/applets/22/webcam.svg">icons/breeze-dark/applets/22/../../devices/22/camera-web.svg</file>
 		<file>icons/breeze-dark/applets/24/car.svg</file>
 		<file>icons/breeze-dark/applets/24/hands-free.svg</file>
 		<file>icons/breeze-dark/applets/24/hifi.svg</file>
 		<file>icons/breeze-dark/applets/24/portable.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../devices/24/smartphone.svg">icons/breeze-dark/applets/24/handset.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../devices/24/audio-headphones.svg">icons/breeze-dark/applets/24/headphone.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../devices/24/audio-headset.svg">icons/breeze-dark/applets/24/headset.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../devices/24/audio-card.svg">icons/breeze-dark/applets/24/internal.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../devices/24/audio-input-microphone.svg">icons/breeze-dark/applets/24/microphone.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../status/24/audio-volume-high.svg">icons/breeze-dark/applets/24/speaker.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../devices/24/video-television.svg">icons/breeze-dark/applets/24/tv.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../actions/24/user-identity.svg">icons/breeze-dark/applets/24/user-identity.svg</file>
-		<file alias="icons/breeze-dark/applets/24/../../devices/24/camera-web.svg">icons/breeze-dark/applets/24/webcam.svg</file>
+		<file alias="icons/breeze-dark/applets/24/handset.svg">icons/breeze-dark/applets/24/../../devices/24/smartphone.svg</file>
+		<file alias="icons/breeze-dark/applets/24/headphone.svg">icons/breeze-dark/applets/24/../../devices/24/audio-headphones.svg</file>
+		<file alias="icons/breeze-dark/applets/24/headset.svg">icons/breeze-dark/applets/24/../../devices/24/audio-headset.svg</file>
+		<file alias="icons/breeze-dark/applets/24/internal.svg">icons/breeze-dark/applets/24/../../devices/24/audio-card.svg</file>
+		<file alias="icons/breeze-dark/applets/24/microphone.svg">icons/breeze-dark/applets/24/../../devices/24/audio-input-microphone.svg</file>
+		<file alias="icons/breeze-dark/applets/24/speaker.svg">icons/breeze-dark/applets/24/../../status/24/audio-volume-high.svg</file>
+		<file alias="icons/breeze-dark/applets/24/tv.svg">icons/breeze-dark/applets/24/../../devices/24/video-television.svg</file>
+		<file alias="icons/breeze-dark/applets/24/user-identity.svg">icons/breeze-dark/applets/24/../../actions/24/user-identity.svg</file>
+		<file alias="icons/breeze-dark/applets/24/webcam.svg">icons/breeze-dark/applets/24/../../devices/24/camera-web.svg</file>
 		<file>icons/breeze-dark/applets/256/applets-template.svg</file>
 		<file>icons/breeze-dark/applets/256/empty.svg</file>
 		<file>icons/breeze-dark/applets/256/org.kde.ktpcontactlist.svg</file>
@@ -79,7 +79,7 @@
 		<file>icons/breeze-dark/applets/256/org.kde.plasma.vault.svg</file>
 		<file>icons/breeze-dark/applets/256/org.kde.plasma.volume.svg</file>
 		<file>icons/breeze-dark/applets/256/org.kde.plasma.windowlist.svg</file>
-		<file alias="icons/breeze-dark/applets/256/org.kde.plasma.calendar.svg">icons/breeze-dark/applets/256/org.kde.plasma.date.svg</file>
+		<file alias="icons/breeze-dark/applets/256/org.kde.plasma.date.svg">icons/breeze-dark/applets/256/org.kde.plasma.calendar.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-clear-wind-night.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-clear-wind.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-clouds-wind-night.svg</file>
@@ -96,13 +96,13 @@
 		<file>icons/breeze-dark/applets/48/weather-clouds.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-few-clouds-night.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-few-clouds.svg</file>
-		<file alias="icons/breeze-dark/applets/48/weather-mist.svg">icons/breeze-dark/applets/48/weather-fog.svg</file>
+		<file alias="icons/breeze-dark/applets/48/weather-fog.svg">icons/breeze-dark/applets/48/weather-mist.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-freezing-rain.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-hail.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-many-clouds.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-none-available.svg</file>
-		<file alias="icons/breeze-dark/applets/48/weather-many-clouds-wind.svg">icons/breeze-dark/applets/48/weather-overcast-wind.svg</file>
-		<file alias="icons/breeze-dark/applets/48/weather-many-clouds.svg">icons/breeze-dark/applets/48/weather-overcast.svg</file>
+		<file alias="icons/breeze-dark/applets/48/weather-overcast-wind.svg">icons/breeze-dark/applets/48/weather-many-clouds-wind.svg</file>
+		<file alias="icons/breeze-dark/applets/48/weather-overcast.svg">icons/breeze-dark/applets/48/weather-many-clouds.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-showers-day.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-showers-night.svg</file>
 		<file>icons/breeze-dark/applets/48/weather-showers-scattered-day.svg</file>
@@ -165,6 +165,6 @@
 		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-windowaperture.svg</file>
 		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-wobblywindows.svg</file>
 		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-zoom.svg</file>
-		<file alias="icons/breeze-dark/applets/64/preferences-system-windows-effect-flipswitch.svg">icons/breeze-dark/applets/64/preferences-system-tabbox.svg</file>
+		<file alias="icons/breeze-dark/applets/64/preferences-system-tabbox.svg">icons/breeze-dark/applets/64/preferences-system-windows-effect-flipswitch.svg</file>
 	</qresource>
 </RCC>

@@ -62,7 +62,8 @@ for d in iconsthemesdir:
                     o_parts = [p for p in original.parts if p not in resourcesdir.parts]
                     local_o = pathlib.Path(*o_parts)
                     original_name = str(local_o)
-                    qrc_file.write(f"\t\t<file alias=\"{original_name}\">{f_name}</file>\n")
+                    # qrc_file.write(f"\t\t<file alias=\"{original_name}\">{f_name}</file>\n")
+                    qrc_file.write(f"\t\t<file alias=\"{f_name}\">{original_name}</file>\n")
                 else:
                     qrc_file.write(f"\t\t<file>{f_name}</file>\n")
                     

@@ -40,20 +40,20 @@
 		<file>icons/breeze-dark/emblems/16/vcs-normal.svg</file>
 		<file>icons/breeze-dark/emblems/16/vcs-removed.svg</file>
 		<file>icons/breeze-dark/emblems/16/vcs-update-required.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/emblem-checked.svg">icons/breeze-dark/emblems/16/emblem-success.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/emblem-checked.svg">icons/breeze-dark/emblems/16/installed.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/package-available.svg">icons/breeze-dark/emblems/16/noninstalled.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/package-installed-outdated.svg">icons/breeze-dark/emblems/16/outdated.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/emblem-error.svg">icons/breeze-dark/emblems/16/package-broken.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/emblem-added.svg">icons/breeze-dark/emblems/16/package-install.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/emblem-locked.svg">icons/breeze-dark/emblems/16/package-installed-locked.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/emblem-checked.svg">icons/breeze-dark/emblems/16/package-installed-updated.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/package-remove.svg">icons/breeze-dark/emblems/16/package-purge.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/package-install.svg">icons/breeze-dark/emblems/16/unrequired.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/emblem-checked.svg">icons/breeze-dark/emblems/16/checkmark.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/emblem-unlocked.svg">icons/breeze-dark/emblems/16/emblem-encrypted-unlocked.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/rating.svg">icons/breeze-dark/emblems/16/emblem-favorite.svg</file>
-		<file alias="icons/breeze-dark/emblems/16/package-upgrade.svg">icons/breeze-dark/emblems/16/newer.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/emblem-success.svg">icons/breeze-dark/emblems/16/emblem-checked.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/installed.svg">icons/breeze-dark/emblems/16/emblem-checked.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/noninstalled.svg">icons/breeze-dark/emblems/16/package-available.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/outdated.svg">icons/breeze-dark/emblems/16/package-installed-outdated.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/package-broken.svg">icons/breeze-dark/emblems/16/emblem-error.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/package-install.svg">icons/breeze-dark/emblems/16/emblem-added.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/package-installed-locked.svg">icons/breeze-dark/emblems/16/emblem-locked.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/package-installed-updated.svg">icons/breeze-dark/emblems/16/emblem-checked.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/package-purge.svg">icons/breeze-dark/emblems/16/package-remove.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/unrequired.svg">icons/breeze-dark/emblems/16/package-install.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/checkmark.svg">icons/breeze-dark/emblems/16/emblem-checked.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/emblem-encrypted-unlocked.svg">icons/breeze-dark/emblems/16/emblem-unlocked.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/emblem-favorite.svg">icons/breeze-dark/emblems/16/rating.svg</file>
+		<file alias="icons/breeze-dark/emblems/16/newer.svg">icons/breeze-dark/emblems/16/package-upgrade.svg</file>
 		<file>icons/breeze-dark/emblems/22/emblem-added.svg</file>
 		<file>icons/breeze-dark/emblems/22/emblem-checked.svg</file>
 		<file>icons/breeze-dark/emblems/22/emblem-encrypted-locked.svg</file>
@@ -83,10 +83,10 @@
 		<file>icons/breeze-dark/emblems/22/vcs-normal.svg</file>
 		<file>icons/breeze-dark/emblems/22/vcs-removed.svg</file>
 		<file>icons/breeze-dark/emblems/22/vcs-update-required.svg</file>
-		<file alias="icons/breeze-dark/emblems/22/emblem-checked.svg">icons/breeze-dark/emblems/22/checkmark.svg</file>
-		<file alias="icons/breeze-dark/emblems/22/emblem-unlocked.svg">icons/breeze-dark/emblems/22/emblem-encrypted-unlocked.svg</file>
-		<file alias="icons/breeze-dark/emblems/22/rating.svg">icons/breeze-dark/emblems/22/emblem-favorite.svg</file>
-		<file alias="icons/breeze-dark/emblems/22/emblem-checked.svg">icons/breeze-dark/emblems/22/emblem-success.svg</file>
+		<file alias="icons/breeze-dark/emblems/22/checkmark.svg">icons/breeze-dark/emblems/22/emblem-checked.svg</file>
+		<file alias="icons/breeze-dark/emblems/22/emblem-encrypted-unlocked.svg">icons/breeze-dark/emblems/22/emblem-unlocked.svg</file>
+		<file alias="icons/breeze-dark/emblems/22/emblem-favorite.svg">icons/breeze-dark/emblems/22/rating.svg</file>
+		<file alias="icons/breeze-dark/emblems/22/emblem-success.svg">icons/breeze-dark/emblems/22/emblem-checked.svg</file>
 		<file>icons/breeze-dark/emblems/24/emblem-added.svg</file>
 		<file>icons/breeze-dark/emblems/24/emblem-checked.svg</file>
 		<file>icons/breeze-dark/emblems/24/emblem-encrypted-locked.svg</file>
@@ -116,10 +116,10 @@
 		<file>icons/breeze-dark/emblems/24/vcs-normal.svg</file>
 		<file>icons/breeze-dark/emblems/24/vcs-removed.svg</file>
 		<file>icons/breeze-dark/emblems/24/vcs-update-required.svg</file>
-		<file alias="icons/breeze-dark/emblems/24/emblem-checked.svg">icons/breeze-dark/emblems/24/checkmark.svg</file>
-		<file alias="icons/breeze-dark/emblems/24/emblem-unlocked.svg">icons/breeze-dark/emblems/24/emblem-encrypted-unlocked.svg</file>
-		<file alias="icons/breeze-dark/emblems/24/rating.svg">icons/breeze-dark/emblems/24/emblem-favorite.svg</file>
-		<file alias="icons/breeze-dark/emblems/24/emblem-checked.svg">icons/breeze-dark/emblems/24/emblem-success.svg</file>
+		<file alias="icons/breeze-dark/emblems/24/checkmark.svg">icons/breeze-dark/emblems/24/emblem-checked.svg</file>
+		<file alias="icons/breeze-dark/emblems/24/emblem-encrypted-unlocked.svg">icons/breeze-dark/emblems/24/emblem-unlocked.svg</file>
+		<file alias="icons/breeze-dark/emblems/24/emblem-favorite.svg">icons/breeze-dark/emblems/24/rating.svg</file>
+		<file alias="icons/breeze-dark/emblems/24/emblem-success.svg">icons/breeze-dark/emblems/24/emblem-checked.svg</file>
 		<file>icons/breeze-dark/emblems/8/emblem-added.svg</file>
 		<file>icons/breeze-dark/emblems/8/emblem-checked.svg</file>
 		<file>icons/breeze-dark/emblems/8/emblem-encrypted-locked.svg</file>
@@ -147,20 +147,20 @@
 		<file>icons/breeze-dark/emblems/8/vcs-normal.svg</file>
 		<file>icons/breeze-dark/emblems/8/vcs-removed.svg</file>
 		<file>icons/breeze-dark/emblems/8/vcs-update-required.svg</file>
-		<file alias="icons/breeze-dark/emblems/8/emblem-checked.svg">icons/breeze-dark/emblems/8/checkmark.svg</file>
-		<file alias="icons/breeze-dark/emblems/8/emblem-unlocked.svg">icons/breeze-dark/emblems/8/emblem-encrypted-unlocked.svg</file>
-		<file alias="icons/breeze-dark/emblems/8/rating.svg">icons/breeze-dark/emblems/8/emblem-favorite.svg</file>
-		<file alias="icons/breeze-dark/emblems/8/emblem-checked.svg">icons/breeze-dark/emblems/8/emblem-success.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../actions/16/dialog-ok.svg">icons/breeze-dark/emblems/symbolic/emblem-default-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../places/16/document-multiple.svg">icons/breeze-dark/emblems/symbolic/emblem-documents-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../actions/16/love-amarok.svg">icons/breeze-dark/emblems/symbolic/emblem-favorite-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../places/16/folder-important.svg">icons/breeze-dark/emblems/symbolic/emblem-important-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../places/16/folder-sound.svg">icons/breeze-dark/emblems/symbolic/emblem-music-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../actions/16/dialog-ok.svg">icons/breeze-dark/emblems/symbolic/emblem-ok-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../places/16/folder-pictures.svg">icons/breeze-dark/emblems/symbolic/emblem-photos-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../actions/16/document-share.svg">icons/breeze-dark/emblems/symbolic/emblem-shared-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../actions/16/folder-sync.svg">icons/breeze-dark/emblems/symbolic/emblem-synchronizing-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../actions/16/run-build.svg">icons/breeze-dark/emblems/symbolic/emblem-system-symbolic.svg</file>
-		<file alias="icons/breeze-dark/emblems/symbolic/../../places/16/folder-videos.svg">icons/breeze-dark/emblems/symbolic/emblem-videos-symbolic.svg</file>
+		<file alias="icons/breeze-dark/emblems/8/checkmark.svg">icons/breeze-dark/emblems/8/emblem-checked.svg</file>
+		<file alias="icons/breeze-dark/emblems/8/emblem-encrypted-unlocked.svg">icons/breeze-dark/emblems/8/emblem-unlocked.svg</file>
+		<file alias="icons/breeze-dark/emblems/8/emblem-favorite.svg">icons/breeze-dark/emblems/8/rating.svg</file>
+		<file alias="icons/breeze-dark/emblems/8/emblem-success.svg">icons/breeze-dark/emblems/8/emblem-checked.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-default-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../actions/16/dialog-ok.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-documents-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../places/16/document-multiple.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-favorite-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../actions/16/love-amarok.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-important-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../places/16/folder-important.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-music-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../places/16/folder-sound.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-ok-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../actions/16/dialog-ok.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-photos-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../places/16/folder-pictures.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-shared-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../actions/16/document-share.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-synchronizing-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../actions/16/folder-sync.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-system-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../actions/16/run-build.svg</file>
+		<file alias="icons/breeze-dark/emblems/symbolic/emblem-videos-symbolic.svg">icons/breeze-dark/emblems/symbolic/../../places/16/folder-videos.svg</file>
 	</qresource>
 </RCC>
