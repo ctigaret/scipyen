@@ -42,7 +42,8 @@ from core.sysutils import adapt_ui_path
 
 import iolib.pictio as pio
 
-from gui import resources_rc as resources_rc
+from gui import resources_rc # as resources_rc
+from gui import icons_rc # as icons_rc
 from gui import quickdialog as qd
 from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
 from gui.protocoleditordialog import ProtocolEditorDialog

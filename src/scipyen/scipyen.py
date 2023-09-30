@@ -82,19 +82,33 @@ QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 # on linux, we rely on platform-level modules, which get packed by pyinstaller
 # when building the bundle
 #
-# MAYBE TODO/FIXME 2023-09-28 22:17:16 MAY
-# try a similar trick for linux
-if sys.platform == "win32":
-    mpath = pathlib.Path(__module_path__)
+mpath = pathlib.Path(__module_path__)
 
-    iconsdir = mpath / "gui" / "resources" / "icons"
+iconsdir = mpath / "gui" / "resources" / "icons"
 
-    if iconsdir.is_dir():
-        themePaths = QtGui.QIcon.themeSearchPaths()
-        themePaths.append(str(iconsdir))
-        QtGui.QIcon.setThemeSearchPaths(themePaths)
-        # QtGui.QIcon.setThemeName("breeze-dark") 
+themePaths = QtGui.QIcon.themeSearchPaths()
+fbPaths = QtGui.QIcon.fallbackSearchPaths()
+themePaths.append(":/icons")
+if iconsdir.is_dir():
+    themePaths.append(str(iconsdir))
+    QtGui.QIcon.setThemeSearchPaths(themePaths)
+    fbPaths.append(str(iconsdir))
+    QtGui.QIcon.setFallbackSearchPaths(fbPaths)
     
+if hasQDarkTheme:
+    # qdarktheme.setup_theme("auto")
+    qdarktheme.enable_hi_dpi()
+    QtGui.QIcon.setThemeName("breeze-dark")
+else:
+    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+    _,_,v,_ = windowColor.getHsv()
+    if v > 128:
+        QtGui.QIcon.setThemeName("breeze")
+        QtGui.QIcon.setFallbackThemeName("breeze")
+    else:
+        QtGui.QIcon.setThemeName("breeze-dark")
+        QtGui.QIcon.setFallbackThemeName("breeze-dark")
+        
 # NOTE: 2023-09-28 22:06:54
 # this should be necessary only on windows platform
 # see also NOTE: 2023-09-28 22:12:25

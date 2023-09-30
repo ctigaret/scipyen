@@ -276,8 +276,8 @@
 <file>icons/breeze/actions/16/filename-filetype-amarok.svg</file>
 <file>icons/breeze/actions/16/filename-group-length.svg</file>
 <file>icons/breeze/actions/16/filename-group-tracks.svg</file>
-<file>icons/breeze/actions/16/filename-moodbar.svg</file>
 <file>icons/breeze/actions/16/filename-initial-amarok.svg</file>
+<file>icons/breeze/actions/16/filename-moodbar.svg</file>
 <file>icons/breeze/actions/16/filename-slash-amarok.svg</file>
 <file>icons/breeze/actions/16/filename-space-amarok.svg</file>
 <file>icons/breeze/actions/16/filename-title-amarok.svg</file>
@@ -1828,7 +1828,6 @@
 <file>icons/breeze/actions/22/question.svg</file>
 <file>icons/breeze/actions/22/quickopen-class.svg</file>
 <file>icons/breeze/actions/22/quickopen-file.svg</file>
-<file>icons/breeze/actions/22/sqrt.svg</file>
 <file>icons/breeze/actions/22/quickopen-function.svg</file>
 <file>icons/breeze/actions/22/quickopen.svg</file>
 <file>icons/breeze/actions/22/raindrop.svg</file>
@@ -1901,6 +1900,7 @@
 <file>icons/breeze/actions/22/speaker.svg</file>
 <file>icons/breeze/actions/22/special_paste.svg</file>
 <file>icons/breeze/actions/22/split.svg</file>
+<file>icons/breeze/actions/22/sqrt.svg</file>
 <file>icons/breeze/actions/22/standard-connector.svg</file>
 <file>icons/breeze/actions/22/state-fork.svg</file>
 <file>icons/breeze/actions/22/stateshape.svg</file>

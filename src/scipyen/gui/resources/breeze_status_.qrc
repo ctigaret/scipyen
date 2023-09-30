@@ -263,7 +263,6 @@
 <file>icons/breeze/status/22/network-mobile-60-umts.svg</file>
 <file>icons/breeze/status/22/network-mobile-60.svg</file>
 <file>icons/breeze/status/22/network-mobile-80-edge-locked.svg</file>
-<file>icons/breeze/status/22/state-ok.svg</file>
 <file>icons/breeze/status/22/network-mobile-80-edge.svg</file>
 <file>icons/breeze/status/22/network-mobile-80-gprs-locked.svg</file>
 <file>icons/breeze/status/22/network-mobile-80-gprs.svg</file>
@@ -303,6 +302,7 @@
 <file>icons/breeze/status/22/state-error.svg</file>
 <file>icons/breeze/status/22/state-information.svg</file>
 <file>icons/breeze/status/22/state-offline.svg</file>
+<file>icons/breeze/status/22/state-ok.svg</file>
 <file>icons/breeze/status/22/state-pause.svg</file>
 <file>icons/breeze/status/22/state-sync.svg</file>
 <file>icons/breeze/status/22/state-warning.svg</file>
@@ -504,7 +504,6 @@
 <file>icons/breeze/status/24/network-mobile-60-umts.svg</file>
 <file>icons/breeze/status/24/network-mobile-60.svg</file>
 <file>icons/breeze/status/24/network-mobile-80-edge-locked.svg</file>
-<file>icons/breeze/status/24/state-ok.svg</file>
 <file>icons/breeze/status/24/network-mobile-80-edge.svg</file>
 <file>icons/breeze/status/24/network-mobile-80-gprs-locked.svg</file>
 <file>icons/breeze/status/24/network-mobile-80-gprs.svg</file>
@@ -544,6 +543,7 @@
 <file>icons/breeze/status/24/state-error.svg</file>
 <file>icons/breeze/status/24/state-information.svg</file>
 <file>icons/breeze/status/24/state-offline.svg</file>
+<file>icons/breeze/status/24/state-ok.svg</file>
 <file>icons/breeze/status/24/state-pause.svg</file>
 <file>icons/breeze/status/24/state-sync.svg</file>
 <file>icons/breeze/status/24/state-warning.svg</file>

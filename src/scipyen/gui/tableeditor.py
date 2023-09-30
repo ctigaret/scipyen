@@ -56,6 +56,7 @@ from gui.widgets import tableeditorwidget
 from gui.widgets.tableeditorwidget import TableEditorWidget
 from . import quickdialog
 from . import resources_rc
+from . import icons_rc
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules

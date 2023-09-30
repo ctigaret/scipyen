@@ -276,8 +276,8 @@
 <file>icons/breeze-dark/actions/16/filename-filetype-amarok.svg</file>
 <file>icons/breeze-dark/actions/16/filename-group-length.svg</file>
 <file>icons/breeze-dark/actions/16/filename-group-tracks.svg</file>
-<file>icons/breeze-dark/actions/16/filename-moodbar.svg</file>
 <file>icons/breeze-dark/actions/16/filename-initial-amarok.svg</file>
+<file>icons/breeze-dark/actions/16/filename-moodbar.svg</file>
 <file>icons/breeze-dark/actions/16/filename-slash-amarok.svg</file>
 <file>icons/breeze-dark/actions/16/filename-space-amarok.svg</file>
 <file>icons/breeze-dark/actions/16/filename-title-amarok.svg</file>
@@ -3185,7 +3185,6 @@
 <file>icons/breeze-dark/actions/24/transform-move-vertical.svg</file>
 <file>icons/breeze-dark/actions/24/transform-move.svg</file>
 <file>icons/breeze-dark/actions/24/transform-rotate.svg</file>
-<file>icons/breeze-dark/actions/24/view-sort-ascending-name.svg</file>
 <file>icons/breeze-dark/actions/24/transform-scale-textbox-points.svg</file>
 <file>icons/breeze-dark/actions/24/transform-scale.svg</file>
 <file>icons/breeze-dark/actions/24/transform-shear-down.svg</file>
@@ -3251,7 +3250,6 @@
 <file>icons/breeze-dark/actions/24/view-filter.svg</file>
 <file>icons/breeze-dark/actions/24/view-financial-account-add.svg</file>
 <file>icons/breeze-dark/actions/24/view-financial-account-asset-closed.svg</file>
-<file>icons/breeze-dark/actions/24/view-sidetree.svg</file>
 <file>icons/breeze-dark/actions/24/view-financial-account-cash-closed.svg</file>
 <file>icons/breeze-dark/actions/24/view-financial-account-cash.svg</file>
 <file>icons/breeze-dark/actions/24/view-financial-account-checking-closed.svg</file>
@@ -3321,6 +3319,8 @@
 <file>icons/breeze-dark/actions/24/view-restore.svg</file>
 <file>icons/breeze-dark/actions/24/view-right-close.svg</file>
 <file>icons/breeze-dark/actions/24/view-right-new.svg</file>
+<file>icons/breeze-dark/actions/24/view-sidetree.svg</file>
+<file>icons/breeze-dark/actions/24/view-sort-ascending-name.svg</file>
 <file>icons/breeze-dark/actions/24/view-sort-ascending.svg</file>
 <file>icons/breeze-dark/actions/24/view-sort-descending-name.svg</file>
 <file>icons/breeze-dark/actions/24/view-sort-descending.svg</file>
