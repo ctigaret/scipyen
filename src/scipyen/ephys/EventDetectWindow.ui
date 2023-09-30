@@ -883,7 +883,7 @@
   </action>
   <action name="actionOpen_Event_Template">
    <property name="icon">
-    <iconset theme="template">
+    <iconset theme="document-new-from-template">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -895,7 +895,7 @@
   </action>
   <action name="actionImport_Event_Template">
    <property name="icon">
-    <iconset theme="template">
+    <iconset theme="document-new-from-template">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -925,7 +925,7 @@
   </action>
   <action name="actionPlot_Data">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="labplot-xy-curve-segments">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -937,7 +937,7 @@
   </action>
   <action name="actionMake_Event_Detection_Epoch">
    <property name="icon">
-    <iconset theme="select">
+    <iconset theme="edit-select">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -982,7 +982,7 @@
   </action>
   <action name="actionClear_default_Event_Template">
    <property name="icon">
-    <iconset theme="remove">
+    <iconset theme="list-remove">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1078,7 +1078,7 @@
   </action>
   <action name="actionView_results">
    <property name="icon">
-    <iconset theme="quickview">
+    <iconset theme="view-visible">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1096,7 +1096,7 @@
   </action>
   <action name="actionUse_default_location_for_persistent_event_template">
    <property name="icon">
-    <iconset theme="mark-location">
+    <iconset theme="edit-paste-in-place">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1120,7 +1120,7 @@
   </action>
   <action name="actionForget_Event_Template">
    <property name="icon">
-    <iconset theme="delete">
+    <iconset theme="edit-delete">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1192,7 +1192,7 @@
   </action>
   <action name="actionPlot_detected_events">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="tag">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1204,7 +1204,7 @@
   </action>
   <action name="actionPlot_Event_template">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1216,7 +1216,7 @@
   </action>
   <action name="actionPlot_events_for_template">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1231,7 +1231,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1276,7 +1276,7 @@
   </action>
   <action name="actionLoad_default_event_Template">
    <property name="icon">
-    <iconset theme="template">
+    <iconset theme="document-new-from-template">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1324,7 +1324,7 @@
   </action>
   <action name="actionFilter_whole_data">
    <property name="icon">
-    <iconset theme="filter-symbolic">
+    <iconset theme="dialog-filters">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1354,7 +1354,7 @@
   </action>
   <action name="actionPreview_filtered_signal">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1366,7 +1366,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1390,7 +1390,7 @@
   </action>
   <action name="actionPlot_aligned_event_waveforms">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1414,7 +1414,7 @@
   </action>
   <action name="actionPlot_all_events">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1517,7 +1517,7 @@
   </action>
   <action name="actionPlot_all_accepted_events">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">

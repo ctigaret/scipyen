@@ -88,26 +88,30 @@ iconsdir = mpath / "gui" / "resources" / "icons"
 
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
-themePaths.append(":/icons")
-if iconsdir.is_dir():
-    themePaths.append(str(iconsdir))
-    QtGui.QIcon.setThemeSearchPaths(themePaths)
-    fbPaths.append(str(iconsdir))
-    QtGui.QIcon.setFallbackSearchPaths(fbPaths)
+# NOTE: 2023-09-30 15:49:27 
+# this below is ALWAYS added by default in the Qt resource system
+# themePaths.append(":/icons") 
+
+# if iconsdir.is_dir():
+#     themePaths.append(str(iconsdir))
+#     fbPaths.append(str(iconsdir))
     
-if hasQDarkTheme:
-    # qdarktheme.setup_theme("auto")
-    qdarktheme.enable_hi_dpi()
-    QtGui.QIcon.setThemeName("breeze-dark")
-else:
-    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-    _,_,v,_ = windowColor.getHsv()
-    if v > 128:
-        QtGui.QIcon.setThemeName("breeze")
-        QtGui.QIcon.setFallbackThemeName("breeze")
-    else:
-        QtGui.QIcon.setThemeName("breeze-dark")
-        QtGui.QIcon.setFallbackThemeName("breeze-dark")
+QtGui.QIcon.setThemeSearchPaths(themePaths)
+QtGui.QIcon.setFallbackSearchPaths(fbPaths)
+    
+# if hasQDarkTheme:
+#     # qdarktheme.setup_theme("auto")
+#     qdarktheme.enable_hi_dpi()
+#     QtGui.QIcon.setThemeName("breeze-dark")
+# else:
+#     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+#     _,_,v,_ = windowColor.getHsv()
+#     if v > 128:
+#         QtGui.QIcon.setThemeName("breeze")
+#         QtGui.QIcon.setFallbackThemeName("breeze")
+#     else:
+#         QtGui.QIcon.setThemeName("breeze-dark")
+#         QtGui.QIcon.setFallbackThemeName("breeze-dark")
         
 # NOTE: 2023-09-28 22:06:54
 # this should be necessary only on windows platform

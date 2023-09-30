@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>597</width>
-    <height>264</height>
+    <height>266</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -28,10 +28,13 @@
         <string>Name of the variable in the workspace</string>
        </property>
        <property name="frameShape">
-        <enum>QFrame::StyledPanel</enum>
+        <enum>QFrame::NoFrame</enum>
        </property>
        <property name="frameShadow">
         <enum>QFrame::Plain</enum>
+       </property>
+       <property name="lineWidth">
+        <number>0</number>
        </property>
        <property name="text">
         <string/>
@@ -319,6 +322,9 @@
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <property name="spacing">
+      <number>0</number>
+     </property>
      <item>
       <widget class="QToolButton" name="biometricsToolButton">
        <property name="toolTip">
@@ -336,6 +342,9 @@
        <property name="icon">
         <iconset theme="package">
          <normaloff>.</normaloff>.</iconset>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -357,6 +366,9 @@
         <iconset theme="configure">
          <normaloff>.</normaloff>.</iconset>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -376,6 +388,9 @@
        <property name="icon">
         <iconset theme="network-connect">
          <normaloff>.</normaloff>.</iconset>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -397,6 +412,9 @@
         <iconset theme="change-date-symbolic">
          <normaloff>.</normaloff>.</iconset>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -416,6 +434,9 @@
        <property name="icon">
         <iconset theme="settings-configure">
          <normaloff>.</normaloff>.</iconset>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -437,6 +458,9 @@
         <iconset theme="description">
          <normaloff>.</normaloff>.</iconset>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -456,6 +480,9 @@
        <property name="icon">
         <iconset theme="document-export">
          <normaloff>.</normaloff>.</iconset>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -477,6 +504,9 @@
         <iconset theme="document-save">
          <normaloff>.</normaloff>.</iconset>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -497,6 +527,9 @@
         <iconset theme="document-import">
          <normaloff>.</normaloff>.</iconset>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -516,6 +549,9 @@
        <property name="icon">
         <iconset theme="document-open">
          <normaloff>.</normaloff>.</iconset>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
        </property>
       </widget>
      </item>

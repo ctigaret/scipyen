@@ -3189,7 +3189,7 @@ Integral values are in the interval [0,5]
      <x>0</x>
      <y>0</y>
      <width>834</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="fileMenu">
@@ -3818,7 +3818,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionRemove_unit">
    <property name="icon">
-    <iconset theme="remove">
+    <iconset theme="list-remove">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -3830,7 +3830,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionBatch_extract_and_write">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
+    <iconset theme="document-export" resource="../gui/resources/resources.qrc">
      <normaloff>:/images/document-export_multiple.svg</normaloff>:/images/document-export_multiple.svg</iconset>
    </property>
    <property name="text">
