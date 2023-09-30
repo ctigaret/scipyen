@@ -937,7 +937,7 @@
   </action>
   <action name="actionMake_Event_Detection_Epoch">
    <property name="icon">
-    <iconset theme="select">
+    <iconset theme="edit-select">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
