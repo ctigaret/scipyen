@@ -1120,7 +1120,7 @@
   </action>
   <action name="actionForget_Event_Template">
    <property name="icon">
-    <iconset theme="delete">
+    <iconset theme="edit-delete">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1324,7 +1324,7 @@
   </action>
   <action name="actionFilter_whole_data">
    <property name="icon">
-    <iconset theme="filter-symbolic">
+    <iconset theme="view-filter">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
