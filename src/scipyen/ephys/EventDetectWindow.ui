@@ -1390,7 +1390,7 @@
   </action>
   <action name="actionPlot_aligned_event_waveforms">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1414,7 +1414,7 @@
   </action>
   <action name="actionPlot_all_events">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1517,7 +1517,7 @@
   </action>
   <action name="actionPlot_all_accepted_events">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
