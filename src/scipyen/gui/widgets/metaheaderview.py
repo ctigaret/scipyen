@@ -43,7 +43,7 @@ from core.datatypes import array_slice
 #### BEGIN pict.gui modules
 # from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 # from . import quickdialog
-# from gui import resources_rc
+from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
 

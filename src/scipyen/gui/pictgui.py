@@ -59,7 +59,7 @@ from core.workspacefunctions import debug_scipyen
 
 #### BEGIN pict.gui modules
 from . import quickdialog
-# from . import resources_rc # OK this is resources_rc.py
+from . import resources_rc # OK this is resources_rc.py
 # from . import icons_rc
 # NOTE: 2023-07-12 09:23:22 are these needed here? FIXME/TODO
 from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,

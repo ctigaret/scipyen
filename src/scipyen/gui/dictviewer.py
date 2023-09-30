@@ -65,7 +65,7 @@ from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel)
 from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from . import quickdialog
 
-# from . import resources_rc
+from . import resources_rc
 # from . import icons_rc
 #### END pict.gui modules
 
