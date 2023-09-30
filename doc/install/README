@@ -4,7 +4,14 @@ To run Scipyen the following requirements must be met:
     
     A python virtual environment:
         On Linux: use virtualenv
-        On windows: use Anaconda (conda) to create a conda environment
+        On windows & macOS: use mambaforge
+
+Further requirements:
+MacOS: a rust compiler is needed to build safetensors, needed by torch (from linguistics)
+	to install, get it from https://rustup.rs
+
+
+	
     
 
     
