@@ -1,147 +1,147 @@
 <!DOCTYPE RCC><RCC version="1.0">
-<qresource>
-<file>icons/breeze-dark/applets/128/user-ada-lovelace.svg</file>
-<file>icons/breeze-dark/applets/128/user-alice-in-wonderland.svg</file>
-<file>icons/breeze-dark/applets/128/user-grace-hopper.svg</file>
-<file>icons/breeze-dark/applets/128/user-leonardo-da-vinci.svg</file>
-<file>icons/breeze-dark/applets/128/user-mahatma-gandhi.svg</file>
-<file>icons/breeze-dark/applets/128/user-man.svg</file>
-<file>icons/breeze-dark/applets/128/user-mowgli.svg</file>
-<file>icons/breeze-dark/applets/128/user-none.svg</file>
-<file>icons/breeze-dark/applets/16/car.svg</file>
-<file>icons/breeze-dark/applets/22/car.svg</file>
-<file>icons/breeze-dark/applets/22/hands-free.svg</file>
-<file>icons/breeze-dark/applets/22/hifi.svg</file>
-<file>icons/breeze-dark/applets/22/portable.svg</file>
-<file>icons/breeze-dark/applets/24/car.svg</file>
-<file>icons/breeze-dark/applets/24/hands-free.svg</file>
-<file>icons/breeze-dark/applets/24/hifi.svg</file>
-<file>icons/breeze-dark/applets/24/portable.svg</file>
-<file>icons/breeze-dark/applets/256/applets-template.svg</file>
-<file>icons/breeze-dark/applets/256/empty.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.ktpcontactlist.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.muonnotifier.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.activitybar.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.analogclock.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.battery.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.binaryclock.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.calculator.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.calendar.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.clipboard.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.colorpicker.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.comic.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.devicenotifier.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.digitalclock.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.diskquota.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.fifteenpuzzle.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.folder.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.frame.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.fuzzyclock.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.icontasks.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.kicker.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.kickerdash.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.kickoff.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.kickofflegacy.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.mediacontroller.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.networkmanagement.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.notes.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.pager.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.quicklaunch.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.showActivityManager.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.systemloadviewer.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.cpu.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.diskactivity.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.diskusage.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.memory.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.net.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.systemtray.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.taskmanager.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.timer.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.userswitcher.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.vault.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.volume.svg</file>
-<file>icons/breeze-dark/applets/256/org.kde.plasma.windowlist.svg</file>
-<file>icons/breeze-dark/applets/48/weather-clear-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-clear-wind-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-clear-wind.svg</file>
-<file>icons/breeze-dark/applets/48/weather-clear.svg</file>
-<file>icons/breeze-dark/applets/48/weather-clouds-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-clouds-wind-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-clouds-wind.svg</file>
-<file>icons/breeze-dark/applets/48/weather-clouds.svg</file>
-<file>icons/breeze-dark/applets/48/weather-few-clouds-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-few-clouds-wind-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-few-clouds-wind.svg</file>
-<file>icons/breeze-dark/applets/48/weather-few-clouds.svg</file>
-<file>icons/breeze-dark/applets/48/weather-freezing-rain.svg</file>
-<file>icons/breeze-dark/applets/48/weather-hail.svg</file>
-<file>icons/breeze-dark/applets/48/weather-many-clouds-wind.svg</file>
-<file>icons/breeze-dark/applets/48/weather-many-clouds.svg</file>
-<file>icons/breeze-dark/applets/48/weather-mist.svg</file>
-<file>icons/breeze-dark/applets/48/weather-none-available.svg</file>
-<file>icons/breeze-dark/applets/48/weather-showers-day.svg</file>
-<file>icons/breeze-dark/applets/48/weather-showers-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-showers-scattered-day.svg</file>
-<file>icons/breeze-dark/applets/48/weather-showers-scattered-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-showers-scattered.svg</file>
-<file>icons/breeze-dark/applets/48/weather-showers.svg</file>
-<file>icons/breeze-dark/applets/48/weather-snow-rain.svg</file>
-<file>icons/breeze-dark/applets/48/weather-snow-scattered-day.svg</file>
-<file>icons/breeze-dark/applets/48/weather-snow-scattered-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-snow-scattered.svg</file>
-<file>icons/breeze-dark/applets/48/weather-snow.svg</file>
-<file>icons/breeze-dark/applets/48/weather-storm-day.svg</file>
-<file>icons/breeze-dark/applets/48/weather-storm-night.svg</file>
-<file>icons/breeze-dark/applets/48/weather-storm.svg</file>
-<file>icons/breeze-dark/applets/64/osd-duplicate.svg</file>
-<file>icons/breeze-dark/applets/64/osd-rotate-ccw.svg</file>
-<file>icons/breeze-dark/applets/64/osd-rotate-cw.svg</file>
-<file>icons/breeze-dark/applets/64/osd-rotate-flip.svg</file>
-<file>icons/breeze-dark/applets/64/osd-rotate-normal.svg</file>
-<file>icons/breeze-dark/applets/64/osd-sbs-left.svg</file>
-<file>icons/breeze-dark/applets/64/osd-sbs-sright.svg</file>
-<file>icons/breeze-dark/applets/64/osd-shutd-laptop.svg</file>
-<file>icons/breeze-dark/applets/64/osd-shutd-screen.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-blur.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-contrast.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-coverswitch.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-cubeslide.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-desktopgrid.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-dialog-parent.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-diminactive.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-dimscreen.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-fade.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-fadedesktop.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-fallapart.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-flipswitch.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-glide.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-highlightwindow.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-invert.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-kscreen.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-login.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-logout.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-magiclamp.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-magnifier.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-maximize.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-minimize.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-mouseclick.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-mousemark.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-presentwindows.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-resize.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-scale-in.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-screenedge.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-screenshot.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-showfps.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-showpaint.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-slide.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-slideback.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-slidingpopups.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-startupfeedback.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-thumbnailaside.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-trackmouse.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-translucency.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-windowaperture.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-wobblywindows.svg</file>
-<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-zoom.svg</file>
-</qresource>
+	<qresource>
+		<file>icons/breeze-dark/applets/128/user-ada-lovelace.svg</file>
+		<file>icons/breeze-dark/applets/128/user-alice-in-wonderland.svg</file>
+		<file>icons/breeze-dark/applets/128/user-grace-hopper.svg</file>
+		<file>icons/breeze-dark/applets/128/user-leonardo-da-vinci.svg</file>
+		<file>icons/breeze-dark/applets/128/user-mahatma-gandhi.svg</file>
+		<file>icons/breeze-dark/applets/128/user-man.svg</file>
+		<file>icons/breeze-dark/applets/128/user-mowgli.svg</file>
+		<file>icons/breeze-dark/applets/128/user-none.svg</file>
+		<file>icons/breeze-dark/applets/16/car.svg</file>
+		<file>icons/breeze-dark/applets/22/car.svg</file>
+		<file>icons/breeze-dark/applets/22/hands-free.svg</file>
+		<file>icons/breeze-dark/applets/22/hifi.svg</file>
+		<file>icons/breeze-dark/applets/22/portable.svg</file>
+		<file>icons/breeze-dark/applets/24/car.svg</file>
+		<file>icons/breeze-dark/applets/24/hands-free.svg</file>
+		<file>icons/breeze-dark/applets/24/hifi.svg</file>
+		<file>icons/breeze-dark/applets/24/portable.svg</file>
+		<file>icons/breeze-dark/applets/256/applets-template.svg</file>
+		<file>icons/breeze-dark/applets/256/empty.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.ktpcontactlist.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.muonnotifier.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.activitybar.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.analogclock.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.battery.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.binaryclock.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.calculator.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.calendar.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.clipboard.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.colorpicker.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.comic.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.devicenotifier.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.digitalclock.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.diskquota.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.fifteenpuzzle.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.folder.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.frame.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.fuzzyclock.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.icontasks.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.kicker.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.kickerdash.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.kickoff.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.kickofflegacy.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.mediacontroller.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.networkmanagement.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.notes.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.pager.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.quicklaunch.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.showActivityManager.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.systemloadviewer.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.cpu.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.diskactivity.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.diskusage.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.memory.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.systemmonitor.net.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.systemtray.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.taskmanager.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.timer.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.userswitcher.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.vault.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.volume.svg</file>
+		<file>icons/breeze-dark/applets/256/org.kde.plasma.windowlist.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-clear-wind-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-clear-wind.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-clouds-wind-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-clouds-wind.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-few-clouds-wind-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-few-clouds-wind.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-many-clouds-wind.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-mist.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-storm-day.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-storm-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-clear-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-clear.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-clouds-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-clouds.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-few-clouds-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-few-clouds.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-freezing-rain.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-hail.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-many-clouds.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-none-available.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-showers-day.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-showers-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-showers-scattered-day.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-showers-scattered-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-showers-scattered.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-showers.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-snow-rain.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-snow-scattered-day.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-snow-scattered-night.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-snow-scattered.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-snow.svg</file>
+		<file>icons/breeze-dark/applets/48/weather-storm.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-duplicate.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-rotate-ccw.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-rotate-cw.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-rotate-flip.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-rotate-normal.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-sbs-left.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-sbs-sright.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-shutd-laptop.svg</file>
+		<file>icons/breeze-dark/applets/64/osd-shutd-screen.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-blur.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-contrast.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-coverswitch.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-cubeslide.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-desktopgrid.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-dialog-parent.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-diminactive.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-dimscreen.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-fade.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-fadedesktop.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-fallapart.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-flipswitch.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-glide.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-highlightwindow.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-invert.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-kscreen.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-login.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-logout.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-magiclamp.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-magnifier.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-maximize.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-minimize.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-mouseclick.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-mousemark.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-presentwindows.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-resize.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-scale-in.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-screenedge.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-screenshot.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-showfps.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-showpaint.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-slide.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-slideback.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-slidingpopups.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-startupfeedback.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-thumbnailaside.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-trackmouse.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-translucency.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-windowaperture.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-wobblywindows.svg</file>
+		<file>icons/breeze-dark/applets/64/preferences-system-windows-effect-zoom.svg</file>
+	</qresource>
 </RCC>

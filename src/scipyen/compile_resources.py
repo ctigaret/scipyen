@@ -27,9 +27,9 @@ for d in iconsthemesdir:
     # print(f"local_theme_file_for_qrc = {local_theme_file_for_qrc}")
     with open(str(qrc_icontheme_path), mode="w") as qrc_icontheme_file:
         qrc_icontheme_file.write(f"<!DOCTYPE RCC><RCC version=\"1.0\">\n")
-        qrc_icontheme_file.write("<qresource>\n")
-        qrc_icontheme_file.write(f"<file>{str(index_file)}</file>\n")
-        qrc_icontheme_file.write("</qresource>\n")
+        qrc_icontheme_file.write("\t<qresource>\n")
+        qrc_icontheme_file.write(f"\t\t<file>{str(index_file)}</file>\n")
+        qrc_icontheme_file.write("\t</qresource>\n")
         qrc_icontheme_file.write("</RCC>\n")
         
     subprocess.run(["pyrcc5", "-threshold", "70", "-compress", "90", "-o", rc_icontheme_py, str(qrc_icontheme_path)], shell=False)
@@ -49,7 +49,7 @@ for d in iconsthemesdir:
             # qrc_file.write(f"<qresource prefix=\"{prefix}\">\n")
             # qrc_file.write("<qresource prefix=\"/\">\n")
             # qrc_file.write(f"<qresource prefix=\"{str(iconsdir.parent)}\">\n")
-            qrc_file.write("<qresource>\n")
+            qrc_file.write("\t<qresource>\n")
             # qrc_write(f"<file>{index_file.name}</file>\n")
             for f in sd.glob("**/*.svg"):
                 parts = [p for p in f.parts if p not in resourcesdir.parts]
@@ -62,11 +62,11 @@ for d in iconsthemesdir:
                     o_parts = [p for p in original.parts if p not in resourcesdir.parts]
                     local_o = pathlib.Path(*o_parts)
                     original_name = str(local_o)
-                    qrc_file.write(f"<file alias=\"{original_name}\">{f_name}</file>\n")
+                    qrc_file.write(f"\t\t<file alias=\"{original_name}\">{f_name}</file>\n")
                 else:
-                    qrc_file.write(f"<file>{f_name}</file>\n")
+                    qrc_file.write(f"\t\t<file>{f_name}</file>\n")
                     
-            qrc_file.write("</qresource>\n")
+            qrc_file.write("\t</qresource>\n")
             qrc_file.write("</RCC>\n") 
             
         subprocess.run(["pyrcc5", "-threshold", "70", "-compress", "90", "-o", str(rc_path), str(qrc_path)], shell=False)

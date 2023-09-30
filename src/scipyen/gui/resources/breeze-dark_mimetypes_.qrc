@@ -1,824 +1,824 @@
 <!DOCTYPE RCC><RCC version="1.0">
-<qresource>
-<file>icons/breeze-dark/mimetypes/16/android-package-archive.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-atom+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-certificate.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-dicom.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-epub+zip.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-illustrator.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-json.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-msonenote.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-msoutlook.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-msword-template.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-msword.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-octet-stream.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-ogg.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-pdf.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-pgp-encrypted.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-pgp-signature.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-postscript.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.appimage.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.apple.pkpass.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.flatpak.ref.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.iccprofile.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-access.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-excel.addin.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-excel.template.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-infopath.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-powerpoint.addin.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-powerpoint.template.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-publisher.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.nokia.xml.qt.resource.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.chart.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.database.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.formula-template.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.formula.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.presentation-template.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.spreadsheet-template.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.text-template.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.web-template.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-vnd.visio.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-ace.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-apple-diskimage.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-ar.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-arc.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-arj.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-audacity-project.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-bittorrent.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-blender.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-bzdvi.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-bzip-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-bzip.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-cd-image.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-cda.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-chm.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-deb.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-designer.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-desktop.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-fictionbook+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-font-afm.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-font-bdf.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-font-otf.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-font-ttf.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-font-type1.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-gdscript.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-gettext-translation.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-godot-project.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-godot-resource.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-godot-scene.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-godot-shader.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-gzip.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-gzpostscript.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-java-archive.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-java.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-javascript.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-kdenlivetitle.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-kexi-connectiondata.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-kexiproject-shortcut.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-kmymoney.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-kplato.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-krita.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-kvtml.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-lyx.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-lzma-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-lzop.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-m4.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-macbinary.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-marble.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-ms-dos-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-msdownload.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-partial-download.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-pem-key.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-perl.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-php.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-plasma.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-python-bytecode.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-rar.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-rdata.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-root.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-rpm.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-ruby.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-sharedlib.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-shockwave-flash.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-skg.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-skgc.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-smb-workgroup.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-srt.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-tarz.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-theme.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-trash.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-tzo.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-wmf.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-xliff.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-x-zerosize.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-xhtml+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-xmind.svg</file>
-<file>icons/breeze-dark/mimetypes/16/application-zip.svg</file>
-<file>icons/breeze-dark/mimetypes/16/audio-midi.svg</file>
-<file>icons/breeze-dark/mimetypes/16/audio-x-flac.svg</file>
-<file>icons/breeze-dark/mimetypes/16/audio-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/16/audio-x-mpeg.svg</file>
-<file>icons/breeze-dark/mimetypes/16/audio-x-wav.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-bmp.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-gif.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-jpeg.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-png.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-svg+xml-compressed.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-tiff.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-vnd.dgn.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-vnd.djvu.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-vnd.dwg.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-x-adobe-dng.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-x-ico.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-x-psd.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-x-tga.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-x-vnd.trolltech.qpicture.svg</file>
-<file>icons/breeze-dark/mimetypes/16/image-x-xcf.svg</file>
-<file>icons/breeze-dark/mimetypes/16/message-news.svg</file>
-<file>icons/breeze-dark/mimetypes/16/message-partial.svg</file>
-<file>icons/breeze-dark/mimetypes/16/message-rfc822.svg</file>
-<file>icons/breeze-dark/mimetypes/16/package-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-css.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-csv.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-dockerfile.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-fortran.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-html.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-rtf.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-rust.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-vnd.abc.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-wiki.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-adasrc.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-apport.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-authors.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-c++hdr.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-c++src.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-changelog.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-chdr.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-cmake.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-csharp.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-csrc.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-go.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-haskell.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-hex.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-install.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-kotlin.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-lua.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-markdown.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-pascal.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-patch.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-po.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-python.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-qml.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-r.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-rpm-spec.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-scala.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-script.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-tcl.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-tex.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-x-texinfo.svg</file>
-<file>icons/breeze-dark/mimetypes/16/text-xml.svg</file>
-<file>icons/breeze-dark/mimetypes/16/video-mp4.svg</file>
-<file>icons/breeze-dark/mimetypes/16/video-webm.svg</file>
-<file>icons/breeze-dark/mimetypes/16/video-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/16/video-x-matroska.svg</file>
-<file>icons/breeze-dark/mimetypes/16/video-x-theora+ogg.svg</file>
-<file>icons/breeze-dark/mimetypes/16/video-x-wmv.svg</file>
-<file>icons/breeze-dark/mimetypes/16/virtualbox-hdd.svg</file>
-<file>icons/breeze-dark/mimetypes/16/virtualbox-ova.svg</file>
-<file>icons/breeze-dark/mimetypes/16/virtualbox-ovf.svg</file>
-<file>icons/breeze-dark/mimetypes/16/virtualbox-vbox-extpack.svg</file>
-<file>icons/breeze-dark/mimetypes/16/virtualbox-vbox.svg</file>
-<file>icons/breeze-dark/mimetypes/16/virtualbox-vdi.svg</file>
-<file>icons/breeze-dark/mimetypes/16/virtualbox-vmdk.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-kde-nsplugin-generated.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-media-podcast.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-office-address-book.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-office-calendar.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-office-contact.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-office-document.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-office-drawing.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-office-presentation.svg</file>
-<file>icons/breeze-dark/mimetypes/16/x-office-spreadsheet.svg</file>
-<file>icons/breeze-dark/mimetypes/22/android-package-archive.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-atom+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-certificate.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-dicom.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-epub+zip.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-illustrator.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-json.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-msonenote.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-msoutlook.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-msword-template.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-msword.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-octet-stream.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-ogg.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-pdf.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-pgp-encrypted.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-pgp-signature.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-postscript.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.appimage.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.apple.pkpass.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.flatpak.ref.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.iccprofile.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-access.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-excel.addin.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-excel.template.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-infopath.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-powerpoint.addin.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-powerpoint.template.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-publisher.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.nokia.xml.qt.resource.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.chart.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.database.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.formula-template.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.formula.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.presentation-template.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.spreadsheet-template.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.text-template.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.web-template.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-vnd.visio.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-ace.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-apple-diskimage.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-ar.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-arc.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-arj.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-audacity-project.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-bittorrent.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-blender.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-bzdvi.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-bzip-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-bzip.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-cd-image.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-cda.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-chm.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-deb.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-designer.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-desktop.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-fictionbook+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-font-afm.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-font-bdf.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-font-otf.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-font-ttf.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-font-type1.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-gdscript.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-gettext-translation.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-godot-project.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-godot-resource.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-godot-scene.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-godot-shader.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-gzip.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-gzpostscript.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-java-archive.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-java.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-javascript.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-kdenlivetitle.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-kexi-connectiondata.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-kexiproject-shortcut.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-kmymoney.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-kplato.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-krita.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-kvtml.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-lyx.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-lzma-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-lzop.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-m4.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-macbinary.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-marble.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-ms-dos-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-msdownload.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-partial-download.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-pem-key.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-perl.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-php.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-plasma.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-python-bytecode.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-rar.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-rdata.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-root.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-rpm.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-ruby.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-sharedlib.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-shockwave-flash.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-skg.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-skgc.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-smb-workgroup.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-srt.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-tarz.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-theme.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-trash.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-tzo.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-wmf.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-xliff.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-x-zerosize.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-xhtml+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-xmind.svg</file>
-<file>icons/breeze-dark/mimetypes/22/application-zip.svg</file>
-<file>icons/breeze-dark/mimetypes/22/audio-midi.svg</file>
-<file>icons/breeze-dark/mimetypes/22/audio-x-flac.svg</file>
-<file>icons/breeze-dark/mimetypes/22/audio-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/22/audio-x-mpeg.svg</file>
-<file>icons/breeze-dark/mimetypes/22/audio-x-wav.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-bmp.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-gif.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-jpeg.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-png.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-svg+xml-compressed.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-tiff.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-vnd.dgn.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-vnd.djvu.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-vnd.dwg.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-x-adobe-dng.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-x-ico.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-x-psd.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-x-tga.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-x-vnd.trolltech.qpicture.svg</file>
-<file>icons/breeze-dark/mimetypes/22/image-x-xcf.svg</file>
-<file>icons/breeze-dark/mimetypes/22/message-news.svg</file>
-<file>icons/breeze-dark/mimetypes/22/message-partial.svg</file>
-<file>icons/breeze-dark/mimetypes/22/message-rfc822.svg</file>
-<file>icons/breeze-dark/mimetypes/22/package-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-css.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-csv.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-dockerfile.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-fortran.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-html.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-rtf.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-rust.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-vnd.abc.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-wiki.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-adasrc.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-apport.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-authors.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-c++hdr.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-c++src.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-changelog.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-chdr.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-cmake.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-csharp.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-csrc.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-go.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-haskell.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-hex.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-install.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-kotlin.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-lua.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-markdown.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-pascal.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-patch.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-po.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-python.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-qml.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-r.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-rpm-spec.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-scala.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-script.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-tcl.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-tex.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-x-texinfo.svg</file>
-<file>icons/breeze-dark/mimetypes/22/text-xml.svg</file>
-<file>icons/breeze-dark/mimetypes/22/video-mp4.svg</file>
-<file>icons/breeze-dark/mimetypes/22/video-webm.svg</file>
-<file>icons/breeze-dark/mimetypes/22/video-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/22/video-x-matroska.svg</file>
-<file>icons/breeze-dark/mimetypes/22/video-x-theora+ogg.svg</file>
-<file>icons/breeze-dark/mimetypes/22/video-x-wmv.svg</file>
-<file>icons/breeze-dark/mimetypes/22/virtualbox-hdd.svg</file>
-<file>icons/breeze-dark/mimetypes/22/virtualbox-ova.svg</file>
-<file>icons/breeze-dark/mimetypes/22/virtualbox-ovf.svg</file>
-<file>icons/breeze-dark/mimetypes/22/virtualbox-vbox-extpack.svg</file>
-<file>icons/breeze-dark/mimetypes/22/virtualbox-vbox.svg</file>
-<file>icons/breeze-dark/mimetypes/22/virtualbox-vdi.svg</file>
-<file>icons/breeze-dark/mimetypes/22/virtualbox-vmdk.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-kde-nsplugin-generated.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-media-podcast.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-office-address-book.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-office-calendar.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-office-contact.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-office-document.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-office-drawing.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-office-presentation.svg</file>
-<file>icons/breeze-dark/mimetypes/22/x-office-spreadsheet.svg</file>
-<file>icons/breeze-dark/mimetypes/24/application-x-fictionbook+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/24/application-x-ms-dos-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/32/android-package-archive.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-atom+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-certificate.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-dicom.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-epub+zip.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-illustrator.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-json.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-msonenote.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-msoutlook.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-msword-template.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-msword.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-octet-stream.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-ogg.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-pdf.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-pgp-encrypted.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-pgp-signature.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-postscript.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.appimage.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.apple.pkpass.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.flatpak.ref.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.iccprofile.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-access.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-excel.addin.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-excel.template.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-infopath.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-powerpoint.addin.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-powerpoint.template.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-publisher.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.nokia.xml.qt.resource.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.chart.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.database.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.formula-template.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.formula.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.presentation-template.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.spreadsheet-template.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.text-template.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.web-template.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-vnd.visio.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-ace.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-apple-diskimage.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-ar.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-arc.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-arj.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-audacity-project.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-bittorrent.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-blender.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-bzdvi.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-bzip-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-bzip.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-cd-image.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-cda.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-chm.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-deb.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-designer.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-desktop.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-fictionbook+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-font-afm.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-font-bdf.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-font-otf.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-font-ttf.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-font-type1.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-gdscript.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-gettext-translation.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-godot-project.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-godot-resource.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-godot-scene.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-godot-shader.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-gzip.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-gzpostscript.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-java-archive.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-java.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-javascript.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-kdenlivetitle.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-kexi-connectiondata.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-kexiproject-shortcut.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-kmymoney.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-kplato.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-krita.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-kvtml.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-lyx.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-lzma-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-lzop.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-m4.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-macbinary.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-marble.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-ms-dos-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-ms-shortcut.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-msdownload.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-partial-download.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-pem-key.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-perl.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-php.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-plasma.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-python-bytecode.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-rar.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-root.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-rpm.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-ruby.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-sharedlib.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-shockwave-flash.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-skg.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-skgc.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-smb-workgroup.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-srt.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-tarz.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-theme.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-trash.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-tzo.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-wmf.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-xliff.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-x-zerosize.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-xhtml+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-xmind.svg</file>
-<file>icons/breeze-dark/mimetypes/32/application-zip.svg</file>
-<file>icons/breeze-dark/mimetypes/32/audio-midi.svg</file>
-<file>icons/breeze-dark/mimetypes/32/audio-x-flac.svg</file>
-<file>icons/breeze-dark/mimetypes/32/audio-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/32/audio-x-mpeg.svg</file>
-<file>icons/breeze-dark/mimetypes/32/audio-x-wav.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-bmp.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-gif.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-jpeg.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-png.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-svg+xml-compressed.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-tiff.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-vnd.dgn.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-vnd.djvu.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-vnd.dwg.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-x-adobe-dng.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-x-ico.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-x-psd.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-x-tga.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-x-vnd.trolltech.qpicture.svg</file>
-<file>icons/breeze-dark/mimetypes/32/image-x-xcf.svg</file>
-<file>icons/breeze-dark/mimetypes/32/message-news.svg</file>
-<file>icons/breeze-dark/mimetypes/32/message-partial.svg</file>
-<file>icons/breeze-dark/mimetypes/32/message-rfc822.svg</file>
-<file>icons/breeze-dark/mimetypes/32/package-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/32/preferences-desktop-cryptography.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-css.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-csv.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-dockerfile.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-fortran.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-html.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-rtf.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-rust.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-vnd.abc.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-wiki.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-adasrc.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-apport.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-authors.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-c++hdr.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-c++src.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-changelog.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-chdr.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-cmake.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-csharp.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-csrc.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-go.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-haskell.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-hex.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-install.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-kotlin.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-lua.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-markdown.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-pascal.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-patch.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-po.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-python.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-qml.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-r.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-rpm-spec.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-scala.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-script.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-tcl.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-tex.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-x-texinfo.svg</file>
-<file>icons/breeze-dark/mimetypes/32/text-xml.svg</file>
-<file>icons/breeze-dark/mimetypes/32/video-mp4.svg</file>
-<file>icons/breeze-dark/mimetypes/32/video-webm.svg</file>
-<file>icons/breeze-dark/mimetypes/32/video-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/32/video-x-matroska.svg</file>
-<file>icons/breeze-dark/mimetypes/32/video-x-theora+ogg.svg</file>
-<file>icons/breeze-dark/mimetypes/32/video-x-wmv.svg</file>
-<file>icons/breeze-dark/mimetypes/32/virtualbox-hdd.svg</file>
-<file>icons/breeze-dark/mimetypes/32/virtualbox-ova.svg</file>
-<file>icons/breeze-dark/mimetypes/32/virtualbox-ovf.svg</file>
-<file>icons/breeze-dark/mimetypes/32/virtualbox-vbox-extpack.svg</file>
-<file>icons/breeze-dark/mimetypes/32/virtualbox-vbox.svg</file>
-<file>icons/breeze-dark/mimetypes/32/virtualbox-vdi.svg</file>
-<file>icons/breeze-dark/mimetypes/32/virtualbox-vmdk.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-kde-nsplugin-generated.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-media-podcast.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-office-address-book.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-office-calendar.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-office-contact.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-office-document.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-office-drawing.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-office-presentation.svg</file>
-<file>icons/breeze-dark/mimetypes/32/x-office-spreadsheet.svg</file>
-<file>icons/breeze-dark/mimetypes/64/android-package-archive.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-atom+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-certificate.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-dicom.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-epub+zip.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-illustrator.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-json.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-msonenote.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-msoutlook.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-msword-template.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-msword.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-octet-stream.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-ogg.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-pdf.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-pgp-encrypted.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-pgp-signature.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-postscript.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.appimage.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.apple.pkpass.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.flatpak.ref.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.iccprofile.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-access.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-excel.addin.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-excel.template.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-infopath.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-powerpoint.addin.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-powerpoint.template.macroenabled.12.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-publisher.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.nokia.xml.qt.resource.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.chart.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.database.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.formula-template.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.formula.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.presentation-template.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.spreadsheet-template.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.text-template.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.web-template.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-vnd.visio.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-ace.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-apple-diskimage.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-ar.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-arc.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-arj.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-audacity-project.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-bittorrent.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-blender.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-bzdvi.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-bzip-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-bzip.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-cd-image.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-cda.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-chm.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-deb.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-designer.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-desktop.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-fictionbook+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-font-afm.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-font-bdf.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-font-otf.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-font-ttf.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-font-type1.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-gdscript.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-gettext-translation.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-godot-project.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-godot-resource.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-godot-scene.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-godot-shader.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-gzip.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-gzpostscript.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-java-archive.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-java.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-javascript.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-kdenlivetitle.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-kexi-connectiondata.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-kexiproject-shortcut.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-kmymoney.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-kplato.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-krita.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-kvtml.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-labplot2.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-lyx.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-lzma-compressed-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-lzop.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-m4.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-macbinary.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-marble.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-ms-dos-executable.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-ms-shortcut.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-msdownload.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-partial-download.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-pem-key.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-perl.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-php.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-plasma.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-python-bytecode.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-rar.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-root.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-rpm.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-ruby.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-sharedlib.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-shockwave-flash.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-skg.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-skgc.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-smb-workgroup.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-srt.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-tar.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-tarz.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-theme.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-trash.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-tzo.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-wmf.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-xliff.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-x-zerosize.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-xhtml+xml.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-xmind.svg</file>
-<file>icons/breeze-dark/mimetypes/64/application-zip.svg</file>
-<file>icons/breeze-dark/mimetypes/64/audio-midi.svg</file>
-<file>icons/breeze-dark/mimetypes/64/audio-x-flac.svg</file>
-<file>icons/breeze-dark/mimetypes/64/audio-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/64/audio-x-mpeg.svg</file>
-<file>icons/breeze-dark/mimetypes/64/audio-x-wav.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-bmp.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-gif.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-jpeg.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-png.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-svg+xml-compressed.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-tiff.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-vnd.dgn.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-vnd.djvu.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-vnd.dwg.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-x-adobe-dng.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-x-ico.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-x-psd.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-x-tga.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-x-vnd.trolltech.qpicture.svg</file>
-<file>icons/breeze-dark/mimetypes/64/image-x-xcf.svg</file>
-<file>icons/breeze-dark/mimetypes/64/message-news.svg</file>
-<file>icons/breeze-dark/mimetypes/64/message-partial.svg</file>
-<file>icons/breeze-dark/mimetypes/64/message-rfc822.svg</file>
-<file>icons/breeze-dark/mimetypes/64/package-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-css.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-csv.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-dockerfile.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-html.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-rtf.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-rust.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-vnd.abc.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-wiki.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-adasrc.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-apport.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-authors.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-c++hdr.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-c++src.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-changelog.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-chdr.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-cmake.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-csharp.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-csrc.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-go.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-haskell.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-hex.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-install.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-kotlin.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-lua.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-markdown.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-pascal.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-patch.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-po.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-python.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-qml.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-r.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-rpm-spec.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-sass.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-scala.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-script.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-tcl.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-tex.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-x-texinfo.svg</file>
-<file>icons/breeze-dark/mimetypes/64/text-xml.svg</file>
-<file>icons/breeze-dark/mimetypes/64/video-mp4.svg</file>
-<file>icons/breeze-dark/mimetypes/64/video-webm.svg</file>
-<file>icons/breeze-dark/mimetypes/64/video-x-generic.svg</file>
-<file>icons/breeze-dark/mimetypes/64/video-x-matroska.svg</file>
-<file>icons/breeze-dark/mimetypes/64/video-x-theora+ogg.svg</file>
-<file>icons/breeze-dark/mimetypes/64/video-x-wmv.svg</file>
-<file>icons/breeze-dark/mimetypes/64/virtualbox-hdd.svg</file>
-<file>icons/breeze-dark/mimetypes/64/virtualbox-ova.svg</file>
-<file>icons/breeze-dark/mimetypes/64/virtualbox-ovf.svg</file>
-<file>icons/breeze-dark/mimetypes/64/virtualbox-vbox-extpack.svg</file>
-<file>icons/breeze-dark/mimetypes/64/virtualbox-vbox.svg</file>
-<file>icons/breeze-dark/mimetypes/64/virtualbox-vdi.svg</file>
-<file>icons/breeze-dark/mimetypes/64/virtualbox-vmdk.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-kde-nsplugin-generated.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-media-podcast.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-office-address-book.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-office-calendar.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-office-contact.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-office-document.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-office-drawing.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-office-presentation.svg</file>
-<file>icons/breeze-dark/mimetypes/64/x-office-spreadsheet.svg</file>
-</qresource>
+	<qresource>
+		<file>icons/breeze-dark/mimetypes/16/android-package-archive.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-atom+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-certificate.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-dicom.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-epub+zip.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-illustrator.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-json.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-msonenote.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-msoutlook.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-msword-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-msword.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-octet-stream.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-ogg.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-pdf.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-pgp-encrypted.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-pgp-signature.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-postscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.appimage.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.apple.pkpass.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.flatpak.ref.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.iccprofile.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-access.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-excel.addin.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-excel.template.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-infopath.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-powerpoint.addin.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-powerpoint.template.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.ms-publisher.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.nokia.xml.qt.resource.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.chart.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.database.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.formula-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.formula.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.presentation-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.spreadsheet-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.text-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.oasis.opendocument.web-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-vnd.visio.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-ace.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-apple-diskimage.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-ar.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-arc.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-arj.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-audacity-project.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-bittorrent.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-blender.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-bzdvi.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-bzip-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-bzip.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-cd-image.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-cda.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-chm.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-deb.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-designer.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-desktop.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-fictionbook+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-font-afm.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-font-bdf.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-font-otf.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-font-ttf.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-font-type1.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-gdscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-gettext-translation.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-godot-project.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-godot-resource.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-godot-scene.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-godot-shader.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-gzip.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-gzpostscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-java-archive.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-java.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-javascript.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-kdenlivetitle.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-kexi-connectiondata.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-kexiproject-shortcut.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-kmymoney.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-kplato.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-krita.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-kvtml.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-lyx.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-lzma-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-lzop.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-m4.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-macbinary.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-marble.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-ms-dos-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-msdownload.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-partial-download.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-pem-key.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-perl.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-php.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-plasma.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-python-bytecode.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-rar.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-rdata.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-root.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-rpm.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-ruby.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-sharedlib.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-shockwave-flash.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-skg.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-skgc.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-smb-workgroup.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-srt.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-tarz.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-theme.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-trash.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-tzo.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-wmf.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-xliff.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-x-zerosize.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-xhtml+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-xmind.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/application-zip.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/audio-midi.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/audio-x-flac.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/audio-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/audio-x-mpeg.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/audio-x-wav.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-bmp.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-gif.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-jpeg.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-png.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-svg+xml-compressed.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-tiff.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-vnd.dgn.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-vnd.djvu.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-vnd.dwg.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-x-adobe-dng.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-x-ico.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-x-psd.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-x-tga.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-x-vnd.trolltech.qpicture.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/image-x-xcf.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/message-news.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/message-partial.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/message-rfc822.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/package-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-css.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-csv.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-dockerfile.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-fortran.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-html.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-rtf.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-rust.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-vnd.abc.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-wiki.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-adasrc.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-apport.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-authors.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-c++hdr.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-c++src.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-changelog.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-chdr.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-cmake.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-csharp.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-csrc.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-go.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-haskell.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-hex.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-install.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-kotlin.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-lua.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-markdown.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-pascal.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-patch.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-po.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-python.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-qml.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-r.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-rpm-spec.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-scala.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-script.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-tcl.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-tex.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-x-texinfo.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/text-xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/video-mp4.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/video-webm.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/video-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/video-x-matroska.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/video-x-theora+ogg.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/video-x-wmv.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/virtualbox-hdd.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/virtualbox-ova.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/virtualbox-ovf.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/virtualbox-vbox-extpack.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/virtualbox-vbox.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/virtualbox-vdi.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/virtualbox-vmdk.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-kde-nsplugin-generated.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-media-podcast.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-office-address-book.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-office-calendar.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-office-contact.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-office-document.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-office-drawing.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-office-presentation.svg</file>
+		<file>icons/breeze-dark/mimetypes/16/x-office-spreadsheet.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/android-package-archive.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-atom+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-certificate.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-dicom.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-epub+zip.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-illustrator.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-json.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-msonenote.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-msoutlook.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-msword-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-msword.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-octet-stream.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-ogg.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-pdf.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-pgp-encrypted.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-pgp-signature.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-postscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.appimage.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.apple.pkpass.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.flatpak.ref.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.iccprofile.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-access.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-excel.addin.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-excel.template.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-infopath.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-powerpoint.addin.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-powerpoint.template.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.ms-publisher.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.nokia.xml.qt.resource.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.chart.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.database.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.formula-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.formula.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.presentation-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.spreadsheet-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.text-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.oasis.opendocument.web-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-vnd.visio.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-ace.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-apple-diskimage.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-ar.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-arc.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-arj.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-audacity-project.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-bittorrent.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-blender.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-bzdvi.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-bzip-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-bzip.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-cd-image.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-cda.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-chm.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-deb.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-designer.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-desktop.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-fictionbook+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-font-afm.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-font-bdf.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-font-otf.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-font-ttf.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-font-type1.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-gdscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-gettext-translation.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-godot-project.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-godot-resource.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-godot-scene.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-godot-shader.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-gzip.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-gzpostscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-java-archive.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-java.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-javascript.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-kdenlivetitle.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-kexi-connectiondata.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-kexiproject-shortcut.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-kmymoney.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-kplato.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-krita.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-kvtml.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-lyx.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-lzma-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-lzop.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-m4.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-macbinary.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-marble.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-ms-dos-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-msdownload.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-partial-download.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-pem-key.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-perl.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-php.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-plasma.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-python-bytecode.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-rar.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-rdata.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-root.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-rpm.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-ruby.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-sharedlib.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-shockwave-flash.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-skg.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-skgc.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-smb-workgroup.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-srt.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-tarz.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-theme.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-trash.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-tzo.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-wmf.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-xliff.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-x-zerosize.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-xhtml+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-xmind.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/application-zip.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/audio-midi.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/audio-x-flac.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/audio-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/audio-x-mpeg.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/audio-x-wav.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-bmp.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-gif.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-jpeg.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-png.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-svg+xml-compressed.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-tiff.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-vnd.dgn.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-vnd.djvu.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-vnd.dwg.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-x-adobe-dng.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-x-ico.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-x-psd.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-x-tga.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-x-vnd.trolltech.qpicture.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/image-x-xcf.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/message-news.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/message-partial.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/message-rfc822.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/package-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-css.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-csv.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-dockerfile.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-fortran.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-html.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-rtf.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-rust.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-vnd.abc.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-wiki.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-adasrc.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-apport.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-authors.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-c++hdr.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-c++src.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-changelog.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-chdr.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-cmake.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-csharp.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-csrc.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-go.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-haskell.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-hex.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-install.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-kotlin.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-lua.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-markdown.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-pascal.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-patch.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-po.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-python.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-qml.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-r.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-rpm-spec.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-scala.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-script.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-tcl.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-tex.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-x-texinfo.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/text-xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/video-mp4.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/video-webm.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/video-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/video-x-matroska.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/video-x-theora+ogg.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/video-x-wmv.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/virtualbox-hdd.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/virtualbox-ova.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/virtualbox-ovf.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/virtualbox-vbox-extpack.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/virtualbox-vbox.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/virtualbox-vdi.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/virtualbox-vmdk.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-kde-nsplugin-generated.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-media-podcast.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-office-address-book.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-office-calendar.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-office-contact.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-office-document.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-office-drawing.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-office-presentation.svg</file>
+		<file>icons/breeze-dark/mimetypes/22/x-office-spreadsheet.svg</file>
+		<file>icons/breeze-dark/mimetypes/24/application-x-fictionbook+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/24/application-x-ms-dos-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/android-package-archive.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-atom+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-certificate.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-dicom.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-epub+zip.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-illustrator.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-json.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-msonenote.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-msoutlook.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-msword-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-msword.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-octet-stream.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-ogg.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-pdf.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-pgp-encrypted.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-pgp-signature.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-postscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.appimage.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.apple.pkpass.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.flatpak.ref.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.iccprofile.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-access.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-excel.addin.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-excel.template.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-infopath.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-powerpoint.addin.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-powerpoint.template.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.ms-publisher.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.nokia.xml.qt.resource.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.chart.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.database.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.formula-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.formula.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.presentation-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.spreadsheet-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.text-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.oasis.opendocument.web-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-ace.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-arc.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-arj.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-bzdvi.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-vnd.visio.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-bzip.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-deb.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-apple-diskimage.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-audacity-project.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-bittorrent.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-blender.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-bzip-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-cd-image.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-cda.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-chm.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-designer.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-desktop.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-fictionbook+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-font-afm.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-font-bdf.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-font-otf.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-font-ttf.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-font-type1.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-gdscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-gettext-translation.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-godot-project.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-godot-resource.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-godot-scene.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-godot-shader.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-gzip.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-gzpostscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-java-archive.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-java.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-javascript.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-kdenlivetitle.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-kexi-connectiondata.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-kexiproject-shortcut.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-kmymoney.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-kplato.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-krita.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-kvtml.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-lyx.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-lzma-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-lzop.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-m4.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-macbinary.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-marble.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-ms-dos-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-ms-shortcut.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-msdownload.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-partial-download.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-pem-key.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-perl.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-php.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-plasma.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-python-bytecode.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-rar.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-root.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-rpm.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-ruby.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-sharedlib.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-shockwave-flash.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-skg.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-skgc.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-smb-workgroup.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-srt.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-tarz.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-theme.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-trash.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-tzo.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-wmf.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-xliff.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-zerosize.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-xhtml+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-xmind.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-zip.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/audio-midi.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/audio-x-flac.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/audio-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/audio-x-mpeg.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/audio-x-wav.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-bmp.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-gif.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-jpeg.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-png.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-svg+xml-compressed.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-tiff.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-vnd.dgn.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-vnd.djvu.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-vnd.dwg.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-x-adobe-dng.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-x-ico.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-x-psd.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-x-tga.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-x-vnd.trolltech.qpicture.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/image-x-xcf.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/message-news.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/message-partial.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/message-rfc822.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/package-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/preferences-desktop-cryptography.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-css.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-csv.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-dockerfile.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-fortran.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-html.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-rtf.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-rust.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-vnd.abc.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-wiki.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-adasrc.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-apport.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-authors.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-c++hdr.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-c++src.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-changelog.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-chdr.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-cmake.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-csharp.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-csrc.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-go.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-haskell.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-hex.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-install.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-kotlin.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-lua.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-markdown.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-pascal.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-patch.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-po.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-python.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-qml.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-r.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-rpm-spec.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-scala.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-script.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-tcl.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-tex.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-x-texinfo.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/text-xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/video-mp4.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/video-webm.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/video-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/video-x-matroska.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/video-x-theora+ogg.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/video-x-wmv.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/virtualbox-hdd.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/virtualbox-ova.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/virtualbox-ovf.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/virtualbox-vbox-extpack.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/virtualbox-vbox.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/virtualbox-vdi.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/virtualbox-vmdk.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-kde-nsplugin-generated.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-media-podcast.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-office-address-book.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-office-calendar.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-office-contact.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-office-document.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-office-drawing.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-office-presentation.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/x-office-spreadsheet.svg</file>
+		<file>icons/breeze-dark/mimetypes/32/application-x-ar.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/android-package-archive.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-atom+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-certificate.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-dicom.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-epub+zip.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-illustrator.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-json.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-msonenote.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-msoutlook.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-msword-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-msword.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-octet-stream.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-ogg.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-pdf.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-pgp-encrypted.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-pgp-signature.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-postscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.appimage.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.apple.pkpass.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.flatpak.ref.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.iccprofile.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-access.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-excel.addin.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-excel.template.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-infopath.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-powerpoint.addin.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-powerpoint.template.macroenabled.12.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.ms-publisher.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.nokia.xml.qt.resource.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.chart.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.database.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.formula-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.formula.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.presentation-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.spreadsheet-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.text-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.oasis.opendocument.web-template.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-vnd.visio.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-ace.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-apple-diskimage.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-ar.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-arc.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-arj.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-audacity-project.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-bittorrent.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-blender.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-bzdvi.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-bzip-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-bzip.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-cd-image.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-cda.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-chm.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-deb.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-designer.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-desktop.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-fictionbook+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-font-afm.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-font-bdf.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-font-otf.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-font-ttf.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-font-type1.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-gdscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-gettext-translation.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-godot-project.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-godot-resource.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-godot-scene.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-godot-shader.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-gzip.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-gzpostscript.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-java-archive.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-java.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-javascript.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-kdenlivetitle.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-kexi-connectiondata.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-kexiproject-shortcut.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-kmymoney.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-kplato.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-krita.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-kvtml.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-labplot2.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-lyx.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-lzma-compressed-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-lzop.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-m4.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-macbinary.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-marble.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-ms-dos-executable.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-ms-shortcut.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-msdownload.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-partial-download.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-pem-key.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-perl.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-php.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-plasma.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-python-bytecode.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-rar.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-root.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-rpm.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-ruby.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-sharedlib.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-shockwave-flash.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-skg.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-skgc.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-smb-workgroup.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-srt.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-tar.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-tarz.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-theme.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-trash.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-tzo.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-wmf.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-xliff.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-x-zerosize.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-xhtml+xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-xmind.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/application-zip.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/audio-midi.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/audio-x-flac.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/audio-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/audio-x-mpeg.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/audio-x-wav.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-bmp.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-gif.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-jpeg.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-png.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-svg+xml-compressed.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-tiff.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-vnd.dgn.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-vnd.djvu.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-vnd.dwg.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-x-adobe-dng.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-x-ico.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-x-psd.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-x-tga.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-x-vnd.trolltech.qpicture.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/image-x-xcf.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/message-news.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/message-partial.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/message-rfc822.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/package-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-css.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-csv.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-dockerfile.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-html.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-rtf.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-rust.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-vnd.abc.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-wiki.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-adasrc.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-apport.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-authors.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-c++hdr.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-c++src.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-changelog.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-chdr.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-cmake.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-csharp.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-csrc.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-go.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-haskell.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-hex.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-install.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-kotlin.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-lua.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-markdown.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-pascal.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-patch.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-po.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-python.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-qml.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-r.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-rpm-spec.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-sass.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-scala.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-script.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-tcl.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-tex.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-x-texinfo.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/text-xml.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/video-mp4.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/video-webm.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/video-x-generic.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/video-x-matroska.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/video-x-theora+ogg.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/video-x-wmv.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/virtualbox-hdd.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/virtualbox-ova.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/virtualbox-ovf.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/virtualbox-vbox-extpack.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/virtualbox-vbox.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/virtualbox-vdi.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/virtualbox-vmdk.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-kde-nsplugin-generated.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-media-podcast.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-office-address-book.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-office-calendar.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-office-contact.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-office-document.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-office-drawing.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-office-presentation.svg</file>
+		<file>icons/breeze-dark/mimetypes/64/x-office-spreadsheet.svg</file>
+	</qresource>
 </RCC>
