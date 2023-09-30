@@ -1,9 +1,0 @@
-<!DOCTYPE RCC><RCC version="1.0">
-	<qresource>
-		<file>icons/breeze-dark/8x8/emblems/gpg-key-trust-level-0.svg</file>
-		<file>icons/breeze-dark/8x8/emblems/gpg-key-trust-level-1.svg</file>
-		<file>icons/breeze-dark/8x8/emblems/gpg-key-trust-level-2.svg</file>
-		<file>icons/breeze-dark/8x8/emblems/gpg-key-trust-level-3.svg</file>
-		<file>icons/breeze-dark/8x8/emblems/gpg-key-trust-level-4.svg</file>
-	</qresource>
-</RCC>
