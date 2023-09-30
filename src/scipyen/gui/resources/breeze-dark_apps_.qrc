@@ -20,6 +20,11 @@
 		<file>icons/breeze-dark/apps/16/utilities-terminal.svg</file>
 		<file>icons/breeze-dark/apps/16/virt-manager.svg</file>
 		<file>icons/breeze-dark/apps/16/vvave.svg</file>
+		<file alias="icons/breeze-dark/apps/16/kwrite.svg">icons/breeze-dark/apps/16/accessories-text-editor.svg</file>
+		<file alias="icons/breeze-dark/apps/16/../../devices/16/smartphone.svg">icons/breeze-dark/apps/16/kdeconnect.svg</file>
+		<file alias="icons/breeze-dark/apps/16/libreoffice-main.svg">icons/breeze-dark/apps/16/libreoffice-startcenter.svg</file>
+		<file alias="icons/breeze-dark/apps/16/../../devices/16/network-bluetooth.svg">icons/breeze-dark/apps/16/preferences-system-bluetooth.svg</file>
+		<file alias="icons/breeze-dark/apps/16/systemsettings.svg">icons/breeze-dark/apps/16/preferences-system.svg</file>
 		<file>icons/breeze-dark/apps/22/akregator.svg</file>
 		<file>icons/breeze-dark/apps/22/anydesk.svg</file>
 		<file>icons/breeze-dark/apps/22/elisa.svg</file>
@@ -35,6 +40,11 @@
 		<file>icons/breeze-dark/apps/22/umbrello.svg</file>
 		<file>icons/breeze-dark/apps/22/utilities-terminal.svg</file>
 		<file>icons/breeze-dark/apps/22/virt-manager.svg</file>
+		<file alias="icons/breeze-dark/apps/22/kwrite.svg">icons/breeze-dark/apps/22/accessories-text-editor.svg</file>
+		<file alias="icons/breeze-dark/apps/22/../../devices/22/smartphone.svg">icons/breeze-dark/apps/22/kdeconnect.svg</file>
+		<file alias="icons/breeze-dark/apps/22/../../actions/22/view-calendar-tasks.svg">icons/breeze-dark/apps/22/korg-todo.svg</file>
+		<file alias="icons/breeze-dark/apps/22/../../actions/22/application-menu.svg">icons/breeze-dark/apps/22/preferences-other.svg</file>
+		<file alias="icons/breeze-dark/apps/22/../../actions/22/kt-plugins.svg">icons/breeze-dark/apps/22/preferences-plugin.svg</file>
 		<file>icons/breeze-dark/apps/24/akregator.svg</file>
 		<file>icons/breeze-dark/apps/24/homerun.svg</file>
 		<file>icons/breeze-dark/apps/24/kde.svg</file>
@@ -42,6 +52,10 @@
 		<file>icons/breeze-dark/apps/24/plasma.svg</file>
 		<file>icons/breeze-dark/apps/24/plasmavault.svg</file>
 		<file>icons/breeze-dark/apps/24/virt-manager.svg</file>
+		<file alias="icons/breeze-dark/apps/24/../../devices/24/smartphone.svg">icons/breeze-dark/apps/24/kdeconnect.svg</file>
+		<file alias="icons/breeze-dark/apps/24/../../actions/24/view-calendar-tasks.svg">icons/breeze-dark/apps/24/korg-todo.svg</file>
+		<file alias="icons/breeze-dark/apps/24/../../actions/24/application-menu.svg">icons/breeze-dark/apps/24/preferences-other.svg</file>
+		<file alias="icons/breeze-dark/apps/24/../../actions/24/kt-plugins.svg">icons/breeze-dark/apps/24/preferences-plugin.svg</file>
 		<file>icons/breeze-dark/apps/32/anydesk.svg</file>
 		<file>icons/breeze-dark/apps/32/hotspot.svg</file>
 		<file>icons/breeze-dark/apps/32/hwinfo.svg</file>
@@ -87,10 +101,18 @@
 		<file>icons/breeze-dark/apps/32/utilities-terminal.svg</file>
 		<file>icons/breeze-dark/apps/32/yast-sw_single.svg</file>
 		<file>icons/breeze-dark/apps/32/yast.svg</file>
+		<file alias="icons/breeze-dark/apps/32/kwrite.svg">icons/breeze-dark/apps/32/accessories-text-editor.svg</file>
+		<file alias="icons/breeze-dark/apps/32/../../preferences/32/preferences-system-backup.svg">icons/breeze-dark/apps/32/kup.svg</file>
+		<file alias="icons/breeze-dark/apps/32/pattern-e17.svg">icons/breeze-dark/apps/32/pattern-enlightenment.svg</file>
+		<file alias="icons/breeze-dark/apps/32/pattern-gnome.svg">icons/breeze-dark/apps/32/pattern-gnome-devel.svg</file>
+		<file alias="icons/breeze-dark/apps/32/systemsettings.svg">icons/breeze-dark/apps/32/preferences-system.svg</file>
+		<file alias="icons/breeze-dark/apps/48/cmake.svg">icons/breeze-dark/apps/48/CMakeSetup.svg</file>
 		<file>icons/breeze-dark/apps/48/QOwnNotes.svg</file>
 		<file>icons/breeze-dark/apps/48/QtProject-designer.svg</file>
+		<file alias="icons/breeze-dark/apps/48/virtualbox.svg">icons/breeze-dark/apps/48/VBox.svg</file>
 		<file>icons/breeze-dark/apps/48/accessories-calculator.svg</file>
 		<file>icons/breeze-dark/apps/48/accessories-character-map.svg</file>
+		<file alias="icons/breeze-dark/apps/48/kwrite.svg">icons/breeze-dark/apps/48/accessories-text-editor.svg</file>
 		<file>icons/breeze-dark/apps/48/acroread.svg</file>
 		<file>icons/breeze-dark/apps/48/akregator.svg</file>
 		<file>icons/breeze-dark/apps/48/alienarena.svg</file>
@@ -100,6 +122,7 @@
 		<file>icons/breeze-dark/apps/48/android-studio.svg</file>
 		<file>icons/breeze-dark/apps/48/anjuta.svg</file>
 		<file>icons/breeze-dark/apps/48/anydesk.svg</file>
+		<file alias="icons/breeze-dark/apps/48/muon.svg">icons/breeze-dark/apps/48/apper.svg</file>
 		<file>icons/breeze-dark/apps/48/application-x-clementine.svg</file>
 		<file>icons/breeze-dark/apps/48/aptana.svg</file>
 		<file>icons/breeze-dark/apps/48/ardour.svg</file>
@@ -125,18 +148,31 @@
 		<file>icons/breeze-dark/apps/48/brackets.svg</file>
 		<file>icons/breeze-dark/apps/48/braindump.svg</file>
 		<file>icons/breeze-dark/apps/48/breeze-settings.svg</file>
+		<file alias="icons/breeze-dark/apps/48/bittorrent-sync.svg">icons/breeze-dark/apps/48/btsync-gui.svg</file>
 		<file>icons/breeze-dark/apps/48/buho.svg</file>
 		<file>icons/breeze-dark/apps/48/calamares.svg</file>
 		<file>icons/breeze-dark/apps/48/calibre-ebook-edit.svg</file>
 		<file>icons/breeze-dark/apps/48/calibre-viewer.svg</file>
 		<file>icons/breeze-dark/apps/48/calindori.svg</file>
+		<file alias="icons/breeze-dark/apps/48/author.svg">icons/breeze-dark/apps/48/calligraauthor.svg</file>
+		<file alias="icons/breeze-dark/apps/48/flow.svg">icons/breeze-dark/apps/48/calligraflow.svg</file>
+		<file alias="icons/breeze-dark/apps/48/karbon.svg">icons/breeze-dark/apps/48/calligrakarbon.svg</file>
+		<file alias="icons/breeze-dark/apps/48/kexi.svg">icons/breeze-dark/apps/48/calligrakexi.svg</file>
+		<file alias="icons/breeze-dark/apps/48/plan.svg">icons/breeze-dark/apps/48/calligraplan.svg</file>
+		<file alias="icons/breeze-dark/apps/48/planwork.svg">icons/breeze-dark/apps/48/calligraplanwork.svg</file>
+		<file alias="icons/breeze-dark/apps/48/sheets.svg">icons/breeze-dark/apps/48/calligrasheets.svg</file>
+		<file alias="icons/breeze-dark/apps/48/stage.svg">icons/breeze-dark/apps/48/calligrastage.svg</file>
+		<file alias="icons/breeze-dark/apps/48/words.svg">icons/breeze-dark/apps/48/calligrawords.svg</file>
 		<file>icons/breeze-dark/apps/48/cantata.svg</file>
 		<file>icons/breeze-dark/apps/48/cantor.svg</file>
 		<file>icons/breeze-dark/apps/48/cervisia.svg</file>
 		<file>icons/breeze-dark/apps/48/choqok.svg</file>
 		<file>icons/breeze-dark/apps/48/claws-mail.svg</file>
+		<file alias="icons/breeze-dark/apps/48/application-x-clementine.svg">icons/breeze-dark/apps/48/clementine.svg</file>
 		<file>icons/breeze-dark/apps/48/cmake.svg</file>
 		<file>icons/breeze-dark/apps/48/codeblocks.svg</file>
+		<file alias="icons/breeze-dark/apps/48/haguichi.svg">icons/breeze-dark/apps/48/com.github.ztefn.haguichi.svg</file>
+		<file alias="icons/breeze-dark/apps/48/com.visualstudio.code.svg">icons/breeze-dark/apps/48/com.visualstudio.code.oss.svg</file>
 		<file>icons/breeze-dark/apps/48/com.visualstudio.code.svg</file>
 		<file>icons/breeze-dark/apps/48/converseen.svg</file>
 		<file>icons/breeze-dark/apps/48/crow-translate.svg</file>
@@ -167,11 +203,13 @@
 		<file>icons/breeze-dark/apps/48/gpick.svg</file>
 		<file>icons/breeze-dark/apps/48/gpodder.svg</file>
 		<file>icons/breeze-dark/apps/48/granatier.svg</file>
+		<file alias="icons/breeze-dark/apps/48/okular.svg">icons/breeze-dark/apps/48/graphics-viewer-document.svg</file>
 		<file>icons/breeze-dark/apps/48/grub-customizer.svg</file>
 		<file>icons/breeze-dark/apps/48/gtkhash.svg</file>
 		<file>icons/breeze-dark/apps/48/gwenview.svg</file>
 		<file>icons/breeze-dark/apps/48/haguichi.svg</file>
 		<file>icons/breeze-dark/apps/48/handbrake.svg</file>
+		<file alias="icons/breeze-dark/apps/48/system-help.svg">icons/breeze-dark/apps/48/help-browser.svg</file>
 		<file>icons/breeze-dark/apps/48/homebank.svg</file>
 		<file>icons/breeze-dark/apps/48/homerun.svg</file>
 		<file>icons/breeze-dark/apps/48/hotspot.svg</file>
@@ -179,17 +217,23 @@
 		<file>icons/breeze-dark/apps/48/hwinfo.svg</file>
 		<file>icons/breeze-dark/apps/48/im.vector.svg</file>
 		<file>icons/breeze-dark/apps/48/imagewriter.svg</file>
+		<file alias="icons/breeze-dark/apps/48/inkscape.svg">icons/breeze-dark/apps/48/inkscape-logo.svg</file>
 		<file>icons/breeze-dark/apps/48/inkscape.svg</file>
+		<file alias="icons/breeze-dark/apps/48/mail-client.svg">icons/breeze-dark/apps/48/internet-mail.svg</file>
+		<file alias="icons/breeze-dark/apps/48/plasma-mobile-phone.svg">icons/breeze-dark/apps/48/internet-telephony.svg</file>
 		<file>icons/breeze-dark/apps/48/internet-web-browser.svg</file>
+		<file alias="icons/breeze-dark/apps/48/goodvibes.svg">icons/breeze-dark/apps/48/io.gitlab.Goodvibes.svg</file>
 		<file>icons/breeze-dark/apps/48/jdownloader.svg</file>
 		<file>icons/breeze-dark/apps/48/joplin.svg</file>
 		<file>icons/breeze-dark/apps/48/juk.svg</file>
 		<file>icons/breeze-dark/apps/48/juliabackend.svg</file>
 		<file>icons/breeze-dark/apps/48/k3b.svg</file>
+		<file alias="icons/breeze-dark/apps/48/office-address-book.svg">icons/breeze-dark/apps/48/kaddressbook.svg</file>
 		<file>icons/breeze-dark/apps/48/kaffeine.svg</file>
 		<file>icons/breeze-dark/apps/48/kajongg.svg</file>
 		<file>icons/breeze-dark/apps/48/kalarm.svg</file>
 		<file>icons/breeze-dark/apps/48/kalgebra.svg</file>
+		<file alias="icons/breeze-dark/apps/48/kalgebra.svg">icons/breeze-dark/apps/48/kalgebrabackend.svg</file>
 		<file>icons/breeze-dark/apps/48/kalzium.svg</file>
 		<file>icons/breeze-dark/apps/48/kamoso.svg</file>
 		<file>icons/breeze-dark/apps/48/kanagram.svg</file>
@@ -204,8 +248,12 @@
 		<file>icons/breeze-dark/apps/48/kbreakout.svg</file>
 		<file>icons/breeze-dark/apps/48/kbruch.svg</file>
 		<file>icons/breeze-dark/apps/48/kcachegrind.svg</file>
+		<file alias="icons/breeze-dark/apps/48/accessories-calculator.svg">icons/breeze-dark/apps/48/kcalc.svg</file>
+		<file alias="icons/breeze-dark/apps/48/sheets.svg">icons/breeze-dark/apps/48/kchart.svg</file>
+		<file alias="icons/breeze-dark/apps/48/gpick.svg">icons/breeze-dark/apps/48/kcolorchooser.svg</file>
 		<file>icons/breeze-dark/apps/48/kde-frameworks.svg</file>
 		<file>icons/breeze-dark/apps/48/kde-im-log-viewer.svg</file>
+		<file alias="icons/breeze-dark/apps/48/kdeapp.svg">icons/breeze-dark/apps/48/kde.svg</file>
 		<file>icons/breeze-dark/apps/48/kdeapp.svg</file>
 		<file>icons/breeze-dark/apps/48/kdenlive.svg</file>
 		<file>icons/breeze-dark/apps/48/kdesrc-build.svg</file>
@@ -215,6 +263,9 @@
 		<file>icons/breeze-dark/apps/48/kdiff3.svg</file>
 		<file>icons/breeze-dark/apps/48/kdots.svg</file>
 		<file>icons/breeze-dark/apps/48/keepass.svg</file>
+		<file alias="icons/breeze-dark/apps/48/keepass.svg">icons/breeze-dark/apps/48/keepass2.svg</file>
+		<file alias="icons/breeze-dark/apps/48/keepass.svg">icons/breeze-dark/apps/48/keepassx.svg</file>
+		<file alias="icons/breeze-dark/apps/48/keepass.svg">icons/breeze-dark/apps/48/keepassx2.svg</file>
 		<file>icons/breeze-dark/apps/48/kexi.svg</file>
 		<file>icons/breeze-dark/apps/48/kfind.svg</file>
 		<file>icons/breeze-dark/apps/48/kfloppy.svg</file>
@@ -239,8 +290,10 @@
 		<file>icons/breeze-dark/apps/48/klipper.svg</file>
 		<file>icons/breeze-dark/apps/48/kmag.svg</file>
 		<file>icons/breeze-dark/apps/48/kmahjongg.svg</file>
+		<file alias="icons/breeze-dark/apps/48/mail-client.svg">icons/breeze-dark/apps/48/kmail.svg</file>
 		<file>icons/breeze-dark/apps/48/kmenuedit.svg</file>
 		<file>icons/breeze-dark/apps/48/kmix.svg</file>
+		<file alias="icons/breeze-dark/apps/48/../../devices/64/input-mouse.svg">icons/breeze-dark/apps/48/kmousetool.svg</file>
 		<file>icons/breeze-dark/apps/48/kmouth.svg</file>
 		<file>icons/breeze-dark/apps/48/kmplayer.svg</file>
 		<file>icons/breeze-dark/apps/48/kmplot.svg</file>
@@ -250,13 +303,18 @@
 		<file>icons/breeze-dark/apps/48/knotes.svg</file>
 		<file>icons/breeze-dark/apps/48/kolf.svg</file>
 		<file>icons/breeze-dark/apps/48/kolourpaint.svg</file>
+		<file alias="icons/breeze-dark/apps/48/kdiff3.svg">icons/breeze-dark/apps/48/kompare.svg</file>
 		<file>icons/breeze-dark/apps/48/konqueror.svg</file>
 		<file>icons/breeze-dark/apps/48/kontact.svg</file>
 		<file>icons/breeze-dark/apps/48/konversation.svg</file>
 		<file>icons/breeze-dark/apps/48/kopete.svg</file>
 		<file>icons/breeze-dark/apps/48/korg-todo.svg</file>
+		<file alias="icons/breeze-dark/apps/48/planwork.svg">icons/breeze-dark/apps/48/korgac.svg</file>
+		<file alias="icons/breeze-dark/apps/48/plan.svg">icons/breeze-dark/apps/48/korganizer.svg</file>
 		<file>icons/breeze-dark/apps/48/kpat.svg</file>
 		<file>icons/breeze-dark/apps/48/kphotoalbum.svg</file>
+		<file alias="icons/breeze-dark/apps/48/planwork.svg">icons/breeze-dark/apps/48/kplato.svg</file>
+		<file alias="icons/breeze-dark/apps/48/stage.svg">icons/breeze-dark/apps/48/kpresenter.svg</file>
 		<file>icons/breeze-dark/apps/48/krdc.svg</file>
 		<file>icons/breeze-dark/apps/48/krename.svg</file>
 		<file>icons/breeze-dark/apps/48/krfb.svg</file>
@@ -267,8 +325,11 @@
 		<file>icons/breeze-dark/apps/48/kshisen.svg</file>
 		<file>icons/breeze-dark/apps/48/ksirk.svg</file>
 		<file>icons/breeze-dark/apps/48/ksnapshot.svg</file>
+		<file alias="icons/breeze-dark/apps/48/sheets.svg">icons/breeze-dark/apps/48/kspread.svg</file>
 		<file>icons/breeze-dark/apps/48/kstars.svg</file>
+		<file alias="icons/breeze-dark/apps/48/utilities-system-monitor.svg">icons/breeze-dark/apps/48/ksysguardd.svg</file>
 		<file>icons/breeze-dark/apps/48/kteatime.svg</file>
+		<file alias="icons/breeze-dark/apps/48/kronometer.svg">icons/breeze-dark/apps/48/ktimer.svg</file>
 		<file>icons/breeze-dark/apps/48/ktimetracker.svg</file>
 		<file>icons/breeze-dark/apps/48/ktip.svg</file>
 		<file>icons/breeze-dark/apps/48/ktnef.svg</file>
@@ -277,13 +338,17 @@
 		<file>icons/breeze-dark/apps/48/ktrip.svg</file>
 		<file>icons/breeze-dark/apps/48/kube-mail.svg</file>
 		<file>icons/breeze-dark/apps/48/kuiviewer.svg</file>
+		<file alias="icons/breeze-dark/apps/48/../../preferences/32/preferences-system-backup.svg">icons/breeze-dark/apps/48/kup.svg</file>
 		<file>icons/breeze-dark/apps/48/kuser.svg</file>
 		<file>icons/breeze-dark/apps/48/kwalletmanager.svg</file>
+		<file alias="icons/breeze-dark/apps/48/kwalletmanager.svg">icons/breeze-dark/apps/48/kwalletmanager2.svg</file>
 		<file>icons/breeze-dark/apps/48/kwave.svg</file>
 		<file>icons/breeze-dark/apps/48/kwin.svg</file>
+		<file alias="icons/breeze-dark/apps/48/words.svg">icons/breeze-dark/apps/48/kword.svg</file>
 		<file>icons/breeze-dark/apps/48/kwrite.svg</file>
 		<file>icons/breeze-dark/apps/48/kxstitch.svg</file>
 		<file>icons/breeze-dark/apps/48/labplot.svg</file>
+		<file alias="icons/breeze-dark/apps/48/labplot.svg">icons/breeze-dark/apps/48/labplot2.svg</file>
 		<file>icons/breeze-dark/apps/48/lastpass.svg</file>
 		<file>icons/breeze-dark/apps/48/latte-dock.svg</file>
 		<file>icons/breeze-dark/apps/48/leocad.svg</file>
@@ -293,6 +358,7 @@
 		<file>icons/breeze-dark/apps/48/libreoffice-impress.svg</file>
 		<file>icons/breeze-dark/apps/48/libreoffice-main.svg</file>
 		<file>icons/breeze-dark/apps/48/libreoffice-math.svg</file>
+		<file alias="icons/breeze-dark/apps/48/libreoffice-main.svg">icons/breeze-dark/apps/48/libreoffice-startcenter.svg</file>
 		<file>icons/breeze-dark/apps/48/libreoffice-writer.svg</file>
 		<file>icons/breeze-dark/apps/48/linguist.svg</file>
 		<file>icons/breeze-dark/apps/48/logisim.svg</file>
@@ -312,20 +378,26 @@
 		<file>icons/breeze-dark/apps/48/multimedia-volume-control.svg</file>
 		<file>icons/breeze-dark/apps/48/muon.svg</file>
 		<file>icons/breeze-dark/apps/48/muondiscover.svg</file>
+		<file alias="icons/breeze-dark/apps/48/internet-web-browser.svg">icons/breeze-dark/apps/48/network-manager.svg</file>
 		<file>icons/breeze-dark/apps/48/nota.svg</file>
 		<file>icons/breeze-dark/apps/48/ntfs-config.svg</file>
 		<file>icons/breeze-dark/apps/48/nylas.svg</file>
 		<file>icons/breeze-dark/apps/48/octave.svg</file>
+		<file alias="icons/breeze-dark/apps/48/octave.svg">icons/breeze-dark/apps/48/octavebackend.svg</file>
+		<file alias="icons/breeze-dark/apps/48/muon.svg">icons/breeze-dark/apps/48/octopi.svg</file>
 		<file>icons/breeze-dark/apps/48/office-address-book.svg</file>
+		<file alias="icons/breeze-dark/apps/48/plan.svg">icons/breeze-dark/apps/48/office-calendar.svg</file>
 		<file>icons/breeze-dark/apps/48/okteta.svg</file>
 		<file>icons/breeze-dark/apps/48/okular.svg</file>
 		<file>icons/breeze-dark/apps/48/openbravo-erp.svg</file>
 		<file>icons/breeze-dark/apps/48/org.fedoraproject.AnacondaInstaller.svg</file>
 		<file>icons/breeze-dark/apps/48/org.gajim.Gajim.svg</file>
+		<file alias="icons/breeze-dark/apps/48/skanlite.svg">icons/breeze-dark/apps/48/org.kde.skanlite.svg</file>
 		<file>icons/breeze-dark/apps/48/org.kde.Ikona.svg</file>
 		<file>icons/breeze-dark/apps/48/org.kde.kongress.svg</file>
 		<file>icons/breeze-dark/apps/48/org.kde.kontrast.svg</file>
 		<file>icons/breeze-dark/apps/48/org.kde.neochat.svg</file>
+		<file alias="icons/breeze-dark/apps/48/inkscape.svg">icons/breeze-dark/apps/48/org.inkscape.Inkscape.svg</file>
 		<file>icons/breeze-dark/apps/48/parley.svg</file>
 		<file>icons/breeze-dark/apps/48/partitionmanager.svg</file>
 		<file>icons/breeze-dark/apps/48/phonon-gstreamer.svg</file>
@@ -340,6 +412,7 @@
 		<file>icons/breeze-dark/apps/48/plasma-nano.svg</file>
 		<file>icons/breeze-dark/apps/48/plasmavault.svg</file>
 		<file>icons/breeze-dark/apps/48/preferences-desktop-font-installer.svg</file>
+		<file alias="icons/breeze-dark/apps/48/ksnapshot.svg">icons/breeze-dark/apps/48/spectacle.svg</file>
 		<file>icons/breeze-dark/apps/48/puremaps.svg</file>
 		<file>icons/breeze-dark/apps/48/pythonbackend.svg</file>
 		<file>icons/breeze-dark/apps/48/q4wine.svg</file>
@@ -422,6 +495,18 @@
 		<file>icons/breeze-dark/apps/48/yast-upgrade.svg</file>
 		<file>icons/breeze-dark/apps/48/yast.svg</file>
 		<file>icons/breeze-dark/apps/48/zanshin.svg</file>
+		<file alias="icons/breeze-dark/apps/48/telegram.svg">icons/breeze-dark/apps/48/org.telegram.desktop.svg</file>
+		<file alias="icons/breeze-dark/apps/48/plan.svg">icons/breeze-dark/apps/48/planner.svg</file>
+		<file alias="icons/breeze-dark/apps/48/../22/plasma-browser-integration.svg">icons/breeze-dark/apps/48/plasma-browser-integration.svg</file>
+		<file alias="icons/breeze-dark/apps/48/muondiscover.svg">icons/breeze-dark/apps/48/plasmadiscover.svg</file>
+		<file alias="icons/breeze-dark/apps/48/systemsettings.svg">icons/breeze-dark/apps/48/preferences-system.svg</file>
+		<file alias="icons/breeze-dark/apps/48/r.svg">icons/breeze-dark/apps/48/rbackend.svg</file>
+		<file alias="icons/breeze-dark/apps/48/ring.svg">icons/breeze-dark/apps/48/ring-kde.svg</file>
+		<file alias="icons/breeze-dark/apps/48/skanlite.svg">icons/breeze-dark/apps/48/scanner.svg</file>
+		<file alias="icons/breeze-dark/apps/48/skrooge.svg">icons/breeze-dark/apps/48/skrooge-initial.svg</file>
+		<file alias="icons/breeze-dark/apps/48/muon.svg">icons/breeze-dark/apps/48/synaptic.svg</file>
+		<file alias="icons/breeze-dark/apps/48/ark.svg">icons/breeze-dark/apps/48/utilities-file-archiver.svg</file>
+		<file alias="icons/breeze-dark/apps/48/yast.svg">icons/breeze-dark/apps/48/yast-control-center.svg</file>
 		<file>icons/breeze-dark/apps/64/diaspora.svg</file>
 		<file>icons/breeze-dark/apps/64/hotspot.svg</file>
 		<file>icons/breeze-dark/apps/64/kwrite.svg</file>
@@ -430,5 +515,7 @@
 		<file>icons/breeze-dark/apps/64/system-file-manager.svg</file>
 		<file>icons/breeze-dark/apps/64/umbrello.svg</file>
 		<file>icons/breeze-dark/apps/64/utilities-terminal.svg</file>
+		<file alias="icons/breeze-dark/apps/64/kwrite.svg">icons/breeze-dark/apps/64/accessories-text-editor.svg</file>
+		<file alias="icons/breeze-dark/apps/64/../22/plasma-browser-integration.svg">icons/breeze-dark/apps/64/plasma-browser-integration.svg</file>
 	</qresource>
 </RCC>

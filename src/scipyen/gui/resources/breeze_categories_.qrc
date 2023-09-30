@@ -14,5 +14,8 @@
 		<file>icons/breeze/categories/32/applications-office.svg</file>
 		<file>icons/breeze/categories/32/applications-science.svg</file>
 		<file>icons/breeze/categories/32/applications-utilities.svg</file>
+		<file alias="icons/breeze/categories/32/applications-internet.svg">icons/breeze/categories/32/applications-network.svg</file>
+		<file alias="icons/breeze/categories/32/../../preferences/32/preferences-other.svg">icons/breeze/categories/32/applications-other.svg</file>
+		<file alias="icons/breeze/categories/32/../../preferences/32/preferences-desktop.svg">icons/breeze/categories/32/applications-system.svg</file>
 	</qresource>
 </RCC>

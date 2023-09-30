@@ -40,6 +40,20 @@
 		<file>icons/breeze/emblems/16/vcs-normal.svg</file>
 		<file>icons/breeze/emblems/16/vcs-removed.svg</file>
 		<file>icons/breeze/emblems/16/vcs-update-required.svg</file>
+		<file alias="icons/breeze/emblems/16/emblem-checked.svg">icons/breeze/emblems/16/emblem-success.svg</file>
+		<file alias="icons/breeze/emblems/16/emblem-checked.svg">icons/breeze/emblems/16/installed.svg</file>
+		<file alias="icons/breeze/emblems/16/package-available.svg">icons/breeze/emblems/16/noninstalled.svg</file>
+		<file alias="icons/breeze/emblems/16/package-installed-outdated.svg">icons/breeze/emblems/16/outdated.svg</file>
+		<file alias="icons/breeze/emblems/16/emblem-error.svg">icons/breeze/emblems/16/package-broken.svg</file>
+		<file alias="icons/breeze/emblems/16/emblem-added.svg">icons/breeze/emblems/16/package-install.svg</file>
+		<file alias="icons/breeze/emblems/16/emblem-locked.svg">icons/breeze/emblems/16/package-installed-locked.svg</file>
+		<file alias="icons/breeze/emblems/16/emblem-checked.svg">icons/breeze/emblems/16/package-installed-updated.svg</file>
+		<file alias="icons/breeze/emblems/16/package-remove.svg">icons/breeze/emblems/16/package-purge.svg</file>
+		<file alias="icons/breeze/emblems/16/package-install.svg">icons/breeze/emblems/16/unrequired.svg</file>
+		<file alias="icons/breeze/emblems/16/emblem-checked.svg">icons/breeze/emblems/16/checkmark.svg</file>
+		<file alias="icons/breeze/emblems/16/emblem-unlocked.svg">icons/breeze/emblems/16/emblem-encrypted-unlocked.svg</file>
+		<file alias="icons/breeze/emblems/16/rating.svg">icons/breeze/emblems/16/emblem-favorite.svg</file>
+		<file alias="icons/breeze/emblems/16/package-upgrade.svg">icons/breeze/emblems/16/newer.svg</file>
 		<file>icons/breeze/emblems/22/emblem-added.svg</file>
 		<file>icons/breeze/emblems/22/emblem-checked.svg</file>
 		<file>icons/breeze/emblems/22/emblem-encrypted-locked.svg</file>
@@ -69,6 +83,10 @@
 		<file>icons/breeze/emblems/22/vcs-normal.svg</file>
 		<file>icons/breeze/emblems/22/vcs-removed.svg</file>
 		<file>icons/breeze/emblems/22/vcs-update-required.svg</file>
+		<file alias="icons/breeze/emblems/22/emblem-checked.svg">icons/breeze/emblems/22/checkmark.svg</file>
+		<file alias="icons/breeze/emblems/22/emblem-unlocked.svg">icons/breeze/emblems/22/emblem-encrypted-unlocked.svg</file>
+		<file alias="icons/breeze/emblems/22/rating.svg">icons/breeze/emblems/22/emblem-favorite.svg</file>
+		<file alias="icons/breeze/emblems/22/emblem-checked.svg">icons/breeze/emblems/22/emblem-success.svg</file>
 		<file>icons/breeze/emblems/24/emblem-added.svg</file>
 		<file>icons/breeze/emblems/24/emblem-checked.svg</file>
 		<file>icons/breeze/emblems/24/emblem-encrypted-locked.svg</file>
@@ -98,6 +116,10 @@
 		<file>icons/breeze/emblems/24/vcs-normal.svg</file>
 		<file>icons/breeze/emblems/24/vcs-removed.svg</file>
 		<file>icons/breeze/emblems/24/vcs-update-required.svg</file>
+		<file alias="icons/breeze/emblems/24/emblem-checked.svg">icons/breeze/emblems/24/checkmark.svg</file>
+		<file alias="icons/breeze/emblems/24/emblem-unlocked.svg">icons/breeze/emblems/24/emblem-encrypted-unlocked.svg</file>
+		<file alias="icons/breeze/emblems/24/rating.svg">icons/breeze/emblems/24/emblem-favorite.svg</file>
+		<file alias="icons/breeze/emblems/24/emblem-checked.svg">icons/breeze/emblems/24/emblem-success.svg</file>
 		<file>icons/breeze/emblems/8/emblem-added.svg</file>
 		<file>icons/breeze/emblems/8/emblem-checked.svg</file>
 		<file>icons/breeze/emblems/8/emblem-encrypted-locked.svg</file>
@@ -125,5 +147,20 @@
 		<file>icons/breeze/emblems/8/vcs-normal.svg</file>
 		<file>icons/breeze/emblems/8/vcs-removed.svg</file>
 		<file>icons/breeze/emblems/8/vcs-update-required.svg</file>
+		<file alias="icons/breeze/emblems/8/emblem-checked.svg">icons/breeze/emblems/8/checkmark.svg</file>
+		<file alias="icons/breeze/emblems/8/emblem-unlocked.svg">icons/breeze/emblems/8/emblem-encrypted-unlocked.svg</file>
+		<file alias="icons/breeze/emblems/8/rating.svg">icons/breeze/emblems/8/emblem-favorite.svg</file>
+		<file alias="icons/breeze/emblems/8/emblem-checked.svg">icons/breeze/emblems/8/emblem-success.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../actions/16/dialog-ok.svg">icons/breeze/emblems/symbolic/emblem-default-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../places/16/document-multiple.svg">icons/breeze/emblems/symbolic/emblem-documents-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../actions/16/love-amarok.svg">icons/breeze/emblems/symbolic/emblem-favorite-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../places/16/folder-important.svg">icons/breeze/emblems/symbolic/emblem-important-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../places/16/folder-sound.svg">icons/breeze/emblems/symbolic/emblem-music-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../actions/16/dialog-ok.svg">icons/breeze/emblems/symbolic/emblem-ok-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../places/16/folder-pictures.svg">icons/breeze/emblems/symbolic/emblem-photos-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../actions/16/document-share.svg">icons/breeze/emblems/symbolic/emblem-shared-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../actions/16/folder-sync.svg">icons/breeze/emblems/symbolic/emblem-synchronizing-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../actions/16/run-build.svg">icons/breeze/emblems/symbolic/emblem-system-symbolic.svg</file>
+		<file alias="icons/breeze/emblems/symbolic/../../places/16/folder-videos.svg">icons/breeze/emblems/symbolic/emblem-videos-symbolic.svg</file>
 	</qresource>
 </RCC>

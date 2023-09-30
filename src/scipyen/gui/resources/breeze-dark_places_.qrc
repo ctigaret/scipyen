@@ -1,5 +1,9 @@
 <!DOCTYPE RCC><RCC version="1.0">
 	<qresource>
+		<file alias="icons/breeze-dark/places/16/folder-cloud.svg">icons/breeze-dark/places/16/folder-dropbox.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/globe.svg">icons/breeze-dark/places/16/folder-html.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-pictures.svg">icons/breeze-dark/places/16/folder-image.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-cloud.svg">icons/breeze-dark/places/16/folder-owncloud.svg</file>
 		<file>icons/breeze-dark/places/16/folder-activities.svg</file>
 		<file>icons/breeze-dark/places/16/folder-add.svg</file>
 		<file>icons/breeze-dark/places/16/folder-android.svg</file>
@@ -7,11 +11,14 @@
 		<file>icons/breeze-dark/places/16/folder-black.svg</file>
 		<file>icons/breeze-dark/places/16/folder-blender.svg</file>
 		<file>icons/breeze-dark/places/16/folder-blue.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-pictures.svg">icons/breeze-dark/places/16/folder-images.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-pictures.svg">icons/breeze-dark/places/16/folder-picture.svg</file>
 		<file>icons/breeze-dark/places/16/folder-brown.svg</file>
 		<file>icons/breeze-dark/places/16/folder-build.svg</file>
 		<file>icons/breeze-dark/places/16/folder-calculate.svg</file>
 		<file>icons/breeze-dark/places/16/folder-chart.svg</file>
 		<file>icons/breeze-dark/places/16/folder-cloud.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-publicshare.svg">icons/breeze-dark/places/16/folder-public.svg</file>
 		<file>icons/breeze-dark/places/16/folder-crash.svg</file>
 		<file>icons/breeze-dark/places/16/folder-cyan.svg</file>
 		<file>icons/breeze-dark/places/16/folder-database.svg</file>
@@ -20,8 +27,11 @@
 		<file>icons/breeze-dark/places/16/folder-desktop.svg</file>
 		<file>icons/breeze-dark/places/16/folder-development.svg</file>
 		<file>icons/breeze-dark/places/16/folder-docker.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-temp.svg">icons/breeze-dark/places/16/folder-recent.svg</file>
 		<file>icons/breeze-dark/places/16/folder-download.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/dialog-scripts.svg">icons/breeze-dark/places/16/folder-script.svg</file>
 		<file>icons/breeze-dark/places/16/folder-drawing.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/object-unlocked.svg">icons/breeze-dark/places/16/folder-unlocked.svg</file>
 		<file>icons/breeze-dark/places/16/folder-extension.svg</file>
 		<file>icons/breeze-dark/places/16/folder-favorites.svg</file>
 		<file>icons/breeze-dark/places/16/folder-flatpak.svg</file>
@@ -31,25 +41,36 @@
 		<file>icons/breeze-dark/places/16/folder-godot.svg</file>
 		<file>icons/breeze-dark/places/16/folder-green.svg</file>
 		<file>icons/breeze-dark/places/16/folder-grey.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/im-user.svg">icons/breeze-dark/places/16/folder-image-people.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-html.svg">icons/breeze-dark/places/16/folder-remote.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-text.svg">icons/breeze-dark/places/16/folder-txt.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-videos.svg">icons/breeze-dark/places/16/folder-video.svg</file>
 		<file>icons/breeze-dark/places/16/folder-important.svg</file>
 		<file>icons/breeze-dark/places/16/folder-java.svg</file>
 		<file>icons/breeze-dark/places/16/folder-language.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-network.svg">icons/breeze-dark/places/16/org.xfce.gigolo.svg</file>
 		<file>icons/breeze-dark/places/16/folder-locked.svg</file>
 		<file>icons/breeze-dark/places/16/folder-log.svg</file>
 		<file>icons/breeze-dark/places/16/folder-mac.svg</file>
 		<file>icons/breeze-dark/places/16/folder-magenta.svg</file>
 		<file>icons/breeze-dark/places/16/folder-mail.svg</file>
+		<file alias="icons/breeze-dark/places/16/network-server-database.svg">icons/breeze-dark/places/16/repository.svg</file>
 		<file>icons/breeze-dark/places/16/folder-network.svg</file>
 		<file>icons/breeze-dark/places/16/folder-notes.svg</file>
+		<file alias="icons/breeze-dark/places/16/network-server-database.svg">icons/breeze-dark/places/16/server-database.svg</file>
 		<file>icons/breeze-dark/places/16/folder-open.svg</file>
 		<file>icons/breeze-dark/places/16/folder-orange.svg</file>
 		<file>icons/breeze-dark/places/16/folder-paint.svg</file>
+		<file alias="icons/breeze-dark/places/16/user-desktop.svg">icons/breeze-dark/places/16/desktop.svg</file>
 		<file>icons/breeze-dark/places/16/folder-pictures.svg</file>
 		<file>icons/breeze-dark/places/16/folder-podcast.svg</file>
 		<file>icons/breeze-dark/places/16/folder-presentation.svg</file>
 		<file>icons/breeze-dark/places/16/folder-print.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-favorites.svg">icons/breeze-dark/places/16/favorites.svg</file>
 		<file>icons/breeze-dark/places/16/folder-publicshare.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/bookmark-new.svg">icons/breeze-dark/places/16/folder-bookmark.svg</file>
 		<file>icons/breeze-dark/places/16/folder-red.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/edit-copy.svg">icons/breeze-dark/places/16/folder-documents.svg</file>
 		<file>icons/breeze-dark/places/16/folder-root.svg</file>
 		<file>icons/breeze-dark/places/16/folder-rpm.svg</file>
 		<file>icons/breeze-dark/places/16/folder-sign.svg</file>
@@ -61,6 +82,8 @@
 		<file>icons/breeze-dark/places/16/folder-templates.svg</file>
 		<file>icons/breeze-dark/places/16/folder-text.svg</file>
 		<file>icons/breeze-dark/places/16/folder-trash.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-html.svg">icons/breeze-dark/places/16/folder_html.svg</file>
+		<file alias="icons/breeze-dark/places/16/network-workgroup.svg">icons/breeze-dark/places/16/network-server.svg</file>
 		<file>icons/breeze-dark/places/16/folder-videos.svg</file>
 		<file>icons/breeze-dark/places/16/folder-violet.svg</file>
 		<file>icons/breeze-dark/places/16/folder-windows.svg</file>
@@ -72,10 +95,27 @@
 		<file>icons/breeze-dark/places/16/mail-message.svg</file>
 		<file>icons/breeze-dark/places/16/network-server-database.svg</file>
 		<file>icons/breeze-dark/places/16/network-workgroup.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../../breeze/places/16/start-here-branding.svg">icons/breeze-dark/places/16/start-here-branding.svg</file>
+		<file alias="icons/breeze-dark/places/16/start-here-kde.svg">icons/breeze-dark/places/16/start-here-kde-plasma.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-activities.svg">icons/breeze-dark/places/16/start-here-kde.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder.svg">icons/breeze-dark/places/16/stock_folder.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-image-people.svg">icons/breeze-dark/places/16/user-identity.svg</file>
 		<file>icons/breeze-dark/places/16/user-desktop.svg</file>
 		<file>icons/breeze-dark/places/16/user-home.svg</file>
 		<file>icons/breeze-dark/places/16/user-trash-full.svg</file>
 		<file>icons/breeze-dark/places/16/user-trash.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-locked.svg">icons/breeze-dark/places/16/certificate-server.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/edit-copy.svg">icons/breeze-dark/places/16/document-multiple.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/address-book-new.svg">icons/breeze-dark/places/16/folder-book.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/kmouth-phrasebook.svg">icons/breeze-dark/places/16/folder-comic.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-download.svg">icons/breeze-dark/places/16/folder-downloads.svg</file>
+		<file alias="icons/breeze-dark/places/16/../../actions/16/view-institution.svg">icons/breeze-dark/places/16/folder-library.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-sound.svg">icons/breeze-dark/places/16/folder-music.svg</file>
+		<file alias="icons/breeze-dark/places/16/folder-cloud.svg">icons/breeze-dark/places/16/folder-onedrive.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/im-user.svg">icons/breeze-dark/places/22/folder-image-people.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-pictures.svg">icons/breeze-dark/places/22/folder-image.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-pictures.svg">icons/breeze-dark/places/22/folder-images.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/dialog-scripts.svg">icons/breeze-dark/places/22/folder-script.svg</file>
 		<file>icons/breeze-dark/places/22/folder-activities.svg</file>
 		<file>icons/breeze-dark/places/22/folder-add.svg</file>
 		<file>icons/breeze-dark/places/22/folder-android.svg</file>
@@ -83,11 +123,14 @@
 		<file>icons/breeze-dark/places/22/folder-black.svg</file>
 		<file>icons/breeze-dark/places/22/folder-blender.svg</file>
 		<file>icons/breeze-dark/places/22/folder-blue.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-html.svg">icons/breeze-dark/places/22/folder-remote.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-text.svg">icons/breeze-dark/places/22/folder-txt.svg</file>
 		<file>icons/breeze-dark/places/22/folder-brown.svg</file>
 		<file>icons/breeze-dark/places/22/folder-build.svg</file>
 		<file>icons/breeze-dark/places/22/folder-calculate.svg</file>
 		<file>icons/breeze-dark/places/22/folder-chart.svg</file>
 		<file>icons/breeze-dark/places/22/folder-cloud.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/object-unlocked.svg">icons/breeze-dark/places/22/folder-unlocked.svg</file>
 		<file>icons/breeze-dark/places/22/folder-crash.svg</file>
 		<file>icons/breeze-dark/places/22/folder-cyan.svg</file>
 		<file>icons/breeze-dark/places/22/folder-database.svg</file>
@@ -96,8 +139,11 @@
 		<file>icons/breeze-dark/places/22/folder-desktop.svg</file>
 		<file>icons/breeze-dark/places/22/folder-development.svg</file>
 		<file>icons/breeze-dark/places/22/folder-docker.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-videos.svg">icons/breeze-dark/places/22/folder-video.svg</file>
 		<file>icons/breeze-dark/places/22/folder-download.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-network.svg">icons/breeze-dark/places/22/org.xfce.gigolo.svg</file>
 		<file>icons/breeze-dark/places/22/folder-drawing.svg</file>
+		<file alias="icons/breeze-dark/places/22/network-server-database.svg">icons/breeze-dark/places/22/repository.svg</file>
 		<file>icons/breeze-dark/places/22/folder-extension.svg</file>
 		<file>icons/breeze-dark/places/22/folder-favorites.svg</file>
 		<file>icons/breeze-dark/places/22/folder-flatpak.svg</file>
@@ -107,9 +153,14 @@
 		<file>icons/breeze-dark/places/22/folder-godot.svg</file>
 		<file>icons/breeze-dark/places/22/folder-green.svg</file>
 		<file>icons/breeze-dark/places/22/folder-grey.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-sound.svg">icons/breeze-dark/places/22/folder-music.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-cloud.svg">icons/breeze-dark/places/22/folder-onedrive.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-cloud.svg">icons/breeze-dark/places/22/folder-owncloud.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-temp.svg">icons/breeze-dark/places/22/folder-recent.svg</file>
 		<file>icons/breeze-dark/places/22/folder-important.svg</file>
 		<file>icons/breeze-dark/places/22/folder-java.svg</file>
 		<file>icons/breeze-dark/places/22/folder-language.svg</file>
+		<file alias="icons/breeze-dark/places/22/network-server-database.svg">icons/breeze-dark/places/22/server-database.svg</file>
 		<file>icons/breeze-dark/places/22/folder-locked.svg</file>
 		<file>icons/breeze-dark/places/22/folder-log.svg</file>
 		<file>icons/breeze-dark/places/22/folder-mac.svg</file>
@@ -117,13 +168,17 @@
 		<file>icons/breeze-dark/places/22/folder-mail.svg</file>
 		<file>icons/breeze-dark/places/22/folder-network.svg</file>
 		<file>icons/breeze-dark/places/22/folder-notes.svg</file>
+		<file alias="icons/breeze-dark/places/22/user-desktop.svg">icons/breeze-dark/places/22/desktop.svg</file>
 		<file>icons/breeze-dark/places/22/folder-open.svg</file>
 		<file>icons/breeze-dark/places/22/folder-orange.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-favorites.svg">icons/breeze-dark/places/22/favorites.svg</file>
 		<file>icons/breeze-dark/places/22/folder-paint.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-cloud.svg">icons/breeze-dark/places/22/folder-dropbox.svg</file>
 		<file>icons/breeze-dark/places/22/folder-pictures.svg</file>
 		<file>icons/breeze-dark/places/22/folder-podcast.svg</file>
 		<file>icons/breeze-dark/places/22/folder-presentation.svg</file>
 		<file>icons/breeze-dark/places/22/folder-print.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/edit-copy.svg">icons/breeze-dark/places/22/folder-documents.svg</file>
 		<file>icons/breeze-dark/places/22/folder-publicshare.svg</file>
 		<file>icons/breeze-dark/places/22/folder-red.svg</file>
 		<file>icons/breeze-dark/places/22/folder-root.svg</file>
@@ -137,6 +192,8 @@
 		<file>icons/breeze-dark/places/22/folder-templates.svg</file>
 		<file>icons/breeze-dark/places/22/folder-text.svg</file>
 		<file>icons/breeze-dark/places/22/folder-trash.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-html.svg">icons/breeze-dark/places/22/folder_html.svg</file>
+		<file alias="icons/breeze-dark/places/22/network-workgroup.svg">icons/breeze-dark/places/22/network-server.svg</file>
 		<file>icons/breeze-dark/places/22/folder-videos.svg</file>
 		<file>icons/breeze-dark/places/22/folder-violet.svg</file>
 		<file>icons/breeze-dark/places/22/folder-windows.svg</file>
@@ -148,10 +205,24 @@
 		<file>icons/breeze-dark/places/22/mail-message.svg</file>
 		<file>icons/breeze-dark/places/22/network-server-database.svg</file>
 		<file>icons/breeze-dark/places/22/network-workgroup.svg</file>
+		<file alias="icons/breeze-dark/places/22/start-here-kde.svg">icons/breeze-dark/places/22/start-here-kde-plasma.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-activities.svg">icons/breeze-dark/places/22/start-here-kde.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder.svg">icons/breeze-dark/places/22/stock_folder.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-image-people.svg">icons/breeze-dark/places/22/user-identity.svg</file>
 		<file>icons/breeze-dark/places/22/user-desktop.svg</file>
 		<file>icons/breeze-dark/places/22/user-home.svg</file>
 		<file>icons/breeze-dark/places/22/user-trash-full.svg</file>
 		<file>icons/breeze-dark/places/22/user-trash.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-locked.svg">icons/breeze-dark/places/22/certificate-server.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/edit-copy.svg">icons/breeze-dark/places/22/document-multiple.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/address-book-new.svg">icons/breeze-dark/places/22/folder-book.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/bookmark-new.svg">icons/breeze-dark/places/22/folder-bookmark.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/kmouth-phrasebook.svg">icons/breeze-dark/places/22/folder-comic.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-download.svg">icons/breeze-dark/places/22/folder-downloads.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/globe.svg">icons/breeze-dark/places/22/folder-html.svg</file>
+		<file alias="icons/breeze-dark/places/22/../../actions/22/view-institution.svg">icons/breeze-dark/places/22/folder-library.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-pictures.svg">icons/breeze-dark/places/22/folder-picture.svg</file>
+		<file alias="icons/breeze-dark/places/22/folder-publicshare.svg">icons/breeze-dark/places/22/folder-public.svg</file>
 		<file>icons/breeze-dark/places/24/folder-activities.svg</file>
 		<file>icons/breeze-dark/places/24/folder-add.svg</file>
 		<file>icons/breeze-dark/places/24/folder-cloud.svg</file>
@@ -181,10 +252,43 @@
 		<file>icons/breeze-dark/places/24/mail-message.svg</file>
 		<file>icons/breeze-dark/places/24/network-server-database.svg</file>
 		<file>icons/breeze-dark/places/24/network-workgroup.svg</file>
+		<file alias="icons/breeze-dark/places/24/user-desktop.svg">icons/breeze-dark/places/24/desktop.svg</file>
 		<file>icons/breeze-dark/places/24/user-desktop.svg</file>
 		<file>icons/breeze-dark/places/24/user-home.svg</file>
 		<file>icons/breeze-dark/places/24/user-trash-full.svg</file>
 		<file>icons/breeze-dark/places/24/user-trash.svg</file>
+		<file alias="icons/breeze-dark/places/24/../../actions/24/globe.svg">icons/breeze-dark/places/24/folder-html.svg</file>
+		<file alias="icons/breeze-dark/places/24/../../actions/24/im-user.svg">icons/breeze-dark/places/24/folder-image-people.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-pictures.svg">icons/breeze-dark/places/24/folder-image.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-pictures.svg">icons/breeze-dark/places/24/folder-images.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-sound.svg">icons/breeze-dark/places/24/folder-music.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-cloud.svg">icons/breeze-dark/places/24/folder-onedrive.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-cloud.svg">icons/breeze-dark/places/24/folder-owncloud.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-pictures.svg">icons/breeze-dark/places/24/folder-picture.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-publicshare.svg">icons/breeze-dark/places/24/folder-public.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-temp.svg">icons/breeze-dark/places/24/folder-recent.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-html.svg">icons/breeze-dark/places/24/folder-remote.svg</file>
+		<file alias="icons/breeze-dark/places/24/../../actions/24/dialog-scripts.svg">icons/breeze-dark/places/24/folder-script.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-text.svg">icons/breeze-dark/places/24/folder-txt.svg</file>
+		<file alias="icons/breeze-dark/places/24/../../actions/24/object-unlocked.svg">icons/breeze-dark/places/24/folder-unlocked.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-videos.svg">icons/breeze-dark/places/24/folder-video.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-html.svg">icons/breeze-dark/places/24/folder_html.svg</file>
+		<file alias="icons/breeze-dark/places/24/network-workgroup.svg">icons/breeze-dark/places/24/network-server.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-network.svg">icons/breeze-dark/places/24/org.xfce.gigolo.svg</file>
+		<file alias="icons/breeze-dark/places/24/network-server-database.svg">icons/breeze-dark/places/24/repository.svg</file>
+		<file alias="icons/breeze-dark/places/24/network-server-database.svg">icons/breeze-dark/places/24/server-database.svg</file>
+		<file alias="icons/breeze-dark/places/24/start-here-kde.svg">icons/breeze-dark/places/24/start-here-kde-plasma.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-activities.svg">icons/breeze-dark/places/24/start-here-kde.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder.svg">icons/breeze-dark/places/24/stock_folder.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-image-people.svg">icons/breeze-dark/places/24/user-identity.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-locked.svg">icons/breeze-dark/places/24/certificate-server.svg</file>
+		<file alias="icons/breeze-dark/places/24/../../actions/24/edit-copy.svg">icons/breeze-dark/places/24/document-multiple.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-favorites.svg">icons/breeze-dark/places/24/favorites.svg</file>
+		<file alias="icons/breeze-dark/places/24/../../actions/24/bookmark-new.svg">icons/breeze-dark/places/24/folder-bookmark.svg</file>
+		<file alias="icons/breeze-dark/places/24/../../actions/24/edit-copy.svg">icons/breeze-dark/places/24/folder-documents.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-download.svg">icons/breeze-dark/places/24/folder-downloads.svg</file>
+		<file alias="icons/breeze-dark/places/24/folder-cloud.svg">icons/breeze-dark/places/24/folder-dropbox.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-favorites.svg">icons/breeze-dark/places/32/favorites.svg</file>
 		<file>icons/breeze-dark/places/32/folder-activities.svg</file>
 		<file>icons/breeze-dark/places/32/folder-android.svg</file>
 		<file>icons/breeze-dark/places/32/folder-appimage.svg</file>
@@ -261,11 +365,30 @@
 		<file>icons/breeze-dark/places/32/folder-windows.svg</file>
 		<file>icons/breeze-dark/places/32/folder-yellow.svg</file>
 		<file>icons/breeze-dark/places/32/folder.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-download.svg">icons/breeze-dark/places/32/folder-downloads.svg</file>
 		<file>icons/breeze-dark/places/32/network-workgroup.svg</file>
 		<file>icons/breeze-dark/places/32/user-desktop.svg</file>
 		<file>icons/breeze-dark/places/32/user-home.svg</file>
 		<file>icons/breeze-dark/places/32/user-trash-full.svg</file>
 		<file>icons/breeze-dark/places/32/user-trash.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-cloud.svg">icons/breeze-dark/places/32/folder-dropbox.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-pictures.svg">icons/breeze-dark/places/32/folder-image.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-pictures.svg">icons/breeze-dark/places/32/folder-images.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-sound.svg">icons/breeze-dark/places/32/folder-music.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-cloud.svg">icons/breeze-dark/places/32/folder-onedrive.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-cloud.svg">icons/breeze-dark/places/32/folder-owncloud.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-pictures.svg">icons/breeze-dark/places/32/folder-picture.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-publicshare.svg">icons/breeze-dark/places/32/folder-public.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-temp.svg">icons/breeze-dark/places/32/folder-recent.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-html.svg">icons/breeze-dark/places/32/folder-remote.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-text.svg">icons/breeze-dark/places/32/folder-txt.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-videos.svg">icons/breeze-dark/places/32/folder-video.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-html.svg">icons/breeze-dark/places/32/folder_html.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-music.svg">icons/breeze-dark/places/32/library-music.svg</file>
+		<file alias="icons/breeze-dark/places/32/network-workgroup.svg">icons/breeze-dark/places/32/network-server.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder.svg">icons/breeze-dark/places/32/stock_folder.svg</file>
+		<file alias="icons/breeze-dark/places/32/folder-locked.svg">icons/breeze-dark/places/32/certificate-server.svg</file>
+		<file alias="icons/breeze-dark/places/32/user-desktop.svg">icons/breeze-dark/places/32/desktop.svg</file>
 		<file>icons/breeze-dark/places/48/folder-activities.svg</file>
 		<file>icons/breeze-dark/places/48/folder-black.svg</file>
 		<file>icons/breeze-dark/places/48/folder-blue.svg</file>
@@ -316,6 +439,27 @@
 		<file>icons/breeze-dark/places/48/user-home.svg</file>
 		<file>icons/breeze-dark/places/48/user-trash-full.svg</file>
 		<file>icons/breeze-dark/places/48/user-trash.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-html.svg">icons/breeze-dark/places/48/folder_html.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-music.svg">icons/breeze-dark/places/48/library-music.svg</file>
+		<file alias="icons/breeze-dark/places/48/network-workgroup.svg">icons/breeze-dark/places/48/network-server.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder.svg">icons/breeze-dark/places/48/stock_folder.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-locked.svg">icons/breeze-dark/places/48/certificate-server.svg</file>
+		<file alias="icons/breeze-dark/places/48/user-desktop.svg">icons/breeze-dark/places/48/desktop.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-favorites.svg">icons/breeze-dark/places/48/favorites.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-download.svg">icons/breeze-dark/places/48/folder-downloads.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-cloud.svg">icons/breeze-dark/places/48/folder-dropbox.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-pictures.svg">icons/breeze-dark/places/48/folder-image.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-pictures.svg">icons/breeze-dark/places/48/folder-images.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-sound.svg">icons/breeze-dark/places/48/folder-music.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-cloud.svg">icons/breeze-dark/places/48/folder-onedrive.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-cloud.svg">icons/breeze-dark/places/48/folder-owncloud.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-pictures.svg">icons/breeze-dark/places/48/folder-picture.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-publicshare.svg">icons/breeze-dark/places/48/folder-public.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-temp.svg">icons/breeze-dark/places/48/folder-recent.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-html.svg">icons/breeze-dark/places/48/folder-remote.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-text.svg">icons/breeze-dark/places/48/folder-txt.svg</file>
+		<file alias="icons/breeze-dark/places/48/folder-videos.svg">icons/breeze-dark/places/48/folder-video.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-locked.svg">icons/breeze-dark/places/64/certificate-server.svg</file>
 		<file>icons/breeze-dark/places/64/folder-activities.svg</file>
 		<file>icons/breeze-dark/places/64/folder-android.svg</file>
 		<file>icons/breeze-dark/places/64/folder-appimage.svg</file>
@@ -354,6 +498,7 @@
 		<file>icons/breeze-dark/places/64/folder-grey.svg</file>
 		<file>icons/breeze-dark/places/64/folder-html.svg</file>
 		<file>icons/breeze-dark/places/64/folder-image-people.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-favorites.svg">icons/breeze-dark/places/64/favorites.svg</file>
 		<file>icons/breeze-dark/places/64/folder-important.svg</file>
 		<file>icons/breeze-dark/places/64/folder-java.svg</file>
 		<file>icons/breeze-dark/places/64/folder-language.svg</file>
@@ -392,12 +537,31 @@
 		<file>icons/breeze-dark/places/64/folder-windows.svg</file>
 		<file>icons/breeze-dark/places/64/folder-yellow.svg</file>
 		<file>icons/breeze-dark/places/64/folder.svg</file>
+		<file alias="icons/breeze-dark/places/64/start-here-kde.svg">icons/breeze-dark/places/64/start-here-kde-plasma.svg</file>
 		<file>icons/breeze-dark/places/64/network-workgroup.svg</file>
 		<file>icons/breeze-dark/places/64/start-here-kde.svg</file>
 		<file>icons/breeze-dark/places/64/user-desktop.svg</file>
 		<file>icons/breeze-dark/places/64/user-home.svg</file>
 		<file>icons/breeze-dark/places/64/user-trash-full.svg</file>
 		<file>icons/breeze-dark/places/64/user-trash.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-download.svg">icons/breeze-dark/places/64/folder-downloads.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-cloud.svg">icons/breeze-dark/places/64/folder-dropbox.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-pictures.svg">icons/breeze-dark/places/64/folder-image.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-pictures.svg">icons/breeze-dark/places/64/folder-images.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-sound.svg">icons/breeze-dark/places/64/folder-music.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-cloud.svg">icons/breeze-dark/places/64/folder-onedrive.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-cloud.svg">icons/breeze-dark/places/64/folder-owncloud.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-pictures.svg">icons/breeze-dark/places/64/folder-picture.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-publicshare.svg">icons/breeze-dark/places/64/folder-public.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-temp.svg">icons/breeze-dark/places/64/folder-recent.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-html.svg">icons/breeze-dark/places/64/folder-remote.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-text.svg">icons/breeze-dark/places/64/folder-txt.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-videos.svg">icons/breeze-dark/places/64/folder-video.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-html.svg">icons/breeze-dark/places/64/folder_html.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder-music.svg">icons/breeze-dark/places/64/library-music.svg</file>
+		<file alias="icons/breeze-dark/places/64/network-workgroup.svg">icons/breeze-dark/places/64/network-server.svg</file>
+		<file alias="icons/breeze-dark/places/64/folder.svg">icons/breeze-dark/places/64/stock_folder.svg</file>
+		<file alias="icons/breeze-dark/places/64/user-desktop.svg">icons/breeze-dark/places/64/desktop.svg</file>
 		<file>icons/breeze-dark/places/96/folder-activities.svg</file>
 		<file>icons/breeze-dark/places/96/folder-black.svg</file>
 		<file>icons/breeze-dark/places/96/folder-blue.svg</file>
@@ -449,5 +613,46 @@
 		<file>icons/breeze-dark/places/96/user-home.svg</file>
 		<file>icons/breeze-dark/places/96/user-trash-full.svg</file>
 		<file>icons/breeze-dark/places/96/user-trash.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-temp.svg">icons/breeze-dark/places/96/folder-recent.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-html.svg">icons/breeze-dark/places/96/folder-remote.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-text.svg">icons/breeze-dark/places/96/folder-txt.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-videos.svg">icons/breeze-dark/places/96/folder-video.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-html.svg">icons/breeze-dark/places/96/folder_html.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-music.svg">icons/breeze-dark/places/96/library-music.svg</file>
+		<file alias="icons/breeze-dark/places/96/network-workgroup.svg">icons/breeze-dark/places/96/network-server.svg</file>
+		<file alias="icons/breeze-dark/places/96/start-here-kde.svg">icons/breeze-dark/places/96/start-here-kde-plasma.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder.svg">icons/breeze-dark/places/96/stock_folder.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-locked.svg">icons/breeze-dark/places/96/certificate-server.svg</file>
+		<file alias="icons/breeze-dark/places/96/user-desktop.svg">icons/breeze-dark/places/96/desktop.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-favorites.svg">icons/breeze-dark/places/96/favorites.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-download.svg">icons/breeze-dark/places/96/folder-downloads.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-cloud.svg">icons/breeze-dark/places/96/folder-dropbox.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-pictures.svg">icons/breeze-dark/places/96/folder-image.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-pictures.svg">icons/breeze-dark/places/96/folder-images.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-sound.svg">icons/breeze-dark/places/96/folder-music.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-cloud.svg">icons/breeze-dark/places/96/folder-onedrive.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-cloud.svg">icons/breeze-dark/places/96/folder-owncloud.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-pictures.svg">icons/breeze-dark/places/96/folder-picture.svg</file>
+		<file alias="icons/breeze-dark/places/96/folder-publicshare.svg">icons/breeze-dark/places/96/folder-public.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-documents.svg">icons/breeze-dark/places/symbolic/folder-documents-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-download.svg">icons/breeze-dark/places/symbolic/folder-download-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-games.svg">icons/breeze-dark/places/symbolic/folder-games-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-sound.svg">icons/breeze-dark/places/symbolic/folder-music-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-pictures.svg">icons/breeze-dark/places/symbolic/folder-pictures-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-publicshare.svg">icons/breeze-dark/places/symbolic/folder-publicshare-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-remote.svg">icons/breeze-dark/places/symbolic/folder-remote-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-root.svg">icons/breeze-dark/places/symbolic/folder-root-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../../actions/16/edit-find.svg">icons/breeze-dark/places/symbolic/folder-saved-search-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder.svg">icons/breeze-dark/places/symbolic/folder-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-templates.svg">icons/breeze-dark/places/symbolic/folder-templates-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-videos.svg">icons/breeze-dark/places/symbolic/folder-videos-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/mail-folder-outbox.svg">icons/breeze-dark/places/symbolic/mail-outbox-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/network-server.svg">icons/breeze-dark/places/symbolic/network-server-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/network-workgroup.svg">icons/breeze-dark/places/symbolic/network-workgroup-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/start-here-kde.svg">icons/breeze-dark/places/symbolic/start-here-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-favorites.svg">icons/breeze-dark/places/symbolic/user-bookmarks-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/folder-documents.svg">icons/breeze-dark/places/symbolic/user-desktop-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/user-home.svg">icons/breeze-dark/places/symbolic/user-home-symbolic.svg</file>
+		<file alias="icons/breeze-dark/places/symbolic/../16/user-trash.svg">icons/breeze-dark/places/symbolic/user-trash-symbolic.svg</file>
 	</qresource>
 </RCC>

@@ -13,6 +13,7 @@
 		<file>icons/breeze/devices/16/drive-harddisk.svg</file>
 		<file>icons/breeze/devices/16/drive-multidisk.svg</file>
 		<file>icons/breeze/devices/16/drive-multipartition.svg</file>
+		<file alias="icons/breeze/devices/16/smartphone.svg">icons/breeze/devices/16/phone.svg</file>
 		<file>icons/breeze/devices/16/drive-removable-media.svg</file>
 		<file>icons/breeze/devices/16/input-dialpad.svg</file>
 		<file>icons/breeze/devices/16/input-keyboard-virtual.svg</file>
@@ -53,6 +54,23 @@
 		<file>icons/breeze/devices/16/smartphone.svg</file>
 		<file>icons/breeze/devices/16/tablet.svg</file>
 		<file>icons/breeze/devices/16/uav-quadcopter.svg</file>
+		<file alias="icons/breeze/devices/16/../../actions/16/tools-media-optical-burn.svg">icons/breeze/devices/16/media-write-cd.svg</file>
+		<file alias="icons/breeze/devices/16/../../actions/16/tools-media-optical-burn.svg">icons/breeze/devices/16/media-write-dvd.svg</file>
+		<file alias="icons/breeze/devices/16/computer.svg">icons/breeze/devices/16/monitor.svg</file>
+		<file alias="icons/breeze/devices/16/multimedia-player-ipod-mini-blue.svg">icons/breeze/devices/16/multimedia-player.svg</file>
+		<file alias="icons/breeze/devices/16/network-wired-activated.svg">icons/breeze/devices/16/network-wired.svg</file>
+		<file alias="icons/breeze/devices/16/network-wireless-connected-100.svg">icons/breeze/devices/16/network-wireless.svg</file>
+		<file alias="icons/breeze/devices/16/../../actions/16/document-print.svg">icons/breeze/devices/16/printer.svg</file>
+		<file alias="icons/breeze/devices/16/audio-radio.svg">icons/breeze/devices/16/radio.svg</file>
+		<file alias="icons/breeze/devices/16/uav-quadcopter.svg">icons/breeze/devices/16/uav.svg</file>
+		<file alias="icons/breeze/devices/16/printer.svg">icons/breeze/devices/16/cups.svg</file>
+		<file alias="icons/breeze/devices/16/printer.svg">icons/breeze/devices/16/cupsprinter.svg</file>
+		<file alias="icons/breeze/devices/16/media-optical.svg">icons/breeze/devices/16/drive-optical.svg</file>
+		<file alias="icons/breeze/devices/16/../../actions/16/office-chart-pie.svg">icons/breeze/devices/16/drive-partition.svg</file>
+		<file alias="icons/breeze/devices/16/drive-removable-media.svg">icons/breeze/devices/16/drive-removable-media-usb-pendrive.svg</file>
+		<file alias="icons/breeze/devices/16/drive-removable-media.svg">icons/breeze/devices/16/drive-removable-media-usb.svg</file>
+		<file alias="icons/breeze/devices/16/../../places/16/folder-games.svg">icons/breeze/devices/16/input-gamepad.svg</file>
+		<file alias="icons/breeze/devices/16/../../actions/16/document-save.svg">icons/breeze/devices/16/media-floppy.svg</file>
 		<file>icons/breeze/devices/22/audio-card.svg</file>
 		<file>icons/breeze/devices/22/audio-headphones.svg</file>
 		<file>icons/breeze/devices/22/audio-headset.svg</file>
@@ -100,6 +118,26 @@
 		<file>icons/breeze/devices/22/tablet.svg</file>
 		<file>icons/breeze/devices/22/uav-quadcopter.svg</file>
 		<file>icons/breeze/devices/22/video-television.svg</file>
+		<file alias="icons/breeze/devices/22/../../status/22/network-wired-activated.svg">icons/breeze/devices/22/network-wired.svg</file>
+		<file alias="icons/breeze/devices/22/../../status/22/network-wireless-connected-100.svg">icons/breeze/devices/22/network-wireless.svg</file>
+		<file alias="icons/breeze/devices/22/../../actions/22/document-print.svg">icons/breeze/devices/22/printer.svg</file>
+		<file alias="icons/breeze/devices/22/audio-radio.svg">icons/breeze/devices/22/radio.svg</file>
+		<file alias="icons/breeze/devices/22/uav-quadcopter.svg">icons/breeze/devices/22/uav.svg</file>
+		<file alias="icons/breeze/devices/22/printer.svg">icons/breeze/devices/22/cups.svg</file>
+		<file alias="icons/breeze/devices/22/printer.svg">icons/breeze/devices/22/cupsprinter.svg</file>
+		<file alias="icons/breeze/devices/22/media-optical.svg">icons/breeze/devices/22/drive-optical.svg</file>
+		<file alias="icons/breeze/devices/22/../../actions/22/office-chart-pie.svg">icons/breeze/devices/22/drive-partition.svg</file>
+		<file alias="icons/breeze/devices/22/drive-removable-media.svg">icons/breeze/devices/22/drive-removable-media-usb-pendrive.svg</file>
+		<file alias="icons/breeze/devices/22/drive-removable-media.svg">icons/breeze/devices/22/drive-removable-media-usb.svg</file>
+		<file alias="icons/breeze/devices/22/../../places/22/folder-games.svg">icons/breeze/devices/22/input-gamepad.svg</file>
+		<file alias="icons/breeze/devices/22/../../actions/22/document-save.svg">icons/breeze/devices/22/media-floppy.svg</file>
+		<file alias="icons/breeze/devices/22/../../actions/22/tools-rip-audio-cd.svg">icons/breeze/devices/22/media-optical-audio.svg</file>
+		<file alias="icons/breeze/devices/22/../../actions/22/tools-rip-video-cd.svg">icons/breeze/devices/22/media-optical-video.svg</file>
+		<file alias="icons/breeze/devices/22/../../actions/22/tools-media-optical-format.svg">icons/breeze/devices/22/media-optical.svg</file>
+		<file alias="icons/breeze/devices/22/../../actions/22/tools-media-optical-burn.svg">icons/breeze/devices/22/media-write-cd.svg</file>
+		<file alias="icons/breeze/devices/22/../../actions/22/tools-media-optical-burn.svg">icons/breeze/devices/22/media-write-dvd.svg</file>
+		<file alias="icons/breeze/devices/22/computer.svg">icons/breeze/devices/22/monitor.svg</file>
+		<file alias="icons/breeze/devices/22/smartphone.svg">icons/breeze/devices/22/phone.svg</file>
 		<file>icons/breeze/devices/24/audio-card.svg</file>
 		<file>icons/breeze/devices/24/audio-headphones.svg</file>
 		<file>icons/breeze/devices/24/audio-headset.svg</file>
@@ -147,6 +185,26 @@
 		<file>icons/breeze/devices/24/tablet.svg</file>
 		<file>icons/breeze/devices/24/uav-quadcopter.svg</file>
 		<file>icons/breeze/devices/24/video-television.svg</file>
+		<file alias="icons/breeze/devices/24/../../status/24/network-wired-activated.svg">icons/breeze/devices/24/network-wired.svg</file>
+		<file alias="icons/breeze/devices/24/../../status/24/network-wireless-connected-100.svg">icons/breeze/devices/24/network-wireless.svg</file>
+		<file alias="icons/breeze/devices/24/../../actions/24/document-print.svg">icons/breeze/devices/24/printer.svg</file>
+		<file alias="icons/breeze/devices/24/audio-radio.svg">icons/breeze/devices/24/radio.svg</file>
+		<file alias="icons/breeze/devices/24/uav-quadcopter.svg">icons/breeze/devices/24/uav.svg</file>
+		<file alias="icons/breeze/devices/24/printer.svg">icons/breeze/devices/24/cups.svg</file>
+		<file alias="icons/breeze/devices/24/printer.svg">icons/breeze/devices/24/cupsprinter.svg</file>
+		<file alias="icons/breeze/devices/24/media-optical.svg">icons/breeze/devices/24/drive-optical.svg</file>
+		<file alias="icons/breeze/devices/24/../../actions/24/office-chart-pie.svg">icons/breeze/devices/24/drive-partition.svg</file>
+		<file alias="icons/breeze/devices/24/drive-removable-media.svg">icons/breeze/devices/24/drive-removable-media-usb-pendrive.svg</file>
+		<file alias="icons/breeze/devices/24/drive-removable-media.svg">icons/breeze/devices/24/drive-removable-media-usb.svg</file>
+		<file alias="icons/breeze/devices/24/../../places/24/folder-games.svg">icons/breeze/devices/24/input-gamepad.svg</file>
+		<file alias="icons/breeze/devices/24/../../actions/24/document-save.svg">icons/breeze/devices/24/media-floppy.svg</file>
+		<file alias="icons/breeze/devices/24/../../actions/24/tools-rip-audio-cd.svg">icons/breeze/devices/24/media-optical-audio.svg</file>
+		<file alias="icons/breeze/devices/24/../../actions/24/tools-rip-video-cd.svg">icons/breeze/devices/24/media-optical-video.svg</file>
+		<file alias="icons/breeze/devices/24/../../actions/24/tools-media-optical-format.svg">icons/breeze/devices/24/media-optical.svg</file>
+		<file alias="icons/breeze/devices/24/../../actions/24/tools-media-optical-burn.svg">icons/breeze/devices/24/media-write-cd.svg</file>
+		<file alias="icons/breeze/devices/24/../../actions/24/tools-media-optical-burn.svg">icons/breeze/devices/24/media-write-dvd.svg</file>
+		<file alias="icons/breeze/devices/24/computer.svg">icons/breeze/devices/24/monitor.svg</file>
+		<file alias="icons/breeze/devices/24/smartphone.svg">icons/breeze/devices/24/phone.svg</file>
 		<file>icons/breeze/devices/64/audio-card.svg</file>
 		<file>icons/breeze/devices/64/audio-headphones.svg</file>
 		<file>icons/breeze/devices/64/audio-headset.svg</file>
@@ -193,5 +251,55 @@
 		<file>icons/breeze/devices/64/smartphone.svg</file>
 		<file>icons/breeze/devices/64/video-display.svg</file>
 		<file>icons/breeze/devices/64/video-television.svg</file>
+		<file alias="icons/breeze/devices/64/computer.svg">icons/breeze/devices/64/monitor.svg</file>
+		<file alias="icons/breeze/devices/64/smartphone.svg">icons/breeze/devices/64/phone.svg</file>
+		<file alias="icons/breeze/devices/64/printer.svg">icons/breeze/devices/64/cups.svg</file>
+		<file alias="icons/breeze/devices/64/printer.svg">icons/breeze/devices/64/cupsprinter.svg</file>
+		<file alias="icons/breeze/devices/64/media-optical.svg">icons/breeze/devices/64/drive-optical.svg</file>
+		<file alias="icons/breeze/devices/64/drive-removable-media.svg">icons/breeze/devices/64/drive-removable-media-usb-pendrive.svg</file>
+		<file alias="icons/breeze/devices/64/drive-removable-media.svg">icons/breeze/devices/64/drive-removable-media-usb.svg</file>
+		<file alias="icons/breeze/devices/64/input-gaming.svg">icons/breeze/devices/64/input-gamepad.svg</file>
+		<file alias="icons/breeze/devices/64/media-flash-sd-mmc.svg">icons/breeze/devices/64/media-flash-smart-media.svg</file>
+		<file alias="icons/breeze/devices/64/media-flash-sd-mmc.svg">icons/breeze/devices/64/media-flash.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/camera-photo.svg">icons/breeze/devices/symbolic/camera-photo-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/camera-video.svg">icons/breeze/devices/symbolic/camera-video-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/camera-photo.svg">icons/breeze/devices/symbolic/camera-web-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/computer.svg">icons/breeze/devices/symbolic/computer-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-harddisk-encrypted.svg">icons/breeze/devices/symbolic/drive-harddisk-encrypted-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-harddisk.svg">icons/breeze/devices/symbolic/drive-harddisk-ieee1394-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-harddisk-root.svg">icons/breeze/devices/symbolic/drive-harddisk-root-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-harddisk.svg">icons/breeze/devices/symbolic/drive-harddisk-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-harddisk.svg">icons/breeze/devices/symbolic/drive-harddisk-system-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-harddisk.svg">icons/breeze/devices/symbolic/drive-harddisk-usb-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-multidisk.svg">icons/breeze/devices/symbolic/drive-multidisk-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-multipartition.svg">icons/breeze/devices/symbolic/drive-multipartition-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../../actions/16/office-chart-pie.svg">icons/breeze/devices/symbolic/drive-partition-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-removable-media.svg">icons/breeze/devices/symbolic/drive-removable-media-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/input-dialpad.svg">icons/breeze/devices/symbolic/input-dialpad-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/input-gamepad.svg">icons/breeze/devices/symbolic/input-gamepad-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/input-keyboard.svg">icons/breeze/devices/symbolic/input-keyboard-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/input-keyboard-virtual.svg">icons/breeze/devices/symbolic/input-keyboard-virtual-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/input-mouse.svg">icons/breeze/devices/symbolic/input-mouse-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/input-tablet.svg">icons/breeze/devices/symbolic/input-tablet-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/input-touchpad.svg">icons/breeze/devices/symbolic/input-touchpad-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-removable-media.svg">icons/breeze/devices/symbolic/media-flash-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/media-floppy.svg">icons/breeze/devices/symbolic/media-floppy-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/media-optical-audio.svg">icons/breeze/devices/symbolic/media-optical-bd-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/media-optical-audio.svg">icons/breeze/devices/symbolic/media-optical-cd-audio-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/media-optical.svg">icons/breeze/devices/symbolic/media-optical-dvd-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/media-optical.svg">icons/breeze/devices/symbolic/media-optical-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/drive-removable-media-usb.svg">icons/breeze/devices/symbolic/media-removable-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/multimedia-player-ipod-mini-blue.svg">icons/breeze/devices/symbolic/multimedia-player-apple-ipod-touch-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/multimedia-player-ipod-mini-blue.svg">icons/breeze/devices/symbolic/multimedia-player-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/network-vpn.svg">icons/breeze/devices/symbolic/network-wired-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/network-wireless.svg">icons/breeze/devices/symbolic/network-wireless-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/smartphone.svg">icons/breeze/devices/symbolic/phone-apple-iphone-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../../actions/16/document-print.svg">icons/breeze/devices/symbolic/printer-network-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../../actions/symbolic/document-print-symbolic.svg">icons/breeze/devices/symbolic/printer-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/audio-input-microphone.svg">icons/breeze/devices/symbolic/audio-input-microphone-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/radio.svg">icons/breeze/devices/symbolic/audio-radio-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../../status/16/audio-volume-high.svg">icons/breeze/devices/symbolic/audio-speakers-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/auth-sim.svg">icons/breeze/devices/symbolic/auth-sim-symbolic.svg</file>
+		<file alias="icons/breeze/devices/symbolic/../16/smartphone.svg">icons/breeze/devices/symbolic/phone-symbolic.svg</file>
 	</qresource>
 </RCC>

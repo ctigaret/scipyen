@@ -181,9 +181,23 @@
 		<file>icons/breeze/preferences/24/system-users.svg</file>
 		<file>icons/breeze/preferences/24/window-duplicate.svg</file>
 		<file>icons/breeze/preferences/24/yast-disk.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-locale.svg">icons/breeze/preferences/32/amarok_change_language.svg</file>
 		<file>icons/breeze/preferences/32/device-notifier.svg</file>
 		<file>icons/breeze/preferences/32/drive-removable-media.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-emoticons.svg">icons/breeze/preferences/32/face-smile.svg</file>
+		<file alias="icons/breeze/preferences/32/../../apps/48/office-calendar.svg">icons/breeze/preferences/32/financial-schedule.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-gtk-config.svg">icons/breeze/preferences/32/gtkconfig.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-accessibility.svg">icons/breeze/preferences/32/kaccess.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-gtk-config.svg">icons/breeze/preferences/32/kde-gtk-config.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-kde-connect.svg">icons/breeze/preferences/32/kdeconnect.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-power-management.svg">icons/breeze/preferences/32/kded5.svg</file>
+		<file alias="icons/breeze/preferences/32/plasma-search.svg">icons/breeze/preferences/32/krunner.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-login.svg">icons/breeze/preferences/32/ksmserver.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-multimedia.svg">icons/breeze/preferences/32/mediacontrol.svg</file>
 		<file>icons/breeze/preferences/32/plasma-search.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-plasma.svg">icons/breeze/preferences/32/plasma.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-plasma.svg">icons/breeze/preferences/32/plasmagik.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-plasma.svg">icons/breeze/preferences/32/plasmashell.svg</file>
 		<file>icons/breeze/preferences/32/podcast-amarok.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-accessibility.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-activities.svg</file>
@@ -200,15 +214,20 @@
 		<file>icons/breeze/preferences/32/preferences-desktop-filetype-association.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-filter.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-font.svg</file>
+		<file alias="icons/breeze/preferences/32/../../categories/32/applications-games.svg">icons/breeze/preferences/32/preferences-desktop-gaming.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-gestures-screenedges.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-gestures-touch.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-icons.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-keyboard.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-launch-feedback.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-locale.svg</file>
+		<file alias="icons/breeze/preferences/32/../../apps/48/kmenuedit.svg">icons/breeze/preferences/32/preferences-desktop-menu-edit.svg</file>
+		<file alias="icons/breeze/preferences/32/../../devices/64/input-mouse.svg">icons/breeze/preferences/32/preferences-desktop-mouse.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-multimedia.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-navigation.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-notification-bell.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-notification-bell.svg">icons/breeze/preferences/32/preferences-desktop-notification.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-tablet.svg">icons/breeze/preferences/32/preferences-desktop-peripherals.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-plasma-theme.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-plasma.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-screensaver.svg</file>
@@ -219,6 +238,7 @@
 		<file>icons/breeze/preferences/32/preferences-desktop-theme-applications.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-theme-global.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-theme-windowdecorations.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-theme-applications.svg">icons/breeze/preferences/32/preferences-desktop-theme.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-thunderbolt.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-touchpad.svg</file>
 		<file>icons/breeze/preferences/32/preferences-desktop-touchscreen.svg</file>
@@ -251,6 +271,7 @@
 		<file>icons/breeze/preferences/32/preferences-system-bluetooth.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-linux.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-login.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-dsl.svg">icons/breeze/preferences/32/yast-dsl.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-network-dsl.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-network-ethernet.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-network-iscsi.svg</file>
@@ -275,9 +296,12 @@
 		<file>icons/breeze/preferences/32/preferences-system-network-server-web.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-network-server.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-network-share-windows.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-sharing.svg">icons/breeze/preferences/32/preferences-system-network-share.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-network-sharing.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-network-vpn.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-network-wakeonlan.svg</file>
+		<file alias="icons/breeze/preferences/32/../../categories/32/applications-internet.svg">icons/breeze/preferences/32/preferences-system-network.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-devices-cpu.svg">icons/breeze/preferences/32/preferences-system-performance.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-power-management.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-services.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-session-services.svg</file>
@@ -285,6 +309,7 @@
 		<file>icons/breeze/preferences/32/preferences-system-startup.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-time.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-user-sudo.svg</file>
+		<file alias="icons/breeze/preferences/32/yast-users.svg">icons/breeze/preferences/32/preferences-system-users.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-windows-actions.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-windows-behavior.svg</file>
 		<file>icons/breeze/preferences/32/preferences-system-windows-move.svg</file>
@@ -302,12 +327,83 @@
 		<file>icons/breeze/preferences/32/preferences-web-browser-shortcuts.svg</file>
 		<file>icons/breeze/preferences/32/preferences-web-browser-ssl.svg</file>
 		<file>icons/breeze/preferences/32/preferences-web-browser-stylesheets.svg</file>
+		<file alias="icons/breeze/preferences/32/../../apps/32/systemsettings.svg">icons/breeze/preferences/32/preferences.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-user-password.svg">icons/breeze/preferences/32/system-lock-screen.svg</file>
 		<file>icons/breeze/preferences/32/system-users.svg</file>
 		<file>icons/breeze/preferences/32/window-duplicate.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-plugin.svg">icons/breeze/preferences/32/yast-addon-extension.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-plugin.svg">icons/breeze/preferences/32/yast-addon.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-other.svg">icons/breeze/preferences/32/yast-alternatives.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-security-apparmor.svg">icons/breeze/preferences/32/yast-apparmor.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-security-kerberos.svg">icons/breeze/preferences/32/yast-auth-client.svg</file>
 		<file>icons/breeze/preferences/32/yast-autoyast.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-startup.svg">icons/breeze/preferences/32/yast-bootloader.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-devices-drive-optical-check.svg">icons/breeze/preferences/32/yast-checkmedia.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-virtualization-vm-new.svg">icons/breeze/preferences/32/yast-create-new-vm.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-devices-tree.svg">icons/breeze/preferences/32/yast-device-tree.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-dhcp.svg">icons/breeze/preferences/32/yast-dhcp-server.svg</file>
 		<file>icons/breeze/preferences/32/yast-disk.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-dns.svg">icons/breeze/preferences/32/yast-dns-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-virtualization-container.svg">icons/breeze/preferences/32/yast-docker.svg</file>
+		<file alias="icons/breeze/preferences/32/yast-lan.svg">icons/breeze/preferences/32/yast-fcoe.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-security-firewall.svg">icons/breeze/preferences/32/yast-firewall.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-font.svg">icons/breeze/preferences/32/yast-fonts.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-ftp.svg">icons/breeze/preferences/32/yast-ftp-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-devices-cpu.svg">icons/breeze/preferences/32/yast-hardware-group.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server.svg">icons/breeze/preferences/32/yast-host.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-web.svg">icons/breeze/preferences/32/yast-http-server.svg</file>
+		<file alias="icons/breeze/preferences/32/../../apps/32/hwinfo.svg">icons/breeze/preferences/32/yast-hwinfo.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-installation.svg">icons/breeze/preferences/32/yast-instserver.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-iscsi.svg">icons/breeze/preferences/32/yast-iscsi-client.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-iscsi.svg">icons/breeze/preferences/32/yast-iscsi-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-log.svg">icons/breeze/preferences/32/yast-journal.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-kerberos.svg">icons/breeze/preferences/32/yast-kerberos-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-linux.svg">icons/breeze/preferences/32/yast-kernel.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-keyboard.svg">icons/breeze/preferences/32/yast-keyboard.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-ethernet.svg">icons/breeze/preferences/32/yast-lan.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-share-windows.svg">icons/breeze/preferences/32/yast-samba-client.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-share-windows.svg">icons/breeze/preferences/32/yast-samba-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-devices-scanner.svg">icons/breeze/preferences/32/yast-scanner.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-security.svg">icons/breeze/preferences/32/yast-security.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-slp.svg">icons/breeze/preferences/32/yast-slp-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-sound.svg">icons/breeze/preferences/32/yast-sound.svg</file>
+		<file alias="icons/breeze/preferences/32/../../apps/32/system-help.svg">icons/breeze/preferences/32/yast-support.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-boot.svg">icons/breeze/preferences/32/yast-tftp-server.svg</file>
 		<file>icons/breeze/preferences/32/yast-software-group.svg</file>
 		<file>icons/breeze/preferences/32/yast-sw_source.svg</file>
 		<file>icons/breeze/preferences/32/yast-update.svg</file>
+		<file alias="icons/breeze/preferences/32/yast-update.svg">icons/breeze/preferences/32/yast-update-online-configuration.svg</file>
+		<file alias="icons/breeze/preferences/32/yast-update.svg">icons/breeze/preferences/32/yast-update-online.svg</file>
+		<file alias="icons/breeze/preferences/32/system-users.svg">icons/breeze/preferences/32/yast-users.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-virtualization-vm.svg">icons/breeze/preferences/32/yast-vm-group.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-virtualization-vm-install.svg">icons/breeze/preferences/32/yast-vm-install.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-virtualization-vm-migrate.svg">icons/breeze/preferences/32/yast-vm-migrate.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-vpn.svg">icons/breeze/preferences/32/yast-vpn.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-wakeonlan.svg">icons/breeze/preferences/32/yast-wol.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-desktop-locale.svg">icons/breeze/preferences/32/yast-language.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-ldap.svg">icons/breeze/preferences/32/yast-ldap-kerberos.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-ldap.svg">icons/breeze/preferences/32/yast-ldap-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-mail.svg">icons/breeze/preferences/32/yast-mail.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-log.svg">icons/breeze/preferences/32/yast-messages.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-other.svg">icons/breeze/preferences/32/yast-misc-group.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network.svg">icons/breeze/preferences/32/yast-network-group.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-share.svg">icons/breeze/preferences/32/yast-nfs-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-sharing.svg">icons/breeze/preferences/32/yast-nfs.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-server-nis.svg">icons/breeze/preferences/32/yast-nis-server.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-nis.svg">icons/breeze/preferences/32/yast-nis.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-ntp.svg">icons/breeze/preferences/32/yast-ntp-client.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-devices-printer.svg">icons/breeze/preferences/32/yast-printer.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-proxy.svg">icons/breeze/preferences/32/yast-proxy.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-network-remote.svg">icons/breeze/preferences/32/yast-remote.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-security.svg">icons/breeze/preferences/32/yast-security-group.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-backup.svg">icons/breeze/preferences/32/yast-snapper.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-user-sudo.svg">icons/breeze/preferences/32/yast-sudo.svg</file>
+		<file alias="icons/breeze/preferences/32/../../apps/32/systemsettings.svg">icons/breeze/preferences/32/yast-sysconfig.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-time.svg">icons/breeze/preferences/32/yast-timezone.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-releasenotes.svg">icons/breeze/preferences/32/yast-release-notes.svg</file>
+		<file alias="icons/breeze/preferences/32/preferences-system-services.svg">icons/breeze/preferences/32/yast-services-manager.svg</file>
+		<file alias="icons/breeze/preferences/32/yast-software-group.svg">icons/breeze/preferences/32/yast-software.svg</file>
+		<file alias="icons/breeze/preferences/32/../../apps/32/system-help.svg">icons/breeze/preferences/32/yast-support-group.svg</file>
+		<file alias="icons/breeze/preferences/32/../../apps/32/systemsettings.svg">icons/breeze/preferences/32/yast-system-group.svg</file>
 	</qresource>
 </RCC>

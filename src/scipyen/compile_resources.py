@@ -56,7 +56,7 @@ for d in iconsthemesdir:
                 local_f = pathlib.Path(*parts)
                 f_name = str(local_f)
                 if f.is_symlink():
-                    continue
+                    # continue
                     link = f.readlink()
                     original = f.parent / link
                     o_parts = [p for p in original.parts if p not in resourcesdir.parts]
