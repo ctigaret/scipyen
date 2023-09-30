@@ -208,7 +208,7 @@ import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer)
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.itemslistdialog import ItemsListDialog
-from gui import resources_rc
+# from gui import resources_rc
 #### END pict.gui modules
 
 #### BEGIN imaging modules
