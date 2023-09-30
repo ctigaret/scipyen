@@ -1204,7 +1204,7 @@
   </action>
   <action name="actionPlot_Event_template">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1216,7 +1216,7 @@
   </action>
   <action name="actionPlot_events_for_template">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1231,7 +1231,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1354,7 +1354,7 @@
   </action>
   <action name="actionPreview_filtered_signal">
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -1366,7 +1366,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="graphics">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
