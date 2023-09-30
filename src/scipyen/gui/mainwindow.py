@@ -84,7 +84,7 @@ from . import consoles
 from . import scipyenviewer
 from . import quickdialog as qd
 from . import resources_rc #as resources_rc
-from . import icons_rc
+# from . import icons_rc
 from . import pictgui as pgui
 from . import xmlviewer as xv
 from . import textviewer as tv

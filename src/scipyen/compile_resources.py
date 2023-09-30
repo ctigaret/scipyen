@@ -71,11 +71,43 @@ for d in iconsthemesdir:
             
         subprocess.run(["pyrcc5", "-threshold", "70", "-compress", "90", "-o", str(rc_path), str(qrc_path)], shell=False)
         rc_files.append(rc_path)
-        
-with open("gui/icons_rc.py", mode="w") as icons_rc_file:
+
+imagesdir = resourcesdir / 'images'
+
+imagespng = list(imagesdir.glob('*.png'))
+imagessvg = list(imagesdir.glob('*.svg'))
+imagesfiles = imagespng + imagessvg
+
+# qrc_images_path = resourcesdir.parent / 'images.qrc'
+qrc_images_path = resourcesdir / 'images.qrc'
+rc_images_path  = resourcesdir.parent / 'images_rc.py'
+
+# print(f"qrc_images_path: {qrc_images_path}")
+# print(f"rc_images_path: {rc_images_path}")
+
+# for f in imagespng:
+#     local_f = pathlib.Path(imagesdir.name, f.name)
+#     print(f"{f} ↦ {local_f} ↦ <file>{str(local_f)}</file>")
+
+
+with open(str(qrc_images_path), mode="w") as qrc_images_file:
+    qrc_images_file.write(f"<!DOCTYPE RCC><RCC version=\"1.0\">\n")
+    qrc_images_file.write("\t<qresource>\n")
+    for f in imagesfiles:
+        # local_f = pathlib.Path(resourcesdir.name, imagesdir.name, f.name)
+        local_f = pathlib.Path(imagesdir.name, f.name)
+        qrc_images_file.write(f"\t\t<file>{str(local_f)}</file>\n")
+    qrc_images_file.write("\t</qresource>\n")
+    qrc_images_file.write("</RCC>\n")
+    
+subprocess.run(["pyrcc5", "-threshold", "70", "-compress", "90", "-o", str(rc_images_path), str(qrc_images_path)], shell=False)
+
+# rc_files.append(rc_images_path)
+
+# with open("gui/icons_rc.py", mode="w") as icons_rc_file:
+with open("gui/resources_rc.py", mode="w") as resources_file:
     for f in rc_files:
         local_f = pathlib.Path(*[p for p in f.parts if p not in resourcesdir.parts])
-        icons_rc_file.write(f"from .resources import {f.stem}\n")
-
-
-
+        resources_file.write(f"from .resources import {f.stem}\n")
+        
+    resources_file.write(f"from . import {rc_images_path.stem}\n")

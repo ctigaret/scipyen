@@ -46,7 +46,7 @@ from core.sysutils import adapt_ui_path
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui import resources_rc
-from gui import icons_rc
+# from gui import icons_rc
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules

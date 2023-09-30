@@ -1026,7 +1026,6 @@
 		<file>icons/breeze/actions/22/bookmark-remove.svg</file>
 		<file>icons/breeze/actions/22/bookmarks-bookmarked.svg</file>
 		<file>icons/breeze/actions/22/bordertool.svg</file>
-		<file>icons/breeze/actions/22/bwtonal.svg</file>
 		<file>icons/breeze/actions/22/brightness-high.svg</file>
 		<file>icons/breeze/actions/22/brightness-low.svg</file>
 		<file>icons/breeze/actions/22/call-start.svg</file>
@@ -1050,8 +1049,9 @@
 		<file>icons/breeze/actions/22/code-function.svg</file>
 		<file>icons/breeze/actions/22/code-typedef.svg</file>
 		<file>icons/breeze/actions/22/code-variable.svg</file>
-		<file>icons/breeze/actions/22/collapse-all.svg</file>
 		<file>icons/breeze/actions/22/colorneg.svg</file>
+		<file>icons/breeze/actions/22/compass.svg</file>
+		<file>icons/breeze/actions/22/collapse-all.svg</file>
 		<file>icons/breeze/actions/22/color-gradient.svg</file>
 		<file>icons/breeze/actions/22/color-management.svg</file>
 		<file>icons/breeze/actions/22/color-mode-black-white.svg</file>
@@ -1064,7 +1064,7 @@
 		<file>icons/breeze/actions/22/color-picker-white.svg</file>
 		<file>icons/breeze/actions/22/color-picker.svg</file>
 		<file>icons/breeze/actions/22/colorfx.svg</file>
-		<file>icons/breeze/actions/22/compass.svg</file>
+		<file>icons/breeze/actions/22/contrast.svg</file>
 		<file>icons/breeze/actions/22/colors-chromablue.svg</file>
 		<file>icons/breeze/actions/22/colors-chromagreen.svg</file>
 		<file>icons/breeze/actions/22/colors-chromared.svg</file>
@@ -1073,7 +1073,6 @@
 		<file>icons/breeze/actions/22/composite-track-preview.svg</file>
 		<file>icons/breeze/actions/22/composition.svg</file>
 		<file>icons/breeze/actions/22/configure.svg</file>
-		<file>icons/breeze/actions/22/contrast.svg</file>
 		<file>icons/breeze/actions/22/coordinate.svg</file>
 		<file>icons/breeze/actions/22/copy-coordinates.svg</file>
 		<file>icons/breeze/actions/22/crosshairs.svg</file>
@@ -1092,6 +1091,7 @@
 		<file>icons/breeze/actions/22/debug-step-over.svg</file>
 		<file>icons/breeze/actions/22/deep-history.svg</file>
 		<file>icons/breeze/actions/22/delete-comment.svg</file>
+		<file>icons/breeze/actions/22/bwtonal.svg</file>
 		<file>icons/breeze/actions/22/dependency.svg</file>
 		<file>icons/breeze/actions/22/depth16to8.svg</file>
 		<file>icons/breeze/actions/22/depth8to16.svg</file>
