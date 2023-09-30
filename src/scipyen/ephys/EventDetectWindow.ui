@@ -1324,7 +1324,7 @@
   </action>
   <action name="actionFilter_whole_data">
    <property name="icon">
-    <iconset theme="view-filter">
+    <iconset theme="dialog-filters">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
