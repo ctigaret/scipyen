@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #### BEGIN core python modules
-import os, sys, traceback, inspect, numbers, warnings, pathlib, timer
+import os, sys, traceback, inspect, numbers, warnings, pathlib
 import functools, itertools
 import collections, enum
 import typing, types
