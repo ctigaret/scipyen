@@ -1637,6 +1637,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     QtGui.QIcon.setThemeName("breeze")
                 else:
                     QtGui.QIcon.setThemeName("breeze-dark")
+                    
+        elif sys.platform == "darwin":
+            windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+            _,_,v,_ = windowColor.getHsv()
+            if v > 128:
+                QtGui.QIcon.setThemeName("breeze")
+            else:
+                QtGui.QIcon.setThemeName("breeze-dark")
+            
             
 
     @property

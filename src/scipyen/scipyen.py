@@ -99,20 +99,6 @@ fbPaths = QtGui.QIcon.fallbackSearchPaths()
 QtGui.QIcon.setThemeSearchPaths(themePaths)
 QtGui.QIcon.setFallbackSearchPaths(fbPaths)
     
-# if hasQDarkTheme:
-#     # qdarktheme.setup_theme("auto")
-#     qdarktheme.enable_hi_dpi()
-#     QtGui.QIcon.setThemeName("breeze-dark")
-# else:
-#     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-#     _,_,v,_ = windowColor.getHsv()
-#     if v > 128:
-#         QtGui.QIcon.setThemeName("breeze")
-#         QtGui.QIcon.setFallbackThemeName("breeze")
-#     else:
-#         QtGui.QIcon.setThemeName("breeze-dark")
-#         QtGui.QIcon.setFallbackThemeName("breeze-dark")
-        
 # NOTE: 2023-09-28 22:06:54
 # this should be necessary only on windows platform
 # see also NOTE: 2023-09-28 22:12:25
