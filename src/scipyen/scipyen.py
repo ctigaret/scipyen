@@ -154,6 +154,15 @@ if sys.platform == "win32":
         # until then, on Windows we will have to put up with the qt-svg messages
         # for now...
         
+elif sys.platform == "darwin":
+    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+    _,_,v,_ = windowColor.getHsv()
+    if v > 128:
+        QtGui.QIcon.setThemeName("breeze")
+    else:
+        QtGui.QIcon.setThemeName("breeze-dark")
+    
+        
 #### END 3rd party modules
 
 #### BEGIN Scipyen modules
