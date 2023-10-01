@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #### BEGIN core python modules
-import os, sys, traceback, inspect, numbers, warnings, pathlib
+import os, sys, traceback, inspect, numbers, warnings, pathlib, timer
 import functools, itertools
 import collections, enum
 import typing, types
@@ -28,6 +28,7 @@ from PyQt5.uic import loadUiType as __loadUiType__
 
 #### BEGIN pict.core modules
 import core.workspacefunctions as wf
+from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace, assignin)
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.pyabfbridge as pab
@@ -767,7 +768,7 @@ class LTPOnline(object):
     #       the rsv file has been removed (by Clampex)
     #
     #
-    # my tests so far using the mainWindow.dirFileWatcher indicate
+    # my tests so far using the mainWindow.dirFileMonitor indicate
     # that the rsv file is created BEFORE its paired abf file
     #
     # but I don't think this is guaranteed?
@@ -859,14 +860,19 @@ class LTPOnline(object):
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
 
         wsp = wf.user_workspace()
-
+        
+#         print(f"LTPOnline.__init__ wsp: {len(wsp)}")
+#         
+#         assignin(wsp, "wsp")
+        
         if emitterWindow is None:
-            self._emitterWindow_ = wsp["mainwindow"]
+            self._emitterWindow_ = wsp["mainWindow"]
 
-        if type(emitterWindow).__name__ != 'ScipyenWindow':
-            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(scipyenWindow).__name__}")
+        elif type(emitterWindow).__name__ != 'ScipyenWindow':
+            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
 
-        self._emitterWindow_ = emitterWindow
+        else:
+            self._emitterWindow_ = emitterWindow
 
         if directory is None:
             self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
@@ -881,16 +887,16 @@ class LTPOnline(object):
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
         
-        # self._filesQueue_ = collections.deque()
+        self._filesQueue_ = collections.deque()
 
         # cbDict = dict(newFiles = self.newFiles, changedFiles = self.changedFiles,
         #               removedFiles = self.removedFiles)
 
-        self._dirWatcher_ = DirectoryFileWatcher(emitter = self._emitterWindow_,
+        self._monitor_ = DirectoryFileWatcher(emitter = self._emitterWindow_,
                                                  directory = self._watchedDir_,
                                                  observer = self)
         
-        print(f"{self.__class__.__name__}.__init__ to watch: {self._watchedDir_}")
+        # print(f"{self.__class__.__name__}.__init__ to watch: {self._watchedDir_}\n")
 
         self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
         
@@ -915,6 +921,8 @@ class LTPOnline(object):
 
         self._viewer_Rseries = self._emitterWindow_.newViewer(sv.SignalViewer)
         self._viewer_DC = self._emitterWindow_.newViewer(sv.SignalViewer)
+        
+        self._a_ = 0
 
 
     def __del__(self):
@@ -930,13 +938,20 @@ class LTPOnline(object):
     def stop(self):
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+            
+        monitoredFiles = self._monitor_._source_.dirFileMonitor.files()
+        if len(monitorFiles):
+            self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
+            
+        self._a_ = 0
 
     def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
         if self._emitterWindow_ is None:
             raise ValueError("You must set an emiter window first...")
 
         if directory is None:
-            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
+            if self._watchedDir_ is None:
+                self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
 
         elif isinstance(directory, str):
             self._watchedDir_ = pathlib.Path(directory)
@@ -946,9 +961,11 @@ class LTPOnline(object):
 
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+    
+        if self._monitor_.directory != self._watchedDir_:
+            self._monitor_.directory = self._watchedDir_
 
-        self._dirWatcher_.directory = self._watchedDir_
-
+        self._a_ = 0
         self._pending_.clear() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
@@ -961,58 +978,50 @@ class LTPOnline(object):
         self._data_["chase"]["path1"].segments.clear()
         self._data_["conditioning"]["path0"].segments.clear()
         self._data_["conditioning"]["path1"].segments.clear()
+        
+        if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
+            
 
     def newFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        # print(f"{self.__class__.__name__}.newFiles {val}")
-        self._pending_.clear()
-        self._latestAbf_ = None
-        if all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
-            # self._filesQueue_.extend(val)
+        print(f"{self._a_} ⇒ {self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
+        self._filesQueue_.extend(val)
+        self._setupPendingAbf_()
 
-            rsv = [v for v in val if v.suffix == ".rsv"]
-            abf = [v for v in val if v.suffix == ".abf"]
-
-            # start of acquisition creates exactly one of each
-            if len(rsv) != len(abf) or len(abf) != 1:
-                return
-
-            rsv = rsv[0]
-            abf = abf[0]
-
-            # and both must have same stem
-            #
-            if rsv.stem != abf.stem:
-                return
-
-            self._pending_[rsv] = abf
-
-            print(f"{self.__class__.__name__}._pending_ {self._pending_}\n")
+        # print(f"\t→ pending: {self._pending_}\n")
+        self._a_ += 1
 
     def changedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        print(f"{self.__class__.__name__}.changedFiles {val}\n")
-        print(f"\tlatestAbf = {self._latestAbf_}\n")
-        if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
-            return
+        print(f"{self._a_} ⇒ {self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
+        # print(f"\t→ latestAbf = {self._latestAbf_}\n")
+        self._a_ += 1
+        
+        
+        # if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
+        #     return
 
         # if len(val) > 1:
         #     # CAUTION!
         #     return
 
-        changed = val[0]
+        # changed = val[0]
 
         # expecting to see an ABf files changed by clampex AFTER removal of its
         # paired rsv
 
-        if changed == self._latestAbf_:
-            print(f"{self.__class__.__name__} do something with this file: {changed}")
-            self.processAbfFile(changed)
-
-        self._latestAbf_ = None
-        self._pending_.clear()
+        # NOTE: 2023-10-01 21:46:24
+        # not here !
+#         if changed == self._latestAbf_:
+#             # print(f"\t→ to process: {changed}\n")
+#             
+#             # self.processAbfFile(changed)
+#             self._pending_.clear()
+#             self._latestAbf_ = None
+            
 
     def removedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        print(f"{self.__class__.__name__}.removedFiles {val}\n")
-
+        print(f"{self._a_} ⇒ {self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
+        self._a_ += 1
         if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
             return
 
@@ -1023,15 +1032,28 @@ class LTPOnline(object):
         removed = val[0]
 
         # expecting the rsv file to be removed by Clampex at this stage
-        print(f"{self.__class__.__name__}.removedFiles pending = {self._pending_}")
+        # print(f"\t→ pending = {self._pending_}\n")
         if removed.suffix == ".rsv":
             if removed in self._pending_:
                 self._latestAbf_ = self._pending_[removed]
-                print(f"\tlatest = {self._latestAbf_}")
+                # print(f"\t\t→ latest = {self._latestAbf_}\n")
                 self._pending_.clear()
+                # NOTE: to stop monitoring abf file after it has been processed
+                # in the processAbfFile(…)
 
-    def processAbfFile(self, abfFile):
-        abfRun = pio.loadAxonFile(abfFile)
+    def processAbfFile(self, abfFile:pathlib.Path):
+        # WARNING: the AbF file may not be completed at this time, depending on when this is called!
+        
+        # fileStat = abfFile.stat()
+        # sz0 = fileStat.st_size
+        # k=0
+        # while abfFile.stat().st_size > sz0 and k < 10:
+        #     k += 1
+        #     print(f"{sz0} → file size: {abfFile.stat().st_size}")
+        
+        return 
+    
+        abfRun = pio.loadAxonFile(str(abfFile))
         protocol = pab.ABFProtocol(abfRun)
 
         # NOTE: 2023-09-29 14:12:56
@@ -1074,26 +1096,59 @@ class LTPOnline(object):
 
             self._viewer_path0_Records.view(self._data_["baseline"]["path0"],showFrame = len(self._data_["baseline"]["path0"].segments)-1)
 
-        elif len(abfRun.segments) == 2: # WARNING we only support two laternative pathways
+        elif len(abfRun.segments) == 2: # WARNING we only support two alternative pathways
             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
             self._viewer_path0_Records.view(self._data_["baseline"]["path0"],showFrame = len(self._data_["baseline"]["path0"].segments)-1)
             self._data_["baseline"]["path1"].segments.append(abfRun.segments[1])
             self._viewer_path1_Records.view(self._data_["baseline"]["path1"],showFrame = len(self._data_["baseline"]["path1"].segments)-1)
 
-
-
-
-#     def rsvForABF(self, abf:pathlib.Path):
-#         """Returns the rsv file paired with the abf"""
-#         paired = [f for f in self._filesQueue_ if f.suffix == ".rsv" and f.stem == abf.stem and f.parent == abf.parent]
-#         if len(paired):
-#             return paired[0]
-#
-#     def abfForRsv(self, rsv:pathlib.Path):
-#         paired = [f for f in self._filesQueue_ if f.suffix == ".abf" and f.stem == rsv.stem and f.parent == rsv.parent]
-#         if len(paired):
-#             return paired[0]
+    def filesChanged(self, filePaths:typing.Sequence[str]):
+        # print(f"{self._a_} → {self.__class__.__name__}.filesChanged {filePaths}\n")
+        for f in filePaths:
+            fp = pathlib.Path(f)
+            stat = fp.stat()
+            print(f"\t → {fp.name}: {stat.st_size}, {stat.st_atime_ns, stat.st_mtime_ns, stat.st_ctime_ns}")
+        # self._a_ += 1
         
+    def _rsvForABF_(self, abf:pathlib.Path):
+        """Returns the rsv file paired with the abf"""
+        paired = [f for f in self._filesQueue_ if f.suffix == ".rsv" and f.stem == abf.stem and f.parent == abf.parent]
+        if len(paired):
+            return paired[0]
+
+    def _abfForRsv_(self, rsv:pathlib.Path):
+        paired = [f for f in self._filesQueue_ if f.suffix == ".abf" and f.stem == rsv.stem and f.parent == rsv.parent]
+        if len(paired):
+            return paired[0]
+        
+    def _setupPendingAbf_(self):
+        self._pending_.clear()
+        if isinstance(self._monitor_, DirectoryFileWatcher):
+            monitoredFiles = self._monitor_._source_.dirFileMonitor.files()
+            if len(monitoredFiles):
+                self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
+        else:
+            raise RuntimeError("We haven't got a dirFileMonitor yet!")
+        
+        if len(self._filesQueue_) < 2:
+            return
+        
+        latestFile = self._filesQueue_[-1]
+        
+        if latestFile.suffix == ".rsv":
+            abf = self._abfForRsv_(latestFile)
+            if isinstance(abf, pathlib.Path) and abf.is_file():
+                self._pending_[latestFile] = abf
+                
+        elif latestFile.suffix == ".abf":
+            rsv = self._rsvForABF_(latestFile)
+            if isinstance(rsv, pathlib.Path) and rsv.is_file():
+                self._pending_[rsv] = latestFile
+            
+        for rsv, abf in self._pending_.items():
+            print(f"To monitor {abf.name}")
+            self._monitor_.monitorFile(abf)
+            
 
 def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
     """Helper function for the SynapticPathway factory function

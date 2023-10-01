@@ -4768,6 +4768,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.dirFileMonitor = QtCore.QFileSystemWatcher(parent = self)
         self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryChanged)
+        # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
         
         self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
 
@@ -7500,7 +7501,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             self.dirFileMonitor.addPath(self.currentDir)
                 
+    @safeWrapper
+    @pyqtSlot()
+    def _slot_monitoredFileChanged(self, *args, **kwargs):
+        print(f"{self.__class__.__name__}._slot_monitoredFileChanged:\n\targs = {args}\n\t kwargs = {kwargs}\n\n")
         
+    
     @safeWrapper
     @pyqtSlot()
     def _slot_monitoredDirectoryChanged(self, *args, **kwargs):

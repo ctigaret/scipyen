@@ -10,7 +10,7 @@ from PyQt5 import (QtCore, QtWidgets, QtGui)
 from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty)
 #from traitlets.config import SingletonConfigurable
 from core.utilities import safeWrapper
-from core.workspacefunctions import (user_workspace, validate_varname,get_symbol_in_namespace)
+from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)
 from core.scipyen_config import (ScipyenConfigurable, 
                                  syncQtSettings, 
                                  markConfigurable, 
@@ -32,7 +32,8 @@ class DirectoryFileWatcher(QtCore.QObject):
 
     required_observer_methods = ("newFiles",
                                  "changedFiles",
-                                 "removedFiles")
+                                 "removedFiles",
+                                 "filesChanged")
 
     def __init__(self, parent=None, emitter = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
@@ -48,9 +49,9 @@ class DirectoryFileWatcher(QtCore.QObject):
         if isinstance(emitter, QtCore.QObject):
             if all(hasattr(emitter, x) and isinstance(inspect.getattr_static(emitter, x), QtCore.pyqtSignal) for x in self.required_sigs):
                 self._source_ = emitter
-                self._source_.sig_newItemsInMonitoredDir.connect(self.slot_newFiles)
-                self._source_.sig_itemsRemovedFromMonitoredDir.connect(self.slot_filesRemoved)
-                self._source_.sig_itemsChangedInMonitoredDir.connect(self.slot_filesChanged)
+                self._source_.sig_newItemsInMonitoredDir.connect(self.slot_newFiles, type=QtCore.Qt.QueuedConnection)
+                self._source_.sig_itemsRemovedFromMonitoredDir.connect(self.slot_filesRemoved, type=QtCore.Qt.QueuedConnection)
+                self._source_.sig_itemsChangedInMonitoredDir.connect(self.slot_filesChanged, type=QtCore.Qt.QueuedConnection)
 
 
         if all(hasattr(observer, x) and (inspect.isfunction(inspect.getattr_static(observer, x)) and inspect.ismethod(getattr(observer, x))) for x in self.required_observer_methods):
@@ -60,8 +61,6 @@ class DirectoryFileWatcher(QtCore.QObject):
             if isinstance(self._source_, QtCore.QObject) and hasattr(self._source_, "currentDir"):
                 if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
                     self._watchedDir_ = pathlib.Path(self._source_.currentDir).absolute()
-            # else:
-            #     self._watchedDir_ = None
 
         elif isinstance(directory, str):
             self._watchedDir_ = pathlib.Path(directory)
@@ -177,6 +176,23 @@ class DirectoryFileWatcher(QtCore.QObject):
         if len(files):
             if self.observer is not None :
                 self.observer.newFiles(self._newFiles_)
+                
+                
+    def monitorFile(self, filepath:pathlib.Path, on:bool=True):
+        if filepath.is_file() and filepath.parent == self._watchedDir_:
+            if hasattr(self._source_, "dirFileMonitor") and isinstance(self._source_.dirFileMonitor, QtCore.QFileSystemWatcher):
+                if on:
+                    self._source_.dirFileMonitor.addPath(str(filepath))
+                    self._source_.dirFileMonitor.fileChanged.connect(self.slot_monitoredFileChanged)
+                else:
+                    if str(filepath) in self._source_.dirFileMonitor.files():
+                        self._source_.dirFileMonitor.removePath(str(filepath))
+        
+    @safeWrapper
+    @pyqtSlot()
+    def slot_monitoredFileChanged(self, *args, **kwargs):
+        # print(f"{self.__class__.__name__}._slot_monitoredFileChanged:\n\targs = {args}\n\t kwargs = {kwargs}\n\n")
+        self._observer_.filesChanged(self._source_.dirFileMonitor.files())
         
     
 
