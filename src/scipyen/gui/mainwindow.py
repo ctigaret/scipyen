@@ -5728,6 +5728,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # Now THIS works like a charm...
         # NOTE: 2023-07-12 11:50:19
         # this below using updateUi=False <feels> faster
+        # NOTE: 62023-10-02 10:51:01
+        # self.loadFiles defined in WorkspaceGuiMixin (inherited by this class)
+        # which then calls self._openSelectedFileItemsThreaded in a separate 
+        # GUI thread.
         self.loadFiles(selectedItems, 
                        self._openSelectedFileItemsThreaded, updateUi=False)
         # self.loadFiles(selectedItems, 

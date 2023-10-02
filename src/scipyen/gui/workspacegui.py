@@ -566,6 +566,52 @@ class FileIOGui(object):
             
         return dirName
     
+class FileStatChecker(QtCore.QObject):
+    def __init__(self, filePath:pathlib.Path, interval:typing.Optional[int] = None, 
+                 parent:typing.Optional[QtCore.QObject] = None):
+        if not filePath.is_file():
+            raise TypeError(f"{filePath} does not represent an existing file")
+        super().__init__(parent=parent)
+        # QCore.QThread._init__(self, parent)
+        
+        self._filePath_ = filePath
+        
+        self._initialStat_ = self._filePath_.stat()
+        
+        self._currentStat_ = self._initialStat_
+        
+        if not isinstance(interval, int) or interval <= 0:
+            interval = 10 # default
+        
+        self.timer = QtCore.QTimer(self)
+        self.timer.setInterval(interval) #  ms interval
+        
+        self.timer.timeout.connect(self._slot_checkFile)
+        
+        self.timer.start()
+        
+    # def run(self):
+    #     pass
+    
+    # def __del__(self):
+    #     self.timer.stop()
+        
+        
+    def _slot_checkFile(self):
+        if isinstance(self._filePath_, pathlib.Path) and self._filePath_.is_file():
+            stat = self._filePath_.stat()
+            
+            # if stat != self._initialStat_:
+            #     print(f"{self.__class__.__name__} file {self._filePath_.name} changed")
+                
+            if stat == self._currentStat_:
+                print(f"{self.__class__.__name__} file {self._filePath_.name} has not changed in the last {self.timer.interval()} ms")
+                
+            else:
+                print(f"{self.__class__.__name__} file {self._filePath_.name} has changed in the last {self.timer.interval()} ms")
+                self._currentStat_ = stat
+            
+    
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     

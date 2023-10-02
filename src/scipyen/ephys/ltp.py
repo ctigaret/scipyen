@@ -91,7 +91,7 @@ import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 from gui.cursors import SignalCursor
-from gui.workspacegui import DirectoryFileWatcher
+from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker)
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -740,6 +740,9 @@ class SynapticPlasticityData(BaseScipyenData):
     # def __reduce__(self): # TODO
     #     pass
     
+class LTPOnlineABFProcessor(QtCore.QObject):
+    pass
+    
 class LTPOnline(object):
     # TODO: 2023-09-27 15:42:11
     # the DirectoryFileWatcher should also know about the directory
@@ -902,11 +905,13 @@ class LTPOnline(object):
         
         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
-        self._pendingAbf_stat_ = None
+        # self._pendingAbf_stat_ = None
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
         self._abfProtocol_ = None
+        
+        self._abfListener_ = None
 
         # TODO: 2023-09-29 13:57:13
         # make this an intelligent thing - use SynapticPathway, PathwayEpisodes, etc.
@@ -941,11 +946,15 @@ class LTPOnline(object):
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
             
-        monitoredFiles = self._monitor_._source_.dirFileMonitor.files()
-        if len(monitorFiles):
-            self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
+        # monitoredFiles = self._monitor_._source_.dirFileMonitor.files()
+        # if len(monitorFiles):
+        #     self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
             
         self._a_ = 0
+
+        delattr(self, "_abfListener_")
+        
+        self._abfListener_ = None
 
     def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
         if self._emitterWindow_ is None:
@@ -970,11 +979,15 @@ class LTPOnline(object):
         self._a_ = 0
         self._pending_.clear() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
-        self._pendingAbf_stat_ = None
+        # self._pendingAbf_stat_ = None
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
         self._abfProtocol_ = None
+        
+        delattr(self, "_abfListener_")
+        
+        self._abfListener_ = None
 
         self._data_["baseline"]["path0"].segments.clear()
         self._data_["baseline"]["path1"].segments.clear()
@@ -1018,6 +1031,7 @@ class LTPOnline(object):
         if removed.suffix == ".rsv":
             if removed in self._pending_:
                 self._latestAbf_ = self._pending_[removed]
+                self._abfListener_ = FileStatChecker(self._latestAbf_)
                 # print(f"\t\t→ latest = {self._latestAbf_}\n")
                 self._pending_.clear()
                 # NOTE: to stop monitoring abf file after it has been processed
@@ -1105,12 +1119,12 @@ class LTPOnline(object):
         
     def _setupPendingAbf_(self):
         self._pending_.clear()
-        if isinstance(self._monitor_, DirectoryFileWatcher):
-            monitoredFiles = self._monitor_._source_.dirFileMonitor.files()
-            if len(monitoredFiles):
-                self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
-        else:
-            raise RuntimeError("We haven't got a dirFileMonitor yet!")
+        # if isinstance(self._monitor_, DirectoryFileWatcher):
+        #     monitoredFiles = self._monitor_._source_.dirFileMonitor.files()
+        #     if len(monitoredFiles):
+        #         self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
+        # else:
+        #     raise RuntimeError("We haven't got a dirFileMonitor yet!")
         
         if len(self._filesQueue_) < 2:
             return
@@ -1129,8 +1143,14 @@ class LTPOnline(object):
             
         for rsv, abf in self._pending_.items():
             print(f"To monitor {abf.name}")
-            self._pendingAbf_stat_ = abf.stat()
-            self._monitor_.monitorFile(abf)
+            # self._pendingAbf_stat_ = abf.stat()
+            # self._monitor_.monitorFile(abf)
+            
+            if rsv in self._filesQueue_:
+                self._filesQueue_.remove(rsv)
+                
+            if abf in self._filesQueue_:
+                self._filesQueue_.remove(abf)
             
 
 def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
