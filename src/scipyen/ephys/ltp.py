@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #### BEGIN core python modules
-import os, sys, traceback, inspect, numbers, warnings, pathlib
+import os, sys, traceback, inspect, numbers, warnings, pathlib, time
 import functools, itertools
 import collections, enum
 import typing, types
@@ -968,6 +968,8 @@ class LTPOnline(object):
         self._a_ = 0
         self._pending_.clear() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
+        self._pendingAbf_stat_ = None
+
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
         self._abfProtocol_ = None
@@ -984,7 +986,7 @@ class LTPOnline(object):
             
 
     def newFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        print(f"{self._a_} ⇒ {self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
+        print(f"{self._a_} → {self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
         self._filesQueue_.extend(val)
         self._setupPendingAbf_()
 
@@ -992,35 +994,12 @@ class LTPOnline(object):
         self._a_ += 1
 
     def changedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        print(f"{self._a_} ⇒ {self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
+        print(f"{self._a_} → {self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
         # print(f"\t→ latestAbf = {self._latestAbf_}\n")
         self._a_ += 1
         
-        
-        # if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
-        #     return
-
-        # if len(val) > 1:
-        #     # CAUTION!
-        #     return
-
-        # changed = val[0]
-
-        # expecting to see an ABf files changed by clampex AFTER removal of its
-        # paired rsv
-
-        # NOTE: 2023-10-01 21:46:24
-        # not here !
-#         if changed == self._latestAbf_:
-#             # print(f"\t→ to process: {changed}\n")
-#             
-#             # self.processAbfFile(changed)
-#             self._pending_.clear()
-#             self._latestAbf_ = None
-            
-
     def removedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        print(f"{self._a_} ⇒ {self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
+        print(f"{self._a_} → {self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
         self._a_ += 1
         if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
             return
@@ -1031,7 +1010,8 @@ class LTPOnline(object):
 
         removed = val[0]
 
-        # expecting the rsv file to be removed by Clampex at this stage
+        # expecting the rsv file to be removed by Clampex;
+        # when this is done, watch the pending ABF file for changes
         # print(f"\t→ pending = {self._pending_}\n")
         if removed.suffix == ".rsv":
             if removed in self._pending_:
@@ -1147,6 +1127,7 @@ class LTPOnline(object):
             
         for rsv, abf in self._pending_.items():
             print(f"To monitor {abf.name}")
+            self._pendingAbf_stat_ = abf.stat()
             self._monitor_.monitorFile(abf)
             
 
