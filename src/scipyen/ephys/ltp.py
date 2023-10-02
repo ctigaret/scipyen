@@ -740,9 +740,6 @@ class SynapticPlasticityData(BaseScipyenData):
     # def __reduce__(self): # TODO
     #     pass
     
-class LTPOnlineABFProcessor(QtCore.QObject):
-    pass
-    
 class LTPOnline(object):
     # TODO: 2023-09-27 15:42:11
     # the DirectoryFileWatcher should also know about the directory
@@ -860,8 +857,8 @@ class LTPOnline(object):
                                 "alternateDACOutputStateEnabled")
 
     def __init__(self,
-                 mainClampMode:ephys.ClampMode = typing.Union[int, ephys.ClampMode.VoltageClamp],
-                 conditioningClampMode:ephys.ClampMode = typing.Union[int, ephys.ClampMode.CurrentClamp],
+                 mainClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
+                 conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
                  stimDIG:int = 0,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
@@ -963,9 +960,9 @@ class LTPOnline(object):
         if isinstance(conditioningClampMode, int):
             if conditioningClampMode not in ephys.ClampMode.values():
                 raise ValueError(f"Invalid conditioningClampMode {conditioningClampMode}; expected values are {list(ephys.ClampMode.values())}")
-            self._conditoiningMode_ = type(conditioningClampMode)
+            self._conditioningClampMode_ = type(conditioningClampMode)
         elif isinstance(conditioningClampMode, ephys.ClampMode):
-            self._conditoiningMode_ = conditioningClampMode
+            self._conditioningClampMode_ = conditioningClampMode
         else:
             raise TypeError(f"conditioningClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(conditioningClampMode).__name__}")
 

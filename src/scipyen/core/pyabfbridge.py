@@ -458,6 +458,8 @@ import pyabf
 
 from core import quantities as scq
 from core import datatypes, strutils
+from core.triggerevent import TriggerEvent
+from core.triggerprotocols import TriggerProtocol
 # from iolib import pictio as pio # NOTE: not here, so we can import this from
 # pictiio (pio); instead we import pio where it is needed i.e. in getABF()
 
@@ -671,31 +673,109 @@ class ABFEpoch:
         # check the argument
         self._alternateDigitalPattern_ = val
         
-#     @property
-#     def useAlternateDigitalPattern(self) -> bool:
-#         # TODO 2023-09-17 09:36:51
-#         # shouldn't this better be in the ABFOutputsConfiguration ?
-#         # I think this logic should be handled by the ABFOutputsConfiguration 
-#         # instance that owns the ABFEpoch
-#         return self._useAltPattern_
-#     
-#     @useAlternateDigitalPattern.setter
-#     def useAlternateDigitalPattern(self, val:bool):
-#         self._useAltPattern_ = val == True
-        
-#     @property
-#     def alternateDigitalOutputStateEnabled(self) -> bool:
-#         return self._altDIGOutState_
-#     
-#     @alternateDigitalOutputStateEnabled.setter
-#     def alternateDigitalOutputStateEnabled(self, val:bool):
-#         self._altDIGOutState_ = val == True
-#         
     def digitalPattern(self, alternate:bool=False) -> tuple:
         """Read-only"""
         return self.alternateDigitalPattern if alternate else self.mainDigitalPattern
-        # return self.alternateDigitalPattern if (self._hasAltDigOutState_ and self.useAlternateDigitalPattern) else self.mainDigitalPattern
-       
+    
+    def usedDigitalOutputChannels(self, alternate:bool=False) -> list:
+        """Indices of DIG channels that emit TTL trains or TTL pulses
+        
+        For a more specific query (i.e. pulse v train output) see
+        pulseDigitalOutputChannels and trainDigitalOutputChannels.
+        
+        Parameters:
+        ===========
+        alternate: when True, the alternate digital pattern will be queried.
+        """
+        p = self.digitalPattern(alternate)
+        return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] != 0, enumerate(reversed(p[k]))))) for k in range(len(p))]))
+        # return [list(map(lambda v: v[0], filter(lambda i: i[1] != 0, enumerate(reversed(p_))))) for p_ in p]
+        
+    def pulseDigitalOutputChannels(self, alternate:bool=False) -> list:
+        """Indices of DIG channel that emit a digital pulse.
+        Parameters:
+        ===========
+        alternate: when True, the alternate digital pattern will be queried.
+        """
+        p = self.digitalPattern(alternate)
+        return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] == 1, enumerate(reversed(p[k]))))) for k in range(len(p))]))
+        # return [list(map(lambda v: v[0], filter(lambda i: i[1] == 1, enumerate(reversed(p_))))) for p_ in p]
+        
+    
+    def trainDigitalOutputChannels(self, alternate:bool=False) -> list:
+        """Indices of DIG channels that emit trains of digital TTL pulses.
+        Parameters:
+        ===========
+        alternate: when True, the alternate digital pattern will be queried.
+        """
+        p = self.digitalPattern(alternate)
+        return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] == '*', enumerate(reversed(p[k]))))) for k in range(len(p))]))
+        # return [list(map(lambda v: v[0], filter(lambda i: i[1] == '*', enumerate(reversed(p_))))) for p_ in p]
+        
+    
+    def hasDigitalOutput(self, digChannel:int = 0, alternate:bool=False) -> bool:
+        """Returns True if the digital channel 'digChannel' is not 0.
+        
+        For a more atomic test, see self.hasDigitalPulse and self.hasDigitalTrain.
+        
+        This is useful to determine if the Pulse... prioperties of the epoch are
+        related to any digital pattern defined in the epoch, or just to the 
+        associated DAC waveform.
+        
+        Parameters:
+        ===========
+        digChannel: int in the range(8) (maximum number of digital channels)
+        alternate: when True, the function will test the alternate digital pattern
+        
+        """
+        p = self.digitalPattern(alternate)
+        if digChannel in range(len(p[0])):
+            return p[0][-digChannel-1] != 0
+        
+        elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+            return p[1][-len(p[0])+digChannel-1] != 0
+        
+        else:
+            return False
+    
+    def hasDigitalPulse(self, digChannel:int = 0, alternate:bool=False) -> bool:
+        """Returns True if the digital channel 'digChannel' is 1.
+        
+        Parameters:
+        ===========
+        digChannel: int in the range(8) (maximum number of digital channels)
+        alternate: when True, the function will test the alternate digital pattern
+        
+        """
+        p = self.digitalPattern(alternate)
+        if digChannel in range(len(p[0])):
+            return p[0][-digChannel-1] == 1
+        
+        elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+            return p[1][-len(p[0])+digChannel-1] == 1
+        
+        else:
+            return False
+        
+    def hasDigitalTrain(self, digChannel:int = 0, alternate:bool=False) -> bool:
+        """Returns True if the digital channel 'digChannel' is '*'.
+        
+        Parameters:
+        ===========
+        digChannel: int in the range(8) (maximum number of digital channels)
+        alternate: when True, the function will test the alternate digital pattern
+        
+        """
+        p = self.digitalPattern(alternate)
+        if digChannel in range(len(p[0])):
+            return p[0][-digChannel-1] == '*'
+        
+        elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+            return p[1][-len(p[0])+digChannel-1] == '*'
+        
+        else:
+            return False
+
 class ABFOutputsConfiguration:   # placeholder to allow the definition of ABFProtocol, below
     pass
 # will be (properly) redefined further below
@@ -1498,6 +1578,20 @@ class ABFOutputsConfiguration:
         return int(self.epochActualDuration(epoch,sweep)/epoch.pulsePeriod)
 
     def epochActualPulseTimes(self, epoch:ABFEpoch, sweep:int = 0) -> list:
+        """Start times for the pulses defined in the epoch.
+        An ABF epoch may define pulses regardless of whether it associates a
+        digital output patter or not. 
+    
+        In the former case, the pulse timings refer to the TTL timings sent out 
+        on the digital channel(s). If a digital channel has a pulse, then only
+        the first timing should be used (as this is a TTL "step"); otherise,
+        the timings should reflect the timings of the TTL pulses in the digital 
+        train.
+        
+        In the latter case (i.e. no digital output associated) then, depending on
+        the epoch type, there will be one pulse (step epoch), or several (pulse
+        epoch).
+        """
         pc = self.epochPulseCount(epoch, sweep)
         if pc == 0:
             return list()
