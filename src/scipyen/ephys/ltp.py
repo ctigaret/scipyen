@@ -902,6 +902,8 @@ class LTPOnline(object):
         
         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
+        self._pendingAbf_stat_ = None
+
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
         self._abfProtocol_ = None
