@@ -864,10 +864,6 @@ class LTPOnline(object):
 
         wsp = wf.user_workspace()
         
-#         print(f"LTPOnline.__init__ wsp: {len(wsp)}")
-#         
-#         assignin(wsp, "wsp")
-        
         if emitterWindow is None:
             self._emitterWindow_ = wsp["mainWindow"]
 
@@ -911,7 +907,8 @@ class LTPOnline(object):
 
         self._abfProtocol_ = None
         
-        self._abfListener_ = None
+        self._abfListener_ = FileStatChecker(interval = 10, maxUnchangedIntervals = 5,
+                                             callback = self.processAbfFile  )
 
         # TODO: 2023-09-29 13:57:13
         # make this an intelligent thing - use SynapticPathway, PathwayEpisodes, etc.
@@ -950,11 +947,9 @@ class LTPOnline(object):
         # if len(monitorFiles):
         #     self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
             
-        self._a_ = 0
+        # self._a_ = 0
 
-        delattr(self, "_abfListener_")
-        
-        self._abfListener_ = None
+        self._abfListener_.stop()
 
     def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
         if self._emitterWindow_ is None:
@@ -985,10 +980,6 @@ class LTPOnline(object):
 
         self._abfProtocol_ = None
         
-        delattr(self, "_abfListener_")
-        
-        self._abfListener_ = None
-
         self._data_["baseline"]["path0"].segments.clear()
         self._data_["baseline"]["path1"].segments.clear()
         self._data_["chase"]["path0"].segments.clear()
@@ -1031,7 +1022,15 @@ class LTPOnline(object):
         if removed.suffix == ".rsv":
             if removed in self._pending_:
                 self._latestAbf_ = self._pending_[removed]
-                self._abfListener_ = FileStatChecker(self._latestAbf_)
+                if self._abfListener_.active:
+                    self._abfListener_.stop()
+                if  not self._latestAbf_.exists() or not self._latestAbf_.is_file():
+                    self._latestAbf_ = None
+                    self._pending_.clear()
+                    self._filesQueue_.clear()
+                    return
+                self._abfListener_.monitoredFile = self._latestAbf_
+                self._abfListener_.start()
                 # print(f"\t\t→ latest = {self._latestAbf_}\n")
                 self._pending_.clear()
                 # NOTE: to stop monitoring abf file after it has been processed
@@ -1047,7 +1046,10 @@ class LTPOnline(object):
         #     k += 1
         #     print(f"{sz0} → file size: {abfFile.stat().st_size}")
         
-        return 
+        self._abfListener_.reset()
+        print(f"\t→ {self.__class__.__name__}.processAbfFile {abfFile}")
+        
+        # return 
     
         abfRun = pio.loadAxonFile(str(abfFile))
         protocol = pab.ABFProtocol(abfRun)

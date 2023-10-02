@@ -567,49 +567,137 @@ class FileIOGui(object):
         return dirName
     
 class FileStatChecker(QtCore.QObject):
-    def __init__(self, filePath:pathlib.Path, interval:typing.Optional[int] = None, 
+    okToProcess = pyqtSignal(pathlib.Path, name="okToProcess")
+    
+    def __init__(self, filePath:typing.Optional[pathlib.Path] = None, 
+                 interval:typing.Optional[int] = None,
+                 maxUnchangedIntervals:typing.Optional[int] = None,
+                 callback:typing.Optional[typing.Callable] = None,
                  parent:typing.Optional[QtCore.QObject] = None):
-        if not filePath.is_file():
-            raise TypeError(f"{filePath} does not represent an existing file")
         super().__init__(parent=parent)
-        # QCore.QThread._init__(self, parent)
         
         self._filePath_ = filePath
         
-        self._initialStat_ = self._filePath_.stat()
-        
-        self._currentStat_ = self._initialStat_
+        if isinstance(callback, typing.Callable):
+            self._callback_ = callback
+        else:
+            self._callback_ = None
         
         if not isinstance(interval, int) or interval <= 0:
             interval = 10 # default
+            
+        if not isinstance(maxUnchangedIntervals, int) or maxUnchangedIntervals < 1:
+            maxUnchangedIntervals = 1
+            
+        self._maxUnchangedIntervals_ = maxUnchangedIntervals # number of intervals
         
-        self.timer = QtCore.QTimer(self)
-        self.timer.setInterval(interval) #  ms interval
+        self._intervals_since_last_change_ = 0 # ms
         
-        self.timer.timeout.connect(self._slot_checkFile)
+        self._timer_ = QtCore.QTimer(self)
+        self._timer_.timeout.connect(self._slot_checkFile)
+        self._timer_.setInterval(interval) #  ms interval
         
-        self.timer.start()
+        if isinstance(filePath, pathlib.Path) and filePath.is_file():
+            self._currentStat_ = self._filePath_.stat()
+            self._timer_.start()
         
     # def run(self):
     #     pass
     
     # def __del__(self):
     #     self.timer.stop()
+    
+    @property
+    def timer(self) -> QtCore.QTimer:
+        return self._timer_
+    
+    @property
+    def interval(self) -> int:
+        return self.timer.interval()
+    
+    @interval.setter
+    def interval(self, val:int):
+        if not isinstance(val, int) or val <= 0:
+            val = 10 #ms, default
+            
+        self.timer.setInterval(val) #  this will also stop the timer ?!?
+        # if not self.timer.isActive():
+        #     self.timer.start()
         
+    @property
+    def active(self) -> bool:
+        return self.timer.isActive()
+        
+    @property
+    def maxIntervalsQuiet(self) -> int:
+        return self._maxUnchangedIntervals_
+    
+    @maxIntervalsQuiet.setter
+    def maxIntervalsQuiet(self, val:int):
+        if not isinstance(val, int) or val < 1:
+            val = 1
+            
+        self._maxUnchangedIntervals_ = val
+
+    @property
+    def monitoredFile(self) -> pathlib.Path:
+        return self._filePath_
+    
+    @monitoredFile.setter
+    def monitoredFile(self, f:pathlib.Path):
+        if not isinstance(f, pathlib.Path) or not f.exists() or not f.is_file():
+            warnings.warn(f"{self.__class__.__name__}.monitoredFile: {self._filePath_} is not a valid file path")
+            return
+        self.reset()
+        try:
+            self._currentStat_ = f.stat()
+            self._filePath_ = f
+        except:
+            traceback.print_exc()
+        
+    @property
+    def callback(self) -> typing.Optional[typing.Callable]:
+        return self._callback_
+    
+    @callback.setter
+    def callback(self, val:typing.Optional[typing.Callable] = None):
+        if not isinstance(val, (typing.Callable, type(None))):
+            warnings.warn(f"Expecting a callable or None; instead, got {type(val).__name__}")
+            return 
+        self.reset()
+        self._callback_ = val
+        
+    def reset(self):
+        self.stop()
+        self._intervals_since_last_change_ = 0
+        
+    def stop(self):
+        self.timer.stop()
+        
+    def start(self):
+        if isinstance(self._filePath_, pathlib.Path) and self._filePath_.is_file():
+            self.timer.start()
+        else:
+            warnings.warn(f"{self.__class__.__name__}.start: {self._filePath_} is not a valid file path")
         
     def _slot_checkFile(self):
         if isinstance(self._filePath_, pathlib.Path) and self._filePath_.is_file():
             stat = self._filePath_.stat()
             
-            # if stat != self._initialStat_:
-            #     print(f"{self.__class__.__name__} file {self._filePath_.name} changed")
-                
             if stat == self._currentStat_:
-                print(f"{self.__class__.__name__} file {self._filePath_.name} has not changed in the last {self.timer.interval()} ms")
+                # print(f"{self.__class__.__name__} file {self._filePath_.name} has not changed in the last {self.timer.interval()} ms")
+                self._intervals_since_last_change_ += 1 # count up
                 
             else:
-                print(f"{self.__class__.__name__} file {self._filePath_.name} has changed in the last {self.timer.interval()} ms")
+                # print(f"{self.__class__.__name__} file {self._filePath_.name} has changed in the last {self.timer.interval()} ms")
                 self._currentStat_ = stat
+                self._intervals_since_last_change_  = 0 # reset this
+                
+            # print(f"{self.__class__.__name__} file {self._filePath_.name} long unchanged {self._intervals_since_last_change_ >= self._maxUnchangedIntervals_}")
+            if self._intervals_since_last_change_ >= self._maxUnchangedIntervals_:
+                self.okToProcess.emit(self._filePath_)
+                if inspect.isfunction(self._callback_) or inspect.ismethod(self._callback_):
+                    self._callback_(self._filePath_)
             
     
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
