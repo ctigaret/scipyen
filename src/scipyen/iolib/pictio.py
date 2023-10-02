@@ -1036,11 +1036,20 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
         abf = pab.getABF(fileName)
         abfEpochSection = pab.getABFsection(abf, "epoch") # needed for DIG holding levels
         abfStringsSection = pab.getABFsection(abf, "strings") # needed for indexed strings, containing inter alia the name of a stimulus file (when used)
+        abfADCSection = pab.getABFsection(abf, "adc")
+        abfDACSection = pab.getABFsection(abf, "dac")
+        abfProtocolSection = pab.getABFsection(abf, "protocol")
+        abfEpochPerDacSection = pab.getABFsection(abf, "epochperdac")
+        abfHeaderSection = pab.getABFsection(abf, "header")
         
+        axon_info["sections"]["ADCSection"].update(abfADCSection)
+        axon_info["sections"]["DACSection"].update(abfDACSection)
         axon_info["sections"]["EpochSection"].update(abfEpochSection)
+        axon_info["sections"]["EpochPerDACSection"].update(abfEpochPerDacSection)
         axon_info["sections"]["StringsSection"]["IndexedStrings"] = abfStringsSection["_indexedStrings"]
-        
-        
+        axon_info["sections"]["ProtocolSection"].update(abfProtocolSection)
+        axon_info["sections"]["HeaderSection"] = abfHeaderSection
+
         axon_info["t_starts"] = axonIO._t_starts
         axon_info["sampling_rate"] = axonIO._sampling_rate
         

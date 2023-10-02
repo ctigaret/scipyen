@@ -859,8 +859,47 @@ class LTPOnline(object):
                                 "alternateDigitalOutputStateEnabled",
                                 "alternateDACOutputStateEnabled")
 
-    def __init__(self, emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
-                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
+    def __init__(self,
+                 mainClampMode:ephys.ClampMode = typing.Union[int, ephys.ClampMode.VoltageClamp],
+                 conditioningClampMode:ephys.ClampMode = typing.Union[int, ephys.ClampMode.CurrentClamp],
+                 stimDIG:int = 0,
+                 emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
+                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
+                 ):
+        """
+        mainClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp
+            or ephys.ClampMode.CurrentClamp, or their respective int values (2, 4)
+
+            NOTE: even if recording field potentials (I=0 "clamping mode") the units
+            of the DAC and ADC should pair up as for current clamp (i.e., DAC in mV
+            and ADC in pA) because I=0 is actually current clamp without actual clamping
+            (i.e. no current injected into the cell whatsoever)
+
+            Also NOTE this is irrespective of electrode mode: patch clamp can
+            record in either clamp modes; on the other hand, sharp (intracellular)
+            or field recording electrodes are useless in voltage clamp...
+
+        conditioningMode: as above;
+            for patch-clamp recordings one may choose to trigger postsynaptic
+                activity by current injection (current clamp) or 'emulated' in
+                voltage-clamp with AP-like waveforms, dynamic clamp and such...
+                (if the cell can be voltage-clamped with some degree of accuracy)
+
+                therefore, any of voltage- or current-clasmp modes are valid
+
+        stimDIG: index of the digital channel that sends out synaptic stimuli
+            (e.g. via stimulus isolators) - typically is 0 (first digital out)
+            or 1 (second digital out) when two synaptic pathways are alternatively
+            tested.
+
+        CAUTION: when stimulus isolators are NOT available, the DIG outputs are
+            NOT used, but can be emulated through additional DAC outputs;
+            however, at the time of this writing, I do not know if alternative
+            DAC outputs can be configured for DIG emulation on higher DAC indices
+            with that is that one cannot
+
+        emitterWindow - by default, Scipyen's main window, so leave it as None
+        """
 
         wsp = wf.user_workspace()
         
@@ -905,10 +944,80 @@ class LTPOnline(object):
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
-        self._abfProtocol_ = None
-        
+        self._synapticProtocol_ = None
+
+        self._conditioningProtocol_ = None
+
+        # self._abfDacOutputConfig_ = None
+
+        if isinstance(mainClampMode, int):
+            if mainClampMode not in ephys.ClampMode.values():
+                raise ValueError(f"Invalid mainClampMode {mainClampMode}; expected values are {list(ephys.ClampMode.values())}")
+            self._clampMode_ = type(mainClampMode)
+        elif isinstance(mainClampMode, ephys.ClampMode):
+            self._clampMode_ = mainClampMode
+        else:
+            raise TypeError(f"mainClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(mainClampMode).__name__}")
+
+
+        if isinstance(conditioningClampMode, int):
+            if conditioningClampMode not in ephys.ClampMode.values():
+                raise ValueError(f"Invalid conditioningClampMode {conditioningClampMode}; expected values are {list(ephys.ClampMode.values())}")
+            self._conditoiningMode_ = type(conditioningClampMode)
+        elif isinstance(conditioningClampMode, ephys.ClampMode):
+            self._conditoiningMode_ = conditioningClampMode
+        else:
+            raise TypeError(f"conditioningClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(conditioningClampMode).__name__}")
+
+
+        # expected epochs layout (and order):
+        #
+        # Role                              ABF Epoch                   Comments
+        # ======================================================================
+        # baseline (for DC, Rs and Rin)     A or None                   When None use DAC holding time
+        #
+        # membrane test                     B (when A present)          Can be AFTER synaptic response
+        #
+        # synaptic baseline                 C (when A, B present)       Can be the baseline when mb test AFTER syn resp
+        #
+        # synaptic response                 D (1 or 2 pulses DIG train) The first epoch with a DIG train
+
+
+        # just one Epoch;
+        # • if ABF Epoch, then it needs to be the first one, type Step,
+        #   ∘ first duration > 0, delta duration == 0
+        #   ∘ first level == 0, delta level == 0
+        # • if NOT an ABF epoch then:
+        #   ∘ by default corresponds to the DAC holding time
+        #
+        self._baselineEpoch_ = None
+
+        # just one epoch:
+        # for voltage clamp needs:
+        # • type Step,
+        # • first duration > 0
+        # • delta duration == 0
+        # • first level != 0
+        # • delta level == 0
+        #
+        self._membraneTestEpoch_ = None
+
+        # baseline before 1ˢᵗ synaptic stimulation below
+        #   it must STOP before  1ˢᵗ synaptic stimulation below
+        #   MAY be the same as baseline if membrane test comes AFTER the last
+        #       synaptic response epoch (as is usual in current clamp)
+        #
+        self._synapticBaselineEpoch_ = None
+
+        # list of one or two epochs
+        # 1) the 1ˢᵗ (and possibly, the only) one is the stimulation for the 1ˢᵗ
+        #   synaptic response
+        # 2) the 2ⁿᵈ (if present) is the stimulation for the 2ⁿᵈ synaptic response
+        #
+        self._synapticStimulationEpochs = list()
+
         self._abfListener_ = FileStatChecker(interval = 10, maxUnchangedIntervals = 5,
-                                             callback = self.processAbfFile  )
+                                             callback = self.processAbfFile)
 
         # TODO: 2023-09-29 13:57:13
         # make this an intelligent thing - use SynapticPathway, PathwayEpisodes, etc.
@@ -971,14 +1080,14 @@ class LTPOnline(object):
         if self._monitor_.directory != self._watchedDir_:
             self._monitor_.directory = self._watchedDir_
 
-        self._a_ = 0
+        # self._a_ = 0
         self._pending_.clear() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
         # self._pendingAbf_stat_ = None
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
-        self._abfProtocol_ = None
+        self._synapticProtocol_ = None
         
         self._data_["baseline"]["path0"].segments.clear()
         self._data_["baseline"]["path1"].segments.clear()
@@ -992,21 +1101,22 @@ class LTPOnline(object):
             
 
     def newFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        print(f"{self._a_} → {self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
+        # print(f"{self._a_} → {self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
         self._filesQueue_.extend(val)
         self._setupPendingAbf_()
 
         # print(f"\t→ pending: {self._pending_}\n")
-        self._a_ += 1
+        # self._a_ += 1
 
     def changedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        print(f"{self._a_} → {self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
+        # print(f"{self._a_} → {self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
         # print(f"\t→ latestAbf = {self._latestAbf_}\n")
-        self._a_ += 1
+        # self._a_ += 1
+        pass
         
     def removedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        print(f"{self._a_} → {self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
-        self._a_ += 1
+        # print(f"{self._a_} → {self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
+        # self._a_ += 1
         if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
             return
 
@@ -1047,12 +1157,15 @@ class LTPOnline(object):
         #     print(f"{sz0} → file size: {abfFile.stat().st_size}")
         
         self._abfListener_.reset()
-        print(f"\t→ {self.__class__.__name__}.processAbfFile {abfFile}")
+        # print(f"\t→ {self.__class__.__name__}.processAbfFile {abfFile}")
         
         # return 
     
         abfRun = pio.loadAxonFile(str(abfFile))
         protocol = pab.ABFProtocol(abfRun)
+
+        if protocol.nSweeps == 2:
+            pass # TODO check for alternate digital outputs → True ; alternate waveform → False
 
         # NOTE: 2023-09-29 14:12:56
         # we need:
@@ -1069,22 +1182,50 @@ class LTPOnline(object):
         #           [pA] for CurrentClamp
 
 
-        if self._abfProtocol_ is None: # FIXME: 2023-09-29 14:32:24 see next line
+        if self._synapticProtocol_ is None: # FIXME: 2023-09-29 14:32:24 see next line
             # make the condition here that data blocks have no segments
-            self._abfProtocol_ = protocol
+            # self._synapticProtocol_ = protocol
+
+            # NOTE: 2023-10-02 17:14:04
+            # for now, we only collect the data from a generic baseline
+            # and the chase; we skip files related to the conditioning
+            # TODO include code for setting up episodes and storing the
+            # conditioning data as well
+            if protocol.clampMode() == self._clampMode_:
+                # NOTE: 2023-10-02 17:32:09
+                # since this the first time we are setting up the protocol, it MUST
+                # be related to the baseline
+                # TODO
+                self._synapticProtocol_ = protocol
+
+                dac = protocol.outputConfiguration() # by default use the active DAC
+
+                epochs = dac.epochs
+
+                # TODO: 2023-10-02 18:23:42
+                # figure out which ABF epoch associates synaptic stimulation
+                # • this is an epoch with digital (TTL) trains → 1 or 2 pulses, OR
+                # • two pulse epochs in quick succession with a digital (TTL) pulse
+                #       (by definition, each one can have at most one TTL pulse)
+                # in either case, the TTL trains or pulse(s) should be on the
+                # same stimDIG channel as set up in the constructor
+
+            else:
+                return # wait for next file
 
         # else:
-        #     # make sure protocols are compatible
-        #     assert all(getattr(protocol, x, None) == getattr(self._abfProtocol_, x, None)), "Abf files have incompatible protocols"
 
-        # WARNING this is bogus code - it runs, but what it does in only part of
-        # what this object is intended to do
+
+
+        # WARNING this code runs, but does only part of what is intended
 
         # TODO: 2023-09-29 14:23:21
         # check that the abf has as many segments as advertised in the protocol
-        if len(abfRun.segments) != self._abfProtocol_.nSweeps:
-            warnings.warn(f"abf has {len(abfRun.segments)} but protocol says {self._abfProtocol_.nSweeps}")
+        if len(abfRun.segments) != self._synapticProtocol_.nSweeps:
+            warnings.warn(f"abf has {len(abfRun.segments)} but protocol says {self._synapticProtocol_.nSweeps}")
             # return
+
+
 
         if len(abfRun.segments) == 1:
             # => single pathway! CAUTION may backfire when recording is interrupted in Clampex
@@ -1092,13 +1233,18 @@ class LTPOnline(object):
             # but in the real world we need to distinguish between various episodes
             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
 
-            self._viewer_path0_Records.view(self._data_["baseline"]["path0"],showFrame = len(self._data_["baseline"]["path0"].segments)-1)
+            self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
+                                            showFrame = len(self._data_["baseline"]["path0"].segments)-1)
+
+
 
         elif len(abfRun.segments) == 2: # WARNING we only support two alternative pathways
             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
-            self._viewer_path0_Records.view(self._data_["baseline"]["path0"],showFrame = len(self._data_["baseline"]["path0"].segments)-1)
+            self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
+                                            showFrame = len(self._data_["baseline"]["path0"].segments)-1)
             self._data_["baseline"]["path1"].segments.append(abfRun.segments[1])
-            self._viewer_path1_Records.view(self._data_["baseline"]["path1"],showFrame = len(self._data_["baseline"]["path1"].segments)-1)
+            self._viewer_path1_Records.view(self._data_["baseline"]["path1"],
+                                            showFrame = len(self._data_["baseline"]["path1"].segments)-1)
 
     def filesChanged(self, filePaths:typing.Sequence[str]):
         # print(f"{self._a_} → {self.__class__.__name__}.filesChanged {filePaths}\n")

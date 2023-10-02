@@ -697,11 +697,15 @@ class ABFEpoch:
         # return self.alternateDigitalPattern if (self._hasAltDigOutState_ and self.useAlternateDigitalPattern) else self.mainDigitalPattern
        
 class ABFOutputsConfiguration:   # placeholder to allow the definition of ABFProtocol, below
+    pass
+# will be (properly) redefined further below
+class ABFInputsConfiguration:   # placeholder to allow the definition of ABFProtocol, below
     pass                         # will be (properly) redefined further below
 
 class ABFProtocol:
     def __init__(self, obj:typing.Union[pyabf.ABF,neo.Block],
-                 generateOutputConfigs:bool=True):
+                 generateOutputConfigs:bool=True,
+                 generateInputConfigs:bool=True):
         if isinstance(obj, pyabf.ABF):
             abfVer = obj.abfVersion["major"]
             if abfVer !=2:
@@ -793,6 +797,11 @@ class ABFProtocol:
             self._outputs_ = [ABFOutputsConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
         else:
             self._outputs_ = list()
+
+        if generateInputConfigs:
+            self._inputs_ = [ABFInputsConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
+        else:
+            self._inputs_ = list()
             
     @property
     def acquisitionMode(self) -> ABFAcquisitionMode:
@@ -904,17 +913,53 @@ class ABFProtocol:
     @property
     def sweepTimes(self) -> pq.Quantity:
         return np.array(list(map(self.sweepTime, range(self.nSweeps)))) * pq.s
-        
+
+    def clampMode(self, dacIndex:typing.Optional[int] = None,
+                  adcIndex:int = 0):
+        from ephys.ephys import ClampMode
+        dac = self.outputConfiguration(dacIndex) # get active DAC by default
+        adc = self.inputConfiguration(adcIndex) # get first (primary) input by default
+
+        commandIsCurrent = scq.check_electrical_current_units(dac.units)
+        commandIsPotential = scq.check_electrical_potential_units(dac.units)
+
+        recordsCurrent = scq.check_electrical_current_units(adc.units)
+        recordsPotential = scq.check_electrical_potential_units(adc.units)
+
+        if recordsPotential and commandIsCurrent:
+            return ClampMode.CurrentClamp
+        elif recordsCurrent and commandIsPotential:
+            return ClampMode.VoltageClamp
+        else:
+            return ClampMode.NoClamp
 
     def sweepTime(self, sweep:int = 0) -> pq.Quantity:
         if self.sweepInterval == 0*pq.s:
             return sweep * self.sweepDuration
         return sweep * self.sweepInterval
+
+    def inputConfiguration(self, adcChannel:int = 0, physical:bool=False,
+                           src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None) -> ABFInputsConfiguration:
+
+
+        inputconfs = list(filter(lambda x: x.channelIndex(physical) == adcChannel, self._inputs_))
+        if len(inputconfs):
+            return inputconfs[0]
+
+        if isinstance(src, (pyabf.ABF, neo.Block)):
+            return ABFInputsConfiguration(src, self, adcChannel, physical)
+        else:
+            warnings.warn(f"The protocol has no input configuration defined - either because 'generateInputConfigs = False' was passed to the protocol constructor, or because there are no ADCs with the specified index ({adcChannel}) in the file and no source ABF or block data were supplied to this method call")
+
     
-    def outputConfiguration(self, dacChannel:int, 
+    def outputConfiguration(self, dacChannel:typing.Optional[int] = None,
                             src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]] = None) -> ABFOutputsConfiguration:
         
+        if not isinstance(dacChannel, int):
+            dacChannel = self.activeDACChannelIndex
+
         outputConfs = list(filter(lambda x: x.dacChannel == dacChannel, self._outputs_))
+
         if len(outputConfs):
             return outputConfs[0]
             
@@ -923,6 +968,149 @@ class ABFProtocol:
         else:
             warnings.warn(f"The protocol has no output configurations defined - either because 'generateOutputConfigs = False' was passed to the protocol constructor, or because there are no DACs in the file - and no source ABF or block data were supplied to this method call")
         
+class ABFInputsConfiguration:
+    """Deliberately thin class with basic info about an ADC input in Clampex.
+        More information may be added for convenience later; until then, just
+        explore the neo.Block annotations (assuming the Block was created from an
+        Axon ABF file) or the relevanmt sections in an ABF object created using
+        pyabf.
+
+        Also note that most relevant information is already parsed by the neo.io
+        classes when the AnalogSignals are constructed using the input data in
+        the ABF.
+
+    """
+    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block],
+                 protocol:typing.Optional[ABFProtocol] = None,
+                 adcChannel:int = 0, physical:bool=False):
+        """
+        obj: ABF object or neo.Block; both must be read from an ABF file
+        adcChannel: logical or physical index of the channel sought (0 -> max ADC channels available)
+        physical: default False, meaning that adcChannel is the logical number
+            When True, then adcChannel is interpreted as the physical channel
+
+            Explanation:
+
+            The ABF protocol can be configured to record data from up to the
+            maximum number of input channels available in the DAQ board.
+
+            These inputs get a logical number (0 → number of USED ADC channels in
+            the protocol). Furthermore, one has the option to select WHICH pysical
+            channel is allocated to a particular logical input channel, depending
+            which physical channels have been already matched to logical inputs,
+            e.g.:
+
+            Input 0 → IN0
+            Input 1 → IN1
+            Input 2 → IN3 !!!
+            Input 3 → IN5 !!! (assuming there are 8 inputs in the hardware this
+                               can take any channel from IN4 to IN7)
+            ⋮
+            etc
+
+            Therefore, when we query for an ADC channel we need to distinguish
+            between a query by logical or physical index. In the first case,
+            passing adcChannel = 3 gets us the physical input channel IN5 matched
+            to logical channel 3; in the latter case we get the physical input
+            channel IN3 matched to logical channel 2!
+        """
+        if protocol is None:
+            protocol =  ABFProtocol(obj)
+
+        elif not isinstance(protocol, ABFProtocol):
+            raise TypeError(f"'protocol' expected to be an ABFProtocol object; instead, got {type(protocol).__name__}")
+
+        self._protocol_ = protocol
+
+        assert self._protocol_._sourceHash_ == hash(obj) and self._protocol_._sourceId_ == id(obj), f"The source {type(obj).__name__} object does not appear linked to the supplied protocol"
+
+        if isinstance(obj, pyabf.ABF):
+            abfVer = obj.abfVersion["major"]
+            if abfVer == 1:
+                raise NotImplementedError(f"ABF version {abfVer} is not supported")
+                # if dacChannel > 1:
+                #     dacChannel = 0
+                # self._interEpisodeLevel_ = bool(obj._headerV1.nInterEpisodeLevel[dacChannel])
+                # self._dacChannel_ = dacChannel
+                # TODO finalize this...
+
+            elif abfVer == 2:
+                if adcChannel not in  obj._adcSection.nADCnum:
+                    raise ValueError(f"Invalid DAC channel index {adcChannel}")
+
+                self._adcChannel_ = adcChannel
+                self._physicalChannelIndex_ = None
+
+                if physical:
+                    if adcChannel in obj._adcSection.nADCNum:
+                        self._physicalChannelIndex_ = adcChannel
+                        logical = obj._adcSection.nADCNum.index(adcChannel)
+                        self._adcChannel_ = logical
+                        adcName = obj.adcNames[logical]
+                        adcUnits = obj.adcUnits[logical]
+                    else:
+                        adcName = ""
+                        adcUnits = ""
+                else:
+                    if adcChannel not in range(len(obj.adcNames)):
+                        adcName = ""
+                        adcUnits = ""
+                    else:
+                        self._physicalChannelIndex_ = obj._adcSection.nADCNum[adcChannel]
+                        adcName = obj.adcNames[adcChannel]# if adcChannel in obj.adcNames else
+                        adcUnits = obj.adcUnits[adcChannel]
+
+            else:
+                raise NotImplementedError(f"ABF version {abfVer} is not supported")
+
+        elif isinstance(obj, neo.Block):
+            assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
+
+            if physical:
+                p = [v["nADCNum"] for v in obj.annotations["listADCInfo"]]
+                if adcChannel not in p:
+                    adcName = ""
+                    adcUnits = ""
+                else:
+                    self._physicalChannelIndex_ = adcChannel
+                    logical = p.index(adcChannel)
+                    self._adcChannel_ = logical
+                    adcName = obj.annotations["listADCInfo"][logical]["ADCChNames"].decode()
+                    adcUnits = obj.annotations["listADCInfo"][logical]["ADCChUnits"].decode()
+            else:
+                if adcChannel not in range(len(obj.annotations["listADCInfo"])):
+                    adcName = ""
+                    adcUnits = ""
+                else:
+                    self._adcChannel_ = adcChannel
+                    self._physicalChannelIndex_ = obj.annotations["listADCInfo"][adcChannel]["nADCNum"]
+                    adcName = obj.annotations["listADCInfo"][adcChannel]["ADCChNames"].decode()
+                    adcUnits = obj.annotations["listADCInfo"][adcChannel]["ADCChUnits"].decode()
+
+                    # raise ValueError(f"Invalid ADC channel index {adcChannel}")
+
+        self._adcName_ = adcName
+        self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
+
+    def channelIndex(self, physical:bool=False) -> int:
+        return self.physicalIndex if physical else self.logicalIndex
+
+    @property
+    def logicalIndex(self) -> int:
+        return self._adcChannel_
+
+    @property
+    def physicalIndex(self) -> int:
+        return self._physicalChannelIndex_
+
+    @property
+    def name(self) -> str:
+        return self._adcName_
+
+    @property
+    def units(self) -> pq.Quantity:
+        return self._adcUnits_
+
 class ABFOutputsConfiguration:
     """Configuration of a DAC channel and digital outputs in pClamp/Clampex ABF files.
         
@@ -954,11 +1142,15 @@ class ABFOutputsConfiguration:
     # there are the following possibilities:
     # Alt waveform  | Alt Dig | DAC waveform enabled | DAC Digital output enabled
     #----------------------------------------------------------------------------
-    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block], protocol:ABFProtocol,
-                 dacChannel:int,
+    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block],
+                 protocol:typing.Optional[ABFProtocol] = None,
+                 dacChannel:int = 0,
                  sweep:typing.Optional[int] = None):
         
-        if not isinstance(protocol, ABFProtocol):
+        if protocol is None:
+            protocol = ABFProtocol(obj)
+
+        elif not isinstance(protocol, ABFProtocol):
             raise TypeError(f"'protocol' expected to be an ABFProtocol object; instead, got {type(protocol).__name__}")
         
         self._protocol_ = protocol
@@ -981,8 +1173,8 @@ class ABFOutputsConfiguration:
                 
                 self._dacChannel_ = dacChannel
                 
-                dacName = obj.dacNames[dacChannel] if dacChannel in obj.dacNames else ""
-                dacUnits = obj.dacUnits[dacChannel] if dacChannel in obj.dacUnits else "mV"
+                dacName = obj.dacNames[dacChannel]# if dacChannel in obj.dacNames else ""
+                dacUnits = obj.dacUnits[dacChannel]# if dacChannel in obj.dacUnits else "mV"
                 
                 self._dacName_ = dacName 
                 self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
@@ -1215,7 +1407,7 @@ class ABFOutputsConfiguration:
     def epochRelativeStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to sweep start.
         WARNING: Does NOT take into account the holding time (1/64 of sweep samples),
-        therefore the respoonse to the epoch's waveform, as recorded in the ADC 
+        therefore the response to the epoch's waveform, as recorded in the ADC
         signal, will appear delayed relative to the epoch's start by the holding time.
         
         Depending what you need, you may want to use self.epochActualRelativeStartTime
@@ -1304,7 +1496,16 @@ class ABFOutputsConfiguration:
         if float(epoch.pulsePeriod) == 0.:
             return 0
         return int(self.epochActualDuration(epoch,sweep)/epoch.pulsePeriod)
-    
+
+    def epochActualPulseTimes(self, epoch:ABFEpoch, sweep:int = 0) -> list:
+        pc = self.epochPulseCount(epoch, sweep)
+        if pc == 0:
+            return list()
+
+        t0 = self.epochActualStartTime(epoch, sweep)
+
+        return [t0 + p * epoch.pulsePeriod for p in range(pc)]
+
     def epochAnalogWaveform(self, epoch:ABFEpoch, previousLevel:pq.Quantity, 
                       sweep:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
         """Realizes the analog waveform associated with a single epoch.
@@ -1779,7 +1980,7 @@ class ABFOutputsConfiguration:
         # "high logic" means 5V on a background of 0 V
         # "low logic" means 0V on a background of 5V
         assert digChannel in range(self.digitalOutputsCount), f"Invalid digital output channel {digChannel} for {self.digitalOutputsCount} channels "
-        em
+
         # altDig = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
  
         digOFF, digON, trainOFF, trainON = self.getDigitalLogicLevels(digChannel)

@@ -427,8 +427,8 @@ assert (Rin.ndim == 0) # ⇒ is True
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
                         # but OK with other ElectrodeMode
-    VoltageClamp=2      # these two should be
-    CurrentClamp=4      # self-explanatory
+    VoltageClamp=2      # |these two should be
+    CurrentClamp=4      # |     self-explanatory
     
     
 class ElectrodeMode(TypeEnum):
