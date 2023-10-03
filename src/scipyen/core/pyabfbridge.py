@@ -458,7 +458,7 @@ import pyabf
 
 from core import quantities as scq
 from core import datatypes, strutils
-from core.triggerevent import TriggerEvent
+from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
 # from iolib import pictio as pio # NOTE: not here, so we can import this from
 # pictiio (pio); instead we import pio where it is needed i.e. in getABF()
@@ -889,6 +889,7 @@ class ABFProtocol:
     
     @property
     def activeDACChannelIndex(self) -> int:
+        """Index fo the DAC channel used for command waveforms (and possibly DIG outputs)"""
         return self._activeDACChannel_
     
     @property
@@ -1213,7 +1214,7 @@ class ABFOutputsConfiguration:
     # index of the DAC where Digital output IS enabled is given by 
     #   annotations["protocol"]["nActiveDACChannel"]
     #       (counter-intuitive: expecting to see this from nDigitalDACChannel and nDigitalEnable
-    #       but these seem to be 0 and 1 regardless of which DAC has waveform enebaled and dig enabled)
+    #       but these seem to be 0 and 1 regardless of which DAC has waveform enabled and dig enabled)
     #
     # index of the DAC where waveform is enabled is the κ index in annotations["listDACInfo"],
     # where 
@@ -1428,6 +1429,15 @@ class ABFOutputsConfiguration:
     def epochs(self) -> list:
         """List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
+    
+    def triggerEvents(self, epoch:ABFEpoch, sweep:int = 0, 
+                      eventType:TriggerEventType = TriggerEventType.presynaptic,
+                      fromDigital:bool=True) -> typing.Sequence[TriggerEvent]:
+        
+        if epoch.epochType not in (ABFEpochType.Step, ABFEpochType.Pulse):
+            return list()
+        
+        
 
     def epochsTable(self, sweep:int = 0):
         """Generate a Pandas DataFrame with the epochs definition for this DAC channel.
@@ -1597,6 +1607,15 @@ class ABFOutputsConfiguration:
             return list()
 
         t0 = self.epochActualStartTime(epoch, sweep)
+
+        return [t0 + p * epoch.pulsePeriod for p in range(pc)]
+    
+    def epochPulseTimes(self, epoch:ABFEpoch, sweep:int = 0) -> list:
+        pc = self.epochPulseCount(epoch, sweep)
+        if pc == 0:
+            return list()
+        
+        t0 = self.epochStartTime(epoch, sweep)
 
         return [t0 + p * epoch.pulsePeriod for p in range(pc)]
 
