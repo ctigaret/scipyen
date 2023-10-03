@@ -1645,20 +1645,20 @@ def detect_trigger_events(x, event_type,
         
     if times.size > 1:
         if isinstance(label, str) and len(label.strip()):
-            labels = [f"{label}_{k}" for k in range(times.size)]
+            labels = [f"{label}{k}" for k in range(times.size)]
             
         elif isinstance(label, (tuple, list)):
             if len(label) > times.size:
-                labels = labek[:times.size]
+                labels = label[:times.size]
                 
             elif len(label) < times.size:
-                labels = label + [f"{label[-1]}_{k}" for k in range(len(label), times.size)]
+                labels = label + [f"{label[-1]}{k}" for k in range(len(label), times.size)]
                 
             else:
                 labels = label
                 
         else:
-            labels = [f"{event_type.name}_{k}" for k in range(times.size)]
+            labels = [f"{event_type.name}{k}" for k in range(times.size)]
                 
     else:
         labels = label
@@ -1675,7 +1675,7 @@ def detect_trigger_events(x, event_type,
                 trig.name = "%d%s" % (trig.times.size, label)
                 
             else:
-                trig.name = "%devent_type.name" % trig.times.size
+                trig.name = f"{trig.times.size}{event_type.name}"
                 # trig.name = event_type.name
                 
 #         else:

@@ -1448,7 +1448,13 @@ class ABFOutputsConfiguration:
         
         times = [x.rescale(pq.s) for x in self.epochActualPulseTimes(epoch, sweep)]
         
-        return TriggerEvent(times=times, units = pq.s, labels = label, name=name)
+        trig = TriggerEvent(times=times, units = pq.s, labels = label, name=name)
+        
+        # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
+        if isinstance(label, str) and len(label.strip()):
+            trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+            
+        return trig
     
     def epochsTable(self, sweep:int = 0):
         """Generate a Pandas DataFrame with the epochs definition for this DAC channel.
