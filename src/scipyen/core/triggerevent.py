@@ -548,16 +548,24 @@ class DataMark(DataObject):
         
         """
         if isinstance(self, TriggerEvent):
-            if other.__event_type__ != self.__mark_type__:
+            if other.__mark_type__ != self.__mark_type__:
                 raise TypeError("Can only merge synaptic events of the same type")
         
-        othertimes = other.times.rescale(self.times.units)
-        times = np.hstack([self.times, othertimes]).sort() * self.times.units
-        labels = np.hstack([self.labels, other.labels]) # CAUTION this will mix the labels!
+        my_times_labels = list(zip(self.times, self.labels))
         
+        other_times_labels = list(zip(other.times, other.labels))
+        
+        new_times_labels = sorted(my_times_labels + other_times_labels, key = lambda x: x[0])
+        
+#         othertimes = other.times.rescale(self.times.units)
+#         times = np.hstack([self.times, othertimes]).sort() * self.times.units
+#         labels = np.hstack([self.labels, other.labels]) # CAUTION this will mix the labels!
+#         
         # NOTE: 2019-03-15 18:45:20
         # preserve _MY_ labels!
-        new_labels = np.full_like(labels, labels[0], dtype=labels.dtype)
+        # new_labels = np.full_like(labels, labels[0], dtype=labels.dtype)
+        
+        new_times, new_labels = zip(*new_times_labels)
         
         # take care of the other constructor parameters
         kwargs = {}
@@ -582,7 +590,7 @@ class DataMark(DataObject):
 
         kwargs.update(merged_annotations)
         
-        return self.__class__(times=times, labels=new_labels, **kwargs)
+        return self.__class__(times=new_times, labels=new_labels, **kwargs)
         #return TriggerEvent(times=times, labels=new_labels, **kwargs)
     
     def rescale(self, units):

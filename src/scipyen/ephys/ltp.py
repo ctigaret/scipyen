@@ -859,6 +859,8 @@ class LTPOnline(object):
     def __init__(self,
                  mainClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
+                 adcChannel:int = 0,
+                 dacChannel:int = 0,
                  synapticDigitalTriggersOnDac:typing.Optional[int]=None,
                  stimDIG:typing.Sequence[int] = (0,1),
                  synapticTriggersOnDac:typing.Optional[int]=None,
@@ -886,6 +888,28 @@ class LTPOnline(object):
                 (if the cell can be voltage-clamped with some degree of accuracy)
 
                 therefore, any of voltage- or current-clasmp modes are valid
+        
+        adcChannel:int, default is 0 (first ADC input channel)
+            Index of the ADC input channel used in recording.
+        
+            NOTE: This cannot be unambguously determined from the Clampex protocol,
+            because the user may decide to "record" signals from more than one
+            amplifier primary output
+        
+        dacChannel:int, default is 0 (first DAC output channel)
+            Index of the DAC output channel used for sending analog
+            waveform commands to the recorded cell (e.g. holding potential
+            or current, membrane test, postsynaptc spikng, etc).
+            
+            NOTE: This cannot be unambiguously determined from the protocol,
+            because the experimenter may decide to enable command waveform
+            in more than one DAC (e.g. for emulating triggers, or any other
+            event)
+        
+            WARNING: For experments using alternative pathways, only the first
+            two DACs can be used for "Alternative waveform stimulation"
+        
+        
         
         synapticDigitalTriggersOnDac: index of the DAC where digital triggers are 
                 enabled, for synaptic stimulation. Default is None (read on).
@@ -996,7 +1020,7 @@ class LTPOnline(object):
         if isinstance(mainClampMode, int):
             if mainClampMode not in ephys.ClampMode.values():
                 raise ValueError(f"Invalid mainClampMode {mainClampMode}; expected values are {list(ephys.ClampMode.values())}")
-            self._clampMode_ = type(mainClampMode)
+            self._clampMode_ = ephys.ClampMode.type(mainClampMode)
         elif isinstance(mainClampMode, ephys.ClampMode):
             self._clampMode_ = mainClampMode
         else:
@@ -1080,7 +1104,7 @@ class LTPOnline(object):
         
         self._a_ = 0
 
-        self._presynaptic_triggers_ = dict(path0 = None, path1 = None)
+        self._presynaptic_triggers_ = dict()
         
         if autoStart:
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
@@ -1212,8 +1236,16 @@ class LTPOnline(object):
         abfRun = pio.loadAxonFile(str(abfFile))
         protocol = pab.ABFProtocol(abfRun)
 
+        assert(protocol.nSweeps) == len(abfRun.segments), f"Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)})"
+        assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
+
+        dac = protocol.outputConfiguration()
+        
         if protocol.nSweeps == 2:
-            pass # TODO check for alternate digital outputs → True ; alternate waveform → False
+            assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digtal Output should have been enabled"
+            assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
+            
+            # pass # TODO check for alternate digital outputs → True ; alternate waveform → False
 
         # NOTE: 2023-09-29 14:12:56
         # we need:
@@ -1230,37 +1262,53 @@ class LTPOnline(object):
         #           [pA] for CurrentClamp
 
 
-        if self._synapticProtocol_ is None: # FIXME: 2023-09-29 14:32:24 see next line
-            # make the condition here that data blocks have no segments
-            # self._synapticProtocol_ = protocol
-
-            # NOTE: 2023-10-02 17:14:04
-            # for now, we only collect the data from a generic baseline
-            # and the chase; we skip files related to the conditioning
-            # TODO include code for setting up episodes and storing the
-            # conditioning data as well
-            if protocol.clampMode() == self._clampMode_:
-                # NOTE: 2023-10-02 17:32:09
-                # since this the first time we are setting up the protocol, it MUST
-                # be related to the baseline
-                # TODO
+        if protocol.clampMode() == self._clampMode_:
+            if not isinstance(self._synapticProtocol_, pab.ABFProtocol):
+                # this is set upon the frst run
                 self._synapticProtocol_ = protocol
-
-                dac = protocol.outputConfiguration() # by default use the active DAC
-
-                epochs = dac.epochs
-
-                # TODO: 2023-10-02 18:23:42
-                # figure out which ABF epoch associates synaptic stimulation
-                # • this is an epoch with digital (TTL) trains → 1 or 2 pulses, OR
-                # • two pulse epochs in quick succession with a digital (TTL) pulse
-                #       (by definition, each one can have at most one TTL pulse)
-                # in either case, the TTL trains or pulse(s) should be on the
-                # same stimDIG channel as set up in the constructor
-
+                self.processProtocol(protocol)
+                
             else:
-                return # wait for next file
-
+                assert(protocol.nSweeps == self._synapticProtocol_.nSweeps), f"The number of protocol sweeps has changed since the last run; expecting {self._synapticProtocol_.nsweeps} but got {protocol.nSweeps} instead"
+                
+        else: # assume this is the condtioning protocol
+            if not isinstance(self._conditioningProtocol_, pab.ABFProtocol):
+                self._conditioningProtocol_ = protocol # we do nothing with this one for now...
+            else:
+                raise RuntimeError("A conditioning protocol has already been detected; expecting a monitoring protocol")
+            
+        
+        # if not self._synapticProtocol_ is None: # FIXME: 2023-09-29 14:32:24 see next line
+        #     # make the condition here that data blocks have no segments
+        #     # self._synapticProtocol_ = protocol
+        # 
+        #     # NOTE: 2023-10-02 17:14:04
+        #     # for now, we only collect the data from a generic baseline
+        #     # and the chase; we skip files related to the conditioning
+        #     # TODO include code for setting up episodes and storing the
+        #     # conditioning data as well
+        #     if protocol.clampMode() == self._clampMode_:
+        #         # NOTE: 2023-10-02 17:32:09
+        #         # since this the first time we are setting up the protocol, it MUST
+        #         # be related to the baseline
+        #         # TODO
+        #         self._synapticProtocol_ = protocol
+        # 
+        #         dac = protocol.outputConfiguration() # by default use the active DAC
+        # 
+        #         epochs = dac.epochs
+        # 
+        #         # TODO: 2023-10-02 18:23:42
+        #         # figure out which ABF epoch associates synaptic stimulation
+        #         # • this is an epoch with digital (TTL) trains → 1 or 2 pulses, OR
+        #         # • two pulse epochs in quick succession with a digital (TTL) pulse
+        #         #       (by definition, each one can have at most one TTL pulse)
+        #         # in either case, the TTL trains or pulse(s) should be on the
+        #         # same stimDIG channel as set up in the constructor
+        # 
+        #     else:
+        #         return # wait for next file
+        # 
         # else:
 
 
@@ -1272,8 +1320,6 @@ class LTPOnline(object):
         if len(abfRun.segments) != self._synapticProtocol_.nSweeps:
             warnings.warn(f"abf has {len(abfRun.segments)} but protocol says {self._synapticProtocol_.nSweeps}")
             # return
-
-
 
         if len(abfRun.segments) == 1:
             # => single pathway! CAUTION may backfire when recording is interrupted in Clampex
@@ -1338,28 +1384,25 @@ class LTPOnline(object):
                 warnings.warn("There are no epoch sending digital triggers")
                 return False
             
-        print(f"{self.__class__.__name__}.processProtocol {len(presynStimEpochs)} synaptic stimulation epochs")
-            
-        trig = dac.triggerEvents(presynStimEpochs[0], 0)
-        if len(presynStimEpochs) > 1:
-            for e in presynStimEpochs[1:]:
-                trig = trig.merge(e, 0)
-            
-        if self._presynaptic_triggers_["path0"] is None:
-            self._presynaptic_triggers_["path0"] = trig
-        else:
-            assert(trig == self._presynaptic_triggers_["path0"]), f"Presynaptic triggers mismatch {trig} vs path0 trigger {self._presynaptic_triggers_['path0']}"
-            
-        if protocol.nSweeps == 2:
-            trig = dac.triggerEvents(presynStimEpochs[0], 1)
-            if len(presynStimEpochs) > 1:
-                for e in presynStimEpochs[1:]:
-                    trig = trig.merge(e, 1)
+        # print(f"{self.__class__.__name__}.processProtocol {len(presynStimEpochs)} synaptic stimulation epochs")
+        
+        for path in range(protocol.nSweeps):
+            pndx = f"path{path}"
+            pathEpochs = sorted(presynStimEpochs, key = lambda x: dac.epochRelativeStartTime(x, path))
+            trig = dac.triggerEvents(pathEpochs[0], path)
+            if len(pathEpochs) > 1:
+                for e in pathEpochs[1:]:
+                    trig = trig.merge(dac.triggerEvents(e, path))#, label="EPSC"))
                 
-            if self._presynaptic_triggers_["path1"] is None:
-                self._presynaptic_triggers_["path1"] = trig
+            ntrigs = trig.size
+            ll = [f"EPSC{k}" for k in range(ntrigs)]
+            trig.labels = ll
+            
+            if not isinstance(self._presynaptic_triggers_.get(pndx, None), TriggerEvent):
+                self._presynaptic_triggers_[pndx] = trig
             else:
-                assert(trig == self._presynaptic_triggers_["path1"]), f"Presynaptic triggers mismatch {trig} vs path1 trigger {self._presynaptic_triggers_['path1']}"
+                assert(trig == self._presynaptic_triggers_[pndx]), f"Presynaptic triggers mismatch {trig} vs path0 trigger {self._presynaptic_triggers_[pndx]}"
+            
         
     def filesChanged(self, filePaths:typing.Sequence[str]):
         # print(f"{self._a_} → {self.__class__.__name__}.filesChanged {filePaths}\n")

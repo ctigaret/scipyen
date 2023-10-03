@@ -889,7 +889,7 @@ class ABFProtocol:
     
     @property
     def activeDACChannelIndex(self) -> int:
-        """Index fo the DAC channel used for command waveforms (and possibly DIG outputs)"""
+        """Index of the DAC channel used for command waveforms (and possibly DIG outputs)"""
         return self._activeDACChannel_
     
     @property
