@@ -380,6 +380,7 @@ class DataMark(DataObject):
         obj = pq.Quantity(places, units=dim).view(cls)
         obj._labels = labels
         obj.segment = None
+        # obj.name = name
         return obj
 
     
@@ -1108,7 +1109,8 @@ class TriggerEvent(DataMark):
     
     def __new__(cls, times=None, labels=None, units=None, name=None, description=None,
                 file_origin=None, event_type=None, array_annotations=None, **annotations):
-        
+        # BUG: 2023-10-03 17:57:30 FIXME
+        # when labels are passed as a string the counter is not taken into account
         if times is None:
             times = np.array([]) * pq.s
         
@@ -1129,19 +1131,25 @@ class TriggerEvent(DataMark):
             if isinstance(evt, TriggerEvent):
                 event_type = evt.event_type
                 
+        # print(f"{cls}.__new__ labels = {labels} ({type(labels).__name__})")
+                
         if labels is None:
-            labels = np.array([], dtype='S')
+            ll = [f"trigger{k}" for k in range(times.size)]
+            labels = np.array(ll, dtype='U')
             
         else:
             if isinstance(labels, str):
-                labels = np.array([labels] * times.size)
+                ll = [f"{labels}{k}" for k in range(times.size)]
+                # print(f"ll = {ll}")
+                # labels = np.array(ll, dtype="U")
+                labels = np.array(ll)
                 
             elif isinstance(labels, (tuple, list)):
                 if not all([isinstance(l, str) for l in labels]):
                     raise TypeError("When ''labels' is a sequence, all elements must be str")
                 
                 if len(labels) < times.size:
-                    labels += [labels[-1]] * (times.size - len(labels))
+                    labels += [f"{labels[-1]}{k}" for k in range(len(labels), times.size)]
                     
                 elif len(labels) > times.size:
                     labels = labels[:times.size]
@@ -1153,13 +1161,17 @@ class TriggerEvent(DataMark):
                     raise TypeError("When 'labels' is a numpy array, it must contain strings")
                 
                 if labels.size < times.size:
-                    labels = np.append(labels, [labels[-1]] * (times.size - labels-size))
+                    ll = np.append(labels, [f"{labels[-1]}{k}" for k in range(labels.size, times.size, )])
+                    labels = ll
+                    
                 elif labels.size > times.size:
                     labels = labels[:times.size]
                     
             else:
                 raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
                     
+        # print(f"\t{cls}.__new__ actual labels = {labels} ({type(labels).__name__}, dype={labels.dtype})")
+        
         if units is None:
             # No keyword units, so get from `times`
             try:
@@ -1191,7 +1203,7 @@ class TriggerEvent(DataMark):
         
         By default its __mark_type__ is TriggerEventType.presynaptic
         """
-        super().__init__(times=times, labels=labels, units=units, 
+        super().__init__(times=times, labels=labels, units=units, name=name,
                          description=description, file_origin=file_origin, 
                          mark_type=event_type, array_annotations=array_annotations,
                          **annotations)
