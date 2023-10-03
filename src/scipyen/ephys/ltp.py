@@ -909,8 +909,6 @@ class LTPOnline(object):
             WARNING: For experments using alternative pathways, only the first
             two DACs can be used for "Alternative waveform stimulation"
         
-        
-        
         synapticDigitalTriggersOnDac: index of the DAC where digital triggers are 
                 enabled, for synaptic stimulation. Default is None (read on).
         
@@ -998,7 +996,7 @@ class LTPOnline(object):
         # cbDict = dict(newFiles = self.newFiles, changedFiles = self.changedFiles,
         #               removedFiles = self.removedFiles)
 
-        self._monitor_ = DirectoryFileWatcher(emitter = self._emitterWindow_,
+        self._dirMonitor_ = DirectoryFileWatcher(emitter = self._emitterWindow_,
                                                  directory = self._watchedDir_,
                                                  observer = self)
         
@@ -1011,9 +1009,15 @@ class LTPOnline(object):
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
-        self._synapticProtocol_ = None
+        self.self._monitorProtocol_ = None
 
         self._conditioningProtocol_ = None
+        
+        self._adcChannel_ = adcChannel
+        self._dacChannel_ = dacChannel
+        
+        self._sigIndex_ = None  # when set, this is an int index of the signal 
+                                # of interest; must be the same across runs
 
         # self._abfDacOutputConfig_ = None
 
@@ -1021,8 +1025,10 @@ class LTPOnline(object):
             if mainClampMode not in ephys.ClampMode.values():
                 raise ValueError(f"Invalid mainClampMode {mainClampMode}; expected values are {list(ephys.ClampMode.values())}")
             self._clampMode_ = ephys.ClampMode.type(mainClampMode)
+            
         elif isinstance(mainClampMode, ephys.ClampMode):
             self._clampMode_ = mainClampMode
+            
         else:
             raise TypeError(f"mainClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(mainClampMode).__name__}")
 
@@ -1119,18 +1125,47 @@ class LTPOnline(object):
     @property
     def data(self) -> dict:
         return self._data_
+    
+    @property
+    def adcChannel(self) -> int:
+        return self._adcChannel_
+    
+    @adcChannel.setter
+    def adcChannel(self, val:int):
+        self._adcChannel_ = val
+    
+    @property
+    def dacChannel(self) -> int:
+        return self._dacChannel_
+    
+    @dacChannel.setter
+    def dacChannel(self, val:int):
+        self._dacChannel_ = val
+    
 
     def stop(self):
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
             
-        # monitoredFiles = self._monitor_._source_.dirFileMonitor.files()
+        # monitoredFiles = self._dirMonitor_._source_.dirFileMonitor.files()
         # if len(monitorFiles):
-        #     self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
+        #     self._dirMonitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
             
         # self._a_ = 0
 
         self._abfListener_.stop()
+        
+    def reset(self):
+        self.self._monitorProtocol_ = None
+        self._conditioningProtocol_ = None
+        
+        self._data_["baseline"]["path0"].segments.clear()
+        self._data_["baseline"]["path1"].segments.clear()
+        self._data_["chase"]["path0"].segments.clear()
+        self._data_["chase"]["path1"].segments.clear()
+        self._data_["conditioning"]["path0"].segments.clear()
+        self._data_["conditioning"]["path1"].segments.clear()
+        
 
     def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
         if self._emitterWindow_ is None:
@@ -1149,8 +1184,8 @@ class LTPOnline(object):
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
     
-        if self._monitor_.directory != self._watchedDir_:
-            self._monitor_.directory = self._watchedDir_
+        if self._dirMonitor_.directory != self._watchedDir_:
+            self._dirMonitor_.directory = self._watchedDir_
 
         # self._a_ = 0
         self._pending_.clear() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
@@ -1159,15 +1194,6 @@ class LTPOnline(object):
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
-        self._synapticProtocol_ = None
-        
-        self._data_["baseline"]["path0"].segments.clear()
-        self._data_["baseline"]["path1"].segments.clear()
-        self._data_["chase"]["path0"].segments.clear()
-        self._data_["chase"]["path1"].segments.clear()
-        self._data_["conditioning"]["path0"].segments.clear()
-        self._data_["conditioning"]["path1"].segments.clear()
-        
         if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
             
@@ -1239,7 +1265,7 @@ class LTPOnline(object):
         assert(protocol.nSweeps) == len(abfRun.segments), f"Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)})"
         assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
 
-        dac = protocol.outputConfiguration()
+        dac = protocol.outputConfiguration(self.dacChannel)
         
         if protocol.nSweeps == 2:
             assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digtal Output should have been enabled"
@@ -1261,66 +1287,41 @@ class LTPOnline(object):
         #           [mV] for VoltageClamp,
         #           [pA] for CurrentClamp
 
-
-        if protocol.clampMode() == self._clampMode_:
-            if not isinstance(self._synapticProtocol_, pab.ABFProtocol):
-                # this is set upon the frst run
-                self._synapticProtocol_ = protocol
+        # TODO/FIXME: 2023-10-03 23:25:04 - the following is a procedural convention
+        # need to make it more generic
+        # we assume the very first abfRun is a monitoring one => baseline episode
+        # we add subsequent runs to the baseline episode until protocol changes
+        #   => assume new protocol is conditioning protocol, which MAY be repeated
+        #       for several runs => add subsequent runs to the conditioning episode
+        #       until protocol changes again => the new protocol must be identical
+        # to the monitoring protocol => chase episode
+        #
+        # TODO allow for several conditioning episodes (with same or different
+        # conditioning protocols), possibly interleaved with monitoring episodes
+        # which should have the same monitoring protocol
+        #
+        if self._monitorProtocol_ is None:
+            if protocol.clampMode() == self._clampMode_:
+                self._monitorProtocol_ = protocol
                 self.processProtocol(protocol)
-                
             else:
-                assert(protocol.nSweeps == self._synapticProtocol_.nSweeps), f"The number of protocol sweeps has changed since the last run; expecting {self._synapticProtocol_.nsweeps} but got {protocol.nSweeps} instead"
-                
-        else: # assume this is the condtioning protocol
-            if not isinstance(self._conditioningProtocol_, pab.ABFProtocol):
-                self._conditioningProtocol_ = protocol # we do nothing with this one for now...
-            else:
-                raise RuntimeError("A conditioning protocol has already been detected; expecting a monitoring protocol")
+                raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._clampMode_}")
             
-        
-        # if not self._synapticProtocol_ is None: # FIXME: 2023-09-29 14:32:24 see next line
-        #     # make the condition here that data blocks have no segments
-        #     # self._synapticProtocol_ = protocol
-        # 
-        #     # NOTE: 2023-10-02 17:14:04
-        #     # for now, we only collect the data from a generic baseline
-        #     # and the chase; we skip files related to the conditioning
-        #     # TODO include code for setting up episodes and storing the
-        #     # conditioning data as well
-        #     if protocol.clampMode() == self._clampMode_:
-        #         # NOTE: 2023-10-02 17:32:09
-        #         # since this the first time we are setting up the protocol, it MUST
-        #         # be related to the baseline
-        #         # TODO
-        #         self._synapticProtocol_ = protocol
-        # 
-        #         dac = protocol.outputConfiguration() # by default use the active DAC
-        # 
-        #         epochs = dac.epochs
-        # 
-        #         # TODO: 2023-10-02 18:23:42
-        #         # figure out which ABF epoch associates synaptic stimulation
-        #         # • this is an epoch with digital (TTL) trains → 1 or 2 pulses, OR
-        #         # • two pulse epochs in quick succession with a digital (TTL) pulse
-        #         #       (by definition, each one can have at most one TTL pulse)
-        #         # in either case, the TTL trains or pulse(s) should be on the
-        #         # same stimDIG channel as set up in the constructor
-        # 
-        #     else:
-        #         return # wait for next file
-        # 
-        # else:
-
-
-
-        # WARNING this code runs, but does only part of what is intended
-
-        # TODO: 2023-09-29 14:23:21
-        # check that the abf has as many segments as advertised in the protocol
-        if len(abfRun.segments) != self._synapticProtocol_.nSweeps:
-            warnings.warn(f"abf has {len(abfRun.segments)} but protocol says {self._synapticProtocol_.nSweeps}")
-            # return
-
+        else:
+            if protocol != self._monitorProtocol_:
+                if self._conditioningProtocol_ is None:
+                    if protocol.clampMode() == self._conditioningClampMode_:
+                        self._conditioningProtocol_ = protocol
+                    else:
+                        raise ValueError("Unexpected conditioning protocol")
+                    
+                else:
+                    if protocol != self._conditioningProtocol_:
+                        raise ValueError("Unexpected protocol for current run")
+            
+        adc = self._monitorProtocol_.inputConfiguration(self.adcChannel)
+        sigIndex = neoutils.get_index_of_named_signal(adc.name)
+            
         if len(abfRun.segments) == 1:
             # => single pathway! CAUTION may backfire when recording is interrupted in Clampex
             # TODO: for now we just populate the baseline
@@ -1328,24 +1329,32 @@ class LTPOnline(object):
             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
 
             self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
+                                            doc_title="path0",
                                             showFrame = len(self._data_["baseline"]["path0"].segments)-1)
 
+            self._viewer_path0_Records.currentAxis = adc.name
 
 
         elif len(abfRun.segments) == 2: # WARNING we only support two alternative pathways
             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
             self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
+                                            doc_tile="path0",
                                             showFrame = len(self._data_["baseline"]["path0"].segments)-1)
+            self._viewer_path0_Records.currentAxis = adc.name
+            
             self._data_["baseline"]["path1"].segments.append(abfRun.segments[1])
             self._viewer_path1_Records.view(self._data_["baseline"]["path1"],
+                                            doc_tile="path1",
                                             showFrame = len(self._data_["baseline"]["path1"].segments)-1)
+            
+            self._viewer_path1_Records.currentAxis = adc.name
 
     def processProtocol(self, protocol:pab.ABFProtocol):
         # TODO: 2023-10-03 12:31:19
         # implement the case where TTLs are emulated with a DAC channel (with its
         # output routed to a simulus isolator)
         #
-        dac = protocol.outputConfiguration()
+        dac = protocol.outputConfiguration(self.dacChannel)
         if len(dac.epochs) == 0:
             warnings.warn("Data has no ABF epochs defined")
             return False
@@ -1425,10 +1434,10 @@ class LTPOnline(object):
         
     def _setupPendingAbf_(self):
         self._pending_.clear()
-        # if isinstance(self._monitor_, DirectoryFileWatcher):
-        #     monitoredFiles = self._monitor_._source_.dirFileMonitor.files()
+        # if isinstance(self._dirMonitor_, DirectoryFileWatcher):
+        #     monitoredFiles = self._dirMonitor_._source_.dirFileMonitor.files()
         #     if len(monitoredFiles):
-        #         self._monitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
+        #         self._dirMonitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
         # else:
         #     raise RuntimeError("We haven't got a dirFileMonitor yet!")
         
@@ -1450,7 +1459,7 @@ class LTPOnline(object):
         for rsv, abf in self._pending_.items():
             print(f"To monitor {abf.name}")
             # self._pendingAbf_stat_ = abf.stat()
-            # self._monitor_.monitorFile(abf)
+            # self._dirMonitor_.monitorFile(abf)
             
             if rsv in self._filesQueue_:
                 self._filesQueue_.remove(rsv)

@@ -883,6 +883,23 @@ class ABFProtocol:
         else:
             self._inputs_ = list()
             
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        
+        # check equality of properties (descriptors); this includes nSweeps and nADCChannels
+        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+
+        # if checked out then verify all epochs Tables are sweep by sweep 
+        # identical in all DAC channels
+        if ret:
+            ret = all(all(np.all(self.outputConfiguration(d).epochsTable(s) == other.outputConfiguration(d).epochsTable(s)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
+                    
+        return ret
+        
+            
     @property
     def acquisitionMode(self) -> ABFAcquisitionMode:
         return self._acquisitionMode_
@@ -1183,10 +1200,18 @@ class ABFInputsConfiguration:
     @property
     def physicalIndex(self) -> int:
         return self._physicalChannelIndex_
+    
+    @property
+    def adcName(self) -> str:
+        return self._adcName_
 
     @property
     def name(self) -> str:
         return self._adcName_
+    
+    @property
+    def adcUnits(self) -> pq.Quantity:
+        return self._adcUnits_
 
     @property
     def units(self) -> pq.Quantity:

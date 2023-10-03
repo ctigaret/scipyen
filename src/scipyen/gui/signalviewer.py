@@ -7036,7 +7036,7 @@ signals in the signal collection.
     
     @selectedPlotItem.setter
     def selectedPlotItem(self, index):
-        self.selectedPlotItem = index
+        self.currentPlotItem = index
         
     @property
     def currentPlotItem(self):
@@ -7048,7 +7048,7 @@ signals in the signal collection.
         return self._selected_plot_item_
     
     @currentPlotItem.setter
-    def currentPlotItem(self, index: typing.Union[int, pg.PlotItem]):
+    def currentPlotItem(self, index: typing.Union[int, pg.PlotItem, str]):
         """Sets the current plot item to the one at the specified index.
         
         Index: int index or a plotitem
@@ -7065,17 +7065,26 @@ signals in the signal collection.
         
         if isinstance(index, int):
             if index not in range(len(plotitems)):
-                raise TypeError(f"Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
-        
-        #system_palette = QtGui.QGuiApplication.palette()
-        #default_border_color = self.axis(0).vb.border.color()
-        
+                warnings.warn(f"Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
+                return
+                # raise TypeError(f"Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
+            
             self._selected_plot_item_ = plotitems[index]
             self._selected_plot_item_index_ = index
             
         elif isinstance (index, pg.PlotItem) and index in self.axes:
             self._selected_plot_item_ = index
             self._selected_plot_item_index_ = plotitems.index(index)
+            
+        elif isinstance(index, str):
+            names = [ax.vb.name for ax in self.axes]
+            if index not in names:
+                return
+            
+            axindex = names.index(index)
+            
+            self._selected_plot_item_ = plotitems[index]
+            self._selected_plot_item_index_ = index
             
         else:
             return
@@ -7105,7 +7114,7 @@ signals in the signal collection.
         return self.currentPlotItem
     
     @currentAxis.setter
-    def currentAxis(self, axis:typing.Union[int, pg.PlotItem]):
+    def currentAxis(self, axis:typing.Union[int, pg.PlotItem, str]):
         self.currentPlotItem = axis
         
     @property
