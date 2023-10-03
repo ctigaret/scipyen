@@ -864,6 +864,7 @@ class LTPOnline(object):
                  synapticTriggersOnDac:typing.Optional[int]=None,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
+                 autoStart:bool=True
                  ):
         """
         mainClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp
@@ -979,7 +980,6 @@ class LTPOnline(object):
         
         # print(f"{self.__class__.__name__}.__init__ to watch: {self._watchedDir_}\n")
 
-        self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
         
         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
@@ -1081,12 +1081,16 @@ class LTPOnline(object):
         self._a_ = 0
 
         self._presynaptic_triggers_ = dict(path0 = None, path1 = None)
+        
+        if autoStart:
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
 
     def __del__(self):
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
 
-        super().__del__()
+        if hasattr(super(object, self), "__del__"):
+            super().__del__()
 
     @property
     def data(self) -> dict:
@@ -1304,15 +1308,14 @@ class LTPOnline(object):
         # first try and find epochs with digital trains
         # there should be only one such epoch, sending at least one TTL pulse per train
         #
-        presynStimEpochs = filter(lambda x: x.hasDigitalTrain(), dac.epochs)
-        if len(presynStimEpochs) == 1: # ideal scenario
-            presynStimEpochs = [presynStimEpochs[0]]
-            
-        elif len(presynStimEpochs) > 1:
+        presynStimEpochs = list(filter(lambda x: x.hasDigitalTrain(), dac.epochs))
+        # ideally there is only one such epoch
+        if len(presynStimEpochs) > 1:
             # raise NotImplementedError("Only synaptic triggers are implemented")
             warnings.warn(f"There are {len(presynStimEpochs)} in the protocol; I need more information")
             return False
-        else:
+        
+        elif len(presynStimEpochs) == 0:
             # Try prestim triggers defined as digital pulses instead of trains.
             #
             # Here we can expect to have more than one such epochs, together 
@@ -1330,22 +1333,33 @@ class LTPOnline(object):
             # using pulses instead of trains for conditioning as well (e.g.
             # low frequency stimulations)
             #
-            presynStimEpochs = filter(lambda x: x.hasDigitalTrain(), dac.epochs)
+            presynStimEpochs = list(filter(lambda x: x.hasDigitalPulse(), dac.epochs))
             if len(presynStimEpochs) == 0:
-                warnings.warn("There are no trigger epochs")
-                return
+                warnings.warn("There are no epoch sending digital triggers")
+                return False
             
-            if len(presynStimEpochs) == 1:
-                presynStimEpochs = [presynStimEpochs[0]] # single pulse
+        print(f"{self.__class__.__name__}.processProtocol {len(presynStimEpochs)} synaptic stimulation epochs")
+            
+        trig = dac.triggerEvents(presynStimEpochs[0], 0)
+        if len(presynStimEpochs) > 1:
+            for e in presynStimEpochs[1:]:
+                trig = trig.merge(e, 0)
+            
+        if self._presynaptic_triggers_["path0"] is None:
+            self._presynaptic_triggers_["path0"] = trig
+        else:
+            assert(trig == self._presynaptic_triggers_["path0"]), f"Presynaptic triggers mismatch {trig} vs path0 trigger {self._presynaptic_triggers_['path0']}"
+            
+        if protocol.nSweeps == 2:
+            trig = dac.triggerEvents(presynStimEpochs[0], 1)
+            if len(presynStimEpochs) > 1:
+                for e in presynStimEpochs[1:]:
+                    trig = trig.merge(e, 1)
                 
-            elif len(presynStimEpochs) > 1:
-                presynStimEpochs = presynStimEpochs[:2]
-                
+            if self._presynaptic_triggers_["path1"] is None:
+                self._presynaptic_triggers_["path1"] = trig
             else:
-                warnings.warn("No epochs with digital triggers found")
-            
-        if protocol.nSweeps == 1:
-            triggers = itertools.chain.from_iterable([dac.triggerEvents(e, 0) for e in presynStimEpochs])
+                assert(trig == self._presynaptic_triggers_["path1"]), f"Presynaptic triggers mismatch {trig} vs path1 trigger {self._presynaptic_triggers_['path1']}"
         
     def filesChanged(self, filePaths:typing.Sequence[str]):
         # print(f"{self._a_} → {self.__class__.__name__}.filesChanged {filePaths}\n")
