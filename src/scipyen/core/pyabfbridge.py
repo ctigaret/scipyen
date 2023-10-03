@@ -1430,15 +1430,26 @@ class ABFOutputsConfiguration:
         """List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
     
-    def triggerEvents(self, epoch:ABFEpoch, sweep:int = 0, 
+    def triggerEvents(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
                       eventType:TriggerEventType = TriggerEventType.presynaptic,
-                      fromDigital:bool=True) -> typing.Sequence[TriggerEvent]:
-        
+                      label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+                      name:typing.Optional[str] = None) -> TriggerEvent:
+        """Trigger events from Step and Pulse-type ABF Epochs.
+        If the epoch has digital outputs, the time stamps for the trigger
+        events will be set by the timings of the digital TTL signals during
+        the epoch. Otherwise, the timings will be given by the epoch's
+        command waveform timing (i.e. its start time)
+        """
+        if isinstance(epoch, (str, int)):
+            epoch = self.getEpoch(epoch)
+            
         if epoch.epochType not in (ABFEpochType.Step, ABFEpochType.Pulse):
             return list()
         
+        times = [x.rescale(pq.s) for x in self.epochActualPulseTimes(epoch, sweep)]
         
-
+        return TriggerEvent(times=times, units = pq.s, labels = label, name=name)
+    
     def epochsTable(self, sweep:int = 0):
         """Generate a Pandas DataFrame with the epochs definition for this DAC channel.
         
@@ -1494,7 +1505,7 @@ class ABFOutputsConfiguration:
         
         return self.epochs[e]
     
-    def epochRelativeStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
+    def epochRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to sweep start.
         WARNING: Does NOT take into account the holding time (1/64 of sweep samples),
         therefore the response to the epoch's waveform, as recorded in the ADC
@@ -1503,33 +1514,61 @@ class ABFOutputsConfiguration:
         Depending what you need, you may want to use self.epochActualRelativeStartTime
         
         """
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         # NOTE: 2023-09-22 15:39:13
         # below, the sweep index is REQUIRED to calculate the actual epoch duration
         # 
         units = epoch.firstDuration.units
         return np.sum([self.epochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units
     
-    def epochActualRelativeStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
+    def epochActualRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to sweep start.
         Takes into account the holding time (1/64 sweep samples, in Clampex)
         
         """
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         units = epoch.firstDuration.units
         return np.sum([self.epochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units + self.holdingTime
         
-    def epochRelativeStartSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+    def epochRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from the start of the sweep to the start of epoch.
         WARNING: Like self.epochRelativeStartTime, does NOT take into account 
         the holding time; you may want to use self.epochActualRelativeStartsSamples
         
         
         """
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         return np.sum([self.epochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]])
     
-    def epochActualRelativeStartSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+    def epochActualRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         return np.sum([self.epochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]]) + self.holdingSampleCount
         
-    def epochStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
+    def epochStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to the start of recording.
         WARNING: Does NOT take into account the holding time (1/64 of sweep samples),
         therefore the respoonse to the epoch's waveform, as recorded in the ADC 
@@ -1540,13 +1579,13 @@ class ABFOutputsConfiguration:
         # units = epoch.firstDuration.units
         return self.epochRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
     
-    def epochActualStartTime(self, epoch:ABFEpoch, sweep:int = 0) -> pq.Quantity:
+    def epochActualStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to the start of recording.
         Takes into account the sweep holding time.
         """
         return self.epochActualRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
         
-    def epochStartSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+    def epochStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from start fo recording to the epoch.
         WARNING: Like self.epochStartSamples, does NOT take into account 
         the holding time; you may want to use self.epochActualStartSamples.
@@ -1554,40 +1593,83 @@ class ABFOutputsConfiguration:
         """
         return self.epochRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
-    def epochActualStartSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+    def epochActualStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from start fo recording to the epoch.
         Takes into account the sweep holding time.
         """
         return self.epochActualRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
-    def epochActualDuration(self, epoch:ABFEpoch, sweep:int=0) -> pq.Quantity:
+    def epochActualDuration(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> pq.Quantity:
         """Actual epoch duration (in ms) for the given sweep.
         Takes into account first duration and delta duration"""
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         return epoch.firstDuration + sweep * epoch.deltaDuration
         
-    def epochActualDurationSamples(self, epoch:ABFEpoch, sweep:int=0) -> int:
+    def epochActualDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Actual epoch duration (in samples) for the given sweep.
         Takes into account first duration and delta duration"""
         return scq.nSamples(self.epochActualDuration(epoch, sweep), self.samplingRate)
     
-    def epochFirstDurationSamples(self, epoch:ABFEpoch) -> int:
+    def epochFirstDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         return scq.nSamples(epoch.firstDuration, self.samplingRate)
         
-    def epochDeltaDurationSamples(self, epoch:ABFEpoch) -> int:
+    def epochDeltaDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         return scq.nSamples(epoch.deltaDuration, self.samplingRate)
     
-    def epochPulseWidthSamples(self, epoch:ABFEpoch) -> int:
+    def epochPulseWidthSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         return scq.nSamples(epoch.pulseWidth, self.samplingRate)
     
-    def epochPulsePeriodSamples(self, epoch:ABFEpoch) -> int:
+    def epochPulsePeriodSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         return scq.nSamples(epoch.pulsePeriod, self.samplingRate)
     
-    def epochPulseCount(self, epoch:ABFEpoch, sweep:int = 0) -> int:
+    def epochPulseCount(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> int:
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         if float(epoch.pulsePeriod) == 0.:
             return 0
+        
         return int(self.epochActualDuration(epoch,sweep)/epoch.pulsePeriod)
 
-    def epochActualPulseTimes(self, epoch:ABFEpoch, sweep:int = 0) -> list:
+    def epochActualPulseTimes(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> list:
         """Start times for the pulses defined in the epoch.
         An ABF epoch may define pulses regardless of whether it associates a
         digital output patter or not. 
@@ -1603,6 +1685,7 @@ class ABFOutputsConfiguration:
         epoch).
         """
         pc = self.epochPulseCount(epoch, sweep)
+        
         if pc == 0:
             return list()
 
@@ -1610,7 +1693,14 @@ class ABFOutputsConfiguration:
 
         return [t0 + p * epoch.pulsePeriod for p in range(pc)]
     
-    def epochPulseTimes(self, epoch:ABFEpoch, sweep:int = 0) -> list:
+    def epochPulseTimes(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> list:
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         pc = self.epochPulseCount(epoch, sweep)
         if pc == 0:
             return list()
@@ -1619,7 +1709,7 @@ class ABFOutputsConfiguration:
 
         return [t0 + p * epoch.pulsePeriod for p in range(pc)]
 
-    def epochAnalogWaveform(self, epoch:ABFEpoch, previousLevel:pq.Quantity, 
+    def epochAnalogWaveform(self, epoch:typing.Union[ABFEpoch, str, int], previousLevel:pq.Quantity, 
                       sweep:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
         """Realizes the analog waveform associated with a single epoch.
         An 'epoch' is defined as a specific time interval in a sweep, during 
@@ -1629,6 +1719,13 @@ class ABFOutputsConfiguration:
         Complex DAC output commands can be generated by defining and concatenating
         several epochs (subject to the constraints of the Clampex software version)
         """
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
         actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
@@ -1710,8 +1807,15 @@ class ABFOutputsConfiguration:
             
         return wave
     
-    def epochDigitalWaveform(self, epoch:ABFEpoch, trainOFF, trainON, digOFF, digON,
+    def epochDigitalWaveform(self, epoch:typing.Union[ABFEpoch, str, int], trainOFF, trainON, digOFF, digON,
                              sweep:int = 0, digChannel:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
+        if isinstance(epoch, (int, str)):
+            e = self.getEpoch(epoch)
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
+            
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
         pulsePeriod = self.epochPulsePeriodSamples(epoch)

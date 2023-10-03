@@ -1595,11 +1595,11 @@ def detect_trigger_events(x, event_type,
         state transition times when "use_lo_hi" is True, otherwise from the 
         high -> low state transition times.
             
-    label: str, optional (default None): the labels for the events in the 
-        datatypes.TriggerEvent array
+    label: str, optional (default None): common label prefix for the individual 
+        events in the generated triggerevent.TriggerEvent array
     
     name: str, optional (default  None): the name of the generated 
-        datatypes.TriggerEvent array
+        triggerevent.TriggerEvent array
     
     Returns:
     ========
@@ -1631,7 +1631,7 @@ def detect_trigger_events(x, event_type,
    
     # lo_hi, hi_lo, _, _ , _, upward = detect_boxcar(x)
     boxdetect = detect_boxcar(x)
-    print(f"triggerprotocols.detect_trigger_events boxdetect = {boxdetect}")
+    # print(f"triggerprotocols.detect_trigger_events boxdetect = {boxdetect}")
     lo_hi, hi_lo, _ampl, _lvl, _lbl, _up = boxdetect
     
     if all([v is None for v in (lo_hi, hi_lo)]):
@@ -1643,10 +1643,31 @@ def detect_trigger_events(x, event_type,
     else:
         times = hi_lo
         
-    trig = TriggerEvent(times=times, units=x.times.units, event_type=event_type, labels=label, name=name)
+    if times.size > 1:
+        if isinstance(label, str) and len(label.strip()):
+            labels = [f"{label}_{k}" for k in range(times.size)]
+            
+        elif isinstance(label, (tuple, list)):
+            if len(label) > times.size:
+                labels = labek[:times.size]
+                
+            elif len(label) < times.size:
+                labels = label + [f"{label[-1]}_{k}" for k in range(len(label), times.size)]
+                
+            else:
+                labels = label
+                
+        else:
+            labels = [f"{event_type.name}_{k}" for k in range(times.size)]
+                
+    else:
+        labels = label
+        
+    trig = TriggerEvent(times=times, units=x.times.units, event_type=event_type, labels=labels, name=name)
     
     if name is None:
-        if label is not None:
+        # if label is not None:
+        if isinstance(label, str) and len(label.strip()):
             trig.name = "%d%s" % (trig.times.size, label)
             
         else:
@@ -1654,7 +1675,14 @@ def detect_trigger_events(x, event_type,
                 trig.name = "%d%s" % (trig.times.size, label)
                 
             else:
-                trig.name = "%dtriggers" % trig.times.size
+                trig.name = "%devent_type.name" % trig.times.size
+                # trig.name = event_type.name
+                
+#         else:
+#             trig.name = event_type.name
+#                 
+    elif isinstance(name, str) and len(name.strip()):
+        trig.name = name
                 
     return trig
     

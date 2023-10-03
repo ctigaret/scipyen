@@ -859,7 +859,9 @@ class LTPOnline(object):
     def __init__(self,
                  mainClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
-                 stimDIG:int = 0,
+                 synapticDigitalTriggersOnDac:typing.Optional[int]=None,
+                 stimDIG:typing.Sequence[int] = (0,1),
+                 synapticTriggersOnDac:typing.Optional[int]=None,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
                  ):
@@ -883,18 +885,62 @@ class LTPOnline(object):
                 (if the cell can be voltage-clamped with some degree of accuracy)
 
                 therefore, any of voltage- or current-clasmp modes are valid
+        
+        synapticDigitalTriggersOnDac: index of the DAC where digital triggers are 
+                enabled, for synaptic stimulation. Default is None (read on).
+        
+                By default, synaptic transmission is evoked via digital TTL pulses
+                or trains, with the digital output enabled on the active DAC - 
+                this is the most common case and the default here.
+        
+                One may specify here the index of the DAC where digital outputs
+                are enabled.
+        
+                REMEMBER:
+                There can be up to 4 or 8 physical DAC channels (respectively,
+                for DigiData 1440 or 1500 series).
+        
+                The "active" DAC can be 0 or 1, depending which amplifier channel
+                is used for recording and for sending command signals to the cell
+                (e.g., membranbe holding potential in voltage clamp, etc).
+        
+                The timings of the triggers for synaptic stimulation are taken 
+                from the Epochs, defined in the active DAC, that have digital
+                outputs enabled.
+        
+                For a two pathway experiment (where two synaptic pathway are 
+                monitored via alternative stimulation) both first two DACs need
+                epochs with digital outputs configured, and alternate digital 
+                output must be enabled in Clampex's protocol editor (Waveforms 
+                tab). 
+        
+                Moreover, alternative waveform must be DISABLED in Clampex's 
+                protocol editor (Waveforms tab).
+        
+        stimDIG: list of 1 or 2 indices of the digital channel(s) sending out 
+                synaptic stimuli as TTL triggers (e.g. via stimulus isolators)
+                In experiments that monitor a single single synaptic pathway only
+                the first element of the list is used.
+     
+                By default this is [0,1] 
 
-        stimDIG: index of the digital channel that sends out synaptic stimuli
-            (e.g. via stimulus isolators) - typically is 0 (first digital out)
-            or 1 (second digital out) when two synaptic pathways are alternatively
-            tested.
+            CAUTION: when stimulus isolators are NOT available, the DIG outputs
+            are NOT used, but can be emulated through additional DAC outputs;
+            At the time of this writing, I believe that alternative DAC outputs
+            cannot be configured for DIG emulation on higher DAC indices.
 
-        CAUTION: when stimulus isolators are NOT available, the DIG outputs are
-            NOT used, but can be emulated through additional DAC outputs;
-            however, at the time of this writing, I do not know if alternative
-            DAC outputs can be configured for DIG emulation on higher DAC indices
-            with that is that one cannot
-
+        synapticTriggersOnDac: int or None; When an int, this is the index of the
+            DAC channel that emulates TTLs
+        
+            WARNING: In Clampex one cannot use DACs to stimulate distinct paths 
+            alternatively, because turning alternative waveforms ON only affects
+            the first two DAC channels.
+        
+            When None, the epochs in the "active" DAC are used to retrieve the
+            timings of the synaptic stimulus triggers (through the digital outputs)
+        
+        
+        
         emitterWindow - by default, Scipyen's main window, so leave it as None
         """
 
@@ -1034,6 +1080,7 @@ class LTPOnline(object):
         
         self._a_ = 0
 
+        self._presynaptic_triggers_ = dict(path0 = None, path1 = None)
 
     def __del__(self):
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
@@ -1243,6 +1290,63 @@ class LTPOnline(object):
             self._viewer_path1_Records.view(self._data_["baseline"]["path1"],
                                             showFrame = len(self._data_["baseline"]["path1"].segments)-1)
 
+    def processProtocol(self, protocol:pab.ABFProtocol):
+        # TODO: 2023-10-03 12:31:19
+        # implement the case where TTLs are emulated with a DAC channel (with its
+        # output routed to a simulus isolator)
+        #
+        dac = protocol.outputConfiguration()
+        if len(dac.epochs) == 0:
+            warnings.warn("Data has no ABF epochs defined")
+            return False
+        
+        # locate the presynaptic triggers epoch
+        # first try and find epochs with digital trains
+        # there should be only one such epoch, sending at least one TTL pulse per train
+        #
+        presynStimEpochs = filter(lambda x: x.hasDigitalTrain(), dac.epochs)
+        if len(presynStimEpochs) == 1: # ideal scenario
+            presynStimEpochs = [presynStimEpochs[0]]
+            
+        elif len(presynStimEpochs) > 1:
+            # raise NotImplementedError("Only synaptic triggers are implemented")
+            warnings.warn(f"There are {len(presynStimEpochs)} in the protocol; I need more information")
+            return False
+        else:
+            # Try prestim triggers defined as digital pulses instead of trains.
+            #
+            # Here we can expect to have more than one such epochs, together 
+            #   emulating a train of TTL pulses (with one pulse per epoch).
+            #
+            # There should be no intervening epochs here...
+            #
+            # Obviously, this is a contrived scenario that might work for the 
+            # synaptic monitoring episodes of the experiment (when one might use
+            # single,  paired-pulse, or even a few pulses - although I am not 
+            # sure there is good case for the latter) but is not so usable during 
+            # conditioning episodes, especially those using high frequency trains
+            # (one would run out of epochs pretty fast...); nevertheless, I can 
+            # imagine case where low frequency triggers could be generated
+            # using pulses instead of trains for conditioning as well (e.g.
+            # low frequency stimulations)
+            #
+            presynStimEpochs = filter(lambda x: x.hasDigitalTrain(), dac.epochs)
+            if len(presynStimEpochs) == 0:
+                warnings.warn("There are no trigger epochs")
+                return
+            
+            if len(presynStimEpochs) == 1:
+                presynStimEpochs = [presynStimEpochs[0]] # single pulse
+                
+            elif len(presynStimEpochs) > 1:
+                presynStimEpochs = presynStimEpochs[:2]
+                
+            else:
+                warnings.warn("No epochs with digital triggers found")
+            
+        if protocol.nSweeps == 1:
+            triggers = itertools.chain.from_iterable([dac.triggerEvents(e, 0) for e in presynStimEpochs])
+        
     def filesChanged(self, filePaths:typing.Sequence[str]):
         # print(f"{self._a_} → {self.__class__.__name__}.filesChanged {filePaths}\n")
         for f in filePaths:
