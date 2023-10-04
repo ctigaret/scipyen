@@ -723,7 +723,8 @@ class ABFEpoch:
         
     
     def hasDigitalOutput(self, digChannel:int = 0, alternate:bool=False) -> bool:
-        """Returns True if the digital channel 'digChannel' is not 0.
+        """
+        Checks the epochs defines an output on the specified digital channel.
         
         For a more atomic test, see self.hasDigitalPulse and self.hasDigitalTrain.
         
@@ -738,6 +739,7 @@ class ABFEpoch:
         
         """
         p = self.digitalPattern(alternate)
+        
         if digChannel in range(len(p[0])):
             return p[0][-digChannel-1] != 0
         
@@ -748,7 +750,8 @@ class ABFEpoch:
             return False
     
     def hasDigitalPulse(self, digChannel:int = 0, alternate:bool=False) -> bool:
-        """Returns True if the digital channel 'digChannel' is 1.
+        """
+        Checks if there is a pulse output (1) on the specified digital channel
         
         Parameters:
         ===========
@@ -767,7 +770,8 @@ class ABFEpoch:
             return False
         
     def hasDigitalTrain(self, digChannel:int = 0, alternate:bool=False) -> bool:
-        """Returns True if the digital channel 'digChannel' is '*'.
+        """
+        Returns if there is a train output ('*') on the specified digital channel
         
         Parameters:
         ===========

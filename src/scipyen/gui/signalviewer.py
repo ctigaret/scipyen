@@ -398,7 +398,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
 
 
-    #dockedWidgetsNames = ["coordinatesDockWidget"]
+    #dockedWidgetsNames = ["cursorsDockWidget"]
 
     sig_activated = pyqtSignal(int, name="sig_activated")
     sig_plot = pyqtSignal(dict, name="sig_plot")
@@ -783,6 +783,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._xAxesLinked_ = self.defaultXAxesLinked
         self._xGridOn_ = self.defaultXGrid
         self._yGridOn_ = self.defaultYGrid
+        self._cursorsDockWidget_enabled_ = True
+        self._annotationsDockWidget_enabled_ = True
         
         #### END generic plot options
         
@@ -1009,50 +1011,41 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.plotEpochsCheckBox.stateChanged[int].connect(self._slot_plotEpochsCheckStateChanged_)
         
         #### BEGIN set up annotations dock widget
-        #print("_configureUI_ sets up annotations dock widget")
-        # self.annotationsDockWidget = QtWidgets.QDockWidget("Annotations", self, objectName="annotationsDockWidget")
-        # self.annotationsDockWidget.setWindowTitle("Annotations")
-        # self.annotationsDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetClosable | QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
-        
-        
+        #
         # NOTE: 2023-01-09 18:02:42
-        # now defined in the ui file ("signalviewer.ui")
+        # self.annotationsViewer and self.annotationsDockWidget are now defined 
+        # in the ui file ("signalviewer.ui")
+        #
+        # NOTE: 2022-03-04 10:14:09 FIXME/TODO code to actually export to workspace
+        #
         # self.annotationsViewer = InteractiveTreeWidget(self.annotationsDockWidget)
         self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self.annotationsViewer.setDragEnabled(True)
         self.annotationsViewer.setSupportedDataTypes(tuple(DataViewer.viewer_for_types))
-        
-        # NOTE: 2022-03-04 10:14:09 FIXME/TODO code to actually export to workspace
-        # items selected in the annotations viewer
-        #self.annotationsViewer.customContextMenuRequested[QtCore.QPoint].connect(self.slot_annotationsContextMenuRequested)
-        
-        # self.annotationsDockWidget.setWidget(self.annotationsViewer)
-        
-        #print("_configureUI_ sets up annotations dock widget action")
         #### END set up annotations dock widget
         
         #### BEGIN set up coordinates dock widget - defined in the UI file
-        #print("_configureUI_ sets up coordinates dock widget")
-        # self.coordinatesDockWidget.setWindowTitle("Cursors")
-        
-        #print("_configureUI_ sets up coordinates dock widget action")
-        
-        #self.coordinatesDockWidget.visibilityChanged[bool].connect(self._slot_dock_visibility_changed_)
+        # self.cursorsDockWidget s now defined in the ui file
         #### END set up coordinates dock widget
         
         #print("_configureUI_ sets up dock widget actions menu")
         self.docksMenu = QtWidgets.QMenu("Panels", self)
         
         self.showAnnotationsDockWidgetAction = self.docksMenu.addAction("Annotations")
+        self.showAnnotationsDockWidgetAction.setCheckable(True)
         self.showAnnotationsDockWidgetAction.setObjectName("action_%s" % self.annotationsDockWidget.objectName())
-        self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_showAnnotationsDock)
+        self.showAnnotationsDockWidgetAction.toggled.connect(self.slot_showAnnotationsDock)
+        # self.showAnnotationsDockWidgetAction.triggered.connect(self.slot_showAnnotationsDock)
         
-        self.showCoordinatesDockWidgetAction = self.docksMenu.addAction("Cursors")
-        self.showCoordinatesDockWidgetAction.setObjectName("action_%s" % self.coordinatesDockWidget.objectName())
-        self.showCoordinatesDockWidgetAction.triggered.connect(self.slot_showCoordinatesDock)
+        self.showCursorsDockWidgetAction = self.docksMenu.addAction("Cursors")
+        self.showCursorsDockWidgetAction.setCheckable(True)
+        self.showCursorsDockWidgetAction.setObjectName("action_%s" % self.cursorsDockWidget.objectName())
+        self.showCursorsDockWidgetAction.toggled.connect(self.slot_showCursorsDock)
+        # self.showCursorsDockWidgetAction.triggered.connect(self.slot_showCursorsDock)
         
-        self.menubar.addMenu(self.docksMenu)
+        # self.menubar.addMenu(self.docksMenu)
+        self.menuSettings.addMenu(self.docksMenu)
         
         self.actionDetect_Triggers.triggered.connect(self.slot_detectTriggers)
         self.actionDetect_Triggers.setEnabled(False)
@@ -1080,7 +1073,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     
     def signalAxis(self, index:int):
         if not isinstance(index, int):
-            raise TypeError(f"Expecting an int; insteadgot a {type(index).__name__}")
+            raise TypeError(f"Expecting an int; instead, got a {type(index).__name__}")
         
         if index not in range(-len(self.signalAxes), len(self.signalAxes)):
             raise ValueError(f"Invalid index {index} for {len(self.signalAxes)} signal axes")
@@ -1216,6 +1209,43 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             
         self._showYGrid(self._yGridOn_)
         
+    @property
+    def annotationsDockWidgetEnabled(self) -> bool:
+        return self._annotationsDockWidget_enabled_
+    
+    @markConfigurable("AnnotationsDock")
+    @annotationsDockWidgetEnabled.setter
+    def annotationsDockWidgetEnabled(self, val:bool):
+        self._annotationsDockWidget_enabled_ = val==True
+        
+        sigBlocker = [QtCore.QSignalBlocker(w) for w in (self.showAnnotationsDockWidgetAction,
+                                                            self.annotationsDockWidget)]
+        
+        if self._annotationsDockWidget_enabled_:
+            self.annotationsDockWidget.show()
+        else:
+            self.annotationsDockWidget.hide()
+            
+        self.showAnnotationsDockWidgetAction.setChecked(self._annotationsDockWidget_enabled_)
+        
+    @property
+    def cursorsDockWidgetEnabled(self) -> bool:
+        return self._cursorsDockWidget_enabled_
+    
+    @markConfigurable("CursorsDock")
+    @cursorsDockWidgetEnabled.setter
+    def cursorsDockWidgetEnabled(self, val:bool):
+        self._cursorsDockWidget_enabled_ = val==True
+        
+        sigBlocker = [QtCore.QSignalBlocker(w) for w in (self.showCursorsDockWidgetAction,
+                                                            self.cursorsDockWidget)]
+        
+        if self._cursorsDockWidget_enabled_:
+            self.cursorsDockWidget.show()
+        else:
+            self.cursorsDockWidget.hide()
+            
+        self.showCursorsDockWidgetAction.setChecked(self._cursorsDockWidget_enabled_)
         
     @property
     def xAxesLinked(self): 
@@ -3068,15 +3098,23 @@ anything else       anything else       ❌
         self._plot_irregularsignals_ = state == QtCore.Qt.Checked
         self.displayFrame()
         
-    @pyqtSlot()
+    @pyqtSlot(bool)
     @safeWrapper
-    def slot_showCoordinatesDock(self):
-        self.coordinatesDockWidget.show()
+    def slot_showCursorsDock(self, value:bool):
+        self.cursorsDockWidgetEnabled = value==True
+        # if value == True:
+        #     self.cursorsDockWidget.show()
+        # else:
+        #     self.cursorsDockWidget.hide()
         
-    @pyqtSlot()
+    @pyqtSlot(bool)
     @safeWrapper
-    def slot_showAnnotationsDock(self):
-        self.annotationsDockWidget.show()
+    def slot_showAnnotationsDock(self, value:bool):
+        self.annotationsDockWidgetEnabled = value == True
+        # if value == True:
+        #     self.annotationsDockWidget.show()
+        # else:
+        #     self.annotationsDockWidget.hide()
         
     @pyqtSlot()
     @safeWrapper
@@ -9565,6 +9603,9 @@ signals in the signal collection.
         The number of PlotItem objects needed to plot signals is stored in the 
         attribute `self._n_signal_axes_` which is set by `_parse_data_`.
         
+        TODO: 2023-10-04 16:51:26
+        If possble, insert horizontal splitters between axes so that the user may
+        "squeeze" or "expand" a single axis vertically.
         --------
         ¹ PyQtGraph's PlotItem 
         """

@@ -868,13 +868,17 @@ class LTPOnline(object):
     def __init__(self,
                  mainClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
-                 timings:dict = dict(),
                  adcChannel:int = 0,
                  dacChannel:int = 0,
                  digOutDacChannel:int = 0,
                  synapticDigitalTriggersOnDac:typing.Optional[int]=None,
                  stimDIG:typing.Sequence[int] = (0,1),
                  synapticTriggersOnDac:typing.Optional[int]=None,
+                 timings:dict = dict(),
+                 mbTest:pq.Quantity = 5 * pq.mV,
+                 mbTestStart:pq.Quantty = 0.05*pq.s,
+                 mbTestDuration:pq.Quantty = 0.1 * pq.s,
+                 useEmbeddedProtocol:bool=True,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
                  autoStart:bool=True
@@ -1070,6 +1074,13 @@ class LTPOnline(object):
         else:
             raise TypeError(f"conditioningClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(conditioningClampMode).__name__}")
 
+        self._mbTestStart_ = mbTestStart
+        self._mbTestDuration_ = mbTestDuration
+        self._mbTestAmplitude_ = mbTest
+        self._signalBaselineStart_ = 0* pq.s
+        self._signalBaselineDuration_ = None
+        self._responseBaselineStart_ = None
+        self._responseBaselineDuration_ = 5 * pq.ms
 
         # expected epochs layout (and order):
         #
@@ -1128,14 +1139,42 @@ class LTPOnline(object):
                            conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
                            chase = dict(path0 = neo.Block(), path1 = neo.Block()))
 
-        self._viewers_ = dict(path0 = dict(synaptic = self._emitterWindow_.newViewer(sv.SignalViewer),
-                                           amplitudes = self._emitterWindow_.newViewer(sv.SignalViewer),
-                                           DC = self._emitterWindow_.newViewer(sv.SignalViewer),
-                                           Rs = self._emitterWindow_.newViewer(sv.SignalViewer),
-                                           Rin = self._emitterWindow_.newViewer(sv.SignalViewer)),
-                              path1 = dict(synaptic = self._emitterWindow_.newViewer(sv.SignalViewer),
-                                           amplitudes = self._emitterWindow_.newViewer(sv.SignalViewer),
-                                           ))
+
+        # synapticViewer0 = self._emitterWindow_.newViewer(sv.SignalViewer, win_title = "path0 Recording")
+        synapticViewer0 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_, win_title = "path0 Recording")
+        synapticViewer0.annotationsDockWidget.hide()
+        synapticViewer0.cursorsDockWidget.hide()
+        
+        synapticViewer1 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_, win_title = "path1 Recording")
+        synapticViewer1.annotationsDockWidget.hide()
+        synapticViewer1.cursorsDockWidget.hide()
+        
+        amplitudesViewer0 =sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "path0 EPSC Amplitude")
+        amplitudesViewer0.annotationsDockWidget.hide()
+        amplitudesViewer0.cursorsDockWidget.hide()
+        
+        amplitudesViewer1 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "path1 EPSC Amplitude")
+        amplitudesViewer1.annotationsDockWidget.hide()
+        amplitudesViewer1.cursorsDockWidget.hide()
+        
+        dcViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "Signal Baseline")
+        dcViewer.annotationsDockWidget.hide()
+        dcViewer.cursorsDockWidget.hide()
+        
+        rsViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "Rs")
+        rsViewer.annotationsDockWidget.hide()
+        rsViewer.cursorsDockWidget.hide()
+        
+        rinViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "Rin")
+        rinViewer.annotationsDockWidget.hide()
+        rinViewer.cursorsDockWidget.hide()
+        
+        self._viewers_ = dict(path0 = dict(synaptic = synapticViewer0,
+                                           amplitudes = amplitudesViewer0,),
+                              path1 = dict(synaptic = synapticViewer1,
+                                           amplitudes = amplitudesViewer1),
+                              dc = dcViewer, rs = rsViewer, rn = rinViewer
+                              )
         
         self._a_ = 0
 
@@ -1147,6 +1186,11 @@ class LTPOnline(object):
     def __del__(self):
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+            
+        for viewer in (synapticViewer0, synapticViewer1,
+                       amplitudesViewer0, amplitudesViewer1,
+                       dcViewer, rsViewer, rinViewer):
+            viewer.close()
 
         if hasattr(super(object, self), "__del__"):
             super().__del__()
@@ -1381,43 +1425,26 @@ class LTPOnline(object):
                 viewer.view(self._data_["baseline"][pndx],
                             doc_title=pndx,
                             showFrame = len(self._data_["baseline"][pndx].segments)-1)
-                
                 viewer.currentAxis = adc.name
-                
-        # for k in len(abfRun.segments)
-#         if len(abfRun.segments) == 1:
-#             # => single pathway! CAUTION may backfire when recording is interrupted in Clampex
-#             # TODO: for now we just populate the baseline
-#             # but in the real world we need to distinguish between various episodes
-#             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
-#             # if isinstance(self._presynaptic_triggers_)
-# 
-#             self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
-#                                             doc_title="path0",
-#                                             showFrame = len(self._data_["baseline"]["path0"].segments)-1)
-# 
-#             self._viewer_path0_Records.currentAxis = adc.name
-# 
-# 
-#         elif len(abfRun.segments) == 2: # WARNING we only support two alternative pathways
-#             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
-#             self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
-#                                             doc_tile="path0",
-#                                             showFrame = len(self._data_["baseline"]["path0"].segments)-1)
-#             self._viewer_path0_Records.currentAxis = adc.name
-#             
-#             self._data_["baseline"]["path1"].segments.append(abfRun.segments[1])
-#             self._viewer_path1_Records.view(self._data_["baseline"]["path1"],
-#                                             doc_tile="path1",
-#                                             showFrame = len(self._data_["baseline"]["path1"].segments)-1)
-#             
-#             self._viewer_path1_Records.currentAxis = adc.name
+                viewer.plotAnalogSignalsCheckBox.setChecked(True)
+                viewer.plotEventsCheckBox.setChecked(True)
+                viewer.analogSignalComboBox.setCurrentIndex(viewer.currentAxisIndex+1)
+                viewer.analogSignalComboBox.activated.emit(viewer.currentAxisIndex+1)
 
     def processMonitorProtocol(self, protocol:pab.ABFProtocol):
         # TODO: 2023-10-03 12:31:19
         # implement the case where TTLs are emulated with a DAC channel (with its
         # output routed to a simulus isolator)
         #
+        # NOTE: 2023-10-04 18:42:34
+        # the code below assumes voltage-clamp and EPSCs hence relies on signal
+        # baseline before the response to measure amplitude
+        #
+        # TODO: 2023-10-04 18:43:12 URGENT FIXME
+        # code for current-clamp/field recordings where we measure the slope of 
+        #   the rising phase of the synaptic potentials !
+        #
+        
         
         # the DAC used to send out the command waveforms
         dac = protocol.outputConfiguration(self.dacChannel)
@@ -1493,12 +1520,41 @@ class LTPOnline(object):
             assert(np.all(digEpochsTable_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels"
             assert(np.all(digEpochsTableAlt_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels with alternate digital outputs"
         
+        
+        # We need:
+        # start of membrane test
+        # duration of membrane test
+        # magnitude of membrane test
+        
+        # locate the membrane test epoch; this is a step or pulse epoch, with:
+        # (• are hard requirements, ∘ are soft requirements)
+        # • first level !=0
+        # • delta level == 0
+        # • delta duration == 0
+        # ∘ no digital info 
+        
+        mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
+                                            and not any(x.hasDigitalOutput(d) for d in stimDIG) \
+                                            and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
+                                   dac.epochs))
+        
+        # NOTE: for the moment, I do not expect to have more than one such epoch
+        if len(mbTestEpochs) == 0:
+            raise ValueError("No membrane test epoch appears to have been defined")
+        
+        self._membraneTestEpoch_ = mbTestEpochs[0]
+        
+        self._mbTestStart_ = dac.epochRelativeStartTime(self._membraneTestEpoch_, 0)
+        self._mbTestDuration_ = self._membraneTestEpoch_.firstDuration
+        
+        
         # locate the presynaptic triggers epoch
         # first try and find epochs with digital trains
         # there should be only one such epoch, sending at least one TTL pulse per train
         #
         
-        synStimEpochs = list(filter(lambda x: x.hasDigitalTrain(), digdac.epochs))
+        synStimEpochs = list(filter(lambda x: any(x.hasDigitalTrain(d) for d in stimDIG), 
+                                    digdac.epochs))
         
         # ideally there is only one such epoch - make it a HARD requirement (for now)
         if len(synStimEpochs) > 1:
@@ -1524,17 +1580,115 @@ class LTPOnline(object):
             # using pulses instead of trains for conditioning as well (e.g.
             # low frequency stimulations)
             #
-            synStimEpochs = list(filter(lambda x: x.hasDigitalPulse(), digdac.epochs))
+            synStimEpochs = list(filter(lambda x: any(x.hasDigitalPulse(d) for d in stimDIG), 
+                                        digdac.epochs))
             if len(synStimEpochs) == 0:
-                warnings.warn("There are no epoch sending digital triggers")
-                return False
+                raise ValueError("There are no epoch sending digital triggers")
             
-        # print(f"{self.__class__.__name__}.processMonitorProtocol {len(synStimEpochs)} synaptic stimulation epochs")
+        # Figure out the global signal baseline and the baseline for synaptic 
+        # responses, based on the relative timings of the membrane test and trigger
+        #   epochs
+        #
+        # For this purpose I guess could use the epoch number or letter but since
+        #   I need the timings, I prefer to do it as below.
+        #
+
+        # all below are relative to the sweep start time
+        if dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) + self._membraneTestEpoch_.firstDuration < digdac.relativeStartTime(synStimEpochs[0], 0):
+            # membrane test is delivered completely sometime BEFORE triggers
+            #
+            
+            if self._mbTestStart_ == 0:
+                # membrane test is at the very beginning of the sweep (but always 
+                # after the holding time; odd, but allowed...)
+                self._signalBaselineStart_ = 0 * pq.s
+                self._signalBaselineDuration_ = dac.epochRelativeStartTime(self._membraneTestEpoch_, 0)
+                
+            else:
+                # are there any epochs definded BEFORE mb test?
+                initialEpochs = list(filter(lambda x: dac.epochRelativeStartTime(x, 0) + x.firstDuration <=  dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) \
+                                                    and and x.firstDuration > 0 and x.deltaDuration == 0, dac.epochs))
+                
+                if len(initialEpochs):
+                    baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
+                    if len(baselineEpochs):
+                        self._signalBaselineStart_ = dac.epochRelativeStartTime(baselineEpochs[0], 0)
+                        self._signalBaselineDuration_ = baselineEpochs[0].firstDuration
+                    else:
+                        self._signalBaselineStart_ = 0 * pq.s
+                        self._signalBaselineDuration_ = dac.epochRelativeStartTime(initialEpochs[0], 0)
+                        
+                else:
+                    # no epochs before the membrane test (odd, but can be allowed...)
+                    self._signalBaselineStart_ = max(self._mbTestStart_ - 2 * dac.holdingTime, 0*pq.s)
+                    self._signalBaselineDuration_ = max(dac.holdingTime, self._membraneTestEpoch_.firstDuration)
+            
+            
+            # Finally, get an epoch for the synaptic response baseline;
+            # NOTE: IN the case where membrane test is delivered BEFORE the triggers,
+            # we would expect to have another epoch intervening between the 
+            # membrane test and the first epoch in synStimEpochs -  we will use
+            # that to calculate the baseline for the synaptic responses
+            #
+            # This is not mandatory, but it would make more sense to let the cell
+            # membrane "settle" after a membrane test before delivering a synaptic
+            # stimulus.
+            #
+            # NOTE: 2023-10-04 18:34:59
+            # we take 5 ms duration for this (arbitrary)
+            #
+            
+            responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._responseBaselineDuration_ \
+                                                        and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_) \
+                                                        and dac.epochRelativeStartTime(x, 0) + x.firstDuration <= digdac.epochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
+                                                dac.epochs))
+            
+            if len(responseBaselineEpochs):
+                # take the last one
+                self._responseBaselineStart_ = dac.epochRelativeStartTime(responseBaselineEpochs[-1], 0)
+            
+            else:
+                self._responseBaselineStart_ = digdac.relativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
+                
+        elif dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) > digdac.relativeStartTime(synStimEpochs[-1], 0) + synStimEpochs[-1].firstDuration:
+            # membrane test delivered somwehere towards the end of the sweep, 
+            # surely AFTER the triggers (and hopefully when the synaptic responses
+            # have decayed...)
+            #
+            # in this case, best is to use the first epoch before the synStimEpochs (if any)
+            # or the dac holding
+            #
+            initialEpochs = list(filter(lambda x: dac.epochRelativeStartTime(x, 0) + x.firstDuration <=  digdac.epochRelativeStartTime(synStimEpochs[0], 0) \
+                                                and and x.firstDuration > 0 and x.deltaDuration == 0, dac.epochs))
+            
+            if len(initialEpochs):
+                # there are epochs before synStimEpochs - are any of these baseline-like?
+                baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
+                if len(baselineEpochs):
+                    self._signalBaselineStart_ = dac.epochRelativeStartTime(baselineEpochs[0], 0)
+                    self._signalBaselineDuration_ = baselineEpochs[0].firstDuration
+                else:
+                    self._signalBaselineStart_ = 0 * pq.s
+                    self._signalBaselineDuration_ = dac.epochRelativeStartTime(initialEpochs[0], 0)
+                    
+            else:
+                # no epochs before the membrane test (odd, but can be allowed...)
+                self._signalBaselineStart_ = max(digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
+                self._signalBaselineDuration_ = max(dac.holdingTime, synStimEpochs[0].firstDuration)
         
-        # check if there are any epochs BEFORE the first epoch in synStimEpochs
-        
-        # preSynStimEpochs = list(filter(lambda x: x.first))
-        
+            # Now, determine the response baseline for this scenario.
+            responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._responseBaselineDuration_ \
+                                                        and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_) \
+                                                        and dac.epochRelativeStartTime(x, 0) + x.firstDuration <= digdac.epochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
+                                                dac.epochs))
+            
+            if len(responseBaselineEpochs):
+                # take the last one
+                self._responseBaselineStart_ = dac.epochRelativeStartTime(responseBaselineEpochs[-1], 0)
+            
+            else:
+                self._responseBaselineStart_ = digdac.relativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
+                
         for path in range(protocol.nSweeps):
             pndx = f"path{path}"
             pathEpochs = sorted(synStimEpochs, key = lambda x: dac.epochRelativeStartTime(x, path))

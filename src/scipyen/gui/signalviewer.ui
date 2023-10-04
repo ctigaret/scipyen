@@ -133,7 +133,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -281,7 +281,7 @@
    <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QDockWidget" name="coordinatesDockWidget">
+  <widget class="QDockWidget" name="cursorsDockWidget">
    <property name="windowTitle">
     <string>&amp;Cursors</string>
    </property>
