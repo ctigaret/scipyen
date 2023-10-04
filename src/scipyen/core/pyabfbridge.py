@@ -686,7 +686,7 @@ class ABFEpoch:
         """Read-only"""
         return self.alternateDigitalPattern if alternate else self.mainDigitalPattern
     
-    def usedDigitalOutputChannels(self, alternate:bool=False) -> list:
+    def usedDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
         """Indices of DIG channels that emit TTL trains or TTL pulses
         
         For a more specific query (i.e. pulse v train output) see
@@ -695,31 +695,105 @@ class ABFEpoch:
         Parameters:
         ===========
         alternate: when True, the alternate digital pattern will be queried.
-        """
-        p = self.digitalPattern(alternate)
-        return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] != 0, enumerate(reversed(p[k]))))) for k in range(len(p))]))
-        # return [list(map(lambda v: v[0], filter(lambda i: i[1] != 0, enumerate(reversed(p_))))) for p_ in p]
         
-    def pulseDigitalOutputChannels(self, alternate:bool=False) -> list:
+            When a str, the only accepted value is "all". In this case, the function
+            return a list of digital channel indices used in both main and alternate patterns
+            (WARNING: these are not necessarily unique)
+            This is useful to test if there is a digital output at all associated with
+            the epoch.
+            
+            Another possible test, specific for a digial channel is the
+            'hasDigital...' family of methods.
+    
+        
+        """
+        if isinstance(alternate, bool):
+            p = self.digitalPattern(alternate)
+            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                filter(lambda i: i[1] != 0, 
+                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))]))
+        
+        elif isinstance(alternate, str) and alternate.lower() == "all":
+            p = self.digitalPattern(False)
+            pa = self.digitalPattern(True)
+            
+            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                filter(lambda i: i[1] != 0, 
+                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+                   + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+                                                                filter(lambda i: i[1] != 0, 
+                                                                       enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+                   
+        else:
+            raise ValueError(f"Invalid 'alternate' specification {alternate}")
+            
+        
+    def pulseDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
         """Indices of DIG channel that emit a digital pulse.
         Parameters:
         ===========
         alternate: when True, the alternate digital pattern will be queried.
-        """
-        p = self.digitalPattern(alternate)
-        return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] == 1, enumerate(reversed(p[k]))))) for k in range(len(p))]))
-        # return [list(map(lambda v: v[0], filter(lambda i: i[1] == 1, enumerate(reversed(p_))))) for p_ in p]
+
+            When a str, the only accepted value is "all". In this case, the function
+            return a list of digital channel indices used in both main and alternate patterns
+            (WARNING: these are not necessarily unique)
+            This is useful to test if there is a digital output at all associated with
+            the epoch.
+            
+            Another possible test, specific for a digial channel is the
+            'hasDigital...' family of methods.
         
-    
-    def trainDigitalOutputChannels(self, alternate:bool=False) -> list:
+        """
+        if isinstance(alternate, bool):
+            p = self.digitalPattern(alternate)
+            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                filter(lambda i: i[1] == 1, 
+                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))]))
+        
+        elif isinstance(alternate, str) and alternate.lower() == "all":
+            p = self.digitalPattern(False)
+            pa = self.digitalPattern(True)
+            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                filter(lambda i: i[1] == 1, 
+                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+                   + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+                                                                 filter(lambda i: i[1] == 1, 
+                                                                        enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+        else:
+            raise ValueError(f"Invalid 'alternate' specification {alternate}")
+            
+    def trainDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
         """Indices of DIG channels that emit trains of digital TTL pulses.
         Parameters:
         ===========
         alternate: when True, the alternate digital pattern will be queried.
+
+            When a str, the only accepted value is "all". In this case, the function
+            return a list of digital channel indices used in both main and alternate patterns
+            (WARNING: these are not necessarily unique)
+            This is useful to test if there is a digital output at all associated with
+            the epoch.
+            
+            Another possible test, specific for a digial channel is the
+            'hasDigital...' family of methods.
+        
         """
-        p = self.digitalPattern(alternate)
-        return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] == '*', enumerate(reversed(p[k]))))) for k in range(len(p))]))
-        # return [list(map(lambda v: v[0], filter(lambda i: i[1] == '*', enumerate(reversed(p_))))) for p_ in p]
+        if isinstance(alternate, bool):
+            p = self.digitalPattern(alternate)
+            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] == '*', enumerate(reversed(p[k]))))) for k in range(len(p))]))
+
+        elif isinstance(alternate, str) and alternate.lower() == "all":
+            p = self.digitalPattern(False)
+            pa = self.digitalPattern(True)
+            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                filter(lambda i: i[1] == '*', 
+                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+                   + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+                                                                 filter(lambda i: i[1] == '*', 
+                                                                        enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+
+        else:
+            raise ValueError(f"Invalid 'alternate' specification {alternate}")
         
     
     def hasDigitalOutput(self, digChannel:int = 0, alternate:bool=False) -> bool:

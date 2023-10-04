@@ -2125,7 +2125,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                 
                 typically, this ends with the current injection
                 
-                When a neo.Epoch,this must contain a single time/duration pair
+                When a neo.Epoch, this must contain a single time/duration pair
         
                 Mandatory when im is just a scalar current quantity.
                 
@@ -2350,8 +2350,8 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         if not isinstance(baseEpoch, neo.Epoch):
             raise ValueError("base epoch must be specified")
         
-        # whe an epoch WAS specified, we take it as given i.e. as indicating the 
-        # ACTUAL baseine or steady-state epochs used for analysis
+        # when an epoch WAS specified, we take it as given i.e. as indicating the 
+        # ACTUAL baseline or steady-state epochs used for analysis
         baseT0 = baseEpoch.times
         baseT1 = baseT0 + baseEpoch.durations
 

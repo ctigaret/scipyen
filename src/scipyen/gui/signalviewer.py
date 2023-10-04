@@ -7853,14 +7853,14 @@ signals in the signal collection.
         if len(self.axes) == 0:
             return
         
-        if len(self.signalAxes) == 0:
-            refAxes = self.axes
-        else:
-            refAxes = self.signalAxes
+        # if len(self.signalAxes) == 0:
+        #     refAxes = self.axes
+        # else:
+        #     refAxes = self.signalAxes
             
         if len(self._x_data_bounds_) == 0:
-            # self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
-            self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in refAxes]
+            self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
+            # self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in refAxes]
             
         for ax in self.axes:
             ax.vb.updateViewRange(True, True)
@@ -7868,8 +7868,8 @@ signals in the signal collection.
         
         # print(f"{self.__class__.__name__}._align_X_range axeslinked = {self.xAxesLinked}")
         if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
-            # if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
-            if any(ax.vb.autoRangeEnabled()[0] for ax in self.signalAxes):
+            if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
+            # if any(ax.vb.autoRangeEnabled()[0] for ax in self.signalAxes):
                 return
             # NOTE: 2023-07-10 10:55:57 FIXME/TODO
             # still have to figure to figure out this contingency below:
@@ -10143,6 +10143,12 @@ signals in the signal collection.
     
     @property
     def dataCursors(self):
+        """Alias to cursors property
+        """
+        return self.cursors
+    
+    @property
+    def signalCursors(self):
         """Alias to cursors property
         """
         return self.cursors

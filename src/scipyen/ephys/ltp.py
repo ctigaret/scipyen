@@ -76,6 +76,7 @@ from core.utilities import (safeWrapper,
                             get_index_for_seq, 
                             sp_set_loc,
                             normalized_index,
+                            unique,
                             GeneralIndexType)
 
 #### END pict.core modules
@@ -1150,11 +1151,19 @@ class LTPOnline(object):
         synapticViewer1.annotationsDockWidget.hide()
         synapticViewer1.cursorsDockWidget.hide()
         
-        amplitudesViewer0 =sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "path0 EPSC Amplitude")
+        amplitudesViewer0 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "path0 EPSC Amplitude")
+        amplitudesViewer0.annotationsDockWidget.hide()
+        amplitudesViewer0.cursorsDockWidget.hide()
+        
+        pairedPulseViewer0 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "path0 EPSC Paired Pulse Ratio")
         amplitudesViewer0.annotationsDockWidget.hide()
         amplitudesViewer0.cursorsDockWidget.hide()
         
         amplitudesViewer1 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "path1 EPSC Amplitude")
+        amplitudesViewer1.annotationsDockWidget.hide()
+        amplitudesViewer1.cursorsDockWidget.hide()
+        
+        pairedPulseViewer1 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "path1 EPSC Paired Pulse Ratio")
         amplitudesViewer1.annotationsDockWidget.hide()
         amplitudesViewer1.cursorsDockWidget.hide()
         
@@ -1171,15 +1180,23 @@ class LTPOnline(object):
         rinViewer.cursorsDockWidget.hide()
         
         self._viewers_ = dict(path0 = dict(synaptic = synapticViewer0,
-                                           amplitudes = amplitudesViewer0,),
+                                           amplitudes = amplitudesViewer0,
+                                           ppr = pairedPulseViewer0,
+                                           ),
                               path1 = dict(synaptic = synapticViewer1,
-                                           amplitudes = amplitudesViewer1),
+                                           amplitudes = amplitudesViewer1,
+                                           ppr = pairedPulseViewer1,
+                                           ),
                               dc = dcViewer, rs = rsViewer, rn = rinViewer
                               )
         
         self._a_ = 0
 
         self._presynaptic_triggers_ = dict()
+        
+        self._cursor_coordinates_ = dict()
+        
+        self._results_ = dict()
         
         if autoStart:
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
@@ -1190,6 +1207,7 @@ class LTPOnline(object):
             
         for viewer in (synapticViewer0, synapticViewer1,
                        amplitudesViewer0, amplitudesViewer1,
+                       pairedPulseViewer0, pairedPulseViewer1,
                        dcViewer, rsViewer, rinViewer):
             viewer.close()
 
@@ -1412,7 +1430,7 @@ class LTPOnline(object):
         if protocol == self._monitorProtocol_:
             adc = protocol.inputConfiguration(self.adcChannel)
             sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
-            
+
             for k, seg in enumerate(abfRun.segments):
                 pndx = f"path{k}"
                 if k > 1:
@@ -1427,10 +1445,24 @@ class LTPOnline(object):
                             doc_title=pndx,
                             showFrame = len(self._data_["baseline"][pndx].segments)-1)
                 viewer.currentAxis = adc.name
+                viewer.xAxesLinked = True
+                
                 viewer.plotAnalogSignalsCheckBox.setChecked(True)
                 viewer.plotEventsCheckBox.setChecked(True)
                 viewer.analogSignalComboBox.setCurrentIndex(viewer.currentAxisIndex+1)
                 viewer.analogSignalComboBox.activated.emit(viewer.currentAxisIndex+1)
+                # viewer.currentAxis.vb.enableAutoRange('x')
+                # viewer.currentAxis.vb.autoRange()
+                
+                if "Rbase" not in [c.name for c in viewer.dataCursors]:
+                    viewer.addCursor(sv.SignalcursorTypes.vertical,
+                                    x = self._signalBaselineStart_ + self._signalBaselineDuration_/2,
+                                    xwindow = self._signalBaselineDuration_,
+                                    label = "Rbase",
+                                    follows_mouse = False,
+                                    axis = viewer.currentAxis,
+                                    relative=True,
+                                    precision=5)
 
     def processMonitorProtocol(self, protocol:pab.ABFProtocol):
         # TODO: 2023-10-03 12:31:19
@@ -1522,6 +1554,52 @@ class LTPOnline(object):
             assert(np.all(digEpochsTableAlt_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels with alternate digital outputs"
         
         
+        # Locate the presynaptic triggers epoch
+        # first try and find epochs with digital trains
+        # there should be only one such epoch, sending at least one TTL pulse per train
+        #
+        
+        synStimEpochs = list(filter(lambda x: len(x.trainDigitalOutputChannels("all"))>0, 
+                                    digdac.epochs))
+        
+        # synStimEpochs = list(filter(lambda x: any(x.hasDigitalTrain(d) for d in stimDIG), 
+        #                             digdac.epochs))
+        
+        # ideally there is only one such epoch
+        if len(synStimEpochs) > 1:
+            warnings.warn(f"There are {len(synStimEpochs)} in the protocol; will use the first one")
+            synStimEpochs = [synStimEpochs[0]]
+            # return False
+        
+        elif len(synStimEpochs) == 0:
+            # Try prestim triggers defined as digital pulses instead of trains.
+            #
+            # Here we can expect to have more than one such epochs, together 
+            #   emulating a train of TTL pulses (with one pulse per epoch).
+            #
+            # There should be no intervening epochs here...
+            #
+            # Obviously, this is a contrived scenario that might work for the 
+            # synaptic monitoring episodes of the experiment (when one might use
+            # single,  paired-pulse, or even a few pulses - although I am not 
+            # sure there is good case for the latter) but is not so usable during 
+            # conditioning episodes, especially those using high frequency trains
+            # (one would run out of epochs pretty fast...); nevertheless, I can 
+            # imagine case where low frequency triggers could be generated
+            # using pulses instead of trains for conditioning as well (e.g.
+            # low frequency stimulations)
+            #
+            synStimEpochs = list(filter(lambda x: len(x.pulseDigitalOutputChannels("all"))>0, 
+                                        digdac.epochs))
+        
+            # synStimEpochs = list(filter(lambda x: any(x.hasDigitalPulse(d) for d in stimDIG), 
+            #                             digdac.epochs))
+            if len(synStimEpochs) == 0:
+                raise ValueError("There are no epoch sending digital triggers")
+            
+        # store these for later
+        stimDIG = unique(synStimEpochs[0].usedDigitalOutputChannels("all"))
+            
         # We need:
         # start of membrane test
         # duration of membrane test
@@ -1549,43 +1627,6 @@ class LTPOnline(object):
         self._mbTestDuration_ = self._membraneTestEpoch_.firstDuration
         
         
-        # locate the presynaptic triggers epoch
-        # first try and find epochs with digital trains
-        # there should be only one such epoch, sending at least one TTL pulse per train
-        #
-        
-        synStimEpochs = list(filter(lambda x: any(x.hasDigitalTrain(d) for d in stimDIG), 
-                                    digdac.epochs))
-        
-        # ideally there is only one such epoch - make it a HARD requirement (for now)
-        if len(synStimEpochs) > 1:
-            warnings.warn(f"There are {len(synStimEpochs)} in the protocol; will use the first one")
-            synStimEpochs = [synStimEpochs[0]]
-            # return False
-        
-        elif len(synStimEpochs) == 0:
-            # Try prestim triggers defined as digital pulses instead of trains.
-            #
-            # Here we can expect to have more than one such epochs, together 
-            #   emulating a train of TTL pulses (with one pulse per epoch).
-            #
-            # There should be no intervening epochs here...
-            #
-            # Obviously, this is a contrived scenario that might work for the 
-            # synaptic monitoring episodes of the experiment (when one might use
-            # single,  paired-pulse, or even a few pulses - although I am not 
-            # sure there is good case for the latter) but is not so usable during 
-            # conditioning episodes, especially those using high frequency trains
-            # (one would run out of epochs pretty fast...); nevertheless, I can 
-            # imagine case where low frequency triggers could be generated
-            # using pulses instead of trains for conditioning as well (e.g.
-            # low frequency stimulations)
-            #
-            synStimEpochs = list(filter(lambda x: any(x.hasDigitalPulse(d) for d in stimDIG), 
-                                        digdac.epochs))
-            if len(synStimEpochs) == 0:
-                raise ValueError("There are no epoch sending digital triggers")
-            
         # Figure out the global signal baseline and the baseline for synaptic 
         # responses, based on the relative timings of the membrane test and trigger
         #   epochs
@@ -1595,7 +1636,7 @@ class LTPOnline(object):
         #
 
         # all below are relative to the sweep start time
-        if dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) + self._membraneTestEpoch_.firstDuration < digdac.relativeStartTime(synStimEpochs[0], 0):
+        if dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) + self._membraneTestEpoch_.firstDuration < digdac.epochRelativeStartTime(synStimEpochs[0], 0):
             # membrane test is delivered completely sometime BEFORE triggers
             #
             
@@ -1650,9 +1691,11 @@ class LTPOnline(object):
                 self._responseBaselineStart_ = dac.epochRelativeStartTime(responseBaselineEpochs[-1], 0)
             
             else:
-                self._responseBaselineStart_ = digdac.relativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
+                self._responseBaselineStart_ = digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
                 
-        elif dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) > digdac.relativeStartTime(synStimEpochs[-1], 0) + synStimEpochs[-1].firstDuration:
+            
+                
+        elif dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) > digdac.epochRelativeStartTime(synStimEpochs[-1], 0) + synStimEpochs[-1].firstDuration:
             # membrane test delivered somwehere towards the end of the sweep, 
             # surely AFTER the triggers (and hopefully when the synaptic responses
             # have decayed...)
@@ -1690,7 +1733,7 @@ class LTPOnline(object):
                 self._responseBaselineStart_ = dac.epochRelativeStartTime(responseBaselineEpochs[-1], 0)
             
             else:
-                self._responseBaselineStart_ = digdac.relativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
+                self._responseBaselineStart_ = digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
                 
         for path in range(protocol.nSweeps):
             pndx = f"path{path}"
@@ -1709,6 +1752,42 @@ class LTPOnline(object):
             else:
                 assert(trig == self._presynaptic_triggers_[pndx]), f"Presynaptic triggers mismatch {trig} vs path0 trigger {self._presynaptic_triggers_[pndx]}"
             
+            # TODO: populate self._cursor_coordinates_ with neo.Epochs
+            # use the epoch to generate cursors in the corresponding pathway signal viewer
+            # DECIDE: we need:
+            #
+            # • for voltage clamp:
+            #
+            #   ∘ global baseline Rbase epoch interval  -> aveage of signal slice
+            #
+            #   ∘ Rs epoch interval                     -> extremum of signal slice
+            #       ⋆ max for positive Vm step, min for negative Vm step
+            #
+            #   ∘ Rin epoch interval                    -> average of signal slice
+            #   
+            #   ∘ EPSCbase interval (or EPSC0Base and EPSC1Base intervals) 
+            #       ⋆ NOTE a single EPSCBase should also be used for paire-pulse,
+            #           where we use it as a common baseline for BOTH EPSCs -> 
+            #           TODO Adapt functions for LTP analysis in this module
+            #
+            #   ∘ EPSCPeak interval (or EPSC0Peak and EPSC1Peak intervals)
+            #       ⋆ NOTE needs two intervals for paired-pulse
+            # 
+            # • for current-clamp:
+            #
+            #   ∘ global baseline Baseline epoch interval  -> aveage of signal slice
+            #
+            #   ∘ measure the membrane test with membrane.passive_Iclamp(…) 
+            #       ⋆ => calculate tau, Rin and capacitance
+            #
+            #   ∘ EPSP interval or EPSP0 and EPSP1 intervals (for paired-pulse)
+            #       ⋆ measure slope of 10-90% of rising phase
+            #
+            if not isinstance(self._cursor_coordinates_.get(pndx, None), dict):
+                self._cursor_coordinates_[pndx] = dict()
+                self._cursor_coordinates_[pndx]["Rbase"] = (self._self._signalBaselineStart_,
+                                                            self._signalBaselineDuration_)
+                
         
     def filesChanged(self, filePaths:typing.Sequence[str]):
         # print(f"{self._a_} → {self.__class__.__name__}.filesChanged {filePaths}\n")
