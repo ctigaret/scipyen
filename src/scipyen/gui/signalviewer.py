@@ -7815,8 +7815,14 @@ signals in the signal collection.
         if len(self.axes) == 0:
             return
         
+        if len(self.signalAxes) == 0:
+            refAxes = self.axes
+        else:
+            refAxes = self.signalAxes
+            
         if len(self._x_data_bounds_) == 0:
-            self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
+            # self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
+            self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in refAxes]
             
         for ax in self.axes:
             ax.vb.updateViewRange(True, True)
@@ -7824,7 +7830,8 @@ signals in the signal collection.
         
         # print(f"{self.__class__.__name__}._align_X_range axeslinked = {self.xAxesLinked}")
         if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
-            if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
+            # if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
+            if any(ax.vb.autoRangeEnabled()[0] for ax in self.signalAxes):
                 return
             # NOTE: 2023-07-10 10:55:57 FIXME/TODO
             # still have to figure to figure out this contingency below:
@@ -7884,6 +7891,8 @@ signals in the signal collection.
 #                 return
                 
         for kax, ax in enumerate(self.axes):
+            # if ax not in self.signalAxes:
+            #     continue
             # NOTE: 2023-07-10 10:51:10
             # this loop OK when auto-ranging is disabled across plot items
             # such as in the case of mouse interaction
@@ -9647,14 +9656,14 @@ signals in the signal collection.
             self._events_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
             if self._events_axis_.scene() is not None:
                 self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-                self._events_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
+                # self._events_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
         
         if self._events_axis_ not in self.signalsLayout.items:
             self.signalsLayout.addItem(self._events_axis_, row = _n_signal_axes_, col=0)
             # self.signalsLayout.addItem(self._events_axis_, row=self._n_signal_axes_, col=0)
             self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-            self._events_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
-            
+            # self._events_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
+        
         # NOTE: 2023-01-17 10:45:24
         # add the spiketrains axis back to the layout (after creating it, if needed)
         # see WARNING 2023-01-17 10:46:04 and NOTE: 2023-01-17 10:44:37 
@@ -9664,17 +9673,26 @@ signals in the signal collection.
             self._spiketrains_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
             if self._spiketrains_axis_.scene() is not None:
                 self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-                self._spiketrains_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
+                # self._spiketrains_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
                 
+            
+            
         if self._spiketrains_axis_ not in self.signalsLayout.items:
             self.signalsLayout.addItem(self._spiketrains_axis_, row = _n_signal_axes_ + 1, col = 0)
             # self.signalsLayout.addItem(self._spiketrains_axis_, row = self._n_signal_axes_ + 1, col = 0)
             self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-            self._spiketrains_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
+            # self._spiketrains_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
             
         # NOTE: 2023-06-02 12:57:26
         # now, remember the (new) _n_signal_axes_:
         self._n_signal_axes_ = _n_signal_axes_
+            
+        # NOTE: 2023-10-04 13:38:53
+        # suppress auto ranging on X in events and spike train axes
+        
+        if len(self.signalAxes):
+            self._events_axis_.vb.enableAutoRange(self._events_axis_.vb.XAxis, enable=False)
+            self._spiketrains_axis_.vb.enableAutoRange(self._spiketrains_axis_.vb.XAxis, enable=False)
             
         if self.signalsLayout.scene() is not None:
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)

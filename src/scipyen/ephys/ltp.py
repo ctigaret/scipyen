@@ -1284,9 +1284,6 @@ class LTPOnline(object):
         #     print(f"{sz0} → file size: {abfFile.stat().st_size}")
         
         self._abfListener_.reset()
-        # print(f"\t→ {self.__class__.__name__}.processAbfFile {abfFile}")
-        
-        # return 
     
         abfRun = pio.loadAxonFile(str(abfFile))
         protocol = pab.ABFProtocol(abfRun)
@@ -1297,7 +1294,7 @@ class LTPOnline(object):
         dac = protocol.outputConfiguration(self.dacChannel)
         
         if protocol.nSweeps == 2:
-            assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digtal Output should have been enabled"
+            assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
             assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
             
             # pass # TODO check for alternate digital outputs → True ; alternate waveform → False
