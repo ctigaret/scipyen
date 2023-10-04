@@ -876,8 +876,9 @@ class LTPOnline(object):
                  synapticTriggersOnDac:typing.Optional[int]=None,
                  timings:dict = dict(),
                  mbTest:pq.Quantity = 5 * pq.mV,
-                 mbTestStart:pq.Quantty = 0.05*pq.s,
-                 mbTestDuration:pq.Quantty = 0.1 * pq.s,
+                 mbTestStart:pq.Quantity = 0.05*pq.s,
+                 mbTestDuration:pq.Quantity = 0.1 * pq.s,
+                 responseBaselineDuration:pq.Quantity = 5 * pq.ms,
                  useEmbeddedProtocol:bool=True,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
@@ -1080,7 +1081,7 @@ class LTPOnline(object):
         self._signalBaselineStart_ = 0* pq.s
         self._signalBaselineDuration_ = None
         self._responseBaselineStart_ = None
-        self._responseBaselineDuration_ = 5 * pq.ms
+        self._responseBaselineDuration_ = responseBaselineDuration
 
         # expected epochs layout (and order):
         #
@@ -1607,7 +1608,8 @@ class LTPOnline(object):
             else:
                 # are there any epochs definded BEFORE mb test?
                 initialEpochs = list(filter(lambda x: dac.epochRelativeStartTime(x, 0) + x.firstDuration <=  dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) \
-                                                    and and x.firstDuration > 0 and x.deltaDuration == 0, dac.epochs))
+                                                    and x.firstDuration > 0 and x.deltaDuration == 0, 
+                                                dac.epochs))
                 
                 if len(initialEpochs):
                     baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
@@ -1639,7 +1641,7 @@ class LTPOnline(object):
             #
             
             responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._responseBaselineDuration_ \
-                                                        and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_) \
+                                                        and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
                                                         and dac.epochRelativeStartTime(x, 0) + x.firstDuration <= digdac.epochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
                                                 dac.epochs))
             
@@ -1659,7 +1661,8 @@ class LTPOnline(object):
             # or the dac holding
             #
             initialEpochs = list(filter(lambda x: dac.epochRelativeStartTime(x, 0) + x.firstDuration <=  digdac.epochRelativeStartTime(synStimEpochs[0], 0) \
-                                                and and x.firstDuration > 0 and x.deltaDuration == 0, dac.epochs))
+                                                and x.firstDuration > 0 and x.deltaDuration == 0, 
+                                            dac.epochs))
             
             if len(initialEpochs):
                 # there are epochs before synStimEpochs - are any of these baseline-like?
@@ -1678,7 +1681,7 @@ class LTPOnline(object):
         
             # Now, determine the response baseline for this scenario.
             responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._responseBaselineDuration_ \
-                                                        and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_) \
+                                                        and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
                                                         and dac.epochRelativeStartTime(x, 0) + x.firstDuration <= digdac.epochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
                                                 dac.epochs))
             
