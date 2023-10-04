@@ -526,6 +526,15 @@ class ABFEpoch:
         # self._pulseWidth_in_samples_ = 0
         self._dacNum_ = -1
         
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        
+        return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        
+        
     @property
     def epochLetter(self) -> str:
         return epochLetter(self.epochNumber)
@@ -884,6 +893,13 @@ class ABFProtocol:
             self._inputs_ = list()
             
     def __eq__(self, other):
+        """Tests for equality of scalar properties and epochs tables.
+        Epochs tables are checked for equality sweep by sweep, in all channels.
+        
+        WARNING: This includes any digital output patterns definded.
+        
+        If this is not intended, then use self.is_identical_except_digital(other)
+        """
         if not isinstance(other, self.__class__):
             return False
         
@@ -893,12 +909,25 @@ class ABFProtocol:
         ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
 
         # if checked out then verify all epochs Tables are sweep by sweep 
-        # identical in all DAC channels
+        # identical in all DAC channels, including digital output patterns!
         if ret:
             ret = all(all(np.all(self.outputConfiguration(d).epochsTable(s) == other.outputConfiguration(d).epochsTable(s)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
         return ret
+    
+    def is_identical_except_digital(self, other):
+        if not isinstance(other, self.__class__):
+            return False
         
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        
+        # check equality of properties (descriptors); this includes nSweeps and nADCChannels
+        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        
+        if ret:
+            ret = all(all(np.all(self.outputConfiguration(d).epochsTable(s, includeDigitalPattern=False) == other.outputConfiguration(d).epochsTable(s, includeDigitalPattern=False)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
+                    
+        return ret
             
     @property
     def acquisitionMode(self) -> ABFAcquisitionMode:
@@ -1216,6 +1245,10 @@ class ABFInputsConfiguration:
     @property
     def units(self) -> pq.Quantity:
         return self._adcUnits_
+    
+    @property
+    def protocol(self) -> ABFProtocol:
+        return self._protocol_
 
 class ABFOutputsConfiguration:
     """Configuration of a DAC channel and digital outputs in pClamp/Clampex ABF files.
@@ -1427,6 +1460,52 @@ class ABFOutputsConfiguration:
         else:
             raise NotImplementedError(f"ABf version {abfVer} is not supported")
         
+    def __eq__(self, other):
+        """Tests for equality of scalar properties and epochs tables.
+        Epochs tables are checked for equality sweep by sweep, in all channels.
+        
+        WARNING: This includes any digital output patterns definded.
+        
+        If this is not intended, then use self.is_identical_except_digital(other)
+        """
+        if not isinstance(other, self.__class__):
+            return False
+        
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        
+        # check equality of properties (descriptors); this includes nSweeps and nADCChannels
+        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+
+        # if checked out then verify all epochs Tables are sweep by sweep 
+        # identical in all DAC channels, including digital output patterns!
+        if ret:
+            ret = all(np.all(self.epochsTable(s) == other.epochsTable(s)) for s in range(self.protocol.nSweeps))
+                    
+        return ret
+        
+    def is_identical_except_digital(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        
+        # check equality of properties (descriptors); this includes nSweeps and nADCChannels
+        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        
+        if ret:
+            ret = all(np.all(self.epochsTable(s, includeDigitalPattern=False) == other.epochsTable(s, includeDigitalPattern=False)) for s in range(self.protocol.nSweeps))
+                    
+        return ret
+    
+    def has_identical_epochs_table(self, other:ABFOutputsConfiguration, 
+                                   sweep:int = 0, includeDigitalPattern:bool=True):
+        
+        if not isinstance(other, ABFOutputsConfiguration):
+            return False
+        
+        return np.all(self.epochsTable(sweep, includeDigitalPattern = includeDigitalPattern) == 
+                      other.epochsTable(sweep, includeDigitalPattern = includeDigitalPattern))
+        
     @property
     def protocol(self) -> ABFProtocol:
         return self._protocol_
@@ -1481,7 +1560,7 @@ class ABFOutputsConfiguration:
             
         return trig
     
-    def epochsTable(self, sweep:int = 0):
+    def epochsTable(self, sweep:int = 0, includeDigitalPattern:bool=True):
         """Generate a Pandas DataFrame with the epochs definition for this DAC channel.
         
         Regarding the command and digital outputs, this reflects the actual 
@@ -1494,34 +1573,52 @@ class ABFOutputsConfiguration:
         waveform more easily.
         
         """
-        
-        altDig = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
-            
-        
-        rowIndex = ["Type", "First Level", "Delta Level",
-                    "First Duration", "First Duration (Samples)",
-                    "Delta Duration", "Delta Duration (Samples)",
-                    "Actual Duration", "Actual Duration (Samples)",
-                    "Digital Pattern #3-0", "Digital Pattern #7-4", 
-                    "Train Rate", "Train Period", "Train Period (Samples)",
-                    "Pulse Width", "Pulse Width (Samples)",
-                    "Pulse Count"]
+        if includeDigitalPattern:
+            rowIndex = ["Type", "First Level", "Delta Level",
+                        "First Duration", "First Duration (Samples)",
+                        "Delta Duration", "Delta Duration (Samples)",
+                        "Actual Duration", "Actual Duration (Samples)",
+                        "Digital Pattern #3-0", "Digital Pattern #7-4", 
+                        "Train Rate", "Train Period", "Train Period (Samples)",
+                        "Pulse Width", "Pulse Width (Samples)",
+                        "Pulse Count"]
+        else:
+            rowIndex = ["Type", "First Level", "Delta Level",
+                        "First Duration", "First Duration (Samples)",
+                        "Delta Duration", "Delta Duration (Samples)",
+                        "Actual Duration", "Actual Duration (Samples)",
+                        "Train Rate", "Train Period", "Train Period (Samples)",
+                        "Pulse Width", "Pulse Width (Samples)",
+                        "Pulse Count"]
+                
     
         epochData = dict()
         
         for i, epoch in enumerate(self.epochs):
-            epochDigPattern = self.epochDigitalPattern(epoch, sweep)
-            epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
-                        epoch.firstDuration, self.epochFirstDurationSamples(epoch),
-                        epoch.deltaDuration, self.epochDeltaDurationSamples(epoch),
-                        self.epochActualDuration(epoch, sweep),
-                        self.epochActualDurationSamples(epoch, sweep),
-                        "".join(map(str, epochDigPattern[0])), 
-                        "".join(map(str, epochDigPattern[1])),
-                        epoch.pulseFrequency,
-                        epoch.pulsePeriod, self.epochPulsePeriodSamples(epoch),
-                        epoch.pulseWidth, self.epochPulseWidthSamples(epoch),
-                        self.epochPulseCount(epoch, sweep)]
+            if includeDigitalPattern:
+                epochDigPattern = self.epochDigitalPattern(epoch, sweep)
+                epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
+                            epoch.firstDuration, self.epochFirstDurationSamples(epoch),
+                            epoch.deltaDuration, self.epochDeltaDurationSamples(epoch),
+                            self.epochActualDuration(epoch, sweep),
+                            self.epochActualDurationSamples(epoch, sweep),
+                            "".join(map(str, epochDigPattern[0])), 
+                            "".join(map(str, epochDigPattern[1])),
+                            epoch.pulseFrequency,
+                            epoch.pulsePeriod, self.epochPulsePeriodSamples(epoch),
+                            epoch.pulseWidth, self.epochPulseWidthSamples(epoch),
+                            self.epochPulseCount(epoch, sweep)]
+            else:
+                epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
+                            epoch.firstDuration, self.epochFirstDurationSamples(epoch),
+                            epoch.deltaDuration, self.epochDeltaDurationSamples(epoch),
+                            self.epochActualDuration(epoch, sweep),
+                            self.epochActualDurationSamples(epoch, sweep),
+                            epoch.pulseFrequency,
+                            epoch.pulsePeriod, self.epochPulsePeriodSamples(epoch),
+                            epoch.pulseWidth, self.epochPulseWidthSamples(epoch),
+                            self.epochPulseCount(epoch, sweep)]
+                    
             
             epochData[epoch.epochLetter] = epValues
             
@@ -1560,7 +1657,10 @@ class ABFOutputsConfiguration:
     
     def epochActualRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to sweep start.
-        Takes into account the holding time (1/64 sweep samples, in Clampex)
+        Takes into account the holding time (1/64 sweep samples, in Clampex),
+        resulting in timings that match the times in the recorded neo.AnalogSignals.
+        
+        Use this function to construct neo.Epoch or neo.Events!
         
         """
         if isinstance(epoch, (int, str)):
@@ -1945,7 +2045,7 @@ class ABFOutputsConfiguration:
             depends on the channel index, with DAC 0 and 1 being the only ones
             used for alternate digital output during even- and odd-numbered sweeps)
         """
-        altDig = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+        isAltDig = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
         
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
@@ -1989,7 +2089,7 @@ class ABFOutputsConfiguration:
                 # ONLY the main digital pattern of the epoch, and ONLY if 
                 # the sweep has an even number
                 #
-                if altDig:
+                if isAltDig:
                     # this DAC has dig output enabled, hence during
                     # an experiment it will output NOTHING if either 
                     # alternateDigitalPattern is disabled OR sweep number 
@@ -2012,11 +2112,51 @@ class ABFOutputsConfiguration:
                 # (and these TTLs will be sent out) ONLY if alternateDigitalPattern
                 # is enabled AND sweep number is odd
                 #
-                if altDig:
-                    dig_3_0 = epoch.digitalPattern(True)[0]
-                    dig_7_4 = epoch.digitalPattern(True)[1]
-                else:
-                    dig_3_0 = dig_7_4 = [0,0,0,0]
+                # NOTE: 2023-10-04 09:07:42 - show what is actually sent out
+                # i.e., if digital output is DISABLED then show zeroes even if
+                # in the Clampex protocol editor we have a pattern entered here.
+                #
+                # This is because, when digital output is disabled for this DAC
+                # AND alternative digital output is enabled in the protocol, the
+                # digital pattern entered on this waveform tab in Clampex
+                # protocol editor is used as the alternative digital output for
+                # the DAC where digital output IS enabled.
+                #
+                # I guess this is was a GUI design decision taken the by Clampex
+                # authors n order to avoid adding another field to the GUI form.
+                #
+                # NOTE: 2023-10-04 09:12:29
+                # Also, the DAC where digital output patterns are enabled may NOT
+                # be the same as the DAC one is recording from! 
+                #
+                # So if you're using, say DAC1, to send commands to your cell 
+                # (where DAC1 should be paired with the ADCs coming from the second
+                # amplifier channel, in a MultiClamp device) it is perfectly OK to
+                # enable digital outputs in the DAC0 waveform tab: Clampex will
+                # still issue TTLs during the sweep, even if DAC0 does not send 
+                # any command waveforms.
+                #
+                #
+                # On the other hand, if DAC0 has waveforms disabled (in this example,
+                # DAC0 is NOT used in the experiment) AND alternate digital outputs
+                # is disabled in the protocol, then NO digital outputs are "linked"
+                # to this DAC0.
+                #
+                # That somewhat confuses things, because DIG channels and DAC
+                # channels are physically independent! The only logical "link"
+                # between them is the timings of the epochs.
+                # 
+                # Also, NOTE that in Clampex only one DAC can have digital outputs
+                # enabled.
+                #
+                
+                # if self.analogWaveformEnabled
+                dig_3_0 = dig_7_4 = [0,0,0,0]
+                # if isAltDig:
+                #     dig_3_0 = epoch.digitalPattern(True)[0]
+                #     dig_7_4 = epoch.digitalPattern(True)[1]
+                # else:
+                #     dig_3_0 = dig_7_4 = [0,0,0,0]
                     
         else:
             if self.digitalOutputEnabled:
@@ -2229,8 +2369,6 @@ class ABFOutputsConfiguration:
         # "low logic" means 0V on a background of 5V
         assert digChannel in range(self.digitalOutputsCount), f"Invalid digital output channel {digChannel} for {self.digitalOutputsCount} channels "
 
-        # altDig = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
- 
         digOFF, digON, trainOFF, trainON = self.getDigitalLogicLevels(digChannel)
         
         waveform = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), digOFF),

@@ -7083,8 +7083,8 @@ signals in the signal collection.
             
             axindex = names.index(index)
             
-            self._selected_plot_item_ = plotitems[index]
-            self._selected_plot_item_index_ = index
+            self._selected_plot_item_ = plotitems[axindex]
+            self._selected_plot_item_index_ = axindex
             
         else:
             return

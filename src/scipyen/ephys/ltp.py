@@ -855,12 +855,23 @@ class LTPOnline(object):
                                 "samplingRate",
                                 "alternateDigitalOutputStateEnabled",
                                 "alternateDACOutputStateEnabled")
+    
+    timings_fields = ("dcStart", "dcStop", 
+                      "RsStart", "RsStop",
+                      "RinStop", "RinStop",
+                      "EPSC0BaseStart", "EPSC0BaseStop",
+                      "EPSC0PeakStart", "EPSC0PeakStop",
+                      "EPSC1BaseStart", "EPSC1BaseStop",
+                      "EPSC1PeakStart", "EPSC1PeakStop",
+                      )
 
     def __init__(self,
                  mainClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
+                 timings:dict = dict(),
                  adcChannel:int = 0,
                  dacChannel:int = 0,
+                 digOutDacChannel:int = 0,
                  synapticDigitalTriggersOnDac:typing.Optional[int]=None,
                  stimDIG:typing.Sequence[int] = (0,1),
                  synapticTriggersOnDac:typing.Optional[int]=None,
@@ -901,13 +912,30 @@ class LTPOnline(object):
             waveform commands to the recorded cell (e.g. holding potential
             or current, membrane test, postsynaptc spikng, etc).
             
+            In the protocol, the corresponding ABFOutput configuration MUST have 
+            'analogWaveformEnabled' == True.
+            
             NOTE: This cannot be unambiguously determined from the protocol,
             because the experimenter may decide to enable command waveform
             in more than one DAC (e.g. for emulating triggers, or any other
             event)
         
-            WARNING: For experments using alternative pathways, only the first
-            two DACs can be used for "Alternative waveform stimulation"
+            WARNING: For experiments using alternative pathways, only the first
+            two DACs (0 and 1) can be used for "Alternative waveform stimulation".
+        
+        digOutDacChannel: int, default is 0
+            The index of the DAC channel where digital output is enabled.
+        
+            This is important because the index of this channel, in Clampex,
+            is not necessarily the same as the index of the DAC channel used for
+            analog waveforms commands.
+        
+            If this channel is distinct from dacChannel, AND digital outputs ARE 
+            enabled in this channel, AND alternative digital outputs ARE enabled 
+            in the Clampex protocol, then THIS channel stores the digital pattern 
+            sent out during even sweeps (0,2, etc) whereas the "other" DAC channel 
+            used (see above) stores the alternative digital pattern (sent out during
+            odd sweeps: 1,3, etc).
         
         synapticDigitalTriggersOnDac: index of the DAC where digital triggers are 
                 enabled, for synaptic stimulation. Default is None (read on).
@@ -1009,7 +1037,7 @@ class LTPOnline(object):
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
-        self.self._monitorProtocol_ = None
+        self._monitorProtocol_ = None
 
         self._conditioningProtocol_ = None
         
@@ -1100,13 +1128,14 @@ class LTPOnline(object):
                            conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
                            chase = dict(path0 = neo.Block(), path1 = neo.Block()))
 
-        self._viewer_path0_Records = self._emitterWindow_.newViewer(sv.SignalViewer)
-        self._viewer_path0_Amplitudes = self._emitterWindow_.newViewer(sv.SignalViewer)
-        self._viewer_path1_Records = self._emitterWindow_.newViewer(sv.SignalViewer)
-        self._viewer_path1_Amplitudes = self._emitterWindow_.newViewer(sv.SignalViewer)
-
-        self._viewer_Rseries = self._emitterWindow_.newViewer(sv.SignalViewer)
-        self._viewer_DC = self._emitterWindow_.newViewer(sv.SignalViewer)
+        self._viewers_ = dict(path0 = dict(synaptic = self._emitterWindow_.newViewer(sv.SignalViewer),
+                                           amplitudes = self._emitterWindow_.newViewer(sv.SignalViewer),
+                                           DC = self._emitterWindow_.newViewer(sv.SignalViewer),
+                                           Rs = self._emitterWindow_.newViewer(sv.SignalViewer),
+                                           Rin = self._emitterWindow_.newViewer(sv.SignalViewer)),
+                              path1 = dict(synaptic = self._emitterWindow_.newViewer(sv.SignalViewer),
+                                           amplitudes = self._emitterWindow_.newViewer(sv.SignalViewer),
+                                           ))
         
         self._a_ = 0
 
@@ -1156,7 +1185,7 @@ class LTPOnline(object):
         self._abfListener_.stop()
         
     def reset(self):
-        self.self._monitorProtocol_ = None
+        self._monitorProtocol_ = None
         self._conditioningProtocol_ = None
         
         self._data_["baseline"]["path0"].segments.clear()
@@ -1300,10 +1329,11 @@ class LTPOnline(object):
         # conditioning protocols), possibly interleaved with monitoring episodes
         # which should have the same monitoring protocol
         #
+        
         if self._monitorProtocol_ is None:
             if protocol.clampMode() == self._clampMode_:
                 self._monitorProtocol_ = protocol
-                self.processProtocol(protocol)
+                self.processMonitorProtocol(protocol)
             else:
                 raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._clampMode_}")
             
@@ -1319,58 +1349,167 @@ class LTPOnline(object):
                     if protocol != self._conditioningProtocol_:
                         raise ValueError("Unexpected protocol for current run")
             
-        adc = self._monitorProtocol_.inputConfiguration(self.adcChannel)
-        sigIndex = neoutils.get_index_of_named_signal(adc.name)
+        if self._monitorProtocol_.nSweeps == 2:
+            if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
+                # NOTE: this is moot, because the protocol has already been checked
+                # in the processMonitorProtocol
+                raise ValueError("When the protocol defines two sweeps, alternate digtal outputs MUST have been enabled in the protocol")
+            # we are alternatively stimulating two pathways
+            # NOTE: the ABF Run should ALWAYS have two sweeps in this case - one
+            # for each pathway - regardless of how many runs there are per trial
+            # if number of runs > 1 then the ABF file stores the average record
+            # of each sweep, across the number of runs (or however the averaging mode
+            # was set in the protocol; WARNING: this last bit of information is 
+            # NOT currently used here)
             
-        if len(abfRun.segments) == 1:
-            # => single pathway! CAUTION may backfire when recording is interrupted in Clampex
-            # TODO: for now we just populate the baseline
-            # but in the real world we need to distinguish between various episodes
-            self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
-
-            self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
-                                            doc_title="path0",
-                                            showFrame = len(self._data_["baseline"]["path0"].segments)-1)
-
-            self._viewer_path0_Records.currentAxis = adc.name
-
-
-        elif len(abfRun.segments) == 2: # WARNING we only support two alternative pathways
-            self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
-            self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
-                                            doc_tile="path0",
-                                            showFrame = len(self._data_["baseline"]["path0"].segments)-1)
-            self._viewer_path0_Records.currentAxis = adc.name
+        elif self._monitorProtocol_.nSweeps != 1:
+            raise ValueError(f"Expecting 1 or 2 sweeps in the protocol; instead, got {self._monitorProtocol_.nSweeps}")
             
-            self._data_["baseline"]["path1"].segments.append(abfRun.segments[1])
-            self._viewer_path1_Records.view(self._data_["baseline"]["path1"],
-                                            doc_tile="path1",
-                                            showFrame = len(self._data_["baseline"]["path1"].segments)-1)
+        # From here on we do things differently, dependng on whether protocol is a
+        # the monitoring protocol or the conditioning protocol
+        if protocol == self._monitorProtocol_:
+            adc = protocol.inputConfiguration(self.adcChannel)
+            sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
             
-            self._viewer_path1_Records.currentAxis = adc.name
+            for k, seg in enumerate(abfRun.segments):
+                pndx = f"path{k}"
+                if k > 1:
+                    break
+                
+                self._data_["baseline"][pndx].segments.append(abfRun.segments[k])
+                if isinstance(self._presynaptic_triggers_[pndx], TriggerEvent):
+                    self._data_["baseline"][pndx].segments[-1].events.append(self._presynaptic_triggers_[pndx])
+                    
+                viewer = self._viewers_[pndx]["synaptic"]
+                viewer.view(self._data_["baseline"][pndx],
+                            doc_title=pndx,
+                            showFrame = len(self._data_["baseline"][pndx].segments)-1)
+                
+                viewer.currentAxis = adc.name
+                
+        # for k in len(abfRun.segments)
+#         if len(abfRun.segments) == 1:
+#             # => single pathway! CAUTION may backfire when recording is interrupted in Clampex
+#             # TODO: for now we just populate the baseline
+#             # but in the real world we need to distinguish between various episodes
+#             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
+#             # if isinstance(self._presynaptic_triggers_)
+# 
+#             self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
+#                                             doc_title="path0",
+#                                             showFrame = len(self._data_["baseline"]["path0"].segments)-1)
+# 
+#             self._viewer_path0_Records.currentAxis = adc.name
+# 
+# 
+#         elif len(abfRun.segments) == 2: # WARNING we only support two alternative pathways
+#             self._data_["baseline"]["path0"].segments.append(abfRun.segments[0])
+#             self._viewer_path0_Records.view(self._data_["baseline"]["path0"],
+#                                             doc_tile="path0",
+#                                             showFrame = len(self._data_["baseline"]["path0"].segments)-1)
+#             self._viewer_path0_Records.currentAxis = adc.name
+#             
+#             self._data_["baseline"]["path1"].segments.append(abfRun.segments[1])
+#             self._viewer_path1_Records.view(self._data_["baseline"]["path1"],
+#                                             doc_tile="path1",
+#                                             showFrame = len(self._data_["baseline"]["path1"].segments)-1)
+#             
+#             self._viewer_path1_Records.currentAxis = adc.name
 
-    def processProtocol(self, protocol:pab.ABFProtocol):
+    def processMonitorProtocol(self, protocol:pab.ABFProtocol):
         # TODO: 2023-10-03 12:31:19
         # implement the case where TTLs are emulated with a DAC channel (with its
         # output routed to a simulus isolator)
         #
+        
+        # the DAC used to send out the command waveforms
         dac = protocol.outputConfiguration(self.dacChannel)
-        if len(dac.epochs) == 0:
-            warnings.warn("Data has no ABF epochs defined")
-            return False
+        
+        # Guess which DAC output has digital outputs enabled.
+        #
+        # In Clampex, there can be only one!¹
+        #
+        # Ths is necessary because one may have confgured dig outputs in a DAC
+        # different from the one used for command waveform.
+        #
+        # HOWEVER, this is only possble when alternate digital outputs are 
+        # enabled in the protocol - and, hence, this dac must have the same epochs
+        # defined as the DAC used for clamping.
+        #
+        # ¹) For this reason, additional triggers can only be sent out by emulating
+        #    TTL waveforms in the analog command epochs on additional DAC outputs.
+        #
+        digOutDacs = list(filter(lambda x: x.digitalOutputEnabled, (protocol.outputConfiguration(k) for k in range(protocol.nDACChannels))))
+        
+        if len(digOutDacs) == 0:
+            raise ValueError("The protocol indicates there are no DAC channels with digtal output enabled")
+        
+        digOutDACIndex = digOutDacs[0]
+        
+        if digOutDACIndex != self.dacChannel:
+            if not protocol.alternateDigitalOutputStateEnabled:
+                raise ValueError(f"Digital outputs are enabled on DAC {digOutDACIndex} and command waveforms are sent via DAC {self.dacChannel}, but alternative digital outputs are disabled in the protocol")
+        
+            assert protocol.nSweeps % 2 == 0, "For alternate DIG pattern the protocol is expected to have an even number of sweeps"
+            
+        # DAC where dig out is enabled;
+        # when alt dig out is enabled, this stores the main dig pattern
+        # (the dig pattern sent out on even sweeps 0, 2, 4, etc)
+        # whereas the "main" dac retrieved above stores the alternate digital pattern
+        # (the dig pattern set out on odd sweeps, 1,3, 5, etc)
+        
+        digdac = protocol.outputConfiguration(digOutDACIndex)
+        
+        if len(digdac.epochs) == 0:
+            raise ValueError("DAC with digital outputs has no epochs!")
+        
+        digEpochsTable = digdac.epochsTable(0)
+        dacEpochsTable = dac.epochsTable(0)
+        
+        digEpochsTable_reduced = digEpochsTable.loc[[i for i in digEpochsTable.index if not i.startswith("Digital Pattern")], :]
+        dacEpochsTable_reduced = dacEpochsTable.loc[[i for i in dacEpochsTable.index if not i.startswith("Digital Pattern")], :]
+        
+        digEpochsTableAlt = None
+        digEpochsTableAlt_reduced = None
+        
+        if digOutDACIndex != self.dacChannel:
+            # a this point, this implies protocol.alternateDigitalOutputStateEnabled == True
+            #
+            # What we check here:
+            # when alternate digital output is enabled, AND the dig dac is dfferent 
+            # from the main dac, the epochs defned in each of the dacs MUST be the same
+            # EXCEPT for the reported (stored) digital patterns
+            # 
+            # The idea is that the main experimental epochs are defined in the dacChannel,
+            # but the digital outputs may be defined in the "alternative" DAC channel,
+            # with the condition that the same epochs are defined there
+            # 
+            # NOTE: In general this is a SOFT requirement (one can imagine 
+            # doing completely different things in the "alternate" digital output)
+            #
+            # However, for a synaptic plasticity experiment, sending stimuli at
+            # different times on the alternate pathway is an unnecessary complication
+            # hence, HERE, this is is a HARD requirement (for now...)
+            #
+            digEpochsTableAlt = digdac.epochsTable(1)
+            digEpochsTableAlt_reduced = digEpochsTableAlt.loc[[i for i in digEpochsTableAlt.index if not i.startswith("Digital Pattern")], :]
+            assert(np.all(digEpochsTable_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels"
+            assert(np.all(digEpochsTableAlt_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels with alternate digital outputs"
         
         # locate the presynaptic triggers epoch
         # first try and find epochs with digital trains
         # there should be only one such epoch, sending at least one TTL pulse per train
         #
-        presynStimEpochs = list(filter(lambda x: x.hasDigitalTrain(), dac.epochs))
-        # ideally there is only one such epoch
-        if len(presynStimEpochs) > 1:
-            # raise NotImplementedError("Only synaptic triggers are implemented")
-            warnings.warn(f"There are {len(presynStimEpochs)} in the protocol; I need more information")
-            return False
         
-        elif len(presynStimEpochs) == 0:
+        synStimEpochs = list(filter(lambda x: x.hasDigitalTrain(), digdac.epochs))
+        
+        # ideally there is only one such epoch - make it a HARD requirement (for now)
+        if len(synStimEpochs) > 1:
+            warnings.warn(f"There are {len(synStimEpochs)} in the protocol; will use the first one")
+            synStimEpochs = [synStimEpochs[0]]
+            # return False
+        
+        elif len(synStimEpochs) == 0:
             # Try prestim triggers defined as digital pulses instead of trains.
             #
             # Here we can expect to have more than one such epochs, together 
@@ -1388,16 +1527,20 @@ class LTPOnline(object):
             # using pulses instead of trains for conditioning as well (e.g.
             # low frequency stimulations)
             #
-            presynStimEpochs = list(filter(lambda x: x.hasDigitalPulse(), dac.epochs))
-            if len(presynStimEpochs) == 0:
+            synStimEpochs = list(filter(lambda x: x.hasDigitalPulse(), digdac.epochs))
+            if len(synStimEpochs) == 0:
                 warnings.warn("There are no epoch sending digital triggers")
                 return False
             
-        # print(f"{self.__class__.__name__}.processProtocol {len(presynStimEpochs)} synaptic stimulation epochs")
+        # print(f"{self.__class__.__name__}.processMonitorProtocol {len(synStimEpochs)} synaptic stimulation epochs")
+        
+        # check if there are any epochs BEFORE the first epoch in synStimEpochs
+        
+        # preSynStimEpochs = list(filter(lambda x: x.first))
         
         for path in range(protocol.nSweeps):
             pndx = f"path{path}"
-            pathEpochs = sorted(presynStimEpochs, key = lambda x: dac.epochRelativeStartTime(x, path))
+            pathEpochs = sorted(synStimEpochs, key = lambda x: dac.epochRelativeStartTime(x, path))
             trig = dac.triggerEvents(pathEpochs[0], path)
             if len(pathEpochs) > 1:
                 for e in pathEpochs[1:]:
