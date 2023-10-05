@@ -1189,8 +1189,10 @@ class LTPOnline(object):
                                            ),
                               dc = dcViewer, rs = rsViewer, rn = rinViewer
                               )
+                              
+        self._signalAxes_ = dict(path0 = None, path1 = None)
         
-        self._a_ = 0
+        # self._a_ = 0
 
         self._presynaptic_triggers_ = dict()
         
@@ -1431,7 +1433,8 @@ class LTPOnline(object):
             adc = protocol.inputConfiguration(self.adcChannel)
             sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
 
-            for k, seg in enumerate(abfRun.segments):
+            # for k, seg in enumerate(abfRun.segments):
+            for k, seg in enumerate(abfRun.segments[:1]): # use this line for debugging
                 pndx = f"path{k}"
                 if k > 1:
                     break
@@ -1444,26 +1447,33 @@ class LTPOnline(object):
                 viewer.view(self._data_["baseline"][pndx],
                             doc_title=pndx,
                             showFrame = len(self._data_["baseline"][pndx].segments)-1)
-                viewer.currentAxis = adc.name
-                viewer.xAxesLinked = True
+                
+                self._signalAxes_[pndx] = viewer.axis(adc.name)
+                
+                viewer.currentAxis = self._signalAxes_[pndx]
+                # viewer.xAxesLinked = True
                 
                 viewer.plotAnalogSignalsCheckBox.setChecked(True)
                 viewer.plotEventsCheckBox.setChecked(True)
                 viewer.analogSignalComboBox.setCurrentIndex(viewer.currentAxisIndex+1)
                 viewer.analogSignalComboBox.activated.emit(viewer.currentAxisIndex+1)
-                # viewer.currentAxis.vb.enableAutoRange('x')
+                # viewer.currentAxis.vb.enableAutoRange()
                 # viewer.currentAxis.vb.autoRange()
+                self._signalAxes_[pndx].vb.enableAutoRange()
                 
                 if "Rbase" not in [c.name for c in viewer.dataCursors]:
-                    viewer.addCursor(sv.SignalcursorTypes.vertical,
-                                    x = self._signalBaselineStart_ + self._signalBaselineDuration_/2,
-                                    xwindow = self._signalBaselineDuration_,
+                    x = float((self._signalBaselineStart_ + self._signalBaselineDuration_/2 + protocol.sweepTime(k)).rescale(pq.s))
+                    xwindow = float(self._signalBaselineDuration_.rescale(pq.s))
+                    # print(f"x = {x}, xwindow = {xwindow}")
+                    viewer.addCursor(sv.SignalCursorTypes.vertical,
+                                    x = x,
+                                    xwindow = xwindow,
                                     label = "Rbase",
                                     follows_mouse = False,
-                                    axis = viewer.currentAxis,
+                                    axis = self._signalAxes_[pndx],
                                     relative=True,
                                     precision=5)
-
+                    
     def processMonitorProtocol(self, protocol:pab.ABFProtocol):
         # TODO: 2023-10-03 12:31:19
         # implement the case where TTLs are emulated with a DAC channel (with its
@@ -1785,9 +1795,17 @@ class LTPOnline(object):
             #
             if not isinstance(self._cursor_coordinates_.get(pndx, None), dict):
                 self._cursor_coordinates_[pndx] = dict()
-                self._cursor_coordinates_[pndx]["Rbase"] = (self._self._signalBaselineStart_,
+                self._cursor_coordinates_[pndx]["Rbase"] = (self._signalBaselineStart_,
                                                             self._signalBaselineDuration_)
-                
+        print("After processMonitorProtocol:")        
+        print(f"\t self._mbTestStart_ = {self._mbTestStart_}")
+        print(f"\t self._mbTestDuration_ = {self._mbTestDuration_}")
+        print(f"\t self._mbTestAmplitude_ = {self._mbTestAmplitude_}")
+        print(f"\t self._signalBaselineStart_ = {self._signalBaselineStart_}")
+        print(f"\t self._signalBaselineDuration_ = {self._signalBaselineDuration_}")
+        print(f"\t self._responseBaselineStart_ = {self._responseBaselineStart_}")
+        print(f"\t self._responseBaselineDuration_ = {self._responseBaselineDuration_}")
+        
         
     def filesChanged(self, filePaths:typing.Sequence[str]):
         # print(f"{self._a_} → {self.__class__.__name__}.filesChanged {filePaths}\n")

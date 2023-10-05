@@ -2824,13 +2824,14 @@ anything else       anything else       ❌
         # NOTE: 2020-02-26 14:23:40
         # creates the cursor DIRECTLY at the specified coordinates
         kwargs["show_value"] = self._cursorsShowValue_ == True
+        precision = kwargs.pop("precision", self.cursorLabelPrecision)
         
         crsID = self._addCursor_(cursor_type = cursorType,
                                 x = x, y = y, xwindow = xwindow, ywindow = ywindow,
                                 xBounds = xBounds, yBounds = yBounds,
                                 axis = axis, label=label,
                                 follows_mouse=follows_mouse,
-                                precision = self.cursorLabelPrecision,
+                                precision = precision,
                                 editFirst = editFirst,
                                 **kwargs)
         
@@ -3412,7 +3413,7 @@ anything else       anything else       ❌
         kwargs: var-keyword parameters for SignalCursor constructor (pen, etc)
         """
         # print(f"{self.__class__.__name__}_addCursor_ cursor_type = {cursor_type}, x = {x} ,y = {y}, xwindow = {xwindow}, ywindow = {ywindow},xBounds = {xBounds},yBounds = {yBounds}, axis={axis}, label= {label}, follows_mouse = {follows_mouse}")
-        
+        relative = kwargs.pop("relative", True)
         if xwindow is None:
             xwindow = self.defaultCursorWindowSizeX
             
@@ -3621,7 +3622,7 @@ anything else       anything else       ❌
                                    # parent = self, 
                                    parent = axis, 
                                    follower = follows_mouse, 
-                                   relative = True,
+                                   relative = relative,
                                    xBounds = xBounds,
                                    yBounds = yBounds,
                                    precision = precision,
@@ -7743,6 +7744,8 @@ signals in the signal collection.
         
         pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
         
+        # print(f"{self.__class__.__name__}._get_axis_data_X_range_ axis {self.axes.index(axis)} : {len(pdis)} plot data items")
+        
         if len(pdis):
             # xbounds0, xbounds1 = zip(*map(lambda i_ : i_.dataBounds(0), pdis))
             # NOTE: BUG
@@ -7753,6 +7756,7 @@ signals in the signal collection.
             xbounds0, xbounds1 = zip(*map(lambda i_ : (i_.dataRect().x(), i_.dataRect().x() + i_.dataRect().width()), pdis))
             min_x = min(xbounds0)
             max_x = max(xbounds1)
+            # print(f"\txbounds0 {xbounds0}, xbounds1 {xbounds1} min_x {min_x}, max_x {max_x}")
             # items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
             
             # min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
@@ -7858,19 +7862,23 @@ signals in the signal collection.
         # else:
         #     refAxes = self.signalAxes
             
-        if len(self._x_data_bounds_) == 0:
-            self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
+        # print(f"{self.__class__.__name__}._align_X_range {len(self._x_data_bounds_)}")
+        self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
+        # if len(self._x_data_bounds_) == 0:
+        #     self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
             # self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in refAxes]
+            
+        # print(f"{self.__class__.__name__}._align_X_range x data bounds {list(zip([self.axes.index(ax) for ax in self.axes] ,self._x_data_bounds_))}")
             
         for ax in self.axes:
             ax.vb.updateViewRange(True, True)
         
         
         # print(f"{self.__class__.__name__}._align_X_range axeslinked = {self.xAxesLinked}")
-        if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
-            if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
+        # if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
             # if any(ax.vb.autoRangeEnabled()[0] for ax in self.signalAxes):
-                return
+            # if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
+            #     return
             # NOTE: 2023-07-10 10:55:57 FIXME/TODO
             # still have to figure to figure out this contingency below:
             # selecting to show just plot items without autoranging
@@ -7928,6 +7936,16 @@ signals in the signal collection.
 #                     self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
 #                 return
                 
+        # NOTE: 2023-10-05 08:46:25
+        # another poss workaround to try: use the first visible signal axis
+        #
+        visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
+        
+        if len(visibleSignalAxes):
+            refAxis = visibleSignalAxes[0]
+        else:
+            refAxis = None
+        
         for kax, ax in enumerate(self.axes):
             # if ax not in self.signalAxes:
             #     continue
@@ -7942,6 +7960,7 @@ signals in the signal collection.
             # NOTE: 2023-07-09 21:17:19
             # this returns the actual data X bounds (see NOTE: 2023-07-09 21:09:08)
             current_X_bounds = self._get_axis_data_X_range_(ax)
+            # print(f"{self.__class__.__name__}._align_X_range: axis {kax} current X bounds = {current_X_bounds}")
             if any(np.isnan(v) for v in current_X_bounds): # ← no data !
                 continue
             
@@ -7951,9 +7970,16 @@ signals in the signal collection.
             xLinkViewXrange = None
             xLink = ax.vb.linkedView(0)
             if isinstance(xLink, pg.ViewBox):
+                if not xLink.isVisible():
+                    continue
+                    # if isinstance(refAxis, pg.PlotItem):
+                    #     aa = [refAxis]
+                else:
+                    aa = [a for a in self.axes if a.vb == xLink]
+                    
                 ax.vb.blockLink(True)
                 xLink.blockLink(True)
-                aa = [a for a in self.axes if a.vb == xLink]
+                
                 if len(aa):
                     xLinkAxis = aa[0]
                     xLinkAxisNdx = self.axes.index(xLinkAxis)
@@ -7968,7 +7994,7 @@ signals in the signal collection.
             new_vx0 = x0 - offset
             new_view_dx = dx1 * scale
             new_vx1 = new_vx0 + new_view_dx
-            # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} to set new view range: {new_vx0, new_vx1}")
+            print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} with view range {current_viewXrange} to set new view range: {new_vx0, new_vx1}")
             ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
             if isinstance(xLink, pg.ViewBox):
                 ax.vb.blockLink(False)
