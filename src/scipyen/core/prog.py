@@ -1293,8 +1293,6 @@ def deprecated(f, *args, **kwargs):
             
     return wrapper
     
-#NOTE: 2017-11-22 22:00:40 FIXME TODO
-# for pyqtSlots, place this AFTER the @pyqtSlot decorator
 def safeWrapper(f, *args, **kwargs):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -1305,9 +1303,6 @@ def safeWrapper(f, *args, **kwargs):
             stars = "".join(["*"]*len(f.__name__))
             print("\n%s\nIn function %s:\n%s" % (stars, f.__name__, stars))
             traceback.print_exc()
-            #print("Call stack:")
-            #traceback.print_stack()
-            #print("%s" % stars)
             
     return wrapper
 

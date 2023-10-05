@@ -2532,9 +2532,19 @@ anything else       anything else       ❌
         self.currentFrame = self._number_of_frames_ - 1
         
     def addLegend(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, 
-                  x=30, y=30, **kwargs):
+                  x:typing.Optional[numbers.Number]=30,
+                  y:typing.Optional[numbers.Number]=30,
+                  **kwargs):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
         cFrame = self.frameIndex[self.currentFrame]
+        
+#         if not isinstance(x, numbers.Number):
+#             minX, maxX = self._get_axis_data_X_range_(axis)
+#             x = minX
+#             
+#         if not isinstance(y, numbers.Number):
+#             minY, maxY = self._get_axis_data_Y_range_(axis)
+#             y = maxY
         
         # make sure there is at most one legend here
         # if the axis already has one legend item, don't add
@@ -8881,11 +8891,11 @@ signals in the signal collection.
         if self._plot_irregularsignals_: # flag set up by `Irregular` checkbox
             selected_irregs, selected_irreg_names, selected_irreg_ndx, plotItemNames = self._signals_select_(irregs, self.irregularSignalComboBox)
 
-            kwargs["symbol"] = self.defaultIrregularSignalSymbols[0]
+            # kwargs["symbol"] = self.defaultIrregularSignalSymbols[0]
             kwargs["pen"] = None
-            kwargs["symbolPen"] = self.defaultIrregularSignalSymbolPen
-            kwargs["symbolBrush"] = self.defaultIrregularSignalSymbolBrush
-            kwargs["symbolSize"] = self.defaultIrregularSignalSymbolSize
+            # kwargs["symbolPen"] = self.defaultIrregularSignalSymbolPen
+            # kwargs["symbolBrush"] = self.defaultIrregularSignalSymbolBrush
+            # kwargs["symbolSize"] = self.defaultIrregularSignalSymbolSize
             kwargs["pxMode"] = True
             
             for k, signal in enumerate(irregs):
@@ -9021,6 +9031,8 @@ signals in the signal collection.
         
         self._setup_signal_choosers_(analog=analog, irregular=irregs)
         
+        sig_name = kwargs.pop("name", None)
+        
         signal_name = getattr(signal, "name", "Signal")
         
         domain_name = neoutils.get_domain_name(signal)
@@ -9028,7 +9040,7 @@ signals in the signal collection.
         if isinstance(signal, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
             if signal.shape[1] > 1:
                 kwargs["symbol"] = cycle(self.defaultIrregularSignalSymbols)
-                kwargs["symbolcolorcycle"] = cycle(self.defaultLineColorsList)
+                kwargs["symbolColor"] = cycle(self.defaultLineColorsList)
             else:
                 kwargs["symbol"] = self.defaultIrregularSignalSymbols[0]
                 
@@ -9081,10 +9093,12 @@ signals in the signal collection.
                     self.signalAxis(k).setVisible(False)
                     return
                 
+                kwargs["name"] = ch_name
+                
                 self._plot_numeric_data_(self.signalAxis(k), 
                                          np.array(sig.times),
                                          np.array(sig[:,channel].magnitude),
-                                         name = ch_name,
+                                         # name = ch_name,
                                          xlabel="%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
                                          ylabel="%s (%s)\nchannel %d" % (signal_name, sig.units.dimensionality, channel), 
                                          *args, **kwargs)
@@ -9103,19 +9117,39 @@ signals in the signal collection.
                 self.signalAxis(0).setVisible(False)
                 return
             
+            # prepare channel names, for legend
+            if sig.shape[1] > 1:
+                if sig_name is None:
+                    sig_name = [f"channel {k}" for k in range(sig.shape[1])]
+                    
+                elif isinstance(sig_name, str):
+                    sig_name = [f"sig_name, channel {k}" for k in range(sig.shape[1])]
+                    
+                elif isinstance(sig_name, (tuple, list)) and all(isinstance(s, str) for s in sig_name):
+                    if len(sig_name) < sig.shape[1]:
+                        sig_name.extend([f"channel {k}" for k in range(len(sig_name, sig.shape[1]))])
+                    elif len(sig_name) > sig.shape[1]:
+                        sig_name = sig_name[:sig.shape[1]]
+                        
+                else:
+                    sig_name = sig.name
+                    
+                kwargs["name"] = sig_name
+                
+            
             if sig.shape[1] > 10:
                 # print("mt")
                 self.setCursor(QtCore.Qt.WaitCursor)
                 self.sig_plot.emit(self._make_sig_plot_dict_(self.signalAxis(0), np.array(sig.times), 
                                        np.array(sig.magnitude), 
-                                       name=sig.name,
+                                       # name=sig.name,
                                        ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                        xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                        *args, **kwargs))
             else:
                 self._plot_numeric_data_(self.signalAxis(0), np.array(sig.times), 
                                         np.array(sig.magnitude), 
-                                        name=sig.name,
+                                        # name=sig.name,
                                         ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
                                         xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
                                         *args, **kwargs)
@@ -9138,13 +9172,13 @@ signals in the signal collection.
                              x:np.ndarray, y:np.ndarray, 
                              xlabel:(str, type(None))=None,  ylabel:(str, type(None))=None, 
                              title:(str, type(None))=None, name:(str, type(None))=None, 
-                             symbolcolorcycle:(cycle, type(None))=None, 
+                             symbolColor:(cycle, type(None))=None, 
                              *args, **kwargs):
         return {"plotItem":plotItem, 
                 "x": x, "y": y, 
                 "xlabel": xlabel, "ylabel": ylabel,
                 "title": title, "name": name, 
-                "symbolcolorcycle": symbolcolorcycle,
+                "symbolColor": symbolColor,
                 "args": args, "kwargs": kwargs}
                     
     @safeWrapper
@@ -9160,18 +9194,16 @@ signals in the signal collection.
         x                   = data.pop("x")
         y                   = data.pop("y")
         xlabel              = data.pop("xlabel", None)
-        #xunits              = data.pop("xunits", None)
         ylabel              = data.pop("ylabel", None)
-        #yunits              = data.pop("yunits", None)
         title               = data.pop("title", None)
         name                = data.pop("name", None)
-        symbolcolorcycle    = data.pop("symbolcolorcycle", None)
+        symbolColor         = data.pop("symbolColor", None)
         args                = data.pop("args", tuple())
         kwargs              = data.pop("args", dict())
 
         # print(f"_slot_plot_numeric_data_ y.shape {y.shape}")
         self._plot_numeric_data_(plotItem,  x, y, xlabel, ylabel,
-                                title, name, symbolcolorcycle, *args, **kwargs)
+                                title, name, symbolColor, *args, **kwargs)
         
         self.setCursor(QtCore.Qt.ArrowCursor)
         self.statusBar().clearMessage()
@@ -9224,12 +9256,12 @@ signals in the signal collection.
                                     pen=None,
                                     name=data_name,
                                     symbol="event", 
-                                    symbolcolorcycle=symbolcolors))
+                                    symbolColor=symbolcolors))
         else:
             self._plot_numeric_data_(entities_axis, xx_, yy_,
                                     pen=None, name=data_name,
                                     symbol="event", 
-                                    symbolcolorcycle=symbolcolors)
+                                    symbolColor=symbolcolors)
         
         # entities_axis.setLabel(bottom = xLabel, left = yLabel)
         entities_axis.axes["left"]["item"].setPen(None)
@@ -9239,30 +9271,33 @@ signals in the signal collection.
             
     def _plot_signal_data_(self, signal:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal], 
                            plot_name:str, plotItem:pg.PlotItem, plotItemName:str, *args, **kwargs):
-        """ Helper method for self._plot_signals_ """
+        """ Helper method for self._plot_signals_(…).
+     (do not confuse with self._plot_signal_(…))"""
         # print(f"{self.__class__.__name__}._plot_signal_data_(signal<{type(signal).__name__}>) kwargs = {kwargs}")
         sig_channel_index = kwargs.pop("SignalChannelIndex", None)
         
-        # print(f"{self.__class__.__name__}._plot_signal_data_ symbol: {kwargs.get('symbol', None)}")
+        # print(f"{self.__class__.__name__}._plot_signal_data_ kwargs: {kwargs}")
         
-        symbol = kwargs.pop("symbol", None)
-        symbolcolorcycle = kwargs.pop("symbolcolorcycle", None)
-        symbolbrush = kwargs.pop("symbolbrush", None)
+        symbol = kwargs.get("symbol", None)
+        symbolColor = kwargs.get("symbolColor", None)
+        symbolBrush = kwargs.get("symbolBrush", None)
         
         if isinstance(signal, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
             if symbol is None:
                 if signal.shape[1] > 1:
                     kwargs["symbol"] = cycle(self.defaultIrregularSignalSymbols)
-                    kwargs["symbolcolorcycle"] = cycle(self.defaultLineColorsList)
+                    kwargs["symbolColor"] = cycle(self.defaultLineColorsList)
                 else:
                     kwargs["symbol"] = self.defaultIrregularSignalSymbols[0]
                 
-            if symbolcolorcycle is None:
+            if symbolColor is None:
                 if signal.shape[1] > 1:
-                    kwargs["symbolcolorcycle"] = cycle(self.defaultLineColorsList)
+                    kwargs["symbolColor"] = cycle(self.defaultLineColorsList)
                     
-            if symbolbrush is None:
-                kwargs["symbolbrush"] = cycle([pg.mkBrush(c) for c in self.defaultLineColorsList])
+            if symbolBrush is None:
+                if signal.shape[1] > 1:
+                    kwargs["symbolBrush"] = cycle(self.defaultLineColorsList)
+                    # kwargs["symbolBrush"] = cycle([QtGui.QBrush(colormaps.qcolor(c)) for c in self.defaultLineColorsList])
         
         domain_name = get_domain_name(signal)
         
@@ -9287,7 +9322,7 @@ signals in the signal collection.
                                     sig.magnitude,
                                     xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
                                     ylabel = "%s (%s)" % (plot_name, signal.units.dimensionality),
-                                    name=plot_name,
+                                    # name=plot_name,
                                     # symbol=None,
                                     **kwargs))
         else:
@@ -9296,7 +9331,7 @@ signals in the signal collection.
                                     sig.magnitude,
                                     xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
                                     ylabel = "%s (%s)" % (plot_name, signal.units.dimensionality),
-                                    name=plot_name,
+                                    # name=plot_name,
                                     # symbol=None,
                                     **kwargs)
             
@@ -9310,9 +9345,9 @@ signals in the signal collection.
     @safeWrapper
     def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, 
                             xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, 
-                            title:(str, type(None))=None, name:(str, type(None))=None, 
-                            symbolcolorcycle:(cycle, type(None))=None, 
+                            title:(str, type(None))=None, # name:(str, type(None))=None, 
                             reusePlotItems:bool = True, *args, **kwargs):
+                            # symbolColor:(cycle, type(None))=None, 
         """ The workhorse that does the actual plotting of signals
         Common landing zone for many of the self._plot_* methods
         
@@ -9325,17 +9360,10 @@ signals in the signal collection.
         xlabel, ylabel: str ; optional (defult is None) 
             Labels for the X and Y axis, respectively
         
-        name:str, optional, default is None
-            The name associated with the PlotDataItem (individual curve or
-            scatter plot), for use in the plot legend.
-            
         title:str, optional, default is None
             When present, will be displayd at the top of the  PlotItem where the
             data is plotted; can be in HTML format
                 
-        symbolcolorcycle: itertools.cycle for colors ; optional, default is None
-            Used when there are several channels for the Y data
-        
         reusePlotItems:bool, default is True, meaning that existing PlotDataItem will
             be reused to plot the data channels, new PlotDataItems will be added
             if necessry, and excess PlotDataItems (if they exist) will be removed.
@@ -9360,6 +9388,8 @@ signals in the signal collection.
         a pyqtgraph.PlotItem where the data was plotted
         
         """
+        # print(f"{self.__class__.__name__}._plot_numeric_data_ kwargs: {kwargs}")
+        
         # ATTENTION: y is a numpy arrays here; x is either None, or a numpy array
         
         # ### BEGIN debug
@@ -9393,9 +9423,10 @@ signals in the signal collection.
 
         # NOTE: 2021-09-09 18:30:20
         # when symbol is present we don't draw the connection line
-        symbol = kwargs.get("symbol", None)
-        symbolbrush = kwargs.get("symbolbrush", None)
-                                 
+        symbolBrush = kwargs.get("symbolBrush", None)
+        symbolColor = kwargs.get("symbolColor", None)
+        color = kwargs.get("color", None)
+        name = kwargs.get("name", None)
         
         pen = kwargs.get("pen", QtGui.QPen(QtGui.QColor("black"),1))
         if isinstance(pen, QtGui.QPen): # because the caller may have passed 'pen=None'
@@ -9405,6 +9436,7 @@ signals in the signal collection.
         if isinstance(symbolPen, QtGui.QPen):# because the caller may have passed 'symbolPen=None'
             symbolPen.setCosmetic(True)
         
+        symbol = kwargs.get("symbol", None)
         if symbol is None:
             kwargs["pen"] = pen
             kwargs["symbolPen"] = None
@@ -9413,6 +9445,7 @@ signals in the signal collection.
         else:
             kwargs["pen"] = None
             kwargs["symbolPen"] = symbolPen
+            # kwargs["symbol"] = symbol
         
         # NOTE: 2022-12-09 09:22:09
         # rewriting into a pg.PlotDataItem needs vector (array with shape (N,))
@@ -9420,9 +9453,6 @@ signals in the signal collection.
         # "vectors" with shape (N,1) won't do
         plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, pg.PlotDataItem)]
 
-        if "name" not in kwargs:
-            kwargs["name"]=name
-            
         if y.ndim == 1:
             y_nan_ndx = np.atleast_1d(np.isnan(y))
             yy = y
@@ -9473,7 +9503,6 @@ signals in the signal collection.
                 for item in plotDataItems[y.shape[1]:]:
                     plotItem.removeItem(item)
             
-            # print("y.shape", y.shape)
             for k in range(y.shape[1]):
                 y_ = np.atleast_1d(y[array_slice(y, {1:k})].squeeze())
                 
@@ -9530,19 +9559,22 @@ signals in the signal collection.
                     else:
                         kwargs["symbol"] = symbol
                     
-                    if isinstance(symbolcolorcycle, cycle):
-                        symbolPen = QtGui.QPen(QtGui.QColor(next(symbolcolorcycle)), 1)
+                    if isinstance(symbolColor, cycle):
+                        symbolPen = QtGui.QPen(QtGui.QColor(next(symbolColor)), 1)
                         symbolPen.setCosmetic(True)
                         kwargs["symbolPen"] = symbolPen
                         
                     else:
                         kwargs["symbolPen"] = symbolPen # same symbol pen as defined above!
                         
-                    if isinstance(symbolbrush, cycle):
-                        kwargs["symbolBrush"] = next(symbolbrush)
+                    if isinstance(symbolBrush, cycle):
+                        kwargs["symbolBrush"] = next(symbolBrush)
                         
-                    elif isinstance(symbolbrush, QtGui.QBrush):
-                        kwargs["symbolBrush"] = symbolbrush
+                    else:
+                        kwargs["symbolBrush"] = symbolBrush
+                        
+                    # elif isinstance(symbolBrush, QtGui.QBrush):
+                    #     kwargs["symbolBrush"] = symbolBrush
                         
                         
                 if reusePlotItems:

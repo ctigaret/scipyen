@@ -1228,19 +1228,19 @@ class LTPOnline(object):
         dcViewer.annotationsDockWidget.hide()
         dcViewer.cursorsDockWidget.hide()
         
-        rsViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "Rs")
-        rsViewer.annotationsDockWidget.hide()
-        rsViewer.cursorsDockWidget.hide()
+        mbTestViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "Membrane Test")
+        mbTestViewer.annotationsDockWidget.hide()
+        mbTestViewer.cursorsDockWidget.hide()
         
-        rinViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "Rin")
-        rinViewer.annotationsDockWidget.hide()
-        rinViewer.cursorsDockWidget.hide()
+        # rinViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "Rin")
+        # rinViewer.annotationsDockWidget.hide()
+        # rinViewer.cursorsDockWidget.hide()
         
         self._viewers_ = dict(path0 = synapticViewer0,
                               path1 = synapticViewer1,
-                              amplitudes = amplitudesViewer,
-                              ppr = pairedPulseViewer,
-                              dc = dcViewer, rs = rsViewer, rin = rinViewer,
+                              amplitudes = amplitudesViewer, # plots one or two signals/frame, one for each pathway
+                              ppr = pairedPulseViewer, # plots one or two signals/frame, one for each pathway
+                              dc = dcViewer, rs = mbTestViewer #, rin = rinViewer,
                               )
         # self._viewers_ = dict(path0 = dict(synaptic = synapticViewer0,
         #                                    amplitudes = amplitudesViewer0,
@@ -1250,7 +1250,7 @@ class LTPOnline(object):
         #                                    amplitudes = amplitudesViewer1,
         #                                    ppr = pairedPulseViewer1,
         #                                    ),
-        #                       dc = dcViewer, rs = rsViewer, rin = rinViewer
+        #                       dc = dcViewer, rs = mbTestViewer, rin = rinViewer
         #                       )
                               
         self._signalAxes_ = dict(path0 = None, path1 = None)
@@ -1271,7 +1271,7 @@ class LTPOnline(object):
         # for viewer in (synapticViewer0, synapticViewer1,
         #                amplitudesViewer0, amplitudesViewer1,
         #                pairedPulseViewer0, pairedPulseViewer1,
-        #                dcViewer, rsViewer, rinViewer):
+        #                dcViewer, mbTestViewer, rinViewer):
         #     viewer.close()
         for viewer in self._viewers_.values():
             viewer.close()
@@ -1542,7 +1542,7 @@ class LTPOnline(object):
                 if self._clampMode_ == ephys.ClampMode.VoltageClamp:
                     for landmarkname, landmarkcoords in self._landmarks_.items():
                         if k > 0 and landmarkname in ("Rbase", "Rs", "Rin"):
-                            # don't neet those in both pathways!
+                            # don't need those in both pathways!
                             continue
                         if landmarkname not in cnames:
                             if landmarkname ==  "Rs":
@@ -1582,7 +1582,7 @@ class LTPOnline(object):
                     # therefore we do not generate neo.Epochs anymore
                     
                     if k == 0:
-                        # calculate DC, Rs Rin for pathway 0 only
+                        # calculate DC, Rs, and Rin for pathway 0 only
                         Rbase_cursor = viewer.dataCursor("Rbase")
                         coords = ((Rbase_cursor.x - Rbase_cursor.xwindow/2) * pq.s, (Rbase_cursor.x + Rbase_cursor.xwindow/2) * pq.s)
                         Idc = np.mean(adcSignal.time_slice(*coords))
@@ -1638,6 +1638,8 @@ class LTPOnline(object):
             responses = dict(path0 = None, path1 = None)
             pprs = dict(path0 = None, path1 = None)
             
+            mbTest = dict(rs = None, rincap = None)
+            
             for field, value in self._results_.items():
                 if not field.startswith("path"):
                     if len(value):
@@ -1656,11 +1658,13 @@ class LTPOnline(object):
                         if field in ("DC", "tau"):
                             self._viewers_["dc"].view(pts)
                                 
-                        elif field in ("Rs", "tau"):
-                            self._viewers_["rs"].view(pts)
+                        elif field == "Rs":
+                            mbTest["rs"] = pts
+                            # self._viewers_["rs"].view(pts)
                             
-                        elif field in ("Rin"):
-                            self._viewers_["rin"].view(pts)
+                        elif field in ("Rin", "Cap"):
+                            mbTest["rincap"] = pts
+                            # self._viewers_["rin"].view(pts)
                             
                 else:
                     pname = field
@@ -1670,13 +1674,15 @@ class LTPOnline(object):
                     
                     resp1 = value["Response1"]
                     
+                    sname = "Slope" if self._clampMode_ == ephys.ClampMode.CurrentClamp and self._useSlopeInIClamp_ else "Amplitude"
+                    
                     if len(resp1) == len(resp0):
                         response = IrregularlySampledDataSignal(np.arange(len(resp0)),
                                                            np.vstack((resp0, resp1)).T,
                                                            units = resp0[0].units,
                                                            time_units = pq.dimensionless,
                                                            domain_name = "Sweep",
-                                                           name = f"Synaptic Response {pname}")
+                                                           name = f"{sname} {pname}")
                         
                     else:
                         response = IrregularlySampledDataSignal(np.arange(len(resp0)),
@@ -1684,7 +1690,7 @@ class LTPOnline(object):
                                                            units = resp0[0].units,
                                                            time_units = pq.dimensionless,
                                                            domain_name = "Sweep",
-                                                           name = f"Synaptic Response {pname}")
+                                                           name = f"{sname} {pname}")
                         
                     # self._viewers_[pname]["amplitudes"].view(pts)
                     
@@ -1698,22 +1704,36 @@ class LTPOnline(object):
                                                            units = pq.dimensionless,
                                                            time_units = pq.dimensionless,
                                                            domain_name = "Sweep",
-                                                           name = f"PairedPulseRatio {pname}")
+                                                           name = f"PPR {pname}")
                         
                         pprs[pname] = pts
                         
             if isinstance(responses["path0"], IrregularlySampledDataSignal):
                 if isinstance(responses["path1"], IrregularlySampledDataSignal):
-                    self._viewers_["amplitudes"].view([responses["path0"], responses["path1"]])
+                    self._viewers_["amplitudes"].view([responses["path0"], responses["path1"]], name=("Path 0", "Path 1"))
                 else:
                     self._viewers_["amplitudes"].view(responses["path0"])
                     
+                if len(self._abfRunDeltaTimes_) <= 1: # first run
+                    self._viewers_["amplitudes"].showLegends(True)
+                    
             if isinstance(pprs["path0"],IrregularlySampledDataSignal):
                 if isinstance(pprs["path1"], IrregularlySampledDataSignal):
-                    self._viewers_["ppr"].view([pprs["path0"], pprs["path1"]])
+                    self._viewers_["ppr"].view([pprs["path0"], pprs["path1"]], symbolColor="black", symbolBrush="black")
                 else:
-                    self._viewers_["ppr"].view(pprs["path0"])
+                    self._viewers_["ppr"].view(pprs["path0"], symbolColor="black", symbolBrush="black")
+                    
+                # if len(self._abfRunDeltaTimes_) <= 1: # first run
+                #     self._viewers_["ppr"].showLegends(True)
+                    
+            if isinstance(mbTest["rs"], IrregularlySampledDataSignal):
+                if isinstance(mbTest["rincap"], IrregularlySampledDataSignal):
+                    self._viewers_["rs"].view([mbTest["rs"], mbTest["rincap"]],symbolColor="black", symbolBrush="black")
+                else:
+                    self._viewers_["rs"].view(mbTest["rs"],symbolColor="black", symbolBrush="black")
                         
+                # if len(self._abfRunDeltaTimes_) <= 1: # first run
+                #     self._viewers_["rs"].showLegends(True)
                         
 
     def processMonitorProtocol(self, protocol:pab.ABFProtocol):
