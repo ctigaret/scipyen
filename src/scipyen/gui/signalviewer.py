@@ -1945,7 +1945,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 symbol="spike",
                                                 pen=None, name=data_name,
                                                 symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))),
-                                                clearItems=False)
+                                                reusePlotItems=False)
                         
                 yLabel = "Spike Trains"
                 xlabel = f"{get_domain_name(entities_list[0])} ({entities_list[0].times.units.dimensionality})"
@@ -9237,10 +9237,32 @@ signals in the signal collection.
         entities_axis.axes["left"]["item"].setStyle(showValues=False)
         entities_axis.axes["bottom"]["item"].setLabel(xLabel)
             
-    def _plot_signal_data_(self, signal:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal], plot_name:str, plotItem:pg.PlotItem, plotItemName:str, *args, **kwargs):
+    def _plot_signal_data_(self, signal:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal], 
+                           plot_name:str, plotItem:pg.PlotItem, plotItemName:str, *args, **kwargs):
         """ Helper method for self._plot_signals_ """
         # print(f"{self.__class__.__name__}._plot_signal_data_(signal<{type(signal).__name__}>) kwargs = {kwargs}")
         sig_channel_index = kwargs.pop("SignalChannelIndex", None)
+        
+        # print(f"{self.__class__.__name__}._plot_signal_data_ symbol: {kwargs.get('symbol', None)}")
+        
+        symbol = kwargs.pop("symbol", None)
+        symbolcolorcycle = kwargs.pop("symbolcolorcycle", None)
+        symbolbrush = kwargs.pop("symbolbrush", None)
+        
+        if isinstance(signal, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+            if symbol is None:
+                if signal.shape[1] > 1:
+                    kwargs["symbol"] = cycle(self.defaultIrregularSignalSymbols)
+                    kwargs["symbolcolorcycle"] = cycle(self.defaultLineColorsList)
+                else:
+                    kwargs["symbol"] = self.defaultIrregularSignalSymbols[0]
+                
+            if symbolcolorcycle is None:
+                if signal.shape[1] > 1:
+                    kwargs["symbolcolorcycle"] = cycle(self.defaultLineColorsList)
+                    
+            if symbolbrush is None:
+                kwargs["symbolbrush"] = cycle([pg.mkBrush(c) for c in self.defaultLineColorsList])
         
         domain_name = get_domain_name(signal)
         
@@ -9266,7 +9288,7 @@ signals in the signal collection.
                                     xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
                                     ylabel = "%s (%s)" % (plot_name, signal.units.dimensionality),
                                     name=plot_name,
-                                    symbol=None,
+                                    # symbol=None,
                                     **kwargs))
         else:
             self._plot_numeric_data_(plotItem,
@@ -9275,7 +9297,7 @@ signals in the signal collection.
                                     xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
                                     ylabel = "%s (%s)" % (plot_name, signal.units.dimensionality),
                                     name=plot_name,
-                                    symbol=None,
+                                    # symbol=None,
                                     **kwargs)
             
         if plotItemName != plotItem.vb.name:
@@ -9290,7 +9312,7 @@ signals in the signal collection.
                             xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, 
                             title:(str, type(None))=None, name:(str, type(None))=None, 
                             symbolcolorcycle:(cycle, type(None))=None, 
-                            clearItems:bool = True, *args, **kwargs):
+                            reusePlotItems:bool = True, *args, **kwargs):
         """ The workhorse that does the actual plotting of signals
         Common landing zone for many of the self._plot_* methods
         
@@ -9314,7 +9336,7 @@ signals in the signal collection.
         symbolcolorcycle: itertools.cycle for colors ; optional, default is None
             Used when there are several channels for the Y data
         
-        cleaItems:bool, default is True, meaning that existing PlotDataItem will
+        reusePlotItems:bool, default is True, meaning that existing PlotDataItem will
             be reused to plot the data channels, new PlotDataItems will be added
             if necessry, and excess PlotDataItems (if they exist) will be removed.
             
@@ -9372,6 +9394,8 @@ signals in the signal collection.
         # NOTE: 2021-09-09 18:30:20
         # when symbol is present we don't draw the connection line
         symbol = kwargs.get("symbol", None)
+        symbolbrush = kwargs.get("symbolbrush", None)
+                                 
         
         pen = kwargs.get("pen", QtGui.QPen(QtGui.QColor("black"),1))
         if isinstance(pen, QtGui.QPen): # because the caller may have passed 'pen=None'
@@ -9418,7 +9442,7 @@ signals in the signal collection.
             
             # print(f"{self.__class__.__name__}._plot_numeric_data_ y.ndim == 1; plotdataitem kwargs {kwargs}")
             
-            if clearItems:
+            if reusePlotItems:
                 if len(plotDataItems):
                     if len(plotDataItems) > 1:
                         for item in plotDataItems[1:]:
@@ -9445,7 +9469,7 @@ signals in the signal collection.
         elif y.ndim == 2:
             colors = cycle(self.defaultLineColorsList)
             
-            if clearItems and y.shape[1] < len(plotDataItems):
+            if reusePlotItems and y.shape[1] < len(plotDataItems):
                 for item in plotDataItems[y.shape[1]:]:
                     plotItem.removeItem(item)
             
@@ -9514,7 +9538,14 @@ signals in the signal collection.
                     else:
                         kwargs["symbolPen"] = symbolPen # same symbol pen as defined above!
                         
-                if clearItems:
+                    if isinstance(symbolbrush, cycle):
+                        kwargs["symbolBrush"] = next(symbolbrush)
+                        
+                    elif isinstance(symbolbrush, QtGui.QBrush):
+                        kwargs["symbolBrush"] = symbolbrush
+                        
+                        
+                if reusePlotItems:
                     if k < len(plotDataItems):
                         plotDataItems[k].clear()
                         if xx is not None:
