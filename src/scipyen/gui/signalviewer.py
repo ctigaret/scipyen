@@ -7875,10 +7875,10 @@ signals in the signal collection.
         
         
         # print(f"{self.__class__.__name__}._align_X_range axeslinked = {self.xAxesLinked}")
-        # if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
+        if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
             # if any(ax.vb.autoRangeEnabled()[0] for ax in self.signalAxes):
-            # if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
-            #     return
+            if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
+                return
             # NOTE: 2023-07-10 10:55:57 FIXME/TODO
             # still have to figure to figure out this contingency below:
             # selecting to show just plot items without autoranging
@@ -7970,12 +7970,13 @@ signals in the signal collection.
             xLinkViewXrange = None
             xLink = ax.vb.linkedView(0)
             if isinstance(xLink, pg.ViewBox):
-                if not xLink.isVisible():
-                    continue
-                    # if isinstance(refAxis, pg.PlotItem):
-                    #     aa = [refAxis]
-                else:
-                    aa = [a for a in self.axes if a.vb == xLink]
+                aa = [a for a in self.axes if a.vb == xLink]
+                # if xLink.isVisible():
+                #     aa = [a for a in self.axes if a.vb == xLink]
+                # else:
+                #     # continue
+                #     if isinstance(refAxis, pg.PlotItem):
+                #         aa = [refAxis]
                     
                 ax.vb.blockLink(True)
                 xLink.blockLink(True)
@@ -7987,6 +7988,7 @@ signals in the signal collection.
                     xLinkViewXrange = xLink.viewRange()[0]
                         
             current_viewXrange = ax.vb.viewRange()[0] if xLinkViewXrange is None else xLinkViewXrange
+            
             offset, scale = self._axes_X_view_offsets_scales_[kax] # if xLinkAxisNdx is None else self._axes_X_view_offsets_scales_[xLinkAxisNdx] # ← set by _slot_plot_axis_x_range_changed
             view_dx = current_viewXrange[1] - current_viewXrange[0]
             x0,x1 = current_X_bounds if xLinkXBounds is None else xLinkXBounds
@@ -7994,12 +7996,14 @@ signals in the signal collection.
             new_vx0 = x0 - offset
             new_view_dx = dx1 * scale
             new_vx1 = new_vx0 + new_view_dx
-            print(f"{self.__class__.__name__}._align_X_range: Axis {kax} named {ax.vb.name} with view range {current_viewXrange} to set new view range: {new_vx0, new_vx1}")
-            ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
-            if isinstance(xLink, pg.ViewBox):
-                ax.vb.blockLink(False)
-                xLink.blockLink(False)
-            self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
+            
+            if any(a!=b for a,b in zip(current_viewXrange, (new_vx0, new_vx1))):
+                # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} ({ax.vb.name}) view range from {current_viewXrange} to: {new_vx0, new_vx1}")
+                ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
+                if isinstance(xLink, pg.ViewBox):
+                    ax.vb.blockLink(False)
+                    xLink.blockLink(False)
+                self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
 
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
@@ -9022,7 +9026,12 @@ signals in the signal collection.
         domain_name = neoutils.get_domain_name(signal)
         
         if isinstance(signal, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
-            kwargs["symbol"] = self.defaultIrregularSignalSymbols[0]
+            if signal.shape[1] > 1:
+                kwargs["symbol"] = cycle(self.defaultIrregularSignalSymbols)
+                kwargs["symbolcolorcycle"] = cycle(self.defaultLineColorsList)
+            else:
+                kwargs["symbol"] = self.defaultIrregularSignalSymbols[0]
+                
             kwargs["pen"] = None
             kwargs["symbolPen"] = self.defaultIrregularSignalSymbolPen
             kwargs["symbolBrush"] = self.defaultIrregularSignalSymbolBrush
@@ -9277,7 +9286,11 @@ signals in the signal collection.
         plotItem.update()
         
     @safeWrapper
-    def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, title:(str, type(None))=None, name:(str, type(None))=None, symbolcolorcycle:(cycle, type(None))=None, clearItems:bool = True, *args, **kwargs):
+    def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, 
+                            xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, 
+                            title:(str, type(None))=None, name:(str, type(None))=None, 
+                            symbolcolorcycle:(cycle, type(None))=None, 
+                            clearItems:bool = True, *args, **kwargs):
         """ The workhorse that does the actual plotting of signals
         Common landing zone for many of the self._plot_* methods
         
@@ -9487,6 +9500,11 @@ signals in the signal collection.
                     
                 else:
                     kwargs["pen"] = None
+                    if isinstance(symbol, cycle):
+                        kwargs["symbol"] = next(symbol)
+                        
+                    else:
+                        kwargs["symbol"] = symbol
                     
                     if isinstance(symbolcolorcycle, cycle):
                         symbolPen = QtGui.QPen(QtGui.QColor(next(symbolcolorcycle)), 1)

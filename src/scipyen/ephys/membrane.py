@@ -2110,7 +2110,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
             start_time (in pq.s or pq.ms) - start time of current injection
             stop_time  (in pq.s or pq.ms) - stop time of current injection
     
-        OR: a scalar quantity object with units scalale to pq.A
+        OR: a scalar quantity object with units scalable to pq.A
     
     baseEpoch¹: neo.Epoch, or sequence of t_start, t_stop time points for the
                 baseline before current injection (optional, default is None).
