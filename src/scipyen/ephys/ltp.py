@@ -740,10 +740,169 @@ class SynapticPlasticityData(BaseScipyenData):
         
     # def __reduce__(self): # TODO
     #     pass
-    
-class _LTPOnlineFileProcessor_(QtCore.QObject):
-    def __init__(self, mutex:QtCore.QMutex,
-                 abfListener:FileStatChecker, 
+
+class _LTPOnlineProducer_(QtCore.QThread):
+    def __init__(self, parent,
+                 abfRunBuffer:collections.deque, 
+                 mutex:QtCore.QMutex,
+                 bufferEmptyCondition:QtCore.QWaitCondition,
+                 bufferNotEmptyCondition:QtCore.QWaitCondition, 
+                 emitterWindow,
+                 directory
+                 ):
+        QtCore.QThread.__init__(self, parent)
+        self._mutex_ = mutex
+        self._abfRunBuffer_ = abfRunBuffer
+        self._bufferEmptyCondition_ = bufferEmptyCondition
+        self._bufferNotEmptyCondition_ = bufferNotEmptyCondition
+        self._filesQueue_ = collections.deque()
+        # print(f"{self.__class__.__name__}.__init__ to watch: {self._watchedDir_}\n")
+        self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
+
+        wsp = wf.user_workspace()
+        
+        if emitterWindow is None:
+            self._emitterWindow_ = wsp["mainWindow"]
+
+        elif type(emitterWindow).__name__ != 'ScipyenWindow':
+            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
+
+        else:
+            self._emitterWindow_ = emitterWindow
+
+        if directory is None:
+            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
+            
+        elif isinstance(directory, str):
+            self._watchedDir_ = pathlib.Path(directory)
+
+        elif isinstance(directory, pathlib.Path):
+            self._watchedDir_ = directory
+            
+        else:
+            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+        
+        
+        self._dirMonitor_ = DirectoryFileWatcher(emitter = self._emitterWindow_,
+                                                 directory = self._watchedDir_,
+                                                 observer = self)
+        
+        self._abfListener_ = FileStatChecker(interval = 10, maxUnchangedIntervals = 5,
+                                             callback = self.fileProcessor)
+
+    def newFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
+        """Needed by DirectoryFileWatcher"""
+        # print(f"{self._a_} → {self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
+        self._filesQueue_.extend(val)
+        self._setupPendingAbf_()
+
+        # print(f"\t→ pending: {self._pending_}\n")
+        # self._a_ += 1
+
+    def changedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
+        """Needed by DirectoryFileWatcher"""
+        # print(f"{self._a_} → {self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
+        # print(f"\t→ latestAbf = {self._latestAbf_}\n")
+        # self._a_ += 1
+        pass
+        
+    def removedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
+        """Needed by DirectoryFileWatcher"""
+        # print(f"{self._a_} → {self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
+        # self._a_ += 1
+        if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
+            return
+
+        # if len(val) > 1:
+        #     # CAUTION!
+        #     return
+
+        removed = val[0]
+
+        # expecting the rsv file to be removed by Clampex;
+        # when this is done, watch the pending ABF file for changes
+        # print(f"\t→ pending = {self._pending_}\n")
+        if removed.suffix == ".rsv":
+            if removed in self._pending_:
+                self._latestAbf_ = self._pending_[removed]
+                if self._abfListener_.active:
+                    self._abfListener_.stop()
+                if  not self._latestAbf_.exists() or not self._latestAbf_.is_file():
+                    self._latestAbf_ = None
+                    self._pending_.clear()
+                    self._filesQueue_.clear()
+                    return
+                self._abfListener_.monitoredFile = self._latestAbf_
+                self._abfListener_.start()
+                # print(f"\t\t→ latest = {self._latestAbf_}\n")
+                self._pending_.clear()
+                # NOTE: to stop monitoring abf file after it has been processed
+                # in the processAbfFile(…)
+                
+    def _rsvForABF_(self, abf:pathlib.Path):
+        """Returns the rsv file paired with the abf
+        Used in communicating with the directory monitor
+        """
+        paired = [f for f in self._filesQueue_ if f.suffix == ".rsv" and f.stem == abf.stem and f.parent == abf.parent]
+        if len(paired):
+            return paired[0]
+
+    def _abfForRsv_(self, rsv:pathlib.Path):
+        """Returns the abf file paired with the rsv.
+        Used in communicating with the directory monitor
+        """
+        paired = [f for f in self._filesQueue_ if f.suffix == ".abf" and f.stem == rsv.stem and f.parent == rsv.parent]
+        if len(paired):
+            return paired[0]
+        
+    def _setupPendingAbf_(self):
+        """
+        Used in communicating with the directory monitor
+        """
+        self._pending_.clear()
+
+        if len(self._filesQueue_) < 2:
+            return
+        
+        latestFile = self._filesQueue_[-1]
+        
+        if latestFile.suffix == ".rsv":
+            abf = self._abfForRsv_(latestFile)
+            if isinstance(abf, pathlib.Path) and abf.is_file():
+                self._pending_[latestFile] = abf
+                
+        elif latestFile.suffix == ".abf":
+            rsv = self._rsvForABF_(latestFile)
+            if isinstance(rsv, pathlib.Path) and rsv.is_file():
+                self._pending_[rsv] = latestFile
+            
+        for rsv, abf in self._pending_.items():
+            if rsv in self._filesQueue_:
+                self._filesQueue_.remove(rsv)
+                
+            if abf in self._filesQueue_:
+                self._filesQueue_.remove(abf)
+            
+    def run(self):
+        self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
+        self._mutex_.lock()
+        if len(self._abfRunBuffer_) == 0:
+            self._bufferEmptyCondition_.wait(self._mutex)
+        self._mutex_.unlock()
+            
+
+    def fileProcessor(self, abfFile:pathlib.Path):
+        self._abfRunBuffer_.append(abfFile)
+        self._abfListener_.reset()
+        self._mutex_.lock()
+        self._bufferNotEmptyCondition_.wakeAll()
+        self._mutex_.unlock()
+
+class _LTPOnlineFileProcessor_(QtCore.QThread):
+    def __init__(self, parent, abfBuffer:collections.deque,
+                 mutex:QtCore.QMutex,
+                 bufferEmptyCondition:QtCore.QWaitCondition,
+                 bufferNotEmptyCondition:QtCore.QWaitCondition,
                  abfRunTimes:list, abfRunDeltaTimes:list, 
                  adcChannel:int, dacChannel:int, clampMode:ephys.ClampMode, 
                  monitorProtocol:pab.ABFProtocol, conditioningProtocol:pab.ABFProtocol,
@@ -752,12 +911,17 @@ class _LTPOnlineFileProcessor_(QtCore.QObject):
                  mbTestStart: pq.Quantity,
                  mbTestDuration: pq.Quantity,
                  presynapticTriggers: dict,
-                 resultsData:dict, resultsAnalysis:dict,viewers:dict,
+                 resultsData:dict, 
+                 resultsAnalysis:dict,
+                 viewers:dict,
                  sigIndex:typing.Optional[int],
-                 signalAxes:list, parent=None):
-        super().__init__(parent=parent)
+                 signalAxes:list):
+        QtCore.QThread.__init__(self, parent)
         
-        self._abfListener_ = abfListener
+        self._abfRunBuffer_ = abfBuffer
+        self._mutex_ = mutex
+        self._bufferEmptyCondition_ = bufferEmptyCondition
+        self._bufferNotEmptyCondition_ = bufferNotEmptyCondition
         self._abfRunTimes_ = abfRunTimes
         self._abfRunDeltaTimes_ = abfRunDeltaTimes
         self._dacChannel_ = dacChannel
@@ -777,6 +941,24 @@ class _LTPOnlineFileProcessor_(QtCore.QObject):
         self._sigIndex_ = sigIndex
         
         
+    def run(self):
+        self._mutex_.lock()
+        if len(self._abfRunBuffer_):
+            self._bufferNotEmptyCondition_.wait(self._mutex)
+        self._mutex_.unlock()
+        
+        if len(self._abfRunBuffer_):
+            abfFile = self._abfRunBuffer_.popleft()
+            ret = self.processAbfFile(abfFile)
+        else:
+            ret = None
+            
+        self._mutex_.lock()
+        self._bufferEmptyCondition_.wakeAll()
+        self._mutex_.unlock()
+        
+        return ret
+        
         
     def processAbfFile(self, abfFile:pathlib.Path):
         # WARNING: the Abf file may not be completed at this time, depending on when this is called!
@@ -789,12 +971,6 @@ class _LTPOnlineFileProcessor_(QtCore.QObject):
         #     print(f"{sz0} → file size: {abfFile.stat().st_size}")
         
         #
-        # CAUTION: 2023-10-05 14:07:41
-        # because we meaure sweep by sweep as they come, we cannot
-        # use analyse_LTP_in_pathway(…) anymore, here...
-        
-        self._abfListener_.reset()
-    
         abfRun = pio.loadAxonFile(str(abfFile))
         
         self._abfRunTimes_.append(abfRun.rec_datetime)
@@ -1135,6 +1311,8 @@ class _LTPOnlineFileProcessor_(QtCore.QObject):
                 resultsPlot.append(responses["dc"])
                 
             self._viewers_["results"].view(resultsPlot, symbolColor="black", symbolBrush="black")
+            
+            return (self._data_, self._results_)
             
             
 #             if isinstance(responses["amplitudes"]["path0"], IrregularlySampledDataSignal):
@@ -1831,6 +2009,7 @@ class LTPOnlineWorker(QtCore.QObject):
         
         super().__init__(parent=parent)
 
+        #### BEGIN TODO move to a producer thread
         wsp = wf.user_workspace()
         
         if emitterWindow is None:
@@ -1869,9 +2048,9 @@ class LTPOnlineWorker(QtCore.QObject):
         
         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
-        # self._pendingAbf_stat_ = None
-
         self._latestAbf_ = None # last ABF file to have been created by Clampex
+
+        #### END   TODO move to a producer thread
 
         self._monitorProtocol_ = None
 
@@ -2033,6 +2212,7 @@ class LTPOnlineWorker(QtCore.QObject):
         resultsViewer.annotationsDockWidget.hide()
         resultsViewer.cursorsDockWidget.hide()
         
+        #### BEGIN Obsolete viewers
 #         amplitudesViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_,  win_title = "Response Amplitude")
 #         amplitudesViewer.annotationsDockWidget.hide()
 #         amplitudesViewer.cursorsDockWidget.hide()
@@ -2069,41 +2249,38 @@ class LTPOnlineWorker(QtCore.QObject):
         # rinViewer.annotationsDockWidget.hide()
         # rinViewer.cursorsDockWidget.hide()
 
-       self._viewers_ = dict(path0 = synapticViewer0,
+        #### END   Obsolete viewers
+        
+        self._viewers_ = dict(path0 = synapticViewer0,
                               path1 = synapticViewer1,
                               results = resultsViewer)
-                              # amplitudes = amplitudesViewer, # plots one or two signals/frame, one for each pathway
-                              # ppr = pairedPulseViewer, # plots one or two signals/frame, one for each pathway
-                              # dc = dcViewer, rs = mbTestViewer #, rin = rinViewer,
-                              # )
-        # self._viewers_ = dict(path0 = dict(synaptic = synapticViewer0,
-        #                                    amplitudes = amplitudesViewer0,
-        #                                    ppr = pairedPulseViewer0,
-        #                                    ),
-        #                       path1 = dict(synaptic = synapticViewer1,
-        #                                    amplitudes = amplitudesViewer1,
-        #                                    ppr = pairedPulseViewer1,
-        #                                    ),
-        #                       dc = dcViewer, rs = mbTestViewer, rin = rinViewer
-        #                       )
-                              
-        # self._firstRun_ = True # set this to False after first parsing of protocol
         
-        
+        #### BEGIN TODO move to a producer thread
         self._abfListener_ = FileStatChecker(interval = 10, maxUnchangedIntervals = 5,
                                              callback = self.fileProcessor)
         # self._abfListener_ = FileStatChecker(interval = 10, maxUnchangedIntervals = 5,
         #                                      callback = self.processAbfFile)
         
+        #### END   TODO move to a producer thread
         # for each new file, create an _LTPOnlineFileProcessor_ and move it here?
         # need to synchronize, as files may come in faster than we can process 
         # them
-        self._processorThread_ = QtCore.QThread() 
         self._abfRunBuffer_ = collections.deque()
-        self._abfRunBufferEmpty_ = QtCore.QWaitCondition()
-        self._abfRunBufferFull_ = QtCore.QWaitCondition()
         self._mutex_ = QtCore.QMutex()
-        self._abfProcessor_ = _LTPOnlineFileProcessor_(self._mutex_,
+        self._abfRunBufferEmptyCondition_ = QtCore.QWaitCondition()
+        self._abfRunBufferNotEmptyCondition_ = QtCore.QWaitCondition()
+        
+        self._abfProducerThread_ = _LTPOnlineProducer_(self, self._abfRunBuffer_,
+                                                 self._mutex_,
+                                                 self._abfRunBufferEmptyCondition_,
+                                                 self._abfRunBufferNotEmptyCondition_,
+                                                 self._emitterWindow_,
+                                                 self._watchedDir_)
+        
+        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self, self._abfRunBuffer_,
+                                                       self._mutex_,
+                                                       self._abfRunBufferEmptyCondition_,
+                                                       self._abfRunBufferNotEmptyCondition_,
                                                        self._abfListener_,
                                                        self._abfRunTimes_,
                                                        self._abfRunDeltaTimes_,
@@ -2123,17 +2300,19 @@ class LTPOnlineWorker(QtCore.QObject):
                                                        self._sigIndex_,
                                                        self._signalAxes_)
         
-        self._abfProcessor_.moveToThread(self._processorThread_)
+        # self._processorThread_ = pgui.WorkerThread(self, self._abfProcessorThread_.runProcessor)
+        # self._abfProcessorThread_.moveToThread(self._processorThread_)
 
         if autoStart:
-            self._processorThread_.start()
-            self._processorThread_.wait()
-            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
+            self._abfProducerThread_.start()
+            self._abfProcessorThread_.start()
+            # self._processorThread_.start()
+            # self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
             
 
     def __del__(self):
-        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+        # if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+        #     self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
             
         # for viewer in (synapticViewer0, synapticViewer1,
         #                amplitudesViewer0, amplitudesViewer1,
@@ -2171,10 +2350,13 @@ class LTPOnlineWorker(QtCore.QObject):
         self._dacChannel_ = val
     
     def stop(self):
-        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+        self._abfProducerThread_.wait()
+        self._abfProcessorThread_.wait()
+        
+        # if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+        #     self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
             
-        self._abfListener_.stop()
+        # self._abfListener_.stop()
         
         self.resultsReady.emit((self._data_, self._results_))
         
@@ -2226,8 +2408,8 @@ class LTPOnlineWorker(QtCore.QObject):
             viewer.clear()
 
     def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
-        if self._emitterWindow_ is None:
-            raise ValueError("You must set an emiter window first...")
+        # if self._emitterWindow_ is None:
+        #     raise ValueError("You must set an emiter window first...")
 
         if directory is None:
             if self._watchedDir_ is None:
@@ -2304,20 +2486,23 @@ class LTPOnlineWorker(QtCore.QObject):
                 
     def fileProcessor(self, abfFile:pathlib.Path):
         self._mutex_.lock()
-        if len(self._abfRunBuffer_):
-            self._abfRunBufferFull_.wait(self._mutex_)
+        if len(self._abfRunBuffer_) == 0:
+            # tell the consumer (_LTPOnlineFileProcessor_) to wait
+            self._abfRunBufferEmptyCondition_.wait(self._mutex_)
         self._mutex_.unlock()
         
         self._abfRunBuffer_.append(abfFile)
         
         self._mutex_.lock()
-        # if len(self._abfRunBuffer_) == 0:
-        self._abfRunBufferEmpty_.wakeAll()
+        # now, there is stuff in _abfRunBuffer_ so _LTPOnlineFileProcessor_
+        # should wake up
+        self._abfRunBufferNotEmptyCondition_.wakeAll()
         self._mutex_.unlock()
         
 
     def processAbfFile(self, abfFile:pathlib.Path):
-        # WARNING: the Abf file may not be completed at this time, depending on when this is called!
+        # WARNING: the Abf file may not be completed at this time, depending on 
+        # when this is called!
         
         # fileStat = abfFile.stat()
         # sz0 = fileStat.st_size
@@ -3126,9 +3311,9 @@ class LTPOnlineWorker(QtCore.QObject):
             return paired[0]
         
     def _setupPendingAbf_(self):
+        """
         Used in communicating with the directory monitor
         """
-    """
         self._pending_.clear()
         # if isinstance(self._dirMonitor_, DirectoryFileWatcher):
         #     monitoredFiles = self._dirMonitor_._source_.dirFileMonitor.files()
@@ -3166,7 +3351,7 @@ class LTPOnlineWorker(QtCore.QObject):
 class LTPOnlineController(QtCore.QObject):
     startLTP = pyqtSignal(name ="startLTP")
     
-    def __init__(self, parent=none, **kwargs):
+    def __init__(self, parent=None, **kwargs):
         super().__init__(parent=parent)
         
         workerThread = QtCore.QThread()
@@ -3187,7 +3372,7 @@ class LTPOnlineController(QtCore.QObject):
         # convert to DataFrame
         print(f"value = {self.analysis}")
         
-    @pyqtSlot
+    @pyqtSlot()
     def finished(self):
         worker.stop()
         worker.deleteLater()

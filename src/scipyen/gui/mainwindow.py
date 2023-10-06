@@ -5700,7 +5700,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2023-07-12 11:52:30
         # self.loadFiles is inherited from WorkspaceGuiMixin
-        # creates a pgui.WorkerThread that runs a file loading loop 
+        # creates a pgui.LoopWorkerThread that runs a file loading loop 
         # in a separate thread. The actual file loading loop is executed by 
         # self._openSelectedFileItemsThreaded. 
         #

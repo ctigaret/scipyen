@@ -1251,7 +1251,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         progressDlg.setMinimumDuration(1000)
         progressDlg.canceled.connect(self._slot_breakLoop)
         kw = {"filePaths": filePaths, "ioReader": ioReaderFn, "updateUi": updateUi}
-        workerThread = pgui.WorkerThread(self, fileLoaderFn, **kw)
+        workerThread = pgui.LoopWorkerThread(self, fileLoaderFn, **kw)
         workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
         workerThread.signals.signal_Result[object].connect(self.workerReady)
         workerThread.signals.signal_Finished.connect(progressDlg.reset)

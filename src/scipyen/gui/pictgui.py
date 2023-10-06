@@ -141,7 +141,7 @@ class GuiWorker(QtCore.QRunnable):
             
         finally:
             self.signals.signal_Finished.emit()  # Done
-
+            
 class ProgressWorkerSignals(QtCore.QObject):
     """See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
     https://martinfitzpatrick.name/article/multithreading-pyqt-applications-with-qthreadpool/
@@ -445,6 +445,31 @@ class ProgressThreadController(QtCore.QObject):
         self.sig_ready.emit(None)
         
 class WorkerThread(QtCore.QThread):
+    """Thread for a generic returning function
+    """
+    def __init__(self, parent, fn:typing.Callable, /, *args, **kwargs):
+        QtCore.QThread.__init__(self, parent)
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        
+        self.signals = GuiWorkerSignals()
+        
+    def run(self):
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+            self.signals.signal_Result.emit(result)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.sig_error.emit((exctype, value, traceback.format_exc()))
+            
+        else:
+            # self.signals.signal_Result.emit(result)
+            self.signals.signal_Finished.emit()
+        
+        
+class LoopWorkerThread(QtCore.QThread):
     """Thread for an atomic function call in a loop.
 See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
 """
