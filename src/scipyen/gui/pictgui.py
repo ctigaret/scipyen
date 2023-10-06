@@ -89,6 +89,8 @@ def generateBrushCycle(color:typing.Optional[QtGui.QColor] = None,
     #pass
 
 def generatePenCycle():
+    # TODO 2023-10-06 10:49:50
+    # define this and use in objects like SignalViewer, etc
     pass
 
 def genColorTable(cmap, ncolors=256):

@@ -285,9 +285,6 @@ qe = 1.602176634e-19 * pq.C
 N_A = 6.02214076e23 * pq.mol**(-1)
 
 
-def testme():
-    print(__file__, __name__)
-    
 def get_constants():
     ret = dict()
     
@@ -603,6 +600,30 @@ def str2quantity(x:str):
         return val * unit
     else:
         raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; indtead, got {x}")
+
+def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]):
+    if isinstance(x, pq.Quantity):
+        x = x.dimensionality
+    dimstr = f"{x}"
+    if dimstr == "dimensionless":
+        return ""
+    
+    pfx = list(AllPrefixes.keys())
+    
+    mypfx = list(filter(lambda x: dimstr.startswith(x), pfx))
+    
+    if len(mypfx):
+        mypfx = mypfx[0]
+        res = dimstr.split(mypfx)
+        if len(res) > 1:
+            sfx = res[-1]
+            if sfx in ("ohm"):
+                sfx = "Ω"
+            return "".join([AllPrefixes[mypfx]["symbol"], sfx])
+    
+    return dimstr
+        
+        
 
 def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], precision:int = 2, format:str="f"):
     """Returns a str representation of a scalar Quantity or Dimensionality.

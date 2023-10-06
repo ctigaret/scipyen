@@ -1897,7 +1897,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 entities_list = entities
             
             if all(isinstance(v, neo.Event) for v in entities_list):
-                xLabel = f"{get_domain_name(entities_list[0])} ({entities_list[0].times.units.dimensionality})"
+                xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
+                if len(xdimstr):
+                    xLabel = f"{get_domain_name(entities_list[0])} ({xdimstr})"
+                else:
+                    xLabel = f"{get_domain_name(entities_list[0])}"
+                    
                 yLabel = "Events"
                 symbolStyle["symbol"] = "event"
                 
@@ -1907,10 +1912,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             height_interval, 
                                             symbolStyle,
                                             **labelStyle)
-                # return
-            
             elif all(isinstance(v, DataMark) for v in entities_list):
-                xLabel = f"{get_domain_name(entities_list[0])} ({entities_list[0].times.units.dimensionality})"
+                xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
+                if len(xdimstr):
+                    xLabel = f"{get_domain_name(entities_list[0])} ({xdimstr})"
+                else:
+                    xLabel = f"{get_domain_name(entities_list[0])}"
+                    
                 yLabel = "Data marks"
                 symbolStyle["symbol"] = "event"
                 
@@ -1947,8 +1955,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                                 symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))),
                                                 reusePlotItems=False)
                         
+                xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
+                if len(xdimstr):
+                    xLabel = f"{get_domain_name(entities_list[0])} ({xdimstr})"
+                else:
+                    xLabel = f"{get_domain_name(entities_list[0])}"
+                    
+                # xlabel = f"{get_domain_name(entities_list[0])} ({entities_list[0].times.units.dimensionality})"
                 yLabel = "Spike Trains"
-                xlabel = f"{get_domain_name(entities_list[0])} ({entities_list[0].times.units.dimensionality})"
                 entities_axis.setLabels(bottom = [xlabel])
                 
                 # NOTE: 2022-11-21 14:15:17
@@ -8977,7 +8991,12 @@ signals in the signal collection.
             ylabel = "Sample value"
             
         if isinstance(y, pq.Quantity):
-            ylabel = f"Sample value ({y.units.dimensionality})"
+            ydimstr = scq.shortSymbol(y.units.dimensionality)
+            if len(ydimstr):
+                ylabel = f"Sample value ({ydimstr})"
+            else:
+                ylabel = "Sample value"
+                
             
         kwargs["ylabel"] = ylabel
         self._plot_numeric_data_(axis, x, y, *args, **kwargs)
@@ -9095,12 +9114,24 @@ signals in the signal collection.
                 
                 kwargs["name"] = ch_name
                 
+                xdimstr = scq.shortSymbol(sig.t_start.units.dimensionality)
+                if len(xdimstr):
+                    xlabel="%s (%s)" % (domain_name, xdimstr)
+                else:
+                    xlabel="%s" % domain_name
+                    
+                ydimstr = scq.shortSymbol(sig.units.dimensionality)
+                if len(ydimstr):
+                    ylabel="%s (%s)\nchannel %d" % (signal_name, ydimstr, channel)
+                else:
+                    ylabel="%s \nchannel %d" % (signal_name, channel)
+                
                 self._plot_numeric_data_(self.signalAxis(k), 
                                          np.array(sig.times),
                                          np.array(sig[:,channel].magnitude),
                                          # name = ch_name,
-                                         xlabel="%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
-                                         ylabel="%s (%s)\nchannel %d" % (signal_name, sig.units.dimensionality, channel), 
+                                         xlabel=xlabel,
+                                         ylabel=ylabel, 
                                          *args, **kwargs)
                 
                 plot_name = f"{sig.name}_{ch_name}"
@@ -9139,19 +9170,31 @@ signals in the signal collection.
             
             if sig.shape[1] > 10:
                 # print("mt")
+                xdimstr = scq.shortSymbol(sig.times.units.dimensionality)
+                if len(xdimstr):
+                    xlabel="%s (%s)" % (domain_name, xdimstr)
+                else:
+                    xlabel="%s" % domain_name
+                    
+                ydimstr = scq.shortSymbol(sig.units.dimensionality)
+                if len(ydimstr):
+                    ylabel="%s (%s)" % (signal_name, ydimstr)
+                else:
+                    ylabel="%s" % signal_name
+                    
                 self.setCursor(QtCore.Qt.WaitCursor)
                 self.sig_plot.emit(self._make_sig_plot_dict_(self.signalAxis(0), np.array(sig.times), 
                                        np.array(sig.magnitude), 
                                        # name=sig.name,
-                                       ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
-                                       xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
+                                       xlabel=xlabel, 
+                                       ylabel=ylabel, 
                                        *args, **kwargs))
             else:
                 self._plot_numeric_data_(self.signalAxis(0), np.array(sig.times), 
                                         np.array(sig.magnitude), 
                                         # name=sig.name,
-                                        ylabel="%s (%s)" % (signal_name, sig.units.dimensionality), 
-                                        xlabel="%s (%s)" % (domain_name, sig.times.units.dimensionality), 
+                                        ylabel=xlabel, 
+                                        xlabel=ylabel, 
                                         *args, **kwargs)
                 
             if sig.name != self.signalAxis(0).vb.name:
@@ -9315,13 +9358,25 @@ signals in the signal collection.
             else:
                 sig = signal
         
+        xdimstr = scq.shortSymbol(sig.t_start.units.dimensionality)
+        if len(xdimstr):
+            xlabel = "%s (%s)" % (domain_name, xdimstr)
+        else:
+            xlabel = "%s" % domain_name
+            
+        ydimstr = scq.shortSymbol(signal.units.dimensionality)
+        if len(ydimstr):
+            ylabel = "%s (%s)" % (plot_name,ydimstr)
+        else:
+            ylabel = "%s" % plot_name
+            
         if sig.shape[1] > 10:
             self.setCursor(QtCore.Qt.WaitCursor)
             self.sig_plot.emit(self._make_sig_plot_dict_(plotItem,
                                     sig.times,
                                     sig.magnitude,
-                                    xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
-                                    ylabel = "%s (%s)" % (plot_name, signal.units.dimensionality),
+                                    xlabel = xlabel,
+                                    ylabel = ylabel,
                                     # name=plot_name,
                                     # symbol=None,
                                     **kwargs))
@@ -9329,8 +9384,8 @@ signals in the signal collection.
             self._plot_numeric_data_(plotItem,
                                     sig.times,
                                     sig.magnitude,
-                                    xlabel = "%s (%s)" % (domain_name, sig.t_start.units.dimensionality),
-                                    ylabel = "%s (%s)" % (plot_name, signal.units.dimensionality),
+                                    xlabel = xlabel,
+                                    ylabel = ylabel,
                                     # name=plot_name,
                                     # symbol=None,
                                     **kwargs)
