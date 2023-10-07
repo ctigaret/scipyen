@@ -967,17 +967,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         protocol = pab.ABFProtocol(abfRun)
 
-        assert(protocol.nSweeps) == len(abfRun.segments), f"Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)})"
-        assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
+        # check that the number of sweeps actually stored in the ABF file/neo.Block
+        # equals that advertised by the protocol
+        # NOTE: mistamtches can happen when trials are acquired very fast (i.e.
+        # back to back) - in this saase check the sequencing key in Clampex!
+        assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
         dac = protocol.outputConfiguration(self._dacChannel_)
         
-        if protocol.nSweeps == 2:
-            assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
-            assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
-            
-            # TODO check for alternate digital outputs → True ; alternate waveform → False
-            # → see # NOTE: 2023-10-07 21:35:39 - DONE ?!?
 
         # NOTE: 2023-09-29 14:12:56
         # we need:
@@ -1009,6 +1006,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         if self._monitorProtocol_ is None:
             if protocol.clampMode() == self._clampMode_:
+                assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
+                if protocol.nSweeps == 2:
+                    assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
+                    assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
+                    
+                    # TODO check for alternate digital outputs → True ; alternate waveform → False
+                    # → see # NOTE: 2023-10-07 21:35:39 - DONE ?!?
                 self._monitorProtocol_ = protocol
                 self.processMonitorProtocol(protocol)
             else:
