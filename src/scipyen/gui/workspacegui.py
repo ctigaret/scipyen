@@ -24,7 +24,7 @@ from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
 
 class DirectoryFileWatcher(QtCore.QObject):
-    """Bounces signals/slots to bound methods in an observer
+    """Bounces signals/slots to bound methods (callbacks) in an observer
     """
     required_sigs = ("sig_newItemsInMonitoredDir",
                      "sig_itemsRemovedFromMonitoredDir",

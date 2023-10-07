@@ -1860,7 +1860,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
     
     @safeWrapper
-    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList], axis:pg.PlotItem, clear:bool=True, adapt_X_range:bool=True, minX:typing.Optional[float]=None, maxX:typing.Optional[float]=None, **kwargs):
+    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList], 
+                                 axis:pg.PlotItem, clear:bool=True, 
+                                 adapt_X_range:bool=True, 
+                                 minX:typing.Optional[float]=None, 
+                                 maxX:typing.Optional[float]=None, 
+                                 **kwargs):
         """For plotting events and spike trains on their own (separate) axis
         Epochs & DataZones are represented as regions between vertical lines 
         across all axes, and therefore they are not dealt with, here.
@@ -1880,11 +1885,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             # this is the PlotItem, not the array axis
             entities_axis = axis
                 
-            symbolcolors = cycle(self.defaultLineColorsList)
+            eventsSymbol = kwargs.pop("eventsSymbol", "event")
+            eventsBrush = kwargs.pop("eventsBrush", QtGui.QBrush(QtGui.QColor("black")))
+            eventsPen = kwargs.pop("eventsPen", QtGui.QPen(QtGui.QColor("black"),1))
+            eventsPen.setCosmetic(True)
+            
+            # eventsSymbolColors = cycle(self.defaultLineColorsList)
+            
+            spikeTrainSymbol = kwargs.pop("spikeTrainSymbol", "spike")
             symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
             symbolPen.setCosmetic(True)
             
-            symbolStyle = {"colors": symbolcolors, "pen":symbolPen}
+            symbolStyle = {"color": "black", 
+                           "pen": eventsPen,
+                           "brush": eventsBrush}
             
             labelStyle = {"color": "#000000"}
             
@@ -1904,7 +1918,18 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     xLabel = f"{get_domain_name(entities_list[0])}"
                     
                 yLabel = "Events"
-                symbolStyle["symbol"] = "event"
+                
+                symbolStyle["symbol"] = eventsSymbol
+                
+                if len(entities_list) > 1:
+                    symbolStyle["pen"] = cycle(self.defaultLineColorsList)
+                    symbolStyle["color"] = cycle(self.defaultLineColorsList)
+                    symbolStyle["brush"] = cycle(self.defaultLineColorsList)
+                else:
+                    symbolStyle["pen"] = symbolPen
+                    symbolStyle["color"] = QtGui.QColor("black")
+                    symbolStyle["brush"] = eventsBrush
+                    
                 
                 self._plot_events_or_marks_(entities_list, entities_axis, 
                                             xLabel, yLabel, 
@@ -1912,6 +1937,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             height_interval, 
                                             symbolStyle,
                                             **labelStyle)
+                
             elif all(isinstance(v, DataMark) for v in entities_list):
                 xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
                 if len(xdimstr):
@@ -1919,8 +1945,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 else:
                     xLabel = f"{get_domain_name(entities_list[0])}"
                     
-                yLabel = "Data marks"
-                symbolStyle["symbol"] = "event"
+                yLabel = "Triggers" if all(isinstance(v, TriggerEvent) for v in entities_list) else "Data marks"
+                
+                symbolStyle["symbol"] = eventsSymbol
+                
+                if len(entities_list) > 1:
+                    symbolStyle["pen"] = cycle(self.defaultLineColorsList)
+                    symbolStyle["color"] = cycle(self.defaultLineColorsList)
                 
                 self._plot_events_or_marks_(entities_list, entities_axis, 
                                             xLabel, yLabel, 
@@ -1929,7 +1960,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             symbolStyle,
                                             **labelStyle)
                 
-                # return
+                
             
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 entities_axis.clear()
@@ -1950,9 +1981,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     y = np.full(x.shape, height_interval * k_train + height_interval/2) # column vector
                         
                     self._plot_numeric_data_(entities_axis, x, y, 
-                                                symbol="spike",
+                                                symbol=spikeTrainSymbol,
                                                 pen=None, name=data_name,
-                                                symbolPen=QtGui.QPen(QtGui.QColor(next(symbolcolors))),
+                                                symbolPen=QtGui.QPen(QtGui.QColor(next(eventsSymbolColors))),
                                                 reusePlotItems=False)
                         
                 xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
@@ -8099,7 +8130,8 @@ signals in the signal collection.
                 
 
     @safeWrapper
-    def _plotEvents_(self, events: typing.Optional[typing.Union[typing.Sequence[neo.Event], typing.Sequence[DataMark]]] = None, plotLabelText=None, **kwargs):
+    def _plotEvents_(self, events: typing.Optional[typing.Union[typing.Sequence[neo.Event], typing.Sequence[DataMark]]] = None, 
+                     plotLabelText=None, **kwargs):
         """ Common landing zone for Event/DataMark plotting 
         Delegates further to _plot_discrete_entities_
         """
@@ -9253,8 +9285,9 @@ signals in the signal collection.
         
     def _plot_events_or_marks_(self, entities_list, entities_axis, xLabel, yLabel, minX, maxX, adapt_X_range, height_interval, symbolStyle, **labelStyle):
         """ Helper method for self._plot_discrete_entities_(events or data marks)"""
-        symbolcolors = symbolStyle["colors"]
+        symbolColor = symbolStyle["color"]
         symbolPen = symbolStyle["pen"]
+        symbolBrush = symbolStyle.get("brush", None)
         # symbol = symbolStyle["symbol"]
         # print(f"symbol = {symbol}")
         max_len =  max((len(event.times) for event in entities_list))
@@ -9294,17 +9327,20 @@ signals in the signal collection.
         
         if yy_.shape[1] > 10:
             self.setCursor(QtCore.Qt.WaitCursor)
-            self.sig_plot.emit(self._make_sig_plot_dict_(entities_axis,
-                                    xx_, yy_,
-                                    pen=None,
-                                    name=data_name,
-                                    symbol="event", 
-                                    symbolColor=symbolcolors))
+            self.sig_plot.emit(self._make_sig_plot_dict_(entities_axis, xx_, yy_,
+                                                        pen=None, name = data_name,
+                                                        symbol = "event", 
+                                                        symbolColor = symbolColor,
+                                                        symbolBrush = symbolBrush,
+                                                        symbolPen   = symbolPen)
+                                )
         else:
             self._plot_numeric_data_(entities_axis, xx_, yy_,
                                     pen=None, name=data_name,
-                                    symbol="event", 
-                                    symbolColor=symbolcolors)
+                                    symbol = "event", 
+                                    symbolColor = symbolColor,
+                                    symbolBrush = symbolBrush,
+                                    symbolPen   = symbolPen)
         
         # entities_axis.setLabel(bottom = xLabel, left = yLabel)
         entities_axis.axes["left"]["item"].setPen(None)
@@ -9624,6 +9660,7 @@ signals in the signal collection.
                         
                     if isinstance(symbolBrush, cycle):
                         kwargs["symbolBrush"] = next(symbolBrush)
+                        # kwargs["symbolBrush"] = QtGui.QBrush(colormaps.qcolor(next(symbolBrush)))
                         
                     else:
                         kwargs["symbolBrush"] = symbolBrush

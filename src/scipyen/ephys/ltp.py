@@ -741,19 +741,19 @@ class SynapticPlasticityData(BaseScipyenData):
     # def __reduce__(self): # TODO
     #     pass
 
-class _LTPOnlineProducer_(QtCore.QThread):
+class _LTPOnlineSupplier_(QtCore.QThread):
+    abfRunReady = pyqtSignal(pathlib.Path, name="abfRunReady")
+    
     def __init__(self, parent,
                  abfRunBuffer:collections.deque, 
-                 mutex:QtCore.QMutex,
-                 bufferEmptyCondition:QtCore.QWaitCondition,
-                 bufferNotEmptyCondition:QtCore.QWaitCondition, 
                  emitterWindow,
                  directory):
         QtCore.QThread.__init__(self, parent)
-        self._mutex_ = mutex
+        # self._mutex_ = mutex
+        # self._guard_ = guard
         self._abfRunBuffer_ = abfRunBuffer
-        self._bufferEmptyCondition_ = bufferEmptyCondition
-        self._bufferNotEmptyCondition_ = bufferNotEmptyCondition
+        # self._bufferEmptyCondition_ = bufferEmptyCondition
+        # self._bufferNotEmptyCondition_ = bufferNotEmptyCondition
         self._filesQueue_ = collections.deque()
         # print(f"{self.__class__.__name__}.__init__ to watch: {self._watchedDir_}\n")
         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
@@ -781,17 +781,18 @@ class _LTPOnlineProducer_(QtCore.QThread):
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
-        
+        # watches for changes (additions and removals of files) in the monitored
+        # directory
         self._dirMonitor_ = DirectoryFileWatcher(emitter = self._emitterWindow_,
                                                  directory = self._watchedDir_,
                                                  observer = self)
         
         self._abfListener_ = FileStatChecker(interval = 10, maxUnchangedIntervals = 5,
-                                             callback = self.fileProcessor)
+                                             callback = self.supplyFile)
 
     def newFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
         """Needed by DirectoryFileWatcher"""
-        # print(f"{self._a_} → {self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
+        # print(f"{self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
         self._filesQueue_.extend(val)
         self._setupPendingAbf_()
 
@@ -800,14 +801,14 @@ class _LTPOnlineProducer_(QtCore.QThread):
 
     def changedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
         """Needed by DirectoryFileWatcher"""
-        # print(f"{self._a_} → {self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
+        # print(f"{self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
         # print(f"\t→ latestAbf = {self._latestAbf_}\n")
         # self._a_ += 1
         pass
         
     def removedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
         """Needed by DirectoryFileWatcher"""
-        # print(f"{self._a_} → {self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
+        # print(f"{self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
         # self._a_ += 1
         if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
             return
@@ -838,6 +839,17 @@ class _LTPOnlineProducer_(QtCore.QThread):
                 # NOTE: to stop monitoring abf file after it has been processed
                 # in the processAbfFile(…)
                 
+    def filesChanged(self, filePaths:typing.Sequence[str]):
+        """
+        Used in communicating with the directory monitor
+        """
+        # print(f"{self.__class__.__name__}.filesChanged {filePaths}\n")
+        for f in filePaths:
+            fp = pathlib.Path(f)
+            stat = fp.stat()
+            # print(f"\t → {fp.name}: {stat.st_size}, {stat.st_atime_ns, stat.st_mtime_ns, stat.st_ctime_ns}")
+        # self._a_ += 1
+        
     def _rsvForABF_(self, abf:pathlib.Path):
         """Returns the rsv file paired with the abf
         Used in communicating with the directory monitor
@@ -884,24 +896,23 @@ class _LTPOnlineProducer_(QtCore.QThread):
             
     def run(self):
         self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
-        self._mutex_.lock()
-        if len(self._abfRunBuffer_) == 0:
-            self._bufferEmptyCondition_.wait(self._mutex)
-        self._mutex_.unlock()
             
 
-    def fileProcessor(self, abfFile:pathlib.Path):
-        self._abfRunBuffer_.append(abfFile)
+    def supplyFile(self, abfFile:pathlib.Path):
+        # print(f"{self.__class__.__name__}.supplyFile to buffer: abfFile {abfFile.name}\n")
         self._abfListener_.reset()
-        self._mutex_.lock()
-        self._bufferNotEmptyCondition_.wakeAll()
-        self._mutex_.unlock()
+        self.abfRunReady.emit(abfFile)
+        
+    @property
+    def abfListener(self) -> FileStatChecker:
+        return self._abfListener_
+    
+    @property
+    def watchedDirectory(self) -> pathlib.Path:
+        return self._watchedDir_
 
 class _LTPOnlineFileProcessor_(QtCore.QThread):
     def __init__(self, parent, abfBuffer:collections.deque,
-                 mutex:QtCore.QMutex,
-                 bufferEmptyCondition:QtCore.QWaitCondition,
-                 bufferNotEmptyCondition:QtCore.QWaitCondition,
                  abfRunTimes:list, abfRunDeltaTimes:list, 
                  adcChannel:int, dacChannel:int, clampMode:ephys.ClampMode, 
                  monitorProtocol:pab.ABFProtocol, conditioningProtocol:pab.ABFProtocol,
@@ -919,9 +930,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         QtCore.QThread.__init__(self, parent)
         
         self._abfRunBuffer_ = abfBuffer
-        self._mutex_ = mutex
-        self._bufferEmptyCondition_ = bufferEmptyCondition
-        self._bufferNotEmptyCondition_ = bufferNotEmptyCondition
+        # self._guard_ = guard
+        # self._mutex_ = mutex
+        # self._bufferEmptyCondition_ = bufferEmptyCondition
+        # self._bufferNotEmptyCondition_ = bufferNotEmptyCondition
         self._abfRunTimes_ = abfRunTimes
         self._abfRunDeltaTimes_ = abfRunDeltaTimes
         self._dacChannel_ = dacChannel
@@ -941,37 +953,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         self._signalAxes_ = signalAxes
         self._sigIndex_ = sigIndex
         
-        
-    def run(self):
-        self._mutex_.lock()
-        if len(self._abfRunBuffer_):
-            self._bufferNotEmptyCondition_.wait(self._mutex)
-        self._mutex_.unlock()
-        
-        if len(self._abfRunBuffer_):
-            abfFile = self._abfRunBuffer_.popleft()
-            ret = self.processAbfFile(abfFile)
-        else:
-            ret = None
-            
-        self._mutex_.lock()
-        self._bufferEmptyCondition_.wakeAll()
-        self._mutex_.unlock()
-        
-        return ret
-        
-        
+    @safeWrapper
+    @pyqtSlot(pathlib.Path)
     def processAbfFile(self, abfFile:pathlib.Path):
+        # print(f"{self.__class__.__name__}.processAbfFile: abfFile: {abfFile}\n")
         # WARNING: the Abf file may not be completed at this time, depending on when this is called!
         
-        # fileStat = abfFile.stat()
-        # sz0 = fileStat.st_size
-        # k=0
-        # while abfFile.stat().st_size > sz0 and k < 10:
-        #     k += 1
-        #     print(f"{sz0} → file size: {abfFile.stat().st_size}")
-        
-        #
         abfRun = pio.loadAxonFile(str(abfFile))
         
         self._abfRunTimes_.append(abfRun.rec_datetime)
@@ -983,13 +970,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         assert(protocol.nSweeps) == len(abfRun.segments), f"Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)})"
         assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
 
-        dac = protocol.outputConfiguration(self.dacChannel)
+        dac = protocol.outputConfiguration(self._dacChannel_)
         
         if protocol.nSweeps == 2:
             assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
             assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
             
-            # pass # TODO check for alternate digital outputs → True ; alternate waveform → False
+            # TODO check for alternate digital outputs → True ; alternate waveform → False
+            # → see # NOTE: 2023-10-07 21:35:39 - DONE ?!?
 
         # NOTE: 2023-09-29 14:12:56
         # we need:
@@ -1043,6 +1031,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # NOTE: this is moot, because the protocol has already been checked
                 # in the processMonitorProtocol
                 raise ValueError("When the protocol defines two sweeps, alternate digtal outputs MUST have been enabled in the protocol")
+            # NOTE: 2023-10-07 21:35:39
             # we are alternatively stimulating two pathways
             # NOTE: the ABF Run should ALWAYS have two sweeps in this case - one
             # for each pathway - regardless of how many runs there are per trial
@@ -1057,7 +1046,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # From here on we do things differently, depending on whether protocol is a
         # the monitoring protocol or the conditioning protocol
         if protocol == self._monitorProtocol_:
-            adc = protocol.inputConfiguration(self.adcChannel)
+            adc = protocol.inputConfiguration(self._adcChannel_)
             sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
             # for k, seg in enumerate(abfRun.segments[:1]): # use this line for debugging
             for k, seg in enumerate(abfRun.segments):
@@ -1368,7 +1357,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         
         # the DAC used to send out the command waveforms
-        dac = protocol.outputConfiguration(self.dacChannel)
+        dac = protocol.outputConfiguration(self._dacChannel_)
         
         # Guess which DAC output has digital outputs enabled.
         #
@@ -1389,11 +1378,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         if len(digOutDacs) == 0:
             raise ValueError("The protocol indicates there are no DAC channels with digtal output enabled")
         
-        digOutDACIndex = digOutDacs[0]
+        digOutDACIndex = digOutDacs[0].number
         
-        if digOutDACIndex != self.dacChannel:
+        if digOutDACIndex != self._dacChannel_:
             if not protocol.alternateDigitalOutputStateEnabled:
-                raise ValueError(f"Digital outputs are enabled on DAC {digOutDACIndex} and command waveforms are sent via DAC {self.dacChannel}, but alternative digital outputs are disabled in the protocol")
+                raise ValueError(f"Digital outputs are enabled on DAC {digOutDACIndex} and command waveforms are sent via DAC {self._dacChannel_}, but alternative digital outputs are disabled in the protocol")
         
             assert protocol.nSweeps % 2 == 0, "For alternate DIG pattern the protocol is expected to have an even number of sweeps"
             
@@ -1417,7 +1406,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         digEpochsTableAlt = None
         digEpochsTableAlt_reduced = None
         
-        if digOutDACIndex != self.dacChannel:
+        if digOutDACIndex != self._dacChannel_:
             # a this point, this implies protocol.alternateDigitalOutputStateEnabled == True
             #
             # What we check here:
@@ -1724,22 +1713,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._landmarks_["VmTest"] = [dac.epochRelativeStartTime(self._membraneTestEpoch_),
                                             self._membraneTestEpoch_.firstDuration]
             
-            
-        #     if not isinstance(self._cursor_coordinates_.get(pndx, None), dict):
-        #         self._cursor_coordinates_[pndx] = dict()
-        #         self._cursor_coordinates_[pndx]["Rbase"] = (self._signalBaselineStart_,
-        #                                                     self._signalBaselineDuration_)
-        # # print("After processMonitorProtocol:")        
-        # print(f"\t self._mbTestStart_ = {self._mbTestStart_}")
-        # print(f"\t self._mbTestDuration_ = {self._mbTestDuration_}")
-        # print(f"\t self._mbTestAmplitude_ = {self._mbTestAmplitude_}")
-        # print(f"\t self._signalBaselineStart_ = {self._signalBaselineStart_}")
-        # print(f"\t self._signalBaselineDuration_ = {self._signalBaselineDuration_}")
-        # print(f"\t self._responseBaselineStart_ = {self._responseBaselineStart_}")
-        # print(f"\t self._responseBaselineDuration_ = {self._responseBaselineDuration_}")
-        
-    
-class LTPOnlineNew(QtCore.QObject):
+class LTPOnline(QtCore.QObject):
 
     test_protocol_properties = ("activeDACChannelIndex",
                                 "nSweeps",
@@ -1902,44 +1876,32 @@ class LTPOnlineNew(QtCore.QObject):
         """
         
         super().__init__(parent=parent)
+        
+        # NOTE: 2023-10-07 11:20:22
+        # _emitterWindow_ needed here, to set up viewers
+        wsp = wf.user_workspace()
+        
+        if emitterWindow is None:
+            self._emitterWindow_ = wsp["mainWindow"]
 
-#         #### BEGIN TODO move to a producer thread
-#         wsp = wf.user_workspace()
-#         
-#         if emitterWindow is None:
-#             self._emitterWindow_ = wsp["mainWindow"]
-# 
-#         elif type(emitterWindow).__name__ != 'ScipyenWindow':
-#             raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
-# 
-#         else:
-#             self._emitterWindow_ = emitterWindow
-# 
-#         if directory is None:
-#             self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
-#             
-#         elif isinstance(directory, str):
-#             self._watchedDir_ = pathlib.Path(directory)
-# 
-#         elif isinstance(directory, pathlib.Path):
-#             self._watchedDir_ = directory
-#             
-#         else:
-#             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
-#         
-#         
-#         self._filesQueue_ = collections.deque()
-# 
-#         self._dirMonitor_ = DirectoryFileWatcher(emitter = self._emitterWindow_,
-#                                                  directory = self._watchedDir_,
-#                                                  observer = self)
-#         
-#         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
-# 
-#         self._latestAbf_ = None # last ABF file to have been created by Clampex
-# 
-#         #### END   TODO move to a producer thread
-# 
+        elif type(emitterWindow).__name__ != 'ScipyenWindow':
+            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
+
+        else:
+            self._emitterWindow_ = emitterWindow
+
+        if directory is None:
+            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
+            
+        elif isinstance(directory, str):
+            self._watchedDir_ = pathlib.Path(directory)
+
+        elif isinstance(directory, pathlib.Path):
+            self._watchedDir_ = directory
+            
+        else:
+            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+        
         self._monitorProtocol_ = None
 
         self._conditioningProtocol_ = None
@@ -1949,8 +1911,6 @@ class LTPOnlineNew(QtCore.QObject):
         
         self._sigIndex_ = None  # when set, this is an int index of the signal 
                                 # of interest; must be the same across runs
-
-        # self._abfDacOutputConfig_ = None
 
         if isinstance(mainClampMode, int):
             if mainClampMode not in ephys.ClampMode.values():
@@ -2117,18 +2077,15 @@ class LTPOnlineNew(QtCore.QObject):
         # need to synchronize, as files may come in faster than we can process 
         # them
         self._abfRunBuffer_ = collections.deque()
+        self._guard_ = dict(nABFs = len(self._abfRunBuffer_))
         self._mutex_ = QtCore.QMutex()
         self._abfRunBufferEmptyCondition_ = QtCore.QWaitCondition()
         self._abfRunBufferNotEmptyCondition_ = QtCore.QWaitCondition()
         
-        self._abfProducerThread_ = _LTPOnlineProducer_(self, self._abfRunBuffer_,
-                                    self._mutex_, self._abfRunBufferEmptyCondition_,
-                                    self._abfRunBufferNotEmptyCondition_,
+        self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
                                     self._emitterWindow_, self._watchedDir_)
         
         self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self, self._abfRunBuffer_,
-                                    self._mutex_, self._abfRunBufferEmptyCondition_,
-                                    self._abfRunBufferNotEmptyCondition_,
                                     self._abfRunTimes_, self._abfRunDeltaTimes_,
                                     self._adcChannel_, self._dacChannel_,
                                     self._clampMode_,
@@ -2140,28 +2097,33 @@ class LTPOnlineNew(QtCore.QObject):
                                     self._data_, self._results_, self._viewers_,
                                     self._sigIndex_, self._signalAxes_)
         
-        # self._processorThread_ = pgui.WorkerThread(self, self._abfProcessorThread_.runProcessor)
-        # self._abfProcessorThread_.moveToThread(self._processorThread_)
-
+        self._abfSupplierThread_.abfRunReady.connect(self._abfProcessorThread_.processAbfFile,
+                                                     QtCore.Qt.QueuedConnection)
+        
         if autoStart:
-            self._abfProducerThread_.start()
+            self._abfSupplierThread_.start()
             self._abfProcessorThread_.start()
-            # self._processorThread_.start()
-            # self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
             
 
     def __del__(self):
-        # if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-        #     self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-            
-        # for viewer in (synapticViewer0, synapticViewer1,
-        #                amplitudesViewer0, amplitudesViewer1,
-        #                pairedPulseViewer0, pairedPulseViewer1,
-        #                dcViewer, mbTestViewer, rinViewer):
-        #     viewer.close()
         for viewer in self._viewers_.values():
             viewer.close()
-
+        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+        self._abfSupplierThread_.abfListener.stop()
+        self._abfSupplierThread_.quit()
+        self._abfSupplierThread_.wait()
+        self._abfProcessorThread_.quit()
+        self._abfProcessorThread_.wait()
+            
+        self._abfSupplierThread_.deleteLater()
+        self._abfProcessorThread_.deleteLater()
+        
+        # if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+        #     self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+        # self._abfProcessorThread_.quit()
+        # self._abfProcessorThread_.wait()
+            
         if hasattr(super(object, self), "__del__"):
             super().__del__()
             
@@ -2190,14 +2152,15 @@ class LTPOnlineNew(QtCore.QObject):
         self._dacChannel_ = val
     
     def stop(self):
-        self._abfProducerThread_.wait()
+        self._abfSupplierThread_.abfListener.stop()
+        self._abfSupplierThread_.quit()
+        self._abfSupplierThread_.wait()
+        self._abfProcessorThread_.quit()
         self._abfProcessorThread_.wait()
         
-        # if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-        #     self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
             
-        # self._abfListener_.stop()
-        
         self.resultsReady.emit((self._data_, self._results_))
         
     def reset(self):
@@ -2265,923 +2228,18 @@ class LTPOnlineNew(QtCore.QObject):
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
     
-        if self._dirMonitor_.directory != self._watchedDir_:
-            self._dirMonitor_.directory = self._watchedDir_
+        if self._abfSupplierThread_._dirMonitor_.directory != self._watchedDir_:
+            self._abfSupplierThread_._dirMonitor_.directory = self._watchedDir_
 
-        # self._a_ = 0
         self._pending_.clear() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
-
-        # self._pendingAbf_stat_ = None
 
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
         if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
             
-    #### BEGIN To producer thread
-
-#     def newFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-#         # print(f"{self._a_} → {self.__class__.__name__}.newFiles {[v.name for v in val]}\n")
-#         self._filesQueue_.extend(val)
-#         self._setupPendingAbf_()
-# 
-#         # print(f"\t→ pending: {self._pending_}\n")
-#         # self._a_ += 1
-# 
-#     def changedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-#         # print(f"{self._a_} → {self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
-#         # print(f"\t→ latestAbf = {self._latestAbf_}\n")
-#         # self._a_ += 1
-#         pass
-#         
-#     def removedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-#         # print(f"{self._a_} → {self.__class__.__name__}.removedFiles {[v.name for v in val]}\n")
-#         # self._a_ += 1
-#         if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
-#             return
-# 
-#         # if len(val) > 1:
-#         #     # CAUTION!
-#         #     return
-# 
-#         removed = val[0]
-# 
-#         # expecting the rsv file to be removed by Clampex;
-#         # when this is done, watch the pending ABF file for changes
-#         # print(f"\t→ pending = {self._pending_}\n")
-#         if removed.suffix == ".rsv":
-#             if removed in self._pending_:
-#                 self._latestAbf_ = self._pending_[removed]
-#                 if self._abfListener_.active:
-#                     self._abfListener_.stop()
-#                 if  not self._latestAbf_.exists() or not self._latestAbf_.is_file():
-#                     self._latestAbf_ = None
-#                     self._pending_.clear()
-#                     self._filesQueue_.clear()
-#                     return
-#                 self._abfListener_.monitoredFile = self._latestAbf_
-#                 self._abfListener_.start()
-#                 # print(f"\t\t→ latest = {self._latestAbf_}\n")
-#                 self._pending_.clear()
-#                 # NOTE: to stop monitoring abf file after it has been processed
-#                 # in the processAbfFile(…)
-                
-    #### END   To producer thread
-
-    def fileProcessor(self, abfFile:pathlib.Path):
-        self._mutex_.lock()
-        if len(self._abfRunBuffer_) == 0:
-            # tell the consumer (_LTPOnlineFileProcessor_) to wait
-            self._abfRunBufferEmptyCondition_.wait(self._mutex_)
-        self._mutex_.unlock()
-        
-        self._abfRunBuffer_.append(abfFile)
-        
-        self._mutex_.lock()
-        # now, there is stuff in _abfRunBuffer_ so _LTPOnlineFileProcessor_
-        # should wake up
-        self._abfRunBufferNotEmptyCondition_.wakeAll()
-        self._mutex_.unlock()
-        
-    #### BEGIN To processor thread
-
-    # def processAbfFile(self, abfFile:pathlib.Path):
-#         # WARNING: the Abf file may not be completed at this time, depending on 
-#         # when this is called!
-#         
-#         # fileStat = abfFile.stat()
-#         # sz0 = fileStat.st_size
-#         # k=0
-#         # while abfFile.stat().st_size > sz0 and k < 10:
-#         #     k += 1
-#         #     print(f"{sz0} → file size: {abfFile.stat().st_size}")
-#         
-#         #
-#         # CAUTION: 2023-10-05 14:07:41
-#         # because we meaure sweep by sweep as they come, we cannot
-#         # use analyse_LTP_in_pathway(…) anymore, here...
-#         
-#         self._abfListener_.reset()
-#     
-#         abfRun = pio.loadAxonFile(str(abfFile))
-#         
-#         self._abfRunTimes_.append(abfRun.rec_datetime)
-#         deltaMinutes = (abfRun.rec_datetime - self._abfRunTimes_[0]).seconds/60
-#         self._abfRunDeltaTimes_.append(deltaMinutes)
-#         
-#         protocol = pab.ABFProtocol(abfRun)
-# 
-#         assert(protocol.nSweeps) == len(abfRun.segments), f"Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)})"
-#         assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
-# 
-#         dac = protocol.outputConfiguration(self.dacChannel)
-#         
-#         if protocol.nSweeps == 2:
-#             assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
-#             assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
-#             
-#             # pass # TODO check for alternate digital outputs → True ; alternate waveform → False
-# 
-#         # NOTE: 2023-09-29 14:12:56
-#         # we need:
-#         #
-#         # 1) the recording mode must be the same, either:
-#         #   VoltageClamp, CurrentClamp, or NoClamp (i=0), for field recordings
-#         #
-#         # 2) on the active DAC index there must be epochs:
-#         #   2.a) for patch clamp experiments:
-#         #       2.a.0) optional baseline step epoch with firstLevel == 0 and deltaLevel == 0
-#         #           alternatively the next epoch must start at First Duration > 0
-#         #       2.a.1) for membrane test: step epoch with firstLevel != 0, in :
-#         #           [mV] for VoltageClamp,
-#         #           [pA] for CurrentClamp
-# 
-#         # TODO/FIXME: 2023-10-03 23:25:04 - the following is a procedural convention
-#         # need to make it more generic
-#         # we assume the very first abfRun is a monitoring one => baseline episode
-#         # we add subsequent runs to the baseline episode until protocol changes
-#         #   => assume new protocol is conditioning protocol, which MAY be repeated
-#         #       for several runs => add subsequent runs to the conditioning episode
-#         #       until protocol changes again => the new protocol must be identical
-#         # to the monitoring protocol => chase episode
-#         #
-#         # TODO allow for several conditioning episodes (with same or different
-#         # conditioning protocols), possibly interleaved with monitoring episodes
-#         # which should have the same monitoring protocol
-#         #
-#         
-#         if self._monitorProtocol_ is None:
-#             if protocol.clampMode() == self._clampMode_:
-#                 self._monitorProtocol_ = protocol
-#                 self.processMonitorProtocol(protocol)
-#             else:
-#                 raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._clampMode_}")
-#             
-#         else:
-#             if protocol != self._monitorProtocol_:
-#                 if self._conditioningProtocol_ is None:
-#                     if protocol.clampMode() == self._conditioningClampMode_:
-#                         self._conditioningProtocol_ = protocol
-#                     else:
-#                         raise ValueError("Unexpected conditioning protocol")
-#                     
-#                 else:
-#                     if protocol != self._conditioningProtocol_:
-#                         raise ValueError("Unexpected protocol for current run")
-#             
-#         if self._monitorProtocol_.nSweeps == 2:
-#             if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
-#                 # NOTE: this is moot, because the protocol has already been checked
-#                 # in the processMonitorProtocol
-#                 raise ValueError("When the protocol defines two sweeps, alternate digtal outputs MUST have been enabled in the protocol")
-#             # we are alternatively stimulating two pathways
-#             # NOTE: the ABF Run should ALWAYS have two sweeps in this case - one
-#             # for each pathway - regardless of how many runs there are per trial
-#             # if number of runs > 1 then the ABF file stores the average record
-#             # of each sweep, across the number of runs (or however the averaging mode
-#             # was set in the protocol; WARNING: this last bit of information is 
-#             # NOT currently used here)
-#             
-#         elif self._monitorProtocol_.nSweeps != 1:
-#             raise ValueError(f"Expecting 1 or 2 sweeps in the protocol; instead, got {self._monitorProtocol_.nSweeps}")
-#             
-#         # From here on we do things differently, depending on whether protocol is a
-#         # the monitoring protocol or the conditioning protocol
-#         if protocol == self._monitorProtocol_:
-#             adc = protocol.inputConfiguration(self.adcChannel)
-#             sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
-#             # for k, seg in enumerate(abfRun.segments[:1]): # use this line for debugging
-#             for k, seg in enumerate(abfRun.segments):
-#                 pndx = f"path{k}"
-#                 if k > 1:
-#                     break
-#                 
-#                 adcSignal = seg.analogsignals[sigIndex]
-#                 
-#                 sweepStartTime = protocol.sweepTime(k)
-#                 
-#                 self._data_["baseline"][pndx].segments.append(abfRun.segments[k])
-#                 if isinstance(self._presynaptic_triggers_[pndx], TriggerEvent):
-#                     self._data_["baseline"][pndx].segments[-1].events.append(self._presynaptic_triggers_[pndx])
-#                     
-#                 viewer = self._viewers_[pndx]#["synaptic"]
-#                 viewer.view(self._data_["baseline"][pndx],
-#                             doc_title=pndx,
-#                             showFrame = len(self._data_["baseline"][pndx].segments)-1)
-#                 
-#                 self._signalAxes_[pndx] = viewer.axis(adc.name)
-#                 
-#                 viewer.currentAxis = self._signalAxes_[pndx]
-#                 # viewer.xAxesLinked = True
-#                 
-#                 viewer.plotAnalogSignalsCheckBox.setChecked(True)
-#                 viewer.plotEventsCheckBox.setChecked(True)
-#                 viewer.analogSignalComboBox.setCurrentIndex(viewer.currentAxisIndex+1)
-#                 viewer.analogSignalComboBox.activated.emit(viewer.currentAxisIndex+1)
-#                 # viewer.currentAxis.vb.enableAutoRange()
-#                 # viewer.currentAxis.vb.autoRange()
-#                 self._signalAxes_[pndx].vb.enableAutoRange()
-#                 
-#                 cnames = [c.name for c in viewer.dataCursors]
-#                 
-#                 if self._clampMode_ == ephys.ClampMode.VoltageClamp:
-#                     for landmarkname, landmarkcoords in self._landmarks_.items():
-#                         if k > 0 and landmarkname in ("Rbase", "Rs", "Rin"):
-#                             # don't need those in both pathways!
-#                             continue
-#                         if landmarkname not in cnames:
-#                             if landmarkname ==  "Rs":
-#                                 # overwrite this with the local signal extremum
-#                                 # (first capacitance transient)
-#                                 sig = adcSignal.time_slice(self._mbTestStart_+ sweepStartTime,
-#                                                                                 self._mbTestStart_ + self._mbTestDuration_+ sweepStartTime)
-#                                 if self._mbTestAmplitude_ > 0:
-#                                     # look for a local maximum in the dac
-#                                     transientTime = sig.times[sig.argmax()]
-#                                 else:
-#                                     transientTime = sig.times[sig.argmin()]
-#                                     # look for local minimum in the dac
-#                                     
-#                                 start = transientTime - self._responseBaselineDuration_/2
-#                                 duration = self._responseBaselineDuration_
-#                                 
-#                             else:
-#                                 if any(v is None for v in landmarkcoords):
-#                                     # for the case when only a single pulse was used
-#                                     continue
-#                                 start, duration = landmarkcoords
-#                                 
-#                             x = float((start + duration / 2 + sweepStartTime).rescale(pq.s))
-#                             xwindow = float(duration.rescale(pq.s))
-#                             # print(f"x = {x}, xwindow = {xwindow}")
-#                             viewer.addCursor(sv.SignalCursorTypes.vertical,
-#                                             x = x,
-#                                             xwindow = xwindow,
-#                                             label = landmarkname,
-#                                             follows_mouse = False,
-#                                             axis = self._signalAxes_[pndx],
-#                                             relative=True,
-#                                             precision=5)
-#                             
-#                     # we allow cursors to be repositioned during the recording
-#                     # therefore we do not generate neo.Epochs anymore
-#                     
-#                     if k == 0:
-#                         # calculate DC, Rs, and Rin for pathway 0 only
-#                         Rbase_cursor = viewer.dataCursor("Rbase")
-#                         coords = ((Rbase_cursor.x - Rbase_cursor.xwindow/2) * pq.s, (Rbase_cursor.x + Rbase_cursor.xwindow/2) * pq.s)
-#                         Idc = np.mean(adcSignal.time_slice(*coords))
-#                                       
-#                         self._results_["DC"].append(Idc)
-#                         
-#                         Rs_cursor = viewer.dataCursor("Rs")
-#                         coords = ((Rs_cursor.x - Rs_cursor.xwindow/2) * pq.s, (Rs_cursor.x + Rs_cursor.xwindow/2) * pq.s)
-#                         if self._mbTestAmplitude_ > 0:
-#                             Irs = np.max(adcSignal.time_slice(*coords))
-#                         else:
-#                             Irs = np.min(adcSignal.time_slice(*coords))
-#                             
-#                         Rs  = (self._mbTestAmplitude_ / (Irs-Idc)).rescale(pq.MOhm)
-#                         
-#                         self._results_["Rs"].append(Rs)
-#                         
-#                         Rin_cursor = viewer.dataCursor("Rin")
-#                         coords = ((Rin_cursor.x - Rin_cursor.xwindow/2) * pq.s, (Rin_cursor.x + Rin_cursor.xwindow/2) * pq.s)
-#                         Irin = np.mean(adcSignal.time_slice(*coords))
-#                             
-#                         Rin = (self._mbTestAmplitude_ / (Irin-Idc)).rescale(pq.MOhm)
-#                         
-#                         self._results_["Rin"].append(Rin)
-#                         
-#                         
-#                     Ipsc_base_cursor = viewer.dataCursor("PSCBase")
-#                     coords = ((Ipsc_base_cursor.x - Ipsc_base_cursor.xwindow/2) * pq.s, (Ipsc_base_cursor.x + Ipsc_base_cursor.xwindow/2) * pq.s)
-#                     
-#                     IpscBase = np.mean(adcSignal.time_slice(*coords))
-#                     
-#                     Ipsc0Peak_cursor = viewer.dataCursor("PSC0Peak")
-#                     coords = ((Ipsc0Peak_cursor.x - Ipsc0Peak_cursor.xwindow/2) * pq.s, (Ipsc0Peak_cursor.x + Ipsc0Peak_cursor.xwindow/2) * pq.s)
-#                     
-#                     Ipsc0Peak = np.mean(adcSignal.time_slice(*coords))
-#                     
-#                     Ipsc0 = Ipsc0Peak - IpscBase
-#                     
-#                     self._results_[pndx]["Response0"].append(Ipsc0)
-#                     
-#                     if self._presynaptic_triggers_[pndx].size > 1:
-#                         Ipsc1Peak_cursor = viewer.dataCursor("PSC1Peak")
-#                         coords = ((Ipsc1Peak_cursor.x - Ipsc1Peak_cursor.xwindow/2) * pq.s, (Ipsc1Peak_cursor.x + Ipsc1Peak_cursor.xwindow/2) * pq.s)
-#                         
-#                         Ipsc1Peak = np.mean(adcSignal.time_slice(*coords))
-#                         Ipsc1 = Ipsc1Peak - IpscBase
-#                         
-#                         self._results_[pndx]["Response1"].append(Ipsc1)
-#                         
-#                         self._results_[pndx]["PairedPulseRatio"].append(Ipsc1/Ipsc0)
-#                     
-#                     
-#             responses = dict(amplitudes = dict(path0 = None, path1 = None), 
-#                              pprs = dict(path0 = None, path1 = None), 
-#                              rs = None, rincap = None, dc = None)
-# #             pprs = dict(path0 = None, path1 = None)
-# #             
-# #             mbTest = dict(rs = None, rincap = None)
-# #             
-#             for field, value in self._results_.items():
-#                 if not field.startswith("path"):
-#                     if len(value):
-#                         # pts = IrregularlySampledDataSignal(np.arange(len(value)),
-#                         #                                     value, units = value[0].units,
-#                         #                                     time_units = pq.dimensionless,
-#                         #                                     name = field,
-#                         #                                     domain_name="Sweep")
-#                         
-#                         pts = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
-#                                                            value, units = value[0].units,
-#                                                            time_units = pq.min,
-#                                                            name = field,
-#                                                            domain_name="Time")
-#                         
-#                         if field in ("DC", "tau"):
-#                             responses["dc"] = pts
-#                             # self._viewers_["dc"].view(pts)
-#                                 
-#                         elif field == "Rs":
-#                             responses["rs"] = pts
-#                             # mbTest["rs"] = pts
-#                             # self._viewers_["rs"].view(pts)
-#                             
-#                         elif field in ("Rin", "Cap"):
-#                             responses["rincap"] = pts
-#                             # mbTest["rincap"] = pts
-#                             # self._viewers_["rin"].view(pts)
-#                             
-#                 else:
-#                     pname = field
-#                     resp0 = value["Response0"]
-#                     if len(resp0) == 0:
-#                         continue
-#                     
-#                     resp1 = value["Response1"]
-#                     
-#                     sname = "Slope" if self._clampMode_ == ephys.ClampMode.CurrentClamp and self._useSlopeInIClamp_ else "Amplitude"
-#                     
-# #                     if len(resp1) == len(resp0):
-# #                         response = IrregularlySampledDataSignal(np.arange(len(resp0)),
-# #                                                            np.vstack((resp0, resp1)).T,
-# #                                                            units = resp0[0].units,
-# #                                                            time_units = pq.dimensionless,
-# #                                                            domain_name = "Sweep",
-# #                                                            name = f"{sname} {pname}")
-# #                         
-# #                     else:
-# #                         response = IrregularlySampledDataSignal(np.arange(len(resp0)),
-# #                                                            resp0,
-# #                                                            units = resp0[0].units,
-# #                                                            time_units = pq.dimensionless,
-# #                                                            domain_name = "Sweep",
-# #                                                            name = f"{sname} {pname}")
-#                     # NOTE: 2023-10-06 08:21:13 
-#                     # only plot the first response amplitude
-#                     response = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
-#                                                         resp0,
-#                                                         units = resp0[0].units,
-#                                                         time_units = pq.min,
-#                                                         domain_name = "Time",
-#                                                         name = f"{sname} {pname}")
-#                         
-#                     # response = IrregularlySampledDataSignal(np.arange(len(resp0)),
-#                     #                                     resp0,
-#                     #                                     units = resp0[0].units,
-#                     #                                     time_units = pq.dimensionless,
-#                     #                                     domain_name = "Sweep",
-#                     #                                     name = f"{sname} {pname}")
-#                         
-#                     # self._viewers_[pname]["amplitudes"].view(pts)
-#                     
-#                     responses["amplitudes"][pname] = response
-#                     
-#                     ppr = value["PairedPulseRatio"]
-#                     
-#                     if len(ppr):
-#                         pts = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
-#                                                            ppr,
-#                                                            units = pq.dimensionless,
-#                                                            time_units = pq.min,
-#                                                            domain_name = "Time",
-#                                                            name = f"PPR {pname}")
-#                         
-#                         # pts = IrregularlySampledDataSignal(np.arange(len(ppr)),
-#                         #                                    ppr,
-#                         #                                    units = pq.dimensionless,
-#                         #                                    time_units = pq.dimensionless,
-#                         #                                    domain_name = "Sweep",
-#                         #                                    name = f"PPR {pname}")
-#                         
-#                         responses["pprs"][pname] = pts
-#                         # pprs[pname] = pts
-#                         
-#             resultsPlot = list()
-#             
-#             if isinstance(responses["amplitudes"]["path0"], IrregularlySampledDataSignal):
-#                 resultsPlot.append(responses["amplitudes"]["path0"])
-#                 if isinstance(responses["amplitudes"]["path1"], IrregularlySampledDataSignal):
-#                     resultsPlot.append(responses["amplitudes"]["path1"])
-#                 
-#             if isinstance(responses["pprs"]["path0"], IrregularlySampledDataSignal):
-#                 resultsPlot.append(responses["pprs"]["path0"])
-#                 if isinstance(responses["pprs"]["path1"], IrregularlySampledDataSignal):
-#                     resultsPlot.append(responses["pprs"]["path1"])
-#                     
-#             if isinstance(responses["rs"], IrregularlySampledDataSignal):
-#                 resultsPlot.append(responses["rs"])
-#                 
-#                 if isinstance(responses["rincap"], IrregularlySampledDataSignal):
-#                     resultsPlot.append(responses["rincap"])
-#                     
-#             if isinstance(responses["dc"], IrregularlySampledDataSignal):
-#                 resultsPlot.append(responses["dc"])
-#                 
-#             self._viewers_["results"].view(resultsPlot, symbolColor="black", symbolBrush="black")
-            
-            
-#             if isinstance(responses["amplitudes"]["path0"], IrregularlySampledDataSignal):
-#                 if isinstance(responses["amplitudes"]["path1"], IrregularlySampledDataSignal):
-#                     self._viewers_["amplitudes"].view([responses["amplitudes"]["path0"], responses["amplitudes"]["path1"]], 
-#                                                       name=("Path 0", "Path 1"))
-#                 else:
-#                     self._viewers_["amplitudes"].view(responses["amplitudes"]["path0"], 
-#                                                       symbolColor="black", symbolBrush="black")
-#                     
-#                 if len(self._abfRunDeltaTimes_) <= 1: # first run
-#                     self._viewers_["amplitudes"].showLegends(True)
-                    
-                    
-            # if isinstance(responses["pprs"]["path0"],IrregularlySampledDataSignal):
-            #     if isinstance(responses["pprs"]["path1"], IrregularlySampledDataSignal):
-            #         self._viewers_["ppr"].view([responses["pprs"]["path0"], responses["pprs"]["path1"]], 
-            #                                    symbolColor="black", symbolBrush="black")
-            #     else:
-            #         self._viewers_["ppr"].view(responses["pprs"]["path0"], 
-            #                                    symbolColor="black", symbolBrush="black")
-                    
-                # if len(self._abfRunDeltaTimes_) <= 1: # first run
-                #     self._viewers_["ppr"].showLegends(True)
-                    
-            # if isinstance(responses["rs"], IrregularlySampledDataSignal):
-            #     if isinstance(responses["rincap"], IrregularlySampledDataSignal):
-            #         self._viewers_["rs"].view([mbTest["rs"], mbTest["rincap"]],symbolColor="black", symbolBrush="black")
-            #     else:
-            #         self._viewers_["rs"].view(mbTest["rs"],symbolColor="black", symbolBrush="black")
-                        
-                # if len(self._abfRunDeltaTimes_) <= 1: # first run
-                #     self._viewers_["rs"].showLegends(True)
-                        
-    
-#     def processMonitorProtocol(self, protocol:pab.ABFProtocol):
-#         """Infers the timings of the landmarks from protocol.
-#         Called only when self._monitorProtocol_ is None (i.e., at first run)
-#         """
-#         # TODO: 2023-10-03 12:31:19
-#         # implement the case where TTLs are emulated with a DAC channel (with its
-#         # output routed to a simulus isolator)
-#         #
-#         # NOTE: 2023-10-04 18:42:34
-#         # the code below assumes voltage-clamp and EPSCs hence relies on signal
-#         # baseline before the response to measure amplitude
-#         #
-#         # TODO: 2023-10-04 18:43:12 URGENT FIXME
-#         # code for current-clamp/field recordings where we measure the slope of 
-#         #   the rising phase of the synaptic potentials !
-#         #
-#         
-#         
-#         # the DAC used to send out the command waveforms
-#         dac = protocol.outputConfiguration(self.dacChannel)
-#         
-#         # Guess which DAC output has digital outputs enabled.
-#         #
-#         # In Clampex, there can be only one!¹
-#         #
-#         # Ths is necessary because one may have confgured dig outputs in a DAC
-#         # different from the one used for command waveform.
-#         #
-#         # HOWEVER, this is only possble when alternate digital outputs are 
-#         # enabled in the protocol - and, hence, this dac must have the same epochs
-#         # defined as the DAC used for clamping.
-#         #
-#         # ¹) For this reason, additional triggers can only be sent out by emulating
-#         #    TTL waveforms in the analog command epochs on additional DAC outputs.
-#         #
-#         digOutDacs = list(filter(lambda x: x.digitalOutputEnabled, (protocol.outputConfiguration(k) for k in range(protocol.nDACChannels))))
-#         
-#         if len(digOutDacs) == 0:
-#             raise ValueError("The protocol indicates there are no DAC channels with digtal output enabled")
-#         
-#         digOutDACIndex = digOutDacs[0]
-#         
-#         if digOutDACIndex != self.dacChannel:
-#             if not protocol.alternateDigitalOutputStateEnabled:
-#                 raise ValueError(f"Digital outputs are enabled on DAC {digOutDACIndex} and command waveforms are sent via DAC {self.dacChannel}, but alternative digital outputs are disabled in the protocol")
-#         
-#             assert protocol.nSweeps % 2 == 0, "For alternate DIG pattern the protocol is expected to have an even number of sweeps"
-#             
-#         # DAC where dig out is enabled;
-#         # when alt dig out is enabled, this stores the main dig pattern
-#         # (the dig pattern sent out on even sweeps 0, 2, 4, etc)
-#         # whereas the "main" dac retrieved above stores the alternate digital pattern
-#         # (the dig pattern set out on odd sweeps, 1,3, 5, etc)
-#         
-#         digdac = protocol.outputConfiguration(digOutDACIndex)
-#         
-#         if len(digdac.epochs) == 0:
-#             raise ValueError("DAC with digital outputs has no epochs!")
-#         
-#         digEpochsTable = digdac.epochsTable(0)
-#         dacEpochsTable = dac.epochsTable(0)
-#         
-#         digEpochsTable_reduced = digEpochsTable.loc[[i for i in digEpochsTable.index if not i.startswith("Digital Pattern")], :]
-#         dacEpochsTable_reduced = dacEpochsTable.loc[[i for i in dacEpochsTable.index if not i.startswith("Digital Pattern")], :]
-#         
-#         digEpochsTableAlt = None
-#         digEpochsTableAlt_reduced = None
-#         
-#         if digOutDACIndex != self.dacChannel:
-#             # a this point, this implies protocol.alternateDigitalOutputStateEnabled == True
-#             #
-#             # What we check here:
-#             # when alternate digital output is enabled, AND the dig dac is dfferent 
-#             # from the main dac, the epochs defned in each of the dacs MUST be the same
-#             # EXCEPT for the reported (stored) digital patterns
-#             # 
-#             # The idea is that the main experimental epochs are defined in the dacChannel,
-#             # but the digital outputs may be defined in the "alternative" DAC channel,
-#             # with the condition that the same epochs are defined there
-#             # 
-#             # NOTE: In general this is a SOFT requirement (one can imagine 
-#             # doing completely different things in the "alternate" digital output)
-#             #
-#             # However, for a synaptic plasticity experiment, sending stimuli at
-#             # different times on the alternate pathway is an unnecessary complication
-#             # hence, HERE, this is is a HARD requirement (for now...)
-#             #
-#             digEpochsTableAlt = digdac.epochsTable(1)
-#             digEpochsTableAlt_reduced = digEpochsTableAlt.loc[[i for i in digEpochsTableAlt.index if not i.startswith("Digital Pattern")], :]
-#             assert(np.all(digEpochsTable_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels"
-#             assert(np.all(digEpochsTableAlt_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels with alternate digital outputs"
-#         
-#         
-#         # Locate the presynaptic triggers epoch
-#         # first try and find epochs with digital trains
-#         # there should be only one such epoch, sending at least one TTL pulse per train
-#         #
-#         
-#         synStimEpochs = list(filter(lambda x: len(x.trainDigitalOutputChannels("all"))>0, 
-#                                     digdac.epochs))
-#         
-#         # synStimEpochs = list(filter(lambda x: any(x.hasDigitalTrain(d) for d in stimDIG), 
-#         #                             digdac.epochs))
-#         
-#         # ideally there is only one such epoch
-#         if len(synStimEpochs) > 1:
-#             warnings.warn(f"There are {len(synStimEpochs)} in the protocol; will use the first one")
-#             synStimEpochs = [synStimEpochs[0]]
-#             # return False
-#         
-#         elif len(synStimEpochs) == 0:
-#             # Try prestim triggers defined as digital pulses instead of trains.
-#             #
-#             # Here we can expect to have more than one such epochs, together 
-#             #   emulating a train of TTL pulses (with one pulse per epoch).
-#             #
-#             # There should be no intervening epochs here...
-#             #
-#             # Obviously, this is a contrived scenario that might work for the 
-#             # synaptic monitoring episodes of the experiment (when one might use
-#             # single,  paired-pulse, or even a few pulses - although I am not 
-#             # sure there is good case for the latter) but is not so usable during 
-#             # conditioning episodes, especially those using high frequency trains
-#             # (one would run out of epochs pretty fast...); nevertheless, I can 
-#             # imagine case where low frequency triggers could be generated
-#             # using pulses instead of trains for conditioning as well (e.g.
-#             # low frequency stimulations)
-#             #
-#             synStimEpochs = list(filter(lambda x: len(x.pulseDigitalOutputChannels("all"))>0, 
-#                                         digdac.epochs))
-#         
-#             # synStimEpochs = list(filter(lambda x: any(x.hasDigitalPulse(d) for d in stimDIG), 
-#             #                             digdac.epochs))
-#             if len(synStimEpochs) == 0:
-#                 raise ValueError("There are no epoch sending digital triggers")
-#             
-#         # store these for later
-#         stimDIG = unique(synStimEpochs[0].usedDigitalOutputChannels("all"))
-#             
-#         # We need:
-#         # start of membrane test
-#         # duration of membrane test
-#         # magnitude of membrane test
-#         
-#         # locate the membrane test epoch; this is a step or pulse epoch, with:
-#         # (• are hard requirements, ∘ are soft requirements)
-#         # • first level !=0
-#         # • delta level == 0
-#         # • delta duration == 0
-#         # ∘ no digital info 
-#         
-#         mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
-#                                             and not any(x.hasDigitalOutput(d) for d in stimDIG) \
-#                                             and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
-#                                    dac.epochs))
-#         
-#         # NOTE: for the moment, I do not expect to have more than one such epoch
-#         # WARNING we require a membrane test epoch in voltage clamp;
-#         # in current clamp this is not mandatory as we may be using field recordings
-#         if len(mbTestEpochs) == 0:
-#             if self._clampMode_ == ephys.ClampMode.VoltageClamp:
-#                 raise ValueError("No membrane test epoch appears to have been defined")
-#             self._membraneTestEpoch_ = None
-#             
-#         else:
-#             self._membraneTestEpoch_ = mbTestEpochs[0]
-#         
-#         if self._membraneTestEpoch_ is None:
-#             self._mbTestAmplitude_ = None
-#             self._mbTestStart_ = None
-#             self._mbTestDuration_ = None
-#             self._signalBaselineStart_ = 0 * pq.s
-#             self._signalBaselineDuration_ = dac.epochRelativeStartTime(synStimEpochs[0], 0)
-#             self._responseBaselineStart_ = self._signalBaselineStart_
-#             self._responseBaselineDuration_ = self._signalBaselineDuration_
-#         else:
-#             self._mbTestAmplitude_ = self._membraneTestEpoch_.firstLevel
-#         
-#             self._mbTestStart_ = dac.epochRelativeStartTime(self._membraneTestEpoch_, 0)
-#             self._mbTestDuration_ = self._membraneTestEpoch_.firstDuration
-#         
-#         
-#             # Figure out the global signal baseline and the baseline for synaptic 
-#             # responses, based on the relative timings of the membrane test and trigger
-#             #   epochs
-#             #
-#             # For this purpose I guess could use the epoch number or letter but since
-#             #   I need the timings, I prefer to do it as below.
-#             #
-# 
-#             # NOTE: 2023-10-05 12:16:09
-#             # Setup landmark timings - all relative to the sweep start time
-#             #
-#             # 1) parse the protocol for epochs
-#             #
-#             if dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) + self._membraneTestEpoch_.firstDuration < digdac.epochRelativeStartTime(synStimEpochs[0], 0):
-#                 # membrane test is delivered completely sometime BEFORE triggers
-#                 #
-#                 
-#                 if self._mbTestStart_ == 0:
-#                     # membrane test is at the very beginning of the sweep (but always 
-#                     # after the holding time; odd, but allowed...)
-#                         
-#                     self._signalBaselineStart_ = 0 * pq.s
-#                     self._signalBaselineDuration_ = dac.epochRelativeStartTime(self._membraneTestEpoch_, 0)
-#                     
-#                 else:
-#                     # are there any epochs definded BEFORE mb test?
-#                     initialEpochs = list(filter(lambda x: dac.epochRelativeStartTime(x, 0) + x.firstDuration <=  dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) \
-#                                                         and x.firstDuration > 0 and x.deltaDuration == 0, 
-#                                                     dac.epochs))
-#                     
-#                     if len(initialEpochs):
-#                         baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
-#                         if len(baselineEpochs):
-#                             self._signalBaselineStart_ = dac.epochRelativeStartTime(baselineEpochs[0], 0)
-#                             self._signalBaselineDuration_ = baselineEpochs[0].firstDuration
-#                         else:
-#                             self._signalBaselineStart_ = 0 * pq.s
-#                             self._signalBaselineDuration_ = dac.epochRelativeStartTime(initialEpochs[0], 0)
-#                             
-#                     else:
-#                         # no epochs before the membrane test (odd, but can be allowed...)
-#                         self._signalBaselineStart_ = max(self._mbTestStart_ - 2 * dac.holdingTime, 0*pq.s)
-#                         self._signalBaselineDuration_ = max(dac.holdingTime, self._membraneTestEpoch_.firstDuration)
-#                 
-#                 
-#                 # Finally, get an epoch for the synaptic response baseline;
-#                 # NOTE: IN the case where membrane test is delivered BEFORE the triggers,
-#                 # we would expect to have another epoch intervening between the 
-#                 # membrane test and the first epoch in synStimEpochs -  we will use
-#                 # that to calculate the baseline for the synaptic responses
-#                 #
-#                 # This is not mandatory, but it would make more sense to let the cell
-#                 # membrane "settle" after a membrane test before delivering a synaptic
-#                 # stimulus.
-#                 #
-#                 # NOTE: 2023-10-04 18:34:59
-#                 # we take 5 ms duration for this (arbitrary)
-#                 #
-#                 
-#                 responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._responseBaselineDuration_ \
-#                                                             and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
-#                                                             and dac.epochRelativeStartTime(x, 0) + x.firstDuration <= digdac.epochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
-#                                                     dac.epochs))
-#                 
-#                 if len(responseBaselineEpochs):
-#                     # take the last one
-#                     self._responseBaselineStart_ = dac.epochRelativeStartTime(responseBaselineEpochs[-1], 0)
-#                 
-#                 else:
-#                     self._responseBaselineStart_ = digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
-#                     
-#                 
-#                     
-#             elif dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) > digdac.epochRelativeStartTime(synStimEpochs[-1], 0) + synStimEpochs[-1].firstDuration:
-#                 # membrane test delivered somwehere towards the end of the sweep, 
-#                 # surely AFTER the triggers (and hopefully when the synaptic responses
-#                 # have decayed...)
-#                 #
-#                 # in this case, best is to use the first epoch before the synStimEpochs (if any)
-#                 # or the dac holding
-#                 #
-#                 initialEpochs = list(filter(lambda x: dac.epochRelativeStartTime(x, 0) + x.firstDuration <=  digdac.epochRelativeStartTime(synStimEpochs[0], 0) \
-#                                                     and x.firstDuration > 0 and x.deltaDuration == 0, 
-#                                                 dac.epochs))
-#                 
-#                 if len(initialEpochs):
-#                     # there are epochs before synStimEpochs - are any of these baseline-like?
-#                     baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
-#                     if len(baselineEpochs):
-#                         self._signalBaselineStart_ = dac.epochRelativeStartTime(baselineEpochs[0], 0)
-#                         self._signalBaselineDuration_ = baselineEpochs[0].firstDuration
-#                     else:
-#                         self._signalBaselineStart_ = 0 * pq.s
-#                         self._signalBaselineDuration_ = dac.epochRelativeStartTime(initialEpochs[0], 0)
-#                         
-#                 else:
-#                     # no epochs before the membrane test (odd, but can be allowed...)
-#                     self._signalBaselineStart_ = max(digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
-#                     self._signalBaselineDuration_ = max(dac.holdingTime, synStimEpochs[0].firstDuration)
-#             
-#                 # Now, determine the response baseline for this scenario.
-#                 responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._responseBaselineDuration_ \
-#                                                             and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
-#                                                             and dac.epochRelativeStartTime(x, 0) + x.firstDuration <= digdac.epochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
-#                                                     dac.epochs))
-#                 
-#                 if len(responseBaselineEpochs):
-#                     # take the last one
-#                     self._responseBaselineStart_ = dac.epochRelativeStartTime(responseBaselineEpochs[-1], 0)
-#                 
-#                 else:
-#                     self._responseBaselineStart_ = digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
-#         #
-#         # 2) create trigger events
-#         #
-#         for path in range(protocol.nSweeps):
-#             pndx = f"path{path}"
-#             pathEpochs = sorted(synStimEpochs, key = lambda x: dac.epochRelativeStartTime(x, path))
-#             trig = dac.triggerEvents(pathEpochs[0], path) # will add sweep start time here
-#             if len(pathEpochs) > 1:
-#                 for e in pathEpochs[1:]:
-#                     trig = trig.merge(dac.triggerEvents(e, path))#, label="EPSC"))
-#                 
-#             ntrigs = trig.size
-#             ll = [f"EPSC{k}" for k in range(ntrigs)]
-#             trig.labels = ll
-#             
-#             if not isinstance(self._presynaptic_triggers_.get(pndx, None), TriggerEvent):
-#                 self._presynaptic_triggers_[pndx] = trig
-#             else: # not needed, really, because we set these up only upon the first run...
-#                 assert(trig == self._presynaptic_triggers_[pndx]), f"Presynaptic triggers mismatch {trig} vs path0 trigger {self._presynaptic_triggers_[pndx]}"
-#                 
-#         #
-#         # 3) populate the landmarks dictionary
-#         #
-#         # TODO: populate self._landmarks_ with neo.Epochs-like lists (start, duration)
-#         # use these to generate cursors in the corresponding pathway signal viewer
-#         # DECIDE: we need:
-#         #
-#         # • for voltage clamp:
-#         #
-#         #   ∘ global baseline Rbase epoch interval  -> aveage of signal slice
-#         #
-#         #   ∘ Rs epoch interval                     -> extremum of signal slice
-#         #       ⋆ max for positive Vm step, min for negative Vm step
-#         #
-#         #   ∘ Rin epoch interval                    -> average of signal slice
-#         #   
-#         #   ∘ EPSCbase interval (or EPSC0Base and EPSC1Base intervals) 
-#         #       ⋆ NOTE a single EPSCBase should also be used for paire-pulse,
-#         #           where we use it as a common baseline for BOTH EPSCs -> 
-#         #           TODO Adapt functions for LTP analysis in this module
-#         #
-#         #   ∘ EPSCPeak interval (or EPSC0Peak and EPSC1Peak intervals)
-#         #       ⋆ NOTE needs two intervals for paired-pulse
-#         # 
-#         # • for current-clamp:
-#         #
-#         #   ∘ global baseline Baseline epoch interval  -> aveage of signal slice
-#         #
-#         #   ∘ measure the membrane test with membrane.passive_Iclamp(…) 
-#         #       ⋆ => calculate tau, Rin and capacitance
-#         #
-#         #   ∘ EPSP interval or EPSP0 and EPSP1 intervals (for paired-pulse)
-#         #       ⋆ measure slope of 10-90% of rising phase
-#         #
-#         if self._clampMode_ == ephys.ClampMode.VoltageClamp:
-#             self._landmarks_["Rbase"] = [self._signalBaselineStart_, self._signalBaselineDuration_]
-#             
-#             # Rs landmark will be overwritten after find out local extremum in 
-#             # the adc signal (searching for the first capacitance transient)
-#             # also, NOTE that we only need Rbase, Rs, and Rin for the pathway 0
-#             #
-#             self._landmarks_["Rs"] = [dac.epochRelativeStartTime(self._membraneTestEpoch_), 
-#                                       self._responseBaselineDuration_]
-#             self._landmarks_["Rin"] = [dac.epochRelativeStartTime(self._membraneTestEpoch_) + self._membraneTestEpoch_.firstDuration - 2 * self._responseBaselineDuration_,
-#                                        self._responseBaselineDuration_]
-#             self._landmarks_["PSCBase"] = [self._responseBaselineStart_, self._responseBaselineDuration_]
-#             self._landmarks_["PSC0Peak"] = [self._presynaptic_triggers_["path0"].times[0] - protocol.sweepTime(0) + 15 * pq.ms,
-#                                            2 * pq.ms]
-#             if self._presynaptic_triggers_["path0"].size > 1:
-#                 self._landmarks_["PSC1Peak"] = [self._presynaptic_triggers_["path0"].times[1] - protocol.sweepTime(0) + 15 * pq.ms,
-#                                             2 * pq.ms]
-#         else:
-#             # WARNING - needs more work to adapt to what passive_Iclamp needs:
-#             # vm signal (slice of the adc data on VmTest)
-#             # im as a list of amplitude, VmTest start, VmTest stop
-#             # steadystate duration - default is 50 ms
-#             self._landmarks_["Base"] = [self._signalBaselineStart_,self._signalBaselineDuration_]
-#             if self._membraneTestEpoch_ is not None:
-#                 self._landmarks_["VmTest"] = [dac.epochRelativeStartTime(self._membraneTestEpoch_),
-#                                             self._membraneTestEpoch_.firstDuration]
-#     
-    #### END   To processor thread
-    
-    #### BEGIN To producer thread
-#     def filesChanged(self, filePaths:typing.Sequence[str]):
-#         """
-#         Used in communicating with the directory monitor
-#     """
-#         # print(f"{self._a_} → {self.__class__.__name__}.filesChanged {filePaths}\n")
-#         for f in filePaths:
-#             fp = pathlib.Path(f)
-#             stat = fp.stat()
-#             # print(f"\t → {fp.name}: {stat.st_size}, {stat.st_atime_ns, stat.st_mtime_ns, stat.st_ctime_ns}")
-#         # self._a_ += 1
-#         
-#     def _rsvForABF_(self, abf:pathlib.Path):
-#         """Returns the rsv file paired with the abf
-#         Used in communicating with the directory monitor
-#     """
-#         paired = [f for f in self._filesQueue_ if f.suffix == ".rsv" and f.stem == abf.stem and f.parent == abf.parent]
-#         if len(paired):
-#             return paired[0]
-# 
-#     def _abfForRsv_(self, rsv:pathlib.Path):
-#         """Returns the abf file paired with the rsv.
-#         Used in communicating with the directory monitor
-#     """
-#         paired = [f for f in self._filesQueue_ if f.suffix == ".abf" and f.stem == rsv.stem and f.parent == rsv.parent]
-#         if len(paired):
-#             return paired[0]
-#         
-#     def _setupPendingAbf_(self):
-#         """
-#         Used in communicating with the directory monitor
-#         """
-#         self._pending_.clear()
-#         # if isinstance(self._dirMonitor_, DirectoryFileWatcher):
-#         #     monitoredFiles = self._dirMonitor_._source_.dirFileMonitor.files()
-#         #     if len(monitoredFiles):
-#         #         self._dirMonitor_._source_.dirFileMonitor.removePaths(monitoredFiles)
-#         # else:
-#         #     raise RuntimeError("We haven't got a dirFileMonitor yet!")
-#         
-#         if len(self._filesQueue_) < 2:
-#             return
-#         
-#         latestFile = self._filesQueue_[-1]
-#         
-#         if latestFile.suffix == ".rsv":
-#             abf = self._abfForRsv_(latestFile)
-#             if isinstance(abf, pathlib.Path) and abf.is_file():
-#                 self._pending_[latestFile] = abf
-#                 
-#         elif latestFile.suffix == ".abf":
-#             rsv = self._rsvForABF_(latestFile)
-#             if isinstance(rsv, pathlib.Path) and rsv.is_file():
-#                 self._pending_[rsv] = latestFile
-#             
-#         for rsv, abf in self._pending_.items():
-#             # print(f"To monitor {abf.name}")
-#             # self._pendingAbf_stat_ = abf.stat()
-#             # self._dirMonitor_.monitorFile(abf)
-#             
-#             if rsv in self._filesQueue_:
-#                 self._filesQueue_.remove(rsv)
-#                 
-#             if abf in self._filesQueue_:
-#                 self._filesQueue_.remove(abf)
-    #### END   To producer thread
-
+        self._abfSupplierThread_.start()
+        self._abfProcessorThread_.start()
             
 # class LTPOnlineController(QtCore.QObject):
 #     startLTP = pyqtSignal(name ="startLTP")
@@ -3747,7 +2805,7 @@ class LTPOnlineOld(QtCore.QObject):
 #         self._abfRunBufferEmptyCondition_ = QtCore.QWaitCondition()
 #         self._abfRunBufferNotEmptyCondition_ = QtCore.QWaitCondition()
 #         
-#         self._abfProducerThread_ = _LTPOnlineProducer_(self, self._abfRunBuffer_,
+#         self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
 #                                                  self._mutex_,
 #                                                  self._abfRunBufferEmptyCondition_,
 #                                                  self._abfRunBufferNotEmptyCondition_,
@@ -3824,7 +2882,7 @@ class LTPOnlineOld(QtCore.QObject):
         self._dacChannel_ = val
     
     def stop(self):
-        self._abfProducerThread_.wait()
+        self._abfSupplierThread_.wait()
         self._abfProcessorThread_.wait()
         
         # if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
