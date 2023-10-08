@@ -1823,6 +1823,7 @@ class LTPOnline(QtCore.QObject):
 #                     
 #           ∘ sends out analog command waveform ⇒ clampMode != NoClamp:
 #               ⋆ alternateDACOutputStateEnabled == False (same analog command every sweep) 
+#
 #               ⋆ analogWaveformEnabled == True, with:
 #                   □ optional membrane test ABF epoch:
 #                       - type Step or Pulse with pulseCount == 1
@@ -1850,9 +1851,11 @@ class LTPOnline(QtCore.QObject):
 #                       - between membrane test and stimulation epochs when membrane 
 #                           test comes before stimulation, or vice-versa
 #
-#   2) recording from two cells:
-#       NOTE: two cells can be recorded simultaneously or alternatively, in either
-#       case you need to ADCs
+#               ⋆ analogWaveformEnabled == FALSE ⇒ field recording (nowhere to send analog command)
+#
+#   2) recording from two cells, or one cell in parallel with field recording:
+#       NOTE: two cells can be recorded simultaneously or alternatively;
+#       in either case you need to ADCs
 #
 #   ADC:
 #   • adcChannel: list of int (2 distinct elements)
@@ -1865,12 +1868,33 @@ class LTPOnline(QtCore.QObject):
 #   DAC:
 #   • dacChannel: list of 2 int (distinct)
 #       ∘ units and clamp modes consistent with the adc channels above
-#       ∘ digitalOutputEnabled == True (for stimulation)
-#           ⋆ alternateDigitalOutputStateEnabled == False
+#       ∘ digitalOutputEnabled == True in BOTH dacChannels (for stimulation)
+#           ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
+#           that converge on at least one of the cells - see (1)
+#           ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
+#           although both cells may respond to that same pathway, 
+#               → not very useful
+#               no restriction on number of sweeps (see (1))
 #
+#       ∘ both dacChannels send out analog command waveform ⇒ clampMode != NoClamp:
+#           ⋆ alternateDACOutputStateEnabled == True ⇒ even number of sweeps
+#               cells receive analog commands on alternative sweeps (NOT useful when 
+#               alternateDigitalOutputStateEnabled == True)
 #
-    #   1.1) track a single synaptic pathway
-    #
+#           ⋆ alternateDACOutputStateEnabled == False ⇒ 
+#               cells receive analgo command simultaneously
+#               allows alternative digital outputs
+#
+#       ∘ OR: only one dacChannel has alternateDACOutputStateEnabled == True
+#           ⇒ one cell is clamped; the other is not so the corresponding adc
+#           likely records fields
+#
+#       WARNING: this is problematic and likely too ambiguous, as one may
+#       design an experiment to record field potentials AND whole-cell 
+#       currents simultaneously; will need to use alternative DIG outputs
+#       AND NO alternative analog waveforms so that the "alternative" DAC
+#       can be configured to send no command waveforms for field recording
+#
 
     test_protocol_properties = ("activeDACChannelIndex",
                                 "nSweeps",
