@@ -207,6 +207,8 @@ class PathwayType(TypeEnum):
 class PathwayEpisode(Episode):
     """
 Specification of an episode in a synaptic pathway.
+    
+WARNING: Do not use yet
 
 An "episode" is a series of sweeps recorded during a specific set of
 experimental conditions -- possibly, a subset of a larger experiment where
@@ -941,29 +943,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         QtCore.QThread.__init__(self, parent)
         
         self._abfRunBuffer_ = abfBuffer
-        # self._guard_ = guard
-        # self._mutex_ = mutex
-        # self._bufferEmptyCondition_ = bufferEmptyCondition
-        # self._bufferNotEmptyCondition_ = bufferNotEmptyCondition
-        # self._abfRunTimes_ = abfRunTimes
-        # self._abfRunDeltaTimes_ = abfRunDeltaTimes
-        # self._dacChannel_ = dacChannel
-        # self._adcChannel_ = adcChannel
-        # self._clampMode_ = clampMode
-        # self._monitorProtocol_ = monitorProtocol
-        # self._conditioningProtocol_ = conditioningProtocol
-        # self._responseBaselineDuration_ = responseBaselineDuration
-        # self._mbTestAmplitude_ = mbTestAmplitude
-        # self._mbTestStart_ = mbTestStart
-        # self._mbTestDuration_ = mbTestDuration
         self._runParams_ = abfRunParams
         self._presynaptic_triggers_ = presynapticTriggers
         self._landmarks_ = landmarks
         self._data_ = resultsData
         self._results_ = resultsAnalysis
         self._viewers_ = viewers
-        # self._signalAxes_ = signalAxes
-        # self._sigIndex_ = sigIndex
         
     @safeWrapper
     @pyqtSlot(pathlib.Path)
@@ -986,6 +971,28 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
         dac = protocol.outputConfiguration(self._runParams_._dacChannel_)
+        
+        episodes = list(self._results_.keys())
+        
+        # check that the protocol in the ABF file is the same as the current one
+        # else create a new episode automatically
+        # 
+        # upon first run, self._runParams_.protocol is None
+        if not isinstance(self._runParams_.protocol, pab.ABFProtocol):
+            self._runParams_.protocol = protocol
+            # set up new episode
+            # since Clampex only runs on Windows, we simply split the string up:
+            #
+            episodeName = protocol.name
+        elif protocol != self._runParams_.protocol:
+            # a different protocol - here, newEpisode should have been "True"
+            # if not, then automatically set a new episode and "invent" a name 
+            # for it
+            if not self._runParams_.newEpisode:
+                self._runParams_.newEpisode = True
+                episodeName = self._runParams_.currentEpisode
+                newEpisodeName = utilities.counter_suffix(episodeName, self._runParams_.episodes)
+                
         
 
         # NOTE: 2023-09-29 14:12:56
@@ -1016,8 +1023,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # which should have the same monitoring protocol
         #
         
-        if self._runParams_._monitorProtocol_ is None:
-            if protocol.clampMode() == self._runParams_._clampMode_:
+        # if self._runParams_.monitorProtocol is None:
+        if self._runParams_.protocol is None:
+            if protocol.clampMode() == self._runParams_.clampMode:
                 assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
                 if protocol.nSweeps == 2:
                     assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
@@ -1025,26 +1033,33 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                     # TODO check for alternate digital outputs → True ; alternate waveform → False
                     # → see # NOTE: 2023-10-07 21:35:39 - DONE ?!?
-                self._monitorProtocol_ = protocol
+                # self._runParams_.monitorProtocol = protocol
+                self._runParams_.protocol = protocol
+                self._runParams_.newEpisode = False
                 self.processMonitorProtocol(protocol)
             else:
-                raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._clampMode_}")
+                raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._runParams_.clampMode}")
             
         else:
-            if protocol != self._monitorProtocol_:
-                # if self._conditioningProtocol_ is None:
-                if len(self._conditioningProtocols_) == 0:
-                    if protocol.clampMode() == self._conditioningClampModes_:
-                        self._conditioningProtocol_ = protocol
+            # if protocol != self._runParams_.monitorProtocol:
+            if protocol != self._runParams_.protocol:
+                if self._runParams_.newEpisode:
+                    # if self._conditioningProtocol_ is None:
+                    if len(self._runParams_.conditioningProtocols) == 0:
+                        # if protocol.clampMode() == self._conditioningClampModes_:
+                        if protocol.clampMode() in self._runParams_.conditioningClampModes:
+                            self._conditioningProtocol_ = protocol
+                        else:
+                            raise ValueError("Unexpected conditioning protocol")
+                        
                     else:
-                        raise ValueError("Unexpected conditioning protocol")
-                    
-                else:
-                    if protocol != self._conditioningProtocol_:
-                        raise ValueError("Unexpected protocol for current run")
+                        if protocol != self._conditioningProtocol_:
+                            raise ValueError("Unexpected protocol for current run")
             
-        if self._monitorProtocol_.nSweeps == 2:
-            if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
+        # if self._monitorProtocol_.nSweeps == 2:
+        if self._runParams_.protocol.nSweeps == 2:
+            # if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
+            if not self._runParams_.protocol.alternateDigitalOutputStateEnabled:
                 # NOTE: this is moot, because the protocol has already been checked
                 # in the processMonitorProtocol
                 raise ValueError("When the protocol defines two sweeps, alternate digtal outputs MUST have been enabled in the protocol")
@@ -1062,8 +1077,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
         # From here on we do things differently, depending on whether protocol is a
         # the monitoring protocol or the conditioning protocol
-        if protocol == self._monitorProtocol_:
-            adc = protocol.inputConfiguration(self._adcChannel_)
+        if protocol == self._runParams_.protocol:
+            adc = protocol.inputConfiguration(self._runParams_.adcChannel)
             sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
             # for k, seg in enumerate(abfRun.segments[:1]): # use this line for debugging
             for k, seg in enumerate(abfRun.segments):
@@ -1075,8 +1090,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 sweepStartTime = protocol.sweepTime(k)
                 
-                self._data_["baseline"][pndx].segments.append(abfRun.segments[k])
-                if isinstance(self._presynaptic_triggers_[pndx], TriggerEvent):
+                # self._data_["baseline"][pndx].segments.append(abfRun.segments[k])
+                self._data_[self._runParams_.currentEpisode][pndx].segments.append(abfRun.segments[k])
+                if isinstance(self._presynaptic_triggers_[self._runParams_.currentEpisode][pndx], TriggerEvent):
                     self._data_["baseline"][pndx].segments[-1].events.append(self._presynaptic_triggers_[pndx])
                     
                 viewer = self._viewers_[pndx]#["synaptic"]
@@ -1731,6 +1747,130 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                             self._membraneTestEpoch_.firstDuration]
             
 class LTPOnline(QtCore.QObject):
+# NOTE: 2023-10-08 20:55:15
+#   Brief description of supported AND protocol configurations:
+#
+#   "Synaptic tracking" protocols: monitor synaptic responses evoed repeatedly over time
+#       NOTE: these should be evoked at every 10 s or more (i.e. 0.1 Hz or less)
+#
+#   1) recording from a single cell:
+#       ADC: 
+#       • adcChannel: int   
+#       • mandatory ! (is the recorded signal)
+#       • receives the Primary amplifier input
+#       • its logical index depends on how the signals are configured in 
+#       • acquisition sofware (in Clampex, that is the 'Lab book')
+#       • must have been selected in the Clampex protocol
+#       • clampMode ⇔ units:
+#           ∘ pA (or A) ⇒ clampMode == ephys.ClampMode.VoltageClamp
+#           ∘ mV (or V) ⇒ clampMode == ephys.ClampMode.CurrentClamp (includes I=0/NoClamp)
+#
+#       DAC: 
+#       • dacChannel: int
+#           ∘ units:
+#               ⋆ mV (or V) ⇒ clampMode == ephys.ClampMode.VoltageClamp
+#               ⋆ pA (or A) ⇒ clampMode == ephys.ClampMode.CurrentClamp (includes I=0/NoClamp)
+#
+#           ∘ dacChannel is usually 0 or 1, depending on which amplifier channel is used 
+#               (1 or 2, respectively) and how their inputs are routed from the DAQ
+#               outputs; it may be higher, but mind the constraint below (» «)
+#
+#           ∘ digitalOutputEnabled == True (for stimulation)
+#               ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
+#                   converging on the same cell, and stimulated in alternative sweeps
+#                   □ ⇒ REQUIRES even number of sweeps per run (typically only TWO sweeps per run)
+#                       ⇒ two sweps per trial (averaged if more than one run per trial)
+#                   □ » applies only to dacChannels 0 & 1 « 
+#                   □ mandatory stimulation ABF epochs:
+#                       a) unique epoch with digital output TRAIN ('*')
+#                       - any type (except for Off)
+#                       - has digital output as TRAIN ('*') - position of '*'
+#                           indicates which DIG channel is used; this must reflect
+#                           physical connection between DAQ's DIG output and the 
+#                           stimulus isolation box
+#                       - has alternate digital output TRAIN on a DISTINCT DIG
+#                           channel defined in the  "alternate" DAC: 
+#                               dac 1 if dacChannel is 0, dac 0 if dacChannel is 1
+#                       - ⇒ this epoch MUST also be defined in the "alternate" DAC ⇒
+#                       - the "alternate" DAC must have the same epochs and timings
+#                           defined as for dacChannel
+#                       - the actual digital pattern of the dacChannel depends on
+#                           the sweep number: 
+#                               main pattern is sent on even sweeps (0,2,4,…)
+#                               alternate pattern is sent on odd sweeps (1,3,5,…)
+#                       - the digital TRAIN provides:
+#                           1 pulse ⇒ single stimulation
+#                           2 pulses ⇒ paired-pulse stimulation
+#                           > 2 pulses ⇒ ONLY FOR SPECIAL EXPERIMENTS when justified
+#                       b) one or more epochs with digital output PULSE ('1')
+#                       - all pulses defined on the same DIG output channel
+#                       - 1 epoch ⇒ single-pulse
+#                       - 2 epochs ⇒ paired-pulse
+#                       - > 2 epochs ⇒ ONLY FOR SPECIAL EXPERIMENTS when justified
+#                       - all these must aso be defined on the "alternate" DAC
+#                           (see above) using a DISTINCT DIG output channel for 
+#                           the other pwthway (stimulus isolator, see above)
+#                   
+#               ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
+#                   to the cell
+#                   □ no restriction to number of sweeps (all sweeps record the same process)
+#                   □ mandatory stimulation ABF epochs:
+#                       a) unique epoch with digital output TRAIN on appropriate
+#                           DIG channel (see above, except for the alternate output)
+#                       - TRAIN defines 1, 2, or more pulses (see above)
+#                       b) 1, 2, or more epochs with digial output PULSE (as above,
+#                           except for the alternative output)
+#                     
+#           ∘ sends out analog command waveform ⇒ clampMode != NoClamp:
+#               ⋆ alternateDACOutputStateEnabled == False (same analog command every sweep) 
+#               ⋆ analogWaveformEnabled == True, with:
+#                   □ optional membrane test ABF epoch:
+#                       - type Step or Pulse with pulseCount == 1
+#                       - firstLevel != 0, deltaLevel == 0, firstDuration ! = 0, deltaDuration == 0
+#                       - sometime BEFORE or AFTER the stimulation epoch(s) (see above)
+#                           if BEFORE simulation epoch:
+#                               it MAY be the first defined epoch ⇒ signal baseline taken from the 
+#                               dacChannel.holdingTime
+#                               if MAY follow a "baseline" epoch (see below)
+#                           if AFTER simulation epoch:
+#                               must start some time AFTER stimulation epoch is order
+#                                   to allow the recorded signal to settle back to baseline
+#                               must end with enough time left in the sweep to allow for 
+#                                   recording signal to settle back to baseline
+#                                   (in current clamp this may allow detecting Vrebound, etc)
+#                   □ optional baseline epoch
+#                       - firstLevel = deltaLevel = 0; firstDuration !=0; deltaDuration = 0
+#                       - contains signal baseline for the sweep
+#                       - when present, this should be the first epoch defined  
+#                       NOTE: when absent, signal baseline will be measured during the 
+#                       DAC holding time which is 1/64 of sweep samples; if sweep is
+#                       too short this may not be helpful
+#                   □ interleaved "no-op" epochs:
+#                       - firstLevel = deltaLevel = 0, firstDuration != 0, deltaDuration = 0
+#                       - between membrane test and stimulation epochs when membrane 
+#                           test comes before stimulation, or vice-versa
+#
+#   2) recording from two cells:
+#       NOTE: two cells can be recorded simultaneously or alternatively, in either
+#       case you need to ADCs
+#
+#   ADC:
+#   • adcChannel: list of int (2 distinct elements)
+#       usually 0 & 1, but depends on the physical connections between the DAQ
+#           and amplifier devices
+#
+#   • clampMode: list of 2 elements depends on adc Units see (1); 
+#       NOTE: theoretically, each adc can have distinct clamp modes
+#
+#   DAC:
+#   • dacChannel: list of 2 int (distinct)
+#       ∘ units and clamp modes consistent with the adc channels above
+#       ∘ digitalOutputEnabled == True (for stimulation)
+#           ⋆ alternateDigitalOutputStateEnabled == False
+#
+#
+    #   1.1) track a single synaptic pathway
+    #
 
     test_protocol_properties = ("activeDACChannelIndex",
                                 "nSweeps",
@@ -1919,7 +2059,9 @@ class LTPOnline(QtCore.QObject):
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
-        self._monitorProtocol_ = None
+        # self._monitorProtocol_ = None
+        
+        self._protocol_ = None
 
         self._conditioningProtocol_ = None
         
@@ -1943,7 +2085,7 @@ class LTPOnline(QtCore.QObject):
             raise TypeError(f"mainClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(mainClampMode).__name__}")
 
         # NOTE: 2023-10-08 09:41:39
-        # conditioning protocols should not really matter!
+        # conditioning protocols should not really matter, 
         # but they SHOULD be different from the monitor protocol
         
 #         if isinstance(conditioningClampMode, int):
@@ -1975,26 +2117,6 @@ class LTPOnline(QtCore.QObject):
         
         self._episode_ = "baseline"
 
-        # NOTE: 2023-10-08 09:27:47
-        # passed by reference to the processor thread
-        self._runParams_= dict(adcChannel = self._adcChannel_,
-                               dacChannel = self._dacChannel_,
-                               clampMode = self._clampMode_,
-                               conditioningClampModes = self._conditioningClampModes_,
-                               monitorProtocol = self._monitorProtocol_,
-                               condtioningProtocols = self._conditioningProtocols_,
-                               signalIndex = self._sigIndex_,
-                               useSlopeInIClamp = self._useSlopeInIClamp_,
-                               mbTestAmplitude = self._mbTestAmplitude_,
-                               mbTestStart = self._mbTestStart_,
-                               mbTestDuration = self._mbTestDuration_,
-                               responseBaselineDuration = self._responseBaselineDuration_,
-                               steadyStateDurationIClampTest = self._steadyStatePassiveVmTest_,
-                               abfRunTimes = self._abfRunTimes_,
-                               abfRunDeltaTimes = self._abfRunDeltaTimes_,
-                               currentEpisode = self._episode_
-                               )
-        
         # WARNING: 2023-10-05 12:10:40
         # below, all timings in self._landmarks_ are RELATIVE to the start of the sweep!
         # timings are stored as [start time, duration] (all Quantity scalars, with units of time)
@@ -2109,15 +2231,26 @@ class LTPOnline(QtCore.QObject):
                               path1 = synapticViewer1,
                               results = resultsViewer)
         
-        #### BEGIN TODO move to a producer thread
-        #
-        # self._abfListener_ = FileStatChecker(interval = 10, maxUnchangedIntervals = 5,
-        #                                      callback = self.fileProcessor)
-        # self._abfListener_ = FileStatChecker(interval = 10, maxUnchangedIntervals = 5,
-        #                                      callback = self.processAbfFile)
-        
-        #
-        #### END   TODO move to a producer thread
+        # NOTE: 2023-10-08 09:27:47
+        # passed by reference to the processor thread
+        self._runParams_= DataBag(adcChannel = self._adcChannel_,
+                               dacChannel = self._dacChannel_,
+                               clampMode = self._clampMode_,
+                               protocol  = self._protocol_,
+                               # monitorProtocol = self._monitorProtocol_,
+                               condtioningProtocols = self._conditioningProtocols_,
+                               signalIndex = self._sigIndex_,
+                               useSlopeInIClamp = self._useSlopeInIClamp_,
+                               mbTestAmplitude = self._mbTestAmplitude_,
+                               mbTestStart = self._mbTestStart_,
+                               mbTestDuration = self._mbTestDuration_,
+                               responseBaselineDuration = self._responseBaselineDuration_,
+                               steadyStateDurationIClampTest = self._steadyStatePassiveVmTest_,
+                               abfRunTimes = self._abfRunTimes_,
+                               abfRunDeltaTimes = self._abfRunDeltaTimes_,
+                               currentEpisodeName = None,
+                               newEpisode = True,
+                               )
         
         # for each new file, create an _LTPOnlineFileProcessor_ and move it here?
         # need to synchronize, as files may come in faster than we can process 

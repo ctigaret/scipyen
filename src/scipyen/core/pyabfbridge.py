@@ -448,7 +448,7 @@ Digital Outputs chacked on Channel #0, with
     
 
 """
-import typing, struct, inspect, itertools, functools, warnings
+import typing, struct, inspect, itertools, functools, warnings, pathlib
 from functools import singledispatch, partial
 import numpy as np
 import pandas as pd
@@ -903,6 +903,8 @@ class ABFProtocol:
             self._digHoldingValue_ = list(reversed(digHolds[0:4])) + list(reversed(digHolds[4:]))
             self._digUseLastEpochHolding_ = bool(obj._protocolSection.nDigitalInterEpisode)
             
+            self._protocolFile_ = abf.protocolPath # store this for future reference
+            
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
             assert obj.annotations["lActualEpisodes"] == obj.annotations["protocol"]["lEpisodesPerRun"], f"In {obj.name}: Mismatch between lActualEpisodes ({obj.annotations['lActualEpisodes']}) and lEpisodesPerRun ({obj.annotations['protocol']['lEpisodesPerRun']})"
@@ -944,10 +946,15 @@ class ABFProtocol:
                 self._digHoldingValue_ = [False] * self._nDigitalOutputs_
                 
             self._digUseLastEpochHolding_ = bool(obj.annotations["protocol"]["nDigitalInterEpisode"])
+            
+            self._protocolFile_ = obj.annotations["sProtocolPath"].decode()
 
         else:
             raise TypeError(f"Expecting a pyabf.ABF or a neo.Block; instead, got {type(obj).__name__}")
-    
+        
+        # since Clampex only runs on Windows, we simply split the string up:
+        self._name_ = pathlib.Path(self._protocolFile_.split("\\")[-1]).stem  # strip off the extension
+        
         self._sourceHash_ = hash(obj)
         self._sourceId_ = id(obj)
         
@@ -1093,6 +1100,14 @@ class ABFProtocol:
     @property
     def holdingSampleCount(self) -> int:
         return self._nDataPointsHolding_
+    
+    @property
+    def protocolFile(self) -> str:
+        return self._protocolFile_
+    
+    @property
+    def name(self)->str:
+        return self._name_
     
     @property
     def duration(self) -> pq.Quantity:
