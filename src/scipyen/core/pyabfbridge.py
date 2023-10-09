@@ -1134,17 +1134,20 @@ class ABFProtocol:
     def sweepTimes(self) -> pq.Quantity:
         return np.array(list(map(self.sweepTime, range(self.nSweeps)))) * pq.s
 
-    def clampMode(self, dacIndex:typing.Optional[int] = None,
-                  adcIndex:int = 0):
+    def clampMode(self, adcIndex:int = 0,
+                  dacIndex:typing.Optional[int] = None,
+                  ):
         from ephys.ephys import ClampMode
-        dac = self.outputConfiguration(dacIndex) # get active DAC by default
         adc = self.inputConfiguration(adcIndex) # get first (primary) input by default
+
+        recordsCurrent = scq.check_electrical_current_units(adc.units)
+        recordsPotential = scq.check_electrical_potential_units(adc.units)
+
+        dac = self.outputConfiguration(dacIndex) # get active DAC by default
 
         commandIsCurrent = scq.check_electrical_current_units(dac.units)
         commandIsPotential = scq.check_electrical_potential_units(dac.units)
 
-        recordsCurrent = scq.check_electrical_current_units(adc.units)
-        recordsPotential = scq.check_electrical_potential_units(adc.units)
 
         if recordsPotential and commandIsCurrent:
             return ClampMode.CurrentClamp

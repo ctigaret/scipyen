@@ -1,4 +1,4 @@
-# # 1) select blocks and concatenate them for eack PathwayEpisode
+# # 1) select blocks and concatenate them for eack RecordingEpisode
 # test_baseline = neoutils.concatenate_blocks(base_0001, base_0002, base_0003, base_0004, base_0005, base_0008, 
 #                                             segments=[0], 
 #                                             analogsignals = ["Im_prim_0", "Vm_sec_0", "Stim_0"])
@@ -34,7 +34,7 @@
 # # make episodes, sort, then update their beginFrame & endFrame considering
 # # the blocks will be further concatenated
 # 
-# test_baseline_episode = ltp.PathwayEpisode("Baseline", response="Im_prim_0", 
+# test_baseline_episode = ltp.RecordingEpisode("Baseline", response="Im_prim_0", 
 #                                            analogCommand="Vm_sec_0", digitalCommand="Stim_0", 
 #                                            begin = test_baseline.segments[0].rec_datetime, 
 #                                            end=test_baseline.segments[-1].rec_datetime,
@@ -43,7 +43,7 @@
 # 
 # 
 # 
-# test_chase_episode = ltp.PathwayEpisode("Chase", response="Im_prim_0", 
+# test_chase_episode = ltp.RecordingEpisode("Chase", response="Im_prim_0", 
 #                                            analogCommand="Vm_sec_0", digitalCommand="Stim_0", 
 #                                            begin = test_chase.segments[0].rec_datetime, 
 #                                            end=test_chase.segments[-1].rec_datetime,
@@ -107,7 +107,7 @@
 # # 
 
 # # ------------
-# # The idea is to generate a SynapticPathway with at least one PathwayEpisode,
+# # The idea is to generate a SynapticPathway with at least one RecordingEpisode,
 # # given a list of source neo.Blocks (the 'trials')
 # #
 # # We can also use a dict to specify each pathway, in a list:

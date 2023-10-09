@@ -121,90 +121,83 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
-class SynapticPathway: pass # forward declaration for PathwayEpisode; redefined below
+class SynapticPathway: pass # forward declaration for RecordingEpisode; redefined below
 
 class PathwayType(TypeEnum):
     """
     Synaptic pathway type.
-    Encapsulates: Null, Test, Control, and up to six additional types
+    Encapsulates: Null, Test, Control, Auxiliary, UserDefined
+    
+    A Test pathway is defined by the presence of a Conditioning episode between
+    two non-Conditioning episodes - see RecordingEpisodeType class.
+    
+        A non-Conditioning episode is usually a Tracking episode, but can also be
+        a Crosstalk or Drug episode.
+        
+        Where justified, the test pathway may be "conditioned" more than once.
+        In this case, the Conditioning episodes MUST be separated by at least 
+        one non-Conditioning episode (usually a Tracking episode).
+        
+        In addition, there may be any number of Crosstalk, Drug and Washout
+        applied either before, or after the Conditioning episode.
+    
+    The Control pathway is defined by the presence of at least one Tracking
+        episode. No Conditioning episodes are allowed in a Control pathway.
+        
+    A combination of types IS NOT ALLOWED. The values were chosen to prevent
+    ambiguities. Thus,
+    
+    Null    | Control   ⇒ Control       (1)
+    Null    | Test      ⇒ Test          (2)
+    Control | Test      ⇒ Auxiliary     (3)
+    Control | Auxiliary ⇒ UserDefined   (4)
+    
+    Any value > 4 is invalid.
+    
     """
-    # TODO: 2023-05-22 14:28:53
-    # To emulate a cross-talk - style recording, this should be associated with
-    # a mapping detailing the order of the cross-stimulation
+    Null        = 0 # undefined; can associate any episode type, EXCEPT for Conditioning and Tracking
+    Undefined   = Null
+    Control     = 1 # can associate any episode type, EXCEPT for Conditioning
+    Test        = 2 # can associate any episode type
+    Auxiliary   = 3 # can associate any episode type, EXCEPT for Tracking;
+                    # NOTE: this requirement is for analysis purpose only; the 
+                    # pathway can be activated during any type of episode, but
+                    # synaptic responses do not need to be analysed during the 
+                    # tracking episodes.
+                    # auxiliary pathways can be:
+                    # • present along the tracking pathway, during tracking only
+                    # • present along the induction pathway, during induction only
+                    # • present throughout
+    UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
     
-    Null = 0
-    # NOTE: 2023-06-02 15:41:59 
-    # In synaptic plasticity experiments, Tracing and Induction pathways are
-    #   recorded FROM THE SAME CELL, in SEPARATE SWEEPS, ONE PER PATHWAY.
-    #
-    #   Each sweep contains an instance of synaptic response on the corresponding
-    #   pathway.
-    #
-    #   When more than one pathway is recorded, tracking the synaptic responses 
-    #   must use the same pattern of activity in all pathways. This ensures
-    #   equal treament of all pathways. The only exception to this rule is during 
-    #   plasticity induction, where only a subset of pathways are exposed to the
-    #   induction protocol (the "Test" pathways), whereas the others ("Control"
-    #   pathways) are left unperturbed.
-    #
-    # Theoretically, this can be achieved either:
-    #
-    # • in INTERLEAVED mode (typical) ⇒ the number of neo.Segment objects 
-    #   (a.k.a 'sweeps') in the neo.Block (a.k.a, the 'trial') is expected to be
-    #   an integer multiple of the TOTAL number of pathways; THE ORDER of the 
-    #   pathway-specific sweeps IS THE SAME IN ALL trials.
-    #
-    #   NOTE: in Clampex, a 'trial' may consist of:
-    #   ∘ several 'runs', meaning that the stored trial data contains AN AVERAGE
-    #       of the corresponding individual sweeps across several runs in the trial.
-    #       The result is like a "running" average across as many runs that were 
-    #       recorded per total duration of the trial - see Clampex protocol editor
-    #       for details. 
-    #
-    #       In the most typical scenario (for two pathways):
-    #       ⋆ 'trials' are repeated every minute
-    #       ⋆ each 'trial' contains six 'runs' repeated every 10 s
-    #       ⋆ each 'run' contains two sweeps, at 5 s delay (so that the pathway 
-    #       responses are evoked with similar delays) and sweeps last 1 s
-    #
-    #           In these conditions, Clampex records a synaptic response from
-    #       each pathway every 10 s for six times, then saves their (minute)
-    #       average on disk.
-    #
-    #   ∘ a single 'run' ⇒ there is no distinction between 'run' and 'trial'. 
-    #       However, a single 'run' per 'trial' means that each 'sweep' in the 
-    #       save file contains just one instance of the synaptic response, NOT an
-    #       average! As we are usually interested in the minute-averaged responses
-    #       the 'runs' are executed several times per minute at a fixed interval
-    #       (e.g, six runs per minute every 10 s). Data will need to be averaged
-    #       off-line.
-    #
-    #
-    # • in contiguous mode (atypical)
-    #       A 'trial' contains responses recorded from a single pathway; when
-    #       there are more pathways, responses on distinct pathways are recorded
-    #       in distinct 'trials' or 'runs' - this is unwieldy, and may result in 
-    #       patterns of activity that are distinct between pathways
-    #
     
-    Tracking = 1 # used for tracking synaptic responses
-    Control = Tracking # alias; this is the "normal" case where no induction is applied 
-    Induction = 2 # used for induction of plasicity (i.e. application of the induction protocol)
-    Test = Tracking | Induction # the Tracking pathway where Induction was applied
-    # auxiliary pathways can be:
-    # • present along the tracking pathway, during tracking only
-    # • present along the induction pathway, during induction only
-    # • present throughout
-    Auxiliary = 4 # e.g. ripple, etc
-    Type1 = 8
-    Type2 = 16
-    Type3 = 32
-    Type4 = 64
-    Type5 = 128
-    CrossTalk = 65536
+class RecordingEpisodeType(TypeEnum):
+    """Once can define valid type combinations as follows:
+    Drug | Tracking     (= 3)   ⇒ Tracking episode recorded in the presence of 
+                                    drug application
+    Drug | CrossTalk    (= 5)   ⇒ CrossTalk episode recorded in the presence of 
+                                    drug application
     
+    Drug | Conditioning (= 7)   ⇒ Conditioning in the presence of drug application
+    
+    A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
+    an episode of "drug washout".
+    
+    A value of 0 and any value > 7 are invalid.
+    
+    """
+    Drug            = 1 # a recording episode in the presence of a drug or mixture
+                        # of drugs
+                        
+    Tracking        = 2 # used for tracking synaptic responses
+                        # can be associated with any PathwayType
+    CrossTalk       = 4 # used to test for pathway independence
+    
+    Conditioning    = 6 # used for induction of plasticity (i.e. application of 
+                        # the induction protocol)
+
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
-class PathwayEpisode(Episode):
+class RecordingEpisode(Episode):
     """
 Specification of an episode in a synaptic pathway.
     
@@ -235,7 +228,7 @@ presence of a drug, then followed by a drug wash-out are all three distinct
 distinct episode from one where each segment contains responses from the
 same synaptic pathway
 
-The sweeps in PathwayEpisode are a sequence of neo.Segment objects, where
+The sweeps in RecordingEpisode are a sequence of neo.Segment objects, where
 objects where each synaptic pathway has contributed data for a neo.Segment
 inside the Block.
 
@@ -243,7 +236,7 @@ Fields (constructor parameters):
 ================================
 • name:str - mandatory, name of the episode
 
-The PathwayEpisode only stores arguments needed to (re)create a new neo.Block
+The RecordingEpisode only stores arguments needed to (re)create a new neo.Block
 by concatenating several source neo.Block data.
 
 The other fields indicate optional indices into the data segments and signals
@@ -339,7 +332,7 @@ of the source data.
                  ascending:typing.Optional[bool] = None,
                  glob:bool = True,
                  **kwargs):
-        """Constructor for PathwayEpisode.
+        """Constructor for RecordingEpisode.
 Mandatory parameters:
 --------------------
 name:str - the name of this episode
@@ -355,7 +348,7 @@ neo.Blocks, or a sequence of neo.Blocks, a str, or a sequence of str
     details.
 
     NOTE: args represent the source data to which this episode applies to, but
-is NOT stored in the PathwayEpisode instance. The only use of the data is to
+is NOT stored in the RecordingEpisode instance. The only use of the data is to
 assign values to the 'begin', 'end', 'beginFrame', 'endFrame' attributes of the 
 episode.
 
@@ -528,7 +521,7 @@ class SynapticPathway(BaseScipyenData):
         ("responseSignal", (str, int), 0),
         ("analogCommandSignal", (str, int), 1),
         ("digitalCommandSignal", (str, int), 2),
-        ("schedule", Schedule, Schedule()),         # one or more PathwayEpisode objects
+        ("schedule", Schedule, Schedule()),         # one or more RecordingEpisode objects
         )
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
@@ -542,7 +535,7 @@ class SynapticPathway(BaseScipyenData):
                  response:typing.Optional[typing.Union[str, int]]=None, 
                  analogStimulus:typing.Union[typing.Union[str, int]] = None, 
                  digitalStimulus:typing.Optional[typing.Union[str, int]] = None, 
-                 schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[PathwayEpisode]]] = None, 
+                 schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
                  **kwargs):
         """SynapticPathway constructor.
 
@@ -591,7 +584,7 @@ digitalStimulus: GeneralIndexType
     Index of the analog signal(s) containing the digital command, or None (default)
     NOTE: Also used to construct the data from *args.
     
-schedule: a Schedule, or a sequence (tuple, list) of PathwayEpisodes; 
+schedule: a Schedule, or a sequence (tuple, list) of RecordingEpisodes; 
         optional, default is None.
     
     CAUTION: Currently, the episodes (whether packed in a Schedule or given as a
@@ -615,7 +608,7 @@ Notes:
         
     @staticmethod
     def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
-                   *episodeSpecs:typing.Sequence[PathwayEpisode]):
+                   *episodeSpecs:typing.Sequence[RecordingEpisode]):
         """
         Factory for SynapticPathway.
         
@@ -624,8 +617,8 @@ Notes:
         pathName:str - name of the pathway
         pathwayType:PathwayType - the type of the pathway (optional, default is PathwayType.Test)
         
-        *episodeSpecs: sequence of PathwayEpisode objects
-            see help PathwayEpisode
+        *episodeSpecs: sequence of RecordingEpisode objects
+            see help RecordingEpisode
         
         """
         
@@ -1369,7 +1362,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         
                 # if len(self._abfRunDeltaTimes_) <= 1: # first run
                 #     self._viewers_["rs"].showLegends(True)
-                        
+
+    def processProtocol(self, protocol:pab.ABFProtocol):
+        clampMode = protocol.clampMode(self._adcChannel_, self._dacChannel_)
+        adc = protocol.inputConfiguration(self._adcChannel_)
+        dac = protocol.outputConfiguration(self._dacChannel_)
+        
+        
+        pass
 
     def processMonitorProtocol(self, protocol:pab.ABFProtocol):
         """Infers the timings of the landmarks from protocol.
@@ -1747,13 +1747,92 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                             self._membraneTestEpoch_.firstDuration]
             
 class LTPOnline(QtCore.QObject):
+    """On-line analysis for synaptic plasticity experiments"""
+        
 # NOTE: 2023-10-08 20:55:15
-#   Brief description of supported AND protocol configurations:
+# Description of supported protocol configurations:
 #
-#   "Synaptic tracking" protocols: monitor synaptic responses evoed repeatedly over time
-#       NOTE: these should be evoked at every 10 s or more (i.e. 0.1 Hz or less)
+# TL;DR:
+# ======
+#   A synaptic tracking protocol has:
 #
-#   1) recording from a single cell:
+#   1 or 2 ADCs used for recording synaptic response:
+#   • 1   ⇒ for single cell or field 
+#   • 2   ⇒ for recording two cells, from one cell + field recording or 
+#         two field recordings (e.g. in two places)
+#
+#       TODO: allow the use of more than two relevant ADCs - say one records
+#       field potentials from more than one place...
+#
+#       NOTE: there is no information in the protocol to distinguish this:
+#       The user may select/enable several ADCs to record data from the cell,
+#       field, or routing digital outputs to some ADC input to obtain records of
+#       digital outputs, etc.
+#
+#       Therefore, we need a "free" parameter 'adcChannel' (int or list or tuple
+#       of int) that is passed as parameter to the LTPOnline constructor and
+#       indicates which ADC channels in the protocol (and analog signals in the 
+#       stored file/neo,.Block) contain the actual synaptic responses.
+#
+#       This is only for the purpose of analysing the synaptic responses in the 
+#       the expriment; other ADCs may be carrying auxiliary information, which
+#       at the moment is irrelevant in the context of LTPOnline.
+#   
+#   1 or 2 DACs used to send analog command waveform and digital outputs;
+#       the analog command waveforms are used for membrane test in voltage or 
+#           current clamp and/or for emulating TTL pulses (not recommended)
+#
+#       the digital outputs are used to stimulate synaptic pathways:
+#       - distinct pathways require distinct DIG OUT channels
+#       - when more than one pathway is used, the pathways can be stimulated:
+#           alternatively (two pathways only) ⇒ even number of sweeps
+#           simultaneously ⇒ no restriction on number of sweeps; 
+#
+#           HOWEVER: 
+#               when recording from the same cell, the pathways MUST be 
+#                   stimulated alternatively, in order to distinguish them
+#
+#               when recording from two cells, or from a cell and field, the
+#                   pathways MAY be stimulated simultaneously ONLY IF each 
+#                   pathway targets a distinct cell, with no overlap
+#           
+#       Therefore, we also need a "free" parameter 'dacChannel' passed to the LTPOnline constructor
+#       as an it or a tuple of two int:
+#
+#   • 1 DAC  
+#           digitalOutputEnabled True (MANDATORY)
+#           and alternateDACOutputStateEnabled False
+#           and alternateDigitalOutputStateEnabled:
+#               False   ⇒ single cell
+#                       with 1 DIG OUT channel used: single pathway (single stim box)
+#                       with >1 DIG OUT channels used: 
+#                           one pathway via stim box AND auxiliary s - senseless for a single cell, UNLESS
+#                           one of the DIG OUT
+#               True    ⇒ single cell, two pathways alternatively simulated
+#                           the DAC can be either 0 or 1 (and the alternative
+#                           digital output pattern being defined in Clampex on 
+#                           the "other DAC", which is NOT pased to the LTPOnline
+#                           contructor)
+#
+#           digitalOutputEnabled False ⇒ INCOMPATIBLE: one needs a way to stimulate
+#               the pathways
+#
+#               NOTE: although TTLs can be "emulated" by DAC analog waveforms,
+#               they need to be delivered to the tissue via either a simulus 
+#               isolator, or through an amplifier headstage with the (extracellular)
+#               electrode placed in the tissue.
+#   
+#   • 2 DACs:
+#
+# In detail:
+# ==========
+#
+#   A)"Synaptic tracking" protocols: monitor synaptic responses evoked repeatedly over time
+#   NOTE: these should be evoked at every 10 s or more (i.e. 0.1 Hz or less)
+#
+#   NOTE: these protocols can only be assocated with non-Conditioning episode types
+#
+#   A.1) recording from a single cell:
 #       ADC: 
 #       • adcChannel: int   
 #       • mandatory ! (is the recorded signal)
@@ -1775,7 +1854,7 @@ class LTPOnline(QtCore.QObject):
 #               (1 or 2, respectively) and how their inputs are routed from the DAQ
 #               outputs; it may be higher, but mind the constraint below (» «)
 #
-#           ∘ digitalOutputEnabled == True (for stimulation)
+#           ∘ digitalOutputEnabled == True MANDATORY (for stimulation)
 #               ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
 #                   converging on the same cell, and stimulated in alternative sweeps
 #                   □ ⇒ REQUIRES even number of sweeps per run (typically only TWO sweeps per run)
@@ -1839,6 +1918,7 @@ class LTPOnline(QtCore.QObject):
 #                               must end with enough time left in the sweep to allow for 
 #                                   recording signal to settle back to baseline
 #                                   (in current clamp this may allow detecting Vrebound, etc)
+#        
 #                   □ optional baseline epoch
 #                       - firstLevel = deltaLevel = 0; firstDuration !=0; deltaDuration = 0
 #                       - contains signal baseline for the sweep
@@ -1846,14 +1926,27 @@ class LTPOnline(QtCore.QObject):
 #                       NOTE: when absent, signal baseline will be measured during the 
 #                       DAC holding time which is 1/64 of sweep samples; if sweep is
 #                       too short this may not be helpful
+#        
 #                   □ interleaved "no-op" epochs:
 #                       - firstLevel = deltaLevel = 0, firstDuration != 0, deltaDuration = 0
 #                       - between membrane test and stimulation epochs when membrane 
 #                           test comes before stimulation, or vice-versa
 #
-#               ⋆ analogWaveformEnabled == FALSE ⇒ field recording (nowhere to send analog command)
+#           ∘ OR:   ⋆ analogWaveformEnabled == FALSE ⇒ field recording (nowhere to send analog command)
 #
-#   2) recording from two cells, or one cell in parallel with field recording:
+#           ∘ epochs:
+#               ⋆ if analogWaveformEnabled is True:
+#                   □ optional membrane test epoch (see above)
+#                   □ optional signal baseline epoch
+#                   □ stimulation epochs with digital output
+#                   □ interleaved "no-op" epochs
+#        
+#               ⋆ if analogWaveformEnabled is False (field recording):
+#                   □ optional signal baseline epoch
+#                   □ stimulation epochs with digital output
+#                   □ interleaved "no-op" epochs
+#
+#   A.2) recording from two cells, or one cell in parallel with field recording:
 #       NOTE: two cells can be recorded simultaneously or alternatively;
 #       in either case you need to ADCs
 #
@@ -1862,7 +1955,7 @@ class LTPOnline(QtCore.QObject):
 #       usually 0 & 1, but depends on the physical connections between the DAQ
 #           and amplifier devices
 #
-#   • clampMode: list of 2 elements depends on adc Units see (1); 
+#   • clampMode: list of 2 elements depends on adc Units see (A.1); 
 #       NOTE: theoretically, each adc can have distinct clamp modes
 #
 #   DAC:
@@ -1870,11 +1963,11 @@ class LTPOnline(QtCore.QObject):
 #       ∘ units and clamp modes consistent with the adc channels above
 #       ∘ digitalOutputEnabled == True in BOTH dacChannels (for stimulation)
 #           ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
-#           that converge on at least one of the cells - see (1)
+#           that converge on at least one of the cells - see (A.1)
 #           ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
 #           although both cells may respond to that same pathway, 
 #               → not very useful
-#               no restriction on number of sweeps (see (1))
+#               no restriction on number of sweeps (see (A.1))
 #
 #       ∘ both dacChannels send out analog command waveform ⇒ clampMode != NoClamp:
 #           ⋆ alternateDACOutputStateEnabled == True ⇒ even number of sweeps
@@ -1895,7 +1988,87 @@ class LTPOnline(QtCore.QObject):
 #       AND NO alternative analog waveforms so that the "alternative" DAC
 #       can be configured to send no command waveforms for field recording
 #
-
+#   B) "Conditioning protocols"
+#   NOTE 1: These are applied to only one synaptic pathway in the experiment - the
+#           "test" pathway - with the other pathway (if present) beng the "control"
+#           pathway.
+#        
+#   NOTE 2: Can only be associated with RecordingEpisodes of Conditioning type(s)
+#
+#   NOTE 3: Usually, a conditioning protocol is applied only once. This is 
+#   certainly the case of whole-cell patch-clamp LTP experiments, where 
+#   a "washout of plasticity" effect seems to take place over long 
+#   recording times.
+# 
+#   This wash out effect is irrelevant for field recording experiments 
+#   (and, possibly, for whole-cell patch-clamp LTD experiments). In these
+#   cases it may be justified to apply conditioning protocols more than 
+#   once, with intervening tracking protocols recordong the evolution of
+#   synpatic responses for some time after each conditioning protocol.
+# 
+#   Also, when justified, several conditioning episodes may use distinct
+#   conditoning protocols.
+#
+#   B.1) Recording from a single cell with or without control pathway:
+#
+#       ADC:
+#       • adcChannel: int - same as for (A.1)
+#       • clampMode may be the same as for the protocol of the preceding
+#           Tracking episode (if present)        
+#           
+#       DAC:
+#       • dacChannel: int - the same as the dacChannel as the protocol for
+#           the preceding Tracking episode
+#
+#       • digitalOutputEnabled == True (to stimulate the pathway)
+#           ⋆ alternateDigitalOutputStateEnabled == False ALWAYS !!!
+#               □ digital output (DIG) channel:
+#                   - for two pathways - use the DIG channel corresponding
+#                    to the conditioned pathway
+#        
+#               □ digital output pattern can be a TRAIN or a PULSE
+#                   - when a TRAIN, there can be several epochs sending out trains
+#                       (e.g, "bursts"), subject to the available number of epochs
+#                       and duration of the sweep        
+#                   - when a PULSE, there can be several epochs sending out a 
+#                       TTL pulse, subject to the available number of epochs        
+#                       and duration of the sweep    
+#
+#               □ NOTE: the index of the DIG out channel identifies which
+#                   pathway is conditioned, and MUST be one of the DIG out channels
+#                   used by the dacChannel in the protocol for the preceding
+#                   Tracking episode.
+#        
+#       • if sending out analog command waveforms (e.g. for triggering postsynaptic
+#           spikes):
+#           ⋆ analogWaveformEnabled == True
+#           ⋆ alternateDACOutputStateEnabled == False
+#        
+#       • NOTE: if analogWaveformEnabled is False AND the protocol for the 
+#         accompanying Tracking episode(s) also has dac with analogWaveformEnabled
+#         set to False, this indicates field recording.
+#       
+#       • epochs:   
+#           ⋆ digital output epochs: MANDATORY, for pathway stimulation
+#           ⋆ if analogWaveformEnabled is True:
+#               any number of waveform epochs; these may be identical to the
+#               digtal output epochs
+#
+#
+#   B.2) Recording from two cells, of a cell + field recordings in parallel
+#   NOTE: To make sense of this experimental approach, one COULD apply conditioning
+#   to only one cell (and leave the other as control).
+#   WARNING The caveat with recording from two cells is that one may not be able
+#   to distinguish between the "test" and the "control" cell when the conditioning
+#   protocol does not include/require controlling the state of the postsynaptic
+#   cell (i.e., spiking or a controlled postsynaptic membrane voltage, etc).
+#
+#   On the other hand, recording from a cell in parallel with field recordings
+#   can be used to compare responses from the recorded cell with those from a 
+#   population of synapses in the same prep (both ADCs in the tracking should be
+#   analysed) and a control pathway should be configured in the Tracking protocols.
+#
+        
     test_protocol_properties = ("activeDACChannelIndex",
                                 "nSweeps",
                                 "acquisitionMode",
@@ -2232,7 +2405,7 @@ class LTPOnline(QtCore.QObject):
         self._presynaptic_triggers_ = dict()
         
        # TODO: 2023-09-29 13:57:13
-        # make this an intelligent thing - use SynapticPathway, PathwayEpisodes, etc.
+        # make this an intelligent thing - use SynapticPathway, RecordingEpisodes, etc.
         # for now, baseline & chase are just one or two neo.Blocks
         #
         self._data_ = dict(baseline = dict(path0 = neo.Block(), path1 = neo.Block()),
@@ -2439,7 +2612,7 @@ class LTPOnline(QtCore.QObject):
             
    
     
-def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
+def makeRecordingEpisode(*args, **kwargs) -> RecordingEpisode:
     """Helper function for the SynapticPathway factory function
     args: list of neo.Blocks
     name: str, default is ""
@@ -2452,7 +2625,7 @@ def makePathwayEpisode(*args, **kwargs) -> PathwayEpisode:
     if not isinstance(name, str):
         name = ""
         
-    ret = PathwayEpisode(name)
+    ret = RecordingEpisode(name)
     
     if len(args): 
         if all(isinstance(v, neo.Block) for v in args):
