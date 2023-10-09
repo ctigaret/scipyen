@@ -1815,8 +1815,7 @@ TL;DR:
         and :
             ⋆ alternateDigitalOutputStateEnabled False   ⇒ SINGLE CELL
                     with 1 DIG OUT channel used: SINGLE PATHWAY (single stim box)
-                        straightforward - only one DIG OUT is used
-                        this channel is:
+                        straightforward - only one DIG OUT is used, for either:
                             '*' (TRAIN) -> 1 or more pulses
                             '1' (PULSE) -> a SINGLE TTL boxcar with 
                                 duration == actual duration of the epoch where
@@ -1858,7 +1857,7 @@ TL;DR:
         
                     - with > 1 DIG OUT in either DAC:
                         REQUIRES 'digChannel' parameter in c'tor to identify
-                         whch DIG OUT channels activate synaptic pathways
+                         which DIG OUT channels activate synaptic pathways
                     
 
         digitalOutputEnabled False ⇒ INCOMPATIBLE: one needs a way to stimulate
@@ -1870,8 +1869,8 @@ TL;DR:
             electrode placed in the tissue.
 
   • 2 or more DACs:
-        NOTE: When alternateDigitalOutputStateEnabled is True on any DAC0 or DAC1
-        the extra DAC indices must be > 1 ! For example one can use 
+        NOTE: When alternateDigitalOutputStateEnabled is True, ths can be only
+        on DAC0 or DAC1, hence the extra DAC indices must be > 1 ! For example one can use 
         DAC0 or DAC1 with alternateDigitalOutputStateEnabled True, and
         DAC2,  DAC3 etc as supplementary DACs
         
@@ -1882,10 +1881,36 @@ TL;DR:
             (possibly synaptic stimulation via extracellular electrode or uncaging,
             etc)
         
-            The DIG OUT used to deliver synaptic stimulation must be specified.
+            REQUIRES 'digChannel' parameter in the c'tor.
         
-        if using two ADCs (cell + cell or cell + field or field + field recordings):
+        if using two or more ADCs (cell + cell or cell + field or 
+        field + field recordings):
             two of these DACs are used to stimulate the corresponding cell/field
+                ideally, these should be DAC0 and DAC1, allowing them to stimulate
+                (groups of) pathways ALTERNATIVELY
+    
+            REQUIRES 'digChannel' parameter in the c'tor, to indicate which pathways
+        or groups of pathway are used
+        
+        NOTE: Only DAC0 and DAC1 can issue alternative ditigal trains
+            
+
+    A conditioning protocol has:
+        1 ADC, DAC
+            the conditioned cell (or field)
+            alternateDigitalOutputStateEnabled False
+            alternateDACOutputStateEnabled False
+        
+            the DAC has:
+                digitalOutputEnabled on at least one DIG OUT channel
+                (for either TRAIN or PULSE) - index of stimulated devices
+        
+                when there is only one DIG OUT, this indicates which pathway
+        is stimulated;
+                whene there are > 1 DIG OUT, their indices are compared to those
+        in a preceding synaptic tracking protocol to identify whiof the the tracked
+        pathway is beign stimulated - hence it MAY reli on the 'digChannel' 
+        parameter in the c'tor
         
 
 In detail:

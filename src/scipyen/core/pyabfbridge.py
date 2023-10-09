@@ -1023,17 +1023,24 @@ class ABFProtocol:
         """Index of the DAC channel used for command waveforms (and possibly DIG outputs)
         """
         # NOTE: 2023-10-09 13:31:58
-#         This is either not very useful or I fail to understand this:
-#         Two identical protocols except for the DAC used report the same number:
-#         protocol 1: alternateDigitalOutputStateEnabled False
-#                     DAC0 analogWaveformEnabled True, digitalOutputEnabled True
-#                     DAC1 analogWaveformEnabled False, digitalOutputEnabled False, but enabled on Channel #0
-#                     
-#         protocol 2: alternateDigitalOutputStateEnabled False
-#                     DAC0 analogWaveformEnabled False, digitalOutputEnabled True
-#                     DAC1 analogWaveformEnabled True, digitalOutputEnabled False, but enabled on Channel #0
-#         
-#         both report self._activeDACChannel_ 0 (in pyabf this is regardless of sweep)
+        # This is either not very useful or I fail to understand this:
+        # 
+        # Two identical protocols except for the DAC used report the same number:
+        # protocol 1: alternateDigitalOutputStateEnabled True
+        #             DAC0 analogWaveformEnabled True, digitalOutputEnabled True
+        #             DAC1 analogWaveformEnabled False, digitalOutputEnabled False, but enabled on Channel #0
+        #             
+        # protocol 2: alternateDigitalOutputStateEnabled True
+        #             DAC0 analogWaveformEnabled False, digitalOutputEnabled True
+        #             DAC1 analogWaveformEnabled True, digitalOutputEnabled False, but enabled on Channel #0
+        # 
+        # both report self._activeDACChannel_ 0 (in pyabf this is regardless of sweep)
+        
+        # However: if alternateDigitalOutputStateEnabled is False AND 
+        #     both analogWaveformEnabled and digitalOutputEnabled ar eenabled in 
+        #     the same DAC then activeDACChannelIndex is the index of said DAC output.
+
+        
         return self._activeDACChannel_
     
     @property
@@ -1187,6 +1194,10 @@ class ABFProtocol:
         else:
             warnings.warn(f"The protocol has no input configuration defined - either because 'generateInputConfigs = False' was passed to the protocol constructor, or because there are no ADCs with the specified index ({adcChannel}) in the file and no source ABF or block data were supplied to this method call")
 
+    def input(self, adcChannel:int = 0, physical:bool=False,
+                           src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None) -> ABFInputsConfiguration:
+        """Shorthand to self.inputConfiguration"""
+        return self.inputConfiguration(adcChannel, src)
     
     def outputConfiguration(self, dacChannel:typing.Optional[int] = None,
                             src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]] = None) -> ABFOutputsConfiguration:
@@ -1203,6 +1214,11 @@ class ABFProtocol:
             return ABFOutputsConfiguration(src, self, dacChannel)
         else:
             warnings.warn(f"The protocol has no output configurations defined - either because 'generateOutputConfigs = False' was passed to the protocol constructor, or because there are no DACs in the file - and no source ABF or block data were supplied to this method call")
+            
+    def output(self, dacChannel:typing.Optional[int] = None,
+                            src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]] = None) -> ABFOutputsConfiguration:
+        """Shorthand to self.outputConfiguration"""
+        return self.outputConfiguration(dacChannel, src)
         
 class ABFInputsConfiguration:
     """Deliberately thin class with basic info about an ADC input in Clampex.
