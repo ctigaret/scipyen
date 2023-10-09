@@ -1747,337 +1747,394 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                             self._membraneTestEpoch_.firstDuration]
             
 class LTPOnline(QtCore.QObject):
-    """On-line analysis for synaptic plasticity experiments"""
+    """On-line analysis for synaptic plasticity experiments
         
-# NOTE: 2023-10-08 20:55:15
-# Description of supported protocol configurations:
-#
-# TL;DR:
-# ======
-#   A synaptic tracking protocol has:
-#
-#   1 or 2 ADCs used for recording synaptic response: → 'adcChannel' parameter in c'tor
-#   • 1   ⇒ for single cell or field 
-#   • 2   ⇒ for recording two cells, from one cell + field recording or 
-#         two field recordings (e.g. in two places)
-#
-#       TODO: allow the use of more than two relevant ADCs - say one records
-#       field potentials from more than one place...
-#
-#       NOTE: there is no information in the protocol to distinguish this:
-#       The user may select/enable several ADCs to record data from the cell,
-#       field, or routing digital outputs to some ADC input to obtain records of
-#       digital outputs, etc.
-#
-#       Therefore, we need a "free" parameter 'adcChannel' (int or list or tuple
-#       of int) that is passed as parameter to the LTPOnline constructor and
-#       indicates which ADC channels in the protocol (and analog signals in the 
-#       stored file/neo,.Block) contain the actual synaptic responses.
-#
-#       This is only for the purpose of analysing the synaptic responses in the 
-#       the expriment; other ADCs may be carrying auxiliary information, which
-#       at the moment is irrelevant in the context of LTPOnline.
-#   
-#   1 or 2 DACs used to send analog command waveform and digital outputs;
-#       → 'dacChannel' and 'digChannel' parameters to the c'tor'
-#
-#           The 'dacChannel' is necessary to identify which DACs are being used
-#           (I cannot figure how to work this out using the information in 
-#           the ABF protocol, see NOTE: 2023-10-09 13:31:58 in pyabfbridge.py)
-#
-#       the analog command waveforms are used for membrane test in voltage or 
-#           current clamp and/or for emulating TTL pulses (not recommended)
-#
-#       the digital outputs are used to stimulate synaptic pathways:
-#       - distinct pathways require distinct DIG OUT channels
-#       - when more than one pathway is used, the pathways can be stimulated:
-#           alternatively (two pathways only) ⇒ even number of sweeps
-#           simultaneously ⇒ no restriction on number of sweeps; 
-#
-#           HOWEVER: 
-#               when recording from the same cell, the pathways MUST be 
-#                   stimulated alternatively, in order to distinguish them
-#
-#               when recording from two cells, or from a cell and field, the
-#                   pathways MAY be stimulated simultaneously ONLY IF each 
-#                   pathway targets a distinct cell, with no overlap
-#           
-#       Therefore, we also need a "free" parameter 'dacChannel' passed to the LTPOnline constructor
-#       as an it or a tuple of two int:
-#
-#   • 1 DAC  
-#           digitalOutputEnabled True (MANDATORY)
-#           and alternateDACOutputStateEnabled False
-#           and alternateDigitalOutputStateEnabled:
-#               False   ⇒ single cell
-#                       with 1 DIG OUT channel used: single pathway (single stim box)
-#                           straightforward - only one out DIG used
-#                       with >1 DIG OUT channels used: 
-#                           one DIG used for the principal synaptic stimulation e.g.
-#                           pathway via stim box AND auxiliary
-#                           other DIG out use for auxiliary triggers (uncaging, 
-#                           optogenetics, local stim electrode etc)
-#                           REQUIRES 'digChannel' parameter in c'tor - necessary
-#               True    ⇒ single cell, two pathways alternatively simulated
-#                           the DAC can be either 0 or 1 (and the alternative
-#                           digital output pattern being defined in Clampex on 
-#                           the "other DAC", which is NOT pased to the LTPOnline
-#                           contructor)
-#
-#           digitalOutputEnabled False ⇒ INCOMPATIBLE: one needs a way to stimulate
-#               the pathways
-#
-#               NOTE: although TTLs can be "emulated" by DAC analog waveforms,
-#               they need to be delivered to the tissue via either a simulus 
-#               isolator, or through an amplifier headstage with the (extracellular)
-#               electrode placed in the tissue.
-#   
-#   • 2 DACs:
-#
-# In detail:
-# ==========
-#
-#   A)"Synaptic tracking" protocols: monitor synaptic responses evoked repeatedly over time
-#   NOTE: these should be evoked at every 10 s or more (i.e. 0.1 Hz or less)
-#
-#   NOTE: these protocols can only be assocated with non-Conditioning episode types
-#
-#   A.1) recording from a single cell:
-#       ADC: 
-#       • adcChannel: int   
-#       • mandatory ! (is the recorded signal)
-#       • receives the Primary amplifier input
-#       • its logical index depends on how the signals are configured in 
-#       • acquisition sofware (in Clampex, that is the 'Lab book')
-#       • must have been selected in the Clampex protocol
-#       • clampMode ⇔ units:
-#           ∘ pA (or A) ⇒ clampMode == ephys.ClampMode.VoltageClamp
-#           ∘ mV (or V) ⇒ clampMode == ephys.ClampMode.CurrentClamp (includes I=0/NoClamp)
-#
-#       DAC: 
-#       • dacChannel: int
-#           ∘ units:
-#               ⋆ mV (or V) ⇒ clampMode == ephys.ClampMode.VoltageClamp
-#               ⋆ pA (or A) ⇒ clampMode == ephys.ClampMode.CurrentClamp (includes I=0/NoClamp)
-#
-#           ∘ dacChannel is usually 0 or 1, depending on which amplifier channel is used 
-#               (1 or 2, respectively) and how their inputs are routed from the DAQ
-#               outputs; it may be higher, but mind the constraint below (» «)
-#
-#           ∘ digitalOutputEnabled == True MANDATORY (for stimulation)
-#               ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
-#                   converging on the same cell, and stimulated in alternative sweeps
-#                   □ ⇒ REQUIRES even number of sweeps per run (typically only TWO sweeps per run)
-#                       ⇒ two sweps per trial (averaged if more than one run per trial)
-#                   □ » applies only to dacChannels 0 & 1 « 
-#                   □ mandatory stimulation ABF epochs:
-#                       a) unique epoch with digital output TRAIN ('*')
-#                       - any type (except for Off)
-#                       - has digital output as TRAIN ('*') - position of '*'
-#                           indicates which DIG channel is used; this must reflect
-#                           physical connection between DAQ's DIG output and the 
-#                           stimulus isolation box
-#                       - has alternate digital output TRAIN on a DISTINCT DIG
-#                           channel defined in the  "alternate" DAC: 
-#                               dac 1 if dacChannel is 0, dac 0 if dacChannel is 1
-#                       - ⇒ this epoch MUST also be defined in the "alternate" DAC ⇒
-#                       - the "alternate" DAC must have the same epochs and timings
-#                           defined as for dacChannel
-#                       - the actual digital pattern of the dacChannel depends on
-#                           the sweep number: 
-#                               main pattern is sent on even sweeps (0,2,4,…)
-#                               alternate pattern is sent on odd sweeps (1,3,5,…)
-#                       - the digital TRAIN provides:
-#                           1 pulse ⇒ single stimulation
-#                           2 pulses ⇒ paired-pulse stimulation
-#                           > 2 pulses ⇒ ONLY FOR SPECIAL EXPERIMENTS when justified
-#                       b) one or more epochs with digital output PULSE ('1')
-#                       - all pulses defined on the same DIG output channel
-#                       - 1 epoch ⇒ single-pulse
-#                       - 2 epochs ⇒ paired-pulse
-#                       - > 2 epochs ⇒ ONLY FOR SPECIAL EXPERIMENTS when justified
-#                       - all these must aso be defined on the "alternate" DAC
-#                           (see above) using a DISTINCT DIG output channel for 
-#                           the other pwthway (stimulus isolator, see above)
-#                   
-#               ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
-#                   to the cell
-#                   □ no restriction to number of sweeps (all sweeps record the same process)
-#                   □ mandatory stimulation ABF epochs:
-#                       a) unique epoch with digital output TRAIN on appropriate
-#                           DIG channel (see above, except for the alternate output)
-#                       - TRAIN defines 1, 2, or more pulses (see above)
-#                       b) 1, 2, or more epochs with digial output PULSE (as above,
-#                           except for the alternative output)
-#                     
-#           ∘ sends out analog command waveform ⇒ clampMode != NoClamp:
-#               ⋆ alternateDACOutputStateEnabled == False (same analog command every sweep) 
-#
-#               ⋆ analogWaveformEnabled == True, with:
-#                   □ optional membrane test ABF epoch:
-#                       - type Step or Pulse with pulseCount == 1
-#                       - firstLevel != 0, deltaLevel == 0, firstDuration ! = 0, deltaDuration == 0
-#                       - sometime BEFORE or AFTER the stimulation epoch(s) (see above)
-#                           if BEFORE simulation epoch:
-#                               it MAY be the first defined epoch ⇒ signal baseline taken from the 
-#                               dacChannel.holdingTime
-#                               if MAY follow a "baseline" epoch (see below)
-#                           if AFTER simulation epoch:
-#                               must start some time AFTER stimulation epoch is order
-#                                   to allow the recorded signal to settle back to baseline
-#                               must end with enough time left in the sweep to allow for 
-#                                   recording signal to settle back to baseline
-#                                   (in current clamp this may allow detecting Vrebound, etc)
-#        
-#                   □ optional baseline epoch
-#                       - firstLevel = deltaLevel = 0; firstDuration !=0; deltaDuration = 0
-#                       - contains signal baseline for the sweep
-#                       - when present, this should be the first epoch defined  
-#                       NOTE: when absent, signal baseline will be measured during the 
-#                       DAC holding time which is 1/64 of sweep samples; if sweep is
-#                       too short this may not be helpful
-#        
-#                   □ interleaved "no-op" epochs:
-#                       - firstLevel = deltaLevel = 0, firstDuration != 0, deltaDuration = 0
-#                       - between membrane test and stimulation epochs when membrane 
-#                           test comes before stimulation, or vice-versa
-#
-#           ∘ OR:   ⋆ analogWaveformEnabled == FALSE ⇒ field recording (nowhere to send analog command)
-#
-#           ∘ epochs:
-#               ⋆ if analogWaveformEnabled is True:
-#                   □ optional membrane test epoch (see above)
-#                   □ optional signal baseline epoch
-#                   □ stimulation epochs with digital output
-#                   □ interleaved "no-op" epochs
-#        
-#               ⋆ if analogWaveformEnabled is False (field recording):
-#                   □ optional signal baseline epoch
-#                   □ stimulation epochs with digital output
-#                   □ interleaved "no-op" epochs
-#
-#   A.2) recording from two cells, or one cell in parallel with field recording:
-#       NOTE: two cells can be recorded simultaneously or alternatively;
-#       in either case you need to ADCs
-#
-#   ADC:
-#   • adcChannel: list of int (2 distinct elements)
-#       usually 0 & 1, but depends on the physical connections between the DAQ
-#           and amplifier devices
-#
-#   • clampMode: list of 2 elements depends on adc Units see (A.1); 
-#       NOTE: theoretically, each adc can have distinct clamp modes
-#
-#   DAC:
-#   • dacChannel: list of 2 int (distinct)
-#       ∘ units and clamp modes consistent with the adc channels above
-#       ∘ digitalOutputEnabled == True in BOTH dacChannels (for stimulation)
-#           ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
-#           that converge on at least one of the cells - see (A.1)
-#           ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
-#           although both cells may respond to that same pathway, 
-#               → not very useful
-#               no restriction on number of sweeps (see (A.1))
-#
-#       ∘ both dacChannels send out analog command waveform ⇒ clampMode != NoClamp:
-#           ⋆ alternateDACOutputStateEnabled == True ⇒ even number of sweeps
-#               cells receive analog commands on alternative sweeps (NOT useful when 
-#               alternateDigitalOutputStateEnabled == True)
-#
-#           ⋆ alternateDACOutputStateEnabled == False ⇒ 
-#               cells receive analgo command simultaneously
-#               allows alternative digital outputs
-#
-#       ∘ OR: only one dacChannel has alternateDACOutputStateEnabled == True
-#           ⇒ one cell is clamped; the other is not so the corresponding adc
-#           likely records fields
-#
-#       WARNING: this is problematic and likely too ambiguous, as one may
-#       design an experiment to record field potentials AND whole-cell 
-#       currents simultaneously; will need to use alternative DIG outputs
-#       AND NO alternative analog waveforms so that the "alternative" DAC
-#       can be configured to send no command waveforms for field recording
-#
-#   B) "Conditioning protocols"
-#   NOTE 1: These are applied to only one synaptic pathway in the experiment - the
-#           "test" pathway - with the other pathway (if present) beng the "control"
-#           pathway.
-#        
-#   NOTE 2: Can only be associated with RecordingEpisodes of Conditioning type(s)
-#
-#   NOTE 3: Usually, a conditioning protocol is applied only once. This is 
-#   certainly the case of whole-cell patch-clamp LTP experiments, where 
-#   a "washout of plasticity" effect seems to take place over long 
-#   recording times.
-# 
-#   This wash out effect is irrelevant for field recording experiments 
-#   (and, possibly, for whole-cell patch-clamp LTD experiments). In these
-#   cases it may be justified to apply conditioning protocols more than 
-#   once, with intervening tracking protocols recordong the evolution of
-#   synpatic responses for some time after each conditioning protocol.
-# 
-#   Also, when justified, several conditioning episodes may use distinct
-#   conditoning protocols.
-#
-#   B.1) Recording from a single cell with or without control pathway:
-#
-#       ADC:
-#       • adcChannel: int - same as for (A.1)
-#       • clampMode may be the same as for the protocol of the preceding
-#           Tracking episode (if present)        
-#           
-#       DAC:
-#       • dacChannel: int - the same as the dacChannel as the protocol for
-#           the preceding Tracking episode
-#
-#       • digitalOutputEnabled == True (to stimulate the pathway)
-#           ⋆ alternateDigitalOutputStateEnabled == False ALWAYS !!!
-#               □ digital output (DIG) channel:
-#                   - for two pathways - use the DIG channel corresponding
-#                    to the conditioned pathway
-#        
-#               □ digital output pattern can be a TRAIN or a PULSE
-#                   - when a TRAIN, there can be several epochs sending out trains
-#                       (e.g, "bursts"), subject to the available number of epochs
-#                       and duration of the sweep        
-#                   - when a PULSE, there can be several epochs sending out a 
-#                       TTL pulse, subject to the available number of epochs        
-#                       and duration of the sweep    
-#
-#               □ NOTE: the index of the DIG out channel identifies which
-#                   pathway is conditioned, and MUST be one of the DIG out channels
-#                   used by the dacChannel in the protocol for the preceding
-#                   Tracking episode.
-#        
-#       • if sending out analog command waveforms (e.g. for triggering postsynaptic
-#           spikes):
-#           ⋆ analogWaveformEnabled == True
-#           ⋆ alternateDACOutputStateEnabled == False
-#        
-#       • NOTE: if analogWaveformEnabled is False AND the protocol for the 
-#         accompanying Tracking episode(s) also has dac with analogWaveformEnabled
-#         set to False, this indicates field recording.
-#       
-#       • epochs:   
-#           ⋆ digital output epochs: MANDATORY, for pathway stimulation
-#           ⋆ if analogWaveformEnabled is True:
-#               any number of waveform epochs; these may be identical to the
-#               digtal output epochs
-#
-#
-#   B.2) Recording from two cells, of a cell + field recordings in parallel
-#   NOTE: To make sense of this experimental approach, one COULD apply conditioning
-#   to only one cell (and leave the other as control).
-#   WARNING The caveat with recording from two cells is that one may not be able
-#   to distinguish between the "test" and the "control" cell when the conditioning
-#   protocol does not include/require controlling the state of the postsynaptic
-#   cell (i.e., spiking or a controlled postsynaptic membrane voltage, etc).
-#
-#   On the other hand, recording from a cell in parallel with field recordings
-#   can be used to compare responses from the recorded cell with those from a 
-#   population of synapses in the same prep (both ADCs in the tracking should be
-#   analysed) and a control pathway should be configured in the Tracking protocols.
-#
+        
+NOTE: 2023-10-08 20:55:15
+Description of supported Clampex protocol configurations:
+
+TL;DR:
+======
+  A synaptic tracking protocol has:
+
+  1 or 2 ADCs used for recording synaptic response: 
+    → 'adcChannel' parameter in c'tor
+  -----------------------------------------------------------------------------------
+  • 1   ⇒ for single cell or field 
+  • 2   ⇒ for recording two cells, from one cell + field recording or 
+        two field recordings (e.g. in two places)
+
+    TODO: allow the use of more than two relevant ADCs - say for recording of
+    field potentials from more than one place...
+
+    NOTE: there is no information in the protocol to distinguish this:
+    The user may select/enable several ADCs to record data from the cell,
+    field, or routing digital outputs to some ADC input to obtain records of
+    digital outputs, etc.
+
+    Therefore, we need a "free" parameter 'adcChannel' (int or list or tuple
+    of int) that is passed as parameter to the LTPOnline constructor and
+    indicates which ADC channels in the protocol (and analog signals in the 
+    stored file/neo,.Block) contain the actual synaptic responses.
+
+    This is only for the purpose of analysing the synaptic responses in the 
+    the expriment; other ADCs may be carrying auxiliary information, which
+    at the moment is irrelevant in the context of LTPOnline.
+  
+  1, 2 or more DACs used to send analog command waveform and digital outputs;
+    → 'dacChannel' and 'digChannel' parameters to the c'tor'
+  -----------------------------------------------------------------------------------
+
+        The 'dacChannel' is necessary to identify which DACs are being used
+        (I cannot figure how to work this out using the information in 
+        the ABF protocol, see NOTE: 2023-10-09 13:31:58 in pyabfbridge.py)
+
+    the analog command waveforms are used for membrane test in voltage or 
+        current clamp and/or for emulating TTL pulses (not recommended)
+
+    the digital outputs are used to stimulate synaptic pathways:
+    - distinct pathways require distinct DIG OUT channels
+    - when more than one pathway is used, the pathways can be stimulated:
+        alternatively (two pathways only) ⇒ even number of sweeps
+        simultaneously ⇒ no restriction on number of sweeps; 
+
+        HOWEVER: 
+            when recording from the same cell, the pathways MUST be 
+                stimulated alternatively, in order to distinguish them
+
+            when recording from two cells, or from a cell and field, the
+                pathways MAY be stimulated simultaneously ONLY IF each 
+                pathway targets a distinct cell, with no overlap
+        
+    Therefore, we also need a "free" parameter 'dacChannel' passed to the LTPOnline constructor
+    as an it or a tuple of two int:
+
+  • 1 DAC  
+        digitalOutputEnabled True (MANDATORY)
+        and alternateDACOutputStateEnabled False
+        and :
+            ⋆ alternateDigitalOutputStateEnabled False   ⇒ SINGLE CELL
+                    with 1 DIG OUT channel used: SINGLE PATHWAY (single stim box)
+                        straightforward - only one DIG OUT is used
+                        this channel is:
+                            '*' (TRAIN) -> 1 or more pulses
+                            '1' (PULSE) -> a SINGLE TTL boxcar with 
+                                duration == actual duration of the epoch where
+                                the DIG OUT is defined
+                        
+        
+                    with >1 DIG OUT channels used: ⇒ posibly more than one 
+                        pathways are stimulated simultaneously
+                        - each DIG out may be used to stimulate something
+                        - if a TTL TRAIN ('*') -> train of TTLS
+                        - if a TTL PULSE ('1') -> a single TTL step ("boxcar")
+        
+                        - REQUIRES 'digChannel' parameter in c'tor to identify
+                         whch DIG OUT channels activate synaptic pathways
+        
+                        - WARNING when both trains and pulses are used in the same
+                        epoch:
+                            the digital pulse count and frequency for the epoch 
+                            defining the digital output is given by the TRAIN 
+                            pattern!
+        
+                            the duration of the digital PULSE (not TRAIN) is given
+                            by the actual duration of the epoch where the digital
+                            is defined (i.e., firstDuration + sweepNumber * deltaDuration)
+        
+            ⋆ alternateDigitalOutputStateEnabled True    ⇒ SINGLE CELL, 
+                    - dacChannel can only be either 0 or 1 (and the alternative
+                        digital output pattern being defined in Clampex on 
+                        the "other DAC", which is NOT pased to the LTPOnline
+                        contructor)
+        
+                    - REQUIRES even sweeps
+        
+                    - with 1 DIG OUT in the main DAC and 1 DIG OUT in the other 
+                        DAC, with distinct DIG OUT index per DAC ⇒ TWO PATHWAYS
+                        stimulated ALTERNATIVELY (WARNING: using the same DIG OUT
+                        index in both DACs defeats the purpose, but will NOT 
+                        raise error!)
+        
+                    - with > 1 DIG OUT in either DAC:
+                        REQUIRES 'digChannel' parameter in c'tor to identify
+                         whch DIG OUT channels activate synaptic pathways
+                    
+
+        digitalOutputEnabled False ⇒ INCOMPATIBLE: one needs a way to stimulate
+            the pathways
+
+            NOTE: although TTLs can be "emulated" by DAC analog waveforms,
+            they need to be delivered to the tissue via either a simulus 
+            isolator, or through an amplifier headstage with the (extracellular)
+            electrode placed in the tissue.
+
+  • 2 or more DACs:
+        NOTE: When alternateDigitalOutputStateEnabled is True on any DAC0 or DAC1
+        the extra DAC indices must be > 1 ! For example one can use 
+        DAC0 or DAC1 with alternateDigitalOutputStateEnabled True, and
+        DAC2,  DAC3 etc as supplementary DACs
+        
+        If using 1 ADC ≡ single cell or field
+            One DAC is used to stimulate as with 1 DAC; but see restrictions above
+        
+            A second DAC can be used to emulate TTLs to trigger other devices 
+            (possibly synaptic stimulation via extracellular electrode or uncaging,
+            etc)
+        
+            The DIG OUT used to deliver synaptic stimulation must be specified.
+        
+        if using two ADCs (cell + cell or cell + field or field + field recordings):
+            two of these DACs are used to stimulate the corresponding cell/field
+        
+
+In detail:
+==========
+
+  A)"Synaptic tracking" protocols: monitor synaptic responses evoked repeatedly over time
+  NOTE: these should be evoked at every 10 s or more (i.e. 0.1 Hz or less)
+
+  NOTE: these protocols can only be assocated with non-Conditioning episode types
+
+  A.1) recording from a single cell:
+      ADC: 
+      • adcChannel: int   
+      • mandatory ! (is the recorded signal)
+      • receives the Primary amplifier input
+      • its logical index depends on how the signals are configured in 
+      • acquisition sofware (in Clampex, that is the 'Lab book')
+      • must have been selected in the Clampex protocol
+      • clampMode ⇔ units:
+          ∘ pA (or A) ⇒ clampMode == ephys.ClampMode.VoltageClamp
+          ∘ mV (or V) ⇒ clampMode == ephys.ClampMode.CurrentClamp (includes I=0/NoClamp)
+
+      DAC: 
+      • dacChannel: int
+          ∘ units:
+              ⋆ mV (or V) ⇒ clampMode == ephys.ClampMode.VoltageClamp
+              ⋆ pA (or A) ⇒ clampMode == ephys.ClampMode.CurrentClamp (includes I=0/NoClamp)
+
+          ∘ dacChannel is usually 0 or 1, depending on which amplifier channel is used 
+              (1 or 2, respectively) and how their inputs are routed from the DAQ
+              outputs; it may be higher, but mind the constraint below (» «)
+
+          ∘ digitalOutputEnabled == True MANDATORY (for stimulation)
+              ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
+                  converging on the same cell, and stimulated in alternative sweeps
+                  □ ⇒ REQUIRES even number of sweeps per run (typically only TWO sweeps per run)
+                      ⇒ two sweps per trial (averaged if more than one run per trial)
+                  □ » applies only to dacChannels 0 & 1 « 
+                  □ mandatory stimulation ABF epochs:
+                      a) unique epoch with digital output TRAIN ('*')
+                      - any type (except for Off)
+                      - has digital output as TRAIN ('*') - position of '*'
+                          indicates which DIG channel is used; this must reflect
+                          physical connection between DAQ's DIG output and the 
+                          stimulus isolation box
+                      - has alternate digital output TRAIN on a DISTINCT DIG
+                          channel defined in the  "alternate" DAC: 
+                              dac 1 if dacChannel is 0, dac 0 if dacChannel is 1
+                      - ⇒ this epoch MUST also be defined in the "alternate" DAC ⇒
+                      - the "alternate" DAC must have the same epochs and timings
+                          defined as for dacChannel
+                      - the actual digital pattern of the dacChannel depends on
+                          the sweep number: 
+                              main pattern is sent on even sweeps (0,2,4,…)
+                              alternate pattern is sent on odd sweeps (1,3,5,…)
+                      - the digital TRAIN provides:
+                          1 pulse ⇒ single stimulation
+                          2 pulses ⇒ paired-pulse stimulation
+                          > 2 pulses ⇒ ONLY FOR SPECIAL EXPERIMENTS when justified
+                      b) one or more epochs with digital output PULSE ('1')
+                      - all pulses defined on the same DIG output channel
+                      - 1 epoch ⇒ single-pulse
+                      - 2 epochs ⇒ paired-pulse
+                      - > 2 epochs ⇒ ONLY FOR SPECIAL EXPERIMENTS when justified
+                      - all these must aso be defined on the "alternate" DAC
+                          (see above) using a DISTINCT DIG output channel for 
+                          the other pwthway (stimulus isolator, see above)
+                  
+              ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
+                  to the cell
+                  □ no restriction to number of sweeps (all sweeps record the same process)
+                  □ mandatory stimulation ABF epochs:
+                      a) unique epoch with digital output TRAIN on appropriate
+                          DIG channel (see above, except for the alternate output)
+                      - TRAIN defines 1, 2, or more pulses (see above)
+                      b) 1, 2, or more epochs with digial output PULSE (as above,
+                          except for the alternative output)
+                    
+          ∘ sends out analog command waveform ⇒ clampMode != NoClamp:
+              ⋆ alternateDACOutputStateEnabled == False (same analog command every sweep) 
+
+              ⋆ analogWaveformEnabled == True, with:
+                  □ optional membrane test ABF epoch:
+                      - type Step or Pulse with pulseCount == 1
+                      - firstLevel != 0, deltaLevel == 0, firstDuration ! = 0, deltaDuration == 0
+                      - sometime BEFORE or AFTER the stimulation epoch(s) (see above)
+                          if BEFORE simulation epoch:
+                              it MAY be the first defined epoch ⇒ signal baseline taken from the 
+                              dacChannel.holdingTime
+                              if MAY follow a "baseline" epoch (see below)
+                          if AFTER simulation epoch:
+                              must start some time AFTER stimulation epoch is order
+                                  to allow the recorded signal to settle back to baseline
+                              must end with enough time left in the sweep to allow for 
+                                  recording signal to settle back to baseline
+                                  (in current clamp this may allow detecting Vrebound, etc)
+       
+                  □ optional baseline epoch
+                      - firstLevel = deltaLevel = 0; firstDuration !=0; deltaDuration = 0
+                      - contains signal baseline for the sweep
+                      - when present, this should be the first epoch defined  
+                      NOTE: when absent, signal baseline will be measured during the 
+                      DAC holding time which is 1/64 of sweep samples; if sweep is
+                      too short this may not be helpful
+       
+                  □ interleaved "no-op" epochs:
+                      - firstLevel = deltaLevel = 0, firstDuration != 0, deltaDuration = 0
+                      - between membrane test and stimulation epochs when membrane 
+                          test comes before stimulation, or vice-versa
+
+          ∘ OR:   ⋆ analogWaveformEnabled == FALSE ⇒ field recording (nowhere to send analog command)
+
+          ∘ epochs:
+              ⋆ if analogWaveformEnabled is True:
+                  □ optional membrane test epoch (see above)
+                  □ optional signal baseline epoch
+                  □ stimulation epochs with digital output
+                  □ interleaved "no-op" epochs
+       
+              ⋆ if analogWaveformEnabled is False (field recording):
+                  □ optional signal baseline epoch
+                  □ stimulation epochs with digital output
+                  □ interleaved "no-op" epochs
+
+  A.2) recording from two cells, or one cell in parallel with field recording:
+      NOTE: two cells can be recorded simultaneously or alternatively;
+      in either case you need to ADCs
+
+  ADC:
+  • adcChannel: list of int (2 distinct elements)
+      usually 0 & 1, but depends on the physical connections between the DAQ
+          and amplifier devices
+
+  • clampMode: list of 2 elements depends on adc Units see (A.1); 
+      NOTE: theoretically, each adc can have distinct clamp modes
+
+  DAC:
+  • dacChannel: list of 2 int (distinct)
+      ∘ units and clamp modes consistent with the adc channels above
+      ∘ digitalOutputEnabled == True in BOTH dacChannels (for stimulation)
+          ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
+          that converge on at least one of the cells - see (A.1)
+          ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
+          although both cells may respond to that same pathway, 
+              → not very useful
+              no restriction on number of sweeps (see (A.1))
+
+      ∘ both dacChannels send out analog command waveform ⇒ clampMode != NoClamp:
+          ⋆ alternateDACOutputStateEnabled == True ⇒ even number of sweeps
+              cells receive analog commands on alternative sweeps (NOT useful when 
+              alternateDigitalOutputStateEnabled == True)
+
+          ⋆ alternateDACOutputStateEnabled == False ⇒ 
+              cells receive analgo command simultaneously
+              allows alternative digital outputs
+
+      ∘ OR: only one dacChannel has alternateDACOutputStateEnabled == True
+          ⇒ one cell is clamped; the other is not so the corresponding adc
+          likely records fields
+
+      WARNING: this is problematic and likely too ambiguous, as one may
+      design an experiment to record field potentials AND whole-cell 
+      currents simultaneously; will need to use alternative DIG outputs
+      AND NO alternative analog waveforms so that the "alternative" DAC
+      can be configured to send no command waveforms for field recording
+
+  B) "Conditioning protocols"
+  NOTE 1: These are applied to only one synaptic pathway in the experiment - the
+          "test" pathway - with the other pathway (if present) beng the "control"
+          pathway.
+       
+  NOTE 2: Can only be associated with RecordingEpisodes of Conditioning type(s)
+
+  NOTE 3: Usually, a conditioning protocol is applied only once. This is 
+  certainly the case of whole-cell patch-clamp LTP experiments, where 
+  a "washout of plasticity" effect seems to take place over long 
+  recording times.
+
+  This wash out effect is irrelevant for field recording experiments 
+  (and, possibly, for whole-cell patch-clamp LTD experiments). In these
+  cases it may be justified to apply conditioning protocols more than 
+  once, with intervening tracking protocols recordong the evolution of
+  synpatic responses for some time after each conditioning protocol.
+
+  Also, when justified, several conditioning episodes may use distinct
+  conditoning protocols.
+
+  B.1) Recording from a single cell with or without control pathway:
+
+      ADC:
+      • adcChannel: int - same as for (A.1)
+      • clampMode may be the same as for the protocol of the preceding
+          Tracking episode (if present)        
+          
+      DAC:
+      • dacChannel: int - the same as the dacChannel as the protocol for
+          the preceding Tracking episode
+
+      • digitalOutputEnabled == True (to stimulate the pathway)
+          ⋆ alternateDigitalOutputStateEnabled == False ALWAYS !!!
+              □ digital output (DIG) channel:
+                  - for two pathways - use the DIG channel corresponding
+                   to the conditioned pathway
+       
+              □ digital output pattern can be a TRAIN or a PULSE
+                  - when a TRAIN, there can be several epochs sending out trains
+                      (e.g, "bursts"), subject to the available number of epochs
+                      and duration of the sweep        
+                  - when a PULSE, there can be several epochs sending out a 
+                      TTL pulse, subject to the available number of epochs        
+                      and duration of the sweep    
+
+              □ NOTE: the index of the DIG out channel identifies which
+                  pathway is conditioned, and MUST be one of the DIG out channels
+                  used by the dacChannel in the protocol for the preceding
+                  Tracking episode.
+       
+      • if sending out analog command waveforms (e.g. for triggering postsynaptic
+          spikes):
+          ⋆ analogWaveformEnabled == True
+          ⋆ alternateDACOutputStateEnabled == False
+       
+      • NOTE: if analogWaveformEnabled is False AND the protocol for the 
+        accompanying Tracking episode(s) also has dac with analogWaveformEnabled
+        set to False, this indicates field recording.
+      
+      • epochs:   
+          ⋆ digital output epochs: MANDATORY, for pathway stimulation
+          ⋆ if analogWaveformEnabled is True:
+              any number of waveform epochs; these may be identical to the
+              digtal output epochs
+
+
+  B.2) Recording from two cells, of a cell + field recordings in parallel
+  NOTE: To make sense of this experimental approach, one COULD apply conditioning
+  to only one cell (and leave the other as control).
+  WARNING The caveat with recording from two cells is that one may not be able
+  to distinguish between the "test" and the "control" cell when the conditioning
+  protocol does not include/require controlling the state of the postsynaptic
+  cell (i.e., spiking or a controlled postsynaptic membrane voltage, etc).
+
+  On the other hand, recording from a cell in parallel with field recordings
+  can be used to compare responses from the recorded cell with those from a 
+  population of synapses in the same prep (both ADCs in the tracking should be
+  analysed) and a control pathway should be configured in the Tracking protocols.
+
+"""
+        
+
         
     test_protocol_properties = ("activeDACChannelIndex",
                                 "nSweeps",
