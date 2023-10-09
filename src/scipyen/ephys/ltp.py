@@ -1895,19 +1895,20 @@ TL;DR:
         NOTE: Only DAC0 and DAC1 can issue alternative ditigal trains
             
 
-    A conditioning protocol has:
-        1 ADC, DAC
+  A conditioning protocol has:
+        1 ADC, 1 DAC
             the conditioned cell (or field)
             alternateDigitalOutputStateEnabled False
             alternateDACOutputStateEnabled False
+        • the ADC shuod be identical to one of the ADC channels in the preceding
+        tracking protocol
+        • the DAC has:
+            digitalOutputEnabled on at least one DIG OUT channel
+            (for either TRAIN or PULSE) - index of stimulated devices
         
-            the DAC has:
-                digitalOutputEnabled on at least one DIG OUT channel
-                (for either TRAIN or PULSE) - index of stimulated devices
-        
-                when there is only one DIG OUT, this indicates which pathway
+            when there is only one DIG OUT, this indicates which pathway
         is stimulated;
-                whene there are > 1 DIG OUT, their indices are compared to those
+            when there are > 1 DIG OUT, their indices are compared to those
         in a preceding synaptic tracking protocol to identify whiof the the tracked
         pathway is beign stimulated - hence it MAY reli on the 'digChannel' 
         parameter in the c'tor

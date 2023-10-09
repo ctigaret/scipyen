@@ -1020,7 +1020,9 @@ class ABFProtocol:
     
     @property
     def activeDACChannelIndex(self) -> int:
-        """Index of the DAC channel used for command waveforms (and possibly DIG outputs)
+        """Index of the "active" DAC channel.
+        The active DAC channel is the DAC channel that sends out the MAIN DIGITAL
+        output - irrespective of whether it also has analog waveform enable or not.
         """
         # NOTE: 2023-10-09 13:31:58
         # This is either not very useful or I fail to understand this:
@@ -1037,8 +1039,80 @@ class ABFProtocol:
         # both report self._activeDACChannel_ 0 (in pyabf this is regardless of sweep)
         
         # However: if alternateDigitalOutputStateEnabled is False AND 
-        #     both analogWaveformEnabled and digitalOutputEnabled ar eenabled in 
+        #     both analogWaveformEnabled and digitalOutputEnabled are enabled in 
         #     the same DAC then activeDACChannelIndex is the index of said DAC output.
+        
+        # protocol with:
+        #
+        # NOTE: DIG OUT CAN ONLY BE ENABLED ON A SINGLE DAC!
+        #
+        #               DAC0:   DAC1:       Alt wave    Alt Dig     Returns:
+        #   analog      1       1           0           1           0
+        #   digital     1       0
+        #
+        #   analog      1       1           0           1           1
+        #   digital     0       1
+        #
+        #   analog      0       1           0           1           1                              
+        #   digital     0       1
+        #
+        #   analog      1       0           0           1           1                              
+        #   digital     0       1
+        #
+        #   analog      0       1           0           1           0                           
+        #   digital     1       0
+        #
+        #   analog      1       1           1           1           0         
+        #   digital     1       0
+        #
+        #   analog      1       1           1           1           1
+        #   digital     0       1
+        #
+        #   analog      0       1           1¹          1           1                           
+        #   digital     0       1
+        #
+        #   analog      1       0           1¹          1           1                              
+        #   digital     0       1
+        #
+        #   analog      0       1           1¹          1           0                           
+        #   digital     1       0
+        #
+        #   analog      1       1           1           0           0         
+        #   digital     1       0
+        #
+        #   analog      1       1           1           0           1
+        #   digital     0       1
+        #
+        #   analog      0       1           1¹          0           1
+        #   digital     0       1
+        #
+        #   analog      1       0           1¹          0           1                              
+        #   digital     0       1
+        #
+        #   analog      0       1           1¹          0           0                           
+        #   digital     1       0
+        #
+        #   analog      1       1           1           0           ?0         
+        #   digital     1       0
+        #
+        #   analog      1       1           1           0           ?1
+        #   digital     0       1
+        #
+        #   analog      0       1           1¹          0           ?1
+        #   digital     0       1
+        #
+        #   analog      1       0           1¹          0           ?1                              
+        #   digital     0       1
+        #
+        #   analog      0       1           1¹          0           0                           
+        #   digital     1       0
+        #
+        #
+        # ¹ irrelevant here
+        #
+        
+        #   
+        
 
         
         return self._activeDACChannel_
