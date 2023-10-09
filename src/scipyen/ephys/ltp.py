@@ -1756,7 +1756,7 @@ class LTPOnline(QtCore.QObject):
 # ======
 #   A synaptic tracking protocol has:
 #
-#   1 or 2 ADCs used for recording synaptic response:
+#   1 or 2 ADCs used for recording synaptic response: → 'adcChannel' parameter in c'tor
 #   • 1   ⇒ for single cell or field 
 #   • 2   ⇒ for recording two cells, from one cell + field recording or 
 #         two field recordings (e.g. in two places)
@@ -1779,6 +1779,12 @@ class LTPOnline(QtCore.QObject):
 #       at the moment is irrelevant in the context of LTPOnline.
 #   
 #   1 or 2 DACs used to send analog command waveform and digital outputs;
+#       → 'dacChannel' and 'digChannel' parameters to the c'tor'
+#
+#           The 'dacChannel' is necessary to identify which DACs are being used
+#           (I cannot figure how to work this out using the information in 
+#           the ABF protocol, see NOTE: 2023-10-09 13:31:58 in pyabfbridge.py)
+#
 #       the analog command waveforms are used for membrane test in voltage or 
 #           current clamp and/or for emulating TTL pulses (not recommended)
 #
@@ -1805,9 +1811,13 @@ class LTPOnline(QtCore.QObject):
 #           and alternateDigitalOutputStateEnabled:
 #               False   ⇒ single cell
 #                       with 1 DIG OUT channel used: single pathway (single stim box)
+#                           straightforward - only one out DIG used
 #                       with >1 DIG OUT channels used: 
-#                           one pathway via stim box AND auxiliary s - senseless for a single cell, UNLESS
-#                           one of the DIG OUT
+#                           one DIG used for the principal synaptic stimulation e.g.
+#                           pathway via stim box AND auxiliary
+#                           other DIG out use for auxiliary triggers (uncaging, 
+#                           optogenetics, local stim electrode etc)
+#                           REQUIRES 'digChannel' parameter in c'tor - necessary
 #               True    ⇒ single cell, two pathways alternatively simulated
 #                           the DAC can be either 0 or 1 (and the alternative
 #                           digital output pattern being defined in Clampex on 

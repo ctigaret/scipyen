@@ -1020,7 +1020,20 @@ class ABFProtocol:
     
     @property
     def activeDACChannelIndex(self) -> int:
-        """Index of the DAC channel used for command waveforms (and possibly DIG outputs)"""
+        """Index of the DAC channel used for command waveforms (and possibly DIG outputs)
+        """
+        # NOTE: 2023-10-09 13:31:58
+#         This is either not very useful or I fail to understand this:
+#         Two identical protocols except for the DAC used report the same number:
+#         protocol 1: alternateDigitalOutputStateEnabled False
+#                     DAC0 analogWaveformEnabled True, digitalOutputEnabled True
+#                     DAC1 analogWaveformEnabled False, digitalOutputEnabled False, but enabled on Channel #0
+#                     
+#         protocol 2: alternateDigitalOutputStateEnabled False
+#                     DAC0 analogWaveformEnabled False, digitalOutputEnabled True
+#                     DAC1 analogWaveformEnabled True, digitalOutputEnabled False, but enabled on Channel #0
+#         
+#         both report self._activeDACChannel_ 0 (in pyabf this is regardless of sweep)
         return self._activeDACChannel_
     
     @property
