@@ -1022,7 +1022,14 @@ class ABFProtocol:
     def activeDACChannelIndex(self) -> int:
         """Index of the "active" DAC channel.
         The active DAC channel is the DAC channel that sends out the MAIN DIGITAL
-        output - irrespective of whether it also has analog waveform enable or not.
+        output - irrespective of whether it also has analog waveform enabled or not.
+        Swithching DIG off in both DAC0 and DAC1 returns 0 here.
+        
+        
+        Therefore, to find out which DAC is associated with stimuli in your experiment:
+        
+        active
+        
         """
         # NOTE: 2023-10-09 13:31:58
         # This is either not very useful or I fail to understand this:
@@ -1107,6 +1114,51 @@ class ABFProtocol:
         #   analog      0       1           1¹          0           0                           
         #   digital     1       0
         #
+        #
+        #   analog      1       1           0           0           0                           
+        #   digital     0       0
+        #
+        #   analog      1       1           1           0           0
+        #   digital     0       0
+        #
+        #   analog      1       0           0¹          0           0
+        #   digital     0       0
+        #
+        #   analog      0       1           0¹          0           0!
+        #   digital     0       0
+        #
+        #   analog      0       1           1¹          0           0!
+        #   digital     0       0
+        #
+        #   analog      0       0           1¹          0           0!
+        #   digital     0       0
+        #
+        #               DAC2    DAC3
+        #   analog      1       0           1¹          1           2
+        #   digital     1       0
+        #
+        #   analog      0       1           1¹          1           3
+        #   digital     0       1
+        #
+        #   analog      0       1           1¹          1           3
+        #   digital     0       0
+        #
+        #   analog      1       1           1           1           3!
+        #   digital     0       0
+        #
+        #   analog      1       1           0           1           3!
+        #   digital     0       0
+        #
+        #               DAC3    DAC4
+        #   analog      1       1           0           1           3!
+        #   digital     0       0
+        #
+        #   analog      0       1           0           1           3!
+        #   digital     0       0
+        #
+        #                       DAC5
+        #   analog      0       1           0           1           3!
+        #   digital     0       0
         #
         # ¹ irrelevant here
         #
