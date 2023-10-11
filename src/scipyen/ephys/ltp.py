@@ -1050,7 +1050,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         try:
             self._runParams_.abfRunTimes.append(abfRun.rec_datetime)
-            deltaMinutes = (abfRun.rec_datetime - self._abfRunTimes_[0]).seconds/60
+            deltaMinutes = (abfRun.rec_datetime - self._runParams_.abfRunTimes[0]).seconds/60
             self._runParams_.abfRunDeltaTimes.append(deltaMinutes)
             
             protocol = pab.ABFProtocol(abfRun)
@@ -1081,7 +1081,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # for it
                 if not self._runParams_.newEpisode:
                     self._runParams_.newEpisode = True
-                    episodeName = self._runParams_.currentEpisode
+                    episodeName = self._runParams_.currentEpisodeName
                     newEpisodeName = utilities.counter_suffix(episodeName, self._runParams_.episodes)
                     
             
@@ -1182,8 +1182,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     sweepStartTime = protocol.sweepTime(k)
                     
                     # self._data_["baseline"][pndx].segments.append(abfRun.segments[k])
-                    self._data_[self._runParams_.currentEpisode][pndx].segments.append(abfRun.segments[k])
-                    if isinstance(self._presynaptic_triggers_[self._runParams_.currentEpisode][pndx], TriggerEvent):
+                    self._data_[self._runParams_.currentEpisodeName][pndx].segments.append(abfRun.segments[k])
+                    if isinstance(self._presynaptic_triggers_[self._runParams_.currentEpisodeName][pndx], TriggerEvent):
                         self._data_["baseline"][pndx].segments[-1].events.append(self._presynaptic_triggers_[pndx])
                         
                     viewer = self._viewers_[pndx]#["synaptic"]
@@ -1461,7 +1461,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # if len(self._abfRunDeltaTimes_) <= 1: # first run
                     #     self._viewers_["rs"].showLegends(True)
         except:
-            traceback_print_exc()
+            traceback.print_exc()
         
 
     def processProtocol(self, protocol:pab.ABFProtocol):
