@@ -1021,9 +1021,22 @@ class ABFProtocol:
     @property
     def activeDACChannelIndex(self) -> int:
         """Index of the "active" DAC channel.
-        The active DAC channel is the DAC channel that sends out the MAIN DIGITAL
-        output - irrespective of whether it also has analog waveform enabled or not.
-        Swithching DIG off in both DAC0 and DAC1 returns 0 here.
+        
+        Meaningless when no analog or digital commands are sent at all.
+        
+        The active DAC channel is the DAC channel that:
+        • sends out the MAIN DIGITAL output - irrespective of whether it 
+            also has analog waveform enabled or not.
+        • the channel with the highest index that sends out analog waveforms, 
+            when no DAC is sending digital output
+        
+        Swithching DIG off in all DACs returns 0 here.
+        
+        Beyond DAC1, the active DAC index returns the highest DAC index in use.
+        HOWEVER, it appears that the highest value returned here is 3 (as if there 
+        were a maximum of 4 DACs - from 0 to 3 - this may be a limitation in my 
+        simulations)
+        
         
         
         Therefore, to find out which DAC is associated with stimuli in your experiment:
@@ -1124,7 +1137,7 @@ class ABFProtocol:
         #   analog      1       0           0¹          0           0
         #   digital     0       0
         #
-        #   analog      0       1           0¹          0           0!
+        #   analog      0       1           0¹          0           0! ???
         #   digital     0       0
         #
         #   analog      0       1           1¹          0           0!
@@ -1159,6 +1172,14 @@ class ABFProtocol:
         #                       DAC5
         #   analog      0       1           0           1           3!
         #   digital     0       0
+        #
+        #               DAC2    DAC>2
+        #   analog      1       1           0           1           3!
+        #   digital     0       0
+        #
+        #               DAC2    DAC5
+        #   analog      1       1           0           1           2 AHA!
+        #   digital     1       0
         #
         # ¹ irrelevant here
         #
