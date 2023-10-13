@@ -1270,10 +1270,14 @@ class ABFProtocol:
     
     @property
     def protocolFile(self) -> str:
+        if not hasattr(self, "_protocolFile_"):
+            self._protocolFile_ = ""
         return self._protocolFile_
     
     @property
     def name(self)->str:
+        if not hasattr(self, "_name_"):
+            self._name_ = "protocol"
         return self._name_
     
     @property

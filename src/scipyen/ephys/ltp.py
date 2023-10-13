@@ -1046,6 +1046,31 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # print(f"{self.__class__.__name__}.processAbfFile: abfFile: {abfFile}\n")
         # WARNING: the Abf file may not be completed at this time, depending on when this is called!
         
+        
+        # logic:
+        #
+        # first run ever: 
+        #   • no protocol yet in runParams
+        #   • runParams to indicate if currentProtocolIsConditioning
+        #       (False => protocol is monitoring)
+        #   • create new episode (if unnamed, use protocol.name)
+        #
+        #   • if monitoring, process the protocol to get measurement landmarks:
+        #       see processProtocol
+        #
+        #   • if conitioning, do nothing - analysis of recordings during conditioning
+        #       would require bespoke measurements, better made offline
+        #       KISS!: just measure evolution of synaptic responses in monitoring
+        #           protocols.
+        #
+        # subsequent runs:
+        #   • runParams.protocol is the previous run's protocol; 
+        #   • new episode (if unnamed, use protocol.name) IFF:
+        #       ∘ current protocol is different from previous protocol
+        #       ∘ currentProtocolIsConditioning changed to True (allows the use 
+        #           of same protocol for condiotning as well)
+        #       ∘ runParams emands a new episode
+        #
         abfRun = pio.loadAxonFile(str(abfFile))
         
         try:
@@ -1114,7 +1139,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # which should have the same monitoring protocol
             #
             
-            # if self._runParams_.monitorProtocol is None:
             if self._runParams_.protocol is None:
                 if protocol.clampMode() == self._runParams_.clampMode:
                     assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
@@ -1135,19 +1159,24 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # if protocol != self._runParams_.monitorProtocol:
                 if protocol != self._runParams_.protocol:
                     if self._runParams_.newEpisode:
-                        # if self._conditioningProtocol_ is None:
-                        if len(self._runParams_.conditioningProtocols) == 0:
-                            # if protocol.clampMode() == self._conditioningClampModes_:
-                            if protocol.clampMode() in self._runParams_.conditioningClampModes:
-                                self._runParams_.conditioningProtocols.append(protocol)
-                            else:
-                                raise ValueError("Unexpected conditioning protocol")
-                            
+                        if self._runParams_.currentEpisodeName is None:
+                            self._runParams_.currentEpisodeName = protocol.name
+                        if self._runParams_.currentProtocolIsConditioning:
+                            self._runParams_.conditioningProtocols.append(protocol)
                         else:
-                            if protocol != self._conditioningProtocol_:
-                                raise ValueError("Unexpected protocol for current run")
+                            self._runParams_.monitoringProtocols.append(protocol)
+                            
+#                         if len(self._runParams_.conditioningProtocols) == 0:
+#                             # if protocol.clampMode() == self._conditioningClampModes_:
+#                             if protocol.clampMode() in self._runParams_.conditioningClampModes:
+#                                 self._runParams_.conditioningProtocols.append(protocol)
+#                             else:
+#                                 raise ValueError("Unexpected conditioning protocol")
+#                             
+#                         else:
+#                             if protocol != self._conditioningProtocol_:
+#                                 raise ValueError("Unexpected protocol for current run")
                 
-            # if self._monitorProtocol_.nSweeps == 2:
             if self._runParams_.protocol.nSweeps == 2:
                 # if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
                 if not self._runParams_.protocol.alternateDigitalOutputStateEnabled:
@@ -1471,6 +1500,26 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         
         pass
+    
+    def storeProtocol(self, protocol:pab.ABFProtocol):
+        if protocol.nSweeps == 2:
+            assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
+            assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
+            
+        if self._runParams_.protocol is None:
+            self._runParams_.newEpisode = True
+            
+        self._runParams_.protocol = protocol
+        
+        if self._runParams_.currentProtocolIsConditioning:
+            self._runParams_.newEpisode
+            self._runParams_.conditioningProtocols.append(protocol)
+        else:
+            self._runParams_.monitoringProtocols.append(protocol)
+        
+        if self._runParams_.newEpisode:
+            self.processMonitorProtocol(protocol)
+        
 
     def processMonitorProtocol(self, protocol:pab.ABFProtocol):
         """Infers the timings of the landmarks from protocol.
@@ -2465,6 +2514,9 @@ In detail:
         self._conditioningProtocol_ = None
         
         self._conditioningProtocols_ = list()
+        self._monitorProtocols_ = list()
+        
+        self._currentProtocolIsConditioning_ = False
         
         self._adcChannel_ = adcChannel
         self._dacChannel_ = dacChannel
@@ -2636,8 +2688,9 @@ In detail:
                                dacChannel = self._dacChannel_,
                                clampMode = self._clampMode_,
                                protocol  = self._protocol_,
-                               # monitorProtocol = self._monitorProtocol_,
+                               monitoringProtocols = self._monitorProtocols_,
                                condtioningProtocols = self._conditioningProtocols_,
+                               currentProtocolIsConditioning = self._currentProtocolIsConditioning_,
                                signalIndex = self._sigIndex_,
                                useSlopeInIClamp = self._useSlopeInIClamp_,
                                mbTestAmplitude = self._mbTestAmplitude_,
