@@ -940,7 +940,8 @@ echo -e "python executable: ${python_executable}"
 if ! [ -v VIRTUAL_ENV ] ; then
 # NOTE: 2023-06-25 20:57:31 
 # these two MUST be run
-upgrade_virtualenv && makevirtenv
+makevirtenv
+# upgrade_virtualenv && makevirtenv
 fi
 
 
