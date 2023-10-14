@@ -983,7 +983,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
     # make scripts
-#     make_scipyenrc
+    make_scipyenrc
 #     
 #     if [[ `id -u` -ne 0 ]] ; then
 #         # only update bashrc for regular users
