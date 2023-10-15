@@ -470,6 +470,8 @@ from pyabf.abfReader import AbfReader
 from pyabf.stimulus import (findStimulusWaveformFile, 
                             stimulusWaveformFromFile)
 
+from ephys.ephys import ElectrophysiologyProtocol
+
 # useful alias:
 ABF = pyabf.ABF
 
@@ -481,7 +483,7 @@ class ABFAcquisitionMode(datatypes.TypeEnum):
     variable_length_event = 1
     fixed_length_event = 2
     gap_free = 3
-    high_speed_oscilloscope = 4 # Not supported by neo, but supported by pyabfbridge!
+    high_speed_oscilloscope = 4 # Not supported by neo, but supported by pyabf!
     episodic_stimulation = 5
     
     
@@ -869,10 +871,11 @@ class ABFOutputsConfiguration:   # placeholder to allow the definition of ABFPro
 class ABFInputsConfiguration:   # placeholder to allow the definition of ABFProtocol, below
     pass                         # will be (properly) redefined further below
 
-class ABFProtocol:
+class ABFProtocol(ElectrophysiologyProtocol):
     def __init__(self, obj:typing.Union[pyabf.ABF,neo.Block],
                  generateOutputConfigs:bool=True,
                  generateInputConfigs:bool=True):
+        super().__init__()
         if isinstance(obj, pyabf.ABF):
             abfVer = obj.abfVersion["major"]
             if abfVer !=2:
@@ -967,15 +970,14 @@ class ABFProtocol:
         
         self._nDataPointsHolding_ = int(self._nDataPointsPerSweep_/64)
         
+        self._outputs_ = list()
+        
         if generateOutputConfigs:
             self._outputs_ = [ABFOutputsConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
-        else:
-            self._outputs_ = list()
 
+        self._inputs_ = list()
         if generateInputConfigs:
             self._inputs_ = [ABFInputsConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
-        else:
-            self._inputs_ = list()
             
     def __eq__(self, other):
         """Tests for equality of scalar properties and epochs tables.
@@ -1022,29 +1024,31 @@ class ABFProtocol:
     def activeDACChannelIndex(self) -> int:
         """Index of the "active" DAC channel.
         
-        Meaningless when no analog or digital commands are sent at all.
+        Works for most cases where a single DAC (0 or 1) is used , but currently
+        meaningless when no analog or digital commands are sent at all or with
+        atypical connections and DAC configurations (see comments in the code)
         
         The active DAC channel is the DAC channel that:
         • sends out the MAIN DIGITAL output - irrespective of whether it 
             also has analog waveform enabled or not.
-        • the channel with the highest index that sends out analog waveforms, 
-            when no DAC is sending digital output
+        • when no DAC is sending digital output, it is the channel with the 
+            highest index that sends out analog waveforms, 
+            
         
         Swithching DIG off in all DACs returns 0 here.
-        
-        Beyond DAC1, the active DAC index returns the highest DAC index in use.
-        HOWEVER, it appears that the highest value returned here is 3 (as if there 
-        were a maximum of 4 DACs - from 0 to 3 - this may be a limitation in my 
-        simulations)
-        
         
         
         Therefore, to find out which DAC is associated with stimuli in your experiment:
         
-        active
+        TODO/FIXME 
         
         """
         # NOTE: 2023-10-09 13:31:58
+        # Beyond DAC1, the active DAC index returns the highest DAC index in use.
+        # HOWEVER, it appears that the highest value returned here is 3 (as if there 
+        # were a maximum of 4 DACs - from 0 to 3 - this may be a limitation in my 
+        # simulations)
+        #
         # This is either not very useful or I fail to understand this:
         # 
         # Two identical protocols except for the DAC used report the same number:
@@ -1061,11 +1065,11 @@ class ABFProtocol:
         # However: if alternateDigitalOutputStateEnabled is False AND 
         #     both analogWaveformEnabled and digitalOutputEnabled are enabled in 
         #     the same DAC then activeDACChannelIndex is the index of said DAC output.
-        
-        # protocol with:
+        #
         #
         # NOTE: DIG OUT CAN ONLY BE ENABLED ON A SINGLE DAC!
         #
+        # protocol with:
         #               DAC0:   DAC1:       Alt wave    Alt Dig     Returns:
         #   analog      1       1           0           1           0
         #   digital     1       0
@@ -1186,7 +1190,13 @@ class ABFProtocol:
         
         #   
         
-
+        # BUG: 2023-10-15 23:38:59 code with circular dependency
+        # # NOTE: 2023-10-15 21:56:55
+        # # this can have AT MOST one element
+#         digSendingDacs = list(c for c in range(self.nDACChannels) if self.outputConfiguration(c).digitalOutputEnabled)
+#         
+#         if len(digSendingDacs): 
+#             return digSendingDacs[-1]
         
         return self._activeDACChannel_
     
@@ -1608,7 +1618,7 @@ class ABFOutputsConfiguration:
                 else:
                     self._waveformSource_ = ABFDACWaveformSource.none
                 
-                # digital (TTL) waveform flags & parameters:
+                # # digital (TTL) waveform flags & parameters:
                 self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
             else:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
@@ -1788,17 +1798,17 @@ class ABFOutputsConfiguration:
     def protocol(self) -> ABFProtocol:
         return self._protocol_
         
-    @property
-    def digitalTrainActiveLogic(self) -> bool:
-        return self.protocol.digitalTrainActiveLogic
-    
-    @property
-    def digitalHolding(self) -> int:
-        return self.protocol.digitalHolding
-    
-    @property
-    def digitalUseLastEpochHolding(self) -> bool:
-        return self.protocol.digitalUseLastEpochHolding
+#     @property
+#     def digitalTrainActiveLogic(self) -> bool:
+#         return self.protocol.digitalTrainActiveLogic
+#     
+#     @property
+#     def digitalHolding(self) -> int:
+#         return self.protocol.digitalHolding
+#     
+#     @property
+#     def digitalUseLastEpochHolding(self) -> bool:
+#         return self.protocol.digitalUseLastEpochHolding
             
     @property
     def returnToHold(self) -> bool: 

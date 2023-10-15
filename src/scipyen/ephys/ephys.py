@@ -161,6 +161,7 @@ from functools import singledispatch
 import warnings
 import typing, types
 from enum import Enum, IntEnum
+from abc import ABC
 from dataclasses import (dataclass, MISSING)
 #### END core python modules
 
@@ -196,7 +197,7 @@ from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
-from core import pyabfbridge as pab
+# from core import pyabfbridge as pab # avoid circular imports!
 
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
@@ -233,8 +234,6 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
-
-ABF = pab.ABF # useful alias
 
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
@@ -275,6 +274,50 @@ class RecordingEpisodeType(TypeEnum):
     
     Conditioning    = 6 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
+
+# class ElectrophysiologyProtocol(object):
+class ElectrophysiologyProtocol(ABC):
+    """Abstract base class for electrophysiology data acquisition protocols
+    
+    """
+    pass
+    # TODO 2023-10-15 21:10:06 on backburner for now.
+    # wriite subclasses for:
+    # • CED Signal protocols ("configuration")
+    # • other ephys acquisition software (CED Spike, ephus?)
+    
+#     def __init__(self):
+#         # possible values for self._data_source_:
+#         # "Axon", "CEDSignal", "CEDSpike", "Ephus", "NA", "unknown"
+#         # default: "unknown"
+#         self._data_source_ = "unknown"  
+#         self._acquisition_protocol_ = dict()
+#         self._acquisition_protocol_["trigger_protocol"] = TriggerProtocol()
+#         self._averaged_runs_ = False
+#         self._alternative_DAC_command_output_ = False
+#         self._alternative_digital_outputs_ = False
+#     
+#     def parse_data(self, data:neo.Block, metadata:dict=None):
+#         if hasattr(data, "annotations"):
+#             self._data_source_ = data.annotations.get("software", "unknown")
+#             if self._data_source_ == "Axon":
+#                 self._parse_axon_data_(data, metadata)
+#                 
+#             else:
+#                 # TODO 2020-02-20 11:32:16
+#                 # parse CEDSignal, CEDSpike, EPhus, unknown
+#                 pass
+#             
+#     def _parse_axon_data_(self, data:neo.Block, metadata:dict=None):
+#         data_protocol = data.annotations.get("protocol", None)
+#         
+#         self._averaged_runs_ = data_protocol.get("lRunsPerTrial",1) > 1
+#         self._n_sweeps_ = data_protocol.get("lEpisodesPerRun",1)
+#         self._alternative_digital_outputs_ = data_protocol.get("nAlternativeDigitalOutputState", 0) == 1
+#         self._alternative_DAC_command_output_ = data_protocol.get("nAlternativeDACOutputState", 0) == 1
+#         
+#     def _parse_ced_data_(self, data:object):
+#         pass
 
 class SynapticPathway: pass
 
@@ -319,8 +362,7 @@ Fields (constructor parameters):
 • name:str - mandatory, name of the episode
 • episodeType: RecordingEpisodeType
 
-The RecordingEpisode only stores arguments needed to (re)create a new neo.Block
-by concatenating several source neo.Block data.
+The RecordingEpisode does NOT store actual neo data objects!
 
 The other fields indicate optional indices into the data segments and signals
 of the source data.
@@ -402,13 +444,14 @@ of the source data.
     
 """
     @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
-    def __init__(self, name:str, episodeType:RecordingEpisodeType, /, *args,
+    def __init__(self, protocol:ElectrophysiologyProtocol, /, *args,
+                 episodeType:RecordingEpisodeType = RecordingEpisodeType.Tracking,
+                 name:typing.Optional[str] = None,
                  segments:typing.Optional[GeneralIndexType] = None,
-                 response:typing.Optional[typing.Union[str, int]] = None, 
-                 analogStimulus:typing.Optional[typing.Union[str, int]] = None, 
-                 digitalStimulus:typing.Optional[typing.Union[str, int]] = None, 
-                 electrodeMode:ElectrodeMode = ElectrodeMode.Field,
-                 clampMode:ClampMode = ClampMode.NoClamp,
+                 adcChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
+                 dacChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
+                 digChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
+                 electrodeMode:ElectrodeMode = ElectrodeMode.WholeCellPatch,
                  pathways:typing.Optional[typing.List[SynapticPathway]] = None,
                  xtalk:typing.Optional[dict[int, tuple[int,int]]] = None,
                  sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
@@ -416,9 +459,13 @@ of the source data.
                  glob:bool = True,
                  **kwargs):
         """Constructor for RecordingEpisode.
-Mandatory parameters:
---------------------
-name:str - the name of this episode
+
+Positional (mandatory) parameters:
+---------------------------------
+protocol: the electrophysiology experimental protocol
+    WARNING: Currently, (2023-10-15 21:15:01) only pyabfbridge.ABFProtocol
+        objects are supported
+
 
 Var-positional parameters (args):
 --------------------------------
@@ -437,6 +484,10 @@ episode.
 
 Named parameters:
 ------------------
+name:str - the name of this episode
+
+episodeType: type of the episode (see RecordingEpisodeType)
+
 These are the attributes of the instance (see the class documentation), PLUS
 the parameters 'segments', 'glob', 'sortby' and 'ascending' with the same types
 and semantincs as for the function neoutils.concatenate_blocks(…).
@@ -457,19 +508,21 @@ See also the class documentation.
         
         self._type_ = episodeType
         
-        self.response=response
-        self.analogStimulus = analogStimulus
-        self.digitalStimulus = digitalStimulus
+        self.adcChannels = adcChannels
+        self.dacChannels = dacChannels
+        self.digChannels = digChannels
         
         if not isinstance(electrodeMode, ElectrodeMode):
             electrodeMode = ElectrodeMode.Field
         
         self.electrodeMode = electrodeMode
-        
-        if not isinstance(clampMode, ClampMode):
-            clampMode = ClampMode.NoClamp
-            
-        self.clampMode = clampMode
+#         
+        # NOTE: 2023-10-15 23:21:06
+        # clamp mode inferred from the protocol
+#         if not isinstance(clampMode, ClampMode):
+#             clampMode = ClampMode.NoClamp
+#             
+#         self.clampMode = clampMode
         
         if isinstance(pathways, (tuple, list)):
             if len(pathways):
@@ -514,6 +567,9 @@ See also the class documentation.
                 raise ValueError("Cannot apply crosstalk when there are not pathways defined")
             
             for k,p in xtalk.items():
+                if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
+                    raise TypeError("Cross-talk has invalid key types; expecting int or pairs of int")
+                
                 if any(p_ not in range(len(self.pathways)) for p_ in p):
                     raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self.pathways)} pathways")
                 
@@ -571,10 +627,12 @@ See also the class documentation.
             p.text(supertxt)
             p.breakable()
             attr_repr = [" "]
-            attr_repr += [f"{a}: {getattr(self,a).__repr__()}" for a in ("response", "analogStimulus",
-                                                         "digitalStimulus",
-                                                         "electrodeMode",
-                                                         "clampMode")]
+            attr_repr += [f"{a}: {getattr(self,a).__repr__()}" for a in ("protocol",
+                                                                         "adcChannels", 
+                                                                         "dacChannels",
+                                                                         "digChannels",
+                                                                         "electrodeMode",
+                                                                        )]
             
             with p.group(4 ,"(",")"):
                 for t in attr_repr:
@@ -2892,48 +2950,6 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency, spike
     else:
         return result
 
-
-class ElectrophysiologyProtocol(object):
-    """Electrophysiology data acquisition protocols
-    
-    Intended to provide a common denominator for data acquired with various 
-        electrophysiology software vendors. 
-        
-    WARNING DO NOT USE YET - API under development (i.e. unstable) TODO
-    """
-    # TODO/FIXME see if pyabf can be used (via pyabfbridge)
-    def __init__(self):
-        # possible values for self._data_source_:
-        # "Axon", "CEDSignal", "CEDSpike", "Ephus", "NA", "unknown"
-        # default: "unknown"
-        self._data_source_ = "unknown"  
-        self._acquisition_protocol_ = dict()
-        self._acquisition_protocol_["trigger_protocol"] = TriggerProtocol()
-        self._averaged_runs_ = False
-        self._alternative_DAC_command_output_ = False
-        self._alternative_digital_outputs_ = False
-    
-    def parse_data(self, data:neo.Block, metadata:dict=None):
-        if hasattr(data, "annotations"):
-            self._data_source_ = data.annotations.get("software", "unknown")
-            if self._data_source_ == "Axon":
-                self._parse_axon_data_(data, metadata)
-                
-            else:
-                # TODO 2020-02-20 11:32:16
-                # parse CEDSignal, CEDSpike, EPhus, unknown
-                pass
-            
-    def _parse_axon_data_(self, data:neo.Block, metadata:dict=None):
-        data_protocol = data.annotations.get("protocol", None)
-        
-        self._averaged_runs_ = data_protocol.get("lRunsPerTrial",1) > 1
-        self._n_sweeps_ = data_protocol.get("lEpisodesPerRun",1)
-        self._alternative_digital_outputs_ = data_protocol.get("nAlternativeDigitalOutputState", 0) == 1
-        self._alternative_DAC_command_output_ = data_protocol.get("nAlternativeDACOutputState", 0) == 1
-        
-    def _parse_ced_data_(self, data:object):
-        pass
 
 def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs):
     """Generates a signal containing a synthetic waveform, as a column vector.

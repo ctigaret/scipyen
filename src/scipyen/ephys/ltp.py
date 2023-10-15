@@ -466,8 +466,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     @safeWrapper
     @pyqtSlot(pathlib.Path)
     def processAbfFile(self, abfFile:pathlib.Path):
+        """Reads and ABF protocol from the ABF file and analyses the data
+        """
         # print(f"{self.__class__.__name__}.processAbfFile: abfFile: {abfFile}\n")
-        # WARNING: the Abf file may not be completed at this time, depending on when this is called!
+        # WARNING: the Abf file may not be completed at this time, depending on 
+        # when this is called!
         
         
         # logic:
@@ -574,9 +577,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #           ⋆ analyse abf file/neo block, append results etc
         #       
         #
-        abfRun = pio.loadAxonFile(str(abfFile))
         
         try:
+            abfRun = pio.loadAxonFile(str(abfFile))
             self._runParams_.abfRunTimes.append(abfRun.rec_datetime)
             deltaMinutes = (abfRun.rec_datetime - self._runParams_.abfRunTimes[0]).seconds/60
             self._runParams_.abfRunDeltaTimes.append(deltaMinutes)
@@ -585,10 +588,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 
             # check that the number of sweeps actually stored in the ABF file/neo.Block
             # equals that advertised by the protocol
-            # NOTE: mistamtches can happen when trials are acquired very fast (i.e.
-            # back to back) - in this saase check the sequencing key in Clampex!
+            # NOTE: mismatches can happen when trials are acquired very fast (i.e.
+            # back to back) - in this case check the sequencing key in Clampex
+            # and set an appropriate interval between successive trials !
             assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
+            # TODO: 2023-10-15 20:42:05 FIXME
+            # reqrite for a list of dacChannels!
             dac = protocol.outputConfiguration(self._runParams_.dacChannel)
             
             if len(self._runParams_.episodes) == 0:
