@@ -1306,10 +1306,12 @@ class ABFProtocol:
         return np.array(list(map(self.sweepTime, range(self.nSweeps)))) * pq.s
 
     def clampMode(self, adcIndex:int = 0,
-                  dacIndex:typing.Optional[int] = None,
-                  ):
+                  dacIndex:typing.Optional[int] = None):
         from ephys.ephys import ClampMode
         adc = self.inputConfiguration(adcIndex) # get first (primary) input by default
+
+        if adc is None:
+            raise ValueError(f"ADC index {adcIndex} is invalid for this protocol")
 
         recordsCurrent = scq.check_electrical_current_units(adc.units)
         recordsPotential = scq.check_electrical_potential_units(adc.units)

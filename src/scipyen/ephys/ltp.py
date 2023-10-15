@@ -483,15 +483,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #   measured (the simplest case)
         #
         # A. the run parameters needs to supply:
-        # adcChannels: sequence of int
+        # adcChannels: sequence of int (0-4 or 0-8, depending on the DAQ)
         #   typically this has just one element (the recording ADC) but more unusual
         #   circumstances might use two or more ADCs (e.g. parallel cell + field 
         #   or even cell + cell recordings) or even more that two ADCs; the values 
         #   in this parameter are indicate which AnalogSignal objects contain the 
         #   relevant recorded signals
         #
-        # dacChannel: sequence of int
-        #   like adcChannel above, this usually has just one element, the index 
+        # dacChannels: sequence of int (0-3 or 0-7 depnding on the DAQ)
+        #   like adcChannels above, this usually has just one element, the index 
         #   the DAC channel where the following are defined:
         #       digital output pattern
         #           if alternateDigitalOutputStateEnabled, this is the DAC where
@@ -504,6 +504,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #
         #       optional intervening no-op epochs 
         #
+        # digChannels: sequence of int (0-3 or 0-7 depending on the DAQ)
+        #    indices of DIG OUT channel used for synaptic stimulation;
+        #    needed when these channels cannot be determined from the protocol:
+        #       • TTLs are sent out through more than one DIG OUT, but there is only
+        #       one synaptic pathway that is beng stimulated (the other triggers 
+        #       might be used to operate other devices, etc)
+        #
+        #       • two pathways are stimulated¹, but TTLs are emitted through more
+        #       than two DIG OUT channels
+        #
+        # ---------------------------------------------------------------------
+        #
         # first run: 
         #   • runParams.protocol is None 
         #   • create new episode named by runParams.episodeName ( ⇐ from LTPOnline, 
@@ -511,7 +523,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #        just yet (classes are not fully functional)
         #
         #
-        #   • if runParams.currentProtocolIsConditioning: to distinguish between
+        #   • if runParams.currentProtocolIsConditioning:
         #       ∘ do nothing - analysis of recordings during conditioning
         #       would require bespoke measurements, better made offline
         #       KISS!: just measure evolution of synaptic responses in monitoring
@@ -524,8 +536,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #       used for plasticity induction
         #
         #   • else:
-        #       ∘ process the protocol to get measurement landmarks:
-        #           see processProtocol for details
+        #       ∘ get measurement landmarks:
+        #           ⋆ determine/create from the protocol -- see processProtocol for details
+        #
+        #           ⋆ OR: supplied by runParams (B)
+        #
+        #           ⋆ NOTE: either way, these MUST be cursor-based, and not 
+        #               neo.Epoch-based as in the offline LTP analysis script
+        #
+        #               This should allow the user to adjust cursor positions
+        #               slightly during acquisition
         #
         #       ∘ analyse the neo.Block of the supplied abf file, then:
         #           ⋆ append the block to the data
@@ -570,6 +590,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
             dac = protocol.outputConfiguration(self._runParams_.dacChannel)
+            
+            if len(self._runParams_.episodes) == 0:
+                # this is the first run ever ⇒ create a new recording episode
+                episodeName = self._runParams_.episodeName
+                if isinstance(episodeName, str) and len(episodeName.strip()):
+                    pass
+                    # episode = 
             
             episodes = list(self._results_.keys())
             
@@ -1822,21 +1849,21 @@ In detail:
     
 
     def __init__(self,
-                 adcChannel:typing.Union[int, typing.Sequence[int]] = 0,
-                 dacChannel:typing.Union[int, typing.Sequence[int]] = 0,
-                 digChannel:typing.Union[int, typing.Sequence[int]] = 0,
-                 mainClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
-                 conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
-                 responseBaselineDuration:pq.Quantity = 5 * pq.ms,
+                 adcChannels:typing.Union[int, typing.Sequence[int]] = 0,
+                 dacChannels:typing.Union[int, typing.Sequence[int]] = 0,
+                 digChannels:typing.Union[int, typing.Sequence[int]] = (0,1),
                  useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
-                 synapticDigitalTriggersOnDac:typing.Optional[int]=None,
-                 stimDIG:typing.Sequence[int] = (0,1),
-                 synapticTriggersOnDac:typing.Optional[int]=None,
-                 mbTest:typing.Optional[pq.Quantity] = None,
-                 mbTestStart:pq.Quantity = 0.05*pq.s,
-                 mbTestDuration:pq.Quantity = 0.1 * pq.s,
+                 baselineDurations:pq.Quantity = 5 * pq.ms,
                  steadyStateDurationIClampTest = 0.05 * pq.s,
+                 useSlopeInIClamp:bool = True,
+                 # mainClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
+                 # conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
+                 # synapticDigitalTriggersOnDac:typing.Optional[int]=None,
+                 # stimDIG:typing.Sequence[int] = (0,1),
+                 # synapticTriggersOnDac:typing.Optional[int]=None,
+                 # mbTest:typing.Optional[pq.Quantity] = None,
+                 # mbTestStart:pq.Quantity = 0.05*pq.s,
+                 # mbTestDuration:pq.Quantity = 0.1 * pq.s,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
                  autoStart:bool=True,
@@ -1864,14 +1891,14 @@ In detail:
 
                 therefore, any of voltage- or current-clasmp modes are valid
         
-        adcChannel:int, default is 0 (first ADC input channel)
+        adcChannels:int or sequence of int, default is 0 (first ADC input channel)
             Index of the ADC input channel used in recording.
         
             NOTE: This cannot be unambguously determined from the Clampex protocol,
             because the user may decide to "record" signals from more than one
             amplifier primary output
         
-        dacChannel:int, default is 0 (first DAC output channel)
+        dacChannels:int or sequence of int, default is 0 (first DAC output channel)
             Index of the DAC output channel used for sending analog
             waveform commands to the recorded cell (e.g. holding potential
             or current, membrane test, postsynaptc spikng, etc).
@@ -1887,7 +1914,7 @@ In detail:
             WARNING: For experiments using alternative pathways, only the first
             two DACs (0 and 1) can be used for "Alternative waveform stimulation".
         
-        digChannel: int, default is 0
+        digChannels: int, or sequence of int; default is 0
             The index of the DAC channel where digital output is enabled.
         
             This is important because the index of this channel, in Clampex,
@@ -1965,6 +1992,35 @@ In detail:
         
         super().__init__(parent=parent)
         
+        # NOTE: 2023-10-15 11:34:27
+        # This will be passed as argument to the processing thread; this should
+        # be OK since all its field values are held by reference, so they can
+        # be modified form within the thread, but CAUTION about possible race
+        # conditions.
+        #
+        # NOTE: 2023-10-15 11:34:34
+        # About its fields:
+        # episodes → a dict key:str ↦ value:dict, where:
+        #   key ≡ name of episode
+        #   value ≡ dict with key ↦ value:
+        #       "protocol" ↦ ABFProtocol
+        #       "conditoning" ↦ bool
+        #       "sweeps" ↦ sequence of ints, or a range (indices of the sweeps
+        #                   in the final data, that belong to this episode)
+        #       "presynapticTriggers"
+        self._runParams_ = DataBag(adcChannels = adcChannels,
+                                   dacChannels = dacChannels,
+                                   digChannels = digChannels,
+                                   episodes = dict(),
+                                   newEpisode = True,
+                                   episodeName = None,
+                                   abfRunTimes = list(),
+                                   abfRunDeltaTimes = list(),
+                                   baselineDurations = baselineDurations,
+                                   steadyStateDurationIClampTest = steadyStateDurationIClampTest,
+                                   useSlopeInIClamp = useSlopeInIClamp,
+                                   currentProtocolIsConditioning = False)
+        
         # NOTE: 2023-10-07 11:20:22
         # _emitterWindow_ needed here, to set up viewers
         wsp = wf.user_workspace()
@@ -1992,31 +2048,32 @@ In detail:
         
         # self._monitorProtocol_ = None
         
-        self._protocol_ = None
-
-        self._conditioningProtocol_ = None
+#         self._protocol_ = None
+# 
+#         self._conditioningProtocol_ = None
+#         
+#         self._conditioningProtocols_ = list()
+#         self._monitorProtocols_ = list()
+#         
+#         self._currentProtocolIsConditioning_ = False
         
-        self._conditioningProtocols_ = list()
-        self._monitorProtocols_ = list()
+        # self._adcChannels_ = adcChannels
+        # self._dacChannels_ = dacChannels
+        # self._digChannels_ = digChannels
         
-        self._currentProtocolIsConditioning_ = False
-        
-        self._adcChannel_ = adcChannel
-        self._dacChannel_ = dacChannel
-        
-        self._sigIndex_ = None  # when set, this is an int index of the signal 
+        # self._sigIndex_ = None  # when set, this is an int index of the signal 
                                 # of interest; must be the same across runs
 
-        if isinstance(mainClampMode, int):
-            if mainClampMode not in ephys.ClampMode.values():
-                raise ValueError(f"Invalid mainClampMode {mainClampMode}; expected values are {list(ephys.ClampMode.values())}")
-            self._clampMode_ = ephys.ClampMode.type(mainClampMode)
-            
-        elif isinstance(mainClampMode, ephys.ClampMode):
-            self._clampMode_ = mainClampMode
-            
-        else:
-            raise TypeError(f"mainClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(mainClampMode).__name__}")
+#         if isinstance(mainClampMode, int):
+#             if mainClampMode not in ephys.ClampMode.values():
+#                 raise ValueError(f"Invalid mainClampMode {mainClampMode}; expected values are {list(ephys.ClampMode.values())}")
+#             self._clampMode_ = ephys.ClampMode.type(mainClampMode)
+#             
+#         elif isinstance(mainClampMode, ephys.ClampMode):
+#             self._clampMode_ = mainClampMode
+#             
+#         else:
+#             raise TypeError(f"mainClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(mainClampMode).__name__}")
 
         # NOTE: 2023-10-08 09:41:39
         # conditioning protocols should not really matter, 
@@ -2034,22 +2091,22 @@ In detail:
 #         else:
 #             raise TypeError(f"conditioningClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(conditioningClampMode).__name__}")
 
-        self._useSlopeInIClamp_ = useSlopeInIClamp
-        self._mbTestStart_ = mbTestStart
-        self._mbTestDuration_ = mbTestDuration
-        self._mbTestAmplitude_ = mbTest
-        self._signalBaselineStart_ = 0 * pq.s
-        self._signalBaselineDuration_ = None
-        self._responseBaselineStart_ = None
-        self._responseBaselineDuration_ = responseBaselineDuration
-        self._steadyStatePassiveVmTest_ = steadyStateDurationIClampTest
+        # self._useSlopeInIClamp_ = useSlopeInIClamp
+        # self._mbTestStart_ = mbTestStart
+        # self._mbTestDuration_ = mbTestDuration
+        # self._mbTestAmplitude_ = mbTest
+        # self._signalBaselineStart_ = 0 * pq.s
+        # self._signalBaselineDuration_ = None
+        # self._responseBaselineStart_ = None
+        # self._responseBaselineDuration_ = responseBaselineDuration
+        # self._steadyStatePassiveVmTest_ = steadyStateDurationIClampTest
         
-        self._abfRunTimes_ = []
-        self._abfRunDeltaTimes_ = []
+        # self._abfRunTimes_ = []
+        # self._abfRunDeltaTimes_ = []
         
         self._results_ = dict() # Episode:str ↦ episodeResultsDict
         
-        self._episode_ = "baseline"
+        # self._episode_ = "baseline"
 
         # WARNING: 2023-10-05 12:10:40
         # below, all timings in self._landmarks_ are RELATIVE to the start of the sweep!
@@ -2166,26 +2223,28 @@ In detail:
                               results = resultsViewer)
         
         # NOTE: 2023-10-08 09:27:47
-        # passed by reference to the processor thread
-        self._runParams_= DataBag(adcChannel = self._adcChannel_,
-                               dacChannel = self._dacChannel_,
-                               clampMode = self._clampMode_,
-                               protocol  = self._protocol_,
-                               monitoringProtocols = self._monitorProtocols_,
-                               condtioningProtocols = self._conditioningProtocols_,
-                               currentProtocolIsConditioning = self._currentProtocolIsConditioning_,
-                               signalIndex = self._sigIndex_,
-                               useSlopeInIClamp = self._useSlopeInIClamp_,
-                               mbTestAmplitude = self._mbTestAmplitude_,
-                               mbTestStart = self._mbTestStart_,
-                               mbTestDuration = self._mbTestDuration_,
-                               responseBaselineDuration = self._responseBaselineDuration_,
-                               steadyStateDurationIClampTest = self._steadyStatePassiveVmTest_,
-                               abfRunTimes = self._abfRunTimes_,
-                               abfRunDeltaTimes = self._abfRunDeltaTimes_,
-                               currentEpisodeName = None,
-                               newEpisode = True,
-                               )
+#         # passed by reference to the processor thread
+#         self._runParams_= DataBag(adcChannels = self._adcChannels_,
+#                                dacChannels = self._dacChannels_,
+#                                digChannels = self._digChannels_,
+#                                
+#                                clampMode = self._clampModes_,
+#                                protocol  = self._protocols_,
+#                                monitoringProtocols = self._monitorProtocols_,
+#                                condtioningProtocols = self._conditioningProtocols_,
+#                                currentProtocolIsConditioning = self._currentProtocolIsConditioning_,
+#                                signalIndex = self._sigIndex_,
+#                                useSlopeInIClamp = self._useSlopeInIClamp_,
+#                                mbTestAmplitude = self._mbTestAmplitude_,
+#                                mbTestStart = self._mbTestStart_,
+#                                mbTestDuration = self._mbTestDuration_,
+#                                responseBaselineDuration = self._responseBaselineDuration_,
+#                                steadyStateDurationIClampTest = self._steadyStatePassiveVmTest_,
+#                                abfRunTimes = self._abfRunTimes_,
+#                                abfRunDeltaTimes = self._abfRunDeltaTimes_,
+#                                currentEpisodeName = None,
+#                                newEpisode = True,
+#                                )
         
         self._abfRunBuffer_ = collections.deque()
         

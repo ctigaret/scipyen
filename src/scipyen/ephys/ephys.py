@@ -254,11 +254,11 @@ class ElectrodeMode(TypeEnum):
 class RecordingEpisodeType(TypeEnum):
     """Once can define valid type combinations as follows:
     Drug | Tracking     (= 3)   ⇒ Tracking episode recorded in the presence of 
-                                    drug application
+                                    drug(s)
     Drug | CrossTalk    (= 5)   ⇒ CrossTalk episode recorded in the presence of 
-                                    drug application
+                                    drug(s)
     
-    Drug | Conditioning (= 7)   ⇒ Conditioning in the presence of drug application
+    Drug | Conditioning (= 7)   ⇒ Conditioning in the presence of drug(s)
     
     A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
     an episode of "drug washout".
@@ -317,6 +317,7 @@ inside the Block.
 Fields (constructor parameters):
 ================================
 • name:str - mandatory, name of the episode
+• episodeType: RecordingEpisodeType
 
 The RecordingEpisode only stores arguments needed to (re)create a new neo.Block
 by concatenating several source neo.Block data.
@@ -401,15 +402,15 @@ of the source data.
     
 """
     @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
-    def __init__(self, name:str, /, *args,
+    def __init__(self, name:str, episodeType:RecordingEpisodeType, /, *args,
                  segments:typing.Optional[GeneralIndexType] = None,
                  response:typing.Optional[typing.Union[str, int]] = None, 
                  analogStimulus:typing.Optional[typing.Union[str, int]] = None, 
                  digitalStimulus:typing.Optional[typing.Union[str, int]] = None, 
                  electrodeMode:ElectrodeMode = ElectrodeMode.Field,
                  clampMode:ClampMode = ClampMode.NoClamp,
-                 xtalk:typing.Optional[typing.List[SynapticPathway]] = None,
                  pathways:typing.Optional[typing.List[SynapticPathway]] = None,
+                 xtalk:typing.Optional[dict[int, tuple[int,int]]] = None,
                  sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
                  ascending:typing.Optional[bool] = None,
                  glob:bool = True,
@@ -454,6 +455,8 @@ See also the class documentation.
             name = ""
         super().__init__(name, **kwargs)
         
+        self._type_ = episodeType
+        
         self.response=response
         self.analogStimulus = analogStimulus
         self.digitalStimulus = digitalStimulus
@@ -476,15 +479,51 @@ See also the class documentation.
         else:
             self.pathways = []
         
-        if isinstance(xtalk, (tuple, list)):
-            if len(xtalk):
-                if not all(isinstance(v, SynapticPathway) for v in xtalk):
-                    raise TypeError(f"'xtalk' must contain only SynapticPatwhay instances")
+        # if isinstance(xtalk, (tuple, list)):
+        
+        # NOTE: 2023-10-15 13:27:27
+        # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
+        # between synapses actiated by seemingly distinct axonal pathways
+        # (in other words, the "inverse" of pathway separation)
+        #
+        # Testing the degree of pathway separation is based on short-term plasticity
+        # at the synapses under study: the "facilitation" or "depletion" of the synaptic
+        # responses seen when two individual stimuli are delivered to the same synapse
+        # (or group of synapses) at a short time interval ("paired-pulse ratio").
+        #
+        # When the two stimuli are delievered to distinct axonal bundles that synapse
+        # on the same cell, the lack of facilitation or depletion indicates that 
+        # the two axonal pathways activate completely separated groups of synapses
+        # on the postsynaptic cell.
+        #
+        # sweep index:intᵃ or tuple of two int ↦ ordered sequence of pathway int indices, 
+        #   e.g., for two pathways, using int keys:
+        #       0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
+        #       1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
+        #
+        #   or, as a tuple of two int:
+        #       (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from path 0 to path 1
+        #       (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from path 1 to path 0
+        #
+        #   ᵃ NOTE: relative to the first sweep in the episode! 
+        #
+        # NOTE: no checks are done on the value of the key(s) so expect errors
+        #   when trying to match an episode with data having the wrong number of sweeps
+        if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
+            if len(self.pathways) == 0:
+                raise ValueError("Cannot apply crosstalk when there are not pathways defined")
+            
+            for k,p in xtalk.items():
+                if any(p_ not in range(len(self.pathways)) for p_ in p):
+                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self.pathways)} pathways")
                 
             self.xtalk = xtalk
             
-        else:
+        elif xtalk is None:
             self.xtalk = []
+            
+        else:
+            raise ValueError(f"Invalid xtalk specification ({xtalk})")
                 
         sort = sortby is not None
         
@@ -650,9 +689,9 @@ class SynapticPathway(BaseScipyenData):
     
     _data_attributes_ = (
         ("pathwayType", PathwayType, PathwayType.Test),
-        ("responseSignal", (str, int), 0),
-        ("analogCommandSignal", (str, int), 1),
-        ("digitalCommandSignal", (str, int), 2),
+        ("responseSignal", (str, int, tuple, list), 0),
+        ("analogCommandSignal", (str, int, tuple, list), 1),
+        ("digitalCommandSignal", (int, tuple, list), 2),
         ("schedule", Schedule, Schedule()),         # one or more RecordingEpisode objects
         )
     
@@ -664,9 +703,9 @@ class SynapticPathway(BaseScipyenData):
                  name:typing.Optional[str]=None, 
                  index:int = 0,
                  segments:GeneralIndexType=0,
-                 response:typing.Optional[typing.Union[str, int]]=None, 
-                 analogStimulus:typing.Union[typing.Union[str, int]] = None, 
-                 digitalStimulus:typing.Optional[typing.Union[str, int]] = None, 
+                 response:typing.Optional[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]]=None, 
+                 analogStimulus:typing.Union[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]] = None, 
+                 digitalStimulus:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
                  schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
                  **kwargs):
         """SynapticPathway constructor.
@@ -833,7 +872,7 @@ Notes:
         
     
 class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locations", "name"))):
-    """Lightweight functor to calculate a signal measure at a location.
+    """Functor to calculate a signal measure at a location.
 
 A location is an object with one of the following types ('locator' types):
 • SignalCursor
@@ -952,7 +991,7 @@ steady_state = LocationMeasure(cursor_average, steady_state_cursor, "steady_stat
 # next line calculates the average baseline membrane current before the membrane test boxcar
 i0 = baseline(signal) 
 # next line calculates the average baseline potential before the membrane test boxcar
-v0 = baseine(command) # return
+v0 = baseline(command) # return
 
 # similarly, for the steady-state membrane current and potential
 i1 = steady_state(signal)
@@ -967,15 +1006,15 @@ LocationMeasure object (see example (3) above):
 
 delta = LocationMeasure(cursors_difference, (baseline_cursor, steady_state_cursor), "delta")
 
-dI = delta(signal)
-dV = delta(command)
+I = delta(signal)
+V = delta(command)
 
-Rin = dV/dI # ⇒ this will generate a Quantity in command.units / signal.units
+Rin = V/I # ⇒ this will generate a Quantity in command.units / signal.units
             # e.g. pq.mV / pq/pA
             # Most likely we want the resistance in MOhm (pq.MOhm), therefore
             # we must rescale it, so the last call should be:
 
-Rin = (dV/dI).rescale(pq.MOhm)
+Rin = (V/I).rescale(pq.MOhm)
 
 Finally, a few reminders:
 
@@ -1006,7 +1045,7 @@ array.
 
 So, we can finish the last example:
 
-Rin = np.squeeze((dV/dI).rescale(pq.MOhm))  # ⇒ e.g. array(90.1997, dtype=float32) * Mohm
+Rin = np.squeeze((V/I).rescale(pq.MOhm))  # ⇒ e.g. array(90.1997, dtype=float32) * Mohm
 
 This is a SCALAR Quantity (even though it is described as an array, but note the
 absence of square brackets in its string representation).
@@ -2100,7 +2139,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     amplitude = y1 - y0
     
-    where y0, y1 are the average signal values across the windows of cursor0 and
+    where y0, y1 are the AVERAGE signal values across the windows of cursor0 and
     cursor1
     
     Parameters:
