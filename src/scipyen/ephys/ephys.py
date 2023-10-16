@@ -328,20 +328,11 @@ class RecordingEpisode(Episode):
     """
 Specification of an episode in a synaptic pathway.
     
-WARNING: Do not use yet
-
 An "episode" is a series of sweeps recorded during a specific set of
 experimental conditions -- possibly, a subset of a larger experiment where
 several conditions were applied in sequence.
 
 All sweeps in the episode must have been recorded during the same conditions.
-
-NOTE: A Pathway Episode does NOT store any data; it only stores indices into
-segments (a.k.a sweeps) of a neo.Block object containing the data.
-
-It can be used to create a new such Block object from source neo.Blocks -
-i.e., passing it to the neoutils.concatenate_blocks(...) function.
-
 
 Examples:
 =========
@@ -393,7 +384,7 @@ of the source data.
     channel(s) used for synaptic stimulation; these are necessary in order to 
     distinguish the digital channel used for synaptic stimulation, from other 
     digital channels used, e.g. to trigger auxiliary devices (such as image
-    acwuistion devices). These outputs can also be "recorded" by feeding a branch
+    acquistion devices). These outputs can also be "recorded" by feeding a branch
     of the digital output into an ADC input of the DAQ board; in such cases, the
     resulting analogsignals have ther own name, and those names can be used here.
 
@@ -456,7 +447,7 @@ of the source data.
     distinct pathways)
     
 """
-    @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
+    # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
     def __init__(self, protocol:ElectrophysiologyProtocol, /, *args,
                  episodeType:RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name:typing.Optional[str] = None,
@@ -466,10 +457,11 @@ of the source data.
                  digChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
                  electrodeMode:ElectrodeMode = ElectrodeMode.WholeCellPatch,
                  pathways:typing.Optional[typing.List[SynapticPathway]] = None,
-                 xtalk:typing.Optional[dict[int, tuple[int,int]]] = None,
-                 sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
-                 ascending:typing.Optional[bool] = None,
-                 glob:bool = True,
+                 xtalk:typing.Optional[dict[int, tuple[int,int]]] = None ,
+                 triggers:typing.Optional[]
+                 # sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
+                 # ascending:typing.Optional[bool] = None,
+                 # glob:bool = True,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -501,11 +493,11 @@ name:str - the name of this episode
 
 episodeType: type of the episode (see RecordingEpisodeType)
 
-These are the attributes of the instance (see the class documentation), PLUS
+NOT IMPLEMENTED: These are the attributes of the instance (see the class documentation), PLUS
 the parameters 'segments', 'glob', 'sortby' and 'ascending' with the same types
 and semantincs as for the function neoutils.concatenate_blocks(…).
 
-NOTE: Data is NOT concatenated here, but these two parameers are used for 
+NOTE: Data is NOT concatenated here, but these two parameters are used for 
         temporarily ordering the source neo.Block objects in args.
 
 Var-keyword parameters (kwargs)
@@ -520,6 +512,12 @@ See also the class documentation.
         super().__init__(name, **kwargs)
         
         self._type_ = episodeType
+        
+        if not isinstance(protocol, ElectrophysiologyProtocol):
+            raise TypeError(f"Expecting an ElectrophysiologyProtocol (e.g. pyabfbridge.ABFProtocol); instead, got a {type(protocol).__name__}")
+        
+        
+        self.protocol = protocol
         
         self.adcChannels = adcChannels
         self.dacChannels = dacChannels
@@ -593,43 +591,46 @@ See also the class documentation.
             
         else:
             raise ValueError(f"Invalid xtalk specification ({xtalk})")
-                
-        sort = sortby is not None
         
-        reverse = not ascending
+        # NOTE: 2023-10-16 15:20:53
+        # for now, do away with *args and sort
+                
+#         sort = sortby is not None
+#         
+#         reverse = not ascending
         
-        if len(args): 
-            if all(isinstance(v, neo.Block) for v in args):
-                source = args
-                
-            elif all(isinstance(v, str) for v in args):
-                source = wf.getvars(*args, var_type = (neo.Block,),
-                               sort=sort, sortkey = sortby, reverse = reverse)
-                
-            elif len(args) == 1:
-                if isinstance(args[0], (tuple, list)) :
-                    if all(isinstance(v, neo.Block) for v in args[0]):
-                        source = args[0]
-                        
-                    elif all(isinstance(v, str) for v in args[0]):
-                        source = wf.getvars(args[0], var_type = (neo.Block,),
-                                          sort=sort, sortkey = sortby, reverse=reverse)
-                
-            else:
-                raise TypeError(f"Bad source arguments")
-        else:
-            source = []
-        
-        if len(source):
-            self.begin = source[0].rec_datetime
-            self.end = source[-1].rec_datetime
-            if segments is not None:
-                seg_ndx = [normalized_index(b.segments, index=segments) for b in source]
-                nsegs = sum(len(n) for n in seg_ndx)
-            else:
-                nsegs = sum(len(b.segments) for b in source)
-            self.beginFrame = 0
-            self.endFrame = nsegs-1 if nsegs > 0 else 0
+#         if len(args): 
+#             if all(isinstance(v, neo.Block) for v in args):
+#                 source = args
+#                 
+#             elif all(isinstance(v, str) for v in args):
+#                 source = wf.getvars(*args, var_type = (neo.Block,),
+#                                sort=sort, sortkey = sortby, reverse = reverse)
+#                 
+#             elif len(args) == 1:
+#                 if isinstance(args[0], (tuple, list)) :
+#                     if all(isinstance(v, neo.Block) for v in args[0]):
+#                         source = args[0]
+#                         
+#                     elif all(isinstance(v, str) for v in args[0]):
+#                         source = wf.getvars(args[0], var_type = (neo.Block,),
+#                                           sort=sort, sortkey = sortby, reverse=reverse)
+#                 
+#             else:
+#                 raise TypeError(f"Bad source arguments")
+#         else:
+#             source = []
+#         
+#         if len(source):
+#             self.begin = source[0].rec_datetime
+#             self.end = source[-1].rec_datetime
+#             if segments is not None:
+#                 seg_ndx = [normalized_index(b.segments, index=segments) for b in source]
+#                 nsegs = sum(len(n) for n in seg_ndx)
+#             else:
+#                 nsegs = sum(len(b.segments) for b in source)
+#             self.beginFrame = 0
+#             self.endFrame = nsegs-1 if nsegs > 0 else 0
         
     def _repr_pretty_(self, p, cycle):
         supertxt = super().__repr__() + " with :"

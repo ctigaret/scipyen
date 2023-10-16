@@ -593,15 +593,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # and set an appropriate interval between successive trials !
             assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
-            # TODO: 2023-10-15 20:42:05 FIXME
-            # reqrite for a list of dacChannels!
-            dac = protocol.outputConfiguration(self._runParams_.dacChannel)
+            dacs = [protocol.outputConfiguration(c) for c in self._runParam_.dacChannels]
             
             if len(self._runParams_.episodes) == 0:
                 # this is the first run ever ⇒ create a new recording episode
                 episodeName = self._runParams_.episodeName
-                if isinstance(episodeName, str) and len(episodeName.strip()):
-                    pass
+                if not isinstance(episodeName, str) or len(episodeName.strip()) == 0:
+                    episodeName = protocol.name
+                    
+                
                     # episode = 
             
             episodes = list(self._results_.keys())
