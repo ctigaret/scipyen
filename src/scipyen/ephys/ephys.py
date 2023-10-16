@@ -254,15 +254,12 @@ class RecordingEpisodeType(TypeEnum):
     """Once can define valid type combinations as follows:
     Drug | Tracking     (= 3)   ⇒ Tracking episode recorded in the presence of 
                                     drug(s)
-    Drug | CrossTalk    (= 5)   ⇒ CrossTalk episode recorded in the presence of 
-                                    drug(s)
-    
-    Drug | Conditioning (= 7)   ⇒ Conditioning in the presence of drug(s)
+    Drug | Conditioning (= 5)   ⇒ Conditioning in the presence of drug(s)
     
     A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
     an episode of "drug washout".
     
-    A value of 0 and any value > 7 are invalid.
+    A value of 0 and any value > 5 are invalid.
     
     """
     Drug            = 1 # a recording episode in the presence of a drug or mixture
@@ -270,10 +267,15 @@ class RecordingEpisodeType(TypeEnum):
                         
     Tracking        = 2 # used for tracking synaptic responses
                         # can be associated with any PathwayType
-    CrossTalk       = 4 # used to test for pathway independence
+    # CrossTalk       = 4 # used to test for pathway independence
     
-    Conditioning    = 6 # used for induction of plasticity (i.e. application of 
+    Conditioning    = 4 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
+
+#     Drug | CrossTalk    (= 5)   ⇒ CrossTalk episode recorded in the presence of 
+#                                     drug(s)
+#     
+
 
 # class ElectrophysiologyProtocol(object):
 class ElectrophysiologyProtocol(ABC):
@@ -359,17 +361,20 @@ inside the Block.
 
 Fields (constructor parameters):
 ================================
-• name:str - mandatory, name of the episode
-• episodeType: RecordingEpisodeType
+    
+• protocol:ElectrophysiologyProtocol - mandatory
+    Currently, only pyabfbridge.ABFProtocol objects are supported. The ABFProtocol
+    is a subclass of ElectrophysiologyProtocol defined in this module.
 
-The RecordingEpisode does NOT store actual neo data objects!
 
 The other fields indicate optional indices into the data segments and signals
 of the source data.
 
-• response : int or str - respectively, the index or the name of the
-    analog signal in each sweep, containing the pathway-specific synaptic
-    response
+• episodeType: RecordingEpisodeType
+    
+• adcChannels : int or str, or sequence of int or str - respectively, the index 
+    (indices) or the name(s) of the ADC channel (corresponding to analog signals
+    in each sweep), recording the pathway-specific synaptic response
 
     NOTE: During an experiment, the recording may switch between episodes with
     different clamping modes, or electrode modes (see below). This results in
@@ -377,25 +382,22 @@ of the source data.
     this information here, instead of the SynapticPathway instance to which this
     episode belongs to.`
 
-• analogStimulus : int or str - index or name of the analog signal containing
-    voltage- or current-clamp command signal (or None); such a signal is
-    typically recorded - when available - by feeding the secondary output of
-    the amplifier into an ADC input in the acquisition board.
+• dacChannels : int or str, or sequence of int or str - index or name of the 
+    DAC channel (optonalliy, corresponding to analog signals in the data containing
+    record copies of the DAC voltage- or current-clamp command signal (or None).
+    When available, these signals are typically recorded - when available - by 
+    feeding the secondary output of the amplifier into an ADC input in the 
+    acquisition (DAQ) board.
 
-• digitalStimulus: int or str - index or name of the analog signal containing
-    a recorded version of the triggers for extracellular stimulation.
+• digChannels: int or str, or sequence of int or str - index od the digital output
+    channel(s) used for synaptic stimulation; these are necessary in order to 
+    distinguish the digital channel used for synaptic stimulation, from other 
+    digital channels used, e.g. to trigger auxiliary devices (such as image
+    acwuistion devices). These outputs can also be "recorded" by feeding a branch
+    of the digital output into an ADC input of the DAQ board; in such cases, the
+    resulting analogsignals have ther own name, and those names can be used here.
 
-    When available, these are triggers sent to stimulus isolation boxes to
-    elicit an extracellular stimulus.
-
-    The triggers themselves are typically TTL signals, either taken directly
-    from the acquisition board digital output, or "emulated" by an analog
-    (DAC) output containing a rectangulare wave of 5 V amplitude.
-
-    In either case, these triggers can be routed into an ADC input of the
-    acquisition board, for recording (e.g., using a BNC "tee" splitter).
-
-•   electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.Field)
+• electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.WholeCellPatch)
 
     NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
     using the same electrode during an experiment (i.e. either Field, *Patch, or
@@ -403,25 +405,6 @@ of the source data.
 
     This attribute allows for episodes with distinct electrode 'mode' for the
     same pathway.
-
-• clampMode: ephys.ClampMode (default is ClampMode.NoClamp)
-    The recording "mode" - no clamping, voltage clamp or current clamp.
-
-    NOTE: Even though a pathway may have been recorded with the same electrode
-    mode throughout an experiment, one may switch between different clamping modes,
-    where it makes sense, e.g., voltage clamp during tracking and current clamp
-    during conditioning.
-
-    This attribute helps distinguish episodes with different clamping modes.
-
-• xtalk: optional, a list of SynapticPathways or None (default); can also be an
-    empty list (same as if it was None)
-
-    Only used for 'virtual' synaptic pathways where the recording tests for
-    the cross-talk between two 'real' pathways using paired-pulse stimulation.
-
-    Indicates the order in which each pathway was stimulated during the
-    paired-pulse.
 
 • pathways: optional, a list of SynapticPathways or None (default); can also be
     an empty list (same as if it was None).
@@ -431,6 +414,36 @@ of the source data.
     an episode involving more pathways is meaningful, e.g., where additional
     pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
     test, or during conditioning in order to test for 'associativity')
+    
+• xtalk: optional, a mapping of int (sweep indices) or tuples (start:int,step:int)
+    to pairs (2-tuples) of valid int indices into the 'pathways' attribute.
+    
+    When not None, it indicates that the episode was used for testing the 
+    independence of two or more synaptic pathways, using paired-pulse stimulations.
+    
+    E.g., for two pathways, using int keys:
+        0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
+        1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
+
+    or, as a tuple of two int:
+        (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from 
+                            path 0 to path 1
+    
+        (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from 
+                            path 1 to path 0
+    
+    The keys should resolve to valid sweep indices in the data; then the keys are 
+    pairs (2-tuples) they contain the 'start' and 'step' values for constructing
+    range objects indicating the sweeps where the test apples to the pathways 
+    given in the value mapped to the key, once the data is fully available.
+    
+    The order of the pathway indices in the values is the order in which each 
+    pathway was stimulated during the paired-pulse.
+
+    
+    
+    WARNING: the pathways attribute must be a list of SynapticPathways.
+
 
 ---
 
