@@ -458,7 +458,7 @@ of the source data.
                  electrodeMode:ElectrodeMode = ElectrodeMode.WholeCellPatch,
                  pathways:typing.Optional[typing.List[SynapticPathway]] = None,
                  xtalk:typing.Optional[dict[int, tuple[int,int]]] = None ,
-                 triggers:typing.Optional[]
+                 triggers:typing.Optional[TriggerEvent] = None,
                  # sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
                  # ascending:typing.Optional[bool] = None,
                  # glob:bool = True,

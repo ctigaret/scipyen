@@ -688,8 +688,9 @@ class ABFEpoch:
         """Read-only"""
         return self.alternateDigitalPattern if alternate else self.mainDigitalPattern
     
-    def usedDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
-        """Indices of DIG channels that emit TTL trains or TTL pulses
+    def usedDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False,
+                                  trains:typing.Union[bool, str] = "all") -> list:
+        """Indices of DIG channels that emit TTL trains OR TTL pulses
         
         For a more specific query (i.e. pulse v train output) see
         pulseDigitalOutputChannels and trainDigitalOutputChannels.
@@ -711,21 +712,41 @@ class ABFEpoch:
         """
         if isinstance(alternate, bool):
             p = self.digitalPattern(alternate)
-            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                filter(lambda i: i[1] != 0, 
-                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))]))
-        
+            
+            if isinstance(trains, str) and trains.lower() == "all":
+                return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                    filter(lambda i: i[1] != 0, 
+                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))]))
+            elif isinstance(trains, bool):
+                val = "*" if trains else 1
+                return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                    filter(lambda i: i[1] == val, 
+                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))]))
+            else:
+                raise ValueError(f"'trains' expected to be the string 'all' or a bool; instead, got {trains}")
+            
         elif isinstance(alternate, str) and alternate.lower() == "all":
             p = self.digitalPattern(False)
             pa = self.digitalPattern(True)
             
-            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                filter(lambda i: i[1] != 0, 
-                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))])) \
-                   + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
-                                                                filter(lambda i: i[1] != 0, 
-                                                                       enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
-                   
+            if isinstance(trains, str) and trains.lower() == "all":
+                return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                    filter(lambda i: i[1] != 0, 
+                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+                    + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+                                                                    filter(lambda i: i[1] != 0, 
+                                                                        enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+            elif isinstance(trains, bool):
+                val = "*" if trains else 1
+                return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+                                                                    filter(lambda i: i[1] == val,
+                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+                    + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+                                                                    filter(lambda i: i[1] == val, 
+                                                                        enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+            else:
+                raise ValueError(f"'trains' expected to be the string 'all' or a bool; instead, got {trains}")
+            
         else:
             raise ValueError(f"Invalid 'alternate' specification {alternate}")
             
@@ -865,10 +886,10 @@ class ABFEpoch:
         else:
             return False
 
-class ABFOutputsConfiguration:   # placeholder to allow the definition of ABFProtocol, below
+class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
     pass
 # will be (properly) redefined further below
-class ABFInputsConfiguration:   # placeholder to allow the definition of ABFProtocol, below
+class ABFInputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
     pass                         # will be (properly) redefined further below
 
 class ABFProtocol(ElectrophysiologyProtocol):
@@ -883,19 +904,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 
             assert obj._headerV2.lActualEpisodes == obj._protocolSection.lEpisodesPerRun, f"Mismatch between lActualEpisodes ({obj._headerV2.lActualEpisodes}) and lEpisodesPerRun ({obj._protocolSection.lEpisodesPerRun})"
 
-            self._acquisitionMode_ = ABFAcquisitionMode.type(obj.nOperationMode)
+            # ### BEGIN ADC inputs information
+            # NOTE: further info in self._inputs_
             self._nADCChannels_ = obj._adcSection._entryCount
-            self._nDACChannels_ = obj._dacSection._entryCount
-            self._nSweeps_ = obj._protocolSection.lEpisodesPerRun
-            self._nTotalDataPoints_ = obj._dataSection._entryCount
-            self._nDataPointsPerSweep_ = obj.sweepPointCount
-            self._samplingRate_ = float(obj.dataRate) * pq.Hz
-            self._sweepInterval_ = obj._protocolSection.fEpisodeStartToStart * pq.s
+            # ### END   ADC inputs information
             
+            # ### BEGIN DAC outputs information
+            # NOTE: further info in self._outputs_
+            self._nDACChannels_ = obj._dacSection._entryCount
             self._activeDACChannel_ = obj._protocolSection.nActiveDACChannel
             self._hasAltDacOutState_ = bool(obj._protocolSection.nAlternateDACOutputState)
+            # ### END   DAC outputs information
             
-            # digital outputs information
+            # ### BEGIN digital outputs information
+            # NOTE: further info indirectly via self._outputs_
             self._nDigitalOutputs_ = obj._dacSection._entryCount
             self._nTotalDigitalOutputs_ = obj._protocolSection.nDigitizerTotalDigitalOuts
             self._nSynchronizedDigitalOutputs_ = obj._protocolSection.nDigitizerSynchDigitalOuts
@@ -905,26 +927,36 @@ class ABFProtocol(ElectrophysiologyProtocol):
             digHolds = list(map(bool, obj._epochSection.nEpochDigitalOutput)) # 3,2,1,0,7,6,5,4
             self._digHoldingValue_ = list(reversed(digHolds[0:4])) + list(reversed(digHolds[4:]))
             self._digUseLastEpochHolding_ = bool(obj._protocolSection.nDigitalInterEpisode)
+            # ### END   digital outputs information
+            
+            self._acquisitionMode_ = ABFAcquisitionMode.type(obj.nOperationMode)
+            self._nSweeps_ = obj._protocolSection.lEpisodesPerRun
+            self._nTotalDataPoints_ = obj._dataSection._entryCount
+            self._nDataPointsPerSweep_ = obj.sweepPointCount
+            self._samplingRate_ = float(obj.dataRate) * pq.Hz
+            self._sweepInterval_ = obj._protocolSection.fEpisodeStartToStart * pq.s
             
             self._protocolFile_ = abf.protocolPath # store this for future reference
+            
             
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
             assert obj.annotations["lActualEpisodes"] == obj.annotations["protocol"]["lEpisodesPerRun"], f"In {obj.name}: Mismatch between lActualEpisodes ({obj.annotations['lActualEpisodes']}) and lEpisodesPerRun ({obj.annotations['protocol']['lEpisodesPerRun']})"
             
-            self._acquisitionMode_ = ABFAcquisitionMode.type(obj.annotations["protocol"]["nOperationMode"]), 
+            # ### BEGIN ADC inputs information
+            # NOTE: further info in self._inputs_
             self._nADCChannels_ = obj.annotations["sections"]["ADCSection"]["llNumEntries"]
-            self._nDACChannels_ = obj.annotations["sections"]["DACSection"]["llNumEntries"]
-            self._nSweeps_ = obj.annotations["protocol"]["lEpisodesPerRun"]
-            self._nTotalDataPoints_ = obj.annotations["sections"]["DataSection"]["llNumEntries"]
-            self._nDataPointsPerSweep_ = int(self._nTotalDataPoints_/self._nSweeps_/self._nADCChannels_)
-            self._samplingRate_ = float(obj.annotations["sampling_rate"]) * pq.Hz
-            self._sweepInterval_ = obj.annotations["protocol"]["fEpisodeStartToStart"] * pq.s
+            # ### END   ADC inputs information
             
+            # ### BEGIN DAC outputs information
+            # NOTE: further info in self._outputs_
+            self._nDACChannels_ = obj.annotations["sections"]["DACSection"]["llNumEntries"]
             self._activeDACChannel_ = obj.annotations["protocol"]["nActiveDACChannel"]
             self._hasAltDacOutState_ = bool(obj.annotations["protocol"]["nAlternateDACOutputState"])
+            # ### END   DAC outputs information
             
-            # digital outputs information
+            # ### BEGIN digital outputs information
+            # NOTE: further info indirectly via self._outputs_
             self._nDigitalOutputs_ = obj.annotations["sections"]["DACSection"]["llNumEntries"]
             self._nTotalDigitalOutputs_ = obj.annotations["protocol"]["nDigitizerTotalDigitalOuts"]
             self._nSynchronizedDigitalOutputs_ = obj.annotations["protocol"]["nDigitizerSynchDigitalOuts"]
@@ -949,6 +981,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 self._digHoldingValue_ = [False] * self._nDigitalOutputs_
                 
             self._digUseLastEpochHolding_ = bool(obj.annotations["protocol"]["nDigitalInterEpisode"])
+            # ### END   digital outputs information
+            
+            self._acquisitionMode_ = ABFAcquisitionMode.type(obj.annotations["protocol"]["nOperationMode"]), 
+            self._nSweeps_ = obj.annotations["protocol"]["lEpisodesPerRun"]
+            self._nTotalDataPoints_ = obj.annotations["sections"]["DataSection"]["llNumEntries"]
+            self._nDataPointsPerSweep_ = int(self._nTotalDataPoints_/self._nSweeps_/self._nADCChannels_)
+            self._samplingRate_ = float(obj.annotations["sampling_rate"]) * pq.Hz
+            self._sweepInterval_ = obj.annotations["protocol"]["fEpisodeStartToStart"] * pq.s
             
             self._protocolFile_ = obj.annotations["sProtocolPath"].decode()
 
@@ -970,14 +1010,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         self._nDataPointsHolding_ = int(self._nDataPointsPerSweep_/64)
         
-        self._outputs_ = list()
-        
-        if generateOutputConfigs:
-            self._outputs_ = [ABFOutputsConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
-
-        self._inputs_ = list()
-        if generateInputConfigs:
-            self._inputs_ = [ABFInputsConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
+        self._inputs_ = [ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
+        self._outputs_ = [ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
             
     def __eq__(self, other):
         """Tests for equality of scalar properties and epochs tables.
@@ -1015,7 +1049,39 @@ class ABFProtocol(ElectrophysiologyProtocol):
             ret = all(all(np.all(self.outputConfiguration(d).epochsTable(s, includeDigitalPattern=False) == other.outputConfiguration(d).epochsTable(s, includeDigitalPattern=False)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
         return ret
+    
+    @property
+    def adcNames(self):
+        return [i.name for i in self.inputs]
+    
+    @property
+    def adcUnits(self):
+        return [i.units for i in self.inputs]
+    
+    @property
+    def adcLogical2PhysicalIndexMap(self):
+        return dict((i.logicalIndex, i.physicalIndex) for i in self.inputs)
             
+    @property
+    def adcPhysical2LogicalIndexMap(self):
+        return dict((i.physicalIndex, i.logicalIndex) for i in self.inputs)
+    
+    @property
+    def dacNames(self):
+        return [o.name for o in self.outputs]
+            
+    @property
+    def dacUnits(self):
+        return [o.units for o in self.outputs]
+            
+    @property
+    def dacLogical2PhysicalIndexMap(self):
+        return dict((i.logicalIndex, i.physicalIndex) for i in self.outputs)
+            
+    @property
+    def dacPhysical2LogicalIndexMap(self):
+        return dict((i.physicalIndex, i.logicalIndex) for i in self.outputs)
+    
     @property
     def acquisitionMode(self) -> ABFAcquisitionMode:
         return self._acquisitionMode_
@@ -1314,6 +1380,22 @@ class ABFProtocol(ElectrophysiologyProtocol):
     @property
     def sweepTimes(self) -> pq.Quantity:
         return np.array(list(map(self.sweepTime, range(self.nSweeps)))) * pq.s
+    
+    def digitalOutputs(self, alternate:typing.Union[bool, str] = "all", trains:typing.Union[str, bool] = "all") -> set:
+        """Returns a set of indices of the digital outputs used in this protocol.
+    
+        By default, returns ALL channels used in both main and alternate patterns,
+        for either TTL pulses OR TTL trains.
+        
+        This behaviour can be controlled with the two parameters:
+        
+        • alterante (False/True/"all") - default is "all"
+        
+        • trains (False/True/"all") - default is "all"
+        
+        """
+        
+        return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([e.usedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
     def clampMode(self, adcIndex:int = 0,
                   dacIndex:typing.Optional[int] = None):
@@ -1343,47 +1425,66 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if self.sweepInterval == 0*pq.s:
             return sweep * self.sweepDuration
         return sweep * self.sweepInterval
+    
+    @property
+    def inputs(self):
+        return self._inputs_
 
-    def inputConfiguration(self, adcChannel:int = 0, physical:bool=False,
-                           src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None) -> ABFInputsConfiguration:
-
+    def inputConfiguration(self, adcChannel:typing.Union[int, str] = 0, physical:bool=False) -> ABFInputConfiguration:
+        if isinstance(adcChannel, str):
+            if adcChannel not in self.adcNames:
+                raise ValueError(f"Invalid ADC channel name {adcChannel}")
+            
+            adcChannel = self.adcNames.index(adcChannel)
+            
+            if physical:
+                adcChannel = self.adcLogical2PhysicalIndexMap[adcChannel]
 
         inputconfs = list(filter(lambda x: x.channelIndex(physical) == adcChannel, self._inputs_))
+        
         if len(inputconfs):
             return inputconfs[0]
-
-        if isinstance(src, (pyabf.ABF, neo.Block)):
-            return ABFInputsConfiguration(src, self, adcChannel, physical)
         else:
-            warnings.warn(f"The protocol has no input configuration defined - either because 'generateInputConfigs = False' was passed to the protocol constructor, or because there are no ADCs with the specified index ({adcChannel}) in the file and no source ABF or block data were supplied to this method call")
+            chtype = "physical" if physical else "logical"
+            raise ValueError(f"Invalid {chtype} ADC channel specified {adCChannel}")
 
-    def input(self, adcChannel:int = 0, physical:bool=False,
-                           src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None) -> ABFInputsConfiguration:
+    def input(self, adcChannel:int = 0, physical:bool=False) -> ABFInputConfiguration:
         """Shorthand to self.inputConfiguration"""
-        return self.inputConfiguration(adcChannel, src)
+        return self.inputConfiguration(adcChannel, physical)
     
-    def outputConfiguration(self, dacChannel:typing.Optional[int] = None,
-                            src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]] = None) -> ABFOutputsConfiguration:
-        
-        if not isinstance(dacChannel, int):
+    @property
+    def outputs(self):
+        return self._outputs_
+    
+    def outputConfiguration(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, physical:bool=False) -> ABFOutputConfiguration:
+        # if not isinstance(dacChannel, int):
+        if dacChannel is None:
             dacChannel = self.activeDACChannelIndex
+            
+        elif isinstance(dacChannel, str):
+            if dacChannel not in self.dacNames:
+                raise ValueError(f"invaid DAC channel name {dacChannel}")
+            
+            dacChannel = self.dacNames.index(dacChannel)
+            
+            if physical:
+                dacChannel = self.dacLogical2PhysicalIndexMap[dacChannel]
 
         outputConfs = list(filter(lambda x: x.dacChannel == dacChannel, self._outputs_))
 
         if len(outputConfs):
             return outputConfs[0]
-            
-        if isinstance(src, (pyabf.ABF, neo.Block)):
-            return ABFOutputsConfiguration(src, self, dacChannel)
         else:
-            warnings.warn(f"The protocol has no output configurations defined - either because 'generateOutputConfigs = False' was passed to the protocol constructor, or because there are no DACs in the file - and no source ABF or block data were supplied to this method call")
+            chtype = "physical" if physical else "logical"
+            raise ValueError(f"Invalid {chtype} DAC channel specified {dacChannel}")
             
-    def output(self, dacChannel:typing.Optional[int] = None,
-                            src:typing.Optional[typing.Union[pyabf.ABF, neo.Block]] = None) -> ABFOutputsConfiguration:
+            
+    def output(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+               physical:bool=False) -> ABFOutputConfiguration:
         """Shorthand to self.outputConfiguration"""
-        return self.outputConfiguration(dacChannel, src)
+        return self.outputConfiguration(dacChannel, physical)
         
-class ABFInputsConfiguration:
+class ABFInputConfiguration:
     """Deliberately thin class with basic info about an ADC input in Clampex.
         More information may be added for convenience later; until then, just
         explore the neo.Block annotations (assuming the Block was created from an
@@ -1450,7 +1551,7 @@ class ABFInputsConfiguration:
                 # TODO finalize this...
 
             elif abfVer == 2:
-                if adcChannel not in  obj._adcSection.nADCnum:
+                if adcChannel not in obj._adcSection.nADCnum or adcChannel not in range(len(obj._adcSection.nADCNum)):
                     raise ValueError(f"Invalid DAC channel index {adcChannel}")
 
                 self._adcChannel_ = adcChannel
@@ -1513,10 +1614,20 @@ class ABFInputsConfiguration:
     @property
     def logicalIndex(self) -> int:
         return self._adcChannel_
+    
+    @property
+    def number(self) -> int:
+        """Alias to self.logicalIndex"""
+        return self.logicalIndex
 
     @property
     def physicalIndex(self) -> int:
         return self._physicalChannelIndex_
+    
+    @property
+    def physical(self) -> int:
+        """Alias to self.physicalIndex"""
+        return self.physicalIndex
     
     @property
     def adcName(self) -> str:
@@ -1538,15 +1649,15 @@ class ABFInputsConfiguration:
     def protocol(self) -> ABFProtocol:
         return self._protocol_
 
-class ABFOutputsConfiguration:
+class ABFOutputConfiguration:
     """Configuration of a DAC channel and digital outputs in pClamp/Clampex ABF files.
         
-    An ABFOutputsConfiguration contains the information related to the use of a 
+    An ABFOutputConfiguration contains the information related to the use of a 
     particular DAC channel (between 0 and the maximum number of DAC outputs of 
     your DAQ hardware - 1, e.g., for DigiData series 1550 there are 8 DAC channels,
     hence a DAC channel can be between 0 and 7).
     
-    An ABFOutputsConfiguration object encapsulates information accessed through
+    An ABFOutputConfiguration object encapsulates information accessed through
     the Waveform tab of the Clampex protocol editor, with a Channel tab selected
     for the specified DAC channel.
         
@@ -1571,8 +1682,7 @@ class ABFOutputsConfiguration:
     #----------------------------------------------------------------------------
     def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block],
                  protocol:typing.Optional[ABFProtocol] = None,
-                 dacChannel:int = 0,
-                 sweep:typing.Optional[int] = None):
+                 dacChannel:int = 0, physical:bool=False):
         
         if protocol is None:
             protocol = ABFProtocol(obj)
@@ -1595,23 +1705,46 @@ class ABFOutputsConfiguration:
                 # TODO finalize this...
                 
             elif abfVer == 2:
-                if dacChannel not in obj._dacSection.nDACNum:
+                if dacChannel not in obj._dacSection.nDACNum or dacChannel not in range(len(obj._dacSection.nDACNum)):
                     raise ValueError(f"Invalid DAC channel index {dacChannel}")
                 
                 self._dacChannel_ = dacChannel
+                self._physicalChannelIndex_ = None
                 
-                dacName = obj.dacNames[dacChannel]# if dacChannel in obj.dacNames else ""
-                dacUnits = obj.dacUnits[dacChannel]# if dacChannel in obj.dacUnits else "mV"
+                if physical:
+                    if dacChannel in obj._dacSection.nDACNum:
+                        self._physicalChannelIndex_ = dacChannel
+                        logical = obj._dacSection.nDACNum[dacChannel]
+                        self._dacChannel_ = logical
+                        dacName = obj.dacNames[logical]
+                        dacUnits = obj.dacUnits[logical]
+                    else:
+                        dacName = ""
+                        dacUnits = ""
+                        
+                else:
+                    if dacChannel not in range(len(obj.dacNames)):
+                        dacName =""
+                        dacUnits = ""
+                        
+                    else:
+                        self._physicalChannelIndex_ = obj._dacSection.nDACNum[dacChannel]
+                        dacName = obj.dacNames[dacChannel]
+                        dacUnits = obj.dacUnits[dacChannel]
+                        
+                
+                # dacName = obj.dacNames[dacChannel]# if dacChannel in obj.dacNames else ""
+                # dacUnits = obj.dacUnits[dacChannel]# if dacChannel in obj.dacUnits else "mV"
                 
                 self._dacName_ = dacName 
                 self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
-                self._dacHoldingLevel_ = float(obj._dacSection.fDACHoldingLevel[dacChannel]) * self._dacUnits_
-                self._interEpisodeLevel_ = bool(obj._dacSection.nInterEpisodeLevel[dacChannel])
+                self._dacHoldingLevel_ = float(obj._dacSection.fDACHoldingLevel[self._dacChannel_]) * self._dacUnits_
+                self._interEpisodeLevel_ = bool(obj._dacSection.nInterEpisodeLevel[self._dacChannel_])
                 
                 # command (analog) waveform flags:
-                self._waveformEnabled_ = bool(obj._dacSection.nWaveformEnable[dacChannel])
+                self._waveformEnabled_ = bool(obj._dacSection.nWaveformEnable[self._dacChannel_])
                 
-                wsrc = obj._dacSection.nWaveformSource[dacChannel]
+                wsrc = obj._dacSection.nWaveformSource[self._dacChannel_]
                 
                 if wsrc in range(3):
                     self._waveformSource_ = ABFDACWaveformSource.type(wsrc)
@@ -1625,19 +1758,41 @@ class ABFOutputsConfiguration:
             
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-            if dacChannel not in (c["nDACNum"] for c in obj.annotations["listDACInfo"]):
-                raise ValueError(f"Invalid DAC channel index {dacChannel}")
-            self._dacChannel_ = dacChannel
-            self._dacName_ = obj.annotations["listDACInfo"][dacChannel]["DACChNames"].decode()
-            self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(obj.annotations["listDACInfo"][dacChannel]["DACChUnits"].decode())
+            # if dacChannel not in (c["nDACNum"] for c in obj.annotations["listDACInfo"]):
+            #     raise ValueError(f"Invalid DAC channel index {dacChannel}")
+            
+            if physical:
+                p = [v["nDACNum"] for v in obj.annotations["listDACInfo"]]
+                if dacChannel not in p:
+                    dacName = ""
+                    dacUnits = ""
+                else:
+                    self._physicalChannelIndex_ = dacChannel
+                    logical = p.index(dacChannel)
+                    self._dacChannel_ = logical
+                    dacName = obj.annotations["listDACInfo"][logical]["DACChNames"].decode()
+                    dacUnits = obj.annotations["listDACInfo"][logical]["DACChUnits"].decode()
+            else:
+                if dacChannel not in range(len(obj.annotations["listDACInfo"])):
+                    dacName = ""
+                    dacUnits = ""
+                else:
+                    self._dacChannel_ = dacChannel
+                    self._physicalChannelIndex_ = obj.annotations["listDACInfo"][dacChannel]["nDACNum"]
+                    dacName = obj.annotations["listDACInfo"][dacChannel]["DACChNames"].decode()
+                    dacUnits = obj.annotations["listDACInfo"][dacChannel]["DACChUnits"].decode()
+                    
+            self._dacName_ = dacName
+            self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
 
-            self._dacHoldingLevel_ = float(obj.annotations["listDACInfo"][dacChannel]["fDACHoldingLevel"]) * self._dacUnits_
-            self._interEpisodeLevel_ = bool(obj.annotations["listDACInfo"][dacChannel]["nInterEpisodeLevel"])
+            self._dacHoldingLevel_ = float(obj.annotations["listDACInfo"][self._dacChannel_]["fDACHoldingLevel"]) * self._dacUnits_
+            self._interEpisodeLevel_ = bool(obj.annotations["listDACInfo"][self._dacChannel_]["nInterEpisodeLevel"])
             
             # command (analog) waveform flags:
             self._waveformEnabled_ = bool(obj.annotations["listDACInfo"][self._dacChannel_]["nWaveformEnable"])
             
             wsrc = obj.annotations["listDACInfo"][self._dacChannel_]["nWaveformSource"]
+            
             if wsrc in range(3):
                 self._waveformSource_ = ABFDACWaveformSource.type(wsrc)
             else:
@@ -1665,8 +1820,8 @@ class ABFOutputsConfiguration:
             
         else:
             digPatterns = getDIGPatterns(obj)
-            if self.dacChannel in obj.annotations["dictEpochInfoPerDAC"]:
-                dacEpochDict = obj.annotations["dictEpochInfoPerDAC"][self.dacChannel]
+            if self._dacChannel_ in obj.annotations["dictEpochInfoPerDAC"]:
+                dacEpochDict = obj.annotations["dictEpochInfoPerDAC"][self.logicalIndex]
                 epochs = list()
                 for epochNum, epochDict in dacEpochDict.items():
                     epoch = ABFEpoch()
@@ -1785,10 +1940,10 @@ class ABFOutputsConfiguration:
                     
         return ret
     
-    def has_identical_epochs_table(self, other:ABFOutputsConfiguration, 
+    def has_identical_epochs_table(self, other:ABFOutputConfiguration, 
                                    sweep:int = 0, includeDigitalPattern:bool=True):
         
-        if not isinstance(other, ABFOutputsConfiguration):
+        if not isinstance(other, ABFOutputConfiguration):
             return False
         
         return np.all(self.epochsTable(sweep, includeDigitalPattern = includeDigitalPattern) == 
@@ -2475,11 +2630,14 @@ class ABFOutputsConfiguration:
     def digitalOutputEnabled(self) -> bool:
         return self._digOutEnabled_
     
+    def channelIndex(self, physical:bool=False):
+        return self.physicalIndex if physical else self.logicalIndex
+    
     @property
-    def dacChannel(self) -> int:
+    def logicalIndex(self) -> int:
         """The index of the DAC channel configured in this object.
         Read-only. 
-        An instance of ABFOutputsConfiguration is 'linked' to the same
+        An instance of ABFOutputConfiguration is 'linked' to the same
         DAC channel throughtout its lifetime; therefore this property can only 
         be set at construction time.
         
@@ -2487,9 +2645,17 @@ class ABFOutputsConfiguration:
         return self._dacChannel_
     
     @property
+    def physicalIndex(self):
+        return self._physicalChannelIndex_
+    
+    @property
     def number(self) -> int:
-        """Alias to self.dacChannel"""
-        return self.dacChannel
+        """Alias to self.logicalIndex"""
+        return self.logicalIndex
+    
+    @property
+    def physical(self):
+        return self.physicalIndex
 
     @property
     def dacName(self) -> str:
