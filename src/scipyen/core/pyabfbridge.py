@@ -1090,16 +1090,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def activeDACChannelIndex(self) -> int:
         """Index of the "active" DAC channel.
         
+        The active DAC channel is the DAC channel that:
+        
+        • sends out the MAIN DIGITAL output - irrespective of whether it 
+            also has analog waveform enabled or not.
+        
+        • when no DAC is sending digital output, it is the channel with the 
+            highest index that sends out analog waveforms
+            
         Works for most cases where a single DAC (0 or 1) is used , but currently
         meaningless when no analog or digital commands are sent at all or with
         atypical connections and DAC configurations (see comments in the code)
         
-        The active DAC channel is the DAC channel that:
-        • sends out the MAIN DIGITAL output - irrespective of whether it 
-            also has analog waveform enabled or not.
-        • when no DAC is sending digital output, it is the channel with the 
-            highest index that sends out analog waveforms, 
-            
         
         Swithching DIG off in all DACs returns 0 here.
         
@@ -1752,6 +1754,8 @@ class ABFOutputConfiguration:
                     self._waveformSource_ = ABFDACWaveformSource.none
                 
                 # # digital (TTL) waveform flags & parameters:
+                # NOTE 2023-10-17 17:31:40 FIXME
+                # not sure this is the correct approach
                 self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
             else:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
@@ -1799,6 +1803,8 @@ class ABFOutputConfiguration:
                 self._waveformSource_ = ABFDACWaveformSource.none
                 
             # digital (TTL) waveform flags & parameters:
+            # NOTE: 2023-10-17 17:31:20 FIXME
+            # not sure this is the correct approach
             self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
             
         else:

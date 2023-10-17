@@ -468,6 +468,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     def processAbfFile(self, abfFile:pathlib.Path):
         """Reads and ABF protocol from the ABF file and analyses the data
         """
+        
+        # NOTE: 2023-10-17 17:25:29
+        # heuristics to determine if the LTP experiment has more than one pathway - dowe need that ?!?
+        
         # print(f"{self.__class__.__name__}.processAbfFile: abfFile: {abfFile}\n")
         # WARNING: the Abf file may not be completed at this time, depending on 
         # when this is called!
@@ -619,6 +623,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # since Clampex only runs on Windows, we simply split the string up:
                 #
                 episodeName = protocol.name
+                
             elif protocol != self._runParams_.protocol:
                 # a different protocol - here, newEpisode should have been "True"
                 # if not, then automatically set a new episode and "invent" a name 
