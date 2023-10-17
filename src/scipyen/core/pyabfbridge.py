@@ -1382,7 +1382,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return np.array(list(map(self.sweepTime, range(self.nSweeps)))) * pq.s
     
     def digitalOutputs(self, alternate:typing.Union[bool, str] = "all", trains:typing.Union[str, bool] = "all") -> set:
-        """Returns a set of indices of the digital outputs used in this protocol.
+        """Returns the indices of digital output channels used in this protocol.
     
         By default, returns ALL channels used in both main and alternate patterns,
         for either TTL pulses OR TTL trains.
