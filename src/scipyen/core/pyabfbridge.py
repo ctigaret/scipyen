@@ -256,7 +256,7 @@ epoch = pab.pyabf.waveform.Epoch()
 epoch.epochNumber = annotations["dictEpochInfoPerDAC"][0][0]["nEpochNum"]
 # NOTE: alternatively: epoch.epochNumber = annotations["EpochInfo"][0]["nEpochNum"]
 
-epoch.epochType = annotations["dictEpochInfoPerDAC"][0][0]["nEpochType"]
+epoch.type = annotations["dictEpochInfoPerDAC"][0][0]["nEpochType"]
 
 epoch.level = annotations["dictEpochInfoPerDAC"][0][0]["fEpochInitLevel"]
 
@@ -538,35 +538,23 @@ class ABFEpoch:
         
         
     @property
-    def epochLetter(self) -> str:
-        return epochLetter(self.epochNumber)
-    
-    @property
     def letter(self) -> str:
-        return self.epochLetter
+        return getEpochLetter(self.number)
     
     @property
-    def epochNumber(self) -> int:
+    def number(self) -> int:
         return self._epochNumber_
     
-    @epochNumber.setter
-    def epochNumber(self, val:int):
+    @number.setter
+    def number(self, val:int):
         self._epochNumber_ = val
         
     @property
-    def number(self) -> int:
-        return self.epochNumber
-    
-    @number.setter
-    def number(self, val):
-        self.epochNumber = val
-    
-    @property
-    def epochType(self) -> ABFEpochType:
+    def type(self) -> ABFEpochType:
         return self._epochType_
     
-    @epochType.setter
-    def epochType(self, val:typing.Union[ABFEpochType, str, int]):
+    @type.setter
+    def type(self, val:typing.Union[ABFEpochType, str, int]):
         
         if isinstance(val, ABFEpochType):
             self._epochType_ = val
@@ -581,17 +569,8 @@ class ABFEpoch:
             raise TypeError(f"Expecting a str, int, or an ABFEpochType; instead, got{type(val).__name__}")
         
     @property
-    def type(self) -> ABFEpochType:
-        """Alias to self.epochType"""
-        return self.epochType
-    
-    @type.setter
-    def type(self, val:typing.Union[ABFEpochType, str, int]):
-        self.epochType = val
-            
-    @property
     def typeName(self) -> str:
-        return self.epochType.name
+        return self.type.name
     
     @property
     def firstLevel(self) -> pq.Quantity:
@@ -684,26 +663,35 @@ class ABFEpoch:
         # check the argument
         self._alternateDigitalPattern_ = val
         
-    def digitalPattern(self, alternate:bool=False) -> tuple:
-        """Read-only"""
+    def getDigitalPattern(self, alternate:bool=False) -> tuple:
         return self.alternateDigitalPattern if alternate else self.mainDigitalPattern
     
-    def usedDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False,
-                                  trains:typing.Union[bool, str] = "all") -> list:
+    def getUsedDigitalOutputChannels(self, alternate:typing.Optional[bool]=None,
+                                  trains:typing.Optional[bool] = None) -> list:
         """Indices of DIG channels that emit TTL trains OR TTL pulses
         
         For a more specific query (i.e. pulse v train output) see
-        pulseDigitalOutputChannels and trainDigitalOutputChannels.
+        getPulseDigitalOutputChannels and getTrainDigitalOutputChannels.
         
         Parameters:
         ===========
-        alternate: when True, the alternate digital pattern will be queried.
+        alternate: default is None: 
         
-            When a str, the only accepted value is "all". In this case, the function
+            When None, returns a list of all digital output indices
+            used in this epoch.
+        
+            When False, returns the indices of the digital output channels
+            used for the main pattern.
+    
+            When True, returns the indices of the digital output channels
+            used for the alternate pattern.
+        
+            When None, the only accepted value is "all". In this case, the function
             return a list of digital channel indices used in both main and alternate patterns
             (WARNING: these are not necessarily unique)
-            This is useful to test if there is a digital output at all associated with
-            the epoch.
+        
+            This is useful to test if there is the epochs associates any digital
+            output at all.
             
             Another possible test, specific for a digial channel is the
             'hasDigital...' family of methods.
@@ -711,9 +699,10 @@ class ABFEpoch:
         
         """
         if isinstance(alternate, bool):
-            p = self.digitalPattern(alternate)
+            p = self.getDigitalPattern(alternate)
             
-            if isinstance(trains, str) and trains.lower() == "all":
+            # if isinstance(trains, str) and trains.lower() == "all":
+            if trains is None:
                 return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
                                                                     filter(lambda i: i[1] != 0, 
                                                                         enumerate(reversed(p[k]))))) for k in range(len(p))]))
@@ -723,13 +712,15 @@ class ABFEpoch:
                                                                     filter(lambda i: i[1] == val, 
                                                                         enumerate(reversed(p[k]))))) for k in range(len(p))]))
             else:
-                raise ValueError(f"'trains' expected to be the string 'all' or a bool; instead, got {trains}")
+                raise ValueError(f"'trains' expected to be a bool or None; instead, got {trains}")
             
-        elif isinstance(alternate, str) and alternate.lower() == "all":
-            p = self.digitalPattern(False)
-            pa = self.digitalPattern(True)
+        # elif isinstance(alternate, str) and alternate.lower() == "all":
+        elif alternate is None:
+            p = self.getDigitalPattern(False)
+            pa = self.getDigitalPattern(True)
             
-            if isinstance(trains, str) and trains.lower() == "all":
+            # if isinstance(trains, str) and trains.lower() == "all":
+            if trains is None:
                 return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
                                                                     filter(lambda i: i[1] != 0, 
                                                                         enumerate(reversed(p[k]))))) for k in range(len(p))])) \
@@ -745,13 +736,13 @@ class ABFEpoch:
                                                                     filter(lambda i: i[1] == val, 
                                                                         enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
             else:
-                raise ValueError(f"'trains' expected to be the string 'all' or a bool; instead, got {trains}")
+                raise ValueError(f"'trains' expected to be a bool or None; instead, got {trains}")
             
         else:
-            raise ValueError(f"Invalid 'alternate' specification {alternate}")
+            raise ValueError(f"Invalid 'alternate' specification {alternate}; expecting a bool or None")
             
         
-    def pulseDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
+    def getPulseDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
         """Indices of DIG channel that emit a digital pulse.
         Parameters:
         ===========
@@ -768,14 +759,14 @@ class ABFEpoch:
         
         """
         if isinstance(alternate, bool):
-            p = self.digitalPattern(alternate)
+            p = self.getDigitalPattern(alternate)
             return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
                                                                 filter(lambda i: i[1] == 1, 
                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))]))
         
         elif isinstance(alternate, str) and alternate.lower() == "all":
-            p = self.digitalPattern(False)
-            pa = self.digitalPattern(True)
+            p = self.getDigitalPattern(False)
+            pa = self.getDigitalPattern(True)
             return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
                                                                 filter(lambda i: i[1] == 1, 
                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))])) \
@@ -785,7 +776,7 @@ class ABFEpoch:
         else:
             raise ValueError(f"Invalid 'alternate' specification {alternate}")
             
-    def trainDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
+    def getTrainDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
         """Indices of DIG channels that emit trains of digital TTL pulses.
         Parameters:
         ===========
@@ -802,12 +793,12 @@ class ABFEpoch:
         
         """
         if isinstance(alternate, bool):
-            p = self.digitalPattern(alternate)
+            p = self.getDigitalPattern(alternate)
             return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] == '*', enumerate(reversed(p[k]))))) for k in range(len(p))]))
 
         elif isinstance(alternate, str) and alternate.lower() == "all":
-            p = self.digitalPattern(False)
-            pa = self.digitalPattern(True)
+            p = self.getDigitalPattern(False)
+            pa = self.getDigitalPattern(True)
             return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
                                                                 filter(lambda i: i[1] == '*', 
                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))])) \
@@ -825,7 +816,7 @@ class ABFEpoch:
         
         For a more atomic test, see self.hasDigitalPulse and self.hasDigitalTrain.
         
-        This is useful to determine if the Pulse... prioperties of the epoch are
+        This is useful to determine if the Pulse... properties of the epoch are
         related to any digital pattern defined in the epoch, or just to the 
         associated DAC waveform.
         
@@ -835,7 +826,7 @@ class ABFEpoch:
         alternate: when True, the function will test the alternate digital pattern
         
         """
-        p = self.digitalPattern(alternate)
+        p = self.getDigitalPattern(alternate)
         
         if digChannel in range(len(p[0])):
             return p[0][-digChannel-1] != 0
@@ -856,7 +847,7 @@ class ABFEpoch:
         alternate: when True, the function will test the alternate digital pattern
         
         """
-        p = self.digitalPattern(alternate)
+        p = self.getDigitalPattern(alternate)
         if digChannel in range(len(p[0])):
             return p[0][-digChannel-1] == 1
         
@@ -876,7 +867,7 @@ class ABFEpoch:
         alternate: when True, the function will test the alternate digital pattern
         
         """
-        p = self.digitalPattern(alternate)
+        p = self.getDigitalPattern(alternate)
         if digChannel in range(len(p[0])):
             return p[0][-digChannel-1] == '*'
         
@@ -936,7 +927,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._samplingRate_ = float(obj.dataRate) * pq.Hz
             self._sweepInterval_ = obj._protocolSection.fEpisodeStartToStart * pq.s
             
-            self._protocolFile_ = abf.protocolPath # store this for future reference
+            self._protocolFile_ = obj.protocolPath # store this for future reference
             
             
         elif isinstance(obj, neo.Block):
@@ -1032,7 +1023,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!
         if ret:
-            ret = all(all(np.all(self.outputConfiguration(d).epochsTable(s) == other.outputConfiguration(d).epochsTable(s)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
+            ret = all(all(np.all(self.getDAC(d).getEpochsTable(s) == other.getDAC(d).getEpochsTable(s)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
         return ret
     
@@ -1046,7 +1037,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
         if ret:
-            ret = all(all(np.all(self.outputConfiguration(d).epochsTable(s, includeDigitalPattern=False) == other.outputConfiguration(d).epochsTable(s, includeDigitalPattern=False)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
+            ret = all(all(np.all(self.getDAC(d).getEpochsTable(s, includeDigitalPattern=False) == other.getDAC(d).getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
         return ret
     
@@ -1087,8 +1078,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return self._acquisitionMode_
     
     @property
-    def activeDACChannelIndex(self) -> int:
-        """Index of the "active" DAC channel.
+    def activeDACChannel(self) -> int:
+        """Index of the "active" DAC channel, as reported by Clampex.
         
         The active DAC channel is the DAC channel that:
         
@@ -1261,7 +1252,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # BUG: 2023-10-15 23:38:59 code with circular dependency
         # # NOTE: 2023-10-15 21:56:55
         # # this can have AT MOST one element
-#         digSendingDacs = list(c for c in range(self.nDACChannels) if self.outputConfiguration(c).digitalOutputEnabled)
+#         digSendingDacs = list(c for c in range(self.nDACChannels) if self.getDAC(c).digitalOutputEnabled)
 #         
 #         if len(digSendingDacs): 
 #             return digSendingDacs[-1]
@@ -1381,9 +1372,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def sweepTimes(self) -> pq.Quantity:
-        return np.array(list(map(self.sweepTime, range(self.nSweeps)))) * pq.s
+        return np.array(list(map(self.getSweepTime, range(self.nSweeps)))) * pq.s
     
-    def digitalOutputs(self, alternate:typing.Union[bool, str] = "all", trains:typing.Union[str, bool] = "all") -> set:
+    def digitalOutputs(self, alternate:typing.Optional[bool] = None, 
+                       trains:typing.Optional[bool] = None) -> set:
         """Returns the indices of digital output channels used in this protocol.
     
         By default, returns ALL channels used in both main and alternate patterns,
@@ -1391,15 +1383,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         This behaviour can be controlled with the two parameters:
         
-        • alterante (False/True/"all") - default is "all"
+        • alterante (False/True/None) - default is None
         
-        • trains (False/True/"all") - default is "all"
+        • trains (False/True/None) - default is None
         
         """
         
         return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([e.usedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
-    def clampMode(self, adcIndex:int = 0,
+    def getClampMode(self, adcIndex:int = 0,
                   dacIndex:typing.Optional[int] = None):
         from ephys.ephys import ClampMode
         adc = self.inputConfiguration(adcIndex) # get first (primary) input by default
@@ -1410,11 +1402,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         recordsCurrent = scq.check_electrical_current_units(adc.units)
         recordsPotential = scq.check_electrical_potential_units(adc.units)
 
-        dac = self.outputConfiguration(dacIndex) # get active DAC by default
+        dac = self.getDAC(dacIndex) # get active DAC by default
 
         commandIsCurrent = scq.check_electrical_current_units(dac.units)
-        commandIsPotential = scq.check_electrical_potential_units(dac.units)
 
+        commandIsPotential = scq.check_electrical_potential_units(dac.units)
 
         if recordsPotential and commandIsCurrent:
             return ClampMode.CurrentClamp
@@ -1423,16 +1415,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             return ClampMode.NoClamp
 
-    def sweepTime(self, sweep:int = 0) -> pq.Quantity:
+    def getSweepTime(self, sweep:int = 0) -> pq.Quantity:
         if self.sweepInterval == 0*pq.s:
             return sweep * self.sweepDuration
         return sweep * self.sweepInterval
     
     @property
     def inputs(self):
+        return self.ADCs
+    
+    @property
+    def ADCs(self):
         return self._inputs_
-
-    def inputConfiguration(self, adcChannel:typing.Union[int, str] = 0, physical:bool=False) -> ABFInputConfiguration:
+        
+    def getADC(self, adcChannel:typing.Union[int, str] = 0, physical:bool=False) -> ABFInputConfiguration:
         if isinstance(adcChannel, str):
             if adcChannel not in self.adcNames:
                 raise ValueError(f"Invalid ADC channel name {adcChannel}")
@@ -1450,15 +1446,24 @@ class ABFProtocol(ElectrophysiologyProtocol):
             chtype = "physical" if physical else "logical"
             raise ValueError(f"Invalid {chtype} ADC channel specified {adCChannel}")
 
-    def input(self, adcChannel:int = 0, physical:bool=False) -> ABFInputConfiguration:
-        """Shorthand to self.inputConfiguration"""
-        return self.inputConfiguration(adcChannel, physical)
+    def getInput(self, adcChannel:int = 0, physical:bool=False) -> ABFInputConfiguration:
+        """Shorthand to self.getADC"""
+        return self.getADC(adcChannel, physical)
+    
+    @property
+    def DACs(self):
+        return self._outputs_
     
     @property
     def outputs(self):
-        return self._outputs_
+        return self.DACs
     
-    def outputConfiguration(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, physical:bool=False) -> ABFOutputConfiguration:
+    def getOutput(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+                            physical:bool=False) -> ABFOutputConfiguration:
+        return self.getDAC(dacChannel, physical)
+    
+    def getDAC(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+                            physical:bool=False) -> ABFOutputConfiguration:
         # if not isinstance(dacChannel, int):
         if dacChannel is None:
             dacChannel = self.activeDACChannelIndex
@@ -1472,7 +1477,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if physical:
                 dacChannel = self.dacLogical2PhysicalIndexMap[dacChannel]
 
-        outputConfs = list(filter(lambda x: x.dacChannel == dacChannel, self._outputs_))
+        outputConfs = list(filter(lambda x: x.logicalIndex == dacChannel if physical else x.physicalIndex == dacChannel, self._outputs_))
 
         if len(outputConfs):
             return outputConfs[0]
@@ -1480,12 +1485,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
             chtype = "physical" if physical else "logical"
             raise ValueError(f"Invalid {chtype} DAC channel specified {dacChannel}")
             
-            
-    def output(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
-               physical:bool=False) -> ABFOutputConfiguration:
-        """Shorthand to self.outputConfiguration"""
-        return self.outputConfiguration(dacChannel, physical)
-        
 class ABFInputConfiguration:
     """Deliberately thin class with basic info about an ADC input in Clampex.
         More information may be added for convenience later; until then, just
@@ -1553,7 +1552,7 @@ class ABFInputConfiguration:
                 # TODO finalize this...
 
             elif abfVer == 2:
-                if adcChannel not in obj._adcSection.nADCnum or adcChannel not in range(len(obj._adcSection.nADCNum)):
+                if adcChannel not in obj._adcSection.nADCNum or adcChannel not in range(len(obj._adcSection.nADCNum)):
                     raise ValueError(f"Invalid DAC channel index {adcChannel}")
 
                 self._adcChannel_ = adcChannel
@@ -1610,7 +1609,7 @@ class ABFInputConfiguration:
         self._adcName_ = adcName
         self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
 
-    def channelIndex(self, physical:bool=False) -> int:
+    def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex
 
     @property
@@ -1632,21 +1631,13 @@ class ABFInputConfiguration:
         return self.physicalIndex
     
     @property
-    def adcName(self) -> str:
-        return self._adcName_
-
-    @property
     def name(self) -> str:
         return self._adcName_
     
     @property
-    def adcUnits(self) -> pq.Quantity:
-        return self._adcUnits_
-
-    @property
     def units(self) -> pq.Quantity:
         return self._adcUnits_
-    
+
     @property
     def protocol(self) -> ABFProtocol:
         return self._protocol_
@@ -1756,7 +1747,7 @@ class ABFOutputConfiguration:
                 # # digital (TTL) waveform flags & parameters:
                 # NOTE 2023-10-17 17:31:40 FIXME
                 # not sure this is the correct approach
-                self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
+                # self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
             else:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
             
@@ -1805,20 +1796,22 @@ class ABFOutputConfiguration:
             # digital (TTL) waveform flags & parameters:
             # NOTE: 2023-10-17 17:31:20 FIXME
             # not sure this is the correct approach
-            self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
+            # self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
             
         else:
             raise TypeError(f"Expecting an ABF or a neo.Block sourced from an ABF file; instead, got {type(obj).__name__}")
     
         if np.abs(self._dacHoldingLevel_).magnitude > 1e6:
-            self._dacHoldingLevel_ = np.nan * self.dacUnits
+            self._dacHoldingLevel_ = np.nan * self.units
             
         elif np.abs(self._dacHoldingLevel_).magnitude > 0 and np.abs(self._dacHoldingLevel_).magnitude < 1e-6:
-            self._dacHoldingLevel_ = 0.0 * self.dacUnits
+            self._dacHoldingLevel_ = 0.0 * self.units
             
         self._epochs_ = list()
         
         self._init_epochs_(obj)
+        
+        # self._digitalOutputs_ = set(itertools.chain.from_iterable([e.usedDigitalOutputChannels() for e in self.epochs]))
         
     def _init_epochs_(self, obj):
         if isinstance(obj, pyabf.ABF):
@@ -1826,21 +1819,21 @@ class ABFOutputConfiguration:
             
         else:
             digPatterns = getDIGPatterns(obj)
-            if self._dacChannel_ in obj.annotations["dictEpochInfoPerDAC"]:
+            if self.logicalIndex in obj.annotations["dictEpochInfoPerDAC"]:
                 dacEpochDict = obj.annotations["dictEpochInfoPerDAC"][self.logicalIndex]
                 epochs = list()
                 for epochNum, epochDict in dacEpochDict.items():
                     epoch = ABFEpoch()
-                    epoch.epochNumber = epochNum
-                    epoch.epochType = epochDict["nEpochType"]
-                    epoch.firstLevel = epochDict["fEpochInitLevel"] * self.dacUnits
-                    epoch.deltaLevel = epochDict["fEpochLevelInc"] * self.dacUnits
+                    epoch.number = epochNum
+                    epoch.type = epochDict["nEpochType"]
+                    epoch.firstLevel = epochDict["fEpochInitLevel"] * self.units
+                    epoch.deltaLevel = epochDict["fEpochLevelInc"] * self.units
                     epoch.firstDuration = (epochDict["lEpochInitDuration"] / self.samplingRate).rescale(pq.ms)
                     epoch.deltaDuration = (epochDict["lEpochDurationInc"] / self.samplingRate).rescale(pq.ms)
                     epoch.pulsePeriod = (epochDict["lEpochPulsePeriod"] / self.samplingRate).rescale(pq.ms)
                     epoch.pulseWidth = (epochDict["lEpochPulseWidth"] / self.samplingRate).rescale(pq.ms)
-                    epoch.mainDigitalPattern = digPatterns[epoch.epochNumber]["main"]
-                    epoch.alternateDigitalPattern = digPatterns[epoch.epochNumber]["alternate"]
+                    epoch.mainDigitalPattern = digPatterns[epoch.number]["main"]
+                    epoch.alternateDigitalPattern = digPatterns[epoch.number]["alternate"]
 
                     epochs.append(epoch)
                 
@@ -1858,7 +1851,7 @@ class ABFOutputConfiguration:
 #             for i in range(20):
 #                 epoch = ABFEpoch()
 #                 epoch.epochNumber = i % 10 # first -> 0-9: channel 0; last 0-9 -> channel 1
-#                 epoch.epochType = obj._headerV1.nEpochType[i]
+#                 epoch.type = obj._headerV1.nEpochType[i]
 #                 epoch.firstLevel = obj._headerV1.fEpochInitLevel[i] * self._dacUnits_
 #                 epoch.deltaLevel = obj._headerV1.fEpochLevelInc[i] * self._dacUnits_
 #                 epoch.firstDuration = (obj._headerV1.lEpochInitDuration[i] / self._samplingRate_).rescale(pq.ms)
@@ -1887,20 +1880,20 @@ class ABFOutputConfiguration:
                 # RESOLVED?: you DO NOT need this info here
                 
                 # NOTE: 2023-09-18 14:46:37 skip epochs NOT defined for this DAC
-                if epochDacNum != self.dacChannel:
+                if epochDacNum != self.logicalIndex:
                     continue
 
                 epoch = ABFEpoch()
-                epoch.epochNumber = obj._epochPerDacSection.nEpochNum[i]
-                epoch.epochType = obj._epochPerDacSection.nEpochType[i]
-                epoch.firstLevel = obj._epochPerDacSection.fEpochInitLevel[i] * self.dacUnits
-                epoch.deltaLevel = obj._epochPerDacSection.fEpochLevelInc[i] * self.dacUnits
+                epoch.number = obj._epochPerDacSection.nEpochNum[i]
+                epoch.type = obj._epochPerDacSection.nEpochType[i]
+                epoch.firstLevel = obj._epochPerDacSection.fEpochInitLevel[i] * self.units
+                epoch.deltaLevel = obj._epochPerDacSection.fEpochLevelInc[i] * self.units
                 epoch.firstDuration = (obj._epochPerDacSection.lEpochInitDuration[i] / self.samplingRate).rescale(pq.ms)
                 epoch.deltaDuration = (obj._epochPerDacSection.lEpochDurationInc[i] / self.samplingRate).rescale(pq.ms)
                 epoch.pulsePeriod = (obj._epochPerDacSection.lEpochPulsePeriod[i] / self.samplingRate).rescale(pq.ms)
                 epoch.pulseWidth = (obj._epochPerDacSection.lEpochPulseWidth[i] / self.samplingRate).rescale(pq.ms)
-                epoch.mainDigitalPattern = digPatterns[epoch.epochNumber]["main"]
-                epoch.alternateDigitalPattern = digPatterns[epoch.epochNumber]["alternate"]
+                epoch.mainDigitalPattern = digPatterns[epoch.number]["main"]
+                epoch.alternateDigitalPattern = digPatterns[epoch.number]["alternate"]
 
                 epochs.append(epoch)
                 
@@ -1928,7 +1921,7 @@ class ABFOutputConfiguration:
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!
         if ret:
-            ret = all(np.all(self.epochsTable(s) == other.epochsTable(s)) for s in range(self.protocol.nSweeps))
+            ret = all(np.all(self.getEpochsTable(s) == other.getEpochsTable(s)) for s in range(self.protocol.nSweeps))
                     
         return ret
         
@@ -1942,7 +1935,7 @@ class ABFOutputConfiguration:
         ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
         if ret:
-            ret = all(np.all(self.epochsTable(s, includeDigitalPattern=False) == other.epochsTable(s, includeDigitalPattern=False)) for s in range(self.protocol.nSweeps))
+            ret = all(np.all(self.getEpochsTable(s, includeDigitalPattern=False) == other.getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.protocol.nSweeps))
                     
         return ret
     
@@ -1952,8 +1945,8 @@ class ABFOutputConfiguration:
         if not isinstance(other, ABFOutputConfiguration):
             return False
         
-        return np.all(self.epochsTable(sweep, includeDigitalPattern = includeDigitalPattern) == 
-                      other.epochsTable(sweep, includeDigitalPattern = includeDigitalPattern))
+        return np.all(self.getEpochsTable(sweep, includeDigitalPattern = includeDigitalPattern) == 
+                      other.getEpochsTable(sweep, includeDigitalPattern = includeDigitalPattern))
         
     @property
     def protocol(self) -> ABFProtocol:
@@ -1983,7 +1976,7 @@ class ABFOutputConfiguration:
         """List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
     
-    def triggerEvents(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
+    def getTriggerEvents(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
                       eventType:TriggerEventType = TriggerEventType.presynaptic,
                       label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
                       name:typing.Optional[str] = None) -> TriggerEvent:
@@ -1996,7 +1989,7 @@ class ABFOutputConfiguration:
         if isinstance(epoch, (str, int)):
             epoch = self.getEpoch(epoch)
             
-        if epoch.epochType not in (ABFEpochType.Step, ABFEpochType.Pulse):
+        if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
             return list()
         
         times = [x.rescale(pq.s) for x in self.epochActualPulseTimes(epoch, sweep)]
@@ -2009,7 +2002,7 @@ class ABFOutputConfiguration:
             
         return trig
     
-    def epochsTable(self, sweep:int = 0, includeDigitalPattern:bool=True):
+    def getEpochsTable(self, sweep:int = 0, includeDigitalPattern:bool=True):
         """Generate a Pandas DataFrame with the epochs definition for this DAC channel.
         
         Regarding the command and digital outputs, this reflects the actual 
@@ -2045,44 +2038,44 @@ class ABFOutputConfiguration:
         
         for i, epoch in enumerate(self.epochs):
             if includeDigitalPattern:
-                epochDigPattern = self.epochDigitalPattern(epoch, sweep)
+                epochDigPattern = self.getEpochDigitalPattern(epoch, sweep)
                 epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
-                            epoch.firstDuration, self.epochFirstDurationSamples(epoch),
-                            epoch.deltaDuration, self.epochDeltaDurationSamples(epoch),
-                            self.epochActualDuration(epoch, sweep),
-                            self.epochActualDurationSamples(epoch, sweep),
+                            epoch.firstDuration, self.getEpochFirstDurationSamples(epoch),
+                            epoch.deltaDuration, self.getEpochDeltaDurationSamples(epoch),
+                            self.getEpochActualDuration(epoch, sweep),
+                            self.getEpochActualDurationSamples(epoch, sweep),
                             "".join(map(str, epochDigPattern[0])), 
                             "".join(map(str, epochDigPattern[1])),
                             epoch.pulseFrequency,
-                            epoch.pulsePeriod, self.epochPulsePeriodSamples(epoch),
-                            epoch.pulseWidth, self.epochPulseWidthSamples(epoch),
-                            self.epochPulseCount(epoch, sweep)]
+                            epoch.pulsePeriod, self.getEpochPulsePeriodSamples(epoch),
+                            epoch.pulseWidth, self.getEpochPulseWidthSamples(epoch),
+                            self.getEpochPulseCount(epoch, sweep)]
             else:
                 epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
-                            epoch.firstDuration, self.epochFirstDurationSamples(epoch),
-                            epoch.deltaDuration, self.epochDeltaDurationSamples(epoch),
-                            self.epochActualDuration(epoch, sweep),
-                            self.epochActualDurationSamples(epoch, sweep),
+                            epoch.firstDuration, self.getEpochFirstDurationSamples(epoch),
+                            epoch.deltaDuration, self.getEpochDeltaDurationSamples(epoch),
+                            self.getEpochActualDuration(epoch, sweep),
+                            self.getEpochActualDurationSamples(epoch, sweep),
                             epoch.pulseFrequency,
-                            epoch.pulsePeriod, self.epochPulsePeriodSamples(epoch),
-                            epoch.pulseWidth, self.epochPulseWidthSamples(epoch),
-                            self.epochPulseCount(epoch, sweep)]
+                            epoch.pulsePeriod, self.getEpochPulsePeriodSamples(epoch),
+                            epoch.pulseWidth, self.getEpochPulseWidthSamples(epoch),
+                            self.getEpochPulseCount(epoch, sweep)]
                     
             
-            epochData[epoch.epochLetter] = epValues
+            epochData[epoch.letter] = epValues
             
         return pd.DataFrame(epochData, index = rowIndex)
         
     def getEpoch(self, e:typing.Union[str, int]):
         if isinstance(e, str):
-            e = epochNumberFromLetter(e)
+            e = getEpochNumberFromLetter(e)
             
         if e < 0 or e >= len(self.epochs):
             return
         
         return self.epochs[e]
     
-    def epochRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
+    def getEpochRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to sweep start.
         WARNING: Does NOT take into account the holding time (1/64 of sweep samples),
         therefore the response to the epoch's waveform, as recorded in the ADC
@@ -2102,9 +2095,9 @@ class ABFOutputConfiguration:
         # below, the sweep index is REQUIRED to calculate the actual epoch duration
         # 
         units = epoch.firstDuration.units
-        return np.sum([self.epochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units
+        return np.sum([self.getEpochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units
     
-    def epochActualRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
+    def getEpochActualRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to sweep start.
         Takes into account the holding time (1/64 sweep samples, in Clampex),
         resulting in timings that match the times in the recorded neo.AnalogSignals.
@@ -2120,9 +2113,9 @@ class ABFOutputConfiguration:
             epoch = e
             
         units = epoch.firstDuration.units
-        return np.sum([self.epochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units + self.holdingTime
+        return np.sum([self.getEpochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units + self.holdingTime
         
-    def epochRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from the start of the sweep to the start of epoch.
         WARNING: Like self.epochRelativeStartTime, does NOT take into account 
         the holding time; you may want to use self.epochActualRelativeStartsSamples
@@ -2136,9 +2129,9 @@ class ABFOutputConfiguration:
             
             epoch = e
             
-        return np.sum([self.epochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]])
+        return np.sum([self.getEpochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]])
     
-    def epochActualRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochActualRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2146,9 +2139,9 @@ class ABFOutputConfiguration:
             
             epoch = e
             
-        return np.sum([self.epochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]]) + self.holdingSampleCount
+        return np.sum([self.getEpochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]]) + self.holdingSampleCount
         
-    def epochStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
+    def getEpochStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to the start of recording.
         WARNING: Does NOT take into account the holding time (1/64 of sweep samples),
         therefore the respoonse to the epoch's waveform, as recorded in the ADC 
@@ -2159,13 +2152,13 @@ class ABFOutputConfiguration:
         # units = epoch.firstDuration.units
         return self.epochRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
     
-    def epochActualStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
+    def getEpochActualStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to the start of recording.
         Takes into account the sweep holding time.
         """
         return self.epochActualRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
         
-    def epochStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from start fo recording to the epoch.
         WARNING: Like self.epochStartSamples, does NOT take into account 
         the holding time; you may want to use self.epochActualStartSamples.
@@ -2173,13 +2166,13 @@ class ABFOutputConfiguration:
         """
         return self.epochRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
-    def epochActualStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochActualStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from start fo recording to the epoch.
         Takes into account the sweep holding time.
         """
         return self.epochActualRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
-    def epochActualDuration(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> pq.Quantity:
+    def getEpochActualDuration(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> pq.Quantity:
         """Actual epoch duration (in ms) for the given sweep.
         Takes into account first duration and delta duration"""
         if isinstance(epoch, (int, str)):
@@ -2191,12 +2184,12 @@ class ABFOutputConfiguration:
             
         return epoch.firstDuration + sweep * epoch.deltaDuration
         
-    def epochActualDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochActualDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Actual epoch duration (in samples) for the given sweep.
         Takes into account first duration and delta duration"""
-        return scq.nSamples(self.epochActualDuration(epoch, sweep), self.samplingRate)
+        return scq.nSamples(self.getEpochActualDuration(epoch, sweep), self.samplingRate)
     
-    def epochFirstDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
+    def getEpochFirstDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2206,7 +2199,7 @@ class ABFOutputConfiguration:
             
         return scq.nSamples(epoch.firstDuration, self.samplingRate)
         
-    def epochDeltaDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
+    def getEpochDeltaDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2216,7 +2209,7 @@ class ABFOutputConfiguration:
             
         return scq.nSamples(epoch.deltaDuration, self.samplingRate)
     
-    def epochPulseWidthSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
+    def getEpochPulseWidthSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2226,7 +2219,7 @@ class ABFOutputConfiguration:
             
         return scq.nSamples(epoch.pulseWidth, self.samplingRate)
     
-    def epochPulsePeriodSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
+    def getEpochPulsePeriodSamples(self, epoch:typing.Union[ABFEpoch, str, int]) -> int:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2236,7 +2229,7 @@ class ABFOutputConfiguration:
             
         return scq.nSamples(epoch.pulsePeriod, self.samplingRate)
     
-    def epochPulseCount(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> int:
+    def getEpochPulseCount(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> int:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2247,9 +2240,9 @@ class ABFOutputConfiguration:
         if float(epoch.pulsePeriod) == 0.:
             return 0
         
-        return int(self.epochActualDuration(epoch,sweep)/epoch.pulsePeriod)
+        return int(self.getEpochActualDuration(epoch,sweep)/epoch.pulsePeriod)
 
-    def epochActualPulseTimes(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> list:
+    def getEpochActualPulseTimes(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> list:
         """Start times for the pulses defined in the epoch.
         An ABF epoch may define pulses regardless of whether it associates a
         digital output patter or not. 
@@ -2264,7 +2257,7 @@ class ABFOutputConfiguration:
         the epoch type, there will be one pulse (step epoch), or several (pulse
         epoch).
         """
-        pc = self.epochPulseCount(epoch, sweep)
+        pc = self.getEpochPulseCount(epoch, sweep)
         
         if pc == 0:
             return list()
@@ -2273,7 +2266,7 @@ class ABFOutputConfiguration:
 
         return [t0 + p * epoch.pulsePeriod for p in range(pc)]
     
-    def epochPulseTimes(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> list:
+    def getEpochPulseTimes(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> list:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2281,7 +2274,7 @@ class ABFOutputConfiguration:
             
             epoch = e
             
-        pc = self.epochPulseCount(epoch, sweep)
+        pc = self.getEpochPulseCount(epoch, sweep)
         if pc == 0:
             return list()
         
@@ -2289,7 +2282,7 @@ class ABFOutputConfiguration:
 
         return [t0 + p * epoch.pulsePeriod for p in range(pc)]
 
-    def epochAnalogWaveform(self, epoch:typing.Union[ABFEpoch, str, int], previousLevel:pq.Quantity, 
+    def getEpochAnalogWaveform(self, epoch:typing.Union[ABFEpoch, str, int], previousLevel:pq.Quantity, 
                       sweep:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
         """Realizes the analog waveform associated with a single epoch.
         An 'epoch' is defined as a specific time interval in a sweep, during 
@@ -2310,38 +2303,38 @@ class ABFOutputConfiguration:
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
         actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
         
-        # print(f"self.__class__.__name__}.epochAnalogWaveform epoch {epoch.epochNumber} ({epoch.epochLetter}) type {epoch.epochType} sample count {epochSamplesCount}")
+        # print(f"self.__class__.__name__}.epochAnalogWaveform epoch {epoch.epochNumber} ({epoch.getEpochLetter}) type {epoch.type} sample count {epochSamplesCount}")
         
-        if epoch.epochType == ABFEpochType.Step:
-            wave = actualLevel if lastLevelOnly else np.full([epochSamplesCount, 1], float(actualLevel)) * self.dacUnits
+        if epoch.type == ABFEpochType.Step:
+            wave = actualLevel if lastLevelOnly else np.full([epochSamplesCount, 1], float(actualLevel)) * self.units
         
-        elif epoch.epochType == ABFEpochType.Ramp:
+        elif epoch.type == ABFEpochType.Ramp:
             wave = actualLevel if lastLevelOnly else np.linspace(previousLevel, actualLevel, epochSamplesCount)[:,np.newaxis]
             
-        elif epoch.epochType == ABFEpochType.Pulse:
-            pulsePeriod = self.epochPulsePeriodSamples(epoch)
-            pulseSamples = self.epochPulseWidthSamples(epoch)
-            pulseCount = self.epochPulseCount(epoch)
+        elif epoch.type == ABFEpochType.Pulse:
+            pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+            pulseSamples = self.getEpochPulseWidthSamples(epoch)
+            pulseCount = self.getEpochPulseCount(epoch)
             
             if lastLevelOnly:
                 wave = actualLevel
             else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.dacUnits
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
                 
                 for pulse in range(pulseCount):
                     p1 = int(pulsePeriod * pulse)
                     p2 = int(p1 + pulseSamples)
                     wave[p1:p2] = actualLevel
                         
-        elif epoch.epochType == ABFEpochType.Triangular:
-            pulsePeriod = self.epochPulsePeriodSamples(epoch)
-            pulseSamples = self.epochPulseWidthSamples(epoch)
-            pulseCount = self.epochPulseCount(epoch)
+        elif epoch.type == ABFEpochType.Triangular:
+            pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+            pulseSamples = self.getEpochPulseWidthSamples(epoch)
+            pulseCount = self.getEpochPulseCount(epoch)
             
             if lastLevelOnly:
                 wave = actualLevel
             else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.dacUnits
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
                             
                 for pulse in range(pulseCount):
                     p1 = int(pulsePeriod * pulse)
@@ -2351,26 +2344,26 @@ class ABFOutputConfiguration:
                     wave[p1:p2] = np.linspace(previousLevel, actualLevel, pulseSamples)[:,np.newaxis]
                     wave[p2:p3] = np.linspace(actualLevel, previousLevel, int(pulsePeriod - pulseSamples))[:,np.newaxis]
             
-        elif epoch.epochType == ABFEpochType.Cosine:
+        elif epoch.type == ABFEpochType.Cosine:
             if lastLevelOnly:
                 wave = actualLevel
             else:
-                pulseCount = self.epochPulseCount(epoch)
+                pulseCount = self.getEpochPulseCount(epoch)
                 levelDelta = float(actualLevel) - float(previousLevel)
                 values = np.linspace(0, 2*pulseCount*np.pi, epochSamplesCount) + np.pi
-                cosines = (np.cos(values) * levelDelta / 2 + levelDelta/2 ) * self.dacUnits + previousLevel
+                cosines = (np.cos(values) * levelDelta / 2 + levelDelta/2 ) * self.units + previousLevel
                 wave = cosines[:, np.newaxis]
             
-        elif epoch.epochType == ABFEpochType.Biphasic:
-            pulsePeriod = self.epochPulsePeriodSamples(epoch)
-            pulseSamples = self.epochPulseWidthSamples(epoch)
-            pulseCount = self.epochPulseCount(epoch)
+        elif epoch.type == ABFEpochType.Biphasic:
+            pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+            pulseSamples = self.getEpochPulseWidthSamples(epoch)
+            pulseCount = self.getEpochPulseCount(epoch)
             levelDelta = actualLevel - previousLevel
             
             if lastLevelOnly:
                 wave = actualLevel
             else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.dacUnits
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
                 # waveform[ndx[0]:ndx[1],0] = previousLevel
                 
                 for pulse in range(pulseCount):
@@ -2383,11 +2376,11 @@ class ABFOutputConfiguration:
                     # waveform[p2:p3,0] = previousLevel - levelDelta
             
         else:
-            wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.dacUnits
+            wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
             
         return wave
     
-    def epochDigitalWaveform(self, epoch:typing.Union[ABFEpoch, str, int], trainOFF, trainON, digOFF, digON,
+    def getEpochDigitalWaveform(self, epoch:typing.Union[ABFEpoch, str, int], trainOFF, trainON, digOFF, digON,
                              sweep:int = 0, digChannel:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
@@ -2398,11 +2391,11 @@ class ABFOutputConfiguration:
             
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
-        pulsePeriod = self.epochPulsePeriodSamples(epoch)
-        pulseSamples = self.epochPulseWidthSamples(epoch)
-        pulseCount = self.epochPulseCount(epoch)
+        pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+        pulseSamples = self.getEpochPulseWidthSamples(epoch)
+        pulseCount = self.getEpochPulseCount(epoch)
         
-        digPattern = self.epochDigitalPattern(epoch, sweep)
+        digPattern = self.getEpochDigitalPattern(epoch, sweep)
         # # either this:
         # digPattern = list(reversed(digPattern[1] + digPattern[0]))
         # digChannelValue = digPattern[digChannel]
@@ -2485,16 +2478,18 @@ class ABFOutputConfiguration:
         return digOFF * pq.V
         
     
-    def epochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) ->tuple:
-        """Returns the digital pattern that WOULD be output by the epoch.
+    def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) ->tuple:
+        """Returns the digital pattern that WOULD be output by the epoch in a real experiment.
         This depends, simultaneously, on the following conditions:
         1) the DAC channel has digital outputs enabled
-        2) alternative digital outputs are enabled in the protocol
+        2) If alternative digital outputs are enabled in the protocol, this DAC
+            is one of DAC0 or DAC1
+            
         3) the DAC channel takes part in alternate digital outputs or not (this
             depends on the channel index, with DAC 0 and 1 being the only ones
             used for alternate digital output during even- and odd-numbered sweeps)
         """
-        isAltDig = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+        isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
         
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
@@ -2506,7 +2501,7 @@ class ABFOutputConfiguration:
         elif not isinstance(epoch, ABFEpoch):
             raise TypeError(f"Expecting an ABFEpoch, an int or a str (epoch 'name' e.g. 'A', 'B' or 'AB', etc); instead got {type(epoch).__name__}")
         
-        if self.alternateDigitalOutputStateEnabled and self.dacChannel < 2:
+        if self.alternateDigitalOutputStateEnabled and self.logicalIndex < 2:
             # NOTE: 2023-09-18 13:22:56
             # When alternative digital outputs are used in an experiment,
             # ONLY the first two DACs (0 and 1) take part in the alternative
@@ -2538,14 +2533,14 @@ class ABFOutputConfiguration:
                 # ONLY the main digital pattern of the epoch, and ONLY if 
                 # the sweep has an even number
                 #
-                if isAltDig:
+                if isAlternateDigital:
                     # this DAC has dig output enabled, hence during
                     # an experiment it will output NOTHING if either 
                     # alternateDigitalPattern is disabled OR sweep number 
                     # is even
                     #
-                    dig_3_0 = epoch.digitalPattern(True)[0]
-                    dig_7_4 = epoch.digitalPattern(True)[1]
+                    dig_3_0 = epoch.getDigitalPattern(True)[0]
+                    dig_7_4 = epoch.getDigitalPattern(True)[1]
                     # dig_3_0 = dig_7_4 = [0,0,0,0]
                 else:
                     # this DAC has dig output enabled, hence during
@@ -2553,8 +2548,8 @@ class ABFOutputConfiguration:
                     # if either alternateDigitalPattern is disabled, OR
                     # sweep number is even
                     #
-                    dig_3_0 = epoch.digitalPattern()[0]
-                    dig_7_4 = epoch.digitalPattern()[1]
+                    dig_3_0 = epoch.getDigitalPattern(False)[0]
+                    dig_7_4 = epoch.getDigitalPattern(False)[1]
             else:
                 # For a DAC where dig output is DISabled, the DAC is simply
                 # a placeholder for the alternate digital output of the epoch, 
@@ -2601,9 +2596,9 @@ class ABFOutputConfiguration:
                 
                 # if self.analogWaveformEnabled
                 dig_3_0 = dig_7_4 = [0,0,0,0]
-                # if isAltDig:
-                #     dig_3_0 = epoch.digitalPattern(True)[0]
-                #     dig_7_4 = epoch.digitalPattern(True)[1]
+                # if isAlternateDigital:
+                #     dig_3_0 = epoch.getDigitalPattern(True)[0]
+                #     dig_7_4 = epoch.getDigitalPattern(True)[1]
                 # else:
                 #     dig_3_0 = dig_7_4 = [0,0,0,0]
                     
@@ -2613,8 +2608,8 @@ class ABFOutputConfiguration:
                 # is one of the channels NOT involved in alternate output
                 # (2, …) the channel will always output the main digital 
                 # pattern here
-                dig_3_0 = epoch.digitalPattern()[0]
-                dig_7_4 = epoch.digitalPattern()[1]
+                dig_3_0 = epoch.getDigitalPattern()[0]
+                dig_7_4 = epoch.getDigitalPattern()[1]
             else:
                 dig_3_0 = dig_7_4 = [0,0,0,0]
                 
@@ -2634,9 +2629,25 @@ class ABFOutputConfiguration:
     
     @property
     def digitalOutputEnabled(self) -> bool:
-        return self._digOutEnabled_
+        """True if any epoch defined in this DAC emits digital pulses or trains"""
+        # NOTE: 2023-10-18 09:57:46
+        # This is NOT an intrinsic variable in Clampex, but is used here to
+        # help identify if this DAC associates the main digital output pattern
+        
+        # In Clampex, only one DAC can associate DIG out; however, when alternate
+        # digital output is enabled in the protocol, the alternative dig out 
+        # pattern can only be defined on another DAC's GUI in the Waveforms tab 
+        # of the Clampex protocol editor.
+        
+        # I think this is unfortunate, as it may confuse one into thinkng that
+        # this "other" DAC emits dig out on alternate sweeps, when in fact it 
+        # doesn't
+        # 
+        return len(tuple(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate=False) for e in self.epochs]))) > 0
+        # pass
+        # return self._digOutEnabled_
     
-    def channelIndex(self, physical:bool=False):
+    def getChannelIndex(self, physical:bool=False):
         return self.physicalIndex if physical else self.logicalIndex
     
     @property
@@ -2664,26 +2675,12 @@ class ABFOutputConfiguration:
         return self.physicalIndex
 
     @property
-    def dacName(self) -> str:
-        """Read-only; can only be set up at initialization (construction)
-        and stays the same throughout the lifetime of the object"""
+    def name(self) -> str:
         return self._dacName_
     
     @property
-    def name(self) -> str:
-        """Alias to self.dacName"""
-        return self.dacName
-    
-    @property
-    def dacUnits(self) -> pq.Quantity:
-        """Read-only; can only be set up at initialization (construction)
-        and stays the same throughout the lifetime of the object"""
-        return self._dacUnits_
-    
-    @property
     def units(self) -> pq.Quantity:
-        """Alias to self.dacUnits"""
-        return self.dacUnits
+        return self._dacUnits_
     
     @property
     def sweepSampleCount(self) -> int:
@@ -2700,6 +2697,13 @@ class ABFOutputConfiguration:
         """Read-only; can only be set up at initialization (construction)
         and stays the same throughout the lifetime of the object"""
         return self.protocol.nDigitalOutputs
+    
+    # @property
+    def getDigitalOutputs(self, alternate:typing.Optional[bool]=None,
+                       trains:typing.Optional[bool]=None) -> set:
+        return set(itertools.chain.from_iterable([e.usedDigitalOutputChannels(alternate, trains) for e in self.epochs]))
+        
+        # return self._digitalOutputs_
     
     @property
     def samplingRate(self) -> pq.Quantity:
@@ -2726,13 +2730,10 @@ class ABFOutputConfiguration:
     """
         return self.protocol.holdingTime
     
-    def analogWaveform(self, sweep:int=0) -> neo.AnalogSignal:
-        return self.dacCommandWaveform(sweep)
+    def getAnalogWaveform(self, sweep:int=0) -> neo.AnalogSignal:
+        return self.getCommandWaveform(sweep)
     
-    def commandWaveform(self, sweep:int=0) -> neo.AnalogSignal:
-        return self.dacCommandWaveform(sweep)
-    
-    def dacCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
+    def getCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
         """Generates an AnalogSignal representation of the command waveform.
         
         When nAlternateDACOutputState is True, this waveform IS specific to the 
@@ -2745,7 +2746,7 @@ class ABFOutputConfiguration:
         if self.analogWaveformSource == ABFDACWaveformSource.none or (not self.analogWaveformEnabled and not self.alternateDACOutputStateEnabled):
             # return empty signal (containing np.nan)
             return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), np.nan),
-                                    units = self.dacUnits, t_start = 0*pq.s,
+                                    units = self.units, t_start = 0*pq.s,
                                     sampling_rate = self.samplingRate,
                                     name = self.dacName)
         
@@ -2755,7 +2756,7 @@ class ABFOutputConfiguration:
             
             if len(self.epochs) == 0:
                 return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), float(holdingLevel)),
-                                        units = self.dacUnits, t_start = 0*pq.s,
+                                        units = self.units, t_start = 0*pq.s,
                                         sampling_rate = self.samplingRate,
                                         name = self.dacName)
             
@@ -2769,7 +2770,7 @@ class ABFOutputConfiguration:
                 previousLevel = self.dacHoldingLevel
             
             waveform = neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), float(previousLevel)),
-                                        units = self.dacUnits, t_start = 0*pq.s,
+                                        units = self.units, t_start = 0*pq.s,
                                         sampling_rate = self.samplingRate,
                                         name = self.dacName)
             
@@ -2784,7 +2785,7 @@ class ABFOutputConfiguration:
                 tt = np.array([t0,t1])*pq.s
                 ndx = waveform.time_index(tt)
                 
-                wave = self.epochAnalogWaveform(epoch, previousLevel, sweep)
+                wave = self.getEpochAnalogWaveform(epoch, previousLevel, sweep)
                 
                 waveform[ndx[0]:ndx[1],0] = wave
                 
@@ -2812,7 +2813,7 @@ class ABFOutputConfiguration:
             # use that informaiton here (search under annotations["sections"]["StringsSection"]["IndexedStrings"])
             warnings.warning(f"Command waveforms from external stimulus files are not yet supported", RuntimeWarning)
             return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), np.nan),
-                                    units = self.dacUnits, t_start = 0*pq.s,
+                                    units = self.units, t_start = 0*pq.s,
                                     sampling_rate = self.samplingRate,
                                     name = self.dacName)
         
@@ -2820,7 +2821,7 @@ class ABFOutputConfiguration:
                 
         return waveform
     
-    def digitalWaveform(self, sweep:int=0, digChannel:int = 0) -> neo.AnalogSignal:
+    def getDigitalWaveform(self, sweep:int=0, digChannel:int = 0) -> neo.AnalogSignal:
         """Realizes the digital output waveform (pulses, trains) emitted when
         this DAC channel is active"""
         # NOTE: 2023-09-20 22:22:41
@@ -2843,13 +2844,13 @@ class ABFOutputConfiguration:
         lastlevel = digOFF * pq.V
         
         for epoch in self.epochs:
-            # print(f"{self.__class__.__name__}.digitalWaveform sweep {sweep}, digChannel {digChannel} in epoch {epoch.epochLetter}: digChannelValue {digChannelValue}")
+            # print(f"{self.__class__.__name__}.getDigitalWaveform sweep {sweep}, digChannel {digChannel} in epoch {epoch.getEpochLetter}: digChannelValue {digChannelValue}")
             actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
             t1 = t0 + actualDuration
             tt = np.array([t0,t1])*pq.s
             ndx = waveform.time_index(tt)
             
-            wave = self.epochDigitalWaveform(epoch, trainOFF, trainON, digOFF, digON, 
+            wave = self.getEpochDigitalWaveform(epoch, trainOFF, trainON, digOFF, digON, 
                                              sweep, digChannel)
             
             waveform[ndx[0]:ndx[1], 0] = wave
@@ -2868,12 +2869,12 @@ class ABFOutputConfiguration:
         
         
         
-def epochNumberFromLetter(x:str) -> int:
-    """The inverse function of epochLetter()"""
+def getEpochNumberFromLetter(x:str) -> int:
+    """The inverse function of getEpochLetter()"""
     from core import strutils
     return strutils.lettersToOrdinal(x)
 
-def epochLetter(epochNumber:int):
+def getEpochLetter(epochNumber:int):
     from core import strutils
     return strutils.ordinalToLetters(epochNumber)
     # from pyabf.waveform.Epoch
@@ -3147,8 +3148,8 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
         epochNumber = epoch_info["nEpochNum"]
         if isinstance(epoch_num, int) and epoch_num != epochNumber:
             continue
-        d = getSynchBitList(epoch_info["nDigitalValue"])
-        s = getSynchBitList(epoch_info["nDigitalTrainValue"])
+        d  = getSynchBitList(epoch_info["nDigitalValue"])
+        s  = getSynchBitList(epoch_info["nDigitalTrainValue"])
         da = getAlternateBitList(epoch_info["nAlternateDigitalValue"])
         sa = getAlternateBitList(epoch_info["nAlternateDigitalTrainValue"])
         
@@ -3433,15 +3434,15 @@ def _(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None) -> pd.
                               epoch.durationDelta,      # "delta" duration (samples)
                               epoch.duration/x.sampleRateHz * 1000 * pq.ms, # first duration (time units)
                               epoch.durationDelta/x.sampleRateHz * 1000 * pq.ms, # delta duration (time units)
-                              epoch.digitalPattern[:4], # first 4 digital channels
-                              epoch.digitalPattern[4:], # last 4 digital channels
+                              epoch.getDigitalPattern()[:4], # first 4 digital channels
+                              epoch.getDigitalPattern()[4:], # last 4 digital channels
                               epoch.pulsePeriod,        # train period (samples`)
                               epoch.pulseWidth,         # pulse width (samples)
                               epoch.pulsePeriod/x.sampleRateHz * 1000 * pq.ms, # train period (time units)
                               epoch.pulseWidth/x.sampleRateHz * 1000 * pq.ms], # pulse width (time units)
                               dtype=object)
             
-            epochData[epoch.epochLetter] = epValues
+            epochData[epoch.getEpochLetter] = epValues
             
         #colIndex = epochLetters
         
