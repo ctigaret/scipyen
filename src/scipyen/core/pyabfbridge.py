@@ -1724,32 +1724,37 @@ class ABFOutputConfiguration:
                 # TODO finalize this...
                 
             elif abfVer == 2:
-#                 if dacChannel not in obj._dacSection.nDACNum or dacChannel not in range(len(obj._dacSection.nDACNum)):
-#                     raise ValueError(f"Invalid DAC channel index {dacChannel}")
-#                 
-                
                 if physical:
                     if dacChannel in obj._dacSection.nDACNum:
                         self._physicalChannelIndex_ = dacChannel
                         logical = obj._dacSection.nDACNum.index(dacChannel)
                         self._dacChannel_ = logical
-                        dacName = obj.dacNames[logical]
-                        dacUnits = obj.dacUnits[logical]
+                        
+                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[logical]]
+                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[logical]]
+                        
+                        # dacName = obj.dacNames[logical]
+                        # dacUnits = obj.dacUnits[logical]
+                        
                     else:
-                        self._dacChannel_ = None
-                        self._physicalChannelIndex_ = None
-                        dacName = ""
-                        dacUnits = ""
+                        raise ValueError(f"Invalid physical DAC channel index specified ({dacChannel}) for physical DAC channels {obj._dacSection.nDACNum}")
+                        # self._dacChannel_ = None
+                        # self._physicalChannelIndex_ = None
+                        # dacName = ""
+                        # dacUnits = ""
                         
                 else:
-                    # if dacChannel in range(len(obj._dacSection.nDACNum)):
-                    if dacChannel in range(len(obj.dacNames)):
+                    # if dacChannel in range(len(obj.dacNames)):
+                    if dacChannel in range(len(obj._dacSection.nDACNum)):
                         self._dacChannel_ = dacChannel
                         self._physicalChannelIndex_ = obj._dacSection.nDACNum[dacChannel]
-                        dacName = obj.dacNames[dacChannel]
-                        dacUnits = obj.dacUnits[dacChannel]
+                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[dacChannel]]
+                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[dacChannel]]
+                        # dacName = obj.dacNames[dacChannel]
+                        # dacUnits = obj.dacUnits[dacChannel]
                         
                     else:
+                        raise ValueError(f"Invalid logical DAC channel index specified {dacChannel} for {len(obj._dacSection.nDACNum)} channels")
                         self._dacChannel_ = None
                         self._physicalChannelIndex_ = None
                         dacName =""
