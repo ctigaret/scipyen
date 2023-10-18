@@ -1552,9 +1552,6 @@ class ABFInputConfiguration:
                 # TODO finalize this...
 
             elif abfVer == 2:
-                if adcChannel not in obj._adcSection.nADCNum or adcChannel not in range(len(obj._adcSection.nADCNum)):
-                    raise ValueError(f"Invalid DAC channel index {adcChannel}")
-
                 self._adcChannel_ = adcChannel
                 self._physicalChannelIndex_ = None
 
@@ -1603,8 +1600,6 @@ class ABFInputConfiguration:
                     self._physicalChannelIndex_ = obj.annotations["listADCInfo"][adcChannel]["nADCNum"]
                     adcName = obj.annotations["listADCInfo"][adcChannel]["ADCChNames"].decode()
                     adcUnits = obj.annotations["listADCInfo"][adcChannel]["ADCChUnits"].decode()
-
-                    # raise ValueError(f"Invalid ADC channel index {adcChannel}")
 
         self._adcName_ = adcName
         self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
@@ -1916,7 +1911,13 @@ class ABFOutputConfiguration:
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
-        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        # but EXCLUDE the protocol property because:
+        # 1) we can have the same DAC output configuration shared acmong different
+        #    protocols
+        # 2) we want to avoid reentrant code when comparing the protocols of 
+        #   self and other.
+        #
+        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] != "protocol")
 
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!
