@@ -1083,9 +1083,32 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         The active DAC channel is the DAC channel that:
         
-        • sends out the MAIN DIGITAL output - irrespective of whether it 
-            also has analog waveform enabled or not.
+        • has "Digital Outputs" enabled in the corresponding 'Channel #' sub-tab
+            of the "Waveform" tab in Clampex protocol editor; 
         
+            ∘ when "Alternate Digital Outputs" is disabled in the "Waveform" tab:
+                ⋆ this is the only DAC that associates digital output in the protocol
+                ⋆ the digital pattern defined in an epoch under this DAC's "Channel #"
+                sub-tab will be sent out with every sweep; this is the 
+        
+            ∘ when "Alternate Digital Outputs" is enabled in the "Waveform" tab:
+                ⋆ this DAC will send the pattern defined here (under this DAC's
+                    "Channel #" sub-tab), ONLY during even-numbered sweeps 
+                    (0, 2, 4, ...)
+        
+                ⋆ the "alternative" pattern needs to be defined in ANOTHER DAC
+                    sub-tab and will be emitted during odd-numbered sweeps
+                    (1, 3, 5, ...)
+        
+                ⋆ there can be only one alternate DIG pattern defined in any 
+                    other DAC
+        
+            NOTE: The association between the alternate DIG pattern and a particular DAC
+        is only for GUI purposes - it does NOT engage the "other" DAC in any way
+        (the "other" DAC may still be used for other purposes e.g. sending out
+        analog DAC command waveforms during its epochs)
+        
+        OR:
         • when no DAC is sending digital output, it is the channel with the 
             highest index that sends out analog waveforms
             
