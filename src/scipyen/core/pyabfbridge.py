@@ -1626,6 +1626,14 @@ class ABFInputConfiguration:
 
         self._adcName_ = adcName
         self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
+        
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        props = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        
+        return np.all(getattr(self, p[0]) == getattr(other, p[0]) for p in props if x[0] != "protocol")
 
     def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex
@@ -1716,33 +1724,36 @@ class ABFOutputConfiguration:
                 # TODO finalize this...
                 
             elif abfVer == 2:
-                if dacChannel not in obj._dacSection.nDACNum or dacChannel not in range(len(obj._dacSection.nDACNum)):
-                    raise ValueError(f"Invalid DAC channel index {dacChannel}")
-                
-                self._dacChannel_ = dacChannel
-                self._physicalChannelIndex_ = None
+#                 if dacChannel not in obj._dacSection.nDACNum or dacChannel not in range(len(obj._dacSection.nDACNum)):
+#                     raise ValueError(f"Invalid DAC channel index {dacChannel}")
+#                 
                 
                 if physical:
                     if dacChannel in obj._dacSection.nDACNum:
                         self._physicalChannelIndex_ = dacChannel
-                        logical = obj._dacSection.nDACNum[dacChannel]
+                        logical = obj._dacSection.nDACNum.index(dacChannel)
                         self._dacChannel_ = logical
                         dacName = obj.dacNames[logical]
                         dacUnits = obj.dacUnits[logical]
                     else:
+                        self._dacChannel_ = None
+                        self._physicalChannelIndex_ = None
                         dacName = ""
                         dacUnits = ""
                         
                 else:
-                    if dacChannel not in range(len(obj.dacNames)):
-                        dacName =""
-                        dacUnits = ""
-                        
-                    else:
+                    # if dacChannel in range(len(obj._dacSection.nDACNum)):
+                    if dacChannel in range(len(obj.dacNames)):
+                        self._dacChannel_ = dacChannel
                         self._physicalChannelIndex_ = obj._dacSection.nDACNum[dacChannel]
                         dacName = obj.dacNames[dacChannel]
                         dacUnits = obj.dacUnits[dacChannel]
                         
+                    else:
+                        self._dacChannel_ = None
+                        self._physicalChannelIndex_ = None
+                        dacName =""
+                        dacUnits = ""
                 
                 # dacName = obj.dacNames[dacChannel]# if dacChannel in obj.dacNames else ""
                 # dacUnits = obj.dacUnits[dacChannel]# if dacChannel in obj.dacUnits else "mV"
@@ -1776,24 +1787,28 @@ class ABFOutputConfiguration:
             
             if physical:
                 p = [v["nDACNum"] for v in obj.annotations["listDACInfo"]]
-                if dacChannel not in p:
-                    dacName = ""
-                    dacUnits = ""
-                else:
+                if dacChannel in p:
                     self._physicalChannelIndex_ = dacChannel
                     logical = p.index(dacChannel)
                     self._dacChannel_ = logical
                     dacName = obj.annotations["listDACInfo"][logical]["DACChNames"].decode()
                     dacUnits = obj.annotations["listDACInfo"][logical]["DACChUnits"].decode()
-            else:
-                if dacChannel not in range(len(obj.annotations["listDACInfo"])):
+                else:
+                    self._physicalChannelIndex_ = None
+                    self._dacChannel_ = None
                     dacName = ""
                     dacUnits = ""
-                else:
+            else:
+                if dacChannel in range(len(obj.annotations["listDACInfo"])):
                     self._dacChannel_ = dacChannel
                     self._physicalChannelIndex_ = obj.annotations["listDACInfo"][dacChannel]["nDACNum"]
                     dacName = obj.annotations["listDACInfo"][dacChannel]["DACChNames"].decode()
                     dacUnits = obj.annotations["listDACInfo"][dacChannel]["DACChUnits"].decode()
+                else:
+                    self._physicalChannelIndex_ = None
+                    self._dacChannel_ = None
+                    dacName = ""
+                    dacUnits = ""
                     
             self._dacName_ = dacName
             self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
@@ -1931,7 +1946,7 @@ class ABFOutputConfiguration:
         if not isinstance(other, self.__class__):
             return False
         
-        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))# and x[0] != "protocol")
         
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
         # but EXCLUDE the protocol property because:
