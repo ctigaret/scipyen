@@ -22,11 +22,11 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-# def generic_exp_decay(x, parameters):
 def generic_exp_decay(x, y0, α, x0, τ):
     """Realizes y = α × exp(-(x-x₀)/τ) + y₀
     
     x: independent variable (e.g., time)
+    
     parameters: sequence of floats: y₀ (offset), α (scale), x₀ (onset), τ (time constant)
     
     """
@@ -45,6 +45,9 @@ def generic_exp_decay(x, y0, α, x0, τ):
     # y0, α, x0, τ = parameters
     
     return α * np.exp(-(x-x0)/τ) + y0
+
+def generic_exp_decay_model(x, parameters, **kwargs):
+    return generic_exp_decay(x, *parameters, **kwargs)
 
 def alphaFunction(x, parameters):
     """

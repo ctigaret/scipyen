@@ -9200,19 +9200,20 @@ signals in the signal collection.
                 kwargs["name"] = sig_name
                 
             
+            xdimstr = scq.shortSymbol(sig.times.units.dimensionality)
+            if len(xdimstr):
+                xlabel="%s (%s)" % (domain_name, xdimstr)
+            else:
+                xlabel="%s" % domain_name
+                
+            ydimstr = scq.shortSymbol(sig.units.dimensionality)
+            if len(ydimstr):
+                ylabel="%s (%s)" % (signal_name, ydimstr)
+            else:
+                ylabel="%s" % signal_name
+                
             if sig.shape[1] > 10:
                 # print("mt")
-                xdimstr = scq.shortSymbol(sig.times.units.dimensionality)
-                if len(xdimstr):
-                    xlabel="%s (%s)" % (domain_name, xdimstr)
-                else:
-                    xlabel="%s" % domain_name
-                    
-                ydimstr = scq.shortSymbol(sig.units.dimensionality)
-                if len(ydimstr):
-                    ylabel="%s (%s)" % (signal_name, ydimstr)
-                else:
-                    ylabel="%s" % signal_name
                     
                 self.setCursor(QtCore.Qt.WaitCursor)
                 self.sig_plot.emit(self._make_sig_plot_dict_(self.signalAxis(0), np.array(sig.times), 
@@ -9225,8 +9226,8 @@ signals in the signal collection.
                 self._plot_numeric_data_(self.signalAxis(0), np.array(sig.times), 
                                         np.array(sig.magnitude), 
                                         # name=sig.name,
-                                        ylabel=xlabel, 
-                                        xlabel=ylabel, 
+                                        ylabel=ylabel, 
+                                        xlabel=xlabel, 
                                         *args, **kwargs)
                 
             if sig.name != self.signalAxis(0).vb.name:

@@ -1062,8 +1062,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     =====================
     data: 1D array-like, numeric - the "dependent" variable to be fitted
     
-    func: python function that takes a scalar and a sequence of model parameters,
-        and returns a scalar, and with signature:
+    func: python function that takes a scalar ('x') and a sequence ('p') of 
+        model parameters, and returns a scalar; the signature is:
     
         func(x, p, /, *args, **kwargs)
     
@@ -1145,27 +1145,41 @@ def fit_model(data, func, p0, *args, **kwargs):
         # func = model function passed in the params to fit_model
         # t = independent variable (e.g. time; this is `x` in the main body of fit-model!)
         # x0 = sequence with initial values for the model parameters!
+        # WARNING do not confuse x0 here with p0 above
+        #
+        # NOTE: 2023-10-19 10:02:24
+        # the below is a BUG
+        # eazy FIXME is to only feed func of the signature
+        # f(x, p, **kwargs)
         # CAUTION: the model function `func` signature MIGHT expect these parameters
         # to be passed unpacked (i.e. individually)
         #
-        # So here we have two accepted signatures:
+        # where x is a scalar, p is a SEQUENCE of model parameters
+        #
+        # So here we have two accept two types of signatures:
         #   func(t, x0, *args, **kwargs) -> TWO named parameters
         #   OR
         #   func(t, *args, **kwargs) -> ONE named parameter (with initial parameter
         #       values contained in *args)
         # the lines below adapt for that
-        sig = prog.signature2Dict(func)
-        namedPars = list(sig["named"].keys())
-        if len(sig["named"]) == 2:
-            par2 = sig["named"][namedPars[1]]
-            if isinstance(par2[1], typing._UnionGenericAlias):
-                # function expects a sequence of parameters
-                yf = func(t, x0, *fargs, **fkwargs)
-            else:
-                # function may expect a single model parameter
-                myargs = []
-        yf = func(t, x0, *fargs, **fkwargs)
-        
+#         sig = prog.signature2Dict(func)
+#         namedPars = list(sig["named"].keys())
+#         if len(sig["named"]) == 2:
+#             par2 = sig["named"][namedPars[1]]
+#             if isinstance(par2[1], typing._UnionGenericAlias):
+#                 # function expects a sequence of parameters
+#                 if fargs is None:
+#                     fargs = tuple(p0)
+#                 yf = func(t, x0, *fargs, **fkwargs)
+#             else:
+#                 # function may expect a single model parameter , or model parameters
+#                 # are packed into a single siequence object
+#                 yf = func(t, x0, p0, **fkwargs)
+#                 
+#         else:        
+#             yf = func(t, x0, *fargs, **fkwargs)
+#         
+        yf = func(t, x0, **fkwargs)
         ret = y-yf
         
         return ret
@@ -1227,7 +1241,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         if l0.size not in (1, len(p0)):
             raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
         
-        if not  datatypes.is_vector(l0):
+        if not datatypes.is_vector(l0):
             raise ValueError("Lower bounds must be a vector")
         
     elif isinstance(l0, pd.Series):
