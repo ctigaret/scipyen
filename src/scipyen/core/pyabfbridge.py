@@ -1078,6 +1078,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return self._acquisitionMode_
     
     @property
+    def activeDACChannelIndex(self) -> int:
+        return self.activeDACChannel
+    
+    @property
     def activeDACChannel(self) -> int:
         """Index of the "active" DAC channel, as reported by Clampex.
         
@@ -1480,6 +1484,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
     @property
     def outputs(self):
         return self.DACs
+    
+    def outputConfiguration(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+                            physical:bool=False) -> ABFOutputConfiguration:
+        """Reintroduced temporarily for back compatibility with existing scripts"""
+        return self.getDAC(dacChannel, physical)
     
     def getOutput(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
@@ -2725,6 +2734,10 @@ class ABFOutputConfiguration:
     @property
     def units(self) -> pq.Quantity:
         return self._dacUnits_
+    
+    @property
+    def dacUnits(self) -> pq.Quantity:
+        return self.units
     
     @property
     def sweepSampleCount(self) -> int:

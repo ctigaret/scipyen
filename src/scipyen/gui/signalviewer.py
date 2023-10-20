@@ -1890,7 +1890,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             eventsPen = kwargs.pop("eventsPen", QtGui.QPen(QtGui.QColor("black"),1))
             eventsPen.setCosmetic(True)
             
-            # eventsSymbolColors = cycle(self.defaultLineColorsList)
+            eventsSymbolColors = cycle(self.defaultLineColorsList)
             
             spikeTrainSymbol = kwargs.pop("spikeTrainSymbol", "spike")
             symbolPen = QtGui.QPen(QtGui.QColor("black"),1)
