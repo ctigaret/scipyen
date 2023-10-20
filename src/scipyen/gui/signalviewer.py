@@ -1994,7 +1994,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     
                 # xlabel = f"{get_domain_name(entities_list[0])} ({entities_list[0].times.units.dimensionality})"
                 yLabel = "Spike Trains"
-                entities_axis.setLabels(bottom = [xlabel])
+                entities_axis.setLabels(bottom = [xLabel])
                 
                 # NOTE: 2022-11-21 14:15:17
                 # this will PREVENT the dispay of Y grid lines (not essential, because
