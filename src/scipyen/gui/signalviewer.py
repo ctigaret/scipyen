@@ -2095,10 +2095,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         elif isinstance(data, dict):
             self.dataAnnotations.update(data)
             
-        self.annotationsViewer.setData(self.dataAnnotations)
+        if self.annotationsViewer.isVisible():
+            self.annotationsViewer.setData(self.dataAnnotations)
             
-        if self.annotationsViewer.topLevelItemCount() == 1:
-            self.annotationsViewer.topLevelItem(0).setText(0, "Data")
+            if self.annotationsViewer.topLevelItemCount() == 1:
+                self.annotationsViewer.topLevelItem(0).setText(0, "Data")
             
     def _gen_signal_ndx_name_map_(self, signals:typing.Union[tuple, list]):
         """Generates a mapping of entry_name ↦ (index , signal_name)
@@ -8530,6 +8531,7 @@ signals in the signal collection.
             self._events_axis_.setVisible(False)
         else:
             self._plotEvents_(obj)
+            
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
             
     @_plot_data_.register(np.ndarray)
@@ -8790,7 +8792,6 @@ signals in the signal collection.
                     
             else:
                 return False
-                        
             self.currentFrameAnnotations = {type(obj).__name__: dict()}
         return True
     
