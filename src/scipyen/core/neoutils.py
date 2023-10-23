@@ -6530,7 +6530,7 @@ def average_segments_in_block(data, **kwargs):
         
 # def average_blocks_old(*args, **kwargs):
 @safeWrapper
-def average_blocks(*args, **kwargs):
+def average_blocks(*args, **kwargs) -> neo.Block:
     """Generates a block containing a list of averaged AnalogSignal data from the *args.
     FIXME/TODO: revisit this
     Parameters:
@@ -6736,6 +6736,9 @@ def average_blocks(*args, **kwargs):
     ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
     ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
     ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
+    
+    for segment in ret.segments:
+        segment.block = ret
     
     return ret
 
