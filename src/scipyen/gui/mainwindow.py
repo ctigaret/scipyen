@@ -2150,7 +2150,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # qt5agg backend throughout
         # -- code from matplotlib.pyplot.switch_backend
         #
-        print(f"{self.__class__.__name__}._adopt_mpl_figure ({fig}, number {fig.number})")
+        # print(f"{self.__class__.__name__}._adopt_mpl_figure ({fig}, number {fig.number})")
         import matplotlib.cbook as cbook
         backend_mod = importlib.import_module(
             cbook._backend_module_name("Qt5Agg"))
@@ -2159,7 +2159,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             locals().update(vars(backend_mod))
             
         if getattr(fig.canvas, "manager", None) is None:
-            print(f"{self.__class__.__name__}._adopt_mpl_figure - no canvas")
+            # print(f"{self.__class__.__name__}._adopt_mpl_figure - no canvas")
             
             # NOTE: for debugging 2023-10-24 13:24:26
             # return fig
@@ -2204,11 +2204,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             fig.number = num
             Gcf.figs[num] = fig.canvas.manager
 
-        # fig.canvas.mpl_connect("button_press_event",
-        #                         self.handle_mpl_figure_click)
-#         
-#         fig.canvas.mpl_connect("figure_enter_event",
-#                                 self.handle_mpl_figure_enter)
+        fig.canvas.mpl_connect("button_press_event",
+                                self.handle_mpl_figure_click)
+        
+        fig.canvas.mpl_connect("figure_enter_event",
+                                self.handle_mpl_figure_enter)
 
         fig.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
 
