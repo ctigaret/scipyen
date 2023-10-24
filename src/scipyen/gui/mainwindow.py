@@ -2007,7 +2007,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
-        print(f"{self.__class__.__name__}.handle_mpl_figure_click evt.canvas.figure: {evt.canvas.figure} ({evt.canvas.figure.number})")
+        # print(f"{self.__class__.__name__}.handle_mpl_figure_click evt.canvas.figure: {evt.canvas.figure} ({evt.canvas.figure.number})")
         self.raiseWindow(evt.canvas.figure)
 
     @safeWrapper
