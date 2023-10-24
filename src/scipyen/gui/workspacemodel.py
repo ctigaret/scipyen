@@ -1216,12 +1216,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         for n,f in deled_mpl_figs.items():
             if hasattr(f, "number") or hasattr(f.canvas, "manager"):
-                # remove from Gcf and also from self.gcf_figs
+                # remove from self.gcf_figs and also from Gcf
                 if f in self.gcf_figs:
                     self.gcf_figs.remove(f)
-                    
-                plt.close(f) # will remove it from Gcf
                 
+                # also remove from Gcf
+                plt.close(f) 
+                
+            # place these in the objects to remove from workspace
             mpl_figs_to_remove_from_ns[n] = f
         
         # these below are the mpl figs that Gcf currently knows about

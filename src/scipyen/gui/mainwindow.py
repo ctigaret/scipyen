@@ -2007,6 +2007,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @safeWrapper
     def handle_mpl_figure_click(self, evt):
+        print(f"{self.__class__.__name__}.handle_mpl_figure_click evt.canvas.figure: {evt.canvas.figure} ({evt.canvas.figure.number})")
         self.raiseWindow(evt.canvas.figure)
 
     @safeWrapper
@@ -2133,7 +2134,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return win
 
-    # , integrate_in_pyplot:bool=True):
     def _adopt_mpl_figure(self, fig: mpl.figure.Figure):
         """Gives a FigureCanvasQTAgg to fig.
         To be used only with mpl Figure created directly from their c'tor, i.e.,
@@ -2142,12 +2142,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         NOTE: This will also 'register' them with the Gcf
         
         """
+        if not isinstance(fig, mpl.figure.Figure):
+            return
         # NOTE: 2023-01-29 16:14:04
         # for mpl figures created manually
         # add a manager backend to the figure - we FORCE the use of the
         # qt5agg backend throughout
         # -- code from matplotlib.pyplot.switch_backend
         #
+        print(f"{self.__class__.__name__}._adopt_mpl_figure ({fig}, number {fig.number})")
         import matplotlib.cbook as cbook
         backend_mod = importlib.import_module(
             cbook._backend_module_name("Qt5Agg"))
