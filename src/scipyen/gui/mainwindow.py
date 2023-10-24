@@ -2159,6 +2159,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             locals().update(vars(backend_mod))
             
         if getattr(fig.canvas, "manager", None) is None:
+            print(f"{self.__class__.__name__}._adopt_mpl_figure - no canvas")
+            
+            # NOTE: for debugging 2023-10-24 13:24:26
+            return fig
+        
             new_figure_manager = getattr(backend_mod, "new_figure_manager", None)
 
             if new_figure_manager is None:
@@ -2199,11 +2204,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             fig.number = num
             Gcf.figs[num] = fig.canvas.manager
 
-        fig.canvas.mpl_connect("button_press_event",
-                                self.handle_mpl_figure_click)
-        
-        fig.canvas.mpl_connect("figure_enter_event",
-                                self.handle_mpl_figure_enter)
+        # fig.canvas.mpl_connect("button_press_event",
+        #                         self.handle_mpl_figure_click)
+#         
+#         fig.canvas.mpl_connect("figure_enter_event",
+#                                 self.handle_mpl_figure_enter)
 
         fig.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
 
@@ -2230,32 +2235,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if winClass is mpl.figure.Figure:
             win = self._adopt_mpl_figure(win)
-            # NOTE: 2023-06-06 08:50:12
-            # do the below in _adopt_mpl_figure()
-            # if win.canvas.manager is None:
-            #     # , integrate_in_pyplot=True)
-            #     win = self._adopt_mpl_figure(win)
-                
-#             win.canvas.mpl_connect("button_press_event",
-#                                    self.handle_mpl_figure_click)
-#             
-#             win.canvas.mpl_connect("figure_enter_event",
-#                                    self.handle_mpl_figure_enter)
-# 
-#             win.canvas.mpl_connect("close_event", self.handle_mpl_figure_close)
-# 
-#             # NOTE: 2023-01-27 22:43:23
-#             # install and event filter on the mpl figure's window - assumes Qt5 backend
-#             # this will capture activation & ficus events to set this figure instance
-#             # as the current one in Scipyen's window manager, AND ALSO in pylab
-#             #
-#             # this has the same effect as
-#             evtFilter = WindowEventFilter(win, parent=self)
-#             # NOTE: 2023-01-29 16:28:50
-#             # We assume matplotlib Qt5Agg backend is used throughout Scipyen;
-#             # there may be figures created via the constructor, that will not
-#             # have a manager
-#             win.canvas.manager.window.installEventFilter(evtFilter)
 
         else:
             if isinstance(getattr(win, "sig_activated", None), QtCore.pyqtBoundSignal):

@@ -849,7 +849,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     @pyqtSlot(tuple)
     def _slot_updateModelFromMonitor_(self, value):
         name, alteration = value
-        print(f"\n{self.__class__.__name__}._slot_updateModelFromMonitor_ {name} {alteration.name}")
+        # print(f"\n{self.__class__.__name__}._slot_updateModelFromMonitor_ {name} {alteration.name}")
         if isinstance(alteration, WorkspaceVarChange):
             # calls a callback to affect the model ⇒ the viewer UI
             self._varChanges_callbacks_[alteration](name)
@@ -1194,7 +1194,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # if len(self.gcf_figs):
         #     print(f"\n{self.__class__.__name__}._updateModel_ figs in gcf since preExecute = {[(i, i.number) for i in self.gcf_figs]}")
             
-        #these are all mpl figs currently in the ns
+        # these are all mpl figs currently in the ns
         ns_figs_dict = dict(i for i in ns.items() if isinstance(i[1], mpl.figure.Figure))
         
         # and these are mpl figs currently in ns, that are displayable
@@ -1235,7 +1235,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #     print(f"\n{self.__class__.__name__}._updateModel_ figs currently in gcf = {[(i, i.number) for i in current_gcf_figs]}")
             
         # figs created in Gcf as a result of code execution ⇒ not present in Gcf
-        # as preExecute time
+        # at preExecute time
         new_figs_from_gcf = set(f for f in current_gcf_figs if f not in self.gcf_figs)
         
         # if len(new_figs_from_gcf):
