@@ -2162,7 +2162,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             print(f"{self.__class__.__name__}._adopt_mpl_figure - no canvas")
             
             # NOTE: for debugging 2023-10-24 13:24:26
-            return fig
+            # return fig
         
             new_figure_manager = getattr(backend_mod, "new_figure_manager", None)
 
