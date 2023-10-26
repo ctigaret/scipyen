@@ -715,7 +715,7 @@ class ABFEpoch:
                 raise ValueError(f"'trains' expected to be a bool or None; instead, got {trains}")
             
         # elif isinstance(alternate, str) and alternate.lower() == "all":
-        elif alternate is None:
+        elif alternate is None or (isinstance(alternate, str) and alternate.lower() == "all"):
             p = self.getDigitalPattern(False)
             pa = self.getDigitalPattern(True)
             
@@ -810,7 +810,8 @@ class ABFEpoch:
             raise ValueError(f"Invalid 'alternate' specification {alternate}")
         
     
-    def hasDigitalOutput(self, digChannel:int = 0, alternate:bool=False) -> bool:
+    def hasDigitalOutput(self, digChannel: typing.Union[int, str] = 0, 
+                         alternate:typing.Union[bool, str]=False) -> bool:
         """
         Checks the epochs defines an output on the specified digital channel.
         
@@ -823,19 +824,53 @@ class ABFEpoch:
         Parameters:
         ===========
         digChannel: int in the range(8) (maximum number of digital channels)
-        alternate: when True, the function will test the alternate digital pattern
+                    or the string "any" -> returns True if ANY of the digital
+                    channels is emitting a train or a pulse
+        
+        alternate: bool, default False; when True, the function will test the 
+                    alternate digital pattern
+        
+                    str ("all") the function will test if the epochs emits a
+                    digital pattern at all
+                
+        
         
         """
-        p = self.getDigitalPattern(alternate)
+        if isinstance(alternate, bool):
+            p = self.getDigitalPattern(alternate)
+            
+            if isinstance(digChannel, int):
+                if digChannel in range(len(p[0])):
+                    return p[0][-digChannel-1] != 0
+                
+                elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+                    return p[1][-len(p[0])+digChannel-1] != 0
+                
+                else:
+                    return False
+                
+            elif isinstance(digChannel, str) and digChannel == "any":
+                return any(v != 0 for v in itertools.chain.from_iterable(p))
+            
+        elif isinstance(alternate, str) and alternate == "all":
+            p = self.getDigitalPattern(False)
+            pa = self.getDigitalPattern(True)
+            
+            if isinstance(digChannel, int):
+                if digChannel in range(len(p[0])):
+                    return p[0][-digChannel-1] != 0 or pa[0][-digChannel-1] != 0
+                
+                elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+                    return p[1][-digChannel-1] != 0 or pa[1][-digChannel-1] != 0
+                
+                else:
+                    return False
+                    
+            elif isinstance(digChannel, str) and digChannel == "any":
+                return any(v != 0 for v in itertools.chain.from_iterable(p+pa))
+                
+                    
         
-        if digChannel in range(len(p[0])):
-            return p[0][-digChannel-1] != 0
-        
-        elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
-            return p[1][-len(p[0])+digChannel-1] != 0
-        
-        else:
-            return False
     
     def hasDigitalPulse(self, digChannel:int = 0, alternate:bool=False) -> bool:
         """
@@ -2497,7 +2532,7 @@ class ABFOutputConfiguration:
         return self.dacHoldingLevel
     
     def getDigitalLogicLevels(self, digChannel:int=0) -> tuple:
-        if self.digitalTrainActiveLogic:
+        if self.protocol.digitalTrainActiveLogic:
             trainOFF = 0
             trainON = 5
         else:
@@ -2910,6 +2945,9 @@ class ABFOutputConfiguration:
             wave = self.getEpochDigitalWaveform(epoch, trainOFF, trainON, digOFF, digON, 
                                              sweep, digChannel)
             
+            if wave.size == 0:
+                continue
+            
             waveform[ndx[0]:ndx[1], 0] = wave
             
             t0 = t1
@@ -2917,7 +2955,7 @@ class ABFOutputConfiguration:
             lastEpochNdx = ndx[1]
             lastLevel = wave[-1]
             
-        if self.digitalUseLastEpochHolding:
+        if self.protocol.digitalUseLastEpochHolding:
             waveform[lastEpochNdx:, 0] = lastLevel
         else:
             waveform[lastEpochNdx:, 0] = digOFF * pq.V
@@ -2925,24 +2963,15 @@ class ABFOutputConfiguration:
         return waveform
         
         
-        
 def getEpochNumberFromLetter(x:str) -> int:
     """The inverse function of getEpochLetter()"""
     from core import strutils
     return strutils.lettersToOrdinal(x)
 
+
 def getEpochLetter(epochNumber:int):
     from core import strutils
     return strutils.ordinalToLetters(epochNumber)
-    # from pyabf.waveform.Epoch
-#     if epochNumber < 0:
-#         return "?"
-#     letter = ""
-#     while epochNumber >= 0:
-#         letter += chr(epochNumber % 26 + 65)
-#         epochNumber -= 26
-#         
-#     return letter
 
 def __wrap_to_quantity__(x:typing.Union[list, tuple], convert:bool=True):
     return (x[0], unitStrAsQuantity(x[1])) if convert else x
