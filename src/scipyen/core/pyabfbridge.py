@@ -2621,23 +2621,26 @@ class ABFOutputConfiguration:
                 # ONLY the main digital pattern of the epoch, and ONLY if 
                 # the sweep has an even number
                 #
-                if isAlternateDigital:
-                    # this DAC has dig output enabled, hence during
-                    # an experiment it will output NOTHING if either 
-                    # alternateDigitalPattern is disabled OR sweep number 
-                    # is even
-                    #
-                    dig_3_0 = epoch.getDigitalPattern(True)[0]
-                    dig_7_4 = epoch.getDigitalPattern(True)[1]
-                    # dig_3_0 = dig_7_4 = [0,0,0,0]
+                if self.logicalIndex == self.protocol.activeDACChannel:
+                    if isAlternateDigital:
+                        # this DAC has dig output enabled, hence during
+                        # an experiment it will output NOTHING if either 
+                        # alternateDigitalPattern is disabled OR sweep number 
+                        # is even
+                        #
+                        dig_3_0 = epoch.getDigitalPattern(True)[0]
+                        dig_7_4 = epoch.getDigitalPattern(True)[1]
+                        # dig_3_0 = dig_7_4 = [0,0,0,0]
+                    else:
+                        # this DAC has dig output enabled, hence during
+                        # an experiment it will output the main digital pattern
+                        # if either alternateDigitalPattern is disabled, OR
+                        # sweep number is even
+                        #
+                        dig_3_0 = epoch.getDigitalPattern(False)[0]
+                        dig_7_4 = epoch.getDigitalPattern(False)[1]
                 else:
-                    # this DAC has dig output enabled, hence during
-                    # an experiment it will output the main digital pattern
-                    # if either alternateDigitalPattern is disabled, OR
-                    # sweep number is even
-                    #
-                    dig_3_0 = epoch.getDigitalPattern(False)[0]
-                    dig_7_4 = epoch.getDigitalPattern(False)[1]
+                    dig_3_0 = dig_7_4 = [0,0,0,0]
             else:
                 # For a DAC where dig output is DISabled, the DAC is simply
                 # a placeholder for the alternate digital output of the epoch, 
