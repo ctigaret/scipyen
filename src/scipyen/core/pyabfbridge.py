@@ -550,6 +550,15 @@ class ABFEpoch:
         self._epochNumber_ = val
         
     @property
+    def epochNumber(self) -> int:
+        """Alias to self.number for backward compatibility"""
+        return self.number
+    
+    @epochNumber.setter
+    def epochNumber(self, val):
+        self.number = val
+    
+    @property
     def type(self) -> ABFEpochType:
         return self._epochType_
     
@@ -1705,7 +1714,16 @@ class ABFInputConfiguration:
         return self._adcName_
     
     @property
+    def adcName(self)->str:
+        """Alias to self.name for backward compatibility"""
+        return self.name
+    
+    @property
     def units(self) -> pq.Quantity:
+        return self._adcUnits_
+
+    @property
+    def adcUnits(self) -> pq.Quantity:
         return self._adcUnits_
 
     @property
@@ -2080,7 +2098,7 @@ class ABFOutputConfiguration:
         if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
             return list()
         
-        times = [x.rescale(pq.s) for x in self.epochActualPulseTimes(epoch, sweep)]
+        times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
         
         trig = TriggerEvent(times=times, units = pq.s, labels = label, name=name)
         
@@ -2169,7 +2187,7 @@ class ABFOutputConfiguration:
         therefore the response to the epoch's waveform, as recorded in the ADC
         signal, will appear delayed relative to the epoch's start by the holding time.
         
-        Depending what you need, you may want to use self.epochActualRelativeStartTime
+        Depending what you need, you may want to use self.getEpochActualRelativeStartTime
         
         """
         if isinstance(epoch, (int, str)):
@@ -2205,7 +2223,7 @@ class ABFOutputConfiguration:
         
     def getEpochRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from the start of the sweep to the start of epoch.
-        WARNING: Like self.epochRelativeStartTime, does NOT take into account 
+        WARNING: Like self.getEpochRelativeStartTime, does NOT take into account 
         the holding time; you may want to use self.epochActualRelativeStartsSamples
         
         
@@ -2235,16 +2253,16 @@ class ABFOutputConfiguration:
         therefore the respoonse to the epoch's waveform, as recorded in the ADC 
         signal, will appear delayed relative to the epoch's start by the holding time.
         
-        Depending what you need, you may want to use self.epochActualStartTime
+        Depending what you need, you may want to use self.getEpochActualStartTime
         """
         # units = epoch.firstDuration.units
-        return self.epochRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
+        return self.getEpochRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
     
     def getEpochActualStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to the start of recording.
         Takes into account the sweep holding time.
         """
-        return self.epochActualRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
+        return self.getEpochActualRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
         
     def getEpochStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from start fo recording to the epoch.
@@ -2252,13 +2270,13 @@ class ABFOutputConfiguration:
         the holding time; you may want to use self.epochActualStartSamples.
         
         """
-        return self.epochRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
+        return self.getEpochRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
     def getEpochActualStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
         """Number of samples from start fo recording to the epoch.
         Takes into account the sweep holding time.
         """
-        return self.epochActualRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
+        return self.getEpochActualRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
     def getEpochActualDuration(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> pq.Quantity:
         """Actual epoch duration (in ms) for the given sweep.
@@ -2350,7 +2368,7 @@ class ABFOutputConfiguration:
         if pc == 0:
             return list()
 
-        t0 = self.epochActualStartTime(epoch, sweep)
+        t0 = self.getEpochActualStartTime(epoch, sweep)
 
         return [t0 + p * epoch.pulsePeriod for p in range(pc)]
     
@@ -2768,6 +2786,11 @@ class ABFOutputConfiguration:
     @property
     def name(self) -> str:
         return self._dacName_
+    
+    @property
+    def dacName(self)->str:
+        """Alias to self.name for backward compatibility"""
+        return self.name
     
     @property
     def units(self) -> pq.Quantity:
