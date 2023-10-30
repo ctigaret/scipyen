@@ -1122,7 +1122,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return self._acquisitionMode_
     
     @property
+    def activeDACOutput(self) -> ABFOutputConfiguration:
+        return self.outputs[self.activeDACChannelIndex]
+    
+    @property
     def activeDACChannelIndex(self) -> int:
+        """Alias to self.activeDacChannel, for backward compatibility"""
         return self.activeDACChannel
     
     @property
@@ -2082,15 +2087,49 @@ class ABFOutputConfiguration:
         """List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
     
-    def getTriggerEvents(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
-                      eventType:TriggerEventType = TriggerEventType.presynaptic,
-                      label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
-                      name:typing.Optional[str] = None) -> TriggerEvent:
-        """Trigger events from Step and Pulse-type ABF Epochs.
+    def getTriggerEvents(self, sweep:int = 0) -> typing.List[TriggerEvent]:
+        """Returns trigger events from all epochs in the protocol"""
+        pass 
+        
+    
+    def getEpochDigitalTriggerEvent(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
+                             digChannel:typing.Union[int, typing.Sequence[int]] = 0,
+                             eventType:TriggerEventType = TriggerEventType.presynaptic,
+                             label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+                             name:typing.Optional[str] = None) -> TriggerEvent:
+        """Trigger events from an individual Step or Pulse-type ABF Epochs.
         If the epoch has digital outputs, the time stamps for the trigger
         events will be set by the timings of the digital TTL signals during
         the epoch. Otherwise, the timings will be given by the epoch's
-        command waveform timing (i.e. its start time)
+        command waveform timing (i.e. its start time).
+        
+        NOTE 1: Digital signals (triggers) are emitted during epochs defined on 
+        the "active" DAC
+        
+        NOTE 2: An epochs supports dsending digital signals simultaneously via 
+        more than one digital output channel; however, Clampex does not support
+        defining different timings for distinct digital output channels, EXCEPT
+        for for the case where digital train and digital pulse are emitted by
+        distinct channels.
+        
+        In such case, the digital train emitted on one channel is interpreted
+        as a sequence of trigger events, whereas the digital pulse emitted on 
+        a distinct digital channel can be intepreted here as a single trigger
+        event, with the onset being equal to the timing of the first pulse in 
+        the digital train (both being defined by the epoch's onset time in the 
+        sweep0).
+        
+        Cases like this one are ambiguous and are best avoided, if possible.
+        
+        However, because distinct digital output channels can drive different
+        devices, it is necessary to specify their "semantic" within the experiment
+        (i.e. the trigger event type for a specific digital output channel).
+        
+        In synaptic plasticity experiments it is usual to use two digital output
+        channels to send digital trains ALTERNATIVELY to two pathways. Since
+        both outputs are effectively presynaptic stimuli, one can specify
+        the output indices by passing a tuple of int to the digChannel parameter.
+        
         """
         if isinstance(epoch, (str, int)):
             epoch = self.getEpoch(epoch)
