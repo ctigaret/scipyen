@@ -2087,26 +2087,180 @@ class ABFOutputConfiguration:
         """List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
     
-    def getTriggerEvents(self, sweep:int = 0) -> typing.List[TriggerEvent]:
-        """Returns trigger events from all epochs in the protocol"""
-        pass 
+    def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Union[int, typing.Sequence[int]] = 0,
+                         eventType:TriggerEventType = TriggerEventType.presynaptic,
+                         label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+                         name:typing.Optional[str] = None,
+                         enableEmptyEvent:bool=True) -> TriggerEvent:
+        """Generates TriggerEvent objects from all epochs in the protocol.
+        These may be empty if the protocol epochs do not define digital patterns.
+        (NOTE: 'enableEmptyEvent' parameter is not yet used)
+        """
         
+        
+        usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in self.epochs]))
+        
+        
+        if isinstance(digChannel, int):
+            if digChannel not in usedDigs:
+                return
+            
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            if all(v not in usedDigs for v in digChannel):
+                return
+            
+        if isinstance(digChannel, int):
+            times = list()
+            for epoch in self.epochs:
+                if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+                    continue
+                
+                # if digChannel not in epoch.getUsedDigitalOutputChannels():
+                #     continue
+                
+                digPattern = self.getEpochDigitalPattern(epoch, sweep)[digChannel // 4]
+                
+                digChannelValue = tuple(reversed(digPattern))[digChannel]
+                
+                if digChannelValue == "*": # ⟹ pulse train
+                    times.extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
+                
+                elif digChannelValue == 1: # ⟹ single TTL pulse ⇒ take the onset time as
+                                        # a trigger event; in theory, a device may 
+                                        # actually require a "ON" state during which 
+                                        # it performs some ciclic function etc;
+                                        # regardless of this we may conosider the onset
+                                        # of the "ON" state as a trigger for such device
+                    
+                    times.extend([self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)])
+                    
+                else:
+                    continue
+                
+            if len(times) == 0 and not enableEmptyEvent:
+                return
+            
+            trig = TriggerEvent(times=times, units = pq.s, labels = label, name=name,
+                                event_type = eventType)
+        
+            if isinstance(label, str) and len(label.strip()):
+                trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+
+            return trig
+        
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            channel_times = [list()] * len(digChannel)
+            
+            for epoch in self.epochs:
+                if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+                    continue
+                
+                digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
+                
+                for k, chnl in enumerate(digChannel):
+                    if digChannelValue[chnl] == "*":
+                        channel_times[k].extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
+                        
+                    elif digChannelValue[chnl] == 1:
+                        channel_times[k].extend([self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)])
+                        
+            trigs = [TriggerEvent(times=channel_times[k], units = pq.s, event_type = eventType, 
+                                name=name, labels = label) for k in range(len(channel_times))]
+
+            # NOTE: 2023-10-31 15:00:10
+            # remove duplicates
+            # CAUTION: TriggerEvent objects are not hashable hence cannot use 
+            # set logic to achieve this
+            uniqueTrigs = list()
+
+            for k,t in enumerate(trigs):
+                if k == 0:
+                    uniqueTrigs.append(t)
+                else:
+                    if t not in uniqueTrigs:
+                        uniqueTrigs.append(t)
+                        
+            if len(uniqueTrigs) == 1:
+                return uniqueTrigs[0]
+            
+            else:
+                return uniqueTrigs
+            
+        else:
+            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
     
     def getEpochDigitalTriggerEvent(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
                              digChannel:typing.Union[int, typing.Sequence[int]] = 0,
                              eventType:TriggerEventType = TriggerEventType.presynaptic,
                              label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
-                             name:typing.Optional[str] = None) -> TriggerEvent:
-        """Trigger events from an individual Step or Pulse-type ABF Epochs.
+                             name:typing.Optional[str] = None,
+                             enableEmptyEvent:bool=True) -> typing.Union[TriggerEvent, typing.List[TriggerEvent]]:
+        """Trigger events from an individual Step or Pulse-type ABF Epoch.
+        
+        Parameters:
+        ------------
+        
+        epoch: ABFEpoch, int index of ABFEpoch or letter of ABFEpoch
+        
+        sweep: index of sweep (0-based)
+        
+        digChannel: int or sequence of int; index or indices of digital output
+            channels where a TTL output is expected.
+        
+            Specifying a tuple of int here (e.g., (0,1)) is convenient for the 
+            situation where alternate digital outputs are used to generate the 
+            same type of TriggerEvent (such as presynaptic). Such alternate 
+            digital outputs will be emitted on distinct digital output channels, 
+            even though they both represent the same type of event (in this case, 
+            presynaptic pulses). This scenario can be used for Hebbian synaptic    
+            plasticity experiments where synaptic responses are recorded 
+            alternatively from two distinct presynaptic pathways converging on 
+            the same cell.
+        
+        sweep: int, index of the sweep in the protocol. 
+            Normally, an ABF Epoch (and any digital output patterns defined 
+            within) is repeated in each sweep - hence the sweep index is 
+            irrelevant. 
+    
+            When alternate digital outputs are enabled, the sweep index BECOMES
+            RELEVANT, as the main digital pattern is emitted during sweeps with 
+            even indices (0, 2, 4, …) whereas the alternate digital pattern is
+            emitted during sweeps with odd indices (1, 3, 5, …).
+        
+            Such scenario is also likely to involve distinct digital output 
+            channels in the main and the alternate digital patterns. In this 
+            case it is recommended to specify BOTH digital output channels used
+            in the protocol (see above).
+        
+        eventType: optional; default is TriggerEventType.presynaptic
+            Necessary in building a TriggerProtocol for the experiment.
+        
+        label: The label(s) for each individual time stamp in the resulting
+            TriggerEvent object
+        
+        name: The name of the resulting TriggerEvent object.
+        
+        enableEmptyEvent: when True (default) the function will return an empty
+            TriggerEvent (i.e. without any time stamps) in any of the following
+            cases:
+        
+            • the ABF Epoch is neither a Step or Pulse Type
+        
+            • Neither of the digital channels given in digChannel are active in
+                the epoch during the specified sweep
+            
+        Returns:
+        ========
+        
+        A TriggerEvent object. This may be empty, or None - see 'enableEmptyEvent'
+        
         If the epoch has digital outputs, the time stamps for the trigger
         events will be set by the timings of the digital TTL signals during
-        the epoch. Otherwise, the timings will be given by the epoch's
-        command waveform timing (i.e. its start time).
         
         NOTE 1: Digital signals (triggers) are emitted during epochs defined on 
         the "active" DAC
         
-        NOTE 2: An epochs supports dsending digital signals simultaneously via 
+        NOTE 2: An ABF Epoch supports sending digital signals simultaneously via 
         more than one digital output channel; however, Clampex does not support
         defining different timings for distinct digital output channels, EXCEPT
         for for the case where digital train and digital pulse are emitted by
@@ -2135,17 +2289,88 @@ class ABFOutputConfiguration:
             epoch = self.getEpoch(epoch)
             
         if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
-            return list()
+            return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
         
-        times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
+        usedDigs = epoch.getUsedDigitalOutputChannels()
         
-        trig = TriggerEvent(times=times, units = pq.s, labels = label, name=name)
         
-        # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
-        if isinstance(label, str) and len(label.strip()):
-            trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+        if isinstance(digChannel, int) and digChannel not in usedDigs:
+            return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+        
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            if any(v not in usedDigs for v in digChannel):
+                return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+        
+        if isinstance(digChannel, int):
+            times = list()
             
-        return trig
+            digPattern = self.getEpochDigitalPattern(epoch, sweep)[digChannel // 4]
+            
+            digChannelValue = tuple(reversed(digPattern))[digChannel]
+            
+            if digChannelValue == "*": # ⟹ pulse train
+                times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
+            
+            elif digChannelValue == 1: # ⟹ single TTL pulse ⇒ take the onset time as
+                                    # a trigger event; in theory, a device may 
+                                    # actually require a "ON" state during which 
+                                    # it performs some ciclic function etc;
+                                    # regardless of this we may conosider the onset
+                                    # of the "ON" state as a trigger for such device
+                times = [self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)]
+                
+            trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
+                                name=name, labels = label) if enableEmptyEvent else None
+            
+            if isinstance(trig, TriggerEvent) and trig.size > 0:
+                # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
+                if isinstance(label, str) and len(label.strip()):
+                    trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+                
+            return trig
+        
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
+            
+            trigs = list()
+            
+            for chnl in digChannel:
+                times = list()
+                
+                if digChannelValue[chnl] == "*":
+                    times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
+                    
+                elif digChannelValue[chnl] == 1:
+                    times = [self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)]
+                    
+                trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
+                                    name=name, labels = label) if enableEmptyEvent else None
+                
+                if isinstance(trig, TriggerEvent) and trig.size > 0:
+                    # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
+                    if isinstance(label, str) and len(label.strip()):
+                        trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+                        
+                    trigs.append(trig)
+                    
+            # NOTE: 2023-10-31 15:01:50 see NOTE: 2023-10-31 15:00:10
+            uniqueTrigs = list()
+
+            for k,t in enumerate(trigs):
+                if k == 0:
+                    uniqueTrigs.append(t)
+                else:
+                    if t not in uniqueTrigs:
+                        uniqueTrigs.append(t)
+                        
+            if len(uniqueTrigs) == 1:
+                return uniqueTrigs[0]
+            
+            else:
+                return uniqueTrigs
+            
+        else:
+            raise TypeError(f"digChannel expected an int or a sequence of int; instead, got {digChannel}")
     
     def getEpochsTable(self, sweep:int = 0, includeDigitalPattern:bool=True):
         """Generate a Pandas DataFrame with the epochs definition for this DAC channel.
