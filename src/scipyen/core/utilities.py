@@ -38,7 +38,7 @@ from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 #     from operator import eq
 
 from core import prog
-from .prog import safeWrapper, deprecation, with_doc
+from .prog import safeWrapper, deprecation, with_doc, is_hashable
 
 from .strutils import get_int_sfx
 from .quantities import units_convertible
@@ -588,7 +588,7 @@ def gethash(x:typing.Any) -> int:
     In particular for mutable sequences, or objects containing immutable sequences
     is very likely to return floats
     """
-    from core.datatypes import is_hashable
+    # from core.datatypes import is_hashable
     
     # FIXME 2021-08-20 14:23:26
     # for large data array, calculating the hash after converting to tuple may:
@@ -3367,7 +3367,7 @@ def unique(seq, key=None) -> typing.Sequence:
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
-    return tuple(item for item in gen_unique(seq, key=key))
+    return tuple(gen_unique(seq, key=key))
 
 def gen_unique(seq, key=None):
     """Iterates through unique elements in seq
@@ -3398,7 +3398,20 @@ def gen_unique(seq, key=None):
     NOTE: Does not guarantee the order of the unique elements is the same as 
             their order in 'seq'
             
-    WARNING: Only works with sequences of hashable types.
+    NOTE: For most primitive and hashable python types, the following idiom is
+    recommended:
+    
+    tuple(set(seq)) 
+
+    where `seq` is an iterable collection of python objects.
+    
+    However, this function is useful to create collections of objects with unique
+    elements based on a value of the objects' property, or the value of a unary 
+    function applied to each object in the original collection.
+    
+    Also, the above idiom works only with hashable types, whereas this function
+    also accepts objects of types that implement the special method __eq__, or 
+    where it makes sense to compare objects using the `is` keyword.
     
     See also:
     ========
@@ -3410,16 +3423,51 @@ def gen_unique(seq, key=None):
     if not hasattr(seq, "__iter__"):
         raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
     
+#     def _add_to_seen_(x, seen_):
+#         if isinstance(seen_, set): # x is hashable; seen_ is def'ed in caller namespace
+#             return seen_.add(x)
+#         
+#         else:
+#             if x in seen_:
+#                 return False
+#             
+#             seen_.append(x)
+#             return True
+        
+    def __add_to__seen__(x, seenset_, seenlist_):
+        if is_hashable(x):
+            return seenset_.add(x)
+        else:
+            if x in seenlist_:
+                return False
+            seenlist_.append(x)
+            return True
+        
+    def __check_fun_val_(x, key, seenset_, seenlist_):
+        val = key(x)
+        return val not in seenset_ and val not in seenlist_ and not __add_to__seen__(val, seenset_, seenlist_)
+            
+    def __check_val__(x, seenset_, seenlist_):
+        return x not in seenset_ and x not in seenlist_ and not __add_to__seen__(x, seenset_, seenlist_)
+        
+    
+    seenlist = list()
     seen = set()
     
     if key is None:
-        yield from (x for x in seq if x not in seen and not seen.add(x))
+        # yield from (x for x in seq if x not in seen and not seen.add(x))
+        # yield from (x for x in seq if x not in seen and x not in seenlist and not __add_to__seen__(x, seen, seenlist))
+        yield from (x for x in seq if __check_val__(x, seen, seenlist))
     
     else:
         if inspect.isfunction(key):
-            yield from (x for x in seq if key(x) not in seen and not seen.add(key(x)))
+            # yield from (x for x in seq if key(x) not in seen and not seen.add(key(x)))
+            # yield from (x for x in seq if (key(x) not in seen and key(x) not in seenlist) and not __add_to__seen__(key(x), seen, seenlist))
+            yield from (x for x in seq if __check_fun_val_(x, key, seen, seenlist))
         else:
-            yield from (x for x in seq if key not in seen and not seen.add(key))
+            # yield from (x for x in seq if key not in seen and not seed.add(key))
+            # yield from (x for x in seq if (key not in seen and key not in seenlist) and not __add_to__seen__(key, seen, seenlist))
+            yield from (x for x in seq if __check_val__(key, seen, seenlist))
             
 def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> typing.Optional[typing.Union[int, typing.Sequence[int]]]:
     """Get indices of container elements with attribute 'name' of given value(s).

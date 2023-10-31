@@ -2087,7 +2087,7 @@ class ABFOutputConfiguration:
         """List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
     
-    def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Union[int, typing.Sequence[int]] = 0,
+    def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                          eventType:TriggerEventType = TriggerEventType.presynaptic,
                          label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
                          name:typing.Optional[str] = None,
@@ -2108,6 +2108,9 @@ class ABFOutputConfiguration:
         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
             if all(v not in usedDigs for v in digChannel):
                 return
+            
+        elif digChannel is None:
+            digChannel = tuple(set(usedDigs))
             
         if isinstance(digChannel, int):
             times = list()

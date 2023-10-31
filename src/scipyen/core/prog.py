@@ -1444,12 +1444,13 @@ def is_hashable(x):
     ret = bool(getattr(x, "__hash__", None) is not None)
     if ret:
         try:
-            # because some 3rd party packages 'get smart' and override __hash__()
-            # to raise Exception 
+            # because some classes may override __hash__() to raise Exception 
             hash(x) 
             return True
         except:
             return False
+        
+    return ret
 
 def is_type_or_subclass(x, y):
     if isinstance(x, type):
