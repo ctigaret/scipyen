@@ -706,15 +706,17 @@ class DataMark(DataObject):
         return self.place_shift(t_shift)
 
     def __getitem__(self, i):
-        obj = super(self.__class__, self).__getitem__(i)
-        if self._labels is not None and self._labels.size > 0:
-            obj._labels = self._labels[i]
-        else:
-            obj._labels = self._labels
+        # obj = super(self.__class__, self).__getitem__(i) # BUG 2023-11-01 22:49:26 FIXME
+        # obj = super().__getitem__(i) 
+        obj = self.__class__(super().__getitem__(i), labels = self._labels[i])
+        # if self._labels is not None and self._labels.size > 0:
+        #     obj._labels = self._labels[i]
+        # else:
+        #     obj._labels = self._labels
             
         try:
             obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
-            obj._copy_data_complement(self)
+            # obj._copy_data_complement(self)
         except AttributeError:  # If Quantity was returned, not Event
             obj.times = obj
         return obj

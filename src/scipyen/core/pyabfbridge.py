@@ -2095,6 +2095,8 @@ class ABFOutputConfiguration:
         """Generates TriggerEvent objects from all epochs in the protocol.
         These may be empty if the protocol epochs do not define digital patterns.
         (NOTE: 'enableEmptyEvent' parameter is not yet used)
+        
+        See also: self.getEpochDigitalTriggerEvent
         """
         
         
@@ -2289,13 +2291,17 @@ class ABFOutputConfiguration:
         
         """
         if isinstance(epoch, (str, int)):
-            epoch = self.getEpoch(epoch)
+            e = self.getEpoch(epoch)
+            
+            if e is None:
+                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
+            
+            epoch = e
             
         if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
         
         usedDigs = epoch.getUsedDigitalOutputChannels()
-        
         
         if isinstance(digChannel, int) and digChannel not in usedDigs:
             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
@@ -2303,6 +2309,9 @@ class ABFOutputConfiguration:
         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
             if any(v not in usedDigs for v in digChannel):
                 return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+            
+        elif digChannel is None:
+            digChannel = usedDigs
         
         if isinstance(digChannel, int):
             times = list()
@@ -2337,13 +2346,13 @@ class ABFOutputConfiguration:
             
             trigs = list()
             
-            for chnl in digChannel:
+            for k,chnl in enumerate(digChannel):
                 times = list()
                 
-                if digChannelValue[chnl] == "*":
+                if digChannelValue[k] == "*":
                     times = [x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)]
                     
-                elif digChannelValue[chnl] == 1:
+                elif digChannelValue[k] == 1:
                     times = [self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)]
                     
                 trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
@@ -2753,8 +2762,59 @@ class ABFOutputConfiguration:
             
         return wave
     
-    def getEpochDigitalWaveform(self, epoch:typing.Union[ABFEpoch, str, int], trainOFF, trainON, digOFF, digON,
-                             sweep:int = 0, digChannel:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
+    def getEpochDigitalWaveform(self, epoch:typing.Union[ABFEpoch, str, int], /, 
+                                sweep:int = 0, 
+                                digChannel: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
+                                lastLevelOnly:bool=False,
+                                separateWavePerChannel:bool=False,
+                                digOFF:typing.Optional[pq.Quantity]=None,
+                                digON:typing.Optional[pq.Quantity]=None,
+                                trainOFF:typing.Optional[pq.Quantity]=None,
+                                trainON:typing.Optional[pq.Quantity]=None) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+        """Waveform with the TTL signals emitted by the epoch.
+        
+        Mandatory positional parameters:
+        --------------------------------
+        
+        epoch: the ABF epoch that is queried
+        
+        Named parameters:
+        -----------------
+        
+        sweep: the index of the AB sweep (digital outputs may be specific to the 
+                sweep index, when alternate digital patterns are enabled in the 
+                ABF protocol)
+        
+                Default is 0 (first sweep)
+        
+        digChannel:default is None, meaning that the function returns a waveform
+            for each digital output channel that is active during this epoch
+            (and during the specified sweep)
+        
+        lastLevelOnly: default is False; when True, just use the last digital 
+            logic level; that is, OFF for digtial pulse or train. NOTE that the 
+            actual value of this level is either 0 V or 5 V, depending on
+            the values of protocol.digitalHoldingValue(channel) and 
+            protocol.digitalTrainActiveLogic.
+        
+            See self.getDigitalLogicLevels, self.getDigitalPulseLogicLevels,
+            and self.getDigitalTrainLogicLevels
+        
+        separateWavePerChannel: default is False. 
+            When False, and more than one digChannel is queried, the function 
+            returns a Quantity array with one channel-specific waveform per
+            column.
+        
+            When True, the function returns a list of vector waveforms (one per 
+            channel)
+        
+        digOFF, digON, trainOFF, trainON: logic levels for digital pulses and 
+            trains, respectively; when they are None (default) the function
+            will query these values from the ABF protocol that associates this
+            DAC output.
+        
+    
+    """
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2767,39 +2827,79 @@ class ABFOutputConfiguration:
         pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
         pulseSamples = self.getEpochPulseWidthSamples(epoch)
         pulseCount = self.getEpochPulseCount(epoch)
-        
-        digPattern = self.getEpochDigitalPattern(epoch, sweep)
-        # # either this:
-        # digPattern = list(reversed(digPattern[1] + digPattern[0]))
-        # digChannelValue = digPattern[digChannel]
-        # # or this:
-        digPattern = digPattern[1] + digPattern[0]
-        digChannelValue = digPattern[-digChannel-1]
-        
-        wave = np.full([epochSamplesCount, 1], 0) * pq.V 
 
-        if digChannelValue == 1: # single TTL pulse (step-like)
-            if lastLevelOnly:
-                wave = digON * V
-            else:
-                wave[:] = digON * pq.V
+        usedDigs = epoch.getUsedDigitalOutputChannels()
+        
+        if isinstance(digChannel, int) and digChannel not in usedDigs:
+            return wave
+        
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            if any(v not in usedDigs for v in digChannel):
+                return wave
             
-        elif digChannelValue == "*": # pulse train!
-            if lastLevelOnly:
-                wave = trainOFF * pq.V
-            else:
-                wave[:] = trainOFF * pq.V
-                for pulse in range(pulseCount):
-                    p1 = int(pulsePeriod * pulse)
-                    p2 = int(p1 + pulseSamples)
-                    wave[p1:p2] = trainON * pq.V
-                    
-        else:
-            if lastLevelOnly:
-                wave = digOFF * pq.V
+        elif digChannel is None:
+            digChannel = usedDigs
+            
+        if isinstance(digChannel, int):
+            wave = np.full([epochSamplesCount, 1], 0) * pq.V 
+            
+            digPattern = self.getEpochDigitalPattern(epoch, sweep)[digChannel // 4]
+            digChannelValue = tuple(reversed(digPattern))[digChannel]
+
+            if digChannelValue == 1: # single TTL pulse (step-like)
+                if any(v is None for v in (digOFF, digON)):
+                    digOFF, digON = self.getDigitalPulseLogicLevels(digChannel)
+                if lastLevelOnly: 
+                    wave[:] = digOFF
+                else:
+                    wave[:] = digON
                 
-        return wave
-    
+            elif digChannelValue == "*": # pulse train!
+                if any(v is None for v in (trainOFF, trainON)):
+                    trainOFF, trainON = self.getDigitalTrainLogicLevels()
+                wave[:] = trainOFF
+                if not lastLevelOnly:
+                    for pulse in range(pulseCount):
+                        p1 = int(pulsePeriod * pulse)
+                        p2 = int(p1 + pulseSamples)
+                        wave[p1:p2] = trainON
+                        
+            return wave
+        
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
+
+            waves = list()
+            
+            for k, chnl in enumerate(digChannel):
+                wave = np.full([epochSamplesCount, 1], 0) * pq.V
+                if digChannelValue[k] == 1:
+                    if any(v is None for v in (digOFF, digON)):
+                        digOFF, digON = self.getDigitalPulseLogicLevels(digChannel[k])
+                    
+                    if lastLevelOnly:
+                        wave[:] = digOFF
+                    else:
+                        wave[:] = digON
+                        
+                elif digChannelValue[k] == "*":
+                    if any(v is None for v in (trainOFF, trainON)):
+                        trainOFF, trainON = self.getDigitalTrainLogicLevels()
+                        off, on = self.getDigitalTrainLogicLevels()
+                    wave[:] = trainOFF
+                    if not lastLevelOnly:
+                        for pulse in range(pulseCount):
+                            p1 = int(pulsePeriod * pulse)
+                            p2 = int(p1 + pulseSamples)
+                            wave[p1:p2] = trainON
+                            
+                waves.append(wave)
+                
+            if not separateWavePerChannel:
+                waves = np.hstack(waves) * pq.V
+                
+            return waves
+                        
     def getPreviousSweepLastEpochLevel(self, sweep:int) -> pq.Quantity:
         # FIXME: 2023-09-18 23:34:27
         # this can become very expensive for many sweeps!
@@ -2816,25 +2916,52 @@ class ABFOutputConfiguration:
         
         return self.dacHoldingLevel
     
-    def getDigitalLogicLevels(self, digChannel:int=0) -> tuple:
+    def getDigitalTrainLogicLevels(self) -> typing.Tuple[pq.Quantity]:
+        """TTL levels for digital trains, V.
+        HIGH level is 5 V, LOW level is 0 V.
+        If protocol.digitalTrainActiveLogic is True then all digital pulses in 
+        the train are steps from OFF = LOW to ON = HIGH then back to OFF = LOW;
+        otherwise, the logic is inversed: each pulse is from OFF = HIGH to 
+        ON = LOW, then back to OFF = HIGH
+        
+        Returns a tuple with OFF and ON values, in THIS order.
+        """
         if self.protocol.digitalTrainActiveLogic:
-            trainOFF = 0
-            trainON = 5
+            return (0 * pq.V, 5 * pq.V)
         else:
-            trainOFF = 5
-            trainON = 0
-            
+            return (5 * pq.V, 0 * pq.V)
+        
+    def getDigitalPulseLogicLevels(self, digChannel:int = 0) -> typing.Tuple[pq.Quantity]:
+        """TTL levels for digital pulses.
+        HIGH level is 5 V, LOW level is 0 V.
+        
+        If protocol.digitalHoldingValue(digChannel) is True, then a TTL pulse
+        is a step from OFF = HIGH to ON = LOW; otherwise the logic is inversed.
+        
+        Returns a tuple (OFF, ON) values (in THIS order)
+        
+        See also self.getDigitalTrainLogicLevels
+        
+    
+    """
         if self.protocol.digitalHoldingValue(digChannel):
-            digOFF = 5
-            digON = 0
+            return (5 * pq.V, 0 * pq.V)
         else:
-            digOFF = 0
-            digON = 5
+            return (0 * pq.V, 5 * pq.V)
             
+    
+    def getDigitalLogicLevels(self, digChannel:int = 0) -> typing.Tuple[pq.Quantity]:
+        """Returns (digOFF, digON, trainOFF, trainON).
+        See also:
+        self.getDigitalPulseLogicLevels() and self.getDigitalTrainLogicLevels()
+    """
+        digOFF, digON = self.getDigitalPulseLogicLevels(digChannel)
+        trainOFF, trainON = self.getDigitalTrainLogicLevels()
+        
         return digOFF, digON, trainOFF, trainON
         
             
-    def getPreviousSweelLastDigitalLevel(self, sweep:int, digChannel:int,
+    def getPreviousSweepLastDigitalLevel(self, sweep:int, digChannel:int,
                                          trainOFF, trainON, digOFF, digON) -> pq.Quantity:
         if len(self.epochs) == 0 or sweep == 0:
             return digOFF * pq.V
@@ -2851,7 +2978,8 @@ class ABFOutputConfiguration:
         return digOFF * pq.V
         
     
-    def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) ->tuple:
+    def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], 
+                               sweep:int=0) ->tuple:
         """Returns the digital pattern that WOULD be output by the epoch in a real experiment.
         This depends, simultaneously, on the following conditions:
         1) the DAC channel has digital outputs enabled
@@ -3206,11 +3334,19 @@ class ABFOutputConfiguration:
                 
         return waveform
     
-    def getDigitalWaveform(self, sweep:int=0, digChannel:int = 0) -> neo.AnalogSignal:
+    def getDigitalWaveform(self, sweep:int=0, 
+                           digChannel:int = 0,
+                           separateWavePerChannel:bool=False) -> neo.AnalogSignal:
         """Realizes the digital output waveform (pulses, trains) emitted when
-        this DAC channel is active"""
+        this DAC channel is active.
+        
+        NOTE: To keep things simple, this method operates only on single digital
+        output channels. If waveforms from more than one digital channel are 
+        wanted, then this method should be called for each of these and the 
+        results concatenated (e.g. using neoutils.concatenate_signals(…))
+        """
         # NOTE: 2023-09-20 22:22:41
-        # the digital output is ALWWAYS in V
+        # the digital output is ALWAYS in V
         # "high logic" means 5V on a background of 0 V
         # "low logic" means 0V on a background of 5V
         assert digChannel in range(self.digitalOutputsCount), f"Invalid digital output channel {digChannel} for {self.digitalOutputsCount} channels "
@@ -3226,7 +3362,7 @@ class ABFOutputConfiguration:
         
         lastEpochNdx = 0
         
-        lastlevel = digOFF * pq.V
+        lastlevel = digOFF 
         
         for epoch in self.epochs:
             # print(f"{self.__class__.__name__}.getDigitalWaveform sweep {sweep}, digChannel {digChannel} in epoch {epoch.getEpochLetter}: digChannelValue {digChannelValue}")
@@ -3235,8 +3371,8 @@ class ABFOutputConfiguration:
             tt = np.array([t0,t1])*pq.s
             ndx = waveform.time_index(tt)
             
-            wave = self.getEpochDigitalWaveform(epoch, trainOFF, trainON, digOFF, digON, 
-                                             sweep, digChannel)
+            wave = self.getEpochDigitalWaveform(epoch, sweep, digChannel,
+                                                separateWavePerChannel = separateWavePerChannel)
             
             if wave.size == 0:
                 continue
