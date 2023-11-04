@@ -2087,6 +2087,10 @@ class ABFOutputConfiguration:
         """List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
     
+    def getEpochsWithDigitalOutput(self) -> typing.List[ABFEpoch]:
+        """List of ABF Epochs that define a digital output"""
+        return [e for e in self.epochs if len(e.getUsedDigitalOutputChannels())]
+    
     def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                          eventType:TriggerEventType = TriggerEventType.presynaptic,
                          label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,

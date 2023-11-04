@@ -6958,8 +6958,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             else:
                 fname = os.path.splitext(fileName)[0]
-                #fname = fname.replace(" ", "\ ")
-                #cmd = "run -i -n -t '%s'" % fname
+
                 if sys.platform == "win32":
                     cmd = f'run -i -n -t "{fname}"'
                 else:
@@ -6982,8 +6981,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # <Esc> key press - and THAT'S A GOOD THING
                 self.console.centralWidget()._show_interpreter_prompt()
                 
-                # self.slot_updateWorkspaceModel()
-
         self.statusbar.showMessage("Done!")
 
     @pyqtSlot(bool)
