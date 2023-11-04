@@ -93,6 +93,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         super(WorkspaceModel, self).__init__(parent)
 
         self.threadpool = QtCore.QThreadPool()
+        
+        # self.Gcf = Gcf
 
         # self.loop = asyncio.get_event_loop()
         # NOTE: 2023-05-27 21:58:23
@@ -1204,6 +1206,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #     print(f"\n{self.__class__.__name__}._updateModel_ displayable figs in ns = {[(i, getattr(i, 'number', None)) for i in ns_displayable_figs]}")
             
         
+        # these below are the mpl figs that Gcf currently knows about
+        # they may have been created by mechanisms a.a.*
+        current_gcf_figs = set(
+            fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+        
+        if len(current_gcf_figs):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs currently in gcf = {[(i, i.number) for i in current_gcf_figs]}")
+            
         # these below are figs deleted from ns via the del command yet still 
         # present in the Gcf (the case where they are not present in Gcf is trivial?
         # if their reference count goes to 0 they will be garbage-collected);
@@ -1213,23 +1223,30 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         deled_mpl_figs = dict(item for item in self.cached_vars.items() 
                               if isinstance(item[1], mpl.figure.Figure) 
                               and item[1] not in ns_displayable_figs)
+        
+        if len(deled_mpl_figs):
+            print(f"_updateModel_ {len(deled_mpl_figs)} deleted mpl figures")
 
         for n,f in deled_mpl_figs.items():
+            print(f"_updateNodel_ deleted mpl fig number {getattr(f, 'number', None)} manager {getattr(f.canvas, 'manager', None)}")
             if hasattr(f, "number") or hasattr(f.canvas, "manager"):
+                # remove from Gcf
+                plt.close(f) 
+                
                 # remove from self.gcf_figs and also from Gcf
                 if f in self.gcf_figs:
                     self.gcf_figs.remove(f)
-                
-                # also remove from Gcf
-                plt.close(f) 
+                    
+                if f.number in Gcf.figs:
+                    Gcf.figs.pop(f.number)
                 
             # place these in the objects to remove from workspace
             mpl_figs_to_remove_from_ns[n] = f
         
-        # these below are the mpl figs that Gcf currently knows about
-        # they may have been created by mechanisms a.a.*
-        current_gcf_figs = set(
-            fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+        # # these below are the mpl figs that Gcf currently knows about
+        # # they may have been created by mechanisms a.a.*
+        # current_gcf_figs = set(
+        #     fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
         
         # if len(current_gcf_figs):
         #     print(f"\n{self.__class__.__name__}._updateModel_ figs currently in gcf = {[(i, i.number) for i in current_gcf_figs]}")
@@ -1238,8 +1255,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # at preExecute time
         new_figs_from_gcf = set(f for f in current_gcf_figs if f not in self.gcf_figs)
         
-        # if len(new_figs_from_gcf):
-        #     print(f"\n{self.__class__.__name__}._updateModel_ figs created in gcf = {[(i, i.number) for i in new_figs_from_gcf]}")
+        if len(new_figs_from_gcf):
+            print(f"\n{self.__class__.__name__}._updateModel_ figs created in gcf = {[(i, i.number) for i in new_figs_from_gcf]}")
             
         # we add these in a targeted fashion:
         for f in new_figs_from_gcf:
@@ -1276,15 +1293,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # will distinguish below (see )
         gcf_closed_figs = set(f for f in self.gcf_figs if f not in current_gcf_figs)
         
-        # if len(gcf_closed_figs):
-        #     print(f"\n{self.__class__.__name__}._updateModel_ figs closed in gcf = {[(i, i.number) for i in gcf_closed_figs]}")
+        if len(gcf_closed_figs):
+            print(f"_updateModel_ figs closed in gcf = {[(i, i.number) for i in gcf_closed_figs]}")
             
         # these are newly-created via pyplot code, but never explicitly bound
         # to a symbol in ns (because we check against ns_displayable_figs); 
         # they aleasy have a 'number' attribute, but not bound to a displayable symbol
         gcf_figs_not_in_ns = set(f for f in current_gcf_figs if f not in ns_displayable_figs)
-        # if len(gcf_figs_not_in_ns):
-        #     print(f"\n{self.__class__._name__}._updateModel_ figs in Gcf that are not in ns = {[(i, getattr(i, 'number', None)) for i in gcf_figs_not_in_ns]}")
+        if len(gcf_figs_not_in_ns):
+            print(f"_updateModel_ figs in Gcf that are not in ns = {[(i, getattr(i, 'number', None)) for i in gcf_figs_not_in_ns]}")
             
         # NOTE: 2023-06-06 22:19:55
         # since they were created by pyplot API they have a number attribute
@@ -1300,7 +1317,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # these can be either new figures via mechanisms a.b.* above,
             # OR Gcf figures that have been removed by the executed code (and hence
             # they still have the 'number' attribute)
-            # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are not currently in gcf  = {[(i, getattr(i, 'number', None)) for i in ns_figs_not_in_gcf]}")
+            print(f"_updateModel_ figs in ns that are not currently in gcf  = {[(i, getattr(i, 'number', None)) for i in ns_figs_not_in_gcf]}")
             
             # these could only have been created from code calling non-pyplot API
             # and bound in the ns, either to a user-defined symbol (i.e., assignment)
@@ -1327,6 +1344,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # the ones closed by code calling pyplot API will be present in gcf_closed_figs;
             # having come from gcf these always have a number attribute
             pyplot_closed = set(f for f in ns_figs_not_in_gcf if f in gcf_closed_figs)
+            
+            if len(pyplot_closed):
+                print(f"_updateModel_ {len(pyplot_closed)} plt.close'd mpl figures")
+            
             # names_ = list(itertools.chain.from_iterable(
             #     [self.getDisplayableVarnamesForVar(ns, f) for f in pyplot_closed]))
             # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are pyplot_closed  = {[(i, getattr(i, 'number', None)) for i in pyplot_closed]} with var names = {names_}")
@@ -1335,6 +1356,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # yet still present in the ns
             # having been in the gcf at some point, these also have a number attribute
             gui_closed = set(f for f in ns_figs_not_in_gcf if f not in gcf_closed_figs)
+            
+            if len(gui_closed):
+                print(f"_updateModel_ {len(gui_closed)} mpl figures closed via gui")
+            
             # names_ = list(itertools.chain.from_iterable(
             #     [self.getDisplayableVarnamesForVar(ns, f) for f in gui_closed]))
             # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are gui_closed  = {[(i, getattr(i, 'number', None)) for i in gui_closed]} with var names = {names_}")
@@ -1350,18 +1375,31 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # print(f"\n{self.__class__.__name__}._updateModel_ mpl_figs_to_remove_from_ns  = {[(i[0], i[1], getattr(i[1], 'number', None)) for i in mpl_figs_to_remove_from_ns.items()]}")
             
         # OK, now, remove mpl_figs_to_remove_from_ns from both the ns and from the internalVariablesMonitor:
+        if len(mpl_figs_to_remove_from_ns):
+            print(f"_updateModel_ {len(mpl_figs_to_remove_from_ns)} mpl figures to remove from ns")
+            
         for n,f in mpl_figs_to_remove_from_ns.items():
             ns.pop(n, None)
             if n in self.internalVariablesMonitor.keys():
                 self.internalVariablesMonitor.pop(n, None)
                 
+#             gcf_figs_now = set(fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+#                 
+#             print(f"mpl figs Gcf knows about: {len(gcf_figs_now)}")
+                
         # now, add new figs in gcf:
+        if len(ns_mpl_figs_to_monitor):
+            print(f"_updateModel_ {len(ns_mpl_figs_to_monitor)} mpl figures to monitor")
+            
         for n,f in ns_mpl_figs_to_monitor.items():
             # these are already bound to a symbol in the ns, so just register them with the monitor
             # process them first
             self.internalVariablesMonitor[n] = f # if they are already there this SHOULD trigger a modified notification
         
         # finally, make bindings for orphan figs
+        
+        if len(unbound_figs_to_add):
+            print(f"_updateModel_ {len(unbound_figs_to_add)} unbound mpl figures to add")
         
         for f in unbound_figs_to_add:
             f = self.parent()._adopt_mpl_figure(f)
@@ -1471,6 +1509,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # the next two signal a change directory command issued at the console
         current_dir = os.getcwd()
         self.workingDir.emit(current_dir)
+        
+        # NOTE: 2023-11-04 17:53:24
+        # update internal caches
+        self.cached_vars = dict([item for item in self.shell.user_ns.items(
+        ) if self.isDisplayable(self.shell.user_ns, *item)])
+        self.gcf_figs.clear()
+        self.gcf_figs.update(
+            fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
         
     @pyqtSlot(str)
     def _slot_itemGuiObjectTitleChanged(self, val:str):

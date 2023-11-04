@@ -61,7 +61,7 @@ import iolib.pictio as pio
 import ephys.ephys as ephys
 from ephys.ephys import ClampMode, ElectrodeMode
 import ephys.ltp as ltp
-from ephys.ltp import PathwayType, SynapticPathway
+from ephys.ltp import SynapticPathwayType, SynapticPathway
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 

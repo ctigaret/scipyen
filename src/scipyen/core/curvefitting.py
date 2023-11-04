@@ -27,6 +27,7 @@ from . import models
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core import datatypes
 from core import prog
+from core.traitcontainers import DataBag
 #from .patchneo import *
 #### END pict.core modules
 
@@ -1303,18 +1304,32 @@ def fit_model(data, func, p0, *args, **kwargs):
 
     fC = func(xdata, res_x, *fargs, **fkwargs)
     
-    sst = np.sum( (ydata - ydata.mean()) ** 2.)
+    sst = np.sum( (ydata - ydata.mean()) ** 2.) # sum of squares about the mean in the data (total sum of squares)
     
-    sse = np.sum((fC - ydata) ** 2.)
+    sse = np.sum((fC - ydata) ** 2.) # sum of squared errors (sum of squared residuals, Sum of Squares Due to Error)
     
-    # R² for the entire fit
+    # Coefficient of determination R² for the entire fit
     rsq = 1 - sse/sst # only one R²
     
+    df_res = fC.size - len(x0)
+    df_tot = fC.size - 1
+    
+    arsq = 1 - sse * df_tot / (sst * df_res)
+    
+    rmse = np.sqrt(sse/fC.size)
+    
+    
     result = collections.OrderedDict()
+    result = DataBag()
     result["Model"] = f"{func.__module__}.{func.__name__}"
     result["Fit"] = res
     result["Coefficients"] = res_x
-    result["Rsq"] = rsq
+    result["GoF"] = DataBag()
+    # result["Rsq"] = rsq
+    result["GoF"]["Rsq"] = rsq
+    result["GoF"]["R2adj"] = arsq
+    result["GoF"]["SSE"] = sse
+    result["GoF"]["RMSE"] = rmse
     
     initialSupport = np.full((data.shape[0],), np.NaN)
     

@@ -266,25 +266,19 @@ class RecordingEpisodeType(TypeEnum):
                         # of drugs
                         
     Tracking        = 2 # used for tracking synaptic responses
-                        # can be associated with any PathwayType
-    # CrossTalk       = 4 # used to test for pathway independence
+                        # can be associated with any SynapticPathwayType
     
     Conditioning    = 4 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
 
-#     Drug | CrossTalk    (= 5)   ⇒ CrossTalk episode recorded in the presence of 
-#                                     drug(s)
-#     
 
-
-# class ElectrophysiologyProtocol(object):
 class ElectrophysiologyProtocol(ABC):
     """Abstract base class for electrophysiology data acquisition protocols
     
     """
     pass
     # TODO 2023-10-15 21:10:06 on backburner for now.
-    # wriite subclasses for:
+    # write subclasses for:
     # • CED Signal protocols ("configuration")
     # • other ephys acquisition software (CED Spike, ephus?)
     
@@ -326,7 +320,7 @@ class SynapticPathway: pass
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class RecordingEpisode(Episode):
     """
-Specification of an episode in a synaptic pathway.
+Specification of an eletrophysiology recording episode.
     
 An "episode" is a series of sweeps recorded during a specific set of
 experimental conditions -- possibly, a subset of a larger experiment where
@@ -676,7 +670,7 @@ See also the class documentation.
 
 
 
-class PathwayType(TypeEnum):
+class SynapticPathwayType(TypeEnum):
     """
     Synaptic pathway type.
     Encapsulates: Null, Test, Control, Auxiliary, UserDefined
@@ -735,13 +729,13 @@ class SynapticPathway(BaseScipyenData):
     These signals are:
     • response (analog, regularly sampled): recorded synaptic responses
     
-    • analogStimulus (analog, regularly sampled): the recorded command waveform;
+    • analogCommandSignal (analog, regularly sampled): the recorded command waveform;
         typically, this is a record of the secondary output of the amplifier, 
         when available, that has been fed into an auxiliary analog input port of
         the acquisition device; this signal carries the amplifier "command", e.g. 
         the voltage command in voltage clamp, or injected current, in current clamp.
     
-    • digitalStimulus (analog, regularly sampled): the TTL (a.k.a the "digital")
+    • digitalCommandSignal (analog, regularly sampled): the TTL (a.k.a the "digital")
         output signal from the acquisition board, typically recorded by feeding this 
         output into an analog input port, when available.
     
@@ -760,88 +754,85 @@ class SynapticPathway(BaseScipyenData):
         )
     
     _data_attributes_ = (
-        ("pathwayType", PathwayType, PathwayType.Test),
+        ("pathwayType", SynapticPathwayType, SynapticPathwayType.Test),
         ("responseSignal", (str, int, tuple, list), 0),
         ("analogCommandSignal", (str, int, tuple, list), 1),
         ("digitalCommandSignal", (int, tuple, list), 2),
-        ("schedule", Schedule, Schedule()),         # one or more RecordingEpisode objects
+        ("schedule", Schedule, Schedule()), # one or more RecordingEpisode objects
         )
     
     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
     
     @with_doc(concatenate_blocks, use_header = True)
     def __init__(self, *args, data:typing.Optional[neo.Block] = None, 
-                 pathwayType:PathwayType = PathwayType.Test, 
+                 pathwayType:SynapticPathwayType = SynapticPathwayType.Test, 
                  name:typing.Optional[str]=None, 
                  index:int = 0,
                  segments:GeneralIndexType=0,
-                 response:typing.Optional[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]]=None, 
-                 analogStimulus:typing.Union[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]] = None, 
-                 digitalStimulus:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
+                 responseSignal:typing.Optional[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]]=None, 
+                 analogCommandSignal:typing.Union[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]] = None, 
+                 digitalCommandSignal:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
                  schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
                  **kwargs):
         """SynapticPathway constructor.
 
-Var-positional parameters (may be empty)
------------------------------------------
-When present, they specify source neo.Block objects wthat will need to be 
-    concatenated to create the underlying data.
+        Var-positional parameters (may be empty)
+        -----------------------------------------
+        When present, they specify source neo.Block objects wthat will need to be 
+            concatenated to create the underlying data.
 
-Named parameters:
------------------
-data: A neo.Block obtained from concatenating several source neo.Blocks (see the
-    function neoutils.concatenate_blocks(…) for details). Optional, default is 
-    None.
-    
-    When specified, the values in *args will be ignored.
-    
-pathwayType: PathwayType
-    The role of the pathway in a synaptic plasticity experiment
-                (Test, Control, Other)
+        Named parameters:
+        -----------------
+        data: A neo.Block obtained from concatenating several source neo.Blocks (see the
+            function neoutils.concatenate_blocks(…) for details). Optional, default is 
+            None.
+            
+            When specified, the values in *args will be ignored.
+            
+        pathwayType: SynapticPathwayType
+            The role of the pathway in a synaptic plasticity experiment
+                        (Test, Control, Other)
 
-name: str
-     Name of the pathway (by default is the name of the pathwayType)
-    
-index: int
-    The index of the Pathway ( >= 0); default is 0
-    
-segments: GeneralIndexType¹
-    The index of the segments in the source data in *args.
-    
-    Used only when 'data' is constructed by concatenating the neo.Blocks in *args
+        name: str
+            Name of the pathway; default is the tring representation of pathwayType
+            
+        index: int
+            The index of the Pathway ( >= 0); default is 0; this index should be 
+            unique among pathways in an experiment or schedule
+            
+        responseSignal: GeneralIndexType
+            The index of the analog signal(s) in data, containing the synaptic response.
+            Default is None.
+            
+            NOTE: This is also used when 'data'is constructed from *args. Therefore, it
+            should typically resolve to a subset of signals distinct from those indicated 
+            by the 'analogCommandSignal' and 'digitalCommandSignal' parameters (see next)
+            
 
-response: GeneralIndexType
-    The index of the analog signal(s) containing the synaptic response.
-    Default is None.
-    
-    NOTE: This is also used when 'data'is constructed from *args. Therefore, it
-    should typically resolve to subset of signals distinct from those indicated 
-    by the 'analogStimulus' and 'digitalStimulus' parameters (see next)
-    
+        analogCommandSignal: GeneralIndexType
+            Index of the analog signal(s) containing the clamping command, or None.
+            NOTE: Also used to construct the data from *args.
 
-analogStimulus: GeneralIndexType
-    Index of the analog signal(s) containing the clamping command, or None.
-    NOTE: Also used to construct the data from *args.
+        digitalCommandSignal: GeneralIndexType
+            Index of the analog signal(s) containing the digital command, or None (default)
+            NOTE: Also used to construct the data from *args.
+            
+        schedule: a Schedule, or a sequence (tuple, list) of RecordingEpisodes; 
+                optional, default is None.
+            
+        segments: GeneralIndexType¹
+            The index of the segments in the source data in *args.
+            
+            Used only when 'data' is constructed by concatenating the neo.Blocks in *args
 
-digitalStimulus: GeneralIndexType
-    Index of the analog signal(s) containing the digital command, or None (default)
-    NOTE: Also used to construct the data from *args.
-    
-schedule: a Schedule, or a sequence (tuple, list) of RecordingEpisodes; 
-        optional, default is None.
-    
-    CAUTION: Currently, the episodes (whether packed in a Schedule or given as a
-    sequence) are NOT checked for consistency with the number and recording time 
-    stamps of the segments in the 'data' parameter.
-    
-Var-keyword parameters (kwargs):
---------------------------------
-These are passed directly to the superclass constructor (BaseScipyenData).
-    
-Notes:
------
-¹see core.utilities.GeneralIndexType
-    
+        Var-keyword parameters (kwargs):
+        --------------------------------
+        These are passed directly to the superclass constructor (BaseScipyenData).
+            
+        Notes:
+        -----
+        ¹see core.utilities.GeneralIndexType
+        
     """
         super().__init__(**kwargs)
         
@@ -850,7 +841,8 @@ Notes:
         #         data = concatenate_blocks(*args, segments=segments)
         
     @staticmethod
-    def fromBlocks(pathName:str, pathwayType:PathwayType=PathwayType.Test, 
+    def fromBlocks(pathName:str, 
+                   pathwayType:SynapticPathwayType=SynapticPathwayType.Test, 
                    *episodeSpecs:typing.Sequence[RecordingEpisode]):
         """
         Factory for SynapticPathway.
@@ -858,7 +850,7 @@ Notes:
         Parameters:
         ==========
         pathName:str - name of the pathway
-        pathwayType:PathwayType - the type of the pathway (optional, default is PathwayType.Test)
+        pathwayType:SynapticPathwayType - the type of the pathway (optional, default is SynapticPathwayType.Test)
         
         *episodeSpecs: sequence of RecordingEpisode objects
             see help RecordingEpisode
@@ -936,9 +928,9 @@ Notes:
         
         return SynapticPathway(data=data, name=pathName,
                                pathwayType=pathwayType,
-                               response=response,
-                               analogStimulus=analogStimulus,
-                               digitalStimulus=digitalStimulus,
+                               responseSignal=responseSignal,
+                               analogCommandSignal=analogCommandSignal,
+                               digitalCommandSignal=digitalCommandSignal,
                                schedule=schedule)
         
         
@@ -1168,6 +1160,18 @@ class DataListener(QtCore.QObject):
     @pyqtSlot(object)
     def slot_filesNew(self, newItems):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
+        
+class Analysis(BaseScipyenData):
+    _data_attributes_ = (
+        ("measurements", list, list()),     # list of time-varying measurements, by default is empty
+                                            # e.g., EPSP amplitude(s), fEPSP slope(s), RS, Rin, DC
+                                            # NOTE: even though some parameters such
+                                            # as Rin, DC, etc are not pathway specific,
+                                            # we store them here as 
+        )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(**kwargs)
 
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
