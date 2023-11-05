@@ -536,6 +536,13 @@ class ABFEpoch:
         
         return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
+    def is_identical_except_digital(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        
+        return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
         
     @property
     def letter(self) -> str:
@@ -1067,8 +1074,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!
         if ret:
-            ret = all(all(np.all(self.getDAC(d).getEpochsTable(s) == other.getDAC(d).getEpochsTable(s)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
+            for k in range(self.nDACChannels):
+                # NOTE: Return after first iteration showing distinct DACs
+                # this should speed up comparison for many DACs
+                if self.getDAC(k) != other.getDAC(k): 
+                    return False
+            # ret = all(self.getDAC(d) == other.getDAC(d) for d in range(self.nDACChannels))
+            # ret = all(all(np.all(self.getDAC(d).getEpochsTable(s) == other.getDAC(d).getEpochsTable(s)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
+        if ret:
+            for k in range(len(self.nADCChannels)):
+                # NOTE: Return after first iteration showing distinct ADCs
+                if self.getADC(k) != other.getADC(k):
+                    return False
+            # ret = all(self.getADC(c) == other.getADC(c) for c in range(self.nADCChannels))
+            
         return ret
     
     def is_identical_except_digital(self, other):
@@ -1081,7 +1101,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
         ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
         if ret:
-            ret = all(all(np.all(self.getDAC(d).getEpochsTable(s, includeDigitalPattern=False) == other.getDAC(d).getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
+            ret = all(self.getDAC(d).is_identical_except_digital(other.getDAC(d)) for d in range(self.nDACChannels))
+                    
+        if ret:
+            ret = all(self.getADC(c) == other.getADC(c) for c in range(self.nADCChannels))
+        # if ret:
+        #     ret = all(all(np.all(self.getDAC(d).getEpochsTable(s, includeDigitalPattern=False) == other.getDAC(d).getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
         return ret
     
@@ -1514,7 +1539,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if physical:
                 adcChannel = self.adcLogical2PhysicalIndexMap[adcChannel]
 
-        inputconfs = list(filter(lambda x: x.channelIndex(physical) == adcChannel, self._inputs_))
+        inputconfs = list(filter(lambda x: x.getChannelIndex(physical) == adcChannel, self._inputs_))
         
         if len(inputconfs):
             return inputconfs[0]
@@ -2022,17 +2047,34 @@ class ABFOutputConfiguration:
         
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
         # but EXCLUDE the protocol property because:
-        # 1) we can have the same DAC output configuration shared acmong different
+        # 1) we can have the same DAC output configuration shared among different
         #    protocols
         # 2) we want to avoid reentrant code when comparing the protocols of 
         #   self and other.
         #
-        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] != "protocol")
+        
+        for p in properties:
+            if p[0] != "protocol":
+                # NOTE: no need to compare all; just compare until first distinct one
+                if getattr(self, p[0]) != getattr(other, p[0]):
+                    return False
+        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] != "protocol")
+
+        if ret:
+            epochs = self.epochs
+            ret = len(epochs) == len(other.epochs)
+        
+        if ret:
+            for k in range(len(epochs)):
+                if epochs[k] != other.epochs[k]:
+                    return False
+            # ret = all(self.epochs[k] == other.epochs[k] for k in range(len(self.epochs)))
 
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!
-        if ret:
-            ret = all(np.all(self.getEpochsTable(s) == other.getEpochsTable(s)) for s in range(self.protocol.nSweeps))
+        # WARNING: this is quite time consuming
+        # if ret:
+        #     ret = all(np.all(self.getEpochsTable(s) == other.getEpochsTable(s)) for s in range(self.protocol.nSweeps))
                     
         return ret
         
@@ -2046,7 +2088,13 @@ class ABFOutputConfiguration:
         ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
         if ret:
-            ret = all(np.all(self.getEpochsTable(s, includeDigitalPattern=False) == other.getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.protocol.nSweeps))
+            ret = len(self.epochs) == len(other.epochs)
+        
+        if ret:
+            ret = all(self.epochs[k].is_identical_except_digital(other.epochs[k]) for k in range(len(self.epochs)))
+
+        # if ret:
+        #     ret = all(np.all(self.getEpochsTable(s, includeDigitalPattern=False) == other.getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.protocol.nSweeps))
                     
         return ret
     
@@ -2088,7 +2136,7 @@ class ABFOutputConfiguration:
         return self._epochs_
     
     def getEpochsWithDigitalOutput(self) -> typing.List[ABFEpoch]:
-        """List of ABF Epochs that define a digital output"""
+        """List of ABF Epochs emitting digital signals (TTLs)"""
         return [e for e in self.epochs if len(e.getUsedDigitalOutputChannels())]
     
     def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,

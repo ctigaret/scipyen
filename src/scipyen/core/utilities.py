@@ -3419,6 +3419,9 @@ def gen_unique(seq, key=None):
     unique for a function version
     
     """
+    seenlist = list()
+    seenset = set()
+    
     # if not isinstance(seq, (tuple, list, range, deque, str)):
     if not hasattr(seq, "__iter__"):
         raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
@@ -3434,40 +3437,46 @@ def gen_unique(seq, key=None):
 #             seen_.append(x)
 #             return True
         
-    def __add_to__seen__(x, seenset_, seenlist_):
+    def __add_to_seen__(x):
         if is_hashable(x):
-            return seenset_.add(x)
-        else:
-            if x in seenlist_:
+            if x not in seenset:
+                seenset.add(x)
                 return False
-            seenlist_.append(x)
+            return True
+        else:
+            if x not in seenlist:
+                seenlist.append(x)
+                return False
             return True
         
-    def __check_fun_val_(x, key, seenset_, seenlist_):
+    def __check_fun_val_(x, key):
         val = key(x)
-        return val not in seenset_ and val not in seenlist_ and not __add_to__seen__(val, seenset_, seenlist_)
+        if is_hashable(val):
+            return val not in seenset and not __add_to_seen__(val)
+        else:
+            return val not in seenlist and not __add_to_seen__(val)
             
-    def __check_val__(x, seenset_, seenlist_):
-        return x not in seenset_ and x not in seenlist_ and not __add_to__seen__(x, seenset_, seenlist_)
+    def __check_val__(x):
+        if is_hashable(x):
+            return x not in seenset and not __add_to_seen__(x)
+        else:
+            return x not in seenlist and not __add_to_seen__(x)
         
-    
-    seenlist = list()
-    seen = set()
     
     if key is None:
         # yield from (x for x in seq if x not in seen and not seen.add(x))
         # yield from (x for x in seq if x not in seen and x not in seenlist and not __add_to__seen__(x, seen, seenlist))
-        yield from (x for x in seq if __check_val__(x, seen, seenlist))
+        yield from (x for x in seq if __check_val__(x))
     
     else:
         if inspect.isfunction(key):
             # yield from (x for x in seq if key(x) not in seen and not seen.add(key(x)))
             # yield from (x for x in seq if (key(x) not in seen and key(x) not in seenlist) and not __add_to__seen__(key(x), seen, seenlist))
-            yield from (x for x in seq if __check_fun_val_(x, key, seen, seenlist))
+            yield from (x for x in seq if __check_fun_val_(x, key))
         else:
             # yield from (x for x in seq if key not in seen and not seed.add(key))
             # yield from (x for x in seq if (key not in seen and key not in seenlist) and not __add_to__seen__(key, seen, seenlist))
-            yield from (x for x in seq if __check_val__(key, seen, seenlist))
+            yield from (x for x in seq if __check_val__(key))
             
 def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> typing.Optional[typing.Union[int, typing.Sequence[int]]]:
     """Get indices of container elements with attribute 'name' of given value(s).
