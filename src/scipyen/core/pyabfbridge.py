@@ -457,7 +457,7 @@ import neo
 import pyabf
 
 from core import quantities as scq
-from core import datatypes, strutils
+from core import datatypes, strutils, utilities
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
 # from iolib import pictio as pio # NOTE: not here, so we can import this from
@@ -1068,22 +1068,31 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
+        ret = True
+        for p in properties:
+            # NOTE: see NOTE: 2023-11-05 21:05:46 and NOTE: 2023-11-05 21:06:10
+            # if getattr(self, p[0]) != getattr(other, p[0]):
+            if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0])):
+                return False
+        
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
-        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
 
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!
         if ret:
             for k in range(self.nDACChannels):
-                # NOTE: Return after first iteration showing distinct DACs
-                # this should speed up comparison for many DACs
+                # NOTE: 2023-11-05 21:06:10
+                # Return after first iteration showing distinct DACs
+                # this should speed up comparison for many DACs (but scales up
+                # with the index of the distinct DAC)
                 if self.getDAC(k) != other.getDAC(k): 
                     return False
             # ret = all(self.getDAC(d) == other.getDAC(d) for d in range(self.nDACChannels))
             # ret = all(all(np.all(self.getDAC(d).getEpochsTable(s) == other.getDAC(d).getEpochsTable(s)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
         if ret:
-            for k in range(len(self.nADCChannels)):
+            for k in range(self.nADCChannels):
                 # NOTE: Return after first iteration showing distinct ADCs
                 if self.getADC(k) != other.getADC(k):
                     return False
@@ -1097,14 +1106,26 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
+        ret = True
+        for p in properties:
+            # NOTE: see NOTE: 2023-11-05 21:05:46 and NOTE: 2023-11-05 21:06:10
+            if getattr(self, p[0]) != getattr(other, p[0]):
+                return False
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
-        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
         if ret:
-            ret = all(self.getDAC(d).is_identical_except_digital(other.getDAC(d)) for d in range(self.nDACChannels))
+            for k in range(self.nDACChannels):
+                if not self.getDAC(k).is_identical_except_digital(other.getDAC(k)):
+                    return False
+            # ret = all(self.getDAC(d).is_identical_except_digital(other.getDAC(d)) for d in range(self.nDACChannels))
                     
         if ret:
-            ret = all(self.getADC(c) == other.getADC(c) for c in range(self.nADCChannels))
+            for k in range(self.nADCChannels):
+                if self.getADC(k) != other.getADC(k):
+                    return False
+                    
+            # ret = all(self.getADC(c) == other.getADC(c) for c in range(self.nADCChannels))
         # if ret:
         #     ret = all(all(np.all(self.getDAC(d).getEpochsTable(s, includeDigitalPattern=False) == other.getDAC(d).getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.nSweeps)) for d in range(self.nDACChannels))
                     
@@ -2045,6 +2066,9 @@ class ABFOutputConfiguration:
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))# and x[0] != "protocol")
         
+        ret = True
+        
+        # NOTE: 2023-11-05 21:21:39
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
         # but EXCLUDE the protocol property because:
         # 1) we can have the same DAC output configuration shared among different
@@ -2052,21 +2076,26 @@ class ABFOutputConfiguration:
         # 2) we want to avoid reentrant code when comparing the protocols of 
         #   self and other.
         #
+        # EXCLUDE epochs because we chekc them individualy
         
         for p in properties:
-            if p[0] != "protocol":
-                # NOTE: no need to compare all; just compare until first distinct one
+            if p[0] not in ("protocol", "epochs"):
+                # NOTE: 2023-11-05 21:05:46
+                # no need to compare all; just compare until first distinct one
                 if getattr(self, p[0]) != getattr(other, p[0]):
                     return False
         # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] != "protocol")
 
+        epochs = self.epochs
+        other_epochs = other.epochs
+        
         if ret:
-            epochs = self.epochs
-            ret = len(epochs) == len(other.epochs)
+            if len(epochs) != len(other_epochs):
+                return False
         
         if ret:
             for k in range(len(epochs)):
-                if epochs[k] != other.epochs[k]:
+                if epochs[k] != other_epochs[k]:
                     return False
             # ret = all(self.epochs[k] == other.epochs[k] for k in range(len(self.epochs)))
 
@@ -2084,14 +2113,28 @@ class ABFOutputConfiguration:
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
+        ret = True
+        # NOTE: see NOTE: 2023-11-05 21:21:39
+        for p in properties:
+            if p[0] not in ("protocol", "epochs"):
+                # NOTE: 2023-11-05 21:05:46
+                # no need to compare all; just compare until first distinct one
+                if getattr(self, p[0]) != getattr(other, p[0]):
+                    return False
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
-        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        
+        epochs = self.epochs
+        other_epochs = other.epochs
+        if ret:
+            if len(epochs) != len(other_epochs):
+                return False
         
         if ret:
-            ret = len(self.epochs) == len(other.epochs)
-        
-        if ret:
-            ret = all(self.epochs[k].is_identical_except_digital(other.epochs[k]) for k in range(len(self.epochs)))
+            for k in range(len(epochs)):
+                if not epochs[k].is_identical_except_digital(other_epochs[k]):
+                    return False
+            # ret = all(self.epochs[k].is_identical_except_digital(other.epochs[k]) for k in range(len(self.epochs)))
 
         # if ret:
         #     ret = all(np.all(self.getEpochsTable(s, includeDigitalPattern=False) == other.getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.protocol.nSweeps))

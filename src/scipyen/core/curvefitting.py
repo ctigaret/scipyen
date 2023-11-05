@@ -27,7 +27,7 @@ from . import models
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core import datatypes
 from core import prog
-from core.traitcontainers import DataBag
+# from core.traitcontainers import DataBag
 #from .patchneo import *
 #### END pict.core modules
 
@@ -1320,12 +1320,10 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     
     result = collections.OrderedDict()
-    result = DataBag()
     result["Model"] = f"{func.__module__}.{func.__name__}"
     result["Fit"] = res
     result["Coefficients"] = res_x
-    result["GoF"] = DataBag()
-    # result["Rsq"] = rsq
+    result["GoF"] = dict()
     result["GoF"]["Rsq"] = rsq
     result["GoF"]["R2adj"] = arsq
     result["GoF"]["SSE"] = sse

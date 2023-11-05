@@ -885,36 +885,36 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.cached_vars = dict([item for item in self.shell.user_ns.items(
         ) if self.isDisplayable(self.shell.user_ns, *item)])
 
-        # NOTE: 2023-01-28 13:27:47
-        # we also take a snapshot of the mpl figures
-        # first, capture those registered in pyplot/pylab
-        # REMEMBER Gcf holds references to instances of FigureManager concrete subclasses
-        # self.cached_mpl_figs_in_internal = set(
-        #     fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
-        self.gcf_figs.clear()
-        self.gcf_figs.update(
-            fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
-        
-        # if len(self.gcf_figs):
-        #     print(f"\n{self.__class__.__name__}.preExecute figs in Gcf = {self.gcf_figs}")
-
-        # NOTE: 2023-01-29 23:30:32
-        # all figures created outside pyplot are now adopted for management under
-        # pyplot (see mainwindow.WindowManager._adopt_mpl_figure() method, called
-        # by code inside post_execute, below)
-        
-        # self.cached_mpl_figs_in_internal.clear()
-        # self.cached_mpl_figs_in_internal.update(v[1] for v in self.cached_vars.items() 
-        #                                         if isinstance(v[1], mpl.figure.Figure)
-        #                                         and self.isDisplayable(self.shell.user_ns, *v))
-        
-        # for v in self.cached_vars.values():
-        #     if isinstance(v, mpl.figure.Figure):
-        #         # self.cached_mpl_figs_in_internal is a set so duplicates won't be added
-        #         print(f"\n{self.__class__.__name__}.preExecute fig in cached vars: {v}")
-        #         self.cached_mpl_figs_in_internal.add(v)
-
-        # print(f"\npreExecute cached figs {self.cached_mpl_figs_in_internal}")
+#         # NOTE: 2023-01-28 13:27:47
+#         # we also take a snapshot of the mpl figures
+#         # first, capture those registered in pyplot/pylab
+#         # REMEMBER Gcf holds references to instances of FigureManager concrete subclasses
+#         # self.cached_mpl_figs_in_internal = set(
+#         #     fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+#         self.gcf_figs.clear()
+#         self.gcf_figs.update(
+#             fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+#         
+#         # if len(self.gcf_figs):
+#         #     print(f"\n{self.__class__.__name__}.preExecute figs in Gcf = {self.gcf_figs}")
+# 
+#         # NOTE: 2023-01-29 23:30:32
+#         # all figures created outside pyplot are now adopted for management under
+#         # pyplot (see mainwindow.WindowManager._adopt_mpl_figure() method, called
+#         # by code inside post_execute, below)
+#         
+#         # self.cached_mpl_figs_in_internal.clear()
+#         # self.cached_mpl_figs_in_internal.update(v[1] for v in self.cached_vars.items() 
+#         #                                         if isinstance(v[1], mpl.figure.Figure)
+#         #                                         and self.isDisplayable(self.shell.user_ns, *v))
+#         
+#         # for v in self.cached_vars.values():
+#         #     if isinstance(v, mpl.figure.Figure):
+#         #         # self.cached_mpl_figs_in_internal is a set so duplicates won't be added
+#         #         print(f"\n{self.__class__.__name__}.preExecute fig in cached vars: {v}")
+#         #         self.cached_mpl_figs_in_internal.add(v)
+# 
+#         # print(f"\npreExecute cached figs {self.cached_mpl_figs_in_internal}")
 
         # NOTE: 2023-06-07 08:39:15
         # at this stage there may be variables not cached but still monitored
@@ -1188,243 +1188,243 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #   skip them, here. Hence, we only check for new figs from gcf, whe it 
         #   comes to their addition
         
-        ns_mpl_figs_to_monitor = dict() # already bound to a displayable symbol in ns; just add to the monitor
-        
-        unbound_figs_to_add = set() # to bound to a symbol and place in ns and monitor
-        
-        mpl_figs_to_remove_from_ns = dict() # closed or otherwise deleted
-        
-        # this below is populated in preExecute; NOTE that there may be code which 
-        # doesn't call preExecute
-        # if len(self.gcf_figs):
-        #     print(f"\n{self.__class__.__name__}._updateModel_ figs in gcf since preExecute = {[(i, i.number) for i in self.gcf_figs]}")
-            
-        # these are all mpl figs currently in the ns
-        ns_figs_dict = dict(i for i in ns.items() if isinstance(i[1], mpl.figure.Figure))
-        
-        # and these are mpl figs currently in ns, that are displayable
-        ns_displayable_figs = set(i[1] for i in ns_figs_dict.items() if self.isDisplayable(ns, *i))
-        
-        # if len(ns_displayable_figs):
-        #     print(f"\n{self.__class__.__name__}._updateModel_ displayable figs in ns = {[(i, getattr(i, 'number', None)) for i in ns_displayable_figs]}")
-            
-        # these below are figs deleted from ns via the del command yet still 
-        # present in the Gcf (the case where they are not present in Gcf is trivial?
-        # if their reference count goes to 0 they will be garbage-collected);
-        # these should be still present in cached_vars since preExecution
-        # which is guaranteed to be called after entering the del command but 
-        # before exec'ing it
-        deled_mpl_figs = dict(item for item in self.cached_vars.items() 
-                              if isinstance(item[1], mpl.figure.Figure) 
-                              and item[1] not in ns_displayable_figs)
-        
-        # if len(deled_mpl_figs):
-        #     print(f"_updateModel_ {len(deled_mpl_figs)} deleted mpl figures")
-
-        for n,f in deled_mpl_figs.items():
-            # print(f"_updateNodel_ to delete mpl fig number {getattr(f, 'number', None)} manager {getattr(f.canvas, 'manager', None)}")
-            # if f in self.gcf_figs:
-            #     self.gcf_figs.remove(f)
-                
-            if n in ns:
-                ns.pop(n, None)
-                
-            if n in self.internalVariablesMonitor.keys():
-                self.internalVariablesMonitor.pop(n, None)
-    
-            if hasattr(f, "number"):
-                # remove from self.gcf_figs and also from Gcf
-                    
-                # remove from Gcf
-                plt.close(f.number) 
-                
-            if hasattr(f.canvas, "manager"):
-                manager = f.canvas.manager
-                Gcf.destroy(manager)
-                del manager
-                Gcf.figs.pop(f.number, None)
-                
-            del f
-                # print(gc.is_finalized(manager))
-                
-        # # these below are the mpl figs that Gcf currently knows about
-        # # they may have been created by mechanisms a.a.*
-        # current_gcf_figs = set(
-        #     fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
-        
-        # if len(current_gcf_figs):
-        #     print(f"\n{self.__class__.__name__}._updateModel_ figs currently in gcf = {[(i, i.number) for i in current_gcf_figs]}")
-            
-        # if len(Gcf.figs):
-        #     print(f"_updateModel_ Gcf.figs {Gcf.figs}")
-        # these below are the mpl figs that Gcf currently knows about
-        # they may have been created by mechanisms a.a.*
-        current_gcf_figs = set(
-            fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
-        
-        # if len(current_gcf_figs):
-        #     print(f"\n{self.__class__.__name__}._updateModel_ figs currently in gcf = {[(i, i.number) for i in current_gcf_figs]}")
-            
-        # figs created in Gcf as a result of code execution ⇒ not present in Gcf
-        # at preExecute time
-        new_figs_from_gcf = set(f for f in current_gcf_figs if f not in self.gcf_figs)
-        
-        # if len(new_figs_from_gcf):
-        #     print(f"\n{self.__class__.__name__}._updateModel_ figs created in gcf = {[(i, i.number) for i in new_figs_from_gcf]}")
-            
-        # we add these in a targeted fashion:
-        for f in new_figs_from_gcf:
-            if f in ns_displayable_figs:
-                # it should already be bound to a user-defined symbol, in the ns
-                # but check nevertheless (less efficient but maybe clerarer)
-                # f = self.parent()._adopt_mpl_figure(f) # to install event filters & callbacks
-                f = self.parent().registerWindow(f) # to install event filters & callbacks
-                name_ = self.getDisplayableVarnamesForVar(ns, f)
-                if len(name_) == 0: # not bound (impossible, here)
-                    if f is self.lastExecutionResult:
-                        unbound_figs_to_add.add(f)
-                if len(name_) == 1: # guaranteed to happen
-                    ns_mpl_figs_to_monitor[name_[0]] = f
-                    
-            else:
-                if f is self.lastExecutionResult:
-                    f = self.parent()._adopt_mpl_figure(f) # to install event filters & callbacks
-                    unbound_figs_to_add.add(f)
-                    
-            # NOTE: 2023-06-06 23:22:52
-            # figs added via pyplot but NOT bound to the ns in any way are skipped
-            # as these may be internal to deeper code exec'ed at the console
-            # and would unnecessarily clutter the viewer
-                    
-        # NOTE: 2023-06-06 22:43:17
-        # possibly new figs that are in ns but NOT in Gcf are checked below
-            
-            
-        # NOTE: 2023-06-06 15:20:45
-        # these may not be captured if the fig window is closed via its gui
-        # because they're closed directly by Gcf before preExecute gets called !
-        # on the other hand, this will capture figs closed using pyplot API;
-        # will distinguish below (see )
-        gcf_closed_figs = set(f for f in self.gcf_figs if f not in current_gcf_figs)
+#         ns_mpl_figs_to_monitor = dict() # already bound to a displayable symbol in ns; just add to the monitor
 #         
-#         if len(gcf_closed_figs):
-#             print(f"_updateModel_ figs closed in gcf = {[(i, i.number) for i in gcf_closed_figs]}")
-            
-        # these are newly-created via pyplot code, but never explicitly bound
-        # to a symbol in ns (because we check against ns_displayable_figs); 
-        # they aleasy have a 'number' attribute, but not bound to a displayable symbol
-        gcf_figs_not_in_ns = set(f for f in current_gcf_figs if f not in ns_displayable_figs)
-        # if len(gcf_figs_not_in_ns):
-        #     print(f"_updateModel_ figs in Gcf that are not in ns = {[(i, getattr(i, 'number', None)) for i in gcf_figs_not_in_ns]}")
-            
-        # NOTE: 2023-06-06 22:19:55
-        # since they were created by pyplot API they have a number attribute
-        # we add them to the ns AND to the monitor, via nameless figs to add
-        unbound_figs_to_add |= gcf_figs_not_in_ns
-        
-        # below, these are figs currently in ns, but not in gcf - maybe they are former
-        # gcf figure now closed (via pyplot API or their own gui), or maybe they
-        # are newly bound in the ns after creating via non-pyplot API (a.b*)
-        ns_figs_not_in_gcf = set(f for f in ns_displayable_figs if f not in current_gcf_figs)
-        
-        if len(ns_figs_not_in_gcf):
-            # these can be either new figures via mechanisms a.b.* above,
-            # OR Gcf figures that have been removed by the executed code (and hence
-            # they still have the 'number' attribute)
-            # print(f"_updateModel_ figs in ns that are not currently in gcf  = {[(i, getattr(i, 'number', None)) for i in ns_figs_not_in_gcf]}")
-            
-            # these could only have been created from code calling non-pyplot API
-            # and bound in the ns, either to a user-defined symbol (i.e., assignment)
-            # or to the lastExecutionResult by IPython (unless code was ';'-terminated)
-            # we assume these are NEW figures, so we add them to ns_mpl_figs_to_monitor
-            ns_figs_wo_number = set(f for f in ns_figs_not_in_gcf if getattr(f, "number", None) is None)
-            for f in ns_figs_wo_number:
-                # are they bound to a user-defined symbol? 
-                # guaranteed because we searched against ns_displayable_figs
-                f = self.parent()._adopt_mpl_figure(f) # this will also register with Gcf !!!
-                name_ = self.getDisplayableVarnamesForVar(ns, f)
-                if len(name_) == 0: # not bound to user-defined symbol - should never happen
-                    # check if it is the lastExecutionResult
-                    if f is self.lastExecutionResult: # case a.b.2
-                        # it is the lastExecutionResult ⇒ cache them to bind them later to a non-clashing name
-                        unbound_figs_to_add.add(f)
-                        
-                if len(name_) == 1: # guaranteed to happen 
-                    # the fig IS bound to a symbol in the ns → case a.b.1 
-                    # the fig IS bound to a symbol in the ns ⇒ all we need is to
-                    # add it as a trait of the monitored values
-                    ns_mpl_figs_to_monitor[name_[0]] = f
-                    
-            # the ones closed by code calling pyplot API will be present in gcf_closed_figs;
-            # having come from gcf these always have a number attribute
-            pyplot_closed = set(f for f in ns_figs_not_in_gcf if f in gcf_closed_figs)
-            
-            # if len(pyplot_closed):
-            #     print(f"_updateModel_ {len(pyplot_closed)} plt.close'd mpl figures")
-            
-            # names_ = list(itertools.chain.from_iterable(
-            #     [self.getDisplayableVarnamesForVar(ns, f) for f in pyplot_closed]))
-            # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are pyplot_closed  = {[(i, getattr(i, 'number', None)) for i in pyplot_closed]} with var names = {names_}")
-            
-            # the ones closed by gui action (window close button) will NOT be present in gcf_closed_figs,
-            # yet still present in the ns
-            # having been in the gcf at some point, these also have a number attribute
-            gui_closed = set(f for f in ns_figs_not_in_gcf if f not in gcf_closed_figs)
-            
-            # if len(gui_closed):
-            #     print(f"_updateModel_ {len(gui_closed)} mpl figures closed via gui")
-            
-            # names_ = list(itertools.chain.from_iterable(
-            #     [self.getDisplayableVarnamesForVar(ns, f) for f in gui_closed]))
-            # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are gui_closed  = {[(i, getattr(i, 'number', None)) for i in gui_closed]} with var names = {names_}")
-            
-            for f in pyplot_closed | gui_closed:
-                # NOTE: 2023-06-07 09:03:51
-                # we will ALWAYS remove these from the ns
-                # see NOTE: FIXME/BUG 2023-06-07 09:00:40 in mainwindow.py
-                name_ = self.getDisplayableVarnamesForVar(ns, f)
-                if len(name_) == 1:
-                    if name_[0] in ns:
-                        ns.pop(name_[0], None)
-                    
-                    if name_[0] in self.internalVariablesMonitor.keys():
-                        self.internalVariablesMonitor.pop(name_[0], None)
-                
-        # print(f"\n{self.__class__.__name__}._updateModel_ mpl_figs_to_remove_from_ns  = {[(i[0], i[1], getattr(i[1], 'number', None)) for i in mpl_figs_to_remove_from_ns.items()]}")
-            
-        # OK, now, remove mpl_figs_to_remove_from_ns from both the ns and from the internalVariablesMonitor:
-        # if len(mpl_figs_to_remove_from_ns):
-        #     print(f"_updateModel_ {len(mpl_figs_to_remove_from_ns)} mpl figures to remove from ns")
-            
-        # now, add new figs in gcf:
-        # if len(ns_mpl_figs_to_monitor):
-        #     print(f"_updateModel_ {len(ns_mpl_figs_to_monitor)} mpl figures to monitor")
-            
-        for n,f in ns_mpl_figs_to_monitor.items():
-            # these are already bound to a symbol in the ns, so just register them with the monitor
-            # process them first
-            self.internalVariablesMonitor[n] = f # if they are already there this SHOULD trigger a modified notification
-        
-        # finally, make bindings for orphan figs
-        
-        # if len(unbound_figs_to_add):
-        #     print(f"_updateModel_ {len(unbound_figs_to_add)} unbound mpl figures to add")
-        
-        for f in unbound_figs_to_add:
-            f = self.parent()._adopt_mpl_figure(f)
-            if hasattr(f.canvas, "manager"):
-                fig_var_name = f"Figure{f.canvas.manager.num}"
-            elif hasattr(f, "number"):
-                fig_var_name = f"Figure{f.number}"
-            else:
-                fig_var_name = "Figure"
-            # print(f"\n{self.__class__.__name__}._updateModel_ new symbol = {fig_var_name}")
-            fig_var_name = validate_varname(fig_var_name, ws=ns)
-            # print(f"\n{self.__class__.__name__}._updateModel_ new symbol after validation = {fig_var_name}")
-            ns[fig_var_name] = f
-            self.internalVariablesMonitor[fig_var_name] = f
-            
-            # if there are any from Gcf they would always have a number
+#         unbound_figs_to_add = set() # to bound to a symbol and place in ns and monitor
+#         
+#         mpl_figs_to_remove_from_ns = dict() # closed or otherwise deleted
+#         
+#         # this below is populated in preExecute; NOTE that there may be code which 
+#         # doesn't call preExecute
+#         # if len(self.gcf_figs):
+#         #     print(f"\n{self.__class__.__name__}._updateModel_ figs in gcf since preExecute = {[(i, i.number) for i in self.gcf_figs]}")
+#             
+#         # these are all mpl figs currently in the ns
+#         ns_figs_dict = dict(i for i in ns.items() if isinstance(i[1], mpl.figure.Figure))
+#         
+#         # and these are mpl figs currently in ns, that are displayable
+#         ns_displayable_figs = set(i[1] for i in ns_figs_dict.items() if self.isDisplayable(ns, *i))
+#         
+#         # if len(ns_displayable_figs):
+#         #     print(f"\n{self.__class__.__name__}._updateModel_ displayable figs in ns = {[(i, getattr(i, 'number', None)) for i in ns_displayable_figs]}")
+#             
+#         # these below are figs deleted from ns via the del command yet still 
+#         # present in the Gcf (the case where they are not present in Gcf is trivial?
+#         # if their reference count goes to 0 they will be garbage-collected);
+#         # these should be still present in cached_vars since preExecution
+#         # which is guaranteed to be called after entering the del command but 
+#         # before exec'ing it
+#         deled_mpl_figs = dict(item for item in self.cached_vars.items() 
+#                               if isinstance(item[1], mpl.figure.Figure) 
+#                               and item[1] not in ns_displayable_figs)
+#         
+#         # if len(deled_mpl_figs):
+#         #     print(f"_updateModel_ {len(deled_mpl_figs)} deleted mpl figures")
+# 
+#         for n,f in deled_mpl_figs.items():
+#             # print(f"_updateNodel_ to delete mpl fig number {getattr(f, 'number', None)} manager {getattr(f.canvas, 'manager', None)}")
+#             # if f in self.gcf_figs:
+#             #     self.gcf_figs.remove(f)
+#                 
+#             if n in ns:
+#                 ns.pop(n, None)
+#                 
+#             if n in self.internalVariablesMonitor.keys():
+#                 self.internalVariablesMonitor.pop(n, None)
+#     
+#             if hasattr(f, "number"):
+#                 # remove from self.gcf_figs and also from Gcf
+#                     
+#                 # remove from Gcf
+#                 plt.close(f.number) 
+#                 
+#             if hasattr(f.canvas, "manager"):
+#                 manager = f.canvas.manager
+#                 Gcf.destroy(manager)
+#                 del manager
+#                 Gcf.figs.pop(f.number, None)
+#                 
+#             del f
+#                 # print(gc.is_finalized(manager))
+#                 
+#         # # these below are the mpl figs that Gcf currently knows about
+#         # # they may have been created by mechanisms a.a.*
+#         # current_gcf_figs = set(
+#         #     fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+#         
+#         # if len(current_gcf_figs):
+#         #     print(f"\n{self.__class__.__name__}._updateModel_ figs currently in gcf = {[(i, i.number) for i in current_gcf_figs]}")
+#             
+#         # if len(Gcf.figs):
+#         #     print(f"_updateModel_ Gcf.figs {Gcf.figs}")
+#         # these below are the mpl figs that Gcf currently knows about
+#         # they may have been created by mechanisms a.a.*
+#         current_gcf_figs = set(
+#             fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
+#         
+#         # if len(current_gcf_figs):
+#         #     print(f"\n{self.__class__.__name__}._updateModel_ figs currently in gcf = {[(i, i.number) for i in current_gcf_figs]}")
+#             
+#         # figs created in Gcf as a result of code execution ⇒ not present in Gcf
+#         # at preExecute time
+#         new_figs_from_gcf = set(f for f in current_gcf_figs if f not in self.gcf_figs)
+#         
+#         # if len(new_figs_from_gcf):
+#         #     print(f"\n{self.__class__.__name__}._updateModel_ figs created in gcf = {[(i, i.number) for i in new_figs_from_gcf]}")
+#             
+#         # we add these in a targeted fashion:
+#         for f in new_figs_from_gcf:
+#             if f in ns_displayable_figs:
+#                 # it should already be bound to a user-defined symbol, in the ns
+#                 # but check nevertheless (less efficient but maybe clerarer)
+#                 # f = self.parent()._adopt_mpl_figure(f) # to install event filters & callbacks
+#                 f = self.parent().registerWindow(f) # to install event filters & callbacks
+#                 name_ = self.getDisplayableVarnamesForVar(ns, f)
+#                 if len(name_) == 0: # not bound (impossible, here)
+#                     if f is self.lastExecutionResult:
+#                         unbound_figs_to_add.add(f)
+#                 if len(name_) == 1: # guaranteed to happen
+#                     ns_mpl_figs_to_monitor[name_[0]] = f
+#                     
+#             else:
+#                 if f is self.lastExecutionResult:
+#                     f = self.parent()._adopt_mpl_figure(f) # to install event filters & callbacks
+#                     unbound_figs_to_add.add(f)
+#                     
+#             # NOTE: 2023-06-06 23:22:52
+#             # figs added via pyplot but NOT bound to the ns in any way are skipped
+#             # as these may be internal to deeper code exec'ed at the console
+#             # and would unnecessarily clutter the viewer
+#                     
+#         # NOTE: 2023-06-06 22:43:17
+#         # possibly new figs that are in ns but NOT in Gcf are checked below
+#             
+#             
+#         # NOTE: 2023-06-06 15:20:45
+#         # these may not be captured if the fig window is closed via its gui
+#         # because they're closed directly by Gcf before preExecute gets called !
+#         # on the other hand, this will capture figs closed using pyplot API;
+#         # will distinguish below (see )
+#         gcf_closed_figs = set(f for f in self.gcf_figs if f not in current_gcf_figs)
+# #         
+# #         if len(gcf_closed_figs):
+# #             print(f"_updateModel_ figs closed in gcf = {[(i, i.number) for i in gcf_closed_figs]}")
+#             
+#         # these are newly-created via pyplot code, but never explicitly bound
+#         # to a symbol in ns (because we check against ns_displayable_figs); 
+#         # they aleasy have a 'number' attribute, but not bound to a displayable symbol
+#         gcf_figs_not_in_ns = set(f for f in current_gcf_figs if f not in ns_displayable_figs)
+#         # if len(gcf_figs_not_in_ns):
+#         #     print(f"_updateModel_ figs in Gcf that are not in ns = {[(i, getattr(i, 'number', None)) for i in gcf_figs_not_in_ns]}")
+#             
+#         # NOTE: 2023-06-06 22:19:55
+#         # since they were created by pyplot API they have a number attribute
+#         # we add them to the ns AND to the monitor, via nameless figs to add
+#         unbound_figs_to_add |= gcf_figs_not_in_ns
+#         
+#         # below, these are figs currently in ns, but not in gcf - maybe they are former
+#         # gcf figure now closed (via pyplot API or their own gui), or maybe they
+#         # are newly bound in the ns after creating via non-pyplot API (a.b*)
+#         ns_figs_not_in_gcf = set(f for f in ns_displayable_figs if f not in current_gcf_figs)
+#         
+#         if len(ns_figs_not_in_gcf):
+#             # these can be either new figures via mechanisms a.b.* above,
+#             # OR Gcf figures that have been removed by the executed code (and hence
+#             # they still have the 'number' attribute)
+#             # print(f"_updateModel_ figs in ns that are not currently in gcf  = {[(i, getattr(i, 'number', None)) for i in ns_figs_not_in_gcf]}")
+#             
+#             # these could only have been created from code calling non-pyplot API
+#             # and bound in the ns, either to a user-defined symbol (i.e., assignment)
+#             # or to the lastExecutionResult by IPython (unless code was ';'-terminated)
+#             # we assume these are NEW figures, so we add them to ns_mpl_figs_to_monitor
+#             ns_figs_wo_number = set(f for f in ns_figs_not_in_gcf if getattr(f, "number", None) is None)
+#             for f in ns_figs_wo_number:
+#                 # are they bound to a user-defined symbol? 
+#                 # guaranteed because we searched against ns_displayable_figs
+#                 f = self.parent()._adopt_mpl_figure(f) # this will also register with Gcf !!!
+#                 name_ = self.getDisplayableVarnamesForVar(ns, f)
+#                 if len(name_) == 0: # not bound to user-defined symbol - should never happen
+#                     # check if it is the lastExecutionResult
+#                     if f is self.lastExecutionResult: # case a.b.2
+#                         # it is the lastExecutionResult ⇒ cache them to bind them later to a non-clashing name
+#                         unbound_figs_to_add.add(f)
+#                         
+#                 if len(name_) == 1: # guaranteed to happen 
+#                     # the fig IS bound to a symbol in the ns → case a.b.1 
+#                     # the fig IS bound to a symbol in the ns ⇒ all we need is to
+#                     # add it as a trait of the monitored values
+#                     ns_mpl_figs_to_monitor[name_[0]] = f
+#                     
+#             # the ones closed by code calling pyplot API will be present in gcf_closed_figs;
+#             # having come from gcf these always have a number attribute
+#             pyplot_closed = set(f for f in ns_figs_not_in_gcf if f in gcf_closed_figs)
+#             
+#             # if len(pyplot_closed):
+#             #     print(f"_updateModel_ {len(pyplot_closed)} plt.close'd mpl figures")
+#             
+#             # names_ = list(itertools.chain.from_iterable(
+#             #     [self.getDisplayableVarnamesForVar(ns, f) for f in pyplot_closed]))
+#             # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are pyplot_closed  = {[(i, getattr(i, 'number', None)) for i in pyplot_closed]} with var names = {names_}")
+#             
+#             # the ones closed by gui action (window close button) will NOT be present in gcf_closed_figs,
+#             # yet still present in the ns
+#             # having been in the gcf at some point, these also have a number attribute
+#             gui_closed = set(f for f in ns_figs_not_in_gcf if f not in gcf_closed_figs)
+#             
+#             # if len(gui_closed):
+#             #     print(f"_updateModel_ {len(gui_closed)} mpl figures closed via gui")
+#             
+#             # names_ = list(itertools.chain.from_iterable(
+#             #     [self.getDisplayableVarnamesForVar(ns, f) for f in gui_closed]))
+#             # print(f"\n{self.__class__.__name__}._updateModel_ figs in ns that are gui_closed  = {[(i, getattr(i, 'number', None)) for i in gui_closed]} with var names = {names_}")
+#             
+#             for f in pyplot_closed | gui_closed:
+#                 # NOTE: 2023-06-07 09:03:51
+#                 # we will ALWAYS remove these from the ns
+#                 # see NOTE: FIXME/BUG 2023-06-07 09:00:40 in mainwindow.py
+#                 name_ = self.getDisplayableVarnamesForVar(ns, f)
+#                 if len(name_) == 1:
+#                     if name_[0] in ns:
+#                         ns.pop(name_[0], None)
+#                     
+#                     if name_[0] in self.internalVariablesMonitor.keys():
+#                         self.internalVariablesMonitor.pop(name_[0], None)
+#                 
+#         # print(f"\n{self.__class__.__name__}._updateModel_ mpl_figs_to_remove_from_ns  = {[(i[0], i[1], getattr(i[1], 'number', None)) for i in mpl_figs_to_remove_from_ns.items()]}")
+#             
+#         # OK, now, remove mpl_figs_to_remove_from_ns from both the ns and from the internalVariablesMonitor:
+#         # if len(mpl_figs_to_remove_from_ns):
+#         #     print(f"_updateModel_ {len(mpl_figs_to_remove_from_ns)} mpl figures to remove from ns")
+#             
+#         # now, add new figs in gcf:
+#         # if len(ns_mpl_figs_to_monitor):
+#         #     print(f"_updateModel_ {len(ns_mpl_figs_to_monitor)} mpl figures to monitor")
+#             
+#         for n,f in ns_mpl_figs_to_monitor.items():
+#             # these are already bound to a symbol in the ns, so just register them with the monitor
+#             # process them first
+#             self.internalVariablesMonitor[n] = f # if they are already there this SHOULD trigger a modified notification
+#         
+#         # finally, make bindings for orphan figs
+#         
+#         # if len(unbound_figs_to_add):
+#         #     print(f"_updateModel_ {len(unbound_figs_to_add)} unbound mpl figures to add")
+#         
+#         for f in unbound_figs_to_add:
+#             f = self.parent()._adopt_mpl_figure(f)
+#             if hasattr(f.canvas, "manager"):
+#                 fig_var_name = f"Figure{f.canvas.manager.num}"
+#             elif hasattr(f, "number"):
+#                 fig_var_name = f"Figure{f.number}"
+#             else:
+#                 fig_var_name = "Figure"
+#             # print(f"\n{self.__class__.__name__}._updateModel_ new symbol = {fig_var_name}")
+#             fig_var_name = validate_varname(fig_var_name, ws=ns)
+#             # print(f"\n{self.__class__.__name__}._updateModel_ new symbol after validation = {fig_var_name}")
+#             ns[fig_var_name] = f
+#             self.internalVariablesMonitor[fig_var_name] = f
+#             
+#             # if there are any from Gcf they would always have a number
 
         # ###
         # 2. deal with Scipyen viewer windows - NOTE: 2023-06-07 09:10:08

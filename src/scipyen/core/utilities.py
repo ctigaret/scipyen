@@ -926,6 +926,9 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
     if not ret:
         return ret
     
+    if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
+        return x == y
+    
     if isfunction(x):
         return x == y
     
@@ -3426,41 +3429,43 @@ def gen_unique(seq, key=None):
     if not hasattr(seq, "__iter__"):
         raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
     
-#     def _add_to_seen_(x, seen_):
-#         if isinstance(seen_, set): # x is hashable; seen_ is def'ed in caller namespace
-#             return seen_.add(x)
-#         
-#         else:
-#             if x in seen_:
-#                 return False
-#             
-#             seen_.append(x)
-#             return True
-        
-    def __add_to_seen__(x):
-        if is_hashable(x):
-            if x not in seenset:
-                seenset.add(x)
-                return False
-            return True
-        else:
-            if x not in seenlist:
-                seenlist.append(x)
-                return False
-            return True
-        
     def __check_fun_val_(x, key):
         val = key(x)
         if is_hashable(val):
-            return val not in seenset and not __add_to_seen__(val)
+            if val not in seenset:
+                seenset.add(val)
+                return True
+            return False
+            # return val not in seenset and not __add_to_seen__(val)
         else:
-            return val not in seenlist and not __add_to_seen__(val)
+            if len(seenlist):
+                if any(not safe_identity_test(val, x_) for x_ in seenlist):
+                    seenlist.append(val)
+                    ret = True
+            else:
+                seenlist.append(val)
+                ret = True
+                
+            return False
+            # return val not in seenlist and not __add_to_seen__(val)
             
     def __check_val__(x):
         if is_hashable(x):
-            return x not in seenset and not __add_to_seen__(x)
+            if x not in seenset:
+                seenset.add(x)
+                return True
+            return False
+            # return x not in seenset and not __add_to_seen__(x)
         else:
-            return x not in seenlist and not __add_to_seen__(x)
+            if len(seenlist) == 0:
+                seenlist.append(x)
+                return True
+                
+            if all(not safe_identity_test(x, x_) for x_ in seenlist):
+                seenlist.append(x)
+                return True
+                
+            return False
         
     
     if key is None:
