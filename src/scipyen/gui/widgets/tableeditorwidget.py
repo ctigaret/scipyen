@@ -26,6 +26,7 @@ import matplotlib.mlab as mlb
 #from core.patchneo import *
 import core.datatypes  
 
+import core.utilities as utilities
 import core.strutils as strutils
 from core.strutils import str2float
 
@@ -106,6 +107,9 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         self._currentSlice_ = 0
         
+        self._selectedRowIndex_ = None
+        self._selectedColumnIndex_ = None
+        
     def setData(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
                        neo.Epoch, neo.Event, neo.SpikeTrain,
@@ -148,6 +152,33 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             if self.currentSlice <= self._data_.shape[self._slicingAxis_] -1 :
                 self.currentSlice = self.currentSlice + 1
         
+    @property
+    def selectedColumnIndex(self) -> typing.Optional[int]:
+        # warnings.warn("This property is deprecated; please use self.selectedColumnIndexes")
+        return self._selectedColumnIndex_
+    
+    @selectedColumnIndex.setter
+    def selectedColumnIndex(self, val:int):
+        self._selectedColumnIndex_ = val
+        
+    @property
+    def selectedColumnIndexes(self) -> list:
+        return utilities.unique([ndx.column() for ndx in self.tableView.selectedIndexes()])
+    
+    
+    @property
+    def selectedRowIndexes(self) -> list:
+        return utilities.unique([ndx.row() for ndx in self.tableView.selectedIndexes()])
+    
+    @property
+    def selectedRowIndex(self) -> typing.Optional[int]:
+        """DEPRECATED"""
+        return self._selectedRowIndex_
+    
+    @selectedRowIndex.setter
+    def selectedRowIndex(self, val:int):
+        self._selectedRowIndex_ = val
+    
     @property
     def currentSlice(self):
         return self._currentSlice_
@@ -259,7 +290,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         #print("horizontal header context menu at pos %s" % pos)
         #print("clicked column %s" % self.tableView.columnAt(pos.x()))
         
-        self.selectedColumnIndex = self.tableView.columnAt(pos.x())
+        if len(self.selectedColumnIndexes) == 0:
+            self.selectedColumnIndex = self.tableView.columnAt(pos.x())
+        else:
+            self.selectedColumnIndex = None
         
         cm = QtWidgets.QMenu("Column Menu", self.tableView)
         copyColumnTitleAction = cm.addAction("Copy column name")
@@ -277,7 +311,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
     def slot_vertical_header_context_menu_request(self, pos):
-        self.selectedRowIndex = self.tableView.rowAt(pos.x())
+        if len(self.selectedRowIndexes) == 0:
+            self.selectedRowIndex = self.tableView.rowAt(pos.x())
+        else:
+            self.selectedRowIndex = None
         
         cm = QtWidgets.QMenu("Row Menu", self.tableView)
         copyColumnTitleAction = cm.addAction("Copy row name")
@@ -295,26 +332,34 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @pyqtSlot()
     @safeWrapper
     def slot_copyColumnName(self):
-        if not isinstance(self.selectedColumnIndex, int):
-            return
-        
-        #columnName = self.tableView.horizontalHeaderItem(self.selectedColumnIndex).text()
-        
-        # NOTE: 2018-11-28 23:38:29
-        # this is a QtCore.QVariant that wraps a python str
-        columnName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
-        
-        QtWidgets.QApplication.instance().clipboard().setText(columnName)
+        quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+        if len(self.selectedColumnIndexes):
+            values = [self.tableView.model().headerData(ndx, QtCore.Qt.Horizontal).value() for ndx in self.selectedColumnIndexes]
+            link = ", "
+            colNames = link.join([f"'{v}'" for v in values]) if quote else link.join(values)
+            QtWidgets.QApplication.instance().clipboard().setText(colNames)
+            
+        elif isinstance(self.selectedColumnIndex, int):
+            colName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
+            if quote:
+                colName = f"'{colName}'"
+            QtWidgets.QApplication.instance().clipboard().setText(colName)
         
     @pyqtSlot()
     @safeWrapper
     def slot_copyRowName(self):
-        if not isinstance(self.selectedRowIndex, int):
-            return
-        
-        rowName = self.tableView.verticalheaderItem(self.selectedRowIndex).text()
-        
-        QtWidgets.QApplication.instance().clipboard().setText(rowName)
+        quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+        if len(self.selectedRowIndexes):
+            values = [self.tableView.model().headerData(ndx, QtCore.Qt.Vertical).value() for ndx in self.selectedRowIndexes]
+            link = ", "
+            rowNames = link.join([f"'{v}'" for v in values]) if quote else link.join(values)
+            QtWidgets.QApplication.instance().clipboard().setText(rowNames)
+            
+        elif isinstance(self.selectedRowIndex, int):
+            rowName = self.tableView.model().headerData(self.selectedRowIndex, QtCore.Qt.Vertical).value()
+            if quote:
+                rowName = f"'{rowName}'"
+            QtWidgets.QApplication.instance().clipboard().setText(rowName)
         
     @pyqtSlot(QtWidgets.QTableWidgetItem)
     @safeWrapper
