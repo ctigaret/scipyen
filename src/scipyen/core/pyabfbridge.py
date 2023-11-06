@@ -2256,8 +2256,10 @@ class ABFOutputConfiguration:
                     continue
                 
                 digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
-                
+                # print(f"digChannelValue = {digChannelValue}" )
                 for k, chnl in enumerate(digChannel):
+                    if chnl >= len(digChannelValue):
+                        continue
                     if digChannelValue[chnl] == "*":
                         channel_times[k].extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
                         
