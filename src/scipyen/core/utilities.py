@@ -927,7 +927,11 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
         return ret
     
     if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
-        return np.all(x == y)
+        try:
+            return np.all(x == y)
+        except:
+            print(f"x is {type(x)}, y is {type(y)}")
+            raise
     
     if isfunction(x):
         return x == y
