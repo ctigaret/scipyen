@@ -906,120 +906,130 @@ def safe_identity_test2(x, y) -> bool:
     """Uses SafeComparator object"""
     return SafeComparator(comp=eq)(x, y)
 
-@safeWrapper
+# @safeWrapper
 def safe_identity_test(x, y, idcheck=False) -> bool:
-    ret = True
-    
-    if x is y:
-        return True
-    
-    if all(isinstance(v, type) for v in (x,y)):
-        return x==y
-    
-    if idcheck:
-        ret &= idcheck(x, y)
+    try:
+        ret = True
+        
+        if x is y:
+            return True
+        
+        if all(isinstance(v, type) for v in (x,y)):
+            return x==y
+        
+        if idcheck:
+            ret &= idcheck(x, y)
+            if not ret:
+                return ret
+        
+        ret &= type(x) == type(y)
+        
         if not ret:
             return ret
-    
-    ret &= type(x) == type(y)
-    
-    if not ret:
-        return ret
-    
-    if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
-        try:
-            return np.all(x == y)
-        except:
-            print(f"x is {type(x)}, y is {type(y)}")
-            raise
-    
-    if isfunction(x):
-        return x == y
-    
-    if isinstance(x, partial):
-        return x.func == y.func and x.args == y.args and x.keywords == y.keywords
         
-    if hasattr(x, "size"): # np arrays and subtypes
-        if not hasattr(y, "size"):
-            return False
+        # if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
+        #     try:
+        #         # return np.all(x == y)
+        #         return x == y
+        #     except:
+        #         print(f"x is {type(x)}, y is {type(y)}")
+        #         raise
         
-        ret &= x.size == y.size
+        if isfunction(x):
+            return x == y
+        
+        if isinstance(x, partial):
+            return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+            
+        if hasattr(x, "size"): # np arrays and subtypes
+            if not hasattr(y, "size"):
+                return False
+            
+            ret &= x.size == y.size
 
-        if not ret:
+            if not ret:
+                return ret
+        
+        elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
+            if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
+                return False
+            
+            ret &= len(x) == len(y)
+            
+            if not ret:
+                return ret
+            
+            if all(isinstance(v, dict) for v in (x,y)):
+                # ret &= list(x.keys()) == list(y.keys())
+                # if not ret:
+                #     return ret
+                
+    #             x_items = list(filter(lambda x_: x_[1] not in (x,y), x.items()))
+    #             y_items = list(filter(lambda x_: x_[1] not in (x,y), y.items()))
+    #             
+    #             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x_items, y_items)))
+                # FIXME: 2023-06-01 13:37:10
+                # prone to infinite recursion when either dict is among either x.values() or y.values()
+                ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
+                if not ret:
+                    return ret
+            else:
+                # FIXME: 2023-06-01 13:43:34
+                # prone to infinite recursion when either element is in x or y
+                ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+            
+            if not ret:
+                return ret
+            
+        if hasattr(x, "shape"):
+            if not hasattr(y, "shape"):
+                return False
+            
+            ret &= x.shape == y.shape
+                
+            if not ret:
+                return ret
+        
+        # NOTE: 2018-11-09 21:46:52
+        # isn't this redundant after checking for shape?
+        # unless an object could have shape attribte but not ndim
+        if hasattr(x, "ndim"):
+            if not hasattr(y, "ndim"):
+                return False
+            ret &= x.ndim == y.ndim
+        
+            if not ret:
+                return ret
+        
+        if hasattr(x, "dtype"):
+            if not hasattr(y, "dtype"):
+                return False
+            ret &= x.dtype == y.dtype
+        
+            if not ret:
+                return ret
+        
+        if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
+            ret &= np.all(x==y)
+            
             return ret
-    
-    elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
-        if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
-            return False
-        
-        ret &= len(x) == len(y)
-        
-        if not ret:
-            return ret
-        
-        if all(isinstance(v, dict) for v in (x,y)):
-            # ret &= list(x.keys()) == list(y.keys())
+            # NOTE: 2023-05-17 08:54:39
+            # event if ret was True here, not sure that falling throhugh to eq would
+            # work for arrays
             # if not ret:
             #     return ret
             
-#             x_items = list(filter(lambda x_: x_[1] not in (x,y), x.items()))
-#             y_items = list(filter(lambda x_: x_[1] not in (x,y), y.items()))
-#             
-#             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x_items, y_items)))
-            # FIXME: 2023-06-01 13:37:10
-            # prone to infinite recursion when either dict is among either x.values() or y.values()
-            ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
-            if not ret:
-                return ret
-        else:
-            # FIXME: 2023-06-01 13:43:34
-            # prone to infinite recursion when either element is in x or y
-            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+        ret &= pyqtgraph.eq(x,y)
         
-        if not ret:
-            return ret
+        return ret ## good fallback, though potentially expensive
+    
+    except:
+        traceback.print_exc()
+        frame = inspect.currentframe()
+        call_stack = "\n".join([f"{fi.function} from {fi.filename} at line {fi.lineno}" for fi in inspect.getouterframes(frame)])
+        print("Call stack:")
+        print(call_stack)
         
-    if hasattr(x, "shape"):
-        if not hasattr(y, "shape"):
-            return False
-        
-        ret &= x.shape == y.shape
-            
-        if not ret:
-            return ret
-    
-    # NOTE: 2018-11-09 21:46:52
-    # isn't this redundant after checking for shape?
-    # unless an object could have shape attribte but not ndim
-    if hasattr(x, "ndim"):
-        if not hasattr(y, "ndim"):
-            return False
-        ret &= x.ndim == y.ndim
-    
-        if not ret:
-            return ret
-    
-    if hasattr(x, "dtype"):
-        if not hasattr(y, "dtype"):
-            return False
-        ret &= x.dtype == y.dtype
-    
-        if not ret:
-            return ret
-    
-    if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
-        ret &= np.all(x==y)
-        
-        return ret
-        # NOTE: 2023-05-17 08:54:39
-        # event if ret was True here, not sure that falling throhugh to eq would
-        # work for arrays
-        # if not ret:
-        #     return ret
-        
-    ret &= pyqtgraph.eq(x,y)
-    
-    return ret ## good fallback, though potentially expensive
 
 class NestedFinder(object):
     """Provides searching in nesting (hierarchical) data structures.

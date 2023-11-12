@@ -1748,7 +1748,7 @@ def getMimeAndFileType(fileName):
     if file_type is None:
         file_type = mime_type
         
-    #print(f"in getMimeAndFileType: mime_type: {mime_type} file_type: {file_type}")
+    # print(f"in getMimeAndFileType: mime_type: {mime_type} file_type: {file_type}")
 
     # # 2.2) try the mimetypes module
     # # NOTE: 2021-04-12 11:31:29
@@ -1766,12 +1766,16 @@ def getMimeAndFileType(fileName):
 def is_python_source(fileName:str):
     mime_type, file_type, encoding = getMimeAndFileType(fileName)
     
-    return any("python" in s.lower() for s in (mime_type, file_type)) or os.path.splitext(fileName)[-1] == ".py"
+    types = tuple([v for v in (mime_type, file_type) if isinstance(v, str) and len(v.strip())])
+    
+    return any("python" in s.lower() for s in types) or os.path.splitext(fileName)[-1] == ".py"
 
 def is_spreadsheet(fileName:str):
     mime_type, file_type, encoding = getMimeAndFileType(fileName)
     
-    return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in (mime_type, file_type)) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
+    types = tuple([v for v in (mime_type, file_type) if isinstance(v, str) and len(v.strip())])
+    
+    return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in types) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
     
 def loadFile(fName):
     value = None
