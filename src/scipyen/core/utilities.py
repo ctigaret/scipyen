@@ -1019,7 +1019,7 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
             # if not ret:
             #     return ret
             
-        ret &= pyqtgraph.eq(x,y)
+        # ret &= pyqtgraph.eq(x,y)
         
         return ret ## good fallback, though potentially expensive
     
