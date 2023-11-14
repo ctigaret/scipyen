@@ -6675,7 +6675,7 @@ def average_blocks(*args, **kwargs) -> neo.Block:
     if len(kwargs) > 0 :
         for key in kwargs.keys():
             if key not in ["count", "every", "name", "segment", 
-                           "analog", "annotation", "rec_datetime", 
+                           "analog", "annotations", "rec_datetime", 
                            "file_origin", "file_datetime"]:
                 raise RuntimeError("Unexpected named parameter %s" % key)
             
@@ -6686,6 +6686,8 @@ def average_blocks(*args, **kwargs) -> neo.Block:
             m = kwargs["every"]
             
         if "name" in kwargs.keys():
+            # NOTE: 2023-11-14 13:57:40 
+            # assign this here and forget about it
             ret.name = kwargs["name"]
             
         if "segment" in kwargs.keys():
@@ -6694,8 +6696,11 @@ def average_blocks(*args, **kwargs) -> neo.Block:
         if "analog" in kwargs.keys():
             analog_index = kwargs["analog"]
             
-        if "annotation" in kwargs.keys():
-            ret.annotation = kwargs["annotation"]
+        if "annotations" in kwargs.keys():
+            # 
+            # fixed typo 'annotation' -> 'annotations'
+            # also take care of this now
+            ret.annotations = kwargs["annotations"]
 
         if "rec_datetime" in kwargs.keys():
             ret.rec_datetime = kwargs["datetime"]
@@ -6765,7 +6770,7 @@ def average_blocks(*args, **kwargs) -> neo.Block:
             return blocks # FIXME: return a concatenated block
         
         else:
-            rangs_avg = [range(0,n)]
+            ranges_avg = [range(0,n)]
             
     else:
         ranges_avg = [range(k, k+n) for k in range(0, len(blocks), m)]
@@ -6778,7 +6783,7 @@ def average_blocks(*args, **kwargs) -> neo.Block:
     for r, range_avg in enumerate(ranges_avg):
         blist = [blocks[k] for k in range_avg]
         if segment_index is None:
-            b = neoutils.average_blocks_by_segments(*blist, analogsignals = analog_index)
+            b = average_blocks_by_segments(*blist, analogsignals = analog_index)
             seg_list.extend(b.segments)
             
         elif isinstance(segment_index, int):
@@ -6791,7 +6796,7 @@ def average_blocks(*args, **kwargs) -> neo.Block:
             
             slist = [blist[k].segments[segment_index] for k in range_avg]
             
-            seg_list.append(neoutils.average_segments(slist, signals = analog_index))
+            seg_list.extend(average_segments(slist, signals = analog_index))
             
         elif isinstance(segment_index, (tuple, list)) and all(isinstance(v, int) for v in segment_index):
             if any(v < 0 for v in segment_index):
@@ -6803,7 +6808,9 @@ def average_blocks(*args, **kwargs) -> neo.Block:
                     raise ValueError(f"Segment index {v} out of range for block {k} ({blist[k].name})")
                 
             
-            slist = [neoutils.average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]
+            # slist = [average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]
+            
+            slist = list(itertools.chain.from_iterable([average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]))
             
             seg_list.extend(slist)
 
@@ -6812,7 +6819,9 @@ def average_blocks(*args, **kwargs) -> neo.Block:
             if len(out_of_range):
                 raise ValueError(f"Last segment index in {segment_index} is out of range for block {k} ({blist[k].name})")
             
-            slist = [neoutils.average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]
+            # slist = [average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]
+            
+            slist = list(itertools.chain.from_iterable([average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]))
             seg_list.extend(slist)
             
         elif isinstance(segment_index, range):
@@ -6821,27 +6830,27 @@ def average_blocks(*args, **kwargs) -> neo.Block:
                 raise ValueError(f"Last segment index in {segment_index} is out of range for block {k} ({blist[k].name})")
             
             srange = range(*segment_index.indices(len(blist[0].segments)))
-            slist = [neoutils.average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in srange]
+            slist = [average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in srange]
             seg_list.extend(slist)
             
         else:
             raise ValueError(f"Invalid segment index specification: {segment_index}")
             
-            
+    # print(f"seg_list = {seg_list}")
     ret.segments = seg_list
-    ret.name = name
-    ret.annotations.update(annotations)
-    ret.annotations["Averaged"] = dict()
-    ret.annotations["Averaged"]["Count"] = n
-    ret.annotations["Averaged"]["Every"] = m
-    ret.annotations["Averaged"]["Origin"] = dict()
-    ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
-    ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
-    ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
+    # ret.name = name # taken care of at NOTE: 2023-11-14 13:57:40 
+    # ret.annotations.update(annotations) # taken care of at NOTE: 2023-11-14 13:58:53 
+    # ret.annotations["Averaged"] = dict()
+    # ret.annotations["Averaged"]["Count"] = n
+    # ret.annotations["Averaged"]["Every"] = m
+    # ret.annotations["Averaged"]["Origin"] = dict()
+    # ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
+    # ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
+    # ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
             
-    for k, segment in enumerate(ret.segments):
-        segment.block = ret
-        segment.index = k
+    # for k, segment in enumerate(ret.segments):
+    #     segment.block = ret
+    #     segment.index = k
     
             
             
