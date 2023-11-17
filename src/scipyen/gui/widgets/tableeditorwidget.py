@@ -360,6 +360,14 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             if quote:
                 rowName = f"'{rowName}'"
             QtWidgets.QApplication.instance().clipboard().setText(rowName)
+            
+    @pyqtSlot()
+    @safeWrapper
+    def slot_copySelection(self):
+        # TODO 2023-11-17 15:00:12
+        quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+        withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        
         
     @pyqtSlot(QtWidgets.QTableWidgetItem)
     @safeWrapper
