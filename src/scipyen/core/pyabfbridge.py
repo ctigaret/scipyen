@@ -564,6 +564,11 @@ class ABFEpoch:
     @epochNumber.setter
     def epochNumber(self, val):
         self.number = val
+        
+    @property
+    def epochType(self) -> ABFEpochType:
+        """Alias to self.type"""
+        return self._epochType_
     
     @property
     def type(self) -> ABFEpochType:
