@@ -574,6 +574,28 @@ function doneuron ()
     fi
 }
 
+function dofenicsx ()
+{
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    if [[ `id -u` -eq 0 ]] ; then
+        py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+        sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
+    else
+        py_exec=${python_exec}
+        sip_wheel_exec=sip-wheel
+    fi
+    
+    if [ ! -r ${VIRTUAL_ENV}/.fenicsxdone ] || [[ $reinstall_fenicsx -gt 0 ]]; then
+        mkdir -p ${VIRTUAL_ENV}/src && cd $VIRTUAL_ENV/src
+        
+        findcmake
+        
+    fi
+}
+
 function make_scipyenrc () 
 {
 # When the installer script is run as regular user, it will create 
@@ -751,10 +773,12 @@ using_python=""
 install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
+install_fenicsx=0
 njobs=4
 reinstall_pyqt5=0
 reinstall_vigra=0
 reinstall_neuron=0
+reinstall_fenicsx=0
 reinstall_pips=0
 reinstall_desktop=0
 refresh_git_repos=0
@@ -792,6 +816,10 @@ for i in "$@" ; do
         ;;
         --with_coreneuron)
         use_core_neuron=1
+        shift
+        ;;
+        --with_fenicsx)
+        install_fenicsx=1
         shift
         ;;
         --install_dir=*)
@@ -838,6 +866,9 @@ for i in "$@" ; do
             NEURON)
             reinstall_neuron=1
             ;;    
+            fenicsx)
+            reinstall_fenicsx=1
+            ;;
             pips)
             reinstall_pips=1
             ;;
@@ -980,6 +1011,10 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     # build neuron NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     if [ $install_neuron -ne 0 ] ; then
         doneuron
+    fi
+    
+    if  [ $install_fenicsx -ne 0 ] ; then
+        dofenicsx
     fi
     
     # make scripts
