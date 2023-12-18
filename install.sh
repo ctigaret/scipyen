@@ -112,25 +112,34 @@ function makevirtenv ()
     # virtual python environment - that is, it contains a file named "pyenv.cfg"
     # containing "virtualenv" in it, has a "bin" directory with "activate" script,
     # which can be sourced to generate VIRTUAL_ENV variable)
-    if [ -d $install_dir/$virtual_env ] ; then
-        if [ -a $install_dir/$virtual_env/pyvenv.cfg ] ; then
-            aa=`cat $install_dir/$virtual_env/pyvenv.cfg | grep "virtualenv"`
+#     if [ -d $install_dir/$virtual_env ] ; then
+    if [ -d $virtual_env ] ; then
+#         if [ -a $install_dir/$virtual_env/pyvenv.cfg ] ; then
+        if [ -a $virtual_env/pyvenv.cfg ] ; then
+#             aa=`cat $install_dir/$virtual_env/pyvenv.cfg | grep "virtualenv"`
+            aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
             if [ -n "$aa" ] ; then
-                if [ ! -d $install_dir/$virtual_env/bin ] ; then
-                    echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+#                 if [ ! -d $install_dir/$virtual_env/bin ] ; then
+                if [ ! -d $virtual_env/bin ] ; then
+#                     echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                     exit 1
                 fi
-                if [ ! -r $install_dir/$virtual_env/bin ] ; then
-                    echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+#                 if [ ! -r $install_dir/$virtual_env/bin ] ; then
+                if [ ! -r $virtual_env/bin ] ; then
+#                     echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                     exit 1
                 fi
                 
                 echo -e "Virtual environment found; activating it...\n"
                 
-                source $install_dir/$virtual_env/bin/activate
+#                 source $install_dir/$virtual_env/bin/activate
+                source $virtual_env/bin/activate
                 
                 if [[ -z ${VIRTUAL_ENV} ]]; then
-                    echo -r "Cannot activate a virtual environment from  $install_dir/$virtual_env . Goodbye!\n"
+#                     echo -r "Cannot activate a virtual environment from  $install_dir/$virtual_env . Goodbye!\n"
+                    echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
                     exit 1
                 fi
                 
@@ -141,26 +150,31 @@ function makevirtenv ()
                 
                 
             else
-                echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+#                 echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                 exit 1
             fi 
         fi
     else
 #         ${python_executable} -m virtualenv --python ${python_executable} $install_dir/$virtual_env && source $install_dir/$virtual_env/bin/activate
-        ${python_executable} -m virtualenv --python ${python_executable} $install_dir/$virtual_env
+        ${python_executable} -m virtualenv --python ${python_executable} $virtual_env
         
         if [[ $? -ne 0 ]] ; then
-            echo -e "Could NOT create a virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+#             echo -e "Could NOT create a virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+            echo -e "Could NOT create a virtual environment at ${virtual_env}. Bailing out...\n"
             exit 1
         fi
 
-        echo -e "Virtual environment created at ${install_dir}/${virtual_env}\n"
+#         echo -e "Virtual environment created at ${install_dir}/${virtual_env}\n"
+        echo -e "Virtual environment created at ${virtual_env}\n"
         echo -e "Activating the virtual environment\n"
         
-        source $install_dir/$virtual_env/bin/activate
+#         source $install_dir/$virtual_env/bin/activate
+        source $virtual_env/bin/activate
         
         if [[ $? -ne 0 ]] ; then
-            echo -e "Could NOT activate the virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+#             echo -e "Could NOT activate the virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+            echo -e "Could NOT activate the virtual environment at ${virtual_env}. Bailing out...\n"
             exit 1
         fi
         
@@ -694,7 +708,7 @@ shopt -s lastpipe
 cat <<END > ${target_dir}/scipyen 
 #! /bin/sh
 if [ -z \${VIRTUAL_ENV} ]; then
-source ${install_dir}/${virtual_env}/bin/activate
+source ${virtual_env}/bin/activate
 fi
 git -C $scipyendir rev-parse 2>/dev/null;
 if [[ \$? -eq 0 ]]; then
@@ -953,8 +967,13 @@ echo -e "Will install in ${install_dir}"
 # echo "python minor": $minor
 # echo "python micro": $micro
 
-virtual_env=${virtual_env_pfx}.$pyver
-python_exec="python${major}.${minor}"
+if ! [ -v VIRTUAL_ENV ] ; then
+    virtual_env={$install_dir}/${virtual_env_pfx}.$pyver
+    python_exec="python${major}.${minor}"
+else
+    virtual_env=$VIRTUAL_ENV
+    python_exec=$VIRTUAL_ENV/bin/"python${major}"
+fi
 
 if [[ `id -u ` -eq 0 ]] ; then
 #     echo "running as root"
@@ -963,7 +982,7 @@ else
     python_executable=${python_exec}
 fi
 
-echo -e "virtual_env is ${virtual_env} \n\twith full path ${install_dir}/${virtual_env}"
+echo -e "virtual_env is ${virtual_env}"
 echo -e "python executable: ${python_executable}"
 
 
@@ -973,6 +992,8 @@ if ! [ -v VIRTUAL_ENV ] ; then
 # these two MUST be run
 makevirtenv
 # upgrade_virtualenv && makevirtenv
+else
+    virtual_env=$VIRTUAL_ENV
 fi
 
 
@@ -990,7 +1011,7 @@ fi
 # exit
 
 if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
-    echo -e "Checking for / making 'src' directory inside $VIRTUAL_ENV ...\n"
+    echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
