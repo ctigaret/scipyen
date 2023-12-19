@@ -255,8 +255,8 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     @pyqtSlot(float)
     def _slot_setAge(self, value):
         spinBox = self.sender()
-        self._age = value * sender.units
-        self._age_units = sender.units
+        self._age = value * spinBox.units
+        self._age_units = spinBox.units
         
         self.sig_valueChanged.emit()
             

@@ -3589,6 +3589,9 @@ events:list                                     neo.Event,
     
     reverse = not ascending
     
+    # NOTE: 2023-12-19 09:42:53
+    # ### BEGIN parse args
+    
     if len(args) == 0:
         return None
     
@@ -3630,6 +3633,11 @@ events:list                                     neo.Event,
                 raise TypeError(f"The following workspace objects are of the wrong type; expecting {neo.Block.__name__}")
             
             args = [ws[a] for a in args]
+            
+    # ### END parse args
+    
+    # NOTE: 2023-12-19 09:43:19
+    # ### BEGIN main code
 
     if isinstance(args, neo.Block):
         # nothing to here: return the source, or a copy of it
@@ -3663,24 +3671,109 @@ events:list                                     neo.Event,
                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
                             **annotations)
         
+        
+        firstBlockDatetime = args[0].rec_datetime
+        
         for (k,arg) in enumerate(args):
-            # copy arg to a new block; the **kwargs will take care of 
-            # selective copy of segments and of their contents
+            # copy arg to a new block (block_src_copy); the **kwargs will take 
+            # care of selective copy of segments and of their contents
             try:
-                new_block = copy_with_data_subset(arg, **kwargs)
+                block_src_copy = copy_with_data_subset(arg, **kwargs)
             except:
                 print(f"*****\nCannot copy block {k} (named: {getattr(arg, 'name', None)}) with data subset\n*****\n")
                 raise 
             
             # NOTE: 2023-05-22 17:46:34 
             # propagate time & file stamps to these segments
-            for seg in new_block.segments:
-                seg.rec_datetime = new_block.rec_datetime
-                seg.file_origin = new_block.file_origin
-            ret.segments.extend(new_block.segments)
+            # 
+            # NOTE: 2023-12-19 09:52:44
+            # store the time interval(in s) since the last prev block (may be 0):
+            deltaSeconds = (block_src_copy.rec_datetime - firstBlockDatetime).total_seconds() * pq.s
+            
+            for seg in block_src_copy.segments:
+                seg.rec_datetime = block_src_copy.rec_datetime # not quite correct, is it ?!?
+                seg.file_origin = block_src_copy.file_origin
+                
+                # NOTE: 2023-12-19 09:48:51
+                # also propagate the time to the t_start of contained signals,
+                # RELATIVE to the first segment
+                for sig in seg.analogsignals:
+                    sig.t_start += deltaSeconds
+                    
+                for sig in seg.irregularlysampledsignals:
+                    if check_time_units(sig.times):
+                        sig.times += deltaSeconds
+                        
+                if len(seg.events):
+                    evts = list()
+                    for event in seg.events:
+                        if check_time_units(event.times):
+                            # NOTE: 2023-12-19 10:55:13
+                            # an event may be a DataMsrk or TriggerEvent, not just neo.Event!
+                            evt = event.__class__(times = event.times + deltaSeconds,
+                                                  labels = event.labels, 
+                                                  units = event.units,
+                                                  name = event.name,
+                                                  description = event.description,
+                                                  file_origin = event.file_origin)
+                            evt.annotations.update(event.annotations)
+                            evt.array_annotate(*event.array_annotations)
+                            evts.append(evt)
+                        else:
+                            evts.append(event)
+                            
+                    seg.events = evts
+                        
+                if len(seg.epochs):
+                    epchs = list()
+                    for epoch in seg.epochs:
+                        if check_time_units(epoch.times):
+                            # NOTE: 2023-12-19 10:58:26
+                            # this may be a DataZone!
+                            epch = epoch.__class__(times = epoch.times + deltaSeconds,
+                                                   durations = epopch.durations,
+                                                   labels = epoch.labels,
+                                                   units = epoch.units,
+                                                   name = epoch.name,
+                                                   description = epoch.description,
+                                                   file_origin = epoch.file_origin,
+                                                   )
+                            epch.annotations.update(epoch.annotations)
+                            epch.array_annotate(*epoch.array_annotations)
+                            epchs.append(epch)
+                        else:
+                            epchs.append(epoch)
+                        
+                if len(seg.imagesequences):
+                    for iseq in seg.imagesequences:
+                        iseq.t_start += deltaSeconds
+                        
+                if len(seg.spiketrains):
+                    stt = list()
+                    for st in seg.spiketrains:
+                        st_copy = neo.SpikeTrain(st.times + deltaSeconds,
+                                                 st.t_stop + deltaSeconds, 
+                                                 units = st.units, 
+                                                 sampling_rate=st.sampling_rate,
+                                                 t_start = st.t_start + deltaSeconds, 
+                                                 waveforms = st.waveforms, 
+                                                 left_sweep = st.left_sweep, 
+                                                 name = st.name, 
+                                                 file_origin = st.file_origin, 
+                                                 description = st.description)
+                        
+                        st_copy.annotations.update(st.annotations)
+                        st_copy.array_annotate(*st_array_annotations)
+                        stt.append(st_copy)
+                        
+                    seg.spiketrains.clear()
+                    for s in stt:
+                        seg.spiketrains.append(s)
+                        
+            ret.segments.extend(block_src_copy.segments)
 
-            if len(new_block.groups):
-                for group in new_block.groups:
+            if len(block_src_copy.groups):
+                for group in block_src_copy.groups:
                     existing_groups = [g for g in ret.groups if g.name == group.name]
                     
                     if len(existing_groups):
@@ -3696,7 +3789,7 @@ events:list                                     neo.Event,
                         # NOTE 2021-11-24 09:56:33
                         # see also NOTE: 2021-11-24 09:12:32
                         if child_class_name != "ChannelView":
-                            data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_block.segments]))
+                            data = list(chain(*[s.list_children_by_class(child_class_name) for s in block_src_copy.segments]))
                             objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
                     
                     if len(objects):
@@ -3718,7 +3811,7 @@ events:list                                     neo.Event,
                         if hasattr(group, "channelviews") and len(group.channelviews):
                             for channelview in group.channelviews:
                                 if isinstance(channelview.obj, neo.core.basesignal.BaseSignal):
-                                    data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in new_block.segments]))
+                                    data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in block_src_copy.segments]))
                                     if any(is_same_as(channelview.obj, o_) for o_ in data):
                                         new_channelview = neo.ChannelView(channelview.obj,
                                                                         index = channelview.index, 
@@ -3734,6 +3827,8 @@ events:list                                     neo.Event,
     else:
         raise TypeError("Expecting a neo.Block or a sequence of neo.Block objects, got %s instead" % type(args).__name__)
 
+    # ### END main block
+    
     # finally, rename segments
     for k, s in enumerate(ret.segments):
         s.name = f"segment_{k}"

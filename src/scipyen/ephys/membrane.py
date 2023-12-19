@@ -50,7 +50,7 @@ import core.workspacefunctions as wf
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models
-import core.datatypes  
+import core.datatypes as datatypes 
 import plots.plots as plots
 import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)

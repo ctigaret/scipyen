@@ -472,6 +472,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def maximum(self):
         return super().maximum() * self.units
     
+    # def decimals(self)d
+    
     def value(self):
         """ Reimplements QDoubleSpinBox.value() to return a quantity
         """
@@ -487,10 +489,16 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         return val * self.units
     
+    def getDecimals(self) -> int:
+        return super().decimals()
+    
     def validate(self, text, pos):
         validator = InftyDoubleValidator(parent=self)
         validator.suffix = self.suffix()
-        validator.setDecimals(self.decimals()) # self.decimals() inherited from QDoubleSpinBox
+        validator.setDecimals(self.getDecimals()) 
+        # NOTE: 2023-12-19 14:37:35
+        # self.decimals is an int property, for a function !!!
+        # validator.setDecimals(self.decimals) # self.decimals inherited from QDoubleSpinBox
         valid = validator.validate(text, pos)
         validstr = validatorString(valid[0])
         # print(f"{self.__class__.__name__}[{self.objectName()}].validate text: {text}, pos: {pos} ⇒ {validstr}")

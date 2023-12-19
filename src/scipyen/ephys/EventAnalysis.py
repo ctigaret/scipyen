@@ -1372,7 +1372,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
             
     def _extract_waves_(self, train, valid_only=False):
-        """Extracts event wavforms from the train.
+        """Extracts event waveforms from the train.
         Calls neoutils.extract_spike_train_waveforms then annotates the waveforms with information
         useful for event tagging in the plotted signal.
         """
