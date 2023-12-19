@@ -1060,6 +1060,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._refresh_signalNameComboBox()
         self._refresh_epochComboBox()
         
+        print(f"{self.__class__.__name__}.displayFrame: currentFrame = {self.currentFrame}; ephysViewer current frame = {self._ephysViewer_.currentFrame}")
+        
         if self._ephysViewer_.yData is None:
             if isinstance(self._data_, (neo.Block, neo.Segment)):
                 doctitle = self._data_.name
@@ -1082,11 +1084,13 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 if len(waves_in_current_frame):
                     w = waves_in_current_frame[0]
                     events_frame = self._all_waves_.index(w)
-                    self.eventsViewer.currentFrame = events_frame
+                    # self.eventsViewer.currentFrame = events_frame
                     return
                 
             else:
                 self._slot_plot_detected_events_in_sweep_()
+        
+        print(f"{self.__class__.__name__}.displayFrame: after events plot: currentFrame = {self.currentFrame}; ephysViewer current frame = {self._ephysViewer_.currentFrame}")
         
     def clear(self):
         if isinstance(self._ephysViewer_,sv.SignalViewer):
@@ -5308,14 +5312,14 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     
 def launch():
     try:
-        win = mainWindow.newViewer(EventAnalysis, parent = mainWindow, win_title="Synaptic Events")
+        win = mainWindow.newViewer(EventAnalysis, parent = mainWindow, win_title="Events Analysis")
         win.show()
     except:
         traceback.print_exc()
         
         
 def init_scipyen_plugin():
-    return {"Applications|Synaptic Events Analysis":launch}
+    return {"Applications|Events Analysis":launch}
 
 
     
@@ -5332,7 +5336,7 @@ class EventAnalysisMagics(Magics):
         mw = local_ns.get("mainWindow", None)
         
         if mw.__class__.__name__ == "ScipyenWindow":
-            win = mw.newViewer(EventAnalysis, parent=mw, win_title="EventAnalysis")
+            win = mw.newViewer(EventAnalysis, parent=mw, win_title="Events Analysis")
             if isinstance(data,  neo.Block):
                 win.view(data)
             else:

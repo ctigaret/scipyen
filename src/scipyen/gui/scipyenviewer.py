@@ -1258,7 +1258,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         
         NOTE: Subclasses can reimplement this function.
         """
-        #print(f"ScipyenFrameViewer<{self.__class__.__name__}> slot_setFrameNumber {value}")
+        print(f"ScipyenFrameViewer<{self.__class__.__name__}> slot_setFrameNumber {value}")
         
         if isinstance(value, int):
             if value not in range(self._number_of_frames_):
