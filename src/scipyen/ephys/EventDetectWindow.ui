@@ -1192,7 +1192,7 @@
   </action>
   <action name="actionPlot_detected_events">
    <property name="icon">
-    <iconset theme="tag">
+    <iconset theme="view-preview">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">

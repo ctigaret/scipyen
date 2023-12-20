@@ -1066,7 +1066,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         self._refresh_signalNameComboBox()
         self._refresh_epochComboBox()
         
-        print(f"{self.__class__.__name__}.displayFrame: currentFrame = {self.currentFrame}; ephysViewer current frame = {self._ephysViewer_.currentFrame}")
+        # print(f"{self.__class__.__name__}.displayFrame: currentFrame = {self.currentFrame}; ephysViewer current frame = {self._ephysViewer_.currentFrame}")
         
         if self._ephysViewer_.yData is None:
             if isinstance(self._data_, (neo.Block, neo.Segment)):
@@ -1096,7 +1096,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             else:
                 self._slot_plot_detected_events_in_sweep_()
         
-        print(f"{self.__class__.__name__}.displayFrame: after events plot: currentFrame = {self.currentFrame}; ephysViewer current frame = {self._ephysViewer_.currentFrame}")
+        # print(f"{self.__class__.__name__}.displayFrame: after events plot: currentFrame = {self.currentFrame}; ephysViewer current frame = {self._ephysViewer_.currentFrame}")
         
     def clear(self):
         if isinstance(self._ephysViewer_,sv.SignalViewer):
@@ -1950,6 +1950,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     def _slot_plot_detected_events_in_sweep_(self):
         if not isinstance(self._ephysViewer_, sv.SignalViewer):
             return
+        
+        # print(f"{self.__class__.__name__}._slot_plot_detected_events_in_sweep_: currentFrame = {self.currentFrame}")
         
         frameResult = self._result_[self.currentFrame] # a spike train list or None !!!
         
@@ -4399,7 +4401,9 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             
     @pyqtSlot(int)
     def _slot_eventsViewer_frame_changed(self, value):
-        signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._detected_Events_Viewer_,)]
+        # NOTE: 2023-12-20 13:29:51
+        # also block signals from self._events_spinBoxSlider_
+        signal_blockers = [QtCore.QSignalBlocker(w) for w in (self._detected_Events_Viewer_,self._events_spinBoxSlider_)]
         self._events_spinBoxSlider_.value = value
         
         if not self._template_showing_:
@@ -4408,7 +4412,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
                 wave = self._detected_Events_Viewer_.yData[value]
                 segment_index = wave.segment.index
                 if isinstance(self._ephysViewer_, sv.SignalViewer) and self._ephysViewer_.isVisible():
-                    if segment_index != self._ephysViewer_.currentFrame:
+                    if self._plots_all_waves_ and segment_index != self._ephysViewer_.currentFrame:
                         self._ephysViewer_.currentFrame = segment_index
                         self._targets_cache_.clear()
                         sigBlock = QtCore.QSignalBlocker(self._frames_spinBoxSlider_)

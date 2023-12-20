@@ -909,8 +909,12 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if isinstance(appWindow, QtWidgets.QMainWindow) and type(appWindow).__name__ != "ScipyenWindow":
             self._appWindow_ = appWindow
             
-        else:
-            self._appWindow_ = self._scipyenWindow_
+        elif self._appWindow_ is None:
+            if isinstance(parent, QtWidgets.QMainWindow):
+                self._appWindow_ = parent
+                
+            else:
+                self._appWindow_ = self._scipyenWindow_
                     
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)  

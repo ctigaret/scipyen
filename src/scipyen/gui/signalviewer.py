@@ -7602,7 +7602,7 @@ signals in the signal collection.
         
         self.currentFrameAnnotations = None
         
-        # print(f"SignalViewer.displayFrame {self._yData_}")
+        # print(f"SignalViewer({self._winTitle_}).displayFrame {self.currentFrame}")
         
         self._plot_data_(self._yData_, *self.plot_args, **self.plot_kwargs)
         
