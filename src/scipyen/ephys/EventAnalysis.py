@@ -144,6 +144,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self._plots_all_waves_ = False
         
+        self._new_data_ = False
+        
         # NOTE: 2022-11-20 11:36:08
         # For each segment in data, if there are spike trains with event time
         # stamps, store them here - see membrane.batch_mPSC() for how such a 
@@ -934,7 +936,11 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
         
         self._frames_spinBoxSlider_.range = range(0, self._number_of_frames_)
         
+        self._new_data_ = True
+        
         self._plot_data()
+        
+        self._new_data_ = False
         
         total_evts, acc_evts = self._tally_events()
         self._report_events_tally(total_evts, acc_evts)
@@ -1715,6 +1721,10 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             if not isinstance(self._ephysViewer_,sv.SignalViewer):
                 self._init_ephysViewer_()
             else:
+                if self._new_data_:
+                    # NOTE: 2023-12-20 08:26:43
+                    # needed to update the signal viewer
+                    self._ephysViewer_.view(self._data_, doc_title=self._data_.name)
                 # NOTE: 2022-12-15 13:39:32
                 # see NOTE: 2022-12-15 13:37:54
                 receivers = self._ephysViewer_.receivers(self._ephysViewer_.sig_axisActivated)
