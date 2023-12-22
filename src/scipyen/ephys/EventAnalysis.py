@@ -1406,7 +1406,7 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
             except Exception as e:
                 traceback.print_exc()
                 excstr = traceback.format_exception(e)
-                msg = f"Event {kw} in sweep {segment}:\n{excstr[-1]}"
+                msg = f"Event {kw} in sweep {train.segment}:\n{excstr[-1]}"
                 self.criticalMessage("Extract waves",
                                         "\n".join(excstr))
                 return
