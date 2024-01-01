@@ -235,6 +235,9 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
+EphysEntity = collections.namedtuple("EphysEntity", ["name", "adc", "dac", "dig", "ttldac"],
+                                     defaults=["cell", 0, 0, [0], None])
+
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
                         # but OK with other ElectrodeMode
@@ -327,7 +330,7 @@ experimental conditions -- possibly, a subset of a larger experiment where
 several conditions were applied in sequence.
 
 All sweeps in the episode must have been recorded during the same conditions.
-
+    
 Examples:
 =========
 
@@ -442,7 +445,7 @@ of the source data.
     
 """
     # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
-    def __init__(self, protocol:ElectrophysiologyProtocol, /, *args,
+    def __init__(self, /, *args, protocol:typing.Optional[ElectrophysiologyProtocol] = None,
                  episodeType:RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name:typing.Optional[str] = None,
                  segments:typing.Optional[GeneralIndexType] = None,
@@ -459,18 +462,10 @@ of the source data.
                  **kwargs):
         """Constructor for RecordingEpisode.
 
-Positional (mandatory) parameters:
----------------------------------
-protocol: the electrophysiology experimental protocol
-    WARNING: Currently, (2023-10-15 21:15:01) only pyabfbridge.ABFProtocol
-        objects are supported
-
-
 Var-positional parameters (args):
 --------------------------------
-neo.Blocks, or a sequence of neo.Blocks, a str, or a sequence of str
-    When a str or a sequence of str, these are (a) symbol(s) in the workspace,
-    bound to neo.Blocks
+neo.Block, a sequence of neo.Blocks, a neo.Segment, or a sequence of neo.Segments,
+    or: a str, or a sequence of str (symbol(s) in the workspace, bound to neo.Blocks)
 
     When a str, if it contains the '*' character then the str is interpreted as 
     a global search string (a 'glob'). See neoutils.concatenate_blocks(…) for 
@@ -483,6 +478,9 @@ episode.
 
 Named parameters:
 ------------------
+protocol: the electrophysiology experimental protocol
+    WARNING: Currently, (2023-10-15 21:15:01) only pyabfbridge.ABFProtocol
+        objects are supported
 name:str - the name of this episode
 
 episodeType: type of the episode (see RecordingEpisodeType)
@@ -506,9 +504,9 @@ See also the class documentation.
         super().__init__(name, **kwargs)
         
         self._type_ = episodeType
-        
-        if not isinstance(protocol, ElectrophysiologyProtocol):
-            raise TypeError(f"Expecting an ElectrophysiologyProtocol (e.g. pyabfbridge.ABFProtocol); instead, got a {type(protocol).__name__}")
+#         
+#         if not isinstance(protocol, ElectrophysiologyProtocol):
+#             raise TypeError(f"Expecting an ElectrophysiologyProtocol (e.g. pyabfbridge.ABFProtocol); instead, got a {type(protocol).__name__}")
         
         
         self.protocol = protocol
@@ -569,7 +567,7 @@ See also the class documentation.
         #   when trying to match an episode with data having the wrong number of sweeps
         if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
             if len(self.pathways) == 0:
-                raise ValueError("Cannot apply crosstalk when there are not pathways defined")
+                raise ValueError("Cannot apply crosstalk when there are no pathways defined")
             
             for k,p in xtalk.items():
                 if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
@@ -586,45 +584,50 @@ See also the class documentation.
         else:
             raise ValueError(f"Invalid xtalk specification ({xtalk})")
         
-        # NOTE: 2023-10-16 15:20:53
-        # for now, do away with *args and sort
-                
-#         sort = sortby is not None
-#         
-#         reverse = not ascending
+        self._data_ = None
         
-#         if len(args): 
-#             if all(isinstance(v, neo.Block) for v in args):
-#                 source = args
-#                 
-#             elif all(isinstance(v, str) for v in args):
-#                 source = wf.getvars(*args, var_type = (neo.Block,),
-#                                sort=sort, sortkey = sortby, reverse = reverse)
-#                 
-#             elif len(args) == 1:
-#                 if isinstance(args[0], (tuple, list)) :
-#                     if all(isinstance(v, neo.Block) for v in args[0]):
-#                         source = args[0]
-#                         
-#                     elif all(isinstance(v, str) for v in args[0]):
-#                         source = wf.getvars(args[0], var_type = (neo.Block,),
-#                                           sort=sort, sortkey = sortby, reverse=reverse)
-#                 
-#             else:
-#                 raise TypeError(f"Bad source arguments")
-#         else:
-#             source = []
-#         
-#         if len(source):
-#             self.begin = source[0].rec_datetime
-#             self.end = source[-1].rec_datetime
-#             if segments is not None:
-#                 seg_ndx = [normalized_index(b.segments, index=segments) for b in source]
-#                 nsegs = sum(len(n) for n in seg_ndx)
-#             else:
-#                 nsegs = sum(len(b.segments) for b in source)
-#             self.beginFrame = 0
-#             self.endFrame = nsegs-1 if nsegs > 0 else 0
+        if len(args) == 0:
+            return
+        
+    def _parse_args_(self, *args):
+        if len(args) == 0:
+            return
+        
+        # NOTE: 2023-12-27 12:39:58
+        # Prerequisite #1: that all neo blocks must have the same number of 
+        # segments (sweeps)
+        #
+        # However, this is only useful for LTP experiments with interleaved pathways
+        # so better not to enforce it
+        #
+        # if all(isinstance(a, neo.Block) for a in args):
+        #     if len(args) > 1:
+        #         assert all(len(args[0].segments) == len(a.segments) for a in args [1:]), "All blocks must contain the same number of segments"
+        
+        # NOTE: 2023-12-27 12:44:26
+        # when several pathways are recorded, we need a mapping that tells which
+        # segments in each block belongs to which pathway
+        #
+        # We search for such mapping in the following places:
+        # 1) self._pathways_ # to decide how to structure this
+        # 2) the annotations in each block
+        # 3) the annotations in each segment of each block
+        #
+        # (1) in the first case we need to decide what / how to implement
+        #   to be used as a mechanism to annotate post-hoc
+        #
+        # (2) second case requires annotating the block - typically, at 
+        #   recording time ⟹ this can be done when the experiment is run from
+        #   within Scipyen; otherwise we need a mechanism to annotate post-hoc
+        #   → fall-back on case (1)
+        #
+        # (3) third case, like case (2) requires annotating each segment
+        #   Like case (2) thish would be done at the recording time, hence when
+        #   the experiment is run from within Scipyen; otherwise, we need a 
+        #   mechanism to annotate post-hoc.
+        #   → fall-back on case (1)
+        
+        
         
     def _repr_pretty_(self, p, cycle):
         supertxt = super().__repr__() + " with :"
@@ -723,8 +726,7 @@ class SynapticPathway(BaseScipyenData):
     """Encapsulates a logical stimulus-response relationship between signals.
 
     Signals are identified by name or their integer index in the collection of a 
-    neo.Segment (sweep) analogsignals. They are NOT stored in the SynapticPathway
-    instance.
+    neo.Segment (sweep) analogsignals. 
 
     These signals are:
     • response (analog, regularly sampled): recorded synaptic responses

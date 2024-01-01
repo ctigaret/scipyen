@@ -444,8 +444,33 @@ Digital Outputs chacked on Channel #0, with
     nDigitalInterEpisode = 0
     
 
-    
-    
+NOTE:
+
+Typical mapping of outputs & inputs in pClamp (NOTE: these must be configured in
+the "LabBench" in the Clampex software)
+
+Amplifier 
+
+Inputs (ADC)                                    | Outputs (DAC)         
+-------------------------------------------------------------------------------------------
+# |    Name (aliases)   | Amplifier output      | # |   Name (aliases)  | Amplifier input
+-------------------------------------------------------------------------------------------
+0 | Im_prim_0 Vm_prim_0 | Channel 0 primary     | 0 | V/I_Clamp_0       | Channel 0 command
+1 | Vm_sec_0  Im_sec_0  | Channel 0 secondary   | 0 |                   | Channel 0 command
+                          (if available)
+-------------------------------------------------------------------------------------------
+These are available only for dual-channel amplifiers (e.g. MultiClamp)
+2 |                     | Channel 1 primary     | 1 | V/I_Clamp_1       | Channel 1 command
+3 |                     | Channel 1 secondary   | 1 |                   | Channel 1 command
+-------------------------------------------------------------------------------------------
+From here onwards, any signal source can be input into the ADCs below; for example,
+one may feed a branch of a digital output (from either the DAQ board or some other 
+device such as an image acquisition workstation - e.g. linescan TTLs or frame TTLs)
+ - or an analog signal (e.g. from a temperature sensor, etc) into one of these.
+4 |                                             
+5 |                                                 
+6 |
+7 |
 
 """
 import typing, struct, inspect, itertools, functools, warnings, pathlib
@@ -1190,6 +1215,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         • has "Digital Outputs" enabled in the corresponding 'Channel #' sub-tab
             of the "Waveform" tab in Clampex protocol editor; 
         
+            NOTE:
             ∘ when "Alternate Digital Outputs" is disabled in the "Waveform" tab:
                 ⋆ this is the only DAC that associates digital output in the protocol
                 ⋆ the digital pattern defined in an epoch under this DAC's "Channel #"
@@ -1198,11 +1224,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             ∘ when "Alternate Digital Outputs" is enabled in the "Waveform" tab:
                 ⋆ this DAC will send the pattern defined here (under this DAC's
                     "Channel #" sub-tab), ONLY during even-numbered sweeps 
-                    (0, 2, 4, ...)
+                    (0, 2, 4, ...); this is the MAIN digital pattern
         
                 ⋆ the "alternative" pattern needs to be defined in ANOTHER DAC
                     sub-tab and will be emitted during odd-numbered sweeps
-                    (1, 3, 5, ...)
+                    (1, 3, 5, ...); this is the ALTERNATIVE digital pattern
         
                 ⋆ there can be only one alternate DIG pattern defined in any 
                     other DAC
@@ -1554,7 +1580,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     @property
     def ADCs(self):
         return self._inputs_
-        
+    
     def getADC(self, adcChannel:typing.Union[int, str] = 0, physical:bool=False) -> ABFInputConfiguration:
         if isinstance(adcChannel, str):
             if adcChannel not in self.adcNames:
@@ -1575,8 +1601,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
     def getInput(self, adcChannel:int = 0, physical:bool=False) -> ABFInputConfiguration:
         """Shorthand to self.getADC"""
-        return self.getADC(adcChannel, physical)
+        return self.getADC(adcChannel, physical=physical)
     
+    def inputConfiguration(self, adcChannel:typing.Union[int, str] = 0, physical:bool=False) -> ABFInputConfiguration:
+        """Calls getADC(…)"""
+        return self.getADC(adcChannel, physical=physical)
+        
     @property
     def DACs(self):
         return self._outputs_
@@ -1584,15 +1614,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
     @property
     def outputs(self):
         return self.DACs
-    
-    def outputConfiguration(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
-                            physical:bool=False) -> ABFOutputConfiguration:
-        """Reintroduced temporarily for back compatibility with existing scripts"""
-        return self.getDAC(dacChannel, physical)
-    
-    def getOutput(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
-                            physical:bool=False) -> ABFOutputConfiguration:
-        return self.getDAC(dacChannel, physical)
     
     def getDAC(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
@@ -1617,6 +1638,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
             chtype = "physical" if physical else "logical"
             raise ValueError(f"Invalid {chtype} DAC channel specified {dacChannel}")
             
+    def outputConfiguration(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+                            physical:bool=False) -> ABFOutputConfiguration:
+        """Reintroduced temporarily for back compatibility with existing scripts"""
+        return self.getDAC(dacChannel, physical)
+    
+    def getOutput(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+                            physical:bool=False) -> ABFOutputConfiguration:
+        return self.getDAC(dacChannel, physical)
+    
 class ABFInputConfiguration:
     """Deliberately thin class with basic info about an ADC input in Clampex.
         More information may be added for convenience later; until then, just

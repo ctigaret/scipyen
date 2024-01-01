@@ -386,8 +386,9 @@ class _LTPOnlineSupplier_(QtCore.QThread):
                 self._filesQueue_.remove(abf)
             
     def run(self):
-        print(f"{self.__class__.__name__}.run(): simulator = {self._simulator_}")
+        # print(f"{self.__class__.__name__}.run(): simulator = {self._simulator_}")
         if isinstance(self._simulator_, _LTPFilesSimulator_):
+            print(f"Starting simulation...")
             self._simulator_.start()
         else:
             # starts directory monitor and captures newly created files
@@ -429,28 +430,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     """Helper class for LTPOnline.
         Runs analysis on a single Clampex trial in a separate thread.
     """
-    # def __init__(self, parent, abfBuffer:collections.deque,
-    #              abfRunTimes:list, abfRunDeltaTimes:list, 
-    #              adcChannel:int, dacChannel:int, clampMode:ephys.ClampMode, 
-    #              monitorProtocol:pab.ABFProtocol, conditioningProtocol:pab.ABFProtocol,
-    #              episode:str,
-    #              responseBaselineDuration:pq.Quantity,
-    #              mbTestAmplitude:pq.Quantity,
-    #              mbTestStart: pq.Quantity,
-    #              mbTestDuration: pq.Quantity,
-    #              presynapticTriggers: dict,
-    #              landmarks:dict,
-    #              resultsData:dict, 
-    #              resultsAnalysis:dict,
-    #              viewers:dict,
-    #              sigIndex:typing.Optional[int],
-    #              signalAxes:list):
     def __init__(self, parent:QtCore.QObject, 
                  abfBuffer:collections.deque,
                  abfRunParams:dict,
                  presynapticTriggers: dict,
                  landmarks:dict,
-                 resultsData:dict, 
+                 data:dict, 
                  resultsAnalysis:dict,
                  viewers:dict):
         QtCore.QThread.__init__(self, parent)
@@ -459,7 +444,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         self._runParams_ = abfRunParams
         self._presynaptic_triggers_ = presynapticTriggers
         self._landmarks_ = landmarks
-        self._data_ = resultsData
+        self._data_ = data
         self._results_ = resultsAnalysis
         self._viewers_ = viewers
         
@@ -469,124 +454,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         """Reads and ABF protocol from the ABF file and analyses the data
         """
         
-        # NOTE: 2023-10-17 17:25:29
-        # heuristics to determine if the LTP experiment has more than one pathway - dowe need that ?!?
-        
-        # print(f"{self.__class__.__name__}.processAbfFile: abfFile: {abfFile}\n")
-        # WARNING: the Abf file may not be completed at this time, depending on 
-        # when this is called!
-        
-        
-        # logic:
-        #
-        # LTPOnline needs to provide either:
-        # A. a DataBag of run parameters which allow this function to infer
-        #   measures made on the recorded signals
-        #
-        # or :
-        #
-        # B. a DataBag of functions and locations (i.e. what and where) and 
-        #   indices of the analogsignals containing the synaptic responses to be
-        #   measured (the simplest case)
-        #
-        # A. the run parameters needs to supply:
-        # adcChannels: sequence of int (0-4 or 0-8, depending on the DAQ)
-        #   typically this has just one element (the recording ADC) but more unusual
-        #   circumstances might use two or more ADCs (e.g. parallel cell + field 
-        #   or even cell + cell recordings) or even more that two ADCs; the values 
-        #   in this parameter are indicate which AnalogSignal objects contain the 
-        #   relevant recorded signals
-        #
-        # dacChannels: sequence of int (0-3 or 0-7 depnding on the DAQ)
-        #   like adcChannels above, this usually has just one element, the index 
-        #   the DAC channel where the following are defined:
-        #       digital output pattern
-        #           if alternateDigitalOutputStateEnabled, this is the DAC where
-        #           the main DIG OUT pattern is defined; if this is one of DAC0
-        #           or DAC1, the alternative pattern is taken from DAC1 or DAC0,
-        #           respectively.
-        #
-        #       optional epochs with "analog" command waveform - recommended for 
-        #       patch-clamp & intracellular recordings, not for field recordings
-        #
-        #       optional intervening no-op epochs 
-        #
-        # digChannels: sequence of int (0-3 or 0-7 depending on the DAQ)
-        #    indices of DIG OUT channel used for synaptic stimulation;
-        #    needed when these channels cannot be determined from the protocol:
-        #       • TTLs are sent out through more than one DIG OUT, but there is only
-        #       one synaptic pathway that is beng stimulated (the other triggers 
-        #       might be used to operate other devices, etc)
-        #
-        #       • two pathways are stimulated¹, but TTLs are emitted through more
-        #       than two DIG OUT channels
-        #
-        # ---------------------------------------------------------------------
-        #
-        # first run: 
-        #   • runParams.protocol is None 
-        #   • create new episode named by runParams.episodeName ( ⇐ from LTPOnline, 
-        #        e.g GUI; if unnamed, use protocol.name) - do NOT use Episode/RecordingEpisode
-        #        just yet (classes are not fully functional)
-        #
-        #
-        #   • if runParams.currentProtocolIsConditioning:
-        #       ∘ do nothing - analysis of recordings during conditioning
-        #       would require bespoke measurements, better made offline
-        #       KISS!: just measure evolution of synaptic responses in monitoring
-        #           protocols.
-        #
-        #       ∘ register the episode & protocol for now
-        #
-        #       ∘ append the neo.Block to data for this episode
-        #       ABF protocol(s) for synaptic response monitoring and protocols
-        #       used for plasticity induction
-        #
-        #   • else:
-        #       ∘ get measurement landmarks:
-        #           ⋆ determine/create from the protocol -- see processProtocol for details
-        #
-        #           ⋆ OR: supplied by runParams (B)
-        #
-        #           ⋆ NOTE: either way, these MUST be cursor-based, and not 
-        #               neo.Epoch-based as in the offline LTP analysis script
-        #
-        #               This should allow the user to adjust cursor positions
-        #               slightly during acquisition
-        #
-        #       ∘ analyse the neo.Block of the supplied abf file, then:
-        #           ⋆ append the block to the data
-        #           ⋆ append results to the results dict in the corresponding episode
-        #           ⋆ populate plots
-        #
-        #
-        # subsequent runs:
-        #   • runParams.protocol is the previous run's protocol; 
-        #   
-        #   • if current protocol is same as runParams.protocol:
-        #       ∘ create new episode ONLY if instructed by runParams.newEpisode
-        #       with value (str = episode name) different that that of runParams.currentEpisodeName
-        #       ∘ else, use current episode
-        #       ∘ if runParams.currentProtocolIsConditioning:
-        #           ⋆ append the neo.Block (no analysis here)
-        #       ∘ else:
-        #           ⋆ check measurement landmarks ?
-        #
-        #   • else:
-        #       ∘ create new episode
-        #       ∘ if runParams.currentProtocolIsConditioning:
-        #           ⋆ do nothing, just store the neo.Block in the data under the 
-        #               new episode
-        #       ∘ else 
-        #           ⋆ analyse abf file/neo block, append results etc
-        #       
-        #
-        
         try:
             abfRun = pio.loadAxonFile(str(abfFile))
             self._runParams_.abfRunTimes.append(abfRun.rec_datetime)
             deltaMinutes = (abfRun.rec_datetime - self._runParams_.abfRunTimes[0]).seconds/60
             self._runParams_.abfRunDeltaTimes.append(deltaMinutes)
+            
+            # NOTE: 2023-12-29 14:59:01
+            # get the ADC channels from the signals in abfRun
             
             protocol = pab.ABFProtocol(abfRun)
 
@@ -597,10 +472,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # and set an appropriate interval between successive trials !
             assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
-            dacs = [protocol.outputConfiguration(c) for c in self._runParams_.dacChannels]
+#             if isinstance(self._runParams_.dacChannels, int):
+#                 dacs = [protocol.outputConfiguration(c) for c in range(self._runParams_.dacChannels)]
+#                 
+#             elif isinstance(self._runParams_.dacChannels, (tuple, list)) and all(isinstance(v, int) for v in self._runParams_.dacChannels):
+#                 dacs = [protocol.outputConfiguration(c) for c in self._runParams_.dacChannels]
             
-            if protocol.activeDACChannelIndex not in [d.number for d in dacs]:
-                raise ValueError(f"Neither dac in {self._runParams_.dacChannels} is the active DAC channel for this protocol")
+            # if protocol.activeDACChannelIndex not in [d.number for d in dacs]:
+            #     raise ValueError(f"Neither dac in {self._runParams_.dacChannels} is the active DAC channel for this protocol")
             
             if len(self._runParams_.episodes) == 0:
                 # this is the first run ever ⇒ create a new recording episode
@@ -608,23 +487,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if not isinstance(episodeName, str) or len(episodeName.strip()) == 0:
                     episodeName = protocol.name
                     
-                
-                    # episode = 
-            
             episodes = list(self._results_.keys())
             
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
             # 
             # upon first run, self._runParams_.protocol is None
-            if not isinstance(self._runParams_.protocol, pab.ABFProtocol):
-                self._runParams_.protocol = protocol
+            if not isinstance(self._runParams_.currentProtocol, pab.ABFProtocol):
+                self._runParams_.currentProtocol = protocol
                 # set up new episode
                 # since Clampex only runs on Windows, we simply split the string up:
                 #
                 episodeName = protocol.name
                 
-            elif protocol != self._runParams_.protocol:
+            elif protocol != self._runParams_.currentProtocol:
                 # a different protocol - here, newEpisode should have been "True"
                 # if not, then automatically set a new episode and "invent" a name 
                 # for it
@@ -638,7 +514,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # NOTE: 2023-09-29 14:12:56
             # we need:
             #
-            # 1) the recording mode must be the same, either:
+            # 1) the recording clamp mode must be the same, either:
             #   VoltageClamp, CurrentClamp, or NoClamp (i=0), for field recordings
             #
             # 2) on the active DAC index there must be epochs:
@@ -663,7 +539,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # which should have the same monitoring protocol
             #
             
-            if self._runParams_.protocol is None:
+            if self._runParams_.currentProtocol is None:
                 if protocol.clampMode() == self._runParams_.clampMode:
                     assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
                     if protocol.nSweeps == 2:
@@ -673,15 +549,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         # TODO check for alternate digital outputs → True ; alternate waveform → False
                         # → see # NOTE: 2023-10-07 21:35:39 - DONE ?!?
                     # self._runParams_.monitorProtocol = protocol
-                    self._runParams_.protocol = protocol
+                    self._runParams_.currentProtocol = protocol
                     self._runParams_.newEpisode = False
-                    self.processMonitorProtocol(protocol)
+                    self.processTrackingProtocol(protocol)
                 else:
                     raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._runParams_.clampMode}")
                 
             else:
                 # if protocol != self._runParams_.monitorProtocol:
-                if protocol != self._runParams_.protocol:
+                if protocol != self._runParams_.currentProtocol:
                     if self._runParams_.newEpisode:
                         if self._runParams_.currentEpisodeName is None:
                             self._runParams_.currentEpisodeName = protocol.name
@@ -701,11 +577,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                             if protocol != self._conditioningProtocol_:
 #                                 raise ValueError("Unexpected protocol for current run")
                 
-            if self._runParams_.protocol.nSweeps == 2:
+            if self._runParams_.currentProtocol.nSweeps == 2:
                 # if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
-                if not self._runParams_.protocol.alternateDigitalOutputStateEnabled:
+                if not self._runParams_.currentProtocol.alternateDigitalOutputStateEnabled:
                     # NOTE: this is moot, because the protocol has already been checked
-                    # in the processMonitorProtocol
+                    # in the processTrackingProtocol
                     raise ValueError("When the protocol defines two sweeps, alternate digtal outputs MUST have been enabled in the protocol")
                 # NOTE: 2023-10-07 21:35:39
                 # we are alternatively stimulating two pathways
@@ -721,7 +597,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
             # From here on we do things differently, depending on whether protocol is a
             # the monitoring protocol or the conditioning protocol
-            if protocol == self._runParams_.protocol:
+            if protocol == self._runParams_.currentProtocol:
                 adc = protocol.inputConfiguration(self._runParams_.adcChannel)
                 sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
                 # for k, seg in enumerate(abfRun.segments[:1]): # use this line for debugging
@@ -981,38 +857,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 return (self._data_, self._results_)
                 
-                
-    #             if isinstance(responses["amplitudes"]["path0"], IrregularlySampledDataSignal):
-    #                 if isinstance(responses["amplitudes"]["path1"], IrregularlySampledDataSignal):
-    #                     self._viewers_["amplitudes"].view([responses["amplitudes"]["path0"], responses["amplitudes"]["path1"]], 
-    #                                                       name=("Path 0", "Path 1"))
-    #                 else:
-    #                     self._viewers_["amplitudes"].view(responses["amplitudes"]["path0"], 
-    #                                                       symbolColor="black", symbolBrush="black")
-    #                     
-    #                 if len(self._abfRunDeltaTimes_) <= 1: # first run
-    #                     self._viewers_["amplitudes"].showLegends(True)
-                        
-                        
-                # if isinstance(responses["pprs"]["path0"],IrregularlySampledDataSignal):
-                #     if isinstance(responses["pprs"]["path1"], IrregularlySampledDataSignal):
-                #         self._viewers_["ppr"].view([responses["pprs"]["path0"], responses["pprs"]["path1"]], 
-                #                                    symbolColor="black", symbolBrush="black")
-                #     else:
-                #         self._viewers_["ppr"].view(responses["pprs"]["path0"], 
-                #                                    symbolColor="black", symbolBrush="black")
-                        
-                    # if len(self._abfRunDeltaTimes_) <= 1: # first run
-                    #     self._viewers_["ppr"].showLegends(True)
-                        
-                # if isinstance(responses["rs"], IrregularlySampledDataSignal):
-                #     if isinstance(responses["rincap"], IrregularlySampledDataSignal):
-                #         self._viewers_["rs"].view([mbTest["rs"], mbTest["rincap"]],symbolColor="black", symbolBrush="black")
-                #     else:
-                #         self._viewers_["rs"].view(mbTest["rs"],symbolColor="black", symbolBrush="black")
-                            
-                    # if len(self._abfRunDeltaTimes_) <= 1: # first run
-                    #     self._viewers_["rs"].showLegends(True)
         except:
             traceback.print_exc()
         
@@ -1042,10 +886,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self._runParams_.monitoringProtocols.append(protocol)
         
         if self._runParams_.newEpisode:
-            self.processMonitorProtocol(protocol)
+            self.processTrackingProtocol(protocol)
         
 
-    def processMonitorProtocol(self, protocol:pab.ABFProtocol):
+    def processTrackingProtocol(self, protocol:pab.ABFProtocol):
         """Infers the timings of the landmarks from protocol.
         Called only when self._monitorProtocol_ is None (i.e., at first run)
         """
@@ -1422,424 +1266,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
 class LTPOnline(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
-        
-NOTE: 2023-10-11 17:29:27
-For effective alternate DIG outputs onto the same cell, the protocol must have: 
-        alternate DIg outputs enabled
-        alternate waveforms DISabled
-        analog waveform enabled only in ONE DAC only (the DAC used)
-        see e.g. LTP protocols and the Cumulative EPSP DIg0AltDig1
-        protocol in the PrairieView (or Bruker) protocols collection
-        
-NOTE: 2023-10-08 20:55:15
-Description of supported Clampex protocol configurations:
-
-TL;DR:
-======
-  A synaptic tracking protocol has:
-
-  1 or 2 ADCs used for recording synaptic response: 
-    → 'adcChannel' parameter in c'tor
-  -----------------------------------------------------------------------------------
-  • 1   ⇒ for single cell or field 
-  • 2   ⇒ for recording two cells, from one cell + field recording or 
-        two field recordings (e.g. in two places)
-
-    TODO: allow the use of more than two relevant ADCs - say for recording of
-    field potentials from more than one place...
-
-    NOTE: there is no information in the protocol to distinguish this:
-    The user may select/enable several ADCs to record data from the cell,
-    field, or routing digital outputs to some ADC input to obtain records of
-    digital outputs, etc.
-
-    Therefore, we need a "free" parameter 'adcChannel' (int or list or tuple
-    of int) that is passed as parameter to the LTPOnline constructor and
-    indicates which ADC channels in the protocol (and analog signals in the 
-    stored file/neo,.Block) contain the actual synaptic responses.
-
-    This is only for the purpose of analysing the synaptic responses in the 
-    the expriment; other ADCs may be carrying auxiliary information, which
-    at the moment is irrelevant in the context of LTPOnline.
-  
-  1, 2 or more DACs used to send analog command waveform and digital outputs;
-    → 'dacChannel' and 'digChannel' parameters to the c'tor'
-  -----------------------------------------------------------------------------------
-
-        The 'dacChannel' is necessary to identify which DACs are being used
-        (I cannot figure how to work this out using the information in 
-        the ABF protocol, see NOTE: 2023-10-09 13:31:58 in pyabfbridge.py)
-
-    the analog command waveforms are used for membrane test in voltage or 
-        current clamp and/or for emulating TTL pulses (not recommended)
-
-    the digital outputs are used to stimulate synaptic pathways:
-    - distinct pathways require distinct DIG OUT channels
-    - when more than one pathway is used, the pathways can be stimulated:
-        alternatively (two pathways only) ⇒ even number of sweeps
-        simultaneously ⇒ no restriction on number of sweeps; 
-
-        HOWEVER: 
-            when recording from the same cell, the pathways MUST be 
-                stimulated alternatively, in order to distinguish them
-
-            when recording from two cells, or from a cell and field, the
-                pathways MAY be stimulated simultaneously ONLY IF each 
-                pathway targets a distinct cell, with no overlap
-        
-    Therefore, we also need a "free" parameter 'dacChannel' passed to the LTPOnline constructor
-    as an it or a tuple of two int:
-
-  • 1 DAC  
-        digitalOutputEnabled True (MANDATORY)
-        and alternateDACOutputStateEnabled False
-        and :
-            ⋆ alternateDigitalOutputStateEnabled False   ⇒ SINGLE CELL
-                    with 1 DIG OUT channel used: SINGLE PATHWAY (single stim box)
-                        straightforward - only one DIG OUT is used, for either:
-                            '*' (TRAIN) -> 1 or more pulses
-                            '1' (PULSE) -> a SINGLE TTL boxcar with 
-                                duration == actual duration of the epoch where
-                                the DIG OUT is defined
-                        
-        
-                    with >1 DIG OUT channels used: ⇒ posibly more than one 
-                        pathways are stimulated simultaneously
-                        - each DIG out may be used to stimulate something
-                        - if a TTL TRAIN ('*') -> train of TTLS
-                        - if a TTL PULSE ('1') -> a single TTL step ("boxcar")
-        
-                        - REQUIRES 'digChannel' parameter in c'tor to identify
-                         whch DIG OUT channels activate synaptic pathways
-        
-                        - WARNING when both trains and pulses are used in the same
-                        epoch:
-                            the digital pulse count and frequency for the epoch 
-                            defining the digital output is given by the TRAIN 
-                            pattern!
-        
-                            the duration of the digital PULSE (not TRAIN) is given
-                            by the actual duration of the epoch where the digital
-                            is defined (i.e., firstDuration + sweepNumber * deltaDuration)
-        
-            ⋆ alternateDigitalOutputStateEnabled True    ⇒ SINGLE CELL, 
-                    - dacChannel can only be either 0 or 1 (and the alternative
-                        digital output pattern being defined in Clampex on 
-                        the "other DAC", which is NOT pased to the LTPOnline
-                        contructor)
-        
-                    - REQUIRES even sweeps
-        
-                    - with 1 DIG OUT in the main DAC and 1 DIG OUT in the other 
-                        DAC, with distinct DIG OUT index per DAC ⇒ TWO PATHWAYS
-                        stimulated ALTERNATIVELY (WARNING: using the same DIG OUT
-                        index in both DACs defeats the purpose, but will NOT 
-                        raise error!)
-        
-                    - with > 1 DIG OUT in either DAC:
-                        REQUIRES 'digChannel' parameter in c'tor to identify
-                         which DIG OUT channels activate synaptic pathways
-                    
-
-        digitalOutputEnabled False ⇒ INCOMPATIBLE: one needs a way to stimulate
-            the pathways
-
-            NOTE: although TTLs can be "emulated" by DAC analog waveforms,
-            they need to be delivered to the tissue via either a simulus 
-            isolator, or through an amplifier headstage with the (extracellular)
-            electrode placed in the tissue.
-
-  • 2 or more DACs:
-        NOTE: When alternateDigitalOutputStateEnabled is True, ths can be only
-        on DAC0 or DAC1, hence the extra DAC indices must be > 1 ! For example one can use 
-        DAC0 or DAC1 with alternateDigitalOutputStateEnabled True, and
-        DAC2,  DAC3 etc as supplementary DACs
-        
-        If using 1 ADC ≡ single cell or field
-            One DAC is used to stimulate as with 1 DAC; but see restrictions above
-        
-            A second DAC can be used to emulate TTLs to trigger other devices 
-            (possibly synaptic stimulation via extracellular electrode or uncaging,
-            etc)
-        
-            REQUIRES 'digChannel' parameter in the c'tor.
-        
-        if using two or more ADCs (cell + cell or cell + field or 
-        field + field recordings):
-            two of these DACs are used to stimulate the corresponding cell/field
-                ideally, these should be DAC0 and DAC1, allowing them to stimulate
-                (groups of) pathways ALTERNATIVELY
-    
-            REQUIRES 'digChannel' parameter in the c'tor, to indicate which pathways
-        or groups of pathway are used
-        
-        NOTE: Only DAC0 and DAC1 can issue alternative ditigal trains
-            
-
-  A conditioning protocol has:
-        1 ADC, 1 DAC
-            the conditioned cell (or field)
-            alternateDigitalOutputStateEnabled False
-            alternateDACOutputStateEnabled False
-        • the ADC shuod be identical to one of the ADC channels in the preceding
-        tracking protocol
-        • the DAC has:
-            digitalOutputEnabled on at least one DIG OUT channel
-            (for either TRAIN or PULSE) - index of stimulated devices
-        
-            when there is only one DIG OUT, this indicates which pathway
-        is stimulated;
-            when there are > 1 DIG OUT, their indices are compared to those
-        in a preceding synaptic tracking protocol to identify whiof the the tracked
-        pathway is beign stimulated - hence it MAY reli on the 'digChannel' 
-        parameter in the c'tor
-        
-
-In detail:
-==========
-
-  A)"Synaptic tracking" protocols: monitor synaptic responses evoked repeatedly over time
-  NOTE: these should be evoked at every 10 s or more (i.e. 0.1 Hz or less)
-
-  NOTE: these protocols can only be assocated with non-Conditioning episode types
-
-  A.1) recording from a single cell:
-      ADC: 
-      • adcChannel: int   
-      • mandatory ! (is the recorded signal)
-      • receives the Primary amplifier input
-      • its logical index depends on how the signals are configured in 
-      • acquisition sofware (in Clampex, that is the 'Lab book')
-      • must have been selected in the Clampex protocol
-      • clampMode ⇔ units:
-          ∘ pA (or A) ⇒ clampMode == ephys.ClampMode.VoltageClamp
-          ∘ mV (or V) ⇒ clampMode == ephys.ClampMode.CurrentClamp (includes I=0/NoClamp)
-
-      DAC: 
-      • dacChannel: int
-          ∘ units:
-              ⋆ mV (or V) ⇒ clampMode == ephys.ClampMode.VoltageClamp
-              ⋆ pA (or A) ⇒ clampMode == ephys.ClampMode.CurrentClamp (includes I=0/NoClamp)
-
-          ∘ dacChannel is usually 0 or 1, depending on which amplifier channel is used 
-              (1 or 2, respectively) and how their inputs are routed from the DAQ
-              outputs; it may be higher, but mind the constraint below (» «)
-
-          ∘ digitalOutputEnabled == True MANDATORY (for stimulation)
-              ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
-                  converging on the same cell, and stimulated in alternative sweeps
-                  □ ⇒ REQUIRES even number of sweeps per run (typically only TWO sweeps per run)
-                      ⇒ two sweps per trial (averaged if more than one run per trial)
-                  □ » applies only to dacChannels 0 & 1 « 
-                  □ mandatory stimulation ABF epochs:
-                      a) unique epoch with digital output TRAIN ('*')
-                      - any type (except for Off)
-                      - has digital output as TRAIN ('*') - position of '*'
-                          indicates which DIG channel is used; this must reflect
-                          physical connection between DAQ's DIG output and the 
-                          stimulus isolation box
-                      - has alternate digital output TRAIN on a DISTINCT DIG
-                          channel defined in the  "alternate" DAC: 
-                              dac 1 if dacChannel is 0, dac 0 if dacChannel is 1
-                      - ⇒ this epoch MUST also be defined in the "alternate" DAC ⇒
-                      - the "alternate" DAC must have the same epochs and timings
-                          defined as for dacChannel
-                      - the actual digital pattern of the dacChannel depends on
-                          the sweep number: 
-                              main pattern is sent on even sweeps (0,2,4,…)
-                              alternate pattern is sent on odd sweeps (1,3,5,…)
-                      - the digital TRAIN provides:
-                          1 pulse ⇒ single stimulation
-                          2 pulses ⇒ paired-pulse stimulation
-                          > 2 pulses ⇒ ONLY FOR SPECIAL EXPERIMENTS when justified
-                      b) one or more epochs with digital output PULSE ('1')
-                      - all pulses defined on the same DIG output channel
-                      - 1 epoch ⇒ single-pulse
-                      - 2 epochs ⇒ paired-pulse
-                      - > 2 epochs ⇒ ONLY FOR SPECIAL EXPERIMENTS when justified
-                      - all these must aso be defined on the "alternate" DAC
-                          (see above) using a DISTINCT DIG output channel for 
-                          the other pwthway (stimulus isolator, see above)
-                  
-              ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
-                  to the cell
-                  □ no restriction to number of sweeps (all sweeps record the same process)
-                  □ mandatory stimulation ABF epochs:
-                      a) unique epoch with digital output TRAIN on appropriate
-                          DIG channel (see above, except for the alternate output)
-                      - TRAIN defines 1, 2, or more pulses (see above)
-                      b) 1, 2, or more epochs with digial output PULSE (as above,
-                          except for the alternative output)
-                    
-          ∘ sends out analog command waveform ⇒ clampMode != NoClamp:
-              ⋆ alternateDACOutputStateEnabled == False (same analog command every sweep) 
-
-              ⋆ analogWaveformEnabled == True, with:
-                  □ optional membrane test ABF epoch:
-                      - type Step or Pulse with pulseCount == 1
-                      - firstLevel != 0, deltaLevel == 0, firstDuration ! = 0, deltaDuration == 0
-                      - sometime BEFORE or AFTER the stimulation epoch(s) (see above)
-                          if BEFORE simulation epoch:
-                              it MAY be the first defined epoch ⇒ signal baseline taken from the 
-                              dacChannel.holdingTime
-                              if MAY follow a "baseline" epoch (see below)
-                          if AFTER simulation epoch:
-                              must start some time AFTER stimulation epoch is order
-                                  to allow the recorded signal to settle back to baseline
-                              must end with enough time left in the sweep to allow for 
-                                  recording signal to settle back to baseline
-                                  (in current clamp this may allow detecting Vrebound, etc)
-       
-                  □ optional baseline epoch
-                      - firstLevel = deltaLevel = 0; firstDuration !=0; deltaDuration = 0
-                      - contains signal baseline for the sweep
-                      - when present, this should be the first epoch defined  
-                      NOTE: when absent, signal baseline will be measured during the 
-                      DAC holding time which is 1/64 of sweep samples; if sweep is
-                      too short this may not be helpful
-       
-                  □ interleaved "no-op" epochs:
-                      - firstLevel = deltaLevel = 0, firstDuration != 0, deltaDuration = 0
-                      - between membrane test and stimulation epochs when membrane 
-                          test comes before stimulation, or vice-versa
-
-          ∘ OR:   ⋆ analogWaveformEnabled == FALSE ⇒ field recording (nowhere to send analog command)
-
-          ∘ epochs:
-              ⋆ if analogWaveformEnabled is True:
-                  □ optional membrane test epoch (see above)
-                  □ optional signal baseline epoch
-                  □ stimulation epochs with digital output
-                  □ interleaved "no-op" epochs
-       
-              ⋆ if analogWaveformEnabled is False (field recording):
-                  □ optional signal baseline epoch
-                  □ stimulation epochs with digital output
-                  □ interleaved "no-op" epochs
-
-  A.2) recording from two cells, or one cell in parallel with field recording:
-      NOTE: two cells can be recorded simultaneously or alternatively;
-      in either case you need to ADCs
-
-  ADC:
-  • adcChannel: list of int (2 distinct elements)
-      usually 0 & 1, but depends on the physical connections between the DAQ
-          and amplifier devices
-
-  • clampMode: list of 2 elements depends on adc Units see (A.1); 
-      NOTE: theoretically, each adc can have distinct clamp modes
-
-  DAC:
-  • dacChannel: list of 2 int (distinct)
-      ∘ units and clamp modes consistent with the adc channels above
-      ∘ digitalOutputEnabled == True in BOTH dacChannels (for stimulation)
-          ⋆ alternateDigitalOutputStateEnabled == True ⇒ tracks TWO synaptic pathways
-          that converge on at least one of the cells - see (A.1)
-          ⋆ alternateDigitalOutputStateEnabled == False ⇒ tracks ONE synaptic pathway
-          although both cells may respond to that same pathway, 
-              → not very useful
-              no restriction on number of sweeps (see (A.1))
-
-      ∘ both dacChannels send out analog command waveform ⇒ clampMode != NoClamp:
-          ⋆ alternateDACOutputStateEnabled == True ⇒ even number of sweeps
-              cells receive analog commands on alternative sweeps (NOT useful when 
-              alternateDigitalOutputStateEnabled == True)
-
-          ⋆ alternateDACOutputStateEnabled == False ⇒ 
-              cells receive analgo command simultaneously
-              allows alternative digital outputs
-
-      ∘ OR: only one dacChannel has alternateDACOutputStateEnabled == True
-          ⇒ one cell is clamped; the other is not so the corresponding adc
-          likely records fields
-
-      WARNING: this is problematic and likely too ambiguous, as one may
-      design an experiment to record field potentials AND whole-cell 
-      currents simultaneously; will need to use alternative DIG outputs
-      AND NO alternative analog waveforms so that the "alternative" DAC
-      can be configured to send no command waveforms for field recording
-
-  B) "Conditioning protocols"
-  NOTE 1: These are applied to only one synaptic pathway in the experiment - the
-          "test" pathway - with the other pathway (if present) beng the "control"
-          pathway.
-       
-  NOTE 2: Can only be associated with RecordingEpisodes of Conditioning type(s)
-
-  NOTE 3: Usually, a conditioning protocol is applied only once. This is 
-  certainly the case of whole-cell patch-clamp LTP experiments, where 
-  a "washout of plasticity" effect seems to take place over long 
-  recording times.
-
-  This wash out effect is irrelevant for field recording experiments 
-  (and, possibly, for whole-cell patch-clamp LTD experiments). In these
-  cases it may be justified to apply conditioning protocols more than 
-  once, with intervening tracking protocols recordong the evolution of
-  synpatic responses for some time after each conditioning protocol.
-
-  Also, when justified, several conditioning episodes may use distinct
-  conditoning protocols.
-
-  B.1) Recording from a single cell with or without control pathway:
-
-      ADC:
-      • adcChannel: int - same as for (A.1)
-      • clampMode may be the same as for the protocol of the preceding
-          Tracking episode (if present)        
-          
-      DAC:
-      • dacChannel: int - the same as the dacChannel as the protocol for
-          the preceding Tracking episode
-
-      • digitalOutputEnabled == True (to stimulate the pathway)
-          ⋆ alternateDigitalOutputStateEnabled == False ALWAYS !!!
-              □ digital output (DIG) channel:
-                  - for two pathways - use the DIG channel corresponding
-                   to the conditioned pathway
-       
-              □ digital output pattern can be a TRAIN or a PULSE
-                  - when a TRAIN, there can be several epochs sending out trains
-                      (e.g, "bursts"), subject to the available number of epochs
-                      and duration of the sweep        
-                  - when a PULSE, there can be several epochs sending out a 
-                      TTL pulse, subject to the available number of epochs        
-                      and duration of the sweep    
-
-              □ NOTE: the index of the DIG out channel identifies which
-                  pathway is conditioned, and MUST be one of the DIG out channels
-                  used by the dacChannel in the protocol for the preceding
-                  Tracking episode.
-       
-      • if sending out analog command waveforms (e.g. for triggering postsynaptic
-          spikes):
-          ⋆ analogWaveformEnabled == True
-          ⋆ alternateDACOutputStateEnabled == False
-       
-      • NOTE: if analogWaveformEnabled is False AND the protocol for the 
-        accompanying Tracking episode(s) also has dac with analogWaveformEnabled
-        set to False, this indicates field recording.
-      
-      • epochs:   
-          ⋆ digital output epochs: MANDATORY, for pathway stimulation
-          ⋆ if analogWaveformEnabled is True:
-              any number of waveform epochs; these may be identical to the
-              digtal output epochs
-
-
-  B.2) Recording from two cells, of a cell + field recordings in parallel
-  NOTE: To make sense of this experimental approach, one COULD apply conditioning
-  to only one cell (and leave the other as control).
-  WARNING The caveat with recording from two cells is that one may not be able
-  to distinguish between the "test" and the "control" cell when the conditioning
-  protocol does not include/require controlling the state of the postsynaptic
-  cell (i.e., spiking or a controlled postsynaptic membrane voltage, etc).
-
-  On the other hand, recording from a cell in parallel with field recordings
-  can be used to compare responses from the recorded cell with those from a 
-  population of synapses in the same prep (both ADCs in the tracking should be
-  analysed) and a control pathway should be configured in the Tracking protocols.
-
-"""
+    """
         
 
         
@@ -1863,21 +1290,17 @@ In detail:
     
 
     def __init__(self,
-                 adcChannels:typing.Union[int, typing.Sequence[int]] = 0,
+                 mainADCs:typing.Union[int, typing.Sequence[int]] = 0,
                  dacChannels:typing.Union[int, typing.Sequence[int]] = 0,
                  digChannels:typing.Union[int, typing.Sequence[int]] = (0,1),
                  useEmbeddedProtocol:bool=True,
+                 trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
+                 conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
                  baselineDurations:pq.Quantity = 5 * pq.ms,
-                 steadyStateDurationIClampTest = 0.05 * pq.s,
+                 steadyStateIClampMbTestDuration = 0.05 * pq.s,
                  useSlopeInIClamp:bool = True,
-                 # mainClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
-                 # conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
-                 # synapticDigitalTriggersOnDac:typing.Optional[int]=None,
-                 # stimDIG:typing.Sequence[int] = (0,1),
-                 # synapticTriggersOnDac:typing.Optional[int]=None,
-                 # mbTest:typing.Optional[pq.Quantity] = None,
-                 # mbTestStart:pq.Quantity = 0.05*pq.s,
-                 # mbTestDuration:pq.Quantity = 0.1 * pq.s,
+                 signalBaselineStart:typing.Optional[pq.Quantity] = None,
+                 signalBaselineDuration:typing.Optional[pq.Quantity] = None,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
                  autoStart:bool=True,
@@ -1885,7 +1308,7 @@ In detail:
                  simulate = None
                  ):
         """
-        mainClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp
+        trackingClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp
             or ephys.ClampMode.CurrentClamp, or their respective int values (2, 4)
 
             NOTE: even if recording field potentials (I=0 "clamping mode") the units
@@ -1905,8 +1328,9 @@ In detail:
 
                 therefore, any of voltage- or current-clasmp modes are valid
         
-        adcChannels:int or sequence of int, default is 0 (first ADC input channel)
-            Index of the ADC input channel used in recording.
+        mainADCs:int or sequence of int, default is 0 (first ADC input channel)
+            Index of the ADC input channel(s) corresponding to the signals where
+            the synaptic responses will be measured.
         
             NOTE: This cannot be unambguously determined from the Clampex protocol,
             because the user may decide to "record" signals from more than one
@@ -1915,7 +1339,7 @@ In detail:
         dacChannels:int or sequence of int, default is 0 (first DAC output channel)
             Index of the DAC output channel used for sending analog
             waveform commands to the recorded cell (e.g. holding potential
-            or current, membrane test, postsynaptc spikng, etc).
+            or current, membrane test, postsynaptic spikng, etc).
             
             In the protocol, the corresponding ABFOutput configuration MUST have 
             'analogWaveformEnabled' == True.
@@ -1925,11 +1349,12 @@ In detail:
             in more than one DAC (e.g. for emulating triggers, or any other
             event)
         
-            WARNING: For experiments using alternative pathways, only the first
-            two DACs (0 and 1) can be used for "Alternative waveform stimulation".
+            WARNING: For experiments using alternative stimulation of pathways, 
+            only the first two DACs (0 and 1) can be used for "Alternative 
+            waveform stimulation".
         
         digChannels: int, or sequence of int; default is 0
-            The index of the DAC channel where digital output is enabled.
+            The index of the DAC channel where the digital output is enabled.
         
             This is important because the index of this channel, in Clampex,
             is not necessarily the same as the index of the DAC channel used for
@@ -1945,84 +1370,19 @@ In detail:
         responseBaselineDuration: time Quantity (default is 5 * pq.ms)
             Duration of baseline before the response - used in Voltage clamp
         
-        synapticDigitalTriggersOnDac: index of the DAC where digital triggers are 
-                enabled, for synaptic stimulation. Default is None (read on).
-        
-                By default, synaptic transmission is evoked via digital TTL pulses
-                or trains, with the digital output enabled on the active DAC - 
-                this is the most common case and the default here.
-        
-                One may specify here the index of the DAC where digital outputs
-                are enabled.
-        
-                REMEMBER:
-                There can be up to 4 or 8 physical DAC channels (respectively,
-                for DigiData 1440 or 1500 series).
-        
-                The "active" DAC can be 0 or 1, depending which amplifier channel
-                is used for recording and for sending command signals to the cell
-                (e.g., membranbe holding potential in voltage clamp, etc).
-        
-                The timings of the triggers for synaptic stimulation are taken 
-                from the Epochs, defined in the active DAC, that have digital
-                outputs enabled.
-        
-                For a two pathway experiment (where two synaptic pathway are 
-                monitored via alternative stimulation) both first two DACs need
-                epochs with digital outputs configured, and alternate digital 
-                output must be enabled in Clampex's protocol editor (Waveforms 
-                tab). 
-        
-                Moreover, alternative waveform must be DISABLED in Clampex's 
-                protocol editor (Waveforms tab).
-        
-        NOTE: All lof the following parameters are in development (not relevant 
-        at this stage) and should be left wth their default values for the moment
-        (some are yet to be documented)
-        
-        stimDIG: list of 1 or 2 indices of the digital channel(s) sending out 
-                synaptic stimuli as TTL triggers (e.g. via stimulus isolators)
-                In experiments that monitor a single single synaptic pathway only
-                the first element of the list is used.
-     
-                By default this is [0,1] 
-
-            CAUTION: when stimulus isolators are NOT available, the DIG outputs
-            are NOT used, but can be emulated through additional DAC outputs;
-            At the time of this writing, I believe that alternative DAC outputs
-            cannot be configured for DIG emulation on higher DAC indices.
-
-        synapticTriggersOnDac: int or None; When an int, this is the index of the
-            DAC channel that emulates TTLs
-        
-            WARNING: In Clampex one cannot use DACs to stimulate distinct paths 
-            alternatively, because turning alternative waveforms ON only affects
-            the first two DAC channels.
-        
-            When None, the epochs in the "active" DAC are used to retrieve the
-            timings of the synaptic stimulus triggers (through the digital outputs)
-        
         """
         
         super().__init__(parent=parent)
         
-        # NOTE: 2023-10-15 11:34:27
-        # This will be passed as argument to the processing thread; this should
-        # be OK since all its field values are held by reference, so they can
-        # be modified form within the thread, but CAUTION about possible race
-        # conditions.
-        #
-        # NOTE: 2023-10-15 11:34:34
-        # About its fields:
-        # episodes → a dict key:str ↦ value:dict, where:
-        #   key ≡ name of episode
-        #   value ≡ dict with key ↦ value:
-        #       "protocol" ↦ ABFProtocol
-        #       "conditoning" ↦ bool
-        #       "sweeps" ↦ sequence of ints, or a range (indices of the sweeps
-        #                   in the final data, that belong to this episode)
-        #       "presynapticTriggers"
-        self._runParams_ = DataBag(adcChannels = adcChannels,
+        self._episodeResults_ = dict()
+        self._landmarks_ = dict()
+        self._results_ = dict() 
+        
+        self._data_ = dict(baseline = dict(path0 = neo.Block(), path1 = neo.Block()),
+                           conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
+                           chase = dict(path0 = neo.Block(), path1 = neo.Block()))
+
+        self._runParams_ = DataBag(mainADCs = mainADCs,
                                    dacChannels = dacChannels,
                                    digChannels = digChannels,
                                    episodes = dict(),
@@ -2031,9 +1391,15 @@ In detail:
                                    abfRunTimes = list(),
                                    abfRunDeltaTimes = list(),
                                    baselineDurations = baselineDurations,
-                                   steadyStateDurationIClampTest = steadyStateDurationIClampTest,
+                                   steadyStateIClampMbTestDuration = steadyStateIClampMbTestDuration,
+                                   trackingClampMode = trackingClampMode,
+                                   conditioningClampMode = conditioningClampMode,
                                    useSlopeInIClamp = useSlopeInIClamp,
-                                   currentProtocolIsConditioning = False)
+                                   signalBaselineStart = signalBaselineStart,
+                                   signalBaselineDuration = signalBaselineDuration,
+                                   currentProtocolIsConditioning = False,
+                                   currentProtocol = None,
+                                   useEmbeddedProtocol = useEmbeddedProtocol)
         
         # NOTE: 2023-10-07 11:20:22
         # _emitterWindow_ needed here, to set up viewers
@@ -2060,77 +1426,19 @@ In detail:
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
-        # self._monitorProtocol_ = None
         
-#         self._protocol_ = None
-# 
-#         self._conditioningProtocol_ = None
-#         
-#         self._conditioningProtocols_ = list()
-#         self._monitorProtocols_ = list()
-#         
-#         self._currentProtocolIsConditioning_ = False
-        
-        # self._adcChannels_ = adcChannels
-        # self._dacChannels_ = dacChannels
-        # self._digChannels_ = digChannels
-        
-        # self._sigIndex_ = None  # when set, this is an int index of the signal 
-                                # of interest; must be the same across runs
-
-#         if isinstance(mainClampMode, int):
-#             if mainClampMode not in ephys.ClampMode.values():
-#                 raise ValueError(f"Invalid mainClampMode {mainClampMode}; expected values are {list(ephys.ClampMode.values())}")
-#             self._clampMode_ = ephys.ClampMode.type(mainClampMode)
-#             
-#         elif isinstance(mainClampMode, ephys.ClampMode):
-#             self._clampMode_ = mainClampMode
-#             
-#         else:
-#             raise TypeError(f"mainClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(mainClampMode).__name__}")
-
-        # NOTE: 2023-10-08 09:41:39
-        # conditioning protocols should not really matter, 
-        # but they SHOULD be different from the monitor protocol
-        
-#         if isinstance(conditioningClampMode, int):
-#             if conditioningClampMode not in ephys.ClampMode.values():
-#                 raise ValueError(f"Invalid conditioningClampMode {conditioningClampMode}; expected values are {list(ephys.ClampMode.values())}")
-#             
-#             self._conditioningClampModes_ = [ephys.ClampMode.type(conditioningClampMode)]
-#             
-#         elif isinstance(conditioningClampMode, ephys.ClampMode):
-#             self._conditioningClampModes_ = [conditioningClampMode]
-#             
-#         else:
-#             raise TypeError(f"conditioningClampMode expected to be an int or an ephys.ClampMode enum value; instead, got {type(conditioningClampMode).__name__}")
-
-        # self._useSlopeInIClamp_ = useSlopeInIClamp
-        # self._mbTestStart_ = mbTestStart
-        # self._mbTestDuration_ = mbTestDuration
-        # self._mbTestAmplitude_ = mbTest
-        # self._signalBaselineStart_ = 0 * pq.s
-        # self._signalBaselineDuration_ = None
-        # self._responseBaselineStart_ = None
-        # self._responseBaselineDuration_ = responseBaselineDuration
-        # self._steadyStatePassiveVmTest_ = steadyStateDurationIClampTest
-        
-        # self._abfRunTimes_ = []
-        # self._abfRunDeltaTimes_ = []
-        
-        self._results_ = dict() # Episode:str ↦ episodeResultsDict
         
         # self._episode_ = "baseline"
 
         # WARNING: 2023-10-05 12:10:40
         # below, all timings in self._landmarks_ are RELATIVE to the start of the sweep!
         # timings are stored as [start time, duration] (all Quantity scalars, with units of time)
-        if self._clampMode_ == ephys.ClampMode.VoltageClamp:
+        if self._runParams_.trackingClampMode == ephys.ClampMode.VoltageClamp:
             self._episodeResults_ = {"path0": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
                               "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
                               "DC": [], "Rs":[], "Rin":[], }
             
-            self._landmarks_ = {"Rbase":[self._signalBaselineStart_, self._signalBaselineDuration_], 
+            self._landmarks_ = {"Rbase":[self._runParams_.signalBaselineStart, self._runParams_.signalBaselineDuration], 
                                 "Rs":[None, None], 
                                 "Rin":[None, None], 
                                 "PSCBase":[None, None],
@@ -2143,15 +1451,15 @@ In detail:
                               "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
                               "tau":[], "Rin":[], "Cap":[], }
             
-            if self._useSlopeInIClamp_:
-                self._landmarks_ = {"Base":[self._signalBaselineStart_, self._signalBaselineDuration_], 
+            if self._runParams_.useSlopeInIClamp:
+                self._landmarks_ = {"Base":[self._runParams_.signalBaselineStart, self._runParams_.signalBaselineDuration], 
                                     "VmTest":[None, None], 
                                     "PSP0Base":[None, None],
                                     "PSP0Peak":[None, None],
                                     "PSP1Base":[None, None],
                                     "PSP1Peak":[None, None]}
             else:
-                self._landmarks_ = {"Base":[self._signalBaselineStart_, self._signalBaselineDuration_], 
+                self._landmarks_ = {"Base":[self._runParams_.signalBaselineStart, self._runParams_.signalBaselineDuration], 
                                     "VmTest":[None, None], 
                                     "PSPBase":[None, None],
                                     "PSP0Peak":[None, None],
@@ -2211,14 +1519,6 @@ In detail:
         self._signalAxes_ = dict(path0 = None, path1 = None)
 
         self._presynaptic_triggers_ = dict()
-        
-       # TODO: 2023-09-29 13:57:13
-        # make this an intelligent thing - use SynapticPathway, RecordingEpisodes, etc.
-        # for now, baseline & chase are just one or two neo.Blocks
-        #
-        self._data_ = dict(baseline = dict(path0 = neo.Block(), path1 = neo.Block()),
-                           conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
-                           chase = dict(path0 = neo.Block(), path1 = neo.Block()))
 
         synapticViewer0 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_, win_title = "path0 Recording")
         synapticViewer0.annotationsDockWidget.hide()
@@ -2236,36 +1536,16 @@ In detail:
                               path1 = synapticViewer1,
                               results = resultsViewer)
         
-        # NOTE: 2023-10-08 09:27:47
-#         # passed by reference to the processor thread
-#         self._runParams_= DataBag(adcChannels = self._adcChannels_,
-#                                dacChannels = self._dacChannels_,
-#                                digChannels = self._digChannels_,
-#                                
-#                                clampMode = self._clampModes_,
-#                                protocol  = self._protocols_,
-#                                monitoringProtocols = self._monitorProtocols_,
-#                                condtioningProtocols = self._conditioningProtocols_,
-#                                currentProtocolIsConditioning = self._currentProtocolIsConditioning_,
-#                                signalIndex = self._sigIndex_,
-#                                useSlopeInIClamp = self._useSlopeInIClamp_,
-#                                mbTestAmplitude = self._mbTestAmplitude_,
-#                                mbTestStart = self._mbTestStart_,
-#                                mbTestDuration = self._mbTestDuration_,
-#                                responseBaselineDuration = self._responseBaselineDuration_,
-#                                steadyStateDurationIClampTest = self._steadyStatePassiveVmTest_,
-#                                abfRunTimes = self._abfRunTimes_,
-#                                abfRunDeltaTimes = self._abfRunDeltaTimes_,
-#                                currentEpisodeName = None,
-#                                newEpisode = True,
-#                                )
-        
         self._abfRunBuffer_ = collections.deque()
         
-        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self, self._abfRunBuffer_,
+        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self, 
+                                                             self._abfRunBuffer_,
                                                              self._runParams_,
-                                    self._presynaptic_triggers_, self._landmarks_,
-                                    self._data_, self._results_, self._viewers_)
+                                                             self._presynaptic_triggers_, 
+                                                             self._landmarks_,
+                                                             self._data_, 
+                                                             self._results_, 
+                                                             self._viewers_)
         
         self._simulation_ = None
         
@@ -2273,21 +1553,26 @@ In detail:
         
         self._doSimulation_ = False
         
+        self._simulator_params_ = dict(files=None, timeout=1000)
+        
+        self._running_ = False
+        
         if isinstance(simulate, dict):
             files = simulate.get("files", None)
             timeout = simulate.get("timeout", 1000)
             if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v,str) for v in files):
-                self._simulatorThread_ = _LTPFilesSimulator_(self, dict(files=files, timeout=timeout))
+                self._simulator_params_ = dict(files=files, timeout=timeout)
                 self._doSimulation_ = True
+                
+        elif isinstance(simulate, bool):
+            self._doSimulation_ = simulate
         
         if self._doSimulation_:
+            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_)
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
                                         simulator = self._simulatorThread_)
             
-        # for each new file, create an _LTPOnlineFileProcessor_ and move it here?
-        # need to synchronize, as files may come in faster than we can process 
-        # them
         else:
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
                                         self._emitterWindow_, self._watchedDir_)
@@ -2326,11 +1611,6 @@ In detail:
         except:
             traceback.print_exc()
         
-        # if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-        #     self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-        # self._abfProcessorThread_.quit()
-        # self._abfProcessorThread_.wait()
-            
         if hasattr(super(object, self), "__del__"):
             super().__del__()
             
@@ -2341,22 +1621,6 @@ In detail:
     @property
     def data(self) -> dict:
         return self._data_
-    
-    @property
-    def adcChannel(self) -> int:
-        return self._adcChannel_
-    
-    @adcChannel.setter
-    def adcChannel(self, val:int):
-        self._adcChannel_ = val
-    
-    @property
-    def dacChannel(self) -> int:
-        return self._dacChannel_
-    
-    @dacChannel.setter
-    def dacChannel(self, val:int):
-        self._dacChannel_ = val
     
     def stop(self):
         if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
@@ -2377,6 +1641,8 @@ In detail:
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
             
         self.resultsReady.emit((self._data_, self._results_))
+        
+        self._running_ = False
         
     def reset(self):
         self._monitorProtocol_ = None
@@ -2429,6 +1695,10 @@ In detail:
     def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
         # if self._emitterWindow_ is None:
         #     raise ValueError("You must set an emiter window first...")
+        
+        if self._running_:
+            print("Already started")
+            return
 
         if directory is None:
             if self._watchedDir_ is None:
@@ -2459,6 +1729,8 @@ In detail:
             
         self._abfSupplierThread_.start()
         self._abfProcessorThread_.start()
+        
+        self._running_ = True
             
    
     
