@@ -235,7 +235,7 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
-EphysEntity = collections.namedtuple("EphysEntity", ["name", "adc", "dac", "dig", "ttldac"],
+Entity = collections.namedtuple("Entity", ["name", "adc", "dac", "dig", "ttldac"],
                                      defaults=["cell", 0, 0, [0], None])
 
 class ClampMode(TypeEnum):
