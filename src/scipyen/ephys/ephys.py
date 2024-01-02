@@ -236,7 +236,39 @@ REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
 Entity = collections.namedtuple("Entity", ["name", "adc", "dac", "dig", "ttldac"],
-                                     defaults=["cell", 0, 0, [0], None])
+                                     defaults=["cell", 0, None, None, None])
+
+_entity_docstr_ = ["Semantic association between input and output eletrophysiology signals.\n",
+                   "Signature:\n",
+                   f"\t{Entity.__doc__}",
+                   "\nwhere:",
+                   "• name (str): The name of the entity\n",
+                   "• adc (int, str): The index or name of the ADC channel for the signal",
+                   "    containing the recorded electric behaviour of the entity",
+                   "    (a.k.a the 'input' channel e.g., cell → amplifier → DAQ device).\n",
+                   "• dac (int, str): The index or name of the DAC channel sending commands",
+                   "    to the entity (in voltage- or current-clamp), a.k.a 'output' e.g.",
+                   "    DAQ device → amplifier → cell.",
+                   "    Optional; default is None.\n",
+                   "• dig (int, sequence of int): The index or indices of the digital output",
+                   "    channels sending TTLs to trigger entity responses (e.g. synaptic",
+                   "    stimulation).",
+                   "    Optional; default is None.\n",
+                   "• ttldac (int, str, sequence of int or sequence of str): ",
+                   "    The index (indices) or name(s) of the DAC channels emulating TTLs",
+                   "    to trigger entity responses.",
+                   "    NOTE: These must be distinct from the dac channel specified above.",
+                   "    Optional; default is None.\n",
+                   "",
+                   "Channel indices above are expected to be >= 0 and correspond to the",
+                   "    logical channel indices in the acquisition protocol. ",
+                   "Channel names are as assigned in the acquisition protocol (if available).",
+                   "",
+                   "NOTE: This object type is oblivious to the recording mode or",
+                   "    electrode mode."]
+
+Entity.__doc__ = "\n".join(_entity_docstr_)
+del _entity_docstr_
 
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,

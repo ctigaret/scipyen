@@ -100,9 +100,8 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 import ephys.ephys as ephys
-from ephys.ephys import ClampMode, ElectrodeMode
-from ephys.ephys import LocationMeasure
-from ephys import membrane
+from ephys.ephys import ClampMode, ElectrodeMode, LocationMeasure, Entity
+import ephys.membrane as membrane
 
 
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
@@ -118,6 +117,92 @@ __ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
 __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
+
+def cellTwoPathways(adc=0, dac=0, dig=[0,1], **kwargs):
+    """Factory for a cell Entity in two-pathways synaptic plasticity experiments.
+    
+    See ephys.ephys.Entity constructor for a full description of parameters.
+    
+    Named parameters:
+    -----------------
+    Here, the default parameter values associate 'adc' 0 with 'dac' 0 and digital 
+    outputs ('dig') 0 and 1.
+    
+    Var-positional parameters:
+    --------------------------
+    These are 'name' and 'ttldac' and here are given the default values of
+    'cell' and None, respectively.
+    
+    In a given application, the 'name' field of Entity objects should have unique
+    values in order to allow the lookup of these objects according to this field.
+    
+    Returns:
+    --------
+    An immutable ephys.ephys.Entity object (a NamedTuple). 
+
+    One can create a modified version using the '_replace' method:
+    (WARNING: Remember to also change the value of the Entity's 'name' field)
+    
+    
+    cell  = cellTwoPathways()
+    cell1 = cellTwoPathways(dac=1, name="cell1")
+    cell2 = cell._replace(dac=1,   name="cell1")
+    
+    assert cell1 == cell2, "The objects are different"
+    
+    NOTE:
+    One can use this mechanism to "convert" to a field recording entity.
+    
+    """
+    name = kwargs.pop("name", "cell")
+    ttldac = kwargs.pop("ttldac", None)
+    return Entity(name, adc, dac, dig, ttldac)
+
+def fieldTwoPathways(adc=0, dig=[0,1], **kwargs):
+    """Factory for a field recording Entity in two-pathways synaptic plasticity experiments.
+
+    See ephys.ephys.Entity constructor for a full description of parameters.
+    
+    Named parameters:
+    -----------------
+    Here, the default parameter values associate 'adc' 0 with the digital 
+    outputs ('dig') 0 and 1 (i.e. no DAC channel is used for command signals, as 
+    this is a field recording — no clamping is used).
+    
+    Var-positional parameters:
+    --------------------------
+    These are 'name' and 'ttldac' and here are given the default values of
+    'field' and None, respectively.
+    
+    In a given application, the 'name' field of Entity objects should have unique
+    values in order to allow the lookup of these objects according to this field.
+    
+    Returns:
+    --------
+    An immutable ephys.ephys.Entity object (a NamedTuple). 
+
+    One can create a modified version using the '_replace' method:
+    (WARNING: Remember to also change the value of the Entity's 'name' field).
+    
+    fieldRec¹  = fieldTwoPathways()
+    fieldRec1  = fieldTwoPathways(adc=1,  name="field1")
+    fieldRec2  = fieldRec._replace(adc=1, name="field1")
+    
+    assert fieldRec1 == fieldRec2, "The objects are different"
+    
+    NOTE:
+    One can use this mechanism to "convert" to a single-cell recording entity
+    
+    NOTE 
+    ¹ We use 'fieldRec' instead of 'field' to avoid possible clashes with
+    the 'dataclasses.field' function, when imported in the workspace.
+    
+    """
+    name = kwargs.pop("name", "field")
+    ttldac = kwargs.pop("ttldac", None)
+    return Entity(name, adc, None, dig, ttldac)
+
+
 
 #"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
 
@@ -1289,10 +1374,10 @@ class LTPOnline(QtCore.QObject):
     resultsReady = pyqtSignal(object, name="resultsReady")
     
 
-    def __init__(self,
-                 mainADCs:typing.Union[int, typing.Sequence[int]] = 0,
-                 dacChannels:typing.Union[int, typing.Sequence[int]] = 0,
-                 digChannels:typing.Union[int, typing.Sequence[int]] = (0,1),
+    def __init__(self, *args,
+                 # mainADCs:typing.Union[int, typing.Sequence[int]] = 0,
+                 # dacChannels:typing.Union[int, typing.Sequence[int]] = 0,
+                 # digChannels:typing.Union[int, typing.Sequence[int]] = (0,1),
                  useEmbeddedProtocol:bool=True,
                  trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
@@ -1303,11 +1388,17 @@ class LTPOnline(QtCore.QObject):
                  signalBaselineDuration:typing.Optional[pq.Quantity] = None,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=True,
+                 autoStart:bool=False, # NOTE: change to True when done coding TODO
                  parent=None,
                  simulate = None
                  ):
         """
+        Var-positional parameters:
+        --------------------------
+    
+        One or more ephys.Entity specifying the semantic association between
+        input and outputs in this experiment.
+    
         trackingClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp
             or ephys.ClampMode.CurrentClamp, or their respective int values (2, 4)
 
@@ -1326,46 +1417,7 @@ class LTPOnline(QtCore.QObject):
                 voltage-clamp with AP-like waveforms, dynamic clamp and such...
                 (if the cell can be voltage-clamped with some degree of accuracy)
 
-                therefore, any of voltage- or current-clasmp modes are valid
-        
-        mainADCs:int or sequence of int, default is 0 (first ADC input channel)
-            Index of the ADC input channel(s) corresponding to the signals where
-            the synaptic responses will be measured.
-        
-            NOTE: This cannot be unambguously determined from the Clampex protocol,
-            because the user may decide to "record" signals from more than one
-            amplifier primary output
-        
-        dacChannels:int or sequence of int, default is 0 (first DAC output channel)
-            Index of the DAC output channel used for sending analog
-            waveform commands to the recorded cell (e.g. holding potential
-            or current, membrane test, postsynaptic spikng, etc).
-            
-            In the protocol, the corresponding ABFOutput configuration MUST have 
-            'analogWaveformEnabled' == True.
-            
-            NOTE: This cannot be unambiguously determined from the protocol,
-            because the experimenter may decide to enable command waveform
-            in more than one DAC (e.g. for emulating triggers, or any other
-            event)
-        
-            WARNING: For experiments using alternative stimulation of pathways, 
-            only the first two DACs (0 and 1) can be used for "Alternative 
-            waveform stimulation".
-        
-        digChannels: int, or sequence of int; default is 0
-            The index of the DAC channel where the digital output is enabled.
-        
-            This is important because the index of this channel, in Clampex,
-            is not necessarily the same as the index of the DAC channel used for
-            analog waveforms commands.
-        
-            If this channel is distinct from dacChannel, AND digital outputs ARE 
-            enabled in this channel, AND alternative digital outputs ARE enabled 
-            in the Clampex protocol, then THIS channel stores the digital pattern 
-            sent out during even sweeps (0,2, etc) whereas the "other" DAC channel 
-            used (see above) stores the alternative digital pattern (sent out during
-            odd sweeps: 1,3, etc).
+                therefore, any of voltage- or current-clamp modes are valid
         
         responseBaselineDuration: time Quantity (default is 5 * pq.ms)
             Duration of baseline before the response - used in Voltage clamp
@@ -1373,6 +1425,13 @@ class LTPOnline(QtCore.QObject):
         """
         
         super().__init__(parent=parent)
+        
+        if len(args) == 0 or not all(isinstance(a, Entity) for a in args):
+            raise TypeError(f"Expecting one or more Entity objects")
+        
+        entityNames = [a.name for a in args]
+        
+        assert len(unique(entityNames)) == len(args), "The entities do not have unique names"
         
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
@@ -1382,9 +1441,7 @@ class LTPOnline(QtCore.QObject):
                            conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
                            chase = dict(path0 = neo.Block(), path1 = neo.Block()))
 
-        self._runParams_ = DataBag(mainADCs = mainADCs,
-                                   dacChannels = dacChannels,
-                                   digChannels = digChannels,
+        self._runParams_ = DataBag(entities = args,
                                    episodes = dict(),
                                    newEpisode = True,
                                    episodeName = None,

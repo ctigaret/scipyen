@@ -3359,7 +3359,7 @@ def sort_with_none(iterable, none_last = True) -> typing.Sequence:
 
 def unique(seq, key=None) -> typing.Sequence:
     """Returns a sequence of unique elements in the iterable 'seq'.
-    Functional version of gen_unique
+    Functional version of gen_unique.
     Parameters:
     -----------
     seq: an iterable (tuple, list, range, map)
@@ -3373,21 +3373,46 @@ def unique(seq, key=None) -> typing.Sequence:
     
     Returns:
     =======
-    A tuple containing unique elements in 'seq'.
+    A sequence containing unique elements in 'seq'.
     
     NOTE: Does not guarantee the order of the unique elements is the same as 
             their order in 'seq'
             
-    See also gen_unique for a generator version.
+    See also:
+    • gen_unique for a generator version.
+    • duplicates for a function returning the duplicates in a sequence
+    
+    CHANGELOG:
+    2024-01-02 14:51:23 Returns a sequence of the same type as 'seq'.
     
     """
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
-    return tuple(gen_unique(seq, key=key))
+    # return tuple(gen_unique(seq, key=key))
+    return seq.__class__(gen_unique(seq, key=key))
+
+def duplicates(seq, key=None) -> typing.Sequence:
+    """Returns a sequence of duplicate elements in 'seq'.
+    
+    Implements:
+    
+        list(gen_unique(gen_duplicates(seq, key=key), key=key))
+    
+    See also:
+    • gen_duplicates
+    • unique
+    
+    """
+    if not hasattr(seq, "__iter__"):
+        raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
+    
+    # return tuple(gen_unique(seq, key=key))
+    return seq.__class__(gen_unique(gen_duplicates(seq, key=key), key=key))
+    
 
 def gen_unique(seq, key=None):
-    """Iterates through unique elements in seq
+    """Iterates through unique elements in the sequence 'seq'.
     
     Parameters:
     -----------
@@ -3416,7 +3441,7 @@ def gen_unique(seq, key=None):
             their order in 'seq'
             
     NOTE: For most primitive and hashable python types, the following idiom is
-    recommended:
+    recommended instead of gen_unique:
     
     tuple(set(seq)) 
 
@@ -3434,6 +3459,8 @@ def gen_unique(seq, key=None):
     ========
     
     unique for a function version
+    
+    gen_duplicates for iterating through the duplicates in 'seq'.
     
     """
     seenlist = list()
@@ -3483,19 +3510,108 @@ def gen_unique(seq, key=None):
         
     
     if key is None:
-        # yield from (x for x in seq if x not in seen and not seen.add(x))
-        # yield from (x for x in seq if x not in seen and x not in seenlist and not __add_to__seen__(x, seen, seenlist))
         yield from (x for x in seq if __check_val__(x))
     
     else:
         if inspect.isfunction(key):
-            # yield from (x for x in seq if key(x) not in seen and not seen.add(key(x)))
-            # yield from (x for x in seq if (key(x) not in seen and key(x) not in seenlist) and not __add_to__seen__(key(x), seen, seenlist))
             yield from (x for x in seq if __check_fun_val_(x, key))
         else:
-            # yield from (x for x in seq if key not in seen and not seed.add(key))
-            # yield from (x for x in seq if (key not in seen and key not in seenlist) and not __add_to__seen__(key, seen, seenlist))
             yield from (x for x in seq if __check_val__(key))
+            
+def gen_duplicates(seq, key=None):
+    """Iterates through the duplicate elements in the sequence 'seq'.
+    Parameters:
+    -----------
+    seq: an iterable sequence (tuple, list, range)
+    
+    key: predicate for uniqueness (optional, default is None)
+        When present, it is usually a unary predicate function taking an 
+        element of the sequence as first parameter, and returning a bool.
+        
+        Predicates with more than one parameters (e.g., a comparator such as 
+        operator.ge_, etc) can be converted to unary predicates by "fixing" the 
+        second operand through functools.partial.
+        
+        
+        Typically, this is an object returned by a lambda function
+        
+        e.g.
+        
+        unique(seq, lambda x: x._some_member_property_or_getter_function_)
+    
+    Yields:
+    =======
+    Duplicate elements in 'seq'.
+    
+    NOTE: Does not guarantee the order of the duplicate elements is the same as 
+            their order in 'seq'.
+    
+    This function is useful to create collections of objects with the duplicate
+    elements in 'seq' based on a value of the objects' property, or the value of
+    a unary function applied to each object in the original collection.
+    
+    gen_duplicates also accepts objects of types that implement the special 
+    method __eq__, or where it makes sense to compare objects using the `is` 
+    keyword.
+    
+    NOTE: To obtain a sequence (e.g. a list) of unique occurrences of the 
+    duplicate elements in 'seq', call:
+    
+    list(gen_unique(gen_duplicates(seq, key=key), key=key))
+    
+    """
+    seenlist = list()
+    seenset = set()
+    
+    if not hasattr(seq, "__iter__"):
+        raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
+    
+    def __check_fun_val_(x, key):
+        val = key(x)
+        if is_hashable(val):
+            if val not in seenset:
+                seenset.add(val)
+                return True
+            return False
+        else:
+            if len(seenlist):
+                if any(not safe_identity_test(val, x_) for x_ in seenlist):
+                    seenlist.append(val)
+                    return True
+            else:
+                seenlist.append(val)
+                return True
+                
+            return False
+            
+    def __check_val__(x):
+        if is_hashable(x):
+            if x not in seenset:
+                seenset.add(x)
+                return True
+            return False
+        else:
+            if len(seenlist) == 0:
+                seenlist.append(x)
+                return True
+                
+            if all(not safe_identity_test(x, x_) for x_ in seenlist):
+                seenlist.append(x)
+                return True
+                
+            return False
+        
+    if key is None:
+        yield from (x for x in seq if not __check_val__(x))
+    
+    else:
+        if inspect.isfunction(key):
+            yield from (x for x in seq if not __check_fun_val_(x, key))
+        else:
+            yield from (x for x in seq if not __check_val__(key))
+            
+     
+    
             
 def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> typing.Optional[typing.Union[int, typing.Sequence[int]]]:
     """Get indices of container elements with attribute 'name' of given value(s).
