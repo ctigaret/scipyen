@@ -235,12 +235,12 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
-Entity = collections.namedtuple("Entity", ["name", "adc", "dac", "dig", "ttldac"],
+Source = collections.namedtuple("Source", ["name", "adc", "dac", "dig", "ttldac"],
                                      defaults=["cell", 0, None, None, None])
 
-_entity_docstr_ = ["Semantic association between input and output eletrophysiology signals.\n",
+_source_docstr_ = ["Semantic association between input and output eletrophysiology signals.\n",
                    "Signature:\n",
-                   f"\t{Entity.__doc__}",
+                   f"\t{Source.__doc__}",
                    "\nwhere:",
                    "• name (str): The name of the entity\n",
                    "• adc (int, str): The index or name of the ADC channel for the signal",
@@ -267,8 +267,8 @@ _entity_docstr_ = ["Semantic association between input and output eletrophysiolo
                    "NOTE: This object type is oblivious to the recording mode or",
                    "    electrode mode."]
 
-Entity.__doc__ = "\n".join(_entity_docstr_)
-del _entity_docstr_
+Source.__doc__ = "\n".join(_source_docstr_)
+del _source_docstr_
 
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,

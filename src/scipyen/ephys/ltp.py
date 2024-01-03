@@ -100,7 +100,7 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 import ephys.ephys as ephys
-from ephys.ephys import ClampMode, ElectrodeMode, LocationMeasure, Entity
+from ephys.ephys import ClampMode, ElectrodeMode, LocationMeasure, Source
 import ephys.membrane as membrane
 
 
@@ -119,9 +119,9 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
                                                    import_from="gui") #  so that resources can be imported too
 
 def cellTwoPathways(adc=0, dac=0, dig=[0,1], **kwargs):
-    """Factory for a cell Entity in two-pathways synaptic plasticity experiments.
+    """Factory for a cell Source in two-pathways synaptic plasticity experiments.
     
-    See ephys.ephys.Entity constructor for a full description of parameters.
+    See ephys.ephys.Source constructor for a full description of parameters.
     
     Named parameters:
     -----------------
@@ -133,15 +133,15 @@ def cellTwoPathways(adc=0, dac=0, dig=[0,1], **kwargs):
     These are 'name' and 'ttldac' and here are given the default values of
     'cell' and None, respectively.
     
-    In a given application, the 'name' field of Entity objects should have unique
+    In a given application, the 'name' field of Source objects should have unique
     values in order to allow the lookup of these objects according to this field.
     
     Returns:
     --------
-    An immutable ephys.ephys.Entity object (a NamedTuple). 
+    An immutable ephys.ephys.Source object (a NamedTuple). 
 
     One can create a modified version using the '_replace' method:
-    (WARNING: Remember to also change the value of the Entity's 'name' field)
+    (WARNING: Remember to also change the value of the Source's 'name' field)
     
     
     cell  = cellTwoPathways()
@@ -156,12 +156,12 @@ def cellTwoPathways(adc=0, dac=0, dig=[0,1], **kwargs):
     """
     name = kwargs.pop("name", "cell")
     ttldac = kwargs.pop("ttldac", None)
-    return Entity(name, adc, dac, dig, ttldac)
+    return Source(name, adc, dac, dig, ttldac)
 
 def fieldTwoPathways(adc=0, dig=[0,1], **kwargs):
-    """Factory for a field recording Entity in two-pathways synaptic plasticity experiments.
+    """Factory for a field recording Source in two-pathways synaptic plasticity experiments.
 
-    See ephys.ephys.Entity constructor for a full description of parameters.
+    See ephys.ephys.Source constructor for a full description of parameters.
     
     Named parameters:
     -----------------
@@ -174,15 +174,15 @@ def fieldTwoPathways(adc=0, dig=[0,1], **kwargs):
     These are 'name' and 'ttldac' and here are given the default values of
     'field' and None, respectively.
     
-    In a given application, the 'name' field of Entity objects should have unique
+    In a given application, the 'name' field of Source objects should have unique
     values in order to allow the lookup of these objects according to this field.
     
     Returns:
     --------
-    An immutable ephys.ephys.Entity object (a NamedTuple). 
+    An immutable ephys.ephys.Source object (a NamedTuple). 
 
     One can create a modified version using the '_replace' method:
-    (WARNING: Remember to also change the value of the Entity's 'name' field).
+    (WARNING: Remember to also change the value of the Source's 'name' field).
     
     fieldRec¹  = fieldTwoPathways()
     fieldRec1  = fieldTwoPathways(adc=1,  name="field1")
@@ -200,7 +200,7 @@ def fieldTwoPathways(adc=0, dig=[0,1], **kwargs):
     """
     name = kwargs.pop("name", "field")
     ttldac = kwargs.pop("ttldac", None)
-    return Entity(name, adc, None, dig, ttldac)
+    return Source(name, adc, None, dig, ttldac)
 
 
 
@@ -1396,7 +1396,7 @@ class LTPOnline(QtCore.QObject):
         Var-positional parameters:
         --------------------------
     
-        One or more ephys.Entity specifying the semantic association between
+        One or more ephys.Source specifying the semantic association between
         input and outputs in this experiment.
     
         trackingClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp
@@ -1426,8 +1426,8 @@ class LTPOnline(QtCore.QObject):
         
         super().__init__(parent=parent)
         
-        if len(args) == 0 or not all(isinstance(a, Entity) for a in args):
-            raise TypeError(f"Expecting one or more Entity objects")
+        if len(args) == 0 or not all(isinstance(a, Source) for a in args):
+            raise TypeError(f"Expecting one or more Source objects")
         
         entityNames = [a.name for a in args]
         
