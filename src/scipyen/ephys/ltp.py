@@ -118,7 +118,7 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
-def cellTwoPathways(adc=0, dac=0, dig=[0,1], **kwargs):
+def twoPathwaysCell(adc=0, dac=0, dig=[0,1], **kwargs):
     """Factory for a cell Source in two-pathways synaptic plasticity experiments.
     
     See ephys.ephys.Source constructor for a full description of parameters.
@@ -158,7 +158,7 @@ def cellTwoPathways(adc=0, dac=0, dig=[0,1], **kwargs):
     ttldac = kwargs.pop("ttldac", None)
     return Source(name, adc, dac, dig, ttldac)
 
-def fieldTwoPathways(adc=0, dig=[0,1], **kwargs):
+def twoPathwaysField(adc=0, dig=[0,1], **kwargs):
     """Factory for a field recording Source in two-pathways synaptic plasticity experiments.
 
     See ephys.ephys.Source constructor for a full description of parameters.
@@ -1429,26 +1429,40 @@ class LTPOnline(QtCore.QObject):
         if len(args) == 0 or not all(isinstance(a, Source) for a in args):
             raise TypeError(f"Expecting one or more Source objects")
         
-        sourceNames = [a.name for a in args]
-        
-        dupNames = utilities.duplicates(sourceNames, indices=True)
-        
+        # parse sources from args; make sure there are identical names
+        dupNames = utilities.duplicates([a.name for a in args], indices=True)
+
         if len(dupNames):
-            warnings.warn("The entities do not have unique names")
+            warnings.warn("The sources do not have unique names; names will be adapted.")
+            snames = list()
+            sources = list()
+            for src in args:
+                if src.name not in snames:
+                    snames.append(src.name)
+                    sources.append(src)
+                    
+                else:
+                    # adapt name to avoid duplicates; since an ephys.Source is 
+                    # an immutable named tuple, we use its _replace method to create
+                    # a copy with a new name
+                    new_name = utilities.counter_suffix(src.name, snames)
+                    snames.append(new_name)
+                    sources.append(src._replace(name=new_name))
+                    
+        else:
+            sources = args
         
-            
-        
-        # assert len(unique(sourceNames)) == len(args), "The entities do not have unique names"
         
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
         self._results_ = dict() 
         
+        # stores the data received from Clampex ATTENTION 
         self._data_ = dict(baseline = dict(path0 = neo.Block(), path1 = neo.Block()),
                            conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
                            chase = dict(path0 = neo.Block(), path1 = neo.Block()))
 
-        self._runParams_ = DataBag(entities = args,
+        self._runParams_ = DataBag(sources = args,
                                    episodes = dict(),
                                    newEpisode = True,
                                    episodeName = None,
