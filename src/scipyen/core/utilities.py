@@ -662,8 +662,11 @@ def get_index_for_seq(index:int, test:typing.Sequence[typing.Any],
                       mapping:typing.Optional[dict]=None) -> typing.Any:
     """Heuristic for computing an index into the target sequence.
     
-    Returns an index into the `target` sequence given `index`:int index into
-    the `test` sequence and an optional index mapping.
+    Returns the index of an element in a `target` sequence given the `index`:int
+    of the element into the `test` sequence and an optional index mapping.
+    
+    In other words, find out at what index in the `target` sequence is located
+    the element at index `index` in the `test` sequence.
     
     Parameters:
     ===========
@@ -3118,7 +3121,7 @@ def elements_types(s) -> typing.Sequence[type]:
 
 
 def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
-    """Appends a counter suffix to x if x is found in the list of strings
+    """Appends a counter suffix to x:str if x is found in the list of strings
     
     Parameters:
     ==========
@@ -3395,7 +3398,6 @@ def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
-    # return tuple(gen_unique(seq, key=key))
     return seq.__class__(gen_unique(seq, key=key, indices=indices))
 
 def duplicates(seq, key=None, indices:bool=False) -> typing.Sequence:
@@ -3442,6 +3444,7 @@ def duplicates(seq, key=None, indices:bool=False) -> typing.Sequence:
     
     if indices:
         return seq.__class__(gen_unique(gen_duplicates(seq, key=key, indices=indices)))
+        
     else:
         return seq.__class__(gen_unique(gen_duplicates(seq, key=key), key=key))
     
@@ -3599,10 +3602,17 @@ def gen_duplicates(seq, key=None, indices:bool=False):
     
     Yields:
     =======
-    Duplicate elements in 'seq'.
+    Duplicate elements in 'seq' i.e., all but the first occurence of
+    of an element present¹ in 'seq' more than once.
     
-    NOTE: Does not guarantee the order of the duplicate elements is the same as 
+    NOTE: 
+        Does not guarantee the order of the duplicate elements is the same as 
             their order in 'seq'.
+    
+    NOTE: 
+        ¹ the presence of the element is established by the 'in'
+        keyword, or by the functor specfied in the 'key' parameter.
+    
     
     This function is useful to create collections of objects with the duplicate
     elements in 'seq' based on a value of the objects' property, or the value of
@@ -3620,6 +3630,8 @@ def gen_duplicates(seq, key=None, indices:bool=False):
     """
     seenlist = list()
     seenset = set()
+    
+    first_index = set()
     
     if not hasattr(seq, "__iter__"):
         raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
@@ -3660,28 +3672,15 @@ def gen_duplicates(seq, key=None, indices:bool=False):
             return False
         
     if indices:
-        try:
-            n = len(seq)
+        if key is None:
+            yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_val__(x))
             
-            if key is None:
-                yield from ((x, k) for x, k in zip(seq, range(n)) if not __check_val__(x))
-                
+        else:
+            if inspect.isfunction(key):
+                yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_fun_val_(x, key))
             else:
-                if inspect.isfunction(key):
-                    yield from ((x, k) for x, k in zip(seq, range(n)) if not __check_fun_val_(x, key))
-                else:
-                    yield from ((x, k) for x, k in zip(seq, range(n)) if not __check_val__(key))
-                    
-        except:
-            if key is None:
-                yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_val__(x))
+                yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_val__(key))
                 
-            else:
-                if inspect.isfunction(key):
-                    yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_fun_val_(x, key))
-                else:
-                    yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_val__(key))
-                    
     else:
         
         if key is None:

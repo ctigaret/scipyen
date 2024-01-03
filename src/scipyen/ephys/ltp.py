@@ -1429,9 +1429,16 @@ class LTPOnline(QtCore.QObject):
         if len(args) == 0 or not all(isinstance(a, Source) for a in args):
             raise TypeError(f"Expecting one or more Source objects")
         
-        entityNames = [a.name for a in args]
+        sourceNames = [a.name for a in args]
         
-        assert len(unique(entityNames)) == len(args), "The entities do not have unique names"
+        dupNames = utilities.duplicates(sourceNames, indices=True)
+        
+        if len(dupNames):
+            warnings.warn("The entities do not have unique names")
+        
+            
+        
+        # assert len(unique(sourceNames)) == len(args), "The entities do not have unique names"
         
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
