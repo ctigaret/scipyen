@@ -100,7 +100,8 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 import ephys.ephys as ephys
-from ephys.ephys import ClampMode, ElectrodeMode, LocationMeasure, Source
+from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
+                         Source, SynapticStimulus, synstim)
 import ephys.membrane as membrane
 
 
@@ -118,15 +119,18 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
-def twoPathwaysCell(adc=0, dac=0, dig=[0,1], **kwargs):
+def twoPathwaysCell(adc=0, dac=0, 
+                    syn=(SynapticStimulus('path0', 0), SynapticStimulus('path1', 1)), 
+                    **kwargs):
     """Factory for a cell Source in two-pathways synaptic plasticity experiments.
     
-    See ephys.ephys.Source constructor for a full description of parameters.
     
     Named parameters:
     -----------------
-    Here, the default parameter values associate 'adc' 0 with 'dac' 0 and digital 
-    outputs ('dig') 0 and 1.
+    See ephys.ephys.Source constructor for a full description.
+    
+    Here, the default parameter values associate 'adc' 0 with 'dac' 0 and two 
+    SynapticStimulus objects, using 'dig' 0 and 'dig' 1, respectively.
     
     Var-positional parameters:
     --------------------------
@@ -155,19 +159,24 @@ def twoPathwaysCell(adc=0, dac=0, dig=[0,1], **kwargs):
     
     """
     name = kwargs.pop("name", "cell")
+    dig = kwargs.pop("dig", None)
     ttldac = kwargs.pop("ttldac", None)
-    return Source(name, adc, dac, dig, ttldac)
+    return Source(name, adc, dac, syn, dig, ttldac)
 
-def twoPathwaysField(adc=0, dig=[0,1], **kwargs):
-    """Factory for a field recording Source in two-pathways synaptic plasticity experiments.
+def twoPathwaysField(adc=0, 
+                    syn=(SynapticStimulus('path0', 0), SynapticStimulus('path1', 1)), 
+                    **kwargs):
+    """Factory for a field Source in two-pathways synaptic plasticity experiments.
 
-    See ephys.ephys.Source constructor for a full description of parameters.
-    
     Named parameters:
     -----------------
-    Here, the default parameter values associate 'adc' 0 with the digital 
-    outputs ('dig') 0 and 1 (i.e. no DAC channel is used for command signals, as 
-    this is a field recording — no clamping is used).
+    See ephys.ephys.Source constructor for a full description of parameters.
+    
+    Here, the default parameter values associate 'adc' 0 with two SynapticStimulus
+    objects, using 'dig' 0 and 'dig' 1, respectively. 
+    
+    No DAC channel is used for command signals, as this is a field recording — 
+    no clamping is used.
     
     Var-positional parameters:
     --------------------------
@@ -200,49 +209,11 @@ def twoPathwaysField(adc=0, dig=[0,1], **kwargs):
     """
     name = kwargs.pop("name", "field")
     ttldac = kwargs.pop("ttldac", None)
-    return Source(name, adc, None, dig, ttldac)
+    dig = kwargs.pop("dig", None)
+    return Source(name, adc, None, syn, dig, ttldac)
 
 
 
-#"def" pairedPulseEPSCs(data_block, Im_signal, Vm_signal, epoch = None):
-
-# class SynapticPlasticityData(BaseScipyenData):
-#     from ephys.ltp import SynapticPathway
-#     _data_children_ = (
-#         ("pathways", (list, tuple), SynapticPathway),
-#         )
-#     
-#     _derived_data_children_ = (
-#         ("Rs", neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.Mohm, time_units=pq.s, name="Rs")),
-#         ("Rin", neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.Mohm, time_units=pq.s, name="Rin")),
-#         ("SynapticResponse", list, neo.IrregularlySampledSignal, neo.IrregularlySampledSignal([], [], units=pq.dimensionless, time_units=pq.s, name="")) # one per pathway
-#         )
-#     
-#     
-#     _result_data_ = (
-#         ("result", pd.DataFrame),
-#         )
-#     
-#     _graphics_attributes_ = (
-#         ("dataCursors", dict),
-#         ("epochs", dict)
-#         )
-#     
-#     _data_attributes_ = (
-#         ("clampMode", ClampMode, ClampMode.VoltageClamp),
-#         ("electrodeModel", ElectrodeMode, ElectrodeMode.WholeCellPatch),
-#         ("baselineReference", range),
-#         )
-#     
-#     _option_attributes_ = ()
-#     
-#     _descriptor_attributes_ = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ + BaseScipyenData._descriptor_attributes_
-#         
-#     def __init__(self, pathways:typing.Optional[typing.Sequence[SynapticPathway]]=None, **kwargs):
-#         super().__init__(**kwargs)
-#         
-#     # def __reduce__(self): # TODO
-#     #     pass
 
 class _LTPFilesSimulator_(QtCore.QThread):
     """
@@ -1426,32 +1397,48 @@ class LTPOnline(QtCore.QObject):
         
         super().__init__(parent=parent)
         
-        if len(args) == 0 or not all(isinstance(a, Source) for a in args):
-            raise TypeError(f"Expecting one or more Source objects")
-        
-        # parse sources from args; make sure there are identical names
-        dupNames = utilities.duplicates([a.name for a in args], indices=True)
-
-        if len(dupNames):
-            warnings.warn("The sources do not have unique names; names will be adapted.")
-            snames = list()
-            self._sources_ = list()
-            for src in args:
-                if src.name not in snames:
-                    snames.append(src.name)
-                    sources.append(src)
-                    
-                else:
-                    # adapt name to avoid duplicates; since an ephys.Source is 
-                    # an immutable named tuple, we use its _replace method to create
-                    # a copy with a new name
-                    new_name = utilities.counter_suffix(src.name, snames)
-                    snames.append(new_name)
-                    sources.append(src._replace(name=new_name))
-                    
+        if len(args) == 0:
+            self._sources_ = None
+            # TODO: 2024-01-04 22:19:44 
+            # write code to infer Source from first ABF file (in _LTPOnlineFileProcessor_)
+            raise ValueError("I must have at least one Source defined")
         else:
-            self._sources_ = args
+            if not all(isinstance(a, Source) for a in args):
+                raise TypeError(f"Expecting one or more Source objects")
         
+            # parse sources from args; make sure there are identical names
+            dupNames = utilities.duplicates([a.name for a in args], indices=True)
+
+            if len(dupNames):
+                warnings.warn("The sources do not have unique names; names will be adapted.")
+                snames = list()
+                self._sources_ = list()
+                for src in args:
+                    if src.name not in snames:
+                        snames.append(src.name)
+                        sources.append(src)
+                        
+                    else:
+                        # adapt name to avoid duplicates; since an ephys.Source is 
+                        # an immutable named tuple, we use its _replace method to create
+                        # a copy with a new name
+                        new_name = utilities.counter_suffix(src.name, snames)
+                        snames.append(new_name)
+                        sources.append(src._replace(name=new_name))
+                        
+            else:
+                self._sources_ = args
+                
+            # NOTE: 2024-01-04 22:20:55
+            # check consistency of sources
+            
+            for k,src in enumerate(self._sources_):
+                if src.syn is None:
+                    raise ValueError(f"Source {k} must have synaptic stimulus defined")
+                
+                # TODO: 2024-01-04 22:26:17
+                # check that syn.dac and src.dac are distinct
+                # check that syn.dig and src.dig are distinct
         
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
@@ -1464,19 +1451,76 @@ class LTPOnline(QtCore.QObject):
         # number of analogsignals); we need information in self._sources_ to
         # group accordingly.
         #
+        # Epsiodes: 
+        # A synaptic plasticity experiment occurs in three episodes (or stages):
+        #
+        # 1. baseline      — records the evolution of synaptic responses BEFORE
+        #                   conditioning (see below); responses are recorded as 
+        #                   analog signals via a specific ADC.
+        #
+        #                   Responses can be recorded on two synaptic pathways in
+        #                   the same Source: e.g., a 'Test' pathway receiving the
+        #                   conditioning protocol (see below), and a 'Control' 
+        #                   pathway (not stimulated during conditioning).
+        #
+        #                   Responses in both pathways are recorded using the 
+        #                   same electrode, but are evoked with TTL signals sent
+        #                   via two distinct digital channels, two distinct DAC
+        #                   channels (as analog signals emulating TTL pulses), 
+        #                   or a combination of a digital and a DAC channel.
+        #                   In order to distinguish the pathway origin of the
+        #                   responses, the pathways are recorded in alternative 
+        #                   sweeps (segments). 
+        #
+        #                   NOTE Clampex (pClamp) has no means to specify the 
+        #                   particular sweeps when a given DIG (or DAC-emulated)
+        #                   TTL should be output. However, Clampex does allow TWO 
+        #                   alternative DIG outputs, with each one active on 
+        #                   alternative sweeps — hence Clampex trials (written 
+        #                   as ABF files) will contain recordings from one
+        #                   pathway in odd-numbered sweeps, and from the other 
+        #                   in even-numbered sweeps.
+        #
+        #                   NOTE: CED Signal is more flexible in this respect,
+        #                   as it allows a definition of 'states', with each state
+        #                   defining a set of 'pulses'; states can then be run in 
+        #                   a user-defined sequence (a.k.a., 'protocol') such that
+        #                   a given 'state' is applied every 𝒏 sweeps, or only
+        #                   once, in a sweep of your choice, during a trial ⟹
+        #                   one can in principle enure interleaved stimulation
+        #                   of more than two pathways (provided the outputs are 
+        #                   physically available).
+        #
+        #                   At the time of writing, this code supports only 
+        #                   ABF/Clampex files.
+        #
+        # 2. conditioning  — the protocol (a combination of synaptic and postsynaptic
+        #                   activity) used to induce (or attempt to induce) synaptic
+        #                   plasticity at a defined synaptic pathway — i.e., the 
+        #                   'Test' pathway.
+        #
+        #                   The electrical behaviour of the Source (cell or field)
+        #                   is optionally recorded via the same ADC as the one
+        #                   used to record the baseline responses. Obviously, when
+        #                   recorded, the all sweeps of the trial will contain 
+        #                   synaptic responses only from the conditioned pathway.
+        #                   
+        # 3. chase         — records synaptic responses AFTER conditioning — 
+        #                   signal layout is identical to that of the baseline episode.
+        # 
         # A Source object does NOT specify synaptic pathways! These need to
         # be inferred from the 'dig' and/or 'ttldac' fields of the Source objects
         # in self._sources_
         #
-        # Also, because baseline/chase by definition have the same signals layout
-        # which can be different from the layout during conditioning, it makes 
-        # more sense to store these as distinct neo.Block objects
+        # Because baseline/chase by definition have the same signal layout, which
+        # can be different from that during conditioning, it makes sense to store
+        # these as distinct neo.Block objects.
         #
         # Furthermore, when more than one synaptic pathway is recorded with the
-        # same electrode (i.e. ephys.Source), these can only be recorded in 
-        # separate sweeps (i.e. segments). Therefore it also makes sense to
-        # separate these in distinct neo.Block objects. 
-        # 
+        # same electrode (i.e. same ephys.Source), these can only be recorded in 
+        # separate sweeps (segments). Therefore it also makes sense to store them
+        # in distinct neo.Block objects. 
+        #
         # We recognize the following possibilities:
         # 1) two alternative pathways ⇔
         #   1.1) two dig channels and no ttldacs, OR
@@ -1850,97 +1894,6 @@ class LTPOnline(QtCore.QObject):
         
         self._running_ = True
             
-   
-    
-# def makeRecordingEpisode(*args, **kwargs) -> RecordingEpisode:
-#     """Helper function for the SynapticPathway factory function
-#     args: list of neo.Blocks
-#     name: str, default is ""
-#     pathways: list of SynapticPathways, default is []
-#     xtalk: list of SynapticPathways, default is []
-#     
-# """
-#     name = kwargs.pop("name", "")
-#     
-#     if not isinstance(name, str):
-#         name = ""
-#         
-#     ret = RecordingEpisode(name)
-#     
-#     if len(args): 
-#         if all(isinstance(v, neo.Block) for v in args):
-#             source = args
-#             
-#         elif len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(v, neo.Block) for v in args[0]):
-#             source = args[0]
-#             
-#         else:
-#             raise TypeError(f"Bad source arguments")
-#     else:
-#         source = []
-#     
-#     pathways = kwargs.pop("pathways", [])
-#     if isinstance(pathways, (tuple, list)):
-#         if len(pathways):
-#             if not all(isinstance(v, SynapticPathway) for v in pathways):
-#                 raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
-#         ret.pathways = pathways
-#     else:
-#         ret.pathways = []
-#         
-#     xtalk = kwargs.pop("xtalk", [])
-#     
-#     if isinstance(xtalk, (tuple, list)):
-#         if len(xtalk):
-#             if not all(isinstance(v, SynapticPathway) for v in xtalk):
-#                 raise TypeError(f"'xtalk' must contain only SynapticPatwhay instances")
-#             
-#             ret.xtalk = xtalk
-#             
-#         else:
-#             ret.xtalk = []
-#             
-#     if len(source):
-#         ret.begin = source[0].rec_datetime
-#         ret.end = source[-1].rec_datetime
-#         nsegs = sum(len(b.segments) for b in source)
-#         ret.beginFrame = 0
-#         ret.endFrame = nsegs-1 if nsegs > 0 else 0
-#         
-#     clampMode = kwargs.pop("clampMode", ClampMode.NoClamp)
-#     if not isinstance(clampMode, ClampMode):
-#         clampMode = ClampMode.NoClamp
-#         
-#     ret.clampMode = clampMode
-#     
-#     electrodeMode = kwargs.pop("electrodeMode", ElectrodeMode.Field)
-#     if not isinstance(electrodeMode, ElectrodeMode):
-#         electrodeMode = ElectrodeMode.Field
-#         
-#     ret.electrodeMode = electrodeMode
-#             
-#     return ret
-#     
-# def makeSynapticPathway(**kwargs):
-#     """Factory for a SynapticPathway
-#         Var-keyword parameters only:
-#         ---------------------------
-#         segments
-#         response
-#         analogStimulus
-#         digitalStimulus
-#         pathwayType
-#         episodes: list of episodeDicts:
-#             name
-#             source: list of blocks
-#             pathways: list of SynapticPathway or empty
-#             xtalk: list of SynapticPathway or empty
-#             
-# """
-#     name = kwargs.pop("name", "")
-#     
-    
-    
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     

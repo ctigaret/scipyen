@@ -235,37 +235,78 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
-Source = collections.namedtuple("Source", ["name", "adc", "dac", "dig", "ttldac"],
-                                     defaults=["cell", 0, None, None, None])
+SynapticStimulus = collections.namedtuple("SynapticStimulus", ["name", "dig", "dac"],
+                                          defaults=["stim", None, None])
 
-_source_docstr_ = ["Semantic association between input and output eletrophysiology signals.\n",
+_synstim_docstr_ = ["Logical association between digital or analog outputs and synaptic stimulation.\n",
+                    "Signature:\n",
+                    f"{SynapticStimulus.__doc__}\n",
+                    "where:",
+                    "• name (str): the name of this synaptic simulus; default is 'stim'\n",
+                    "• dig (int): index of DIG outputs sending TTL triggers to a synaptic",
+                    "   stimulation device e.g. simulus isolation box, uncaging laser",
+                    "   modulator, LED device, 𝑒𝑡𝑐.",
+                    "   Optional; default is None\n",
+                    "• dac (int, str): index or name of the DAC channel emulating TTL triggers",
+                    "   to a synaptic stimulation device;",
+                    "   Optional; default is None\n"
+                    "",
+                    "Channel indices above are expected to be >= 0 and correspond to the",
+                    "    logical channel indices in the acquisition protocol.\n",
+                    "Channel names are as assigned in the acquisition protocol (if available).",
+                    "",
+                    "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
+                    ""]
+
+SynapticStimulus.__doc__ = "\n".join(_synstim_docstr_)
+del _synstim_docstr_
+
+def synstim(name:str, dig=None, dac=None):
+    """Shorthand constructor of SynapticStimulus (saves typing)"""
+    return SynapticStimulus(name, dig, dac)
+
+Source = collections.namedtuple("Source", ["name", "adc", "dac", "syn", "dig", "ttldac"],
+                                     defaults=["cell", 0, None, None, None, None])
+
+_source_docstr_ = ["Semantic association between input and output electrophysiology signals.\n",
                    "Signature:\n",
-                   f"\t{Source.__doc__}",
-                   "\nwhere:",
-                   "• name (str): The name of the entity\n",
+                   f"\t{Source.__doc__}\n",
+                   "where:",
+                   "• name (str): The name of the source; default is 'cell'\n",
                    "• adc (int, str): The index or name of the ADC channel for the signal",
-                   "    containing the recorded electric behaviour of the entity",
+                   "    containing the recorded electric behaviour of the source",
                    "    (a.k.a the 'input' channel e.g., cell → amplifier → DAQ device).\n",
                    "• dac (int, str): The index or name of the DAC channel sending commands",
-                   "    to the entity (in voltage- or current-clamp), a.k.a 'output' e.g.",
-                   "    DAQ device → amplifier → cell.",
+                   "    to the source in voltage- or current-clamp, a.k.a 'output' (e.g.",
+                   "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
                    "    Optional; default is None.\n",
+                   "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
+                   "    Configuration(s) of TTL sources for synaptic stimulation",
+                   "    (one SynapticStimulus per synaptic pathway).",
+                   "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
+                   "    from those specified in 'dig', 'dac', or 'ttldac' fields of this object. "
+                   "    Optional; default is SynapticStimulus('stim', None, None).\n",
                    "• dig (int, sequence of int): The index or indices of the digital output",
-                   "    channels sending TTLs to trigger entity responses (e.g. synaptic",
-                   "    stimulation).",
+                   "    channels sending TTLs triggers for purposes OTHER THAN synaptic stimulation",
+                   "    (e.g., imaging frame triggers, etc.)",
                    "    Optional; default is None.\n",
                    "• ttldac (int, str, sequence of int or sequence of str): ",
-                   "    The index (indices) or name(s) of the DAC channels emulating TTLs",
-                   "    to trigger entity responses.",
+                   "    The index (indices) or name(s) of the DAC channels emulating TTL",
+                   "    triggers for purposes OTHER THAN synaptic stimulation (e.g.,",
+                   "    imaging frame triggers, etc)",
                    "    NOTE: These must be distinct from the dac channel specified above.",
                    "    Optional; default is None.\n",
                    "",
                    "Channel indices above are expected to be >= 0 and correspond to the",
                    "    logical channel indices in the acquisition protocol. ",
+                   "",
                    "Channel names are as assigned in the acquisition protocol (if available).",
                    "",
                    "NOTE: This object type is oblivious to the recording mode or",
-                   "    electrode mode."]
+                   "    electrode mode.",
+                   "",
+                   "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
+                   ""]
 
 Source.__doc__ = "\n".join(_source_docstr_)
 del _source_docstr_
