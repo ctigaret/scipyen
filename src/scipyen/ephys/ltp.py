@@ -1435,7 +1435,7 @@ class LTPOnline(QtCore.QObject):
         if len(dupNames):
             warnings.warn("The sources do not have unique names; names will be adapted.")
             snames = list()
-            sources = list()
+            self._sources_ = list()
             for src in args:
                 if src.name not in snames:
                     snames.append(src.name)
@@ -1450,19 +1450,59 @@ class LTPOnline(QtCore.QObject):
                     sources.append(src._replace(name=new_name))
                     
         else:
-            sources = args
+            self._sources_ = args
         
         
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
         self._results_ = dict() 
         
-        # stores the data received from Clampex ATTENTION 
+        # stores the data received from Clampex 
+        # ATTENTION 
+        # Clampex sends one trial per ABF file → one neo.Block containing ALL 
+        # data in a trial (i.e. segments = sweeps, each segment with same 
+        # number of analogsignals); we need information in self._sources_ to
+        # group accordingly.
+        #
+        # A Source object does NOT specify synaptic pathways! These need to
+        # be inferred from the 'dig' and/or 'ttldac' fields of the Source objects
+        # in self._sources_
+        #
+        # Also, because baseline/chase by definition have the same signals layout
+        # which can be different from the layout during conditioning, it makes 
+        # more sense to store these as distinct neo.Block objects
+        #
+        # Furthermore, when more than one synaptic pathway is recorded with the
+        # same electrode (i.e. ephys.Source), these can only be recorded in 
+        # separate sweeps (i.e. segments). Therefore it also makes sense to
+        # separate these in distinct neo.Block objects. 
+        # 
+        # We recognize the following possibilities:
+        # 1) two alternative pathways ⇔
+        #   1.1) two dig channels and no ttldacs, OR
+        #   1.2) one dig channel  and one ttldac, OR
+        #   1.3) no dig channels  and two ttldacs
+        # 2) one synaptic pathway only ⇔ one dig channel or one ttldac
+        #
+        #
+        # 3) although theoretically possible, we do NOT support more than two pathways
+        # per source.
+        
+        
+        # only be done alternatively (because responses are )
+        self._data_ = dict()
+        
+        for src in self._sources_:
+            self._data_[src.name] = dict(source = src,
+                                         baseline = dict(), 
+                                         conditioning = dict(),
+                                         chase = dict())
+        
         self._data_ = dict(baseline = dict(path0 = neo.Block(), path1 = neo.Block()),
                            conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
                            chase = dict(path0 = neo.Block(), path1 = neo.Block()))
 
-        self._runParams_ = DataBag(sources = args,
+        self._runParams_ = DataBag(sources = self._sources_,
                                    episodes = dict(),
                                    newEpisode = True,
                                    episodeName = None,
