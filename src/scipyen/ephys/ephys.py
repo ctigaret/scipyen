@@ -261,7 +261,7 @@ _synstim_docstr_ = ["Logical association between digital or analog outputs and s
 SynapticStimulus.__doc__ = "\n".join(_synstim_docstr_)
 del _synstim_docstr_
 
-def synstim(name:str, dig:typing.Optional[int]=None, dac:typing.Optional[int]=None):
+def synstim(name:str, dig:typing.Optional[int]=None, dac:typing.Optional[int]=None) -> SynapticStimulus:
     """Shorthand constructor of SynapticStimulus (saves typing)"""
     return SynapticStimulus(name, dig, dac)
 
@@ -302,7 +302,9 @@ AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel 
 AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (False), a trigger (TTL-like) signal (True) or any other analog input"
 del _aux_docstr_
 
-def auxinput(name:str, )
+def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
+    return AuxiliaryInput(name, adc, cmd)
+    
 
 Source = collections.namedtuple("Source", ["name", "adc", "dac", "syn", "dig", "ttldac", "aux"],
                                      defaults=["cell", 0, None, None, None, None, None])
