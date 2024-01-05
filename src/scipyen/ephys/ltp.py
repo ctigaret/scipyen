@@ -101,7 +101,7 @@ import iolib.pictio as pio
 
 import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
-                         Source, SynapticStimulus, AuxiliaryInput)
+                         Source, SynapticStimulus, AuxiliaryInput, synstim)
 import ephys.membrane as membrane
 
 
@@ -1462,44 +1462,62 @@ class LTPOnline(QtCore.QObject):
             # • unique synaptic stimulus configurations
             # • unique auxiliary ADCs (when used) — these are useful to infer 
             #   trigger protocols from input signals recorded via auxiliary inputs
+            #   — specified using AuxiliaryInput objects:
+            #   
+            adcs        = set()
+            dacs        = set()
+            auxadcs     = set() # we need to check these in case we fall back on detecting command waveforms and triggers from auxiliary inputs
             synstims    = set()
             stimdig     = set()
             stimdac     = set()
             stimnames   = set()
-            adcs        = set()
-            dacs        = set()
-            auxadcs     = set()
             
+            # WARNING: 2024-01-05 11:56:12
+            # the one thing we cannot yet verify is that different channel names 
+            # erroneously point to the same channel index in the protocol — this 
+            # is possible, but unlikely
             for k,src in enumerate(self._sources_):
+                if not isinstance(src.adc, (int, str)):
+                    raise ValueError(f"Source {k} does not specify a primary ADC input")
+                
+                if src.adc not in adcs:
+                    adcs.add(src.adc)
+                else:
+                    raise ValueError(f"The ADC {src.adc} in source {k} is already in use by other source")
+                
+                if not isinstance(src.dac, (int, str)):
+                    raise ValueError(f"Source {k} does not specify a primary DAC output")
+                
+                if src.dac not in dacs:
+                    dacs.add(src.dac)
+                else:
+                    raise ValueError(f"The DAC {src.dac} in source {k} is already in use by other source")
+                    
+                # check synaptic stimulus configurations for consistency
+                # NOTE: it is possible for a SynapticStimulus configuration to be 
+                # shared among sources; this means the same DIG and DAC channels
+                # used for stimulus can be shared.
+                #
+                # the only thing to avoid is duplicate synaptic stimulus
+                # configurations in the same source
                 if isinstance(src.syn, SynapticStimulus):
                     if not any(isinstance(v, int) for v in src.syn[1:]):
-                        return TypeError(f"At least one of the 'dug' and 'dac' fields in the synaptic stimulus definition {src.syn} in source {k} must be an int")
+                        return TypeError(f"At least one of the 'dig' and 'dac' fields in the synaptic stimulus definition {src.syn} in source {k} must be an int")
                     
                     if src.syn not in synstims:
                         synstims.add(src.syn)
-                    else:
-                        raise ValueError(f"The synaptic stimulus configuration ({src.syn}) in source {k} has been specified before")
                     
                     
                     if isinstance(src.syn.dig, int):
                         if src.syn.dig not in stimdig:
                             stimdig.add(src.syn.dig)
-                        else:
-                            raise ValueError(f"The 'dig' channel ({src.syn.dig}) in the synaptic stimulus definition of source {k} is already used")
-                        
+
                     if isinstance(src.syn.dac, int):
                         if src.syn.dac not in stimdac:
                             stimdac.add(src.syn.dac)
-                        else:
-                            raise ValueError(f"The 'dac' channel ({src.syn.dac}) in the synaptic stimulus definition of source {k} is already used")
                         
                     if not isinstance(src.syn.name, str):
                         raise TypeError(f"Invalid name ('{src.syn.name}') for synaptic stimulus definition in source {k}")
-                    
-                    if src.syn.name not in stimnames:
-                        stimnames.add(src.syn.name)
-                    else:
-                        raise ValueError(f"Duplicate synaptic stimulus definition name in source {k}: '{src.syn.name}' is already used.")
                     
                 elif isinstance(src.syn, (list, tuple)) and all(isinstance(v, SynapticStimulus) for v in src.syn):
                     ssyn = set(src.syn)
@@ -1508,33 +1526,22 @@ class LTPOnline(QtCore.QObject):
                     
                     for ks, syn in src.syn:
                         if not any(isinstance(v, int) for v in syn[1:]):
-                            return TypeError(f"At least one of thge 'dig' and 'dac' fields of the {ks}th synaptic stimulus definition ({syn}) in source {k} must be an int")
+                            return TypeError(f"At least one of the 'dig' and 'dac' fields of the {ks}th synaptic stimulus definition ({syn}) in source {k} must be an int")
                         
                         
                         if syn not in synstims:
                             synstims.add(syn)
-                        else:
-                            raise ValueError(f"The {ks}th synaptic stimulus configuration ({syn}) in source {k} has been specified before")
                         
                         if isinstance(syn.dig, int):
                             if syn.dig not in stimdig:
                                 stimdig.add(syn.dig)
-                            else:
-                                raise ValueError(f"The 'dig' channel ({syn.dig}) in the synaptic stimulus definition {ks} of source {k} is already used")
                             
                         if isinstance(syn.dac, int):
                             if syn.dac not in stimdac:
                                 stimdac.add(syn.dac)
-                            else:
-                                raise ValueError(f"The 'dac' channel ({syn.dac}) in the synaptic stimulus definition {ks} of source {k} is already used")
                             
                         if not isinstance(syn.name, str):
                             raise TypeError(f"Invalid name ('{syn.name}') for synaptic stimulus definition {ks} in source {k}")
-                        
-                        if syn.name not in stimnames:
-                            stimnames.add(syn.name)
-                        else:
-                            raise ValueError(f"Duplicate synaptic stimulus definition name in source {k}: '{syn.name}' is already used.")
                         
                 else:
                     raise ValueError(f"Source {k} does not define a synaptic stimulus.")

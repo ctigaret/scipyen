@@ -261,12 +261,12 @@ _synstim_docstr_ = ["Logical association between digital or analog outputs and s
 SynapticStimulus.__doc__ = "\n".join(_synstim_docstr_)
 del _synstim_docstr_
 
-def synstim(name:str, dig=None, dac=None):
+def synstim(name:str, dig:typing.Optional[int]=None, dac:typing.Optional[int]=None):
     """Shorthand constructor of SynapticStimulus (saves typing)"""
     return SynapticStimulus(name, dig, dac)
 
 AuxiliaryInput = collections.namedtuple("AuxiliaryInput", ["name", "adc", "cmd"],
-                                        defaults=["aux", None, False])
+                                        defaults=["aux", None, None])
 
 _aux_docstr_ = ["An auxiliary input identifies an ADC for recording a signal other than",
                 "the primary amplifier output (e.g. a secondary amplifier output, 'copies' ",
@@ -298,8 +298,11 @@ _aux_docstr_ = ["An auxiliary input identifies an ADC for recording a signal oth
 
 AuxiliaryInput.__doc__ = "\n".join(_aux_docstr_)
 AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux'"
-AuxiliaryInput.adc.__doc__  = "int or str: index or name of the ADC channel used to record the auxiliary input; default is None."
+AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
+AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (False), a trigger (TTL-like) signal (True) or any other analog input"
 del _aux_docstr_
+
+def auxinput(name:str, )
 
 Source = collections.namedtuple("Source", ["name", "adc", "dac", "syn", "dig", "ttldac", "aux"],
                                      defaults=["cell", 0, None, None, None, None, None])
@@ -340,10 +343,18 @@ _source_docstr_ = ["Semantic association between input and output electrophysiol
                    "",
                    "Channel names are as assigned in the acquisition protocol (if available).",
                    "",
-                   "NOTE: This object type is oblivious to the recording mode or",
-                   "    electrode mode.",
+                   "NOTES: ",
                    "",
-                   "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
+                   "1. This object type is oblivious to the recording mode or electrode mode.",
+                   "",
+                   "2. The order of parameters matters, unless they are given as name↦value pairs.",
+                   "",
+                   "3. A Source object is immutable. However one can create a modified copy by calling",
+                   "    its '_replace' method specifying different values to selected fields, e.g.:",
+                   "",
+                   "\t source1 = Source('cell1', 0, 1, SynapticStimulus('path0', 0))",
+                   "",
+                   "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
                    ""]
 
 Source.__doc__ = "\n".join(_source_docstr_)
