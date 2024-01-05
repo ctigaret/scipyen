@@ -1,4 +1,4 @@
-""" Functionality for electrophysiology data.
+""" Classes and functions for electrophysiology data.
 
 NOTATIONS USED BELOW:
 
@@ -251,7 +251,7 @@ _synstim_docstr_ = ["Logical association between digital or analog outputs and s
                     "   to a synaptic stimulation device;",
                     "   Optional; default is None\n"
                     "",
-                    "Channel indices above are expected to be >= 0 and correspond to the",
+                    "Channel indices are expected to be >= 0 and correspond to the",
                     "    logical channel indices in the acquisition protocol.\n",
                     "Channel names are as assigned in the acquisition protocol (if available).",
                     "",
@@ -265,8 +265,44 @@ def synstim(name:str, dig=None, dac=None):
     """Shorthand constructor of SynapticStimulus (saves typing)"""
     return SynapticStimulus(name, dig, dac)
 
-Source = collections.namedtuple("Source", ["name", "adc", "dac", "syn", "dig", "ttldac"],
-                                     defaults=["cell", 0, None, None, None, None])
+AuxiliaryInput = collections.namedtuple("AuxiliaryInput", ["name", "adc", "cmd"],
+                                        defaults=["aux", None, False])
+
+_aux_docstr_ = ["An auxiliary input identifies an ADC for recording a signal other than",
+                "the primary amplifier output (e.g. a secondary amplifier output, 'copies' ",
+                "of digital TTLs or DAQ command output signals sent to the amplifier, ", 
+                "output from auxiliary measurement device, 𝑒𝑡𝑐.)\n",
+                "Signature:\n"
+                f"\t{AuxiliaryInput.__doc__}\n",
+                "where:",
+                "• name (str): name of this auxiliary input specification; default is 'aux'.\n",
+                "• adc (int, str, None): index or name of the ADC channel used to record the auxiliary input.",
+                "   Optional; default is None.\n",
+                "• cmd (bool, None): default is None; ",
+                "   when False, this indicates that this auxiliary input is a copy or a trigger (TTL-like)",
+                "       signal (either from a digital output or from a DAC);",
+                "   when True, this is a 'copy' of a command signal, or of an appropriately chosen",
+                "       secondary amplifier output, as a 'proxy' of the command signal (e.g.",
+                "       membrane potential in voltage clamp, or membrane current in current clamp)¹;",
+                "   when None, this auxiliary input carries any other signal NOT mentioned above.\n"
+                "",
+                "Channel indices are expected to be >= 0 and correspond to the logical channel",
+                "    indices in the acquisition protocol.\n",
+                "Channel names are as assigned in the acquisition protocol (if available).",
+                "",
+                "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
+                "",
+                "¹ In modern amplifiers the recording electrode switches between voltage measurement and current injection,",
+                "   with a high cycle rate; therefore, both membrane potential and current are theoretically available "
+                ""]
+
+AuxiliaryInput.__doc__ = "\n".join(_aux_docstr_)
+AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux'"
+AuxiliaryInput.adc.__doc__  = "int or str: index or name of the ADC channel used to record the auxiliary input; default is None."
+del _aux_docstr_
+
+Source = collections.namedtuple("Source", ["name", "adc", "dac", "syn", "dig", "ttldac", "aux"],
+                                     defaults=["cell", 0, None, None, None, None, None])
 
 _source_docstr_ = ["Semantic association between input and output electrophysiology signals.\n",
                    "Signature:\n",
@@ -296,8 +332,10 @@ _source_docstr_ = ["Semantic association between input and output electrophysiol
                    "    imaging frame triggers, etc)",
                    "    NOTE: These must be distinct from the dac channel specified above.",
                    "    Optional; default is None.\n",
+                   "• aux (AuxiliaryInput or sequence of AuxiliaryInput objects)",
+                   "    Optional; default is None.\n",
                    "",
-                   "Channel indices above are expected to be >= 0 and correspond to the",
+                   "Channel indices are expected to be >= 0 and correspond to the",
                    "    logical channel indices in the acquisition protocol. ",
                    "",
                    "Channel names are as assigned in the acquisition protocol (if available).",

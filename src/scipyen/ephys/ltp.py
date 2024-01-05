@@ -101,7 +101,7 @@ import iolib.pictio as pio
 
 import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
-                         Source, SynapticStimulus, synstim)
+                         Source, SynapticStimulus, AuxiliaryInput)
 import ephys.membrane as membrane
 
 
@@ -119,23 +119,26 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
-def twoPathwaysCell(adc=0, dac=0, 
-                    syn=(SynapticStimulus('path0', 0), SynapticStimulus('path1', 1)), 
-                    **kwargs):
+def twoPathwaysCell(adc=0, dac=0, path0=0, path1=1, **kwargs):
     """Factory for a cell Source in two-pathways synaptic plasticity experiments.
     
+    Synaptic stimulation is carried out via extracellular electrodes using
+    simulus devices driven by TTLs on DIG channels 0 and 1
+    
+    Responses are recorded on ADC 0.
     
     Named parameters:
     -----------------
-    See ephys.ephys.Source constructor for a full description.
+    adc, dac: See ephys.ephys.Source constructor for a full description.
+    path0, path1 (int) >= 0 indices of DIG channels used to stimulate the patwhays.
     
     Here, the default parameter values associate 'adc' 0 with 'dac' 0 and two 
     SynapticStimulus objects, using 'dig' 0 and 'dig' 1, respectively.
     
     Var-positional parameters:
     --------------------------
-    These are 'name' and 'ttldac' and here are given the default values of
-    'cell' and None, respectively.
+    These are 'name' and 'ttldac' and here are given the default values 
+    of 'cell' and None, respectively.
     
     In a given application, the 'name' field of Source objects should have unique
     values in order to allow the lookup of these objects according to this field.
@@ -158,18 +161,29 @@ def twoPathwaysCell(adc=0, dac=0,
     One can use this mechanism to "convert" to a field recording entity.
     
     """
+    syn=(SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)), 
     name = kwargs.pop("name", "cell")
     dig = kwargs.pop("dig", None)
     ttldac = kwargs.pop("ttldac", None)
+    aux = kwargs.pop("aux", None)
+    if aux is not None:
+        if (isinstance(aux, (list, tuple)) and not all(isinstance(v, AuxiliaryInput) for v in aux)) or not isinstance(aux, AuxiliaryInput):
+            raise TypeError(f"'aux' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
     return Source(name, adc, dac, syn, dig, ttldac)
 
-def twoPathwaysField(adc=0, 
-                    syn=(SynapticStimulus('path0', 0), SynapticStimulus('path1', 1)), 
-                    **kwargs):
+def twoPathwaysField(adc=0, path0=0, path1=1, **kwargs):
     """Factory for a field Source in two-pathways synaptic plasticity experiments.
 
+    Synaptic stimulation is carried out via extracellular electrodes using
+    simulus devices driven by TTLs on DIG channels 0 and 1.
+    
+    Responses are recorded on ADC 0.
+    
     Named parameters:
     -----------------
+    adc: See ephys.ephys.Source constructor for a full description.
+    path0, path1 (int) >= 0 indices of DIG channels stimulating the patwhays.
+    
     See ephys.ephys.Source constructor for a full description of parameters.
     
     Here, the default parameter values associate 'adc' 0 with two SynapticStimulus
@@ -207,9 +221,14 @@ def twoPathwaysField(adc=0,
     the 'dataclasses.field' function, when imported in the workspace.
     
     """
+    syn=(SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)), 
     name = kwargs.pop("name", "field")
     ttldac = kwargs.pop("ttldac", None)
     dig = kwargs.pop("dig", None)
+    aux = kwargs.pop("aux", None)
+    if aux is not None:
+        if (isinstance(aux, (list, tuple)) and not all(isinstance(v, AuxiliaryInput) for v in aux)) or not isinstance(aux, AuxiliaryInput):
+            raise TypeError(f"'aux' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
     return Source(name, adc, None, syn, dig, ttldac)
 
 
@@ -1405,6 +1424,11 @@ class LTPOnline(QtCore.QObject):
         else:
             if not all(isinstance(a, Source) for a in args):
                 raise TypeError(f"Expecting one or more Source objects")
+            sset = set(args)
+            
+            if len(sset) < len(args):
+                dupsrc = utilities.duplicates(args, indices=True)
+                raise ValueError(f"Duplicate sources detected in 'args': {dupsrc}")
         
             # parse sources from args; make sure there are identical names
             dupNames = utilities.duplicates([a.name for a in args], indices=True)
@@ -1430,16 +1454,91 @@ class LTPOnline(QtCore.QObject):
                 self._sources_ = args
                 
             # NOTE: 2024-01-04 22:20:55
-            # check consistency of sources
+            # check consistency of synaptic stimuli in sources
+            
+            # make sure sources specify distinct signal layouts for synaptic
+            # simulations; in particular sources must specifiy:
+            # • unique ADC ↦ DAC pairs
+            # • unique synaptic stimulus configurations
+            # • unique auxiliary ADCs (when used) — these are useful to infer 
+            #   trigger protocols from input signals recorded via auxiliary inputs
+            synstims    = set()
+            stimdig     = set()
+            stimdac     = set()
+            stimnames   = set()
+            adcs        = set()
+            dacs        = set()
+            auxadcs     = set()
             
             for k,src in enumerate(self._sources_):
-                if src.syn is None:
-                    raise ValueError(f"Source {k} must have synaptic stimulus defined")
+                if isinstance(src.syn, SynapticStimulus):
+                    if not any(isinstance(v, int) for v in src.syn[1:]):
+                        return TypeError(f"At least one of the 'dug' and 'dac' fields in the synaptic stimulus definition {src.syn} in source {k} must be an int")
+                    
+                    if src.syn not in synstims:
+                        synstims.add(src.syn)
+                    else:
+                        raise ValueError(f"The synaptic stimulus configuration ({src.syn}) in source {k} has been specified before")
+                    
+                    
+                    if isinstance(src.syn.dig, int):
+                        if src.syn.dig not in stimdig:
+                            stimdig.add(src.syn.dig)
+                        else:
+                            raise ValueError(f"The 'dig' channel ({src.syn.dig}) in the synaptic stimulus definition of source {k} is already used")
+                        
+                    if isinstance(src.syn.dac, int):
+                        if src.syn.dac not in stimdac:
+                            stimdac.add(src.syn.dac)
+                        else:
+                            raise ValueError(f"The 'dac' channel ({src.syn.dac}) in the synaptic stimulus definition of source {k} is already used")
+                        
+                    if not isinstance(src.syn.name, str):
+                        raise TypeError(f"Invalid name ('{src.syn.name}') for synaptic stimulus definition in source {k}")
+                    
+                    if src.syn.name not in stimnames:
+                        stimnames.add(src.syn.name)
+                    else:
+                        raise ValueError(f"Duplicate synaptic stimulus definition name in source {k}: '{src.syn.name}' is already used.")
+                    
+                elif isinstance(src.syn, (list, tuple)) and all(isinstance(v, SynapticStimulus) for v in src.syn):
+                    ssyn = set(src.syn)
+                    if len(ssyn) < len(src.syn):
+                        raise ValueError(f"Duplicate synaptic stimulus definitions in source {k}")
+                    
+                    for ks, syn in src.syn:
+                        if not any(isinstance(v, int) for v in syn[1:]):
+                            return TypeError(f"At least one of thge 'dig' and 'dac' fields of the {ks}th synaptic stimulus definition ({syn}) in source {k} must be an int")
+                        
+                        
+                        if syn not in synstims:
+                            synstims.add(syn)
+                        else:
+                            raise ValueError(f"The {ks}th synaptic stimulus configuration ({syn}) in source {k} has been specified before")
+                        
+                        if isinstance(syn.dig, int):
+                            if syn.dig not in stimdig:
+                                stimdig.add(syn.dig)
+                            else:
+                                raise ValueError(f"The 'dig' channel ({syn.dig}) in the synaptic stimulus definition {ks} of source {k} is already used")
+                            
+                        if isinstance(syn.dac, int):
+                            if syn.dac not in stimdac:
+                                stimdac.add(syn.dac)
+                            else:
+                                raise ValueError(f"The 'dac' channel ({syn.dac}) in the synaptic stimulus definition {ks} of source {k} is already used")
+                            
+                        if not isinstance(syn.name, str):
+                            raise TypeError(f"Invalid name ('{syn.name}') for synaptic stimulus definition {ks} in source {k}")
+                        
+                        if syn.name not in stimnames:
+                            stimnames.add(syn.name)
+                        else:
+                            raise ValueError(f"Duplicate synaptic stimulus definition name in source {k}: '{syn.name}' is already used.")
+                        
+                else:
+                    raise ValueError(f"Source {k} does not define a synaptic stimulus.")
                 
-                # TODO: 2024-01-04 22:26:17
-                # check that syn.dac and src.dac are distinct
-                # check that syn.dig and src.dig are distinct
-        
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
         self._results_ = dict() 
@@ -1508,32 +1607,10 @@ class LTPOnline(QtCore.QObject):
         # 3. chase         — records synaptic responses AFTER conditioning — 
         #                   signal layout is identical to that of the baseline episode.
         # 
-        # A Source object does NOT specify synaptic pathways! These need to
-        # be inferred from the 'dig' and/or 'ttldac' fields of the Source objects
-        # in self._sources_
-        #
-        # Because baseline/chase by definition have the same signal layout, which
-        # can be different from that during conditioning, it makes sense to store
-        # these as distinct neo.Block objects.
-        #
-        # Furthermore, when more than one synaptic pathway is recorded with the
-        # same electrode (i.e. same ephys.Source), these can only be recorded in 
-        # separate sweeps (segments). Therefore it also makes sense to store them
-        # in distinct neo.Block objects. 
-        #
-        # We recognize the following possibilities:
-        # 1) two alternative pathways ⇔
-        #   1.1) two dig channels and no ttldacs, OR
-        #   1.2) one dig channel  and one ttldac, OR
-        #   1.3) no dig channels  and two ttldacs
-        # 2) one synaptic pathway only ⇔ one dig channel or one ttldac
-        #
-        #
-        # 3) although theoretically possible, we do NOT support more than two pathways
-        # per source.
         
+        # Data is organized by Source; for each Source we may have more than one
+        # SynapticStimulus configuration
         
-        # only be done alternatively (because responses are )
         self._data_ = dict()
         
         for src in self._sources_:
