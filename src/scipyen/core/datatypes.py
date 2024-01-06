@@ -340,7 +340,7 @@ def sequence_element_type(s):
     return unique((type(e) for e in s))
 
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]], 
-                     ref:typing.Union[type, typing.Sequence[type], typing.Set[type]],
+                     ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
                      use_mro:bool=False,
                      use_ref_mro:bool=False) -> bool:
     """Checks a type in 't' against a reference type in 'ref'.
@@ -387,7 +387,37 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
         
     return len(t & ref) > 0
     
+def type2str(t:type) -> str:
+    if not isinstance(t, type):
+        if type(t).__name__ in typing.__dict__:
+            type_origin = typing.get_origin(t)
+            if type_origin is None:
+                return t.__name__
+            if type_origin is typing.Union:
+                type_origin=""
+            t_args = typing.get_args(t)
+            if len(t_args):
+                type_args = ", ".join([f"{type2str(_t)}" for _t in t_args])
+                return f"{type_origin}: {type_args}"
+            return type_origin
+            
+        raise TypeError(f"Expecting a type; instead, got {type(t).__name__}")
     
+    if t.__name__ in typing.__dict__:
+        type_origin = typing.get_origin(t)
+        if type_origin is None:
+            return t.__name__
+        if type_origin is typing.Union:
+            type_origin=""
+        t_args = typing.get_args(t)
+        if len(t_args):
+            type_args = ", ".join([f"{type2str(_t)}" for _t in t_args])
+            return f"{type_origin}: {type_args}"
+        return type_origin
+    
+    return f": {t.__name__}"
+
+
     
 def array_slice(data:np.ndarray, slicing:(dict, type(None))):
     """Dynamic slicing of nD arrays and introducing new axis in the array.

@@ -3610,4 +3610,7 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
     
     return result
 
+def make_path_dict(src:Source):
+    if isinstance(src, SynapticStimulus):
+        pass
 

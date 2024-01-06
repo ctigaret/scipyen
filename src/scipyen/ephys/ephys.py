@@ -192,7 +192,7 @@ from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventTyp
 from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes
-from core.datatypes import (Episode, Schedule, TypeEnum, check_type)
+from core.datatypes import (Episode, Schedule, TypeEnum, check_type, type2str)
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
@@ -235,45 +235,111 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
-SynapticStimulus = collections.namedtuple("SynapticStimulus", ["name", "dig", "dac"],
-                                          defaults=["stim", None, None])
-
-_synstim_docstr_ = ["Logical association between digital or analog outputs and synaptic stimulation.\n",
+class __BaseSynStim__(typing.NamedTuple):
+    name: str = "stim"
+    channel: typing.Union[int, str] = 0
+    dig: bool=True
+    
+class SynapticStimulus(__BaseSynStim__):
+    # see https://stackoverflow.com/questions/61844368/how-to-initialize-a-namedtuple-child-class-different-ways-based-on-input-argumen
+    __slots__ = ()
+    
+    __sig__ = ", ".join([f"{k}{type2str(v)}" for (k,v) in __BaseSynStim__.__annotations__.items()])
+    
+    __doc__ = "\n".join( ["Logical association between digital or analog outputs and synaptic stimulation.\n",
                     "Signature:\n",
-                    f"{SynapticStimulus.__doc__}\n",
+                    f"\tSynapticStimulus({__sig__})\n",
                     "where:",
                     "• name (str): the name of this synaptic simulus; default is 'stim'\n",
-                    "• dig (int): index of DIG outputs sending TTL triggers to a synaptic",
-                    "   stimulation device e.g. simulus isolation box, uncaging laser",
-                    "   modulator, LED device, 𝑒𝑡𝑐.",
-                    "   Optional; default is None\n",
-                    "• dac (int, str): index or name of the DAC channel emulating TTL triggers",
-                    "   to a synaptic stimulation device;",
-                    "   Optional; default is None\n"
+                    "• channel (int, str): index or name of the output channel sending TTL",
+                    "   triggers to a synaptic stimulation device e.g. stimulus isolation box,",
+                    "   uncaging laser modulator, LED device, 𝑒𝑡𝑐.",
+                    "   Optional; default is 0\n",
+                    "• dig (bool): indicates the type of the triggering channel",
+                    "   (used when the 'channel' field is an int):",
+                    "   when True, the channel is a digital output",
+                    "   when False, the channel is a DAC that emulates TTL triggers",
+                    "   Optional; default is True\n"
                     "",
                     "Channel indices are expected to be >= 0 and correspond to the",
                     "    logical channel indices in the acquisition protocol.\n",
                     "Channel names are as assigned in the acquisition protocol (if available).",
                     "",
                     "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
-                    ""]
+                    "",
+                    "Since only DAC channels can be named in a protocol, specifying a str as 'channel'",
+                    "   implied the stimulus is a DAC channel and not a DIG output channel."
+                    ""])
 
-SynapticStimulus.__doc__ = "\n".join(_synstim_docstr_)
-del _synstim_docstr_
-
-def synstim(name:str, dig:typing.Optional[int]=None, dac:typing.Optional[int]=None) -> SynapticStimulus:
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        super_anns = super().__annotations__
+        fields = list(super_anns.keys())
+        super_defaults = super()._field_defaults
+        
+        args = args[1:] # drop cls
+        
+        if len(args) > len(super_anns):
+            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        
+        
+        new_args = dict()
+        for k, arg in enumerate(args):
+            if not isinstance(arg, super_anns[fields[k]]):
+                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+            new_args[fields[k]] = arg
+            
+        if len(new_args) == len(super_anns):
+            if len(kwargs):
+                dups = [k for k in kwargs if k in fields]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                else:
+                    raise SyntaxError("Spurious additional keyword parameters")
+                
+        else:
+            if len(kwargs):
+                dups = [k for k in kwargs if k in new_args]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                
+                spurious = [k for k in kwargs if k not in fields]
+                if len(spurious):
+                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+                
+                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+                
+                new_args.update(new_kwargs)
+                
+            # finally, add the default unspecified args
+            for (k,v) in super_defaults.items():
+                if k not in new_args:
+                    new_args[k] = v
+                    
+        return super().__new__(cls, **new_args)
+    
+SynapticStimulus.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
+SynapticStimulus.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
+SynapticStimulus.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
+                
+def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> SynapticStimulus:
     """Shorthand constructor of SynapticStimulus (saves typing)"""
-    return SynapticStimulus(name, dig, dac)
+    return SynapticStimulus(name, channel, dig)
 
-AuxiliaryInput = collections.namedtuple("AuxiliaryInput", ["name", "adc", "cmd"],
-                                        defaults=["aux", None, None])
-
-_aux_docstr_ = ["An auxiliary input identifies an ADC for recording a signal other than",
+class __BaseAuxInput__(typing.NamedTuple):
+    name: str = "aux"
+    adc: typing.Optional[typing.Union[int, str]] = None
+    cmd: typing.Optional[bool] = None
+    
+class AuxiliaryInput(__BaseAuxInput__):
+    __slots__ = ()
+    __sig__ = ", ".join([f"{k}{type2str(v)}" for (k,v) in __BaseAuxInput__.__annotations__.items()])
+    __doc__ = "\n".join(["An auxiliary input identifies an ADC for recording a signal other than",
                 "the primary amplifier output (e.g. a secondary amplifier output, 'copies' ",
                 "of digital TTLs or DAQ command output signals sent to the amplifier, ", 
                 "output from auxiliary measurement device, 𝑒𝑡𝑐.)\n",
                 "Signature:\n"
-                f"\t{AuxiliaryInput.__doc__}\n",
+                f"\tAuxiliaryInput({__sig__})\n",
                 "where:",
                 "• name (str): name of this auxiliary input specification; default is 'aux'.\n",
                 "• adc (int, str, None): index or name of the ADC channel used to record the auxiliary input.",
@@ -294,24 +360,80 @@ _aux_docstr_ = ["An auxiliary input identifies an ADC for recording a signal oth
                 "",
                 "¹ In modern amplifiers the recording electrode switches between voltage measurement and current injection,",
                 "   with a high cycle rate; therefore, both membrane potential and current are theoretically available "
-                ""]
+                ""])
+    
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        super_anns = super().__annotations__
+        fields = list(super_anns.keys())
+        super_defaults = super()._field_defaults
+        
+        args = args[1:] # drop cls
+        
+        if len(args) > len(super_anns):
+            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        
+        
+        new_args = dict()
+        for k, arg in enumerate(args):
+            if not isinstance(arg, super_anns[fields[k]]):
+                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+            new_args[fields[k]] = arg
+            
+        if len(new_args) == len(super_anns):
+            if len(kwargs):
+                dups = [k for k in kwargs if k in fields]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                else:
+                    raise SyntaxError("Spurious additional keyword parameters")
+                
+        else:
+            if len(kwargs):
+                dups = [k for k in kwargs if k in new_args]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                
+                spurious = [k for k in kwargs if k not in fields]
+                if len(spurious):
+                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+                
+                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+                
+                new_args.update(new_kwargs)
+                
+            # finally, add the default unspecified args
+            for (k,v) in super_defaults.items():
+                if k not in new_args:
+                    new_args[k] = v
+                    
+        return super().__new__(cls, **new_args)
+        
+    
 
-AuxiliaryInput.__doc__ = "\n".join(_aux_docstr_)
 AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux'"
 AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
 AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (False), a trigger (TTL-like) signal (True) or any other analog input"
-del _aux_docstr_
 
 def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
     return AuxiliaryInput(name, adc, cmd)
     
+class __BaseSource__(typing.NamedTuple):
+    name: str = "cell"
+    adc: typing.Union[int, str] = 0
+    dac: typing.Optional[typing.Union[int, str]] = None
+    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
+    dig: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None
+    ttldac: typing.Optional[typing.Union[int, str, typing.Sequence[int], typing.Sequence[str]]] = None
+    aux: typing.Optional[typing.Union[AuxiliaryInput, typing.Sequence[AuxiliaryInput]]] = None
+    
+class Source(__BaseSource__):
+    __slots__ = ()
+    __sig__ = ", ".join([f"{k}{type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
 
-Source = collections.namedtuple("Source", ["name", "adc", "dac", "syn", "dig", "ttldac", "aux"],
-                                     defaults=["cell", 0, None, None, None, None, None])
-
-_source_docstr_ = ["Semantic association between input and output electrophysiology signals.\n",
+    __doc__ = "\n".join(["Semantic association between input and output electrophysiology signals.\n",
                    "Signature:\n",
-                   f"\t{Source.__doc__}\n",
+                   f"\tSource({__sig__})\n",
                    "where:",
                    "• name (str): The name of the source; default is 'cell'\n",
                    "• adc (int, str): The index or name of the ADC channel for the signal",
@@ -357,10 +479,54 @@ _source_docstr_ = ["Semantic association between input and output electrophysiol
                    "\t source1 = Source('cell1', 0, 1, SynapticStimulus('path0', 0))",
                    "",
                    "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
-                   ""]
+                   ""])
 
-Source.__doc__ = "\n".join(_source_docstr_)
-del _source_docstr_
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        super_anns = super().__annotations__
+        fields = list(super_anns.keys())
+        super_defaults = super()._field_defaults
+        
+        args = args[1:] # drop cls
+        
+        if len(args) > len(super_anns):
+            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        
+        
+        new_args = dict()
+        for k, arg in enumerate(args):
+            if not isinstance(arg, super_anns[fields[k]]):
+                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+            new_args[fields[k]] = arg
+            
+        if len(new_args) == len(super_anns):
+            if len(kwargs):
+                dups = [k for k in kwargs if k in fields]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                else:
+                    raise SyntaxError("Spurious additional keyword parameters")
+                
+        else:
+            if len(kwargs):
+                dups = [k for k in kwargs if k in new_args]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                
+                spurious = [k for k in kwargs if k not in fields]
+                if len(spurious):
+                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+                
+                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+                
+                new_args.update(new_kwargs)
+                
+            # finally, add the default unspecified args
+            for (k,v) in super_defaults.items():
+                if k not in new_args:
+                    new_args[k] = v
+                    
+        return super().__new__(cls, **new_args)
 
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
