@@ -161,11 +161,12 @@ def twoPathwaysCell(adc=0, dac=0, path0=0, path1=1, **kwargs):
     One can use this mechanism to "convert" to a field recording entity.
     
     """
-    syn=(SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)), 
-    name = kwargs.pop("name", "cell")
-    dig = kwargs.pop("dig", None)
-    ttldac = kwargs.pop("ttldac", None)
-    aux = kwargs.pop("aux", None)
+    syn     = (SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)) 
+    name    = kwargs.pop("name", "cell")
+    dig     = kwargs.pop("dig", None)
+    ttldac  = kwargs.pop("ttldac", None)
+    aux     = kwargs.pop("aux", None)
+    
     if aux is not None:
         if (isinstance(aux, (list, tuple)) and not all(isinstance(v, AuxiliaryInput) for v in aux)) or not isinstance(aux, AuxiliaryInput):
             raise TypeError(f"'aux' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
@@ -221,11 +222,12 @@ def twoPathwaysField(adc=0, path0=0, path1=1, **kwargs):
     the 'dataclasses.field' function, when imported in the workspace.
     
     """
-    syn=(SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)), 
-    name = kwargs.pop("name", "field")
-    ttldac = kwargs.pop("ttldac", None)
-    dig = kwargs.pop("dig", None)
-    aux = kwargs.pop("aux", None)
+    syn     = (SynapticStimulus('path0', path0), SynapticStimulus('path1', path1))
+    name    = kwargs.pop("name", "field")
+    ttldac  = kwargs.pop("ttldac", None)
+    dig     = kwargs.pop("dig", None)
+    aux     = kwargs.pop("aux", None)
+    
     if aux is not None:
         if (isinstance(aux, (list, tuple)) and not all(isinstance(v, AuxiliaryInput) for v in aux)) or not isinstance(aux, AuxiliaryInput):
             raise TypeError(f"'aux' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
@@ -1386,7 +1388,7 @@ class LTPOnline(QtCore.QObject):
         Var-positional parameters:
         --------------------------
     
-        One or more ephys.Source specifying the semantic association between
+        One or more ephys.Source specifying the logical association between
         input and outputs in this experiment.
     
         trackingClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp

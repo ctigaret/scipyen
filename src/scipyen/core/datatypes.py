@@ -342,7 +342,9 @@ def sequence_element_type(s):
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]], 
                      ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
                      use_mro:bool=False,
-                     use_ref_mro:bool=False) -> bool:
+                     use_ref_mro:bool=False,
+                     check_elements:bool=False,
+                     check_keys:bool=False) -> bool:
     """Checks a type in 't' against a reference type in 'ref'.
     
     't': a type, or a collection of types (i.e., tuple, list or set)
@@ -357,6 +359,9 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     When 't' is a collection of types (see above) the function verifies that any
     of the members in 't' are 'ref' (or in 'ref').
     
+    WARNING: currently this does not check element types (or key/value types)
+    in collections.
+    
     Named parameters:
     -----------------
     use_mro: bool, optional, default is False; when True, the comparison extends
@@ -365,57 +370,126 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     use_ref_mro: bool, optional, default is False; when True, the comparison extends
         to the type hierarchy of objects in 'ref'
     
+    check_elements:bool - Not used
+    check_keys:bool - Not used
+    
     
 """
+    # NOTE: 2024-01-07 00:12:32
+    # the following five variables are not currently used; 
+    # defined here for future code to check types nested in collections
+    t_keys = t_vals = t_elems = None
+    ref_keys = ref_vals = ref_elems = None
+    
     if isinstance(t, type):
-        t = set(inspect.getmro(t)) if use_mro else set([t])
+        # single type
+        t_set = set(inspect.getmro(t)) if use_mro else {t}
         
-    elif isinstance(t, (tuple, list, set)):
-        t = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else set(t)
+    elif isinstance(t, (tuple, list, set) and all(isinstance(t_, type) for t_ in t)):
+        # sequence of types
+        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else {t}
         
     else:
-        raise TypeError(f"'t': Expecting a type, or a list, set, or tuple of types; instead, got {type(t).__name__}")
+        # any object OTHER THAN a type
+        if issubclass(type(t), dict):
+            # cache key/value types - not currently used
+            # TODO 2024-01-06 23:54:37 
+            # write code to check these
+            t_keys, t_vals = tuple(map(lambda x: set(x), zip(*((type(k), type(v)) for k,v in t.items))))
+            
+        elif issubclass(type(t), (list, tuple, set, collections.deque)):
+            # cache element types
+            # TODO 2024-01-06 23:55:01
+            # write code to check element types
+            t_elems = set(type(v) for v in t)
+            
+        t = type(t)
+        t_set = set(inspect.getmro(t)) if use_mro else {t}
+        
+    # else:
+    #     raise TypeError(f"'t': Expecting a type, or a list, set, or tuple of types; instead, got {type(t).__name__}")
         
     if isinstance(ref, type):
-        ref = set(inspect.getmro(ref)) if use_ref_mro else set([type])
+        ref_set = set(inspect.getmro(ref)) if use_ref_mro else {ref}
         
     elif isinstance(ref, (list, tuple, set)):
-        ref = set(itertools.chain.from_iterable([inspect.getmro(t_) for t_ in ref])) if use_ref_mro else set(ref)
+        return any(check_types(t, r_) for r_ in ref)
+        # ref = set(itertools.chain.from_iterable([inspect.getmro(t_) for t_ in ref])) if use_ref_mro else {ref}
+        
+    elif type(ref).__module__ == "typing":
+        ref_origin = typing.get_origin(ref)
+        ref_args = typing.get_args(ref)
+        if ref_origin == typing.Union:
+            if len(ref_args) == 0:
+                raise RuntimeError(f"Cannot resolve {ref} with type arguments {ref_args}")
+            
+            ref_set = set(itertools.chain.from_iterable(map(lambda x: inspect.getmro(typing.get_origin(x) or x), ref_args))) if use_ref_mro else set(map(lambda x: typing.get_origin(x) or x, ref_args))
+            
+        else:
+            ref_set = {inspect.getmro(ref_origin)} if use_ref_mro else {ref_origin}
+            
+            if len(ref_args):
+                if issubclass(ref_origin, (dict, collections.abc.Mapping)):
+                    if len(ref_args) != 2:
+                        raise RuntimeError(f"Cannot resolve {ref} with type arguments {ref_args}")
+                    ref_keys, ref_vals = ref_args
+                    ref_keys = {ref_keys}
+                    ref_vals = {ref_vals}
+                    
+                if issubclass(ref_origin (list, tuple, set, frozentset, collections.deque, collections.abc.Sequence)):
+                    if len(ref_args) > 1:
+                        raise RuntimeError(f"Cannot resolve {ref} with type arguments {ref_args}")
+                    
+                    if typing.get_origin(ref_args[0]) == typing.Union:
+                        ref_elems = set(typing.get_args(ref_args[0]))
+                    else:
+                        ref_elems = set(ref_args)
+                        
+                # TODO 2024-01-07 00:12:02
+                # unravel typing types
+                        
         
     else:
         raise TypeError(f"'ref': Expecting a type, or a list, set, or tuple of types; instead, got {type(ref).__name__}")
-        
-    return len(t & ref) > 0
     
+    # print(f"final t: {t}")
+    # print(f"final ref: {ref}")
+    
+    return len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
+
 def type2str(t:type) -> str:
     if not isinstance(t, type):
-        if type(t).__name__ in typing.__dict__:
+        # print(f"{t} not a type")
+        # if type(t).__name__ in typing.__dict__:
+        if type(t).__module__ == "typing":
             type_origin = typing.get_origin(t)
+            # print(f"type_origin: {type_origin}")
+            t_args = typing.get_args(t)
+            # print(f"t_args: {t_args}")
             if type_origin is None:
                 return t.__name__
-            if type_origin is typing.Union:
-                type_origin=""
-            t_args = typing.get_args(t)
             if len(t_args):
                 type_args = ", ".join([f"{type2str(_t)}" for _t in t_args])
-                return f"{type_origin}: {type_args}"
-            return type_origin
+                return f"{type_origin.__name__}[{type_args}]"
+            return type_origin.__name__
             
         raise TypeError(f"Expecting a type; instead, got {type(t).__name__}")
     
-    if t.__name__ in typing.__dict__:
+    # if t.__name__ in typing.__dict__:
+    if t.__module__ == "typing":
+        # print(f"{t} is a type")
         type_origin = typing.get_origin(t)
+        # print(f"type_origin: {type_origin}")
+        t_args = typing.get_args(t)
+        # print(f"t_args: {t_args}")
         if type_origin is None:
             return t.__name__
-        if type_origin is typing.Union:
-            type_origin=""
-        t_args = typing.get_args(t)
         if len(t_args):
             type_args = ", ".join([f"{type2str(_t)}" for _t in t_args])
-            return f"{type_origin}: {type_args}"
-        return type_origin
+            return f"{type_origin.__name__}[{type_args}]"
+        return type_origin.__name__
     
-    return f": {t.__name__}"
+    return t.__name__
 
 
     

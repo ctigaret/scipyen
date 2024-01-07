@@ -244,7 +244,7 @@ class SynapticStimulus(__BaseSynStim__):
     # see https://stackoverflow.com/questions/61844368/how-to-initialize-a-namedtuple-child-class-different-ways-based-on-input-argumen
     __slots__ = ()
     
-    __sig__ = ", ".join([f"{k}{type2str(v)}" for (k,v) in __BaseSynStim__.__annotations__.items()])
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSynStim__.__annotations__.items()])
     
     __doc__ = "\n".join( ["Logical association between digital or analog outputs and synaptic stimulation.\n",
                     "Signature:\n",
@@ -285,7 +285,8 @@ class SynapticStimulus(__BaseSynStim__):
         
         new_args = dict()
         for k, arg in enumerate(args):
-            if not isinstance(arg, super_anns[fields[k]]):
+            # if not isinstance(arg, super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
@@ -333,7 +334,7 @@ class __BaseAuxInput__(typing.NamedTuple):
     
 class AuxiliaryInput(__BaseAuxInput__):
     __slots__ = ()
-    __sig__ = ", ".join([f"{k}{type2str(v)}" for (k,v) in __BaseAuxInput__.__annotations__.items()])
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseAuxInput__.__annotations__.items()])
     __doc__ = "\n".join(["An auxiliary input identifies an ADC for recording a signal other than",
                 "the primary amplifier output (e.g. a secondary amplifier output, 'copies' ",
                 "of digital TTLs or DAQ command output signals sent to the amplifier, ", 
@@ -376,7 +377,8 @@ class AuxiliaryInput(__BaseAuxInput__):
         
         new_args = dict()
         for k, arg in enumerate(args):
-            if not isinstance(arg, super_anns[fields[k]]):
+            # if not isinstance(arg, super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
@@ -407,6 +409,8 @@ class AuxiliaryInput(__BaseAuxInput__):
                 if k not in new_args:
                     new_args[k] = v
                     
+        # print(f"new_args: {new_args}")
+                    
         return super().__new__(cls, **new_args)
         
     
@@ -429,7 +433,7 @@ class __BaseSource__(typing.NamedTuple):
     
 class Source(__BaseSource__):
     __slots__ = ()
-    __sig__ = ", ".join([f"{k}{type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
 
     __doc__ = "\n".join(["Semantic association between input and output electrophysiology signals.\n",
                    "Signature:\n",
@@ -492,11 +496,13 @@ class Source(__BaseSource__):
         if len(args) > len(super_anns):
             raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
         
-        
         new_args = dict()
+        
         for k, arg in enumerate(args):
-            if not isinstance(arg, super_anns[fields[k]]):
+            # if not isinstance(arg, super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+                # warnings.warn(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
         if len(new_args) == len(super_anns):
@@ -525,6 +531,8 @@ class Source(__BaseSource__):
             for (k,v) in super_defaults.items():
                 if k not in new_args:
                     new_args[k] = v
+                    
+        # print(f"{cls} new_args = {new_args}")
                     
         return super().__new__(cls, **new_args)
 
