@@ -1466,87 +1466,41 @@ class LTPOnline(QtCore.QObject):
             #   trigger protocols from input signals recorded via auxiliary inputs
             #   — specified using AuxiliaryInput objects:
             #   
-            adcs        = set()
-            dacs        = set()
-            auxadcs     = set() # we need to check these in case we fall back on detecting command waveforms and triggers from auxiliary inputs
-            synstims    = set()
-            stimdig     = set()
-            stimdac     = set()
-            stimnames   = set()
             
-            # WARNING: 2024-01-05 11:56:12
-            # the one thing we cannot yet verify is that different channel names 
-            # erroneously point to the same channel index in the protocol — this 
-            # is possible, but unlikely
-            for k,src in enumerate(self._sources_):
-                if not isinstance(src.adc, (int, str)):
-                    raise ValueError(f"Source {k} does not specify a primary ADC input")
+            if any(s.adc is None for s in sources):
+                raise ValueError("All source must specify a primary ADC input")
+            
+            adcs, snames  = list(zip(*[(s.adc, s.name) for s in sources]))
+            
+            dupadcs     = utilities.duplicates(adcs)  # sources must have distinct main ADCs
+            if len(dupadcs):
+                raise ValueError(f"Sharing of ADCs ({dupadcs}) among sources is forbidden")
+            
+            dupnames = utilities.duplicates(snames)
+            if len(dupnames):
+                raise ValueError(f"Sharing of names ({dupnames}) among sources is forbidden")
                 
-                if src.adc not in adcs:
-                    adcs.add(src.adc)
-                else:
-                    raise ValueError(f"The ADC {src.adc} in source {k} is already in use by other source")
-                
-                if not isinstance(src.dac, (int, str)):
-                    raise ValueError(f"Source {k} does not specify a primary DAC output")
-                
-                if src.dac not in dacs:
-                    dacs.add(src.dac)
-                else:
-                    raise ValueError(f"The DAC {src.dac} in source {k} is already in use by other source")
-                    
-                # check synaptic stimulus configurations for consistency
-                # NOTE: it is possible for a SynapticStimulus configuration to be 
-                # shared among sources; this means the same DIG and DAC channels
-                # used for stimulus can be shared.
+            cellsources = [s for s in sources if s.dac is not None]
+            if len(cellsources):
+                # cell-type sources specify a primary DAC, necessary for clamping
+                # and optionally used for membrane test (recommended) and possibly 
+                # also for other electrical manipulations of the recorded cell
+                # e.g., to elicit postsynaptic spikes.
                 #
-                # the only thing to avoid is duplicate synaptic stimulus
-                # configurations in the same source
-                if isinstance(src.syn, SynapticStimulus):
-                    if not any(isinstance(v, int) for v in src.syn[1:]):
-                        return TypeError(f"At least one of the 'dig' and 'dac' fields in the synaptic stimulus definition {src.syn} in source {k} must be an int")
-                    
-                    if src.syn not in synstims:
-                        synstims.add(src.syn)
-                    
-                    
-                    if isinstance(src.syn.dig, int):
-                        if src.syn.dig not in stimdig:
-                            stimdig.add(src.syn.dig)
-
-                    if isinstance(src.syn.dac, int):
-                        if src.syn.dac not in stimdac:
-                            stimdac.add(src.syn.dac)
-                        
-                    if not isinstance(src.syn.name, str):
-                        raise TypeError(f"Invalid name ('{src.syn.name}') for synaptic stimulus definition in source {k}")
-                    
-                elif isinstance(src.syn, (list, tuple)) and all(isinstance(v, SynapticStimulus) for v in src.syn):
-                    ssyn = set(src.syn)
-                    if len(ssyn) < len(src.syn):
-                        raise ValueError(f"Duplicate synaptic stimulus definitions in source {k}")
-                    
-                    for ks, syn in src.syn:
-                        if not any(isinstance(v, int) for v in syn[1:]):
-                            return TypeError(f"At least one of the 'dig' and 'dac' fields of the {ks}th synaptic stimulus definition ({syn}) in source {k} must be an int")
-                        
-                        
-                        if syn not in synstims:
-                            synstims.add(syn)
-                        
-                        if isinstance(syn.dig, int):
-                            if syn.dig not in stimdig:
-                                stimdig.add(syn.dig)
-                            
-                        if isinstance(syn.dac, int):
-                            if syn.dac not in stimdac:
-                                stimdac.add(syn.dac)
-                            
-                        if not isinstance(syn.name, str):
-                            raise TypeError(f"Invalid name ('{syn.name}') for synaptic stimulus definition {ks} in source {k}")
-                        
-                else:
-                    raise ValueError(f"Source {k} does not define a synaptic stimulus.")
+                # these DACs MUST be unique
+                dacs = [s.dac for s in cellsources]
+                
+                dupdacs = utilities.duplicates(dacs)
+                if len(dupdacs):
+                    raise ValueError(f"Sharing of DACs ({dupdacs}) among cell sources is forbidden")
+            
+                # also, these DACs CANNOT be used for anything else (e.g. emulate
+                # TTLs)
+                
+                ttldacs = set(itertools.chain.from_iterable([s.ttldac] if isinstance(s.ttldac, (int, str)) else s.ttldac for s in sources if s.ttldac is not None))
+                ovlap = ttldacs & set(dacs)
+                if len(ovlap):
+                    raise ValueError(f"The following DACs {ovlap} seem to be used for both clamping and for TTL emulation")
                 
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
@@ -1620,19 +1574,31 @@ class LTPOnline(QtCore.QObject):
         # Data is organized by Source; for each Source we may have more than one
         # SynapticStimulus configuration
         
-        self._data_ = dict()
         
-        for src in self._sources_:
-            self._data_[src.name] = dict(source = src,
-                                         baseline = dict(), 
-                                         conditioning = dict(),
-                                         chase = dict())
+        # set up data dictionary ⇒ to be populated with recorded data from ABF files
+        # e.g.: {name1 ↦ {source         ↦ src,
+        #
+        #                 baseline       ↦ { 'path0' ↦ neo.Block,
+        #                                    'path1' ↦ neo.block},
+        #
+        #                 conditioning   ↦ { 'path0' ↦ neo.Block,
+        #                                    'path1' ↦ neo.block},
+        #
+        #                 chase          ↦ { 'path0' ↦ neo.Block,
+        #                                    'path1' ↦ neo.block}
+        #                },
+        #
+        #       name2 ↦ … as above …
+        #       }
+        #
+        self._data_ = dict((src.name, dict((("source",          src),
+                                            ("baseline",        dict(src.syn_blocks)),
+                                            ("conditioning",    dict(src.syn_blocks)),
+                                            ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
         
-        self._data_ = dict(baseline = dict(path0 = neo.Block(), path1 = neo.Block()),
-                           conditioning = dict(path0 = neo.Block(), path1 = neo.Block()),
-                           chase = dict(path0 = neo.Block(), path1 = neo.Block()))
-
+        
         self._runParams_ = DataBag(sources = self._sources_,
+                                   data = self._data_,
                                    episodes = dict(),
                                    newEpisode = True,
                                    episodeName = None,

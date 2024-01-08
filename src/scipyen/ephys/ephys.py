@@ -282,7 +282,6 @@ class SynapticStimulus(__BaseSynStim__):
         if len(args) > len(super_anns):
             raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
         
-        
         new_args = dict()
         for k, arg in enumerate(args):
             # if not isinstance(arg, super_anns[fields[k]]):
@@ -294,15 +293,15 @@ class SynapticStimulus(__BaseSynStim__):
             if len(kwargs):
                 dups = [k for k in kwargs if k in fields]
                 if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
                 else:
-                    raise SyntaxError("Spurious additional keyword parameters")
+                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
                 
         else:
             if len(kwargs):
                 dups = [k for k in kwargs if k in new_args]
                 if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
                 
                 spurious = [k for k in kwargs if k not in fields]
                 if len(spurious):
@@ -346,11 +345,11 @@ class AuxiliaryInput(__BaseAuxInput__):
                 "• adc (int, str, None): index or name of the ADC channel used to record the auxiliary input.",
                 "   Optional; default is None.\n",
                 "• cmd (bool, None): default is None; ",
-                "   when False, this indicates that this auxiliary input is a copy or a trigger (TTL-like)",
-                "       signal (either from a digital output or from a DAC);",
                 "   when True, this is a 'copy' of a command signal, or of an appropriately chosen",
                 "       secondary amplifier output, as a 'proxy' of the command signal (e.g.",
                 "       membrane potential in voltage clamp, or membrane current in current clamp)¹;",
+                "   when False, this indicates that this auxiliary input is a copy or a trigger (TTL-like)",
+                "       signal (either from a digital output or from a DAC);",
                 "   when None, this auxiliary input carries any other signal NOT mentioned above.\n"
                 "",
                 "Channel indices are expected to be >= 0 and correspond to the logical channel",
@@ -374,10 +373,8 @@ class AuxiliaryInput(__BaseAuxInput__):
         if len(args) > len(super_anns):
             raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
         
-        
         new_args = dict()
         for k, arg in enumerate(args):
-            # if not isinstance(arg, super_anns[fields[k]]):
             if not datatypes.check_type(type(arg), super_anns[fields[k]]):
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
@@ -386,15 +383,15 @@ class AuxiliaryInput(__BaseAuxInput__):
             if len(kwargs):
                 dups = [k for k in kwargs if k in fields]
                 if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
                 else:
-                    raise SyntaxError("Spurious additional keyword parameters")
+                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
                 
         else:
             if len(kwargs):
                 dups = [k for k in kwargs if k in new_args]
                 if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
                 
                 spurious = [k for k in kwargs if k not in fields]
                 if len(spurious):
@@ -409,15 +406,11 @@ class AuxiliaryInput(__BaseAuxInput__):
                 if k not in new_args:
                     new_args[k] = v
                     
-        # print(f"new_args: {new_args}")
-                    
         return super().__new__(cls, **new_args)
-        
-    
 
 AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux'"
 AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
-AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (False), a trigger (TTL-like) signal (True) or any other analog input"
+AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
 
 def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
     return AuxiliaryInput(name, adc, cmd)
@@ -435,7 +428,8 @@ class Source(__BaseSource__):
     __slots__ = ()
     __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
 
-    __doc__ = "\n".join(["Semantic association between input and output electrophysiology signals.\n",
+    __doc__ = "\n".join(["Semantic association between input and output electrophysiology signals.",
+                         "in single-electrode recordings.\n"
                    "Signature:\n",
                    f"\tSource({__sig__})\n",
                    "where:",
@@ -484,6 +478,132 @@ class Source(__BaseSource__):
                    "",
                    "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
                    ""])
+    
+    @property
+    def syndigs(self) -> tuple:
+        """Sequence of DIG channels used for synaptic stimulation; may be empty.
+        """
+        if isinstance(self.syn, SynapticStimulus):
+            return tuple(self.syn.channel if self.syn.dig else None)
+        
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+            return tuple(s.channel if s.dig else None for s in self.syn)
+        
+        return tuple()
+    
+    @property
+    def syndacs(self) -> tuple:
+        """Sequence of DAC channels used for synaptic stimulation; may be empty.
+        """
+        if isinstance(self.syn, SynapticStimulus):
+            return tuple(self.syn.channel) if not self.syn.dig else tuple()
+        
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+            return tuple(s.channel for s in self.syn if not s.dig)
+        
+        return tuple()
+    
+    @property
+    def synpaths(self) -> typing.Union[SynapticStimulus, typing.Tuple[SynapticStimulus]]:
+        """Alias to the 'syn' field"""
+        return self.syn
+    
+    @property
+    def daq_clamps(self) -> tuple:
+        """Sequence of ADCs for recording DAQ-issued command waveforms.
+        May be empty.
+        
+        These ADCs are specified in the 'aux' field.
+        
+        These waveforms are issued via the main DAC output tothe source, as part
+        of the clamping command signal, and therefore are configured in the 
+        recording protocol.
+        
+        NOTE: Technically, there should be only one such input; this can be: 
+        • a record of the secondary amplifier output channel (when available)
+            fed in an auxiliary ADC input of the DAQ device (e.g., membrane potential
+            in voltage clamp, or membrane current in current clamp) and used as
+            a sort of proxy for the clamping command signal itself;
+        • a branch off the DAQ command output used for clamping, and fed directly
+            into an auxiliary ADC input of the same DAQ device, thus generating 
+            a true record of the actual clamping command signal.
+        
+        Such inputs are useful to create a record copy of the command waveforms
+        sent to the source (i.e. a cell) during the experiment — needed to
+        identify manipulations such as a membrane test, steps, ramps, pulses, or 
+        oscillatory phenomena, or induction of spikes, in a clamped cell, when 
+        these manipulations cannot be parsed from the recording protocol.
+        
+        """
+        if isinstance(self.aux, AuxiliaryInput):
+            return tuple(self.aux.adc) if self.aux.cmd is True else tuple()
+    
+        if isinstance(self.aux, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.aux):
+            return tuple(a.adc for a in self.aux if a.cmd is True)
+        
+        return tuple()
+    
+    @property
+    def daq_triggers(self) -> tuple:
+        """Sequence of ADCs for recording DAQ-generated TTL signals; 
+        may be empty.
+        
+        These ADCs are specified in the 'aux' field.
+        
+        These signals are configured in the recording protocol; 
+        they can be:
+        • branches off DIG outputs of the DAQ device, fed into auxiliary ADCs of
+            the same DAQ device;
+        • branches off the DAC outputs of the DAQ device, used to emulate TTLs
+            (e.g. in lieu of DIG outputs) and fed into auxiliary ADC inputs of
+            the same DAQ device.
+        
+        Such inputs are useful to create a record copy of the TTLs sent out 
+        during an experiment, when these cannot be parsed from the recording 
+        protocol.
+        
+        """
+        if isinstance(self.aux, AuxiliaryInput):
+            return tuple(self.aux.adc) if self.aux.cmd is False else tuple()
+    
+        if isinstance(self.aux, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.aux):
+            return tuple(a.adc for a in self.aux if a.cmd is False)
+        
+        return tuple()
+    
+    @property
+    def other_inputs(self) -> tuple:
+        """Sequence of ADCs recording input signals not issued by the DAQ device.
+        May be empty.
+        
+        These ADCs are specified in the 'aux' field.
+        
+        Such inputs record auxiliary data signals other than clamping commands or
+        TTLs, e.g. bath temperature, photodetector current, 'external' triggers,
+        etc, and are neither generated by the source (cell or field) nor copies
+        of signal waveforms sent to the source (when clamping)
+        
+        """
+        if isinstance(self.aux, AuxiliaryInput):
+            return tuple(self.aux.adc) if self.aux.cmd is None else tuple()
+    
+        if isinstance(self.aux, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.aux):
+            return tuple(a.adc for a in self.aux if a.cmd is None)
+        
+        return tuple()
+    
+    @property
+    def syn_blocks(self) -> tuple:
+        """Tuple of (name, neo.Block) tuples, one for each SynapticStimulus.
+        May be empty.
+        """
+        if isinstance(self.syn, SynapticStimulus):
+            return ((self.syn.name, neo.Block()),)
+        
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+            return tuple((s.name, neo.Block()) for s in self.syn)
+        
+        return tuple()
 
     @classmethod
     def __new__(cls, *args, **kwargs):
@@ -499,25 +619,23 @@ class Source(__BaseSource__):
         new_args = dict()
         
         for k, arg in enumerate(args):
-            # if not isinstance(arg, super_anns[fields[k]]):
             if not datatypes.check_type(type(arg), super_anns[fields[k]]):
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-                # warnings.warn(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
         if len(new_args) == len(super_anns):
             if len(kwargs):
                 dups = [k for k in kwargs if k in fields]
                 if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
                 else:
-                    raise SyntaxError("Spurious additional keyword parameters")
+                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
                 
         else:
             if len(kwargs):
                 dups = [k for k in kwargs if k in new_args]
                 if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters {dups} ")
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
                 
                 spurious = [k for k in kwargs if k not in fields]
                 if len(spurious):
@@ -531,8 +649,6 @@ class Source(__BaseSource__):
             for (k,v) in super_defaults.items():
                 if k not in new_args:
                     new_args[k] = v
-                    
-        # print(f"{cls} new_args = {new_args}")
                     
         return super().__new__(cls, **new_args)
 
