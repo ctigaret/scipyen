@@ -1644,6 +1644,10 @@ class LTPOnline(QtCore.QObject):
         
         # self._episode_ = "baseline"
 
+        # TODO: 2024-01-08 00:04:55 FIXME
+        # FINALIZE THIS !!!
+        #
+        
         # WARNING: 2023-10-05 12:10:40
         # below, all timings in self._landmarks_ are RELATIVE to the start of the sweep!
         # timings are stored as [start time, duration] (all Quantity scalars, with units of time)
