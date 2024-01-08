@@ -6,6 +6,7 @@ import functools, itertools
 import collections, enum
 import typing, types
 import dataclasses
+import subprocess
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
 #### END core python modules
@@ -77,6 +78,7 @@ from core.utilities import (safeWrapper,
                             sp_set_loc,
                             normalized_index,
                             unique,
+                            duplicates,
                             GeneralIndexType)
 
 #### END pict.core modules
@@ -137,13 +139,18 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
     
     When 'dac' parameter is specified as an int (index) or str (name), the 
     source is considered to be recorded in 𝑐𝑙𝑎𝑚𝑝𝑖𝑛𝑔 mode (i.e. voltage- or 
-    current-clamp), and, by implication, the Source is a 𝒄𝒆𝒍𝒍.
+    current-clamp), and, by implication, the Source is a cell or a membrane 
+    patch.
     
     Synaptic responses are recorded on ADC 0 by default, but this can be specified
     using the 'adc' parameter as an int (index) or str (name).
     
     By default the source 'name' field is "cell"¹ but this can be specified using
     the 'name' parameter as a str.
+    
+    Sources with more complex configurations (e.g. using photostimulation of 
+    synaptic activity triggered with DAC-emulated TTLs) should be constructed
+    directly (see ephys.Source documentation for details).
     
     Named parameters:
     -----------------
@@ -202,41 +209,51 @@ class _LTPFilesSimulator_(QtCore.QThread):
         self._simulationFiles_ = []
         self._simulationTimeOut_ = 1000
         
+        files = None
+        
         # self._simulationTimer_ = QtCore.QTimer(self)
         # self._simulationTimer_.timeout.connect(self.simulateFile)
         
         
         if isinstance(simulation, dict):
+            self._simulationTimeOut_ = simulation.get("timeout",1000)
+            
             files = simulation.get("files", None)
             
-            if isinstance(files, list) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                simFilesPaths = list(filter(lambda x: x.is_file(),[pathlib.Path(v) for v in files]))
-                
-                if len(simFilesPaths):
-                    self._simulationFiles_ = simFilesPaths
-                    self._simulationTimeOut_ = simulation.get("timeout",1000)
+        if files is None:
+            files = subprocess.run(["ls"], capture_output=True).stdout.decode().split("\n")
+        
+        if isinstance(files, list) and len(files) > 0 and all(isinstance(v, str) for v in files):
+            simFilesPaths = list(filter(lambda x: x.is_file() and x.suffix == ".abf", [pathlib.Path(v) for v in files]))
+            
+            if len(simFilesPaths):
+                # NOTE: 2024-01-08 17:45:21
+                # bound to introduce some delay, but needs must, for simulation purposes
+                self._simulationFiles_ = sorted(simFilesPaths, key = lambda x: pio.loadAxonFile(x).rec_datetime)
+                    
+        
                    
     
     def run(self):
-        print(f"{self.__class__.__name__}.run()")
+        # print(f"{self.__class__.__name__}.run()")
+        self._simulationCounter_ = 0
         for k,f in enumerate(self._simulationFiles_):
             print(f"k: {k}, f = {f}\n")
             if self.isInterruptionRequested():
                 break
+            # self._simulationCounter_ = k # incremented in self.simulateFile
+            self.simulateFile()
             QtCore.QThread.sleep(self._simulationTimeOut_//1000) # seconds!
+            
             # QtCore.QTimer.singleShot(self._simulationTimeOut_, self.simulateFile)
-            # self.simulateFile()
         # self._simulationTimer_.start()
         
     @pyqtSlot()
     def simulateFile(self):
-        print(f"{self.__class__.__name__}.simulateFile()")
-        if len(self._simulationFiles_) == 0:
-            # self._simulationTimer_.stop()
-            return
+        # print(f"{self.__class__.__name__}.simulateFile()")
         
         if self._simulationCounter_ >= len(self._simulationFiles_):
-            # self._simulationTimer_.stop()
+            self.stop()
             return
         
         self._simulatedFile_ = self._simulationFiles_[self._simulationCounter_]
@@ -256,11 +273,13 @@ class _LTPOnlineSupplier_(QtCore.QThread):
     abfRunReady = pyqtSignal(pathlib.Path, name="abfRunReady")
     stopTimer = pyqtSignal(name="stopTimer")
     
-    def __init__(self, parent,
-                 abfRunBuffer:collections.deque, 
-                 emitterWindow,
-                 directory,
-                 simulator = None):
+    def __init__(self, parent: QtCore.QObject,
+                 abfRunBuffer: collections.deque, 
+                 emitterWindow: QtCore.QObject,
+                 directory: pathlib.Path,
+                 simulator: typing.Optional[_LTPFilesSimulator_] = None):
+        """
+        """
         QtCore.QThread.__init__(self, parent)
         # self._mutex_ = mutex
         # self._guard_ = guard
@@ -296,9 +315,8 @@ class _LTPOnlineSupplier_(QtCore.QThread):
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
-        if isinstance(self._simulator_,_LTPFilesSimulator_):
-            self._simulator_.supplyFile.connect(self._simulateFile_,
-                                                QtCore.Qt.QueuedConnection)
+        if isinstance(self._simulator_, _LTPFilesSimulator_):
+            self._simulator_.supplyFile.connect(self._simulateFile_)
             
         # watches for changes (additions and removals of files) in the monitored
         # directory
@@ -417,7 +435,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
     def run(self):
         # print(f"{self.__class__.__name__}.run(): simulator = {self._simulator_}")
         if isinstance(self._simulator_, _LTPFilesSimulator_):
-            print(f"Starting simulation...")
+            # print(f"Starting simulation...")
             self._simulator_.start()
         else:
             # starts directory monitor and captures newly created files
@@ -437,7 +455,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
 
     @pyqtSlot(pathlib.Path)
     def _simulateFile_(self, value):
-        print(f"{self.__class__.__name__}._simulateFile_: {value}")
+        # print(f"{self.__class__.__name__}._simulateFile_: {value}")
         
         self.supplyFile(value)
             
@@ -595,17 +613,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         else:
                             self._runParams_.monitoringProtocols.append(protocol)
                             
-#                         if len(self._runParams_.conditioningProtocols) == 0:
-#                             # if protocol.clampMode() == self._conditioningClampModes_:
-#                             if protocol.clampMode() in self._runParams_.conditioningClampModes:
-#                                 self._runParams_.conditioningProtocols.append(protocol)
-#                             else:
-#                                 raise ValueError("Unexpected conditioning protocol")
-#                             
-#                         else:
-#                             if protocol != self._conditioningProtocol_:
-#                                 raise ValueError("Unexpected protocol for current run")
-                
             if self._runParams_.currentProtocol.nSweeps == 2:
                 # if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
                 if not self._runParams_.currentProtocol.alternateDigitalOutputStateEnabled:
@@ -1297,8 +1304,6 @@ class LTPOnline(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
     """
         
-
-        
     test_protocol_properties = ("activeDACChannelIndex",
                                 "nSweeps",
                                 "acquisitionMode",
@@ -1319,9 +1324,6 @@ class LTPOnline(QtCore.QObject):
     
 
     def __init__(self, *args,
-                 # mainADCs:typing.Union[int, typing.Sequence[int]] = 0,
-                 # dacChannels:typing.Union[int, typing.Sequence[int]] = 0,
-                 # digChannels:typing.Union[int, typing.Sequence[int]] = (0,1),
                  useEmbeddedProtocol:bool=True,
                  trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
@@ -1381,11 +1383,11 @@ class LTPOnline(QtCore.QObject):
             sset = set(args)
             
             if len(sset) < len(args):
-                dupsrc = utilities.duplicates(args, indices=True)
+                dupsrc = duplicates(args, indices=True)
                 raise ValueError(f"Duplicate sources detected in 'args': {dupsrc}")
         
             # parse sources from args; make sure there are identical names
-            dupNames = utilities.duplicates([a.name for a in args], indices=True)
+            dupNames = duplicates([a.name for a in args], indices=True)
 
             if len(dupNames):
                 warnings.warn("The sources do not have unique names; names will be adapted.")
@@ -1407,6 +1409,8 @@ class LTPOnline(QtCore.QObject):
             else:
                 self._sources_ = args
                 
+            #### BEGIN Checks
+            #
             # NOTE: 2024-01-04 22:20:55
             # check consistency of synaptic stimuli in sources
             
@@ -1419,19 +1423,36 @@ class LTPOnline(QtCore.QObject):
             #   — specified using AuxiliaryInput objects:
             #   
             
+            # DACs used to emulate TTLs for synaptic stimuli
+            syndacs = set(itertools.chain.from_iterable(s.syn_dac for s in self._sources_))
+            
+            # DACs used to emulate TTLs for other purposes
+            ttldacs = set(itertools.chain.from_iterable(s.out_dac_triggers for s in self._sources_))
+            
+            # DACs used to emit waveforms other than clamping
+            # these should REALLY be distinct from ttldacs
+            cmddacs = set(itertools.chain.from_iterable(s.other_outputs for s in self._sources_))
+            
+            # DIGs used for synaptic stimulation
+            syndigs = set(itertools.chain.from_iterable(s.syn_dig for s in self._sources_))
+            
+            # DIGs used to trigger anything other than synapses
+            digs = set(itertools.chain.from_iterable(s.out_dig_triggers for s in self._sources_))
+            
+            
             # 1. all sources must have a primary ADC
-            if any(s.adc is None for s in sources):
+            if any(s.adc is None for s in self._sources_):
                 raise ValueError("All source must specify a primary ADC input")
             
-            adcs, snames  = list(zip(*[(s.adc, s.name) for s in sources]))
+            adcs, snames  = list(zip(*[(s.adc, s.name) for s in self._sources_]))
             
             # 2. primary ADCs cannot be shared among sources
-            dupadcs     = utilities.duplicates(adcs)  # sources must have distinct main ADCs
+            dupadcs     = duplicates(adcs)  # sources must have distinct main ADCs
             if len(dupadcs):
                 raise ValueError(f"Sharing of primary ADCs ({dupadcs}) among sources is forbidden")
             
             # 3. source names should be unique
-            dupnames = utilities.duplicates(snames)
+            dupnames = duplicates(snames)
             if len(dupnames):
                 raise ValueError(f"Sharing of names ({dupnames}) among sources is forbidden")
                 
@@ -1440,23 +1461,53 @@ class LTPOnline(QtCore.QObject):
             #   membrane test (recommended) and possibly other electrical 
             #   manipulations of the clamped cell (e.g., to elicit postsynaptic spikes).
             #
-            clamped_sources = [s for s in sources if s.dac is not None]
+            #   See detailed checks below (4.1, 4.2, etc)
+            #
+            # In the SAME experiment, a DAC cannot be used, simultaneously, for:
+            # • clamping command waveforms
+            # • TTL emulation (± 5 V !)
+            # 
+            
+            clamped_sources = [s for s in self._sources_ if s.clamped]
             if len(clamped_sources):
                 # these DACs MUST be unique
                 dacs = [s.dac for s in clamped_sources]
                 
                 # 4.1 primary DACs must be unique
-                dupdacs = utilities.duplicates(dacs)
+                dupdacs = duplicates(dacs)
                 if len(dupdacs):
-                    raise ValueError(f"Sharing of DACs ({dupdacs}) among cell sources is forbidden")
-            
-                # also, these DACs CANNOT be used for anything else (e.g. emulate
-                # TTLs)
+                    raise ValueError(f"Sharing of primary DACs ({dupdacs}) among sources is forbidden")
                 
-                ttldacs = set(itertools.chain.from_iterable([s.ttldac] if isinstance(s.ttldac, (int, str)) else s.ttldac for s in sources if s.ttldac is not None))
+                # 4.2 primary DACs CANNOT be used for synaptic stimulation
+                ovlap = syndacs & set(dacs)
+                if len(ovlap):
+                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and synaptic stimulation")
+            
+                # 4.3 primary DACs CANNOT be used to emulate TTLs for 3ʳᵈ party devices in the same experiment
                 ovlap = ttldacs & set(dacs)
                 if len(ovlap):
-                    raise ValueError(f"The following DACs {ovlap} seem to be used for both clamping and for TTL emulation")
+                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and TTL emulation for 3ʳᵈ party devices")
+                
+                # 4.4 primary DACs CANNOT be used to send command signal waveforms
+                # to other than the source (cell or membrane patch)
+                ovlap = cmddacs & set(dacs)
+                if len(ovlap):
+                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and controlling 3ʳᵈ party devices")
+                
+            # 5. check that DIG channels do not overlap with those used for syn stim
+            ovlap = digs & syndigs
+            if len(ovlap):
+                raise ValueError(f"The following DIGs {ovlap} seem to be used both for synaptic stimulation and triggering 3ʳᵈ party devices")
+            
+            # 6. in each Source, the SynapticStimulus objects must have unique names 
+            # (but OK to share across sources)
+            
+            for k, s in enumerate(self._sources_):
+                if isinstance(s.syn, typing.Sequence):
+                    assert len(set(s_.name for s_ in s.syn)) == len(s.syn), f"{k}ᵗʰ source ({s.name}) has duplicate names for SynapticStimulus"
+            
+            #
+            #### END   Checks
                 
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
@@ -1530,6 +1581,9 @@ class LTPOnline(QtCore.QObject):
         # Data is organized by Source; for each Source we may have more than one
         # SynapticStimulus configuration
         
+        # technically, Conditioning should only use ONE pathway; since an empty
+        #       neo.Block does not use much resources, we leave this empty
+        # 
         
         # set up data dictionary ⇒ to be populated with recorded data from ABF files
         # e.g.: {name1 ↦ {source         ↦ src,
@@ -1553,11 +1607,12 @@ class LTPOnline(QtCore.QObject):
                                             ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
         
         
+        # place analysis resuolts inside each episode sub-dict ⇒ do away with _episodeResults_
+        
         self._runParams_ = DataBag(sources = self._sources_,
                                    data = self._data_,
-                                   episodes = dict(),
                                    newEpisode = True,
-                                   episodeName = None,
+                                   episodeName = None, # default is "baseline"
                                    abfRunTimes = list(),
                                    abfRunDeltaTimes = list(),
                                    baselineDurations = baselineDurations,
@@ -1734,7 +1789,7 @@ class LTPOnline(QtCore.QObject):
         if isinstance(simulate, dict):
             files = simulate.get("files", None)
             timeout = simulate.get("timeout", 1000)
-            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v,str) for v in files):
+            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
                 self._simulator_params_ = dict(files=files, timeout=timeout)
                 self._doSimulation_ = True
                 
@@ -1757,12 +1812,11 @@ class LTPOnline(QtCore.QObject):
         if autoStart:
             self._abfSupplierThread_.start()
             self._abfProcessorThread_.start()
-            # if self._doSimulation_ and isinstance(self._simulatorThread_,_LTPFilesSimulator_):
-            #     self._simulatorThread_.start()
-            
+            self._running_ = True
 
     def __del__(self):
-        self.stop()
+        if self._running_:
+            self.stop()
         try:
             for viewer in self._viewers_.values():
                 viewer.close()
@@ -1867,9 +1921,6 @@ class LTPOnline(QtCore.QObject):
             
 
     def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
-        # if self._emitterWindow_ is None:
-        #     raise ValueError("You must set an emiter window first...")
-        
         if self._running_:
             print("Already started")
             return
@@ -1893,8 +1944,6 @@ class LTPOnline(QtCore.QObject):
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
         if not self._doSimulation_ or not isinstance(self._simulatorThread_, _LTPFilesSimulator_):
-        #     self._simulatorThread_.start()
-        # else:
             if self._abfSupplierThread_._dirMonitor_.directory != self._watchedDir_:
                 self._abfSupplierThread_._dirMonitor_.directory = self._watchedDir_
                 

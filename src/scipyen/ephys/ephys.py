@@ -424,8 +424,8 @@ class __BaseAuxOutput__(typing.NamedTuple):
 class AuxiliaryOutput(__BaseAuxOutput__):
     __slots__ = ()
     __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseAuxOutput__.__annotations__.items()])
-    __doc__ = "\n".join(["An auxiliary output channel of the DAQ device (either a DAC or a digital — DIG — channel.\n",
-                         "This channel is used for sending waveforms other than for clamping or for synaptic ",
+    __doc__ = "\n".join(["An auxiliary (analog — DAC — or a digital — DIG) output channel of the DAQ device.\n",
+                         "This channel is used for sending waveforms other than for clamping or synaptic ",
                          "stimulation (the latter being specified using SynapticStimulus objects).\n",
                          "Signature:\n",
                          f"AuxiliaryOutput({__sig__})\n",
@@ -572,7 +572,7 @@ class Source(__BaseSource__):
         'clamped' even if technically it is not (e.g. when using the amplifier's
         'I=0' mode, available in Axon amplifiers, or voltage follower).
     
-        In field recordings (hese use voltabe follower mode, or I=0 in Axon 
+        In field recordings (using voltage follower mode, or 'I=0' mode in Axon 
         patch-clamp amplifiers) the primay DAC output ("active DAC") is still 
         be present in the protocol, but it is not used.
     
@@ -583,21 +583,27 @@ class Source(__BaseSource__):
         return isinstance(self.dac, (int, str))
     
     @property
-    def syndigs(self) -> tuple:
-        """Sequence of DIG channels used for synaptic stimulation; may be empty.
+    def syn_dig(self) -> tuple:
+        """Tuple of DIG channels used for synaptic stimulation; may be empty.
+        These channels emit TTLs to drive devices that elicit synaptic activity,
+        such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
+        for optogenetic stimulation.
         """
         if isinstance(self.syn, SynapticStimulus):
             return (self.syn.channel,) if self.syn.dig else tuple()
         
         if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
-            # return tuple(s.channel if s.dig else None for s in self.syn)
             return tuple(s.channel for s in self.syn if s.dig)
         
         return tuple()
     
     @property
-    def syndacs(self) -> tuple:
-        """Sequence of DAC channels used for synaptic stimulation; may be empty.
+    def syn_dac(self) -> tuple:
+        """Tuple of DAC channels used for synaptic stimulation; may be empty.
+        These channels emit TTLs (emulated as pulses or steps in ± 5 V range and 
+        embedded in analog signals) to drive devices that elicit synaptic activity,
+        such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
+        for optogenetic stimulation.
         """
         if isinstance(self.syn, SynapticStimulus):
             return (self.syn.channel, ) if not self.syn.dig else tuple()
@@ -608,35 +614,36 @@ class Source(__BaseSource__):
         return tuple()
     
     @property
-    def synpaths(self) -> typing.Union[SynapticStimulus, typing.Tuple[SynapticStimulus]]:
+    def syn_paths(self) -> typing.Union[SynapticStimulus, typing.Tuple[SynapticStimulus]]:
         """Alias to the 'syn' field"""
         return self.syn
     
     @property
     def in_daq_cmd(self) -> tuple:
-        """Sequence of ADCs for recording DAQ-issued command waveforms other than TTLs.
+        """Tuple of ADCs for recording DAQ-issued command waveforms other than TTLs.
         May be empty.
         
-        These ADCs are specified in the 'aux' field.
+        These ADCs are specified in the 'aux' field, and correspond to the auxiliary
+        input channels of the DAQ device where a 'copy' of the clamping command 
+        signal is being fed. The inputs are configured in the recording protocol.
         
-        These waveforms are issued via the main DAC output tothe source, as part
-        of the clamping command signal, and therefore are configured in the 
-        recording protocol.
+        NOTE: Technically, there should be only one such input, which can be: 
         
-        NOTE: Technically, there should be only one such input; this can be: 
-        • a record of the secondary amplifier output channel (when available)
-            fed in an auxiliary ADC input of the DAQ device (e.g., membrane potential
-            in voltage clamp, or membrane current in current clamp) and used as
-            a sort of proxy for the clamping command signal itself;
-        • a branch off the DAQ command output used for clamping, and fed directly
-            into an auxiliary ADC input of the same DAQ device, thus generating 
-            a true record of the actual clamping command signal.
+        • a feed of the secondary amplifier output channel (when available, e.g.,
+            membrane potential in voltage clamp, or membrane current in current clamp)
+            into an auxiliary ADC input of the DAQ device, and used as a proxy
+            for the clamping command signal itself;
         
-        Such inputs are useful to create a record copy of the command waveforms
-        sent to the source (i.e. a cell) during the experiment — needed to
-        identify manipulations such as a membrane test, steps, ramps, pulses, or 
-        oscillatory phenomena, or induction of spikes, in a clamped cell, when 
-        these manipulations cannot be parsed from the recording protocol.
+        • a branch off the DAQ command output used for clamping (i.e. sent to the
+            amplifier's command input); the branch is fed directly into an
+            auxiliary ADC input to record a 'true' copy of the actual clamping 
+            command signal.
+        
+        A record copy of the command waveforms helps to identify, during subsequent
+        analysis, the electrical manipulations of a cell — such as a membrane test, 
+        steps, ramps, pulses, induction of oscillatory phenomena or spikes, in a 
+        clamped cell, when these manipulations cannot be parsed (or reconstructed) 
+        from the recording protocol.
         
         """
         if isinstance(self.aux, AuxiliaryInput):
@@ -649,18 +656,20 @@ class Source(__BaseSource__):
     
     @property
     def in_daq_triggers(self) -> tuple:
-        """Sequence of ADCs for recording DAQ-generated TTL signals; 
+        """Tuple of ADCs for recording DAQ-generated TTL signals; 
         may be empty.
         
-        These ADCs are specified in the 'aux' field.
+        These ADCs (analog inputs) are specified in the 'aux' field and correspond
+        to the auxiliary input channels of the DAQ device for recording a 'copy' 
+        of DAQ-issued triggers (other than for synaptic stimulaion purposes).
         
-        These signals are configured in the recording protocol; 
-        they can be:
-        • branches off DIG outputs of the DAQ device, fed into auxiliary ADCs of
-            the same DAQ device;
-        • branches off the DAC outputs of the DAQ device, used to emulate TTLs
-            (e.g. in lieu of DIG outputs) and fed into auxiliary ADC inputs of
-            the same DAQ device.
+        These signals are configured in the recording protocol and can be branches
+        off DIG (digital) or DAC (analog) outputs of the DAQ device, fed into 
+        auxiliary analog inputs.
+        
+        In the case of DAC outputs, these are the analog output channels where
+        TTL-like waveforms are generated as pulses or steps in the range of ± 5 V
+        and used in lieu of DIG outputs.
         
         Such inputs are useful to create a record copy of the TTLs sent out 
         during an experiment, when these cannot be parsed from the recording 
@@ -677,7 +686,7 @@ class Source(__BaseSource__):
     
     @property
     def other_inputs(self) -> tuple:
-        """Sequence of ADCs recording input signals not issued by the DAQ device.
+        """Tuple of ADCs recording input signals not issued by the DAQ device.
         May be empty.
         
         These ADCs are specified in the 'aux' field.
@@ -685,7 +694,7 @@ class Source(__BaseSource__):
         Such inputs record auxiliary data signals other than clamping commands or
         TTLs, e.g. bath temperature, photodetector current, 'external' triggers,
         etc, and are neither generated by the source (cell or field) nor copies
-        of signal waveforms sent to the source (when clamping)
+        of command signal waveforms sent to the source in patch-clamp experiments.
         
         """
         if isinstance(self.aux, AuxiliaryInput):
@@ -711,6 +720,10 @@ class Source(__BaseSource__):
     
     @property
     def out_dig_triggers(self) -> tuple:
+        """Tuple of DIG channels used to emit TTL (triggers) to 3ʳᵈ party devices.
+        These TTLs are used for purposes other than synaptic stimulation.
+        May be empty
+        """
         if isinstance(self.out, AuxiliaryOutput):
             return (self.out.channel, ) if self.out.digttl is True else (tuple)
         
@@ -721,6 +734,10 @@ class Source(__BaseSource__):
     
     @property
     def out_dac_triggers(self) -> tuple:
+        """Tuple of DAC channels used to emit TTL to 3ʳᵈ party devices.
+        These TTLs are emulated (pulses or steps with ± 5 V range) and are used
+        for purposes other than synaptic stimulation.
+        """
         if isinstance(self.out, AuxiliaryOutput):
             return (self.out.channel, ) if self.out.digttl is False else (tuple)
         
