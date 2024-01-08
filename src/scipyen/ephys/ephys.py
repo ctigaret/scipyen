@@ -327,9 +327,9 @@ def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> Synap
     return SynapticStimulus(name, channel, dig)
 
 class __BaseAuxInput__(typing.NamedTuple):
-    name: str = "aux"
-    adc: typing.Optional[typing.Union[int, str]] = None
-    cmd: typing.Optional[bool] = None
+    name: str = "aux_in"
+    adc: typing.Union[int, str] = 0
+    cmd: typing.Optional[bool] = None # reflects an input that "copies" a command signal
     
 class AuxiliaryInput(__BaseAuxInput__):
     __slots__ = ()
@@ -341,9 +341,9 @@ class AuxiliaryInput(__BaseAuxInput__):
                 "Signature:\n"
                 f"\tAuxiliaryInput({__sig__})\n",
                 "where:",
-                "• name (str): name of this auxiliary input specification; default is 'aux'.\n",
-                "• adc (int, str, None): index or name of the ADC channel used to record the auxiliary input.",
-                "   Optional; default is None.\n",
+                "• name (str): name of this auxiliary input specification; default is 'aux_in'.\n",
+                "• adc (int, str): index or name of the ADC channel used to record the auxiliary input.",
+                "   Optional; default is 0.\n",
                 "• cmd (bool, None): default is None; ",
                 "   when True, this is a 'copy' of a command signal, or of an appropriately chosen",
                 "       secondary amplifier output, as a 'proxy' of the command signal (e.g.",
@@ -408,56 +408,138 @@ class AuxiliaryInput(__BaseAuxInput__):
                     
         return super().__new__(cls, **new_args)
 
-AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux'"
+AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux_in'"
 AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
 AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
 
 def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
+    """Constructs a run-of-the-mill AuxiliaryInput"""
     return AuxiliaryInput(name, adc, cmd)
+
+class __BaseAuxOutput__(typing.NamedTuple):
+    name: str = "aux_out"
+    channel: typing.Union[int, str] = 0
+    digttl: typing.Optional[bool] = None
     
+class AuxiliaryOutput(__BaseAuxOutput__):
+    __slots__ = ()
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseAuxOutput__.__annotations__.items()])
+    __doc__ = "\n".join(["An auxiliary output channel of the DAQ device (either a DAC or a digital — DIG — channel.\n",
+                         "This channel is used for sending waveforms other than for clamping or for synaptic ",
+                         "stimulation (the latter being specified using SynapticStimulus objects).\n",
+                         "Signature:\n",
+                         f"AuxiliaryOutput({__sig__})\n",
+                         "where:"
+                         "• name (str): name of this auxiliary output specification; default is 'aux_out'.\n",
+                         "• channel (int, str): specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only)\n",
+                         "  Optional; default is 0.\n",
+                         "• digttl (bool or None): flag to indicate if the output is used to send out triggers, with:",
+                         "  True ⇒ the auxiliary output is a DIG channel (hence sending out exclusively TTL-like waveforms)",
+                         "  False ⇒ the auxiliary output is a DAC channel used to emulaate TTLs",
+                         "  None ⇒ the auxiliary outoyut is a DAC channel used to send arbitrary¹ waveforms",
+                         "  Optional, default is None.\n",
+                         "",
+                         "Channel indices are expected to be >= 0 and correspond to the logical channel",
+                         "    indices in the acquisition protocol.\n",
+                         "Channel names are as assigned in the acquisition protocol (if available).",
+                         "",
+                         "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
+                         "",
+                         "¹ From the range of waveforms available in the acquisition software."
+                         ])
+    
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        super_anns = super().__annotations__
+        fields = list(super_anns.keys())
+        super_defaults = super()._field_defaults
+        
+        args = args[1:] # drop cls
+        
+        if len(args) > len(super_anns):
+            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        
+        new_args = dict()
+        for k, arg in enumerate(args):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+            new_args[fields[k]] = arg
+            
+        if len(new_args) == len(super_anns):
+            if len(kwargs):
+                dups = [k for k in kwargs if k in fields]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                else:
+                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+                
+        else:
+            if len(kwargs):
+                dups = [k for k in kwargs if k in new_args]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                
+                spurious = [k for k in kwargs if k not in fields]
+                if len(spurious):
+                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+                
+                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+                
+                new_args.update(new_kwargs)
+                
+            # finally, add the default unspecified args
+            for (k,v) in super_defaults.items():
+                if k not in new_args:
+                    new_args[k] = v
+                    
+        return super().__new__(cls, **new_args)
+    
+AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification; default is 'aux_out'"
+AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
+AuxiliaryOutput.digttl.__doc__ = "bool, or None: flag to indicate if the output is used to send out triggers via a DIG (True), emulated via a DAC (False) or other waveforms (None); default is None"
+
+def auxoutput(name:str, channel:int=0, digttl:typing.Optional[bool]=None) -> AuxiliaryOutput:
+    """Constructs a run-of-the-mill AuxiliaryOutput"""
+    return AuxiliaryOutput(name, channel, digttl)
+
 class __BaseSource__(typing.NamedTuple):
     name: str = "cell"
     adc: typing.Union[int, str] = 0
     dac: typing.Optional[typing.Union[int, str]] = None
     syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
-    dig: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None
-    ttldac: typing.Optional[typing.Union[int, str, typing.Sequence[int], typing.Sequence[str]]] = None
-    aux: typing.Optional[typing.Union[AuxiliaryInput, typing.Sequence[AuxiliaryInput]]] = None
+    aux: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
+    out: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
     
 class Source(__BaseSource__):
     __slots__ = ()
     __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
 
-    __doc__ = "\n".join(["Semantic association between input and output electrophysiology signals.",
-                         "in single-electrode recordings.\n"
+    __doc__ = "\n".join(["Semantic association between input and output signals in single-electrode recordings.\n",
                    "Signature:\n",
                    f"\tSource({__sig__})\n",
                    "where:",
                    "• name (str): The name of the source; default is 'cell'\n",
                    "• adc (int, str): The index or name of the ADC channel for the signal",
                    "    containing the recorded electric behaviour of the source",
-                   "    (a.k.a the 'input' channel e.g., cell → amplifier → DAQ device).\n",
-                   "• dac (int, str): The index or name of the DAC channel sending commands",
-                   "    to the source in voltage- or current-clamp, a.k.a 'output' (e.g.",
+                   "    (a.k.a the primary 'input' channel i.e., cell or field → amplifier → DAQ device).\n",
+                   "• dac (int, str, None): The index or name of the DAC channel sending commands",
+                   "    to the source in voltage- or current-clamp, (a.k.a the primary 'output', i.e.,",
                    "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
                    "    Optional; default is None.\n",
                    "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
-                   "    Configuration(s) of TTL sources for synaptic stimulation",
+                   "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
                    "    (one SynapticStimulus per synaptic pathway).",
                    "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
-                   "    from those specified in 'dig', 'dac', or 'ttldac' fields of this object. "
+                   "    from those specified in 'dac', or 'out' fields of this object. ",
                    "    Optional; default is SynapticStimulus('stim', None, None).\n",
-                   "• dig (int, sequence of int): The index or indices of the digital output",
-                   "    channels sending TTLs triggers for purposes OTHER THAN synaptic stimulation",
-                   "    (e.g., imaging frame triggers, etc.)",
+                   "• aux (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
+                   "    NOTE: When present, these must specify ADCs distinct from the 'adc' above",
                    "    Optional; default is None.\n",
-                   "• ttldac (int, str, sequence of int or sequence of str): ",
-                   "    The index (indices) or name(s) of the DAC channels emulating TTL",
-                   "    triggers for purposes OTHER THAN synaptic stimulation (e.g.,",
-                   "    imaging frame triggers, etc)",
-                   "    NOTE: These must be distinct from the dac channel specified above.",
-                   "    Optional; default is None.\n",
-                   "• aux (AuxiliaryInput or sequence of AuxiliaryInput objects)",
+                   "• out (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
+                   "    Auxiliary outputs for purposes OTHER THAN clamping command waveforms or ",
+                   "    synaptic stimulation (e.g., imaging frame triggers, etc)",
+                   "    NOTE: These must be distinct from the channels specified by the 'dac' ",
+                   "    or 'syn' fields above.",
                    "    Optional; default is None.\n",
                    "",
                    "Channel indices are expected to be >= 0 and correspond to the",
@@ -480,14 +562,36 @@ class Source(__BaseSource__):
                    ""])
     
     @property
+    def clamped(self) -> bool:
+        """Returns True when a primary DAC is defined.
+    
+        A primary DAC is the index or name of the DAC channel used to send command
+        waveforms to a clamped cell and is specified by the field 'dac'.
+    
+        NOTE: When a 'dac' channel is present (not None) the Source is considered
+        'clamped' even if technically it is not (e.g. when using the amplifier's
+        'I=0' mode, available in Axon amplifiers, or voltage follower).
+    
+        In field recordings (hese use voltabe follower mode, or I=0 in Axon 
+        patch-clamp amplifiers) the primay DAC output ("active DAC") is still 
+        be present in the protocol, but it is not used.
+    
+        Setting 'dac' to None (in the constructor) simply flags up the ABSENCE of
+        a clamp signal (and of command waveforms), and the fact that the "active DAC"
+        in the protocol is to be ignored in subsequent analysis.
+        """
+        return isinstance(self.dac, (int, str))
+    
+    @property
     def syndigs(self) -> tuple:
         """Sequence of DIG channels used for synaptic stimulation; may be empty.
         """
         if isinstance(self.syn, SynapticStimulus):
-            return tuple(self.syn.channel if self.syn.dig else None)
+            return (self.syn.channel,) if self.syn.dig else tuple()
         
         if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
-            return tuple(s.channel if s.dig else None for s in self.syn)
+            # return tuple(s.channel if s.dig else None for s in self.syn)
+            return tuple(s.channel for s in self.syn if s.dig)
         
         return tuple()
     
@@ -496,7 +600,7 @@ class Source(__BaseSource__):
         """Sequence of DAC channels used for synaptic stimulation; may be empty.
         """
         if isinstance(self.syn, SynapticStimulus):
-            return tuple(self.syn.channel) if not self.syn.dig else tuple()
+            return (self.syn.channel, ) if not self.syn.dig else tuple()
         
         if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
             return tuple(s.channel for s in self.syn if not s.dig)
@@ -509,8 +613,8 @@ class Source(__BaseSource__):
         return self.syn
     
     @property
-    def daq_clamps(self) -> tuple:
-        """Sequence of ADCs for recording DAQ-issued command waveforms.
+    def in_daq_cmd(self) -> tuple:
+        """Sequence of ADCs for recording DAQ-issued command waveforms other than TTLs.
         May be empty.
         
         These ADCs are specified in the 'aux' field.
@@ -536,7 +640,7 @@ class Source(__BaseSource__):
         
         """
         if isinstance(self.aux, AuxiliaryInput):
-            return tuple(self.aux.adc) if self.aux.cmd is True else tuple()
+            return (self.aux.adc, ) if self.aux.cmd is True else tuple()
     
         if isinstance(self.aux, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.aux):
             return tuple(a.adc for a in self.aux if a.cmd is True)
@@ -544,7 +648,7 @@ class Source(__BaseSource__):
         return tuple()
     
     @property
-    def daq_triggers(self) -> tuple:
+    def in_daq_triggers(self) -> tuple:
         """Sequence of ADCs for recording DAQ-generated TTL signals; 
         may be empty.
         
@@ -604,7 +708,37 @@ class Source(__BaseSource__):
             return tuple((s.name, neo.Block()) for s in self.syn)
         
         return tuple()
-
+    
+    @property
+    def out_dig_triggers(self) -> tuple:
+        if isinstance(self.out, AuxiliaryOutput):
+            return (self.out.channel, ) if self.out.digttl is True else (tuple)
+        
+        if isinstance(self.out, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.out):
+            return tuple(o.channel for o in self.out if o.digttl is True)
+        
+        return tuple()
+    
+    @property
+    def out_dac_triggers(self) -> tuple:
+        if isinstance(self.out, AuxiliaryOutput):
+            return (self.out.channel, ) if self.out.digttl is False else (tuple)
+        
+        if isinstance(self.out, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.out):
+            return tuple(o.channel for o in self.out if o.digttl is False)
+        
+        return tuple()
+    
+    @property
+    def other_outputs(self) -> tuple:
+        if isinstance(self.out, AuxiliaryOutput):
+            return (self.out.channel, ) if self.out.digttl is None else (tuple)
+        
+        if isinstance(self.out, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.out):
+            return tuple(o.channel for o in self.out if o.digttl is None)
+        
+        return tuple()
+    
     @classmethod
     def __new__(cls, *args, **kwargs):
         super_anns = super().__annotations__
@@ -651,6 +785,14 @@ class Source(__BaseSource__):
                     new_args[k] = v
                     
         return super().__new__(cls, **new_args)
+    
+Source.name.__doc__ = "str: The name of the source; default is 'cell'"
+Source.adc.__doc__  = "int, str: The index or name of the primary ADC channel — records the eletrical behaviour of the source (cell or field)."
+Source.dac.__doc__  = "int, str: The index or name of the primary DAC channel — the output channel that operates the voltage- or current-clamp."
+Source.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus objects or None — origin of trigger (TTL-like) signals for synaptic stimulation, one per 'synaptic pathway'."
+Source.aux.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
+Source.out.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
+
 
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,

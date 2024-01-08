@@ -101,7 +101,9 @@ import iolib.pictio as pio
 
 import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
-                         Source, SynapticStimulus, AuxiliaryInput, synstim)
+                         Source, SynapticStimulus, 
+                         AuxiliaryInput, AuxiliaryOutput,
+                         synstim, auxinput, auxoutput)
 import ephys.membrane as membrane
 
 
@@ -119,26 +121,42 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
-def twoPathwaysCell(adc=0, dac=0, path0=0, path1=1, **kwargs):
-    """Factory for a cell Source in two-pathways synaptic plasticity experiments.
+def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None,
+                      path0:int=0, path1:int=1, name:str="cell", 
+                      **kwargs):
+    """Factory for a data source in two-pathways synaptic plasticity experiments.
     
     Synaptic stimulation is carried out via extracellular electrodes using
-    simulus devices driven by TTLs on DIG channels 0 and 1
+    simulus devices driven by TTLs via DIG channels.
+
+    By default DIG channel indices are 0 and 1, but they can be specified using 
+    the 'path0' and 'path1' parameters.
     
-    Responses are recorded on ADC 0.
+    By default, the 'dac' parameter is None, indicating a recording from an 
+    𝑢𝑛𝑐𝑙𝑎𝑚𝑝𝑒𝑑 Source (e.g. a field recording, or recording from an unclamped cell).
+    
+    When 'dac' parameter is specified as an int (index) or str (name), the 
+    source is considered to be recorded in 𝑐𝑙𝑎𝑚𝑝𝑖𝑛𝑔 mode (i.e. voltage- or 
+    current-clamp), and, by implication, the Source is a 𝒄𝒆𝒍𝒍.
+    
+    Synaptic responses are recorded on ADC 0 by default, but this can be specified
+    using the 'adc' parameter as an int (index) or str (name).
+    
+    By default the source 'name' field is "cell"¹ but this can be specified using
+    the 'name' parameter as a str.
     
     Named parameters:
     -----------------
-    adc, dac: See ephys.ephys.Source constructor for a full description.
-    path0, path1 (int) >= 0 indices of DIG channels used to stimulate the patwhays.
+    adc, dac, name: See ephys.ephys.Source constructor for a full description.
+    path0, path1 (int) >= 0 indices of DIG channels used to stimulate the pathways.
+    
     
     Here, the default parameter values associate 'adc' 0 with 'dac' 0 and two 
     SynapticStimulus objects, using 'dig' 0 and 'dig' 1, respectively.
     
-    Var-positional parameters:
+    Var-keyword parameters:
     --------------------------
-    These are 'name' and 'ttldac' and here are given the default values 
-    of 'cell' and None, respectively.
+    These are 'out' and 'aux' and here are given the default values of 'None'.
     
     In a given application, the 'name' field of Source objects should have unique
     values in order to allow the lookup of these objects according to this field.
@@ -151,90 +169,24 @@ def twoPathwaysCell(adc=0, dac=0, path0=0, path1=1, **kwargs):
     (WARNING: Remember to also change the value of the Source's 'name' field)
     
     
-    cell  = cellTwoPathways()
-    cell1 = cellTwoPathways(dac=1, name="cell1")
+    cell  = twoPathwaysSource()
+    cell1 = twoPathwaysSource(dac=1, name="cell1")
     cell2 = cell._replace(dac=1,   name="cell1")
     
     assert cell1 == cell2, "The objects are different"
     
-    NOTE:
-    One can use this mechanism to "convert" to a field recording entity.
+    ¹ It is illegal to use Python keywords as name here.
     
     """
     syn     = (SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)) 
-    name    = kwargs.pop("name", "cell")
-    dig     = kwargs.pop("dig", None)
-    ttldac  = kwargs.pop("ttldac", None)
+    out     = kwargs.pop("out", None)
     aux     = kwargs.pop("aux", None)
     
     if aux is not None:
         if (isinstance(aux, (list, tuple)) and not all(isinstance(v, AuxiliaryInput) for v in aux)) or not isinstance(aux, AuxiliaryInput):
             raise TypeError(f"'aux' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
-    return Source(name, adc, dac, syn, dig, ttldac)
 
-def twoPathwaysField(adc=0, path0=0, path1=1, **kwargs):
-    """Factory for a field Source in two-pathways synaptic plasticity experiments.
-
-    Synaptic stimulation is carried out via extracellular electrodes using
-    simulus devices driven by TTLs on DIG channels 0 and 1.
-    
-    Responses are recorded on ADC 0.
-    
-    Named parameters:
-    -----------------
-    adc: See ephys.ephys.Source constructor for a full description.
-    path0, path1 (int) >= 0 indices of DIG channels stimulating the patwhays.
-    
-    See ephys.ephys.Source constructor for a full description of parameters.
-    
-    Here, the default parameter values associate 'adc' 0 with two SynapticStimulus
-    objects, using 'dig' 0 and 'dig' 1, respectively. 
-    
-    No DAC channel is used for command signals, as this is a field recording — 
-    no clamping is used.
-    
-    Var-positional parameters:
-    --------------------------
-    These are 'name' and 'ttldac' and here are given the default values of
-    'field' and None, respectively.
-    
-    In a given application, the 'name' field of Source objects should have unique
-    values in order to allow the lookup of these objects according to this field.
-    
-    Returns:
-    --------
-    An immutable ephys.ephys.Source object (a NamedTuple). 
-
-    One can create a modified version using the '_replace' method:
-    (WARNING: Remember to also change the value of the Source's 'name' field).
-    
-    fieldRec¹  = fieldTwoPathways()
-    fieldRec1  = fieldTwoPathways(adc=1,  name="field1")
-    fieldRec2  = fieldRec._replace(adc=1, name="field1")
-    
-    assert fieldRec1 == fieldRec2, "The objects are different"
-    
-    NOTE:
-    One can use this mechanism to "convert" to a single-cell recording entity
-    
-    NOTE 
-    ¹ We use 'fieldRec' instead of 'field' to avoid possible clashes with
-    the 'dataclasses.field' function, when imported in the workspace.
-    
-    """
-    syn     = (SynapticStimulus('path0', path0), SynapticStimulus('path1', path1))
-    name    = kwargs.pop("name", "field")
-    ttldac  = kwargs.pop("ttldac", None)
-    dig     = kwargs.pop("dig", None)
-    aux     = kwargs.pop("aux", None)
-    
-    if aux is not None:
-        if (isinstance(aux, (list, tuple)) and not all(isinstance(v, AuxiliaryInput) for v in aux)) or not isinstance(aux, AuxiliaryInput):
-            raise TypeError(f"'aux' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
-    return Source(name, adc, None, syn, dig, ttldac)
-
-
-
+    return Source(name, adc, dac, syn, aux, out)
 
 class _LTPFilesSimulator_(QtCore.QThread):
     """
@@ -1467,29 +1419,33 @@ class LTPOnline(QtCore.QObject):
             #   — specified using AuxiliaryInput objects:
             #   
             
+            # 1. all sources must have a primary ADC
             if any(s.adc is None for s in sources):
                 raise ValueError("All source must specify a primary ADC input")
             
             adcs, snames  = list(zip(*[(s.adc, s.name) for s in sources]))
             
+            # 2. primary ADCs cannot be shared among sources
             dupadcs     = utilities.duplicates(adcs)  # sources must have distinct main ADCs
             if len(dupadcs):
-                raise ValueError(f"Sharing of ADCs ({dupadcs}) among sources is forbidden")
+                raise ValueError(f"Sharing of primary ADCs ({dupadcs}) among sources is forbidden")
             
+            # 3. source names should be unique
             dupnames = utilities.duplicates(snames)
             if len(dupnames):
                 raise ValueError(f"Sharing of names ({dupnames}) among sources is forbidden")
                 
-            cellsources = [s for s in sources if s.dac is not None]
-            if len(cellsources):
-                # cell-type sources specify a primary DAC, necessary for clamping
-                # and optionally used for membrane test (recommended) and possibly 
-                # also for other electrical manipulations of the recorded cell
-                # e.g., to elicit postsynaptic spikes.
-                #
+            # 4. for clamped sources only - by definition these define a primary DAC
+            #   needed for clamping and to provide waveforms for optionally for 
+            #   membrane test (recommended) and possibly other electrical 
+            #   manipulations of the clamped cell (e.g., to elicit postsynaptic spikes).
+            #
+            clamped_sources = [s for s in sources if s.dac is not None]
+            if len(clamped_sources):
                 # these DACs MUST be unique
-                dacs = [s.dac for s in cellsources]
+                dacs = [s.dac for s in clamped_sources]
                 
+                # 4.1 primary DACs must be unique
                 dupdacs = utilities.duplicates(dacs)
                 if len(dupdacs):
                     raise ValueError(f"Sharing of DACs ({dupdacs}) among cell sources is forbidden")
