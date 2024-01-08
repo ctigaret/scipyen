@@ -325,6 +325,11 @@ function dopyqt5 ()
 
         if [[ $? -ne 0 ]] ; then
             echo -e "sip Cannot build a PyQt5 wheel. Bailing out. Goodbye!\n"
+            echo -e "You might want to upgrade sip and Pyqt5-sip in this environment\n"
+            echo -e " by calling \n\n"
+            echo -e "pip install --upgrade sip\n"
+            echo -e "pip install --upgrade PyQt5-sip\n\n"
+            echo -e "Then run this script again"
             exit 1
         fi
         
