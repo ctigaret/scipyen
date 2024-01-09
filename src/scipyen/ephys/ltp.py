@@ -204,36 +204,41 @@ class _LTPFilesSimulator_(QtCore.QThread):
     def __init__(self, parent, simulation:dict = None):
         super().__init__(parent=parent)
         
+        print(f"Simulating a supply of ABF (Axon) binary data files")
+        
         self._simulatedFile_ = None
         self._simulationCounter_ = 0
         self._simulationFiles_ = []
-        self._simulationTimeOut_ = 1000
+        self._simulationTimeOut_ = 10000
         
         files = None
         
-        # self._simulationTimer_ = QtCore.QTimer(self)
-        # self._simulationTimer_.timeout.connect(self.simulateFile)
-        
-        
         if isinstance(simulation, dict):
-            self._simulationTimeOut_ = simulation.get("timeout",1000)
+            self._simulationTimeOut_ = simulation.get("timeout",10000)
             
             files = simulation.get("files", None)
             
+            if not isinstance(files, (list, tuple)) or len(files) == 0 or not all(isinstance(v, (str, pathlib.Path)) for v in files):
+                files = None
+            
         if files is None:
+            print(f"Looking for ABF files in current directory ({os.getcwd()})…")
             files = subprocess.run(["ls"], capture_output=True).stdout.decode().split("\n")
+            print(f"… found {len(files)} ABF files")
         
-        if isinstance(files, list) and len(files) > 0 and all(isinstance(v, str) for v in files):
+        if isinstance(files, list) and len(files) > 0 and all(isinstance(v, (str, pathlib.Path)) for v in files):
             simFilesPaths = list(filter(lambda x: x.is_file() and x.suffix == ".abf", [pathlib.Path(v) for v in files]))
             
             if len(simFilesPaths):
                 # NOTE: 2024-01-08 17:45:21
                 # bound to introduce some delay, but needs must, for simulation purposes
+                print("Sorting ABF data based on recording time…")
                 self._simulationFiles_ = sorted(simFilesPaths, key = lambda x: pio.loadAxonFile(x).rec_datetime)
-                    
-        
-                   
-    
+                print("… done.")
+                
+        if len(self._simulationFiles_) == 0:
+            print(f"No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
+                
     def run(self):
         # print(f"{self.__class__.__name__}.run()")
         self._simulationCounter_ = 0
@@ -241,13 +246,9 @@ class _LTPFilesSimulator_(QtCore.QThread):
             print(f"k: {k}, f = {f}\n")
             if self.isInterruptionRequested():
                 break
-            # self._simulationCounter_ = k # incremented in self.simulateFile
             self.simulateFile()
             QtCore.QThread.sleep(self._simulationTimeOut_//1000) # seconds!
             
-            # QtCore.QTimer.singleShot(self._simulationTimeOut_, self.simulateFile)
-        # self._simulationTimer_.start()
-        
     @pyqtSlot()
     def simulateFile(self):
         # print(f"{self.__class__.__name__}.simulateFile()")
@@ -262,13 +263,6 @@ class _LTPFilesSimulator_(QtCore.QThread):
         self.supplyFile.emit(self._simulatedFile_)
         
         
-    # @pyqtSlot()
-    # def quit(self):
-    #     self.requestInterruption()
-    #     # self._simulationTimer_.timeout.disconnect()
-    #     # self._simulationTimer_.stop()
-    #     super().quit()
-
 class _LTPOnlineSupplier_(QtCore.QThread):
     abfRunReady = pyqtSignal(pathlib.Path, name="abfRunReady")
     stopTimer = pyqtSignal(name="stopTimer")
@@ -281,13 +275,8 @@ class _LTPOnlineSupplier_(QtCore.QThread):
         """
         """
         QtCore.QThread.__init__(self, parent)
-        # self._mutex_ = mutex
-        # self._guard_ = guard
         self._abfRunBuffer_ = abfRunBuffer
-        # self._bufferEmptyCondition_ = bufferEmptyCondition
-        # self._bufferNotEmptyCondition_ = bufferNotEmptyCondition
         self._filesQueue_ = collections.deque()
-        # print(f"{self.__class__.__name__}.__init__ to watch: {self._watchedDir_}\n")
         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
         self._simulator_ = simulator
@@ -1607,7 +1596,7 @@ class LTPOnline(QtCore.QObject):
                                             ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
         
         
-        # place analysis resuolts inside each episode sub-dict ⇒ do away with _episodeResults_
+        # place analysis results inside each episode sub-dict ⇒ do away with _episodeResults_
         
         self._runParams_ = DataBag(sources = self._sources_,
                                    data = self._data_,
@@ -1625,32 +1614,6 @@ class LTPOnline(QtCore.QObject):
                                    currentProtocolIsConditioning = False,
                                    currentProtocol = None,
                                    useEmbeddedProtocol = useEmbeddedProtocol)
-        
-        # NOTE: 2023-10-07 11:20:22
-        # _emitterWindow_ needed here, to set up viewers
-        wsp = wf.user_workspace()
-        
-        if emitterWindow is None:
-            self._emitterWindow_ = wsp["mainWindow"]
-
-        elif type(emitterWindow).__name__ != 'ScipyenWindow':
-            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
-
-        else:
-            self._emitterWindow_ = emitterWindow
-
-        if directory is None:
-            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
-            
-        elif isinstance(directory, str):
-            self._watchedDir_ = pathlib.Path(directory)
-
-        elif isinstance(directory, pathlib.Path):
-            self._watchedDir_ = directory
-            
-        else:
-            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
-        
         
         
         # self._episode_ = "baseline"
@@ -1749,6 +1712,33 @@ class LTPOnline(QtCore.QObject):
 
         self._presynaptic_triggers_ = dict()
 
+        # ### BEGIN set up emitter window and viewers
+        #
+        # NOTE: 2023-10-07 11:20:22
+        # _emitterWindow_ needed here, to set up viewers
+        wsp = wf.user_workspace()
+        
+        if emitterWindow is None:
+            self._emitterWindow_ = wsp["mainWindow"]
+
+        elif type(emitterWindow).__name__ != 'ScipyenWindow':
+            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
+
+        else:
+            self._emitterWindow_ = emitterWindow
+
+        if directory is None:
+            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
+            
+        elif isinstance(directory, str):
+            self._watchedDir_ = pathlib.Path(directory)
+
+        elif isinstance(directory, pathlib.Path):
+            self._watchedDir_ = directory
+            
+        else:
+            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+        
         synapticViewer0 = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_, win_title = "path0 Recording")
         synapticViewer0.annotationsDockWidget.hide()
         synapticViewer0.cursorsDockWidget.hide()
@@ -1764,6 +1754,9 @@ class LTPOnline(QtCore.QObject):
         self._viewers_ = dict(path0 = synapticViewer0,
                               path1 = synapticViewer1,
                               results = resultsViewer)
+        
+        #
+        # ### END set up emitter window and viewers
         
         self._abfRunBuffer_ = collections.deque()
         

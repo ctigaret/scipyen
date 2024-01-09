@@ -543,7 +543,7 @@ class Source(__BaseSource__):
                    "    Optional; default is None.\n",
                    "",
                    "Channel indices are expected to be >= 0 and correspond to the",
-                   "    logical channel indices in the acquisition protocol. ",
+                   "    physical¹ (NOT logical!) channel indices in the acquisition protocol. ",
                    "",
                    "Channel names are as assigned in the acquisition protocol (if available).",
                    "",
@@ -559,7 +559,20 @@ class Source(__BaseSource__):
                    "\t source1 = Source('cell1', 0, 1, SynapticStimulus('path0', 0))",
                    "",
                    "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
-                   ""])
+                   "",
+                   "FOOTNOTES:",
+                   "",
+                   "¹ Analog channels (analog input — ADCs — or output — DACs) have both physical ",
+                   "    and logical indices. Physical indices are integers from 0 to one less than the ",
+                   "    maximum number of physical channels of the same category (i.e. input or output)",
+                   "    provided by the digital acquisition (DAQ) device.",
+                   "    Logical indices are integers from 0 to one less than maximum number of channels",
+                   "    of the same category, actually used in the recording protocol.",
+                   "",
+                   "    For example, assuming a DAQ device provides eight ADCs (physical indices 0-7)",
+                   "    with only four of these used to record data (say, 0, 1, 5, 6) - their",
+                   "    logical indices would be 0-3, corresponding to physical indices as follows:",
+                   "    0: 0, 1: 1, 2: 5, 3: 6"])
     
     @property
     def clamped(self) -> bool:
@@ -717,6 +730,11 @@ class Source(__BaseSource__):
             return tuple((s.name, neo.Block()) for s in self.syn)
         
         return tuple()
+    
+    @property
+    def syn_blocks_dict(self) -> dict:
+        """Returns syn_blocks as a dict"""
+        return dict(self.syn_blocks)
     
     @property
     def out_dig_triggers(self) -> tuple:
