@@ -1250,11 +1250,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Swithching DIG off in all DACs returns 0 here.
         
         
-        Therefore, to find out which DAC is associated with stimuli in your experiment:
-        
-        TODO/FIXME 
-        
         """
+#         Therefore, to find out which DAC is associated with stimuli in your experiment:
+#         
+#         TODO/FIXME 
+#         
         # NOTE: 2023-10-09 13:31:58
         # Beyond DAC1, the active DAC index returns the highest DAC index in use.
         # HOWEVER, it appears that the highest value returned here is 3 (as if there 
@@ -1545,17 +1545,19 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([e.usedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
     def getClampMode(self, adcIndex:int = 0,
-                  dacIndex:typing.Optional[int] = None):
+                  dacIndex:typing.Optional[int] = None,
+                  physicalADC:bool=False,
+                  physicalDAC:bool=False):
         from ephys.ephys import ClampMode
-        adc = self.inputConfiguration(adcIndex) # get first (primary) input by default
+        adc = self.inputConfiguration(adcIndex, physical=physicalADC) # get first (primary) input by default
 
         if adc is None:
-            raise ValueError(f"ADC index {adcIndex} is invalid for this protocol")
+            raise ValueError(f"{'Physical' if physicalADC else 'Logical'} ADC index {adcIndex} is invalid for this protocol")
 
         recordsCurrent = scq.check_electrical_current_units(adc.units)
         recordsPotential = scq.check_electrical_potential_units(adc.units)
 
-        dac = self.getDAC(dacIndex) # get active DAC by default
+        dac = self.getDAC(dacIndex, physicalDAC) # get active DAC by default
 
         commandIsCurrent = scq.check_electrical_current_units(dac.units)
 
@@ -1597,13 +1599,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return inputconfs[0]
         else:
             chtype = "physical" if physical else "logical"
-            raise ValueError(f"Invalid {chtype} ADC channel specified {adCChannel}")
+            raise ValueError(f"Invalid {chtype} ADC channel specified {adcChannel}")
 
     def getInput(self, adcChannel:int = 0, physical:bool=False) -> ABFInputConfiguration:
         """Shorthand to self.getADC"""
         return self.getADC(adcChannel, physical=physical)
     
-    def inputConfiguration(self, adcChannel:typing.Union[int, str] = 0, physical:bool=False) -> ABFInputConfiguration:
+    def inputConfiguration(self, adcChannel:typing.Union[int, str] = 0, 
+                           physical:bool=False) -> ABFInputConfiguration:
         """Calls getADC(…)"""
         return self.getADC(adcChannel, physical=physical)
         

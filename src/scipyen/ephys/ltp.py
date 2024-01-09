@@ -201,20 +201,22 @@ class _LTPFilesSimulator_(QtCore.QThread):
     """
     supplyFile = pyqtSignal(pathlib.Path, name = "supplyFile")
     
+    defaultTimeout = 10000 # ms
+    
     def __init__(self, parent, simulation:dict = None):
         super().__init__(parent=parent)
         
-        print(f"Simulating a supply of ABF (Axon) binary data files")
+        # print(f"Simulating a supply of ABF (Axon) binary data files")
         
         self._simulatedFile_ = None
         self._simulationCounter_ = 0
         self._simulationFiles_ = []
-        self._simulationTimeOut_ = 10000
+        self._simulationTimeOut_ = self.defaultTimeout
         
         files = None
         
         if isinstance(simulation, dict):
-            self._simulationTimeOut_ = simulation.get("timeout",10000)
+            self._simulationTimeOut_ = simulation.get("timeout",self.defaultTimeout )
             
             files = simulation.get("files", None)
             
@@ -222,9 +224,9 @@ class _LTPFilesSimulator_(QtCore.QThread):
                 files = None
             
         if files is None:
-            print(f"Looking for ABF files in current directory ({os.getcwd()})…")
+            print(f"Looking for ABF files in current directory ({os.getcwd()}) ...")
             files = subprocess.run(["ls"], capture_output=True).stdout.decode().split("\n")
-            print(f"… found {len(files)} ABF files")
+            print(f"Found {len(files)} ABF files")
         
         if isinstance(files, list) and len(files) > 0 and all(isinstance(v, (str, pathlib.Path)) for v in files):
             simFilesPaths = list(filter(lambda x: x.is_file() and x.suffix == ".abf", [pathlib.Path(v) for v in files]))
@@ -232,27 +234,24 @@ class _LTPFilesSimulator_(QtCore.QThread):
             if len(simFilesPaths):
                 # NOTE: 2024-01-08 17:45:21
                 # bound to introduce some delay, but needs must, for simulation purposes
-                print("Sorting ABF data based on recording time…")
+                print("Sorting ABF data based on recording time ...")
                 self._simulationFiles_ = sorted(simFilesPaths, key = lambda x: pio.loadAxonFile(x).rec_datetime)
-                print("… done.")
+                print("... done.")
                 
         if len(self._simulationFiles_) == 0:
             print(f"No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
                 
     def run(self):
-        # print(f"{self.__class__.__name__}.run()")
         self._simulationCounter_ = 0
         for k,f in enumerate(self._simulationFiles_):
-            print(f"k: {k}, f = {f}\n")
+            print(f"{k}ᵗʰ file: {f}\n")
+            self.simulateFile()
+            QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             if self.isInterruptionRequested():
                 break
-            self.simulateFile()
-            QtCore.QThread.sleep(self._simulationTimeOut_//1000) # seconds!
             
     @pyqtSlot()
     def simulateFile(self):
-        # print(f"{self.__class__.__name__}.simulateFile()")
-        
         if self._simulationCounter_ >= len(self._simulationFiles_):
             self.stop()
             return
@@ -492,9 +491,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         try:
             abfRun = pio.loadAxonFile(str(abfFile))
-            self._runParams_.abfRunTimes.append(abfRun.rec_datetime)
-            deltaMinutes = (abfRun.rec_datetime - self._runParams_.abfRunTimes[0]).seconds/60
-            self._runParams_.abfRunDeltaTimes.append(deltaMinutes)
+            self._runParams_.abfRunTimesMinutes.append(abfRun.rec_datetime)
+            deltaMinutes = (abfRun.rec_datetime - self._runParams_.abfRunTimesMinutes[0]).seconds/60
+            self._runParams_.abfRunDeltaTimesMinutes.append(deltaMinutes)
             
             # NOTE: 2023-12-29 14:59:01
             # get the ADC channels from the signals in abfRun
@@ -517,13 +516,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # if protocol.activeDACChannelIndex not in [d.number for d in dacs]:
             #     raise ValueError(f"Neither dac in {self._runParams_.dacChannels} is the active DAC channel for this protocol")
             
-            if len(self._runParams_.episodes) == 0:
-                # this is the first run ever ⇒ create a new recording episode
-                episodeName = self._runParams_.episodeName
-                if not isinstance(episodeName, str) or len(episodeName.strip()) == 0:
-                    episodeName = protocol.name
-                    
-            episodes = list(self._results_.keys())
+#             if len(self._runParams_.episodes) == 0:
+#                 # this is the first run ever ⇒ create a new recording episode
+#                 episodeName = self._runParams_.episodeName
+#                 if not isinstance(episodeName, str) or len(episodeName.strip()) == 0:
+#                     episodeName = protocol.name
+#                     
+#             episodes = list(self._results_.keys())
             
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
@@ -575,312 +574,312 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # which should have the same monitoring protocol
             #
             
-            if self._runParams_.currentProtocol is None:
-                if protocol.clampMode() == self._runParams_.clampMode:
-                    assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
-                    if protocol.nSweeps == 2:
-                        assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
-                        assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
-                        
-                        # TODO check for alternate digital outputs → True ; alternate waveform → False
-                        # → see # NOTE: 2023-10-07 21:35:39 - DONE ?!?
-                    # self._runParams_.monitorProtocol = protocol
-                    self._runParams_.currentProtocol = protocol
-                    self._runParams_.newEpisode = False
-                    self.processTrackingProtocol(protocol)
-                else:
-                    raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._runParams_.clampMode}")
-                
-            else:
-                # if protocol != self._runParams_.monitorProtocol:
-                if protocol != self._runParams_.currentProtocol:
-                    if self._runParams_.newEpisode:
-                        if self._runParams_.currentEpisodeName is None:
-                            self._runParams_.currentEpisodeName = protocol.name
-                        if self._runParams_.currentProtocolIsConditioning:
-                            self._runParams_.conditioningProtocols.append(protocol)
-                        else:
-                            self._runParams_.monitoringProtocols.append(protocol)
-                            
-            if self._runParams_.currentProtocol.nSweeps == 2:
-                # if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
-                if not self._runParams_.currentProtocol.alternateDigitalOutputStateEnabled:
-                    # NOTE: this is moot, because the protocol has already been checked
-                    # in the processTrackingProtocol
-                    raise ValueError("When the protocol defines two sweeps, alternate digtal outputs MUST have been enabled in the protocol")
-                # NOTE: 2023-10-07 21:35:39
-                # we are alternatively stimulating two pathways
-                # NOTE: the ABF Run should ALWAYS have two sweeps in this case - one
-                # for each pathway - regardless of how many runs there are per trial
-                # if number of runs > 1 then the ABF file stores the average record
-                # of each sweep, across the number of runs (or however the averaging mode
-                # was set in the protocol; WARNING: this last bit of information is 
-                # NOT currently used here)
-                
-            elif self._monitorProtocol_.nSweeps != 1:
-                raise ValueError(f"Expecting 1 or 2 sweeps in the protocol; instead, got {self._monitorProtocol_.nSweeps}")
-                
-            # From here on we do things differently, depending on whether protocol is a
-            # the monitoring protocol or the conditioning protocol
-            if protocol == self._runParams_.currentProtocol:
-                adc = protocol.inputConfiguration(self._runParams_.adcChannel)
-                sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
-                # for k, seg in enumerate(abfRun.segments[:1]): # use this line for debugging
-                for k, seg in enumerate(abfRun.segments):
-                    pndx = f"path{k}"
-                    if k > 1:
-                        break
-                    
-                    adcSignal = seg.analogsignals[sigIndex]
-                    
-                    sweepStartTime = protocol.sweepTime(k)
-                    
-                    # self._data_["baseline"][pndx].segments.append(abfRun.segments[k])
-                    self._data_[self._runParams_.currentEpisodeName][pndx].segments.append(abfRun.segments[k])
-                    if isinstance(self._presynaptic_triggers_[self._runParams_.currentEpisodeName][pndx], TriggerEvent):
-                        self._data_["baseline"][pndx].segments[-1].events.append(self._presynaptic_triggers_[pndx])
-                        
-                    viewer = self._viewers_[pndx]#["synaptic"]
-                    viewer.view(self._data_["baseline"][pndx],
-                                doc_title=pndx,
-                                showFrame = len(self._data_["baseline"][pndx].segments)-1)
-                    
-                    self._signalAxes_[pndx] = viewer.axis(adc.name)
-                    
-                    viewer.currentAxis = self._signalAxes_[pndx]
-                    # viewer.xAxesLinked = True
-                    
-                    viewer.plotAnalogSignalsCheckBox.setChecked(True)
-                    viewer.plotEventsCheckBox.setChecked(True)
-                    viewer.analogSignalComboBox.setCurrentIndex(viewer.currentAxisIndex+1)
-                    viewer.analogSignalComboBox.activated.emit(viewer.currentAxisIndex+1)
-                    # viewer.currentAxis.vb.enableAutoRange()
-                    # viewer.currentAxis.vb.autoRange()
-                    self._signalAxes_[pndx].vb.enableAutoRange()
-                    
-                    cnames = [c.name for c in viewer.dataCursors]
-                    
-                    if self._clampMode_ == ephys.ClampMode.VoltageClamp:
-                        for landmarkname, landmarkcoords in self._landmarks_.items():
-                            if k > 0 and landmarkname in ("Rbase", "Rs", "Rin"):
-                                # don't need those in both pathways!
-                                continue
-                            if landmarkname not in cnames:
-                                if landmarkname ==  "Rs":
-                                    # overwrite this with the local signal extremum
-                                    # (first capacitance transient)
-                                    sig = adcSignal.time_slice(self._mbTestStart_+ sweepStartTime,
-                                                                                    self._mbTestStart_ + self._mbTestDuration_+ sweepStartTime)
-                                    if self._mbTestAmplitude_ > 0:
-                                        # look for a local maximum in the dac
-                                        transientTime = sig.times[sig.argmax()]
-                                    else:
-                                        transientTime = sig.times[sig.argmin()]
-                                        # look for local minimum in the dac
-                                        
-                                    start = transientTime - self._responseBaselineDuration_/2
-                                    duration = self._responseBaselineDuration_
-                                    
-                                else:
-                                    if any(v is None for v in landmarkcoords):
-                                        # for the case when only a single pulse was used
-                                        continue
-                                    start, duration = landmarkcoords
-                                    
-                                x = float((start + duration / 2 + sweepStartTime).rescale(pq.s))
-                                xwindow = float(duration.rescale(pq.s))
-                                # print(f"x = {x}, xwindow = {xwindow}")
-                                viewer.addCursor(sv.SignalCursorTypes.vertical,
-                                                x = x,
-                                                xwindow = xwindow,
-                                                label = landmarkname,
-                                                follows_mouse = False,
-                                                axis = self._signalAxes_[pndx],
-                                                relative=True,
-                                                precision=5)
-                                
-                        # we allow cursors to be repositioned during the recording
-                        # therefore we do not generate neo.Epochs anymore
-                        
-                        if k == 0:
-                            # calculate DC, Rs, and Rin for pathway 0 only
-                            Rbase_cursor = viewer.dataCursor("Rbase")
-                            coords = ((Rbase_cursor.x - Rbase_cursor.xwindow/2) * pq.s, (Rbase_cursor.x + Rbase_cursor.xwindow/2) * pq.s)
-                            Idc = np.mean(adcSignal.time_slice(*coords))
-                                        
-                            self._results_["DC"].append(Idc)
-                            
-                            Rs_cursor = viewer.dataCursor("Rs")
-                            coords = ((Rs_cursor.x - Rs_cursor.xwindow/2) * pq.s, (Rs_cursor.x + Rs_cursor.xwindow/2) * pq.s)
-                            if self._mbTestAmplitude_ > 0:
-                                Irs = np.max(adcSignal.time_slice(*coords))
-                            else:
-                                Irs = np.min(adcSignal.time_slice(*coords))
-                                
-                            Rs  = (self._mbTestAmplitude_ / (Irs-Idc)).rescale(pq.MOhm)
-                            
-                            self._results_["Rs"].append(Rs)
-                            
-                            Rin_cursor = viewer.dataCursor("Rin")
-                            coords = ((Rin_cursor.x - Rin_cursor.xwindow/2) * pq.s, (Rin_cursor.x + Rin_cursor.xwindow/2) * pq.s)
-                            Irin = np.mean(adcSignal.time_slice(*coords))
-                                
-                            Rin = (self._mbTestAmplitude_ / (Irin-Idc)).rescale(pq.MOhm)
-                            
-                            self._results_["Rin"].append(Rin)
-                            
-                            
-                        Ipsc_base_cursor = viewer.dataCursor("PSCBase")
-                        coords = ((Ipsc_base_cursor.x - Ipsc_base_cursor.xwindow/2) * pq.s, (Ipsc_base_cursor.x + Ipsc_base_cursor.xwindow/2) * pq.s)
-                        
-                        IpscBase = np.mean(adcSignal.time_slice(*coords))
-                        
-                        Ipsc0Peak_cursor = viewer.dataCursor("PSC0Peak")
-                        coords = ((Ipsc0Peak_cursor.x - Ipsc0Peak_cursor.xwindow/2) * pq.s, (Ipsc0Peak_cursor.x + Ipsc0Peak_cursor.xwindow/2) * pq.s)
-                        
-                        Ipsc0Peak = np.mean(adcSignal.time_slice(*coords))
-                        
-                        Ipsc0 = Ipsc0Peak - IpscBase
-                        
-                        self._results_[pndx]["Response0"].append(Ipsc0)
-                        
-                        if self._presynaptic_triggers_[pndx].size > 1:
-                            Ipsc1Peak_cursor = viewer.dataCursor("PSC1Peak")
-                            coords = ((Ipsc1Peak_cursor.x - Ipsc1Peak_cursor.xwindow/2) * pq.s, (Ipsc1Peak_cursor.x + Ipsc1Peak_cursor.xwindow/2) * pq.s)
-                            
-                            Ipsc1Peak = np.mean(adcSignal.time_slice(*coords))
-                            Ipsc1 = Ipsc1Peak - IpscBase
-                            
-                            self._results_[pndx]["Response1"].append(Ipsc1)
-                            
-                            self._results_[pndx]["PairedPulseRatio"].append(Ipsc1/Ipsc0)
-                        
-                        
-                responses = dict(amplitudes = dict(path0 = None, path1 = None), 
-                                pprs = dict(path0 = None, path1 = None), 
-                                rs = None, rincap = None, dc = None)
-    #             pprs = dict(path0 = None, path1 = None)
-    #             
-    #             mbTest = dict(rs = None, rincap = None)
-    #             
-                for field, value in self._results_.items():
-                    if not field.startswith("path"):
-                        if len(value):
-                            # pts = IrregularlySampledDataSignal(np.arange(len(value)),
-                            #                                     value, units = value[0].units,
-                            #                                     time_units = pq.dimensionless,
-                            #                                     name = field,
-                            #                                     domain_name="Sweep")
-                            
-                            pts = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
-                                                            value, units = value[0].units,
-                                                            time_units = pq.min,
-                                                            name = field,
-                                                            domain_name="Time")
-                            
-                            if field in ("DC", "tau"):
-                                responses["dc"] = pts
-                                # self._viewers_["dc"].view(pts)
-                                    
-                            elif field == "Rs":
-                                responses["rs"] = pts
-                                # mbTest["rs"] = pts
-                                # self._viewers_["rs"].view(pts)
-                                
-                            elif field in ("Rin", "Cap"):
-                                responses["rincap"] = pts
-                                # mbTest["rincap"] = pts
-                                # self._viewers_["rin"].view(pts)
-                                
-                    else:
-                        pname = field
-                        resp0 = value["Response0"]
-                        if len(resp0) == 0:
-                            continue
-                        
-                        resp1 = value["Response1"]
-                        
-                        sname = "Slope" if self._clampMode_ == ephys.ClampMode.CurrentClamp and self._useSlopeInIClamp_ else "Amplitude"
-                        
-    #                     if len(resp1) == len(resp0):
-    #                         response = IrregularlySampledDataSignal(np.arange(len(resp0)),
-    #                                                            np.vstack((resp0, resp1)).T,
-    #                                                            units = resp0[0].units,
-    #                                                            time_units = pq.dimensionless,
-    #                                                            domain_name = "Sweep",
-    #                                                            name = f"{sname} {pname}")
-    #                         
-    #                     else:
-    #                         response = IrregularlySampledDataSignal(np.arange(len(resp0)),
-    #                                                            resp0,
-    #                                                            units = resp0[0].units,
-    #                                                            time_units = pq.dimensionless,
-    #                                                            domain_name = "Sweep",
-    #                                                            name = f"{sname} {pname}")
-                        # NOTE: 2023-10-06 08:21:13 
-                        # only plot the first response amplitude
-                        response = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
-                                                            resp0,
-                                                            units = resp0[0].units,
-                                                            time_units = pq.min,
-                                                            domain_name = "Time",
-                                                            name = f"{sname} {pname}")
-                            
-                        # response = IrregularlySampledDataSignal(np.arange(len(resp0)),
-                        #                                     resp0,
-                        #                                     units = resp0[0].units,
-                        #                                     time_units = pq.dimensionless,
-                        #                                     domain_name = "Sweep",
-                        #                                     name = f"{sname} {pname}")
-                            
-                        # self._viewers_[pname]["amplitudes"].view(pts)
-                        
-                        responses["amplitudes"][pname] = response
-                        
-                        ppr = value["PairedPulseRatio"]
-                        
-                        if len(ppr):
-                            pts = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
-                                                            ppr,
-                                                            units = pq.dimensionless,
-                                                            time_units = pq.min,
-                                                            domain_name = "Time",
-                                                            name = f"PPR {pname}")
-                            
-                            # pts = IrregularlySampledDataSignal(np.arange(len(ppr)),
-                            #                                    ppr,
-                            #                                    units = pq.dimensionless,
-                            #                                    time_units = pq.dimensionless,
-                            #                                    domain_name = "Sweep",
-                            #                                    name = f"PPR {pname}")
-                            
-                            responses["pprs"][pname] = pts
-                            # pprs[pname] = pts
-                            
-                resultsPlot = list()
-                
-                if isinstance(responses["amplitudes"]["path0"], IrregularlySampledDataSignal):
-                    resultsPlot.append(responses["amplitudes"]["path0"])
-                    if isinstance(responses["amplitudes"]["path1"], IrregularlySampledDataSignal):
-                        resultsPlot.append(responses["amplitudes"]["path1"])
-                    
-                if isinstance(responses["pprs"]["path0"], IrregularlySampledDataSignal):
-                    resultsPlot.append(responses["pprs"]["path0"])
-                    if isinstance(responses["pprs"]["path1"], IrregularlySampledDataSignal):
-                        resultsPlot.append(responses["pprs"]["path1"])
-                        
-                if isinstance(responses["rs"], IrregularlySampledDataSignal):
-                    resultsPlot.append(responses["rs"])
-                    
-                    if isinstance(responses["rincap"], IrregularlySampledDataSignal):
-                        resultsPlot.append(responses["rincap"])
-                        
-                if isinstance(responses["dc"], IrregularlySampledDataSignal):
-                    resultsPlot.append(responses["dc"])
-                    
-                self._viewers_["results"].view(resultsPlot, symbolColor="black", symbolBrush="black")
-                
-                return (self._data_, self._results_)
+#             if self._runParams_.currentProtocol is None:
+#                 if protocol.clampMode() == self._runParams_.clampMode:
+#                     assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
+#                     if protocol.nSweeps == 2:
+#                         assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
+#                         assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
+#                         
+#                         # TODO check for alternate digital outputs → True ; alternate waveform → False
+#                         # → see # NOTE: 2023-10-07 21:35:39 - DONE ?!?
+#                     # self._runParams_.monitorProtocol = protocol
+#                     self._runParams_.currentProtocol = protocol
+#                     self._runParams_.newEpisode = False
+#                     self.processTrackingProtocol(protocol)
+#                 else:
+#                     raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._runParams_.clampMode}")
+#                 
+#             else:
+#                 # if protocol != self._runParams_.monitorProtocol:
+#                 if protocol != self._runParams_.currentProtocol:
+#                     if self._runParams_.newEpisode:
+#                         if self._runParams_.currentEpisodeName is None:
+#                             self._runParams_.currentEpisodeName = protocol.name
+#                         if self._runParams_.currentProtocolIsConditioning:
+#                             self._runParams_.conditioningProtocols.append(protocol)
+#                         else:
+#                             self._runParams_.monitoringProtocols.append(protocol)
+#                             
+#             if self._runParams_.currentProtocol.nSweeps == 2:
+#                 # if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
+#                 if not self._runParams_.currentProtocol.alternateDigitalOutputStateEnabled:
+#                     # NOTE: this is moot, because the protocol has already been checked
+#                     # in the processTrackingProtocol
+#                     raise ValueError("When the protocol defines two sweeps, alternate digtal outputs MUST have been enabled in the protocol")
+#                 # NOTE: 2023-10-07 21:35:39
+#                 # we are alternatively stimulating two pathways
+#                 # NOTE: the ABF Run should ALWAYS have two sweeps in this case - one
+#                 # for each pathway - regardless of how many runs there are per trial
+#                 # if number of runs > 1 then the ABF file stores the average record
+#                 # of each sweep, across the number of runs (or however the averaging mode
+#                 # was set in the protocol; WARNING: this last bit of information is 
+#                 # NOT currently used here)
+#                 
+#             elif self._monitorProtocol_.nSweeps != 1:
+#                 raise ValueError(f"Expecting 1 or 2 sweeps in the protocol; instead, got {self._monitorProtocol_.nSweeps}")
+#                 
+#             # From here on we do things differently, depending on whether protocol is a
+#             # the monitoring protocol or the conditioning protocol
+#             if protocol == self._runParams_.currentProtocol:
+#                 adc = protocol.inputConfiguration(self._runParams_.adcChannel)
+#                 sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
+#                 # for k, seg in enumerate(abfRun.segments[:1]): # use this line for debugging
+#                 for k, seg in enumerate(abfRun.segments):
+#                     pndx = f"path{k}"
+#                     if k > 1:
+#                         break
+#                     
+#                     adcSignal = seg.analogsignals[sigIndex]
+#                     
+#                     sweepStartTime = protocol.sweepTime(k)
+#                     
+#                     # self._data_["baseline"][pndx].segments.append(abfRun.segments[k])
+#                     self._data_[self._runParams_.currentEpisodeName][pndx].segments.append(abfRun.segments[k])
+#                     if isinstance(self._presynaptic_triggers_[self._runParams_.currentEpisodeName][pndx], TriggerEvent):
+#                         self._data_["baseline"][pndx].segments[-1].events.append(self._presynaptic_triggers_[pndx])
+#                         
+#                     viewer = self._viewers_[pndx]#["synaptic"]
+#                     viewer.view(self._data_["baseline"][pndx],
+#                                 doc_title=pndx,
+#                                 showFrame = len(self._data_["baseline"][pndx].segments)-1)
+#                     
+#                     self._signalAxes_[pndx] = viewer.axis(adc.name)
+#                     
+#                     viewer.currentAxis = self._signalAxes_[pndx]
+#                     # viewer.xAxesLinked = True
+#                     
+#                     viewer.plotAnalogSignalsCheckBox.setChecked(True)
+#                     viewer.plotEventsCheckBox.setChecked(True)
+#                     viewer.analogSignalComboBox.setCurrentIndex(viewer.currentAxisIndex+1)
+#                     viewer.analogSignalComboBox.activated.emit(viewer.currentAxisIndex+1)
+#                     # viewer.currentAxis.vb.enableAutoRange()
+#                     # viewer.currentAxis.vb.autoRange()
+#                     self._signalAxes_[pndx].vb.enableAutoRange()
+#                     
+#                     cnames = [c.name for c in viewer.dataCursors]
+#                     
+#                     if self._clampMode_ == ephys.ClampMode.VoltageClamp:
+#                         for landmarkname, landmarkcoords in self._landmarks_.items():
+#                             if k > 0 and landmarkname in ("Rbase", "Rs", "Rin"):
+#                                 # don't need those in both pathways!
+#                                 continue
+#                             if landmarkname not in cnames:
+#                                 if landmarkname ==  "Rs":
+#                                     # overwrite this with the local signal extremum
+#                                     # (first capacitance transient)
+#                                     sig = adcSignal.time_slice(self._mbTestStart_+ sweepStartTime,
+#                                                                                     self._mbTestStart_ + self._mbTestDuration_+ sweepStartTime)
+#                                     if self._mbTestAmplitude_ > 0:
+#                                         # look for a local maximum in the dac
+#                                         transientTime = sig.times[sig.argmax()]
+#                                     else:
+#                                         transientTime = sig.times[sig.argmin()]
+#                                         # look for local minimum in the dac
+#                                         
+#                                     start = transientTime - self._responseBaselineDuration_/2
+#                                     duration = self._responseBaselineDuration_
+#                                     
+#                                 else:
+#                                     if any(v is None for v in landmarkcoords):
+#                                         # for the case when only a single pulse was used
+#                                         continue
+#                                     start, duration = landmarkcoords
+#                                     
+#                                 x = float((start + duration / 2 + sweepStartTime).rescale(pq.s))
+#                                 xwindow = float(duration.rescale(pq.s))
+#                                 # print(f"x = {x}, xwindow = {xwindow}")
+#                                 viewer.addCursor(sv.SignalCursorTypes.vertical,
+#                                                 x = x,
+#                                                 xwindow = xwindow,
+#                                                 label = landmarkname,
+#                                                 follows_mouse = False,
+#                                                 axis = self._signalAxes_[pndx],
+#                                                 relative=True,
+#                                                 precision=5)
+#                                 
+#                         # we allow cursors to be repositioned during the recording
+#                         # therefore we do not generate neo.Epochs anymore
+#                         
+#                         if k == 0:
+#                             # calculate DC, Rs, and Rin for pathway 0 only
+#                             Rbase_cursor = viewer.dataCursor("Rbase")
+#                             coords = ((Rbase_cursor.x - Rbase_cursor.xwindow/2) * pq.s, (Rbase_cursor.x + Rbase_cursor.xwindow/2) * pq.s)
+#                             Idc = np.mean(adcSignal.time_slice(*coords))
+#                                         
+#                             self._results_["DC"].append(Idc)
+#                             
+#                             Rs_cursor = viewer.dataCursor("Rs")
+#                             coords = ((Rs_cursor.x - Rs_cursor.xwindow/2) * pq.s, (Rs_cursor.x + Rs_cursor.xwindow/2) * pq.s)
+#                             if self._mbTestAmplitude_ > 0:
+#                                 Irs = np.max(adcSignal.time_slice(*coords))
+#                             else:
+#                                 Irs = np.min(adcSignal.time_slice(*coords))
+#                                 
+#                             Rs  = (self._mbTestAmplitude_ / (Irs-Idc)).rescale(pq.MOhm)
+#                             
+#                             self._results_["Rs"].append(Rs)
+#                             
+#                             Rin_cursor = viewer.dataCursor("Rin")
+#                             coords = ((Rin_cursor.x - Rin_cursor.xwindow/2) * pq.s, (Rin_cursor.x + Rin_cursor.xwindow/2) * pq.s)
+#                             Irin = np.mean(adcSignal.time_slice(*coords))
+#                                 
+#                             Rin = (self._mbTestAmplitude_ / (Irin-Idc)).rescale(pq.MOhm)
+#                             
+#                             self._results_["Rin"].append(Rin)
+#                             
+#                             
+#                         Ipsc_base_cursor = viewer.dataCursor("PSCBase")
+#                         coords = ((Ipsc_base_cursor.x - Ipsc_base_cursor.xwindow/2) * pq.s, (Ipsc_base_cursor.x + Ipsc_base_cursor.xwindow/2) * pq.s)
+#                         
+#                         IpscBase = np.mean(adcSignal.time_slice(*coords))
+#                         
+#                         Ipsc0Peak_cursor = viewer.dataCursor("PSC0Peak")
+#                         coords = ((Ipsc0Peak_cursor.x - Ipsc0Peak_cursor.xwindow/2) * pq.s, (Ipsc0Peak_cursor.x + Ipsc0Peak_cursor.xwindow/2) * pq.s)
+#                         
+#                         Ipsc0Peak = np.mean(adcSignal.time_slice(*coords))
+#                         
+#                         Ipsc0 = Ipsc0Peak - IpscBase
+#                         
+#                         self._results_[pndx]["Response0"].append(Ipsc0)
+#                         
+#                         if self._presynaptic_triggers_[pndx].size > 1:
+#                             Ipsc1Peak_cursor = viewer.dataCursor("PSC1Peak")
+#                             coords = ((Ipsc1Peak_cursor.x - Ipsc1Peak_cursor.xwindow/2) * pq.s, (Ipsc1Peak_cursor.x + Ipsc1Peak_cursor.xwindow/2) * pq.s)
+#                             
+#                             Ipsc1Peak = np.mean(adcSignal.time_slice(*coords))
+#                             Ipsc1 = Ipsc1Peak - IpscBase
+#                             
+#                             self._results_[pndx]["Response1"].append(Ipsc1)
+#                             
+#                             self._results_[pndx]["PairedPulseRatio"].append(Ipsc1/Ipsc0)
+#                         
+#                         
+#                 responses = dict(amplitudes = dict(path0 = None, path1 = None), 
+#                                 pprs = dict(path0 = None, path1 = None), 
+#                                 rs = None, rincap = None, dc = None)
+#     #             pprs = dict(path0 = None, path1 = None)
+#     #             
+#     #             mbTest = dict(rs = None, rincap = None)
+#     #             
+#                 for field, value in self._results_.items():
+#                     if not field.startswith("path"):
+#                         if len(value):
+#                             # pts = IrregularlySampledDataSignal(np.arange(len(value)),
+#                             #                                     value, units = value[0].units,
+#                             #                                     time_units = pq.dimensionless,
+#                             #                                     name = field,
+#                             #                                     domain_name="Sweep")
+#                             
+#                             pts = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
+#                                                             value, units = value[0].units,
+#                                                             time_units = pq.min,
+#                                                             name = field,
+#                                                             domain_name="Time")
+#                             
+#                             if field in ("DC", "tau"):
+#                                 responses["dc"] = pts
+#                                 # self._viewers_["dc"].view(pts)
+#                                     
+#                             elif field == "Rs":
+#                                 responses["rs"] = pts
+#                                 # mbTest["rs"] = pts
+#                                 # self._viewers_["rs"].view(pts)
+#                                 
+#                             elif field in ("Rin", "Cap"):
+#                                 responses["rincap"] = pts
+#                                 # mbTest["rincap"] = pts
+#                                 # self._viewers_["rin"].view(pts)
+#                                 
+#                     else:
+#                         pname = field
+#                         resp0 = value["Response0"]
+#                         if len(resp0) == 0:
+#                             continue
+#                         
+#                         resp1 = value["Response1"]
+#                         
+#                         sname = "Slope" if self._clampMode_ == ephys.ClampMode.CurrentClamp and self._useSlopeInIClamp_ else "Amplitude"
+#                         
+#     #                     if len(resp1) == len(resp0):
+#     #                         response = IrregularlySampledDataSignal(np.arange(len(resp0)),
+#     #                                                            np.vstack((resp0, resp1)).T,
+#     #                                                            units = resp0[0].units,
+#     #                                                            time_units = pq.dimensionless,
+#     #                                                            domain_name = "Sweep",
+#     #                                                            name = f"{sname} {pname}")
+#     #                         
+#     #                     else:
+#     #                         response = IrregularlySampledDataSignal(np.arange(len(resp0)),
+#     #                                                            resp0,
+#     #                                                            units = resp0[0].units,
+#     #                                                            time_units = pq.dimensionless,
+#     #                                                            domain_name = "Sweep",
+#     #                                                            name = f"{sname} {pname}")
+#                         # NOTE: 2023-10-06 08:21:13 
+#                         # only plot the first response amplitude
+#                         response = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
+#                                                             resp0,
+#                                                             units = resp0[0].units,
+#                                                             time_units = pq.min,
+#                                                             domain_name = "Time",
+#                                                             name = f"{sname} {pname}")
+#                             
+#                         # response = IrregularlySampledDataSignal(np.arange(len(resp0)),
+#                         #                                     resp0,
+#                         #                                     units = resp0[0].units,
+#                         #                                     time_units = pq.dimensionless,
+#                         #                                     domain_name = "Sweep",
+#                         #                                     name = f"{sname} {pname}")
+#                             
+#                         # self._viewers_[pname]["amplitudes"].view(pts)
+#                         
+#                         responses["amplitudes"][pname] = response
+#                         
+#                         ppr = value["PairedPulseRatio"]
+#                         
+#                         if len(ppr):
+#                             pts = IrregularlySampledDataSignal(self._abfRunDeltaTimes_,
+#                                                             ppr,
+#                                                             units = pq.dimensionless,
+#                                                             time_units = pq.min,
+#                                                             domain_name = "Time",
+#                                                             name = f"PPR {pname}")
+#                             
+#                             # pts = IrregularlySampledDataSignal(np.arange(len(ppr)),
+#                             #                                    ppr,
+#                             #                                    units = pq.dimensionless,
+#                             #                                    time_units = pq.dimensionless,
+#                             #                                    domain_name = "Sweep",
+#                             #                                    name = f"PPR {pname}")
+#                             
+#                             responses["pprs"][pname] = pts
+#                             # pprs[pname] = pts
+#                             
+#                 resultsPlot = list()
+#                 
+#                 if isinstance(responses["amplitudes"]["path0"], IrregularlySampledDataSignal):
+#                     resultsPlot.append(responses["amplitudes"]["path0"])
+#                     if isinstance(responses["amplitudes"]["path1"], IrregularlySampledDataSignal):
+#                         resultsPlot.append(responses["amplitudes"]["path1"])
+#                     
+#                 if isinstance(responses["pprs"]["path0"], IrregularlySampledDataSignal):
+#                     resultsPlot.append(responses["pprs"]["path0"])
+#                     if isinstance(responses["pprs"]["path1"], IrregularlySampledDataSignal):
+#                         resultsPlot.append(responses["pprs"]["path1"])
+#                         
+#                 if isinstance(responses["rs"], IrregularlySampledDataSignal):
+#                     resultsPlot.append(responses["rs"])
+#                     
+#                     if isinstance(responses["rincap"], IrregularlySampledDataSignal):
+#                         resultsPlot.append(responses["rincap"])
+#                         
+#                 if isinstance(responses["dc"], IrregularlySampledDataSignal):
+#                     resultsPlot.append(responses["dc"])
+#                     
+#                 self._viewers_["results"].view(resultsPlot, symbolColor="black", symbolBrush="black")
+#                 
+#                 return (self._data_, self._results_)
                 
         except:
             traceback.print_exc()
@@ -1602,8 +1601,8 @@ class LTPOnline(QtCore.QObject):
                                    data = self._data_,
                                    newEpisode = True,
                                    episodeName = None, # default is "baseline"
-                                   abfRunTimes = list(),
-                                   abfRunDeltaTimes = list(),
+                                   abfRunTimesMinutes = list(),
+                                   abfRunDeltaTimesMinutes = list(),
                                    baselineDurations = baselineDurations,
                                    steadyStateIClampMbTestDuration = steadyStateIClampMbTestDuration,
                                    trackingClampMode = trackingClampMode,
@@ -1775,19 +1774,23 @@ class LTPOnline(QtCore.QObject):
         
         self._doSimulation_ = False
         
-        self._simulator_params_ = dict(files=None, timeout=1000)
+        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
         
         self._running_ = False
         
         if isinstance(simulate, dict):
             files = simulate.get("files", None)
-            timeout = simulate.get("timeout", 1000)
+            timeout = simulate.get("timeout", 2000) # ms
             if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
                 self._simulator_params_ = dict(files=files, timeout=timeout)
                 self._doSimulation_ = True
                 
         elif isinstance(simulate, bool):
             self._doSimulation_ = simulate
+            
+        elif isinstance(simulate, (int, float)):
+            self._doSimulation_ = True
+            self._simulator_params_ = dict(files=None, timeout = int(simulate))
         
         if self._doSimulation_:
             self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_)
