@@ -1869,8 +1869,8 @@ class LTPOnline(QtCore.QObject):
         self._running_ = False
         
     def reset(self):
-        self._monitorProtocol_ = None
-        self._conditioningProtocol_ = None
+        # self._monitorProtocol_ = None
+        # self._conditioningProtocol_ = None
         
         self._data_["baseline"]["path0"].segments.clear()
         self._data_["baseline"]["path1"].segments.clear()
