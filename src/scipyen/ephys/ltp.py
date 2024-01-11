@@ -1360,143 +1360,11 @@ class LTPOnline(QtCore.QObject):
         
         super().__init__(parent=parent)
         
-        if len(args) == 0:
-            self._sources_ = None
-            # TODO: 2024-01-04 22:19:44 
-            # write code to infer Source from first ABF file (in _LTPOnlineFileProcessor_)
-            raise ValueError("I must have at least one Source defined")
-        else:
-            if not all(isinstance(a, Source) for a in args):
-                raise TypeError(f"Expecting one or more Source objects")
-            sset = set(args)
-            
-            if len(sset) < len(args):
-                dupsrc = duplicates(args, indices=True)
-                raise ValueError(f"Duplicate sources detected in 'args': {dupsrc}")
+        if not self._parse_args_(args):
+            raise RuntimeError("Cannot parse arguments")
         
-            # parse sources from args; make sure there are identical names
-            dupNames = duplicates([a.name for a in args], indices=True)
-
-            if len(dupNames):
-                warnings.warn("The sources do not have unique names; names will be adapted.")
-                snames = list()
-                self._sources_ = list()
-                for src in args:
-                    if src.name not in snames:
-                        snames.append(src.name)
-                        sources.append(src)
-                        
-                    else:
-                        # adapt name to avoid duplicates; since an ephys.Source is 
-                        # an immutable named tuple, we use its _replace method to create
-                        # a copy with a new name
-                        new_name = utilities.counter_suffix(src.name, snames)
-                        snames.append(new_name)
-                        sources.append(src._replace(name=new_name))
-                        
-            else:
-                self._sources_ = args
-                
-            #### BEGIN Checks
-            #
-            # NOTE: 2024-01-04 22:20:55
-            # check consistency of synaptic stimuli in sources
-            
-            # make sure sources specify distinct signal layouts for synaptic
-            # simulations; in particular sources must specifiy:
-            # • unique ADC ↦ DAC pairs
-            # • unique synaptic stimulus configurations
-            # • unique auxiliary ADCs (when used) — these are useful to infer 
-            #   trigger protocols from input signals recorded via auxiliary inputs
-            #   — specified using AuxiliaryInput objects:
-            #   
-            
-            # DACs used to emulate TTLs for synaptic stimuli
-            syndacs = set(itertools.chain.from_iterable(s.syn_dac for s in self._sources_))
-            
-            # DACs used to emulate TTLs for other purposes
-            ttldacs = set(itertools.chain.from_iterable(s.out_dac_triggers for s in self._sources_))
-            
-            # DACs used to emit waveforms other than clamping
-            # these should REALLY be distinct from ttldacs
-            cmddacs = set(itertools.chain.from_iterable(s.other_outputs for s in self._sources_))
-            
-            # DIGs used for synaptic stimulation
-            syndigs = set(itertools.chain.from_iterable(s.syn_dig for s in self._sources_))
-            
-            # DIGs used to trigger anything other than synapses
-            digs = set(itertools.chain.from_iterable(s.out_dig_triggers for s in self._sources_))
-            
-            
-            # 1. all sources must have a primary ADC
-            if any(s.adc is None for s in self._sources_):
-                raise ValueError("All source must specify a primary ADC input")
-            
-            adcs, snames  = list(zip(*[(s.adc, s.name) for s in self._sources_]))
-            
-            # 2. primary ADCs cannot be shared among sources
-            dupadcs     = duplicates(adcs)  # sources must have distinct main ADCs
-            if len(dupadcs):
-                raise ValueError(f"Sharing of primary ADCs ({dupadcs}) among sources is forbidden")
-            
-            # 3. source names should be unique
-            dupnames = duplicates(snames)
-            if len(dupnames):
-                raise ValueError(f"Sharing of names ({dupnames}) among sources is forbidden")
-                
-            # 4. for clamped sources only - by definition these define a primary DAC
-            #   needed for clamping and to provide waveforms for optionally for 
-            #   membrane test (recommended) and possibly other electrical 
-            #   manipulations of the clamped cell (e.g., to elicit postsynaptic spikes).
-            #
-            #   See detailed checks below (4.1, 4.2, etc)
-            #
-            # In the SAME experiment, a DAC cannot be used, simultaneously, for:
-            # • clamping command waveforms
-            # • TTL emulation (± 5 V !)
-            # 
-            
-            clamped_sources = [s for s in self._sources_ if s.clamped]
-            if len(clamped_sources):
-                # these DACs MUST be unique
-                dacs = [s.dac for s in clamped_sources]
-                
-                # 4.1 primary DACs must be unique
-                dupdacs = duplicates(dacs)
-                if len(dupdacs):
-                    raise ValueError(f"Sharing of primary DACs ({dupdacs}) among sources is forbidden")
-                
-                # 4.2 primary DACs CANNOT be used for synaptic stimulation
-                ovlap = syndacs & set(dacs)
-                if len(ovlap):
-                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and synaptic stimulation")
-            
-                # 4.3 primary DACs CANNOT be used to emulate TTLs for 3ʳᵈ party devices in the same experiment
-                ovlap = ttldacs & set(dacs)
-                if len(ovlap):
-                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and TTL emulation for 3ʳᵈ party devices")
-                
-                # 4.4 primary DACs CANNOT be used to send command signal waveforms
-                # to other than the source (cell or membrane patch)
-                ovlap = cmddacs & set(dacs)
-                if len(ovlap):
-                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and controlling 3ʳᵈ party devices")
-                
-            # 5. check that DIG channels do not overlap with those used for syn stim
-            ovlap = digs & syndigs
-            if len(ovlap):
-                raise ValueError(f"The following DIGs {ovlap} seem to be used both for synaptic stimulation and triggering 3ʳᵈ party devices")
-            
-            # 6. in each Source, the SynapticStimulus objects must have unique names 
-            # (but OK to share across sources)
-            
-            for k, s in enumerate(self._sources_):
-                if isinstance(s.syn, typing.Sequence):
-                    assert len(set(s_.name for s_ in s.syn)) == len(s.syn), f"{k}ᵗʰ source ({s.name}) has duplicate names for SynapticStimulus"
-            
-            #
-            #### END   Checks
-                
+        self._setup_data_()
+        
         self._episodeResults_ = dict()
         self._landmarks_ = dict()
         self._results_ = dict() 
@@ -1589,10 +1457,10 @@ class LTPOnline(QtCore.QObject):
         #       name2 ↦ … as above …
         #       }
         #
-        self._data_ = dict((src.name, dict((("source",          src),
-                                            ("baseline",        dict(src.syn_blocks)),
-                                            ("conditioning",    dict(src.syn_blocks)),
-                                            ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
+        # self._data_ = dict((src.name, dict((("source",          src),
+        #                                     ("baseline",        dict(src.syn_blocks)),
+        #                                     ("conditioning",    dict(src.syn_blocks)),
+        #                                     ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
         
         
         # place analysis results inside each episode sub-dict ⇒ do away with _episodeResults_
@@ -1838,6 +1706,153 @@ class LTPOnline(QtCore.QObject):
         if hasattr(super(object, self), "__del__"):
             super().__del__()
             
+    def _parse_args_(self, *args):
+        if len(args) == 0:
+            self._sources_ = None
+            # TODO: 2024-01-04 22:19:44 
+            # write code to infer Source from first ABF file (in _LTPOnlineFileProcessor_)
+            raise ValueError("I must have at least one Source defined")
+        else:
+            if not all(isinstance(a, Source) for a in args):
+                raise TypeError(f"Expecting one or more Source objects")
+            
+            sset = set(args)
+            
+            if len(sset) < len(args):
+                dupsrc = duplicates(args, indices=True)
+                raise ValueError(f"Duplicate sources detected in 'args': {dupsrc}")
+        
+            # parse sources from args; make sure there are identical names
+            dupNames = duplicates([a.name for a in args], indices=True)
+
+            if len(dupNames):
+                warnings.warn("The sources do not have unique names; names will be adapted.")
+                snames = list()
+                self._sources_ = list()
+                for src in args:
+                    if src.name not in snames:
+                        snames.append(src.name)
+                        sources.append(src)
+                        
+                    else:
+                        # adapt name to avoid duplicates; since an ephys.Source is 
+                        # an immutable named tuple, we use its _replace method to create
+                        # a copy with a new name
+                        new_name = utilities.counter_suffix(src.name, snames)
+                        snames.append(new_name)
+                        sources.append(src._replace(name=new_name))
+                        
+            else:
+                self._sources_ = args
+                
+            #### BEGIN Checks
+            #
+            # NOTE: 2024-01-04 22:20:55
+            # check consistency of synaptic stimuli in sources
+            
+            # make sure sources specify distinct signal layouts for synaptic
+            # simulations; in particular sources must specifiy:
+            # • unique ADC ↦ DAC pairs
+            # • unique synaptic stimulus configurations
+            # • unique auxiliary ADCs (when used) — these are useful to infer 
+            #   trigger protocols from input signals recorded via auxiliary inputs
+            #   — specified using AuxiliaryInput objects:
+            #   
+            
+            # DACs used to emulate TTLs for synaptic stimuli
+            syndacs = set(itertools.chain.from_iterable(s.syn_dac for s in self._sources_))
+            
+            # DACs used to emulate TTLs for other purposes
+            ttldacs = set(itertools.chain.from_iterable(s.out_dac_triggers for s in self._sources_))
+            
+            # DACs used to emit waveforms other than clamping
+            # these should REALLY be distinct from ttldacs
+            cmddacs = set(itertools.chain.from_iterable(s.other_outputs for s in self._sources_))
+            
+            # DIGs used for synaptic stimulation
+            syndigs = set(itertools.chain.from_iterable(s.syn_dig for s in self._sources_))
+            
+            # DIGs used to trigger anything other than synapses
+            digs = set(itertools.chain.from_iterable(s.out_dig_triggers for s in self._sources_))
+            
+            
+            # 1. all sources must have a primary ADC
+            if any(s.adc is None for s in self._sources_):
+                raise ValueError("All source must specify a primary ADC input")
+            
+            adcs, snames  = list(zip(*[(s.adc, s.name) for s in self._sources_]))
+            
+            # 2. primary ADCs cannot be shared among sources
+            dupadcs     = duplicates(adcs)  # sources must have distinct main ADCs
+            if len(dupadcs):
+                raise ValueError(f"Sharing of primary ADCs ({dupadcs}) among sources is forbidden")
+            
+            # 3. source names should be unique
+            dupnames = duplicates(snames)
+            if len(dupnames):
+                raise ValueError(f"Sharing of names ({dupnames}) among sources is forbidden")
+                
+            # 4. for clamped sources only - by definition these define a primary DAC
+            #   needed for clamping and to provide waveforms for optionally for 
+            #   membrane test (recommended) and possibly other electrical 
+            #   manipulations of the clamped cell (e.g., to elicit postsynaptic spikes).
+            #
+            #   See detailed checks below (4.1, 4.2, etc)
+            #
+            # In the SAME experiment, a DAC cannot be used, simultaneously, for:
+            # • clamping command waveforms
+            # • TTL emulation (± 5 V !)
+            # 
+            
+            clamped_sources = [s for s in self._sources_ if s.clamped]
+            if len(clamped_sources):
+                # these DACs MUST be unique
+                dacs = [s.dac for s in clamped_sources]
+                
+                # 4.1 primary DACs must be unique
+                dupdacs = duplicates(dacs)
+                if len(dupdacs):
+                    raise ValueError(f"Sharing of primary DACs ({dupdacs}) among sources is forbidden")
+                
+                # 4.2 primary DACs CANNOT be used for synaptic stimulation
+                ovlap = syndacs & set(dacs)
+                if len(ovlap):
+                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and synaptic stimulation")
+            
+                # 4.3 primary DACs CANNOT be used to emulate TTLs for 3ʳᵈ party devices in the same experiment
+                ovlap = ttldacs & set(dacs)
+                if len(ovlap):
+                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and TTL emulation for 3ʳᵈ party devices")
+                
+                # 4.4 primary DACs CANNOT be used to send command signal waveforms
+                # to other than the source (cell or membrane patch)
+                ovlap = cmddacs & set(dacs)
+                if len(ovlap):
+                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and controlling 3ʳᵈ party devices")
+                
+            # 5. check that DIG channels do not overlap with those used for syn stim
+            ovlap = digs & syndigs
+            if len(ovlap):
+                raise ValueError(f"The following DIGs {ovlap} seem to be used both for synaptic stimulation and triggering 3ʳᵈ party devices")
+            
+            # 6. in each Source, the SynapticStimulus objects must have unique names 
+            # (but OK to share across sources)
+            
+            for k, s in enumerate(self._sources_):
+                if isinstance(s.syn, typing.Sequence):
+                    assert len(set(s_.name for s_ in s.syn)) == len(s.syn), f"{k}ᵗʰ source ({s.name}) has duplicate names for SynapticStimulus"
+            
+            #
+            #### END   Checks
+                
+    def _setup_data_(self):
+        self._data_ = dict((src.name, dict((("source",          src),
+                                            ("baseline",        dict(src.syn_blocks)),
+                                            ("conditioning",    dict(src.syn_blocks)),
+                                            ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
+        
+        
+    
     @pyqtSlot()
     def doWork(self):
         self.start()
@@ -1868,52 +1883,58 @@ class LTPOnline(QtCore.QObject):
         
         self._running_ = False
         
-    def reset(self):
+        
+        
+    def reset(self, *args):
+        if len(args):
+            self._parse_args_(args)
         # self._monitorProtocol_ = None
         # self._conditioningProtocol_ = None
         
-        self._data_["baseline"]["path0"].segments.clear()
-        self._data_["baseline"]["path1"].segments.clear()
-        self._data_["chase"]["path0"].segments.clear()
-        self._data_["chase"]["path1"].segments.clear()
-        self._data_["conditioning"]["path0"].segments.clear()
-        self._data_["conditioning"]["path1"].segments.clear()
-        
-        if self._clampMode_ == ephys.ClampMode.VoltageClamp:
-            self._results_ = {"path0": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
-                              "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
-                              "DC": [], "Rs":[], "Rin":[], }
-            
-            self._landmarks_ = {"Rbase":[self._signalBaselineStart_, self._signalBaselineDuration_], 
-                                "Rs":[None, None], 
-                                "Rin":[None, None], 
-                                "PSCBase":[None, None],
-                                            
-                                "PSC0Peak":[None, None], 
-                                "PSC1Peak":[None, None]}
-    
-        else:
-            self._results_ = {"path0": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
-                              "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
-                              "tau":[], "Rin":[], "Cap":[], }
-            
-            if self._useSlopeInIClamp_:
-                self._landmarks_ = {"Base":[self._signalBaselineStart_, self._signalBaselineDuration_], 
-                                    "VmTest":[None, None], 
-                                    "PSP0Base":[None, None],
-                                    "PSP0Peak":[None, None],
-                                    "PSP1Base":[None, None],
-                                    "PSP1Peak":[None, None]}
-            else:
-                self._landmarks_ = {"Base":[self._signalBaselineStart_, self._signalBaselineDuration_], 
-                                    "VmTest":[None, None], 
-                                    "PSPBase":[None, None],
-                                    "PSP0Peak":[None, None],
-                                    "PSP1Peak":[None, None]}
+#         self._data_["baseline"]["path0"].segments.clear()
+#         self._data_["baseline"]["path1"].segments.clear()
+#         self._data_["chase"]["path0"].segments.clear()
+#         self._data_["chase"]["path1"].segments.clear()
+#         self._data_["conditioning"]["path0"].segments.clear()
+#         self._data_["conditioning"]["path1"].segments.clear()
+#         
+#         if self._clampMode_ == ephys.ClampMode.VoltageClamp:
+#             self._results_ = {"path0": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
+#                               "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
+#                               "DC": [], "Rs":[], "Rin":[], }
+#             
+#             self._landmarks_ = {"Rbase":[self._signalBaselineStart_, self._signalBaselineDuration_], 
+#                                 "Rs":[None, None], 
+#                                 "Rin":[None, None], 
+#                                 "PSCBase":[None, None],
+#                                             
+#                                 "PSC0Peak":[None, None], 
+#                                 "PSC1Peak":[None, None]}
+#     
+#         else:
+#             self._results_ = {"path0": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
+#                               "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
+#                               "tau":[], "Rin":[], "Cap":[], }
+#             
+#             if self._useSlopeInIClamp_:
+#                 self._landmarks_ = {"Base":[self._signalBaselineStart_, self._signalBaselineDuration_], 
+#                                     "VmTest":[None, None], 
+#                                     "PSP0Base":[None, None],
+#                                     "PSP0Peak":[None, None],
+#                                     "PSP1Base":[None, None],
+#                                     "PSP1Peak":[None, None]}
+#             else:
+#                 self._landmarks_ = {"Base":[self._signalBaselineStart_, self._signalBaselineDuration_], 
+#                                     "VmTest":[None, None], 
+#                                     "PSPBase":[None, None],
+#                                     "PSP0Peak":[None, None],
+#                                     "PSP1Peak":[None, None]}
         
                 
         for viewer in self._viewers_.values():
             viewer.clear()
+            
+        return True
             
 
     def start(self, directory:typing.Optional[typing.Union[str, pathlib.Path]] = None):
