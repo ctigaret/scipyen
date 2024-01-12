@@ -5000,11 +5000,10 @@ anything else       anything else       ❌
             if isinstance(txt, str) and len(txt.strip()):
                 name=txt
                 
-        epoch = self.cursorsToEpoch(self.selectedDataCursor, name=name)
-        
-        if epoch is not None:
-            scipyenWindow.assignToWorkspace(name, epoch)
-        # if self._scipyenWindow_ is not None:
+            epoch = self.cursorsToEpoch(self.selectedDataCursor, name=name)
+            
+            if epoch is not None:
+                scipyenWindow.assignToWorkspace(name, epoch)
                 
     
     @pyqtSlot()
