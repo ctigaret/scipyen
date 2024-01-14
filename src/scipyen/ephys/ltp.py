@@ -103,7 +103,7 @@ import iolib.pictio as pio
 
 import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
-                         Source, SynapticStimulus, 
+                         RecordingSource, SynapticStimulus, 
                          AuxiliaryInput, AuxiliaryOutput,
                          synstim, auxinput, auxoutput)
 import ephys.membrane as membrane
@@ -135,11 +135,11 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
     the 'path0' and 'path1' parameters.
     
     By default, the 'dac' parameter is None, indicating a recording from an 
-    𝑢𝑛𝑐𝑙𝑎𝑚𝑝𝑒𝑑 Source (e.g. a field recording, or recording from an unclamped cell).
+    𝑢𝑛𝑐𝑙𝑎𝑚𝑝𝑒𝑑 RecordingSource (e.g. a field recording, or recording from an unclamped cell).
     
     When 'dac' parameter is specified as an int (index) or str (name), the 
     source is considered to be recorded in 𝑐𝑙𝑎𝑚𝑝𝑖𝑛𝑔 mode (i.e. voltage- or 
-    current-clamp), and, by implication, the Source is a cell or a membrane 
+    current-clamp), and, by implication, the RecordingSource is a cell or a membrane 
     patch.
     
     Synaptic responses are recorded on ADC 0 by default, but this can be specified
@@ -148,13 +148,13 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
     By default the source 'name' field is "cell"¹ but this can be specified using
     the 'name' parameter as a str.
     
-    Sources with more complex configurations (e.g. using photostimulation of 
+    RecordingSources with more complex configurations (e.g. using photostimulation of 
     synaptic activity triggered with DAC-emulated TTLs) should be constructed
-    directly (see ephys.Source documentation for details).
+    directly (see ephys.RecordingSource documentation for details).
     
     Named parameters:
     -----------------
-    adc, dac, name: See ephys.ephys.Source constructor for a full description.
+    adc, dac, name: See ephys.ephys.RecordingSource constructor for a full description.
     path0, path1 (int) >= 0 indices of DIG channels used to stimulate the pathways.
     
     
@@ -165,15 +165,15 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
     --------------------------
     These are 'auxin' and 'auxout', and by default are set to 'None'.
     
-    In a given application, the 'name' field of Source objects should have unique
+    In a given application, the 'name' field of RecordingSource objects should have unique
     values in order to allow the lookup of these objects according to this field.
     
     Returns:
     --------
-    An immutable ephys.ephys.Source object (a NamedTuple). 
+    An immutable ephys.ephys.RecordingSource object (a NamedTuple). 
 
     One can create a modified version using the '_replace' method:
-    (WARNING: Remember to also change the value of the Source's 'name' field)
+    (WARNING: Remember to also change the value of the RecordingSource's 'name' field)
     
     
     cell  = twoPathwaysSource()
@@ -197,7 +197,7 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
         if (isinstance(auxout, typing.Sequence) and not all(isinstance(v, AuxiliaryOutput) for v in auxout)) or not isinstance(auxout, AuxiliaryOutput):
             raise TypeError(f"'auxout' expected to be an AuxiliaryOutput or a sequence of AuxiliaryOutput, or None")
 
-    return Source(name, adc, dac, syn, auxin, auxout)
+    return RecordingSource(name, adc, dac, syn, auxin, auxout)
 
 class _LTPFilesSimulator_(QtCore.QThread):
     """
@@ -1335,7 +1335,7 @@ class LTPOnline(QtCore.QObject):
         Var-positional parameters:
         --------------------------
     
-        One or more ephys.Source specifying the logical association between
+        One or more ephys.RecordingSource specifying the logical association between
         input and outputs in this experiment.
     
         Named parameters:
@@ -1406,7 +1406,7 @@ class LTPOnline(QtCore.QObject):
         #                   analog signals via a specific ADC.
         #
         #                   Responses can be recorded on two synaptic pathways in
-        #                   the same Source: e.g., a 'Test' pathway receiving the
+        #                   the same RecordingSource: e.g., a 'Test' pathway receiving the
         #                   conditioning protocol (see below), and a 'Control' 
         #                   pathway (not stimulated during conditioning).
         #
@@ -1446,7 +1446,7 @@ class LTPOnline(QtCore.QObject):
         #                   plasticity at a defined synaptic pathway — i.e., the 
         #                   'Test' pathway.
         #
-        #                   The electrical behaviour of the Source (cell or field)
+        #                   The electrical behaviour of the RecordingSource (cell or field)
         #                   is optionally recorded via the same ADC as the one
         #                   used to record the baseline responses. Obviously, when
         #                   recorded, the all sweeps of the trial will contain 
@@ -1456,7 +1456,7 @@ class LTPOnline(QtCore.QObject):
         #                   signal layout is identical to that of the baseline episode.
         # 
         
-        # Data is organized by Source; for each Source we may have more than one
+        # Data is organized by RecordingSource; for each RecordingSource we may have more than one
         # SynapticStimulus configuration
         
         # technically, Conditioning should only use ONE pathway; since an empty
@@ -1738,11 +1738,11 @@ class LTPOnline(QtCore.QObject):
         if len(args) == 0:
             self._sources_ = None
             # TODO: 2024-01-04 22:19:44 
-            # write code to infer Source from first ABF file (in _LTPOnlineFileProcessor_)
-            raise ValueError("I must have at least one Source defined")
+            # write code to infer RecordingSource from first ABF file (in _LTPOnlineFileProcessor_)
+            raise ValueError("I must have at least one RecordingSource defined")
         else:
-            if not all(isinstance(a, Source) for a in args):
-                raise TypeError(f"Expecting one or more Source objects")
+            if not all(isinstance(a, RecordingSource) for a in args):
+                raise TypeError(f"Expecting one or more RecordingSource objects")
             
             sset = set(args)
             
@@ -1763,7 +1763,7 @@ class LTPOnline(QtCore.QObject):
                         sources.append(src)
                         
                     else:
-                        # adapt name to avoid duplicates; since an ephys.Source is 
+                        # adapt name to avoid duplicates; since an ephys.RecordingSource is 
                         # an immutable named tuple, we use its _replace method to create
                         # a copy with a new name
                         new_name = utilities.counter_suffix(src.name, snames)
@@ -1863,7 +1863,7 @@ class LTPOnline(QtCore.QObject):
             if len(ovlap):
                 raise ValueError(f"The following DIGs {ovlap} seem to be used both for synaptic stimulation and triggering 3ʳᵈ party devices")
             
-            # 6. in each Source, the SynapticStimulus objects must have unique names 
+            # 6. in each RecordingSource, the SynapticStimulus objects must have unique names 
             # (but OK to share across sources)
             
             for k, s in enumerate(self._sources_):
@@ -3643,8 +3643,4 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
     result.segments.append(result_segment)
     
     return result
-
-def make_path_dict(src:Source):
-    if isinstance(src, SynapticStimulus):
-        pass
 
