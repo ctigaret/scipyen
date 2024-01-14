@@ -507,8 +507,8 @@ class __BaseSource__(typing.NamedTuple):
     adc: typing.Union[int, str] = 0
     dac: typing.Optional[typing.Union[int, str]] = None
     syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
-    aux: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
-    out: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
+    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
+    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
     
 class Source(__BaseSource__):
     __slots__ = ()
@@ -530,12 +530,12 @@ class Source(__BaseSource__):
                    "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
                    "    (one SynapticStimulus per synaptic pathway).",
                    "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
-                   "    from those specified in 'dac', or 'out' fields of this object. ",
+                   "    from those specified in 'dac', or 'auxout' fields of this object. ",
                    "    Optional; default is SynapticStimulus('stim', None, None).\n",
-                   "• aux (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
+                   "• auxin (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
                    "    NOTE: When present, these must specify ADCs distinct from the 'adc' above",
                    "    Optional; default is None.\n",
-                   "• out (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
+                   "• auxout (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
                    "    Auxiliary outputs for purposes OTHER THAN clamping command waveforms or ",
                    "    synaptic stimulation (e.g., imaging frame triggers, etc)",
                    "    NOTE: These must be distinct from the channels specified by the 'dac' ",
@@ -636,7 +636,7 @@ class Source(__BaseSource__):
         """Tuple of ADCs for recording DAQ-issued command waveforms other than TTLs.
         May be empty.
         
-        These ADCs are specified in the 'aux' field, and correspond to the auxiliary
+        These ADCs are specified in the 'auxin' field, and correspond to the auxiliary
         input channels of the DAQ device where a 'copy' of the clamping command 
         signal is being fed. The inputs are configured in the recording protocol.
         
@@ -659,11 +659,11 @@ class Source(__BaseSource__):
         from the recording protocol.
         
         """
-        if isinstance(self.aux, AuxiliaryInput):
-            return (self.aux.adc, ) if self.aux.cmd is True else tuple()
+        if isinstance(self.auxin, AuxiliaryInput):
+            return (self.auxin.adc, ) if self.auxin.cmd is True else tuple()
     
-        if isinstance(self.aux, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.aux):
-            return tuple(a.adc for a in self.aux if a.cmd is True)
+        if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
+            return tuple(a.adc for a in self.auxin if a.cmd is True)
         
         return tuple()
     
@@ -672,7 +672,7 @@ class Source(__BaseSource__):
         """Tuple of ADCs for recording DAQ-generated TTL signals; 
         may be empty.
         
-        These ADCs (analog inputs) are specified in the 'aux' field and correspond
+        These ADCs (analog inputs) are specified in the 'auxin' field and correspond
         to the auxiliary input channels of the DAQ device for recording a 'copy' 
         of DAQ-issued triggers (other than for synaptic stimulaion purposes).
         
@@ -689,11 +689,11 @@ class Source(__BaseSource__):
         protocol.
         
         """
-        if isinstance(self.aux, AuxiliaryInput):
-            return tuple(self.aux.adc) if self.aux.cmd is False else tuple()
+        if isinstance(self.auxin, AuxiliaryInput):
+            return tuple(self.auxin.adc) if self.auxin.cmd is False else tuple()
     
-        if isinstance(self.aux, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.aux):
-            return tuple(a.adc for a in self.aux if a.cmd is False)
+        if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
+            return tuple(a.adc for a in self.auxin if a.cmd is False)
         
         return tuple()
     
@@ -702,7 +702,7 @@ class Source(__BaseSource__):
         """Tuple of ADCs recording input signals not issued by the DAQ device.
         May be empty.
         
-        These ADCs are specified in the 'aux' field.
+        These ADCs are specified in the 'auxin' field.
         
         Such inputs record auxiliary data signals other than clamping commands or
         TTLs, e.g. bath temperature, photodetector current, 'external' triggers,
@@ -710,11 +710,11 @@ class Source(__BaseSource__):
         of command signal waveforms sent to the source in patch-clamp experiments.
         
         """
-        if isinstance(self.aux, AuxiliaryInput):
-            return tuple(self.aux.adc) if self.aux.cmd is None else tuple()
+        if isinstance(self.auxin, AuxiliaryInput):
+            return tuple(self.auxin.adc) if self.auxin.cmd is None else tuple()
     
-        if isinstance(self.aux, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.aux):
-            return tuple(a.adc for a in self.aux if a.cmd is None)
+        if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
+            return tuple(a.adc for a in self.auxin if a.cmd is None)
         
         return tuple()
     
@@ -733,7 +733,8 @@ class Source(__BaseSource__):
     
     @property
     def syn_blocks_dict(self) -> dict:
-        """Returns syn_blocks as a dict"""
+        """Returns syn_blocks as a dict with syn name ↦ empty neo.Block.
+        """
         return dict(self.syn_blocks)
     
     @property
@@ -742,11 +743,11 @@ class Source(__BaseSource__):
         These TTLs are used for purposes other than synaptic stimulation.
         May be empty
         """
-        if isinstance(self.out, AuxiliaryOutput):
-            return (self.out.channel, ) if self.out.digttl is True else (tuple)
+        if isinstance(self.auxout, AuxiliaryOutput):
+            return (self.auxout.channel, ) if self.auxout.digttl is True else (tuple)
         
-        if isinstance(self.out, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.out):
-            return tuple(o.channel for o in self.out if o.digttl is True)
+        if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
+            return tuple(o.channel for o in self.auxout if o.digttl is True)
         
         return tuple()
     
@@ -756,21 +757,21 @@ class Source(__BaseSource__):
         These TTLs are emulated (pulses or steps with ± 5 V range) and are used
         for purposes other than synaptic stimulation.
         """
-        if isinstance(self.out, AuxiliaryOutput):
-            return (self.out.channel, ) if self.out.digttl is False else (tuple)
+        if isinstance(self.auxout, AuxiliaryOutput):
+            return (self.auxout.channel, ) if self.auxout.digttl is False else (tuple)
         
-        if isinstance(self.out, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.out):
-            return tuple(o.channel for o in self.out if o.digttl is False)
+        if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
+            return tuple(o.channel for o in self.auxout if o.digttl is False)
         
         return tuple()
     
     @property
     def other_outputs(self) -> tuple:
-        if isinstance(self.out, AuxiliaryOutput):
-            return (self.out.channel, ) if self.out.digttl is None else (tuple)
+        if isinstance(self.auxout, AuxiliaryOutput):
+            return (self.auxout.channel, ) if self.auxout.digttl is None else (tuple)
         
-        if isinstance(self.out, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.out):
-            return tuple(o.channel for o in self.out if o.digttl is None)
+        if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
+            return tuple(o.channel for o in self.auxout if o.digttl is None)
         
         return tuple()
     
@@ -825,8 +826,8 @@ Source.name.__doc__ = "str: The name of the source; default is 'cell'"
 Source.adc.__doc__  = "int, str: The index or name of the primary ADC channel — records the eletrical behaviour of the source (cell or field)."
 Source.dac.__doc__  = "int, str: The index or name of the primary DAC channel — the output channel that operates the voltage- or current-clamp."
 Source.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus objects or None — origin of trigger (TTL-like) signals for synaptic stimulation, one per 'synaptic pathway'."
-Source.aux.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
-Source.out.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
+Source.auxin.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
+Source.auxout.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
 
 
 class ClampMode(TypeEnum):
@@ -914,125 +915,125 @@ class SynapticPathway: pass
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class RecordingEpisode(Episode):
     """
-Specification of an eletrophysiology recording episode.
-    
-An "episode" is a series of sweeps recorded during a specific set of
-experimental conditions -- possibly, a subset of a larger experiment where
-several conditions were applied in sequence.
+    Specification of an eletrophysiology recording episode.
+        
+    An "episode" is a series of sweeps recorded during a specific set of
+    experimental conditions -- possibly, a subset of a larger experiment where
+    several conditions were applied in sequence.
 
-All sweeps in the episode must have been recorded during the same conditions.
-    
-Examples:
-=========
+    All sweeps in the episode must have been recorded during the same conditions.
+        
+    Examples:
+    =========
 
-1) A response recorded without drug, followed by a response recorded in the
-presence of a drug, then followed by a drug wash-out are all three distinct
-"episodes".
+    1) A response recorded without drug, followed by a response recorded in the
+    presence of a drug, then followed by a drug wash-out are all three distinct
+    "episodes".
 
-2) Segments recorded while testing for cross-talk between synaptic pathways,
-(and therefore, where the paired pulses are crossed between pathways) is a
-distinct episode from one where each segment contains responses from the
-same synaptic pathway
+    2) Segments recorded while testing for cross-talk between synaptic pathways,
+    (and therefore, where the paired pulses are crossed between pathways) is a
+    distinct episode from one where each segment contains responses from the
+    same synaptic pathway
 
-The sweeps in RecordingEpisode are a sequence of neo.Segment objects, where
-objects where each synaptic pathway has contributed data for a neo.Segment
-inside the Block.
+    The sweeps in RecordingEpisode are a sequence of neo.Segment objects, where
+    objects where each synaptic pathway has contributed data for a neo.Segment
+    inside the Block.
 
-Fields (constructor parameters):
-================================
-    
-• protocol:ElectrophysiologyProtocol - mandatory
-    Currently, only pyabfbridge.ABFProtocol objects are supported. The ABFProtocol
-    is a subclass of ElectrophysiologyProtocol defined in this module.
-
-
-The other fields indicate optional indices into the data segments and signals
-of the source data.
-
-• episodeType: RecordingEpisodeType
-    
-• adcChannels : int or str, or sequence of int or str - respectively, the index 
-    (indices) or the name(s) of the ADC channel (corresponding to analog signals
-    in each sweep), recording the pathway-specific synaptic response
-
-    NOTE: During an experiment, the recording may switch between episodes with
-    different clamping modes, or electrode modes (see below). This results in
-    episodes with different response and command signals. Therefore we attach
-    this information here, instead of the SynapticPathway instance to which this
-    episode belongs to.`
-
-• dacChannels : int or str, or sequence of int or str - index or name of the 
-    DAC channel (optonalliy, corresponding to analog signals in the data containing
-    record copies of the DAC voltage- or current-clamp command signal (or None).
-    When available, these signals are typically recorded - when available - by 
-    feeding the secondary output of the amplifier into an ADC input in the 
-    acquisition (DAQ) board.
-
-• digChannels: int or str, or sequence of int or str - index od the digital output
-    channel(s) used for synaptic stimulation; these are necessary in order to 
-    distinguish the digital channel used for synaptic stimulation, from other 
-    digital channels used, e.g. to trigger auxiliary devices (such as image
-    acquistion devices). These outputs can also be "recorded" by feeding a branch
-    of the digital output into an ADC input of the DAQ board; in such cases, the
-    resulting analogsignals have ther own name, and those names can be used here.
-
-• electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.WholeCellPatch)
-
-    NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
-    using the same electrode during an experiment (i.e. either Field, *Patch, or
-    or Sharp).
-
-    This attribute allows for episodes with distinct electrode 'mode' for the
-    same pathway.
-
-• pathways: optional, a list of SynapticPathways or None (default); can also be
-    an empty list (same as if it was None).
-
-    Indicates the SynapticPathways to which this episode applies. Typically,
-    an episode applied to a single pathway. However, there are situations where
-    an episode involving more pathways is meaningful, e.g., where additional
-    pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
-    test, or during conditioning in order to test for 'associativity')
-    
-• xtalk: optional, a mapping of int (sweep indices) or tuples (start:int,step:int)
-    to pairs (2-tuples) of valid int indices into the 'pathways' attribute.
-    
-    When not None, it indicates that the episode was used for testing the 
-    independence of two or more synaptic pathways, using paired-pulse stimulations.
-    
-    E.g., for two pathways, using int keys:
-        0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
-        1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
-
-    or, as a tuple of two int:
-        (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from 
-                            path 0 to path 1
-    
-        (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from 
-                            path 1 to path 0
-    
-    The keys should resolve to valid sweep indices in the data; then the keys are 
-    pairs (2-tuples) they contain the 'start' and 'step' values for constructing
-    range objects indicating the sweeps where the test apples to the pathways 
-    given in the value mapped to the key, once the data is fully available.
-    
-    The order of the pathway indices in the values is the order in which each 
-    pathway was stimulated during the paired-pulse.
-
-    
-    
-    WARNING: the pathways attribute must be a list of SynapticPathways.
+    Fields (constructor parameters):
+    ================================
+        
+    • protocol:ElectrophysiologyProtocol - mandatory
+        Currently, only pyabfbridge.ABFProtocol objects are supported. The ABFProtocol
+        is a subclass of ElectrophysiologyProtocol defined in this module.
 
 
----
+    The other fields indicate optional indices into the data segments and signals
+    of the source data.
 
-¹Exceptions are possible:
-    ∘ 'repatching' the cell (e.g. in order to dialyse with a drug, etc) see, e.g.
-        Oren et al, (2009) J. Neurosci 29(4):939
-        Maier et al, (2011) Neuron, DOI 10.1016/j.neuron.2011.08.016
-    ∘ switch between field recording and patch clamp or sharp electrode recordings
-     (theoretically possible, but then one may also think of this as being two
-    distinct pathways)
+    • episodeType: RecordingEpisodeType
+        
+    • adcChannels : int or str, or sequence of int or str - respectively, the index 
+        (indices) or the name(s) of the ADC channel (corresponding to analog signals
+        in each sweep), recording the pathway-specific synaptic response
+
+        NOTE: During an experiment, the recording may switch between episodes with
+        different clamping modes, or electrode modes (see below). This results in
+        episodes with different response and command signals. Therefore we attach
+        this information here, instead of the SynapticPathway instance to which this
+        episode belongs to.`
+
+    • dacChannels : int or str, or sequence of int or str - index or name of the 
+        DAC channel (optonalliy, corresponding to analog signals in the data containing
+        record copies of the DAC voltage- or current-clamp command signal (or None).
+        When available, these signals are typically recorded - when available - by 
+        feeding the secondary output of the amplifier into an ADC input in the 
+        acquisition (DAQ) board.
+
+    • digChannels: int or str, or sequence of int or str - index od the digital output
+        channel(s) used for synaptic stimulation; these are necessary in order to 
+        distinguish the digital channel used for synaptic stimulation, from other 
+        digital channels used, e.g. to trigger auxiliary devices (such as image
+        acquistion devices). These outputs can also be "recorded" by feeding a branch
+        of the digital output into an ADC input of the DAQ board; in such cases, the
+        resulting analogsignals have ther own name, and those names can be used here.
+
+    • electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.WholeCellPatch)
+
+        NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
+        using the same electrode during an experiment (i.e. either Field, *Patch, or
+        or Sharp).
+
+        This attribute allows for episodes with distinct electrode 'mode' for the
+        same pathway.
+
+    • pathways: optional, a list of SynapticPathways or None (default); can also be
+        an empty list (same as if it was None).
+
+        Indicates the SynapticPathways to which this episode applies. Typically,
+        an episode applied to a single pathway. However, there are situations where
+        an episode involving more pathways is meaningful, e.g., where additional
+        pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
+        test, or during conditioning in order to test for 'associativity')
+        
+    • xtalk: optional, a mapping of int (sweep indices) or tuples (start:int,step:int)
+        to pairs (2-tuples) of valid int indices into the 'pathways' attribute.
+        
+        When not None, it indicates that the episode was used for testing the 
+        independence of two or more synaptic pathways, using paired-pulse stimulations.
+        
+        E.g., for two pathways, using int keys:
+            0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
+            1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
+
+        or, as a tuple of two int:
+            (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from 
+                                path 0 to path 1
+        
+            (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from 
+                                path 1 to path 0
+        
+        The keys should resolve to valid sweep indices in the data; then the keys are 
+        pairs (2-tuples) they contain the 'start' and 'step' values for constructing
+        range objects indicating the sweeps where the test apples to the pathways 
+        given in the value mapped to the key, once the data is fully available.
+        
+        The order of the pathway indices in the values is the order in which each 
+        pathway was stimulated during the paired-pulse.
+
+        
+        
+        WARNING: the pathways attribute must be a list of SynapticPathways.
+
+
+    ---
+
+    ¹Exceptions are possible:
+        ∘ 'repatching' the cell (e.g. in order to dialyse with a drug, etc) see, e.g.
+            Oren et al, (2009) J. Neurosci 29(4):939
+            Maier et al, (2011) Neuron, DOI 10.1016/j.neuron.2011.08.016
+        ∘ switch between field recording and patch clamp or sharp electrode recordings
+        (theoretically possible, but then one may also think of this as being two
+        distinct pathways)
     
 """
     # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
@@ -1053,43 +1054,43 @@ of the source data.
                  **kwargs):
         """Constructor for RecordingEpisode.
 
-Var-positional parameters (args):
---------------------------------
-neo.Block, a sequence of neo.Blocks, a neo.Segment, or a sequence of neo.Segments,
-    or: a str, or a sequence of str (symbol(s) in the workspace, bound to neo.Blocks)
+        Var-positional parameters (args):
+        --------------------------------
+        neo.Block, a sequence of neo.Blocks, a neo.Segment, or a sequence of neo.Segments,
+            or: a str, or a sequence of str (symbol(s) in the workspace, bound to neo.Blocks)
 
-    When a str, if it contains the '*' character then the str is interpreted as 
-    a global search string (a 'glob'). See neoutils.concatenate_blocks(…) for 
-    details.
+            When a str, if it contains the '*' character then the str is interpreted as 
+            a global search string (a 'glob'). See neoutils.concatenate_blocks(…) for 
+            details.
 
-    NOTE: args represent the source data to which this episode applies to, but
-is NOT stored in the RecordingEpisode instance. The only use of the data is to
-assign values to the 'begin', 'end', 'beginFrame', 'endFrame' attributes of the 
-episode.
+            NOTE: args represent the source data to which this episode applies to, but
+        is NOT stored in the RecordingEpisode instance. The only use of the data is to
+        assign values to the 'begin', 'end', 'beginFrame', 'endFrame' attributes of the 
+        episode.
 
-Named parameters:
-------------------
-protocol: the electrophysiology experimental protocol
-    WARNING: Currently, (2023-10-15 21:15:01) only pyabfbridge.ABFProtocol
-        objects are supported
-name:str - the name of this episode
+        Named parameters:
+        ------------------
+        protocol: the electrophysiology experimental protocol
+            WARNING: Currently, (2023-10-15 21:15:01) only pyabfbridge.ABFProtocol
+                objects are supported
+        name:str - the name of this episode
 
-episodeType: type of the episode (see RecordingEpisodeType)
+        episodeType: type of the episode (see RecordingEpisodeType)
 
-NOT IMPLEMENTED: These are the attributes of the instance (see the class documentation), PLUS
-the parameters 'segments', 'glob', 'sortby' and 'ascending' with the same types
-and semantincs as for the function neoutils.concatenate_blocks(…).
+        NOT IMPLEMENTED: These are the attributes of the instance (see the class documentation), PLUS
+        the parameters 'segments', 'glob', 'sortby' and 'ascending' with the same types
+        and semantincs as for the function neoutils.concatenate_blocks(…).
 
-NOTE: Data is NOT concatenated here, but these two parameters are used for 
-        temporarily ordering the source neo.Block objects in args.
+        NOTE: Data is NOT concatenated here, but these two parameters are used for 
+                temporarily ordering the source neo.Block objects in args.
 
-Var-keyword parameters (kwargs)
--------------------------------
-These are passed directly to the datatypes.Episode superclass (see documentation
-for Episode)
+        Var-keyword parameters (kwargs)
+        -------------------------------
+        These are passed directly to the datatypes.Episode superclass (see documentation
+        for Episode)
 
-See also the class documentation.
-    """
+        See also the class documentation.
+        """
         if not isinstance(name, str):
             name = ""
         super().__init__(name, **kwargs)

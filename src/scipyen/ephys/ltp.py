@@ -163,7 +163,7 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
     
     Var-keyword parameters:
     --------------------------
-    These are 'out' and 'aux' and here are given the default values of 'None'.
+    These are 'auxin' and 'auxout', and by default are set to 'None'.
     
     In a given application, the 'name' field of Source objects should have unique
     values in order to allow the lookup of these objects according to this field.
@@ -186,14 +186,18 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
     
     """
     syn     = (SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)) 
-    out     = kwargs.pop("out", None)
-    aux     = kwargs.pop("aux", None)
+    auxin   = kwargs.pop("auxin", None)
+    auxout  = kwargs.pop("auxout", None)
     
-    if aux is not None:
-        if (isinstance(aux, (list, tuple)) and not all(isinstance(v, AuxiliaryInput) for v in aux)) or not isinstance(aux, AuxiliaryInput):
-            raise TypeError(f"'aux' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
+    if auxin is not None:
+        if (isinstance(auxin, typing.Sequence) and not all(isinstance(v, AuxiliaryInput) for v in auxin)) or not isinstance(auxin, AuxiliaryInput):
+            raise TypeError(f"'auxin' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
+    
+    if auxout is not None:
+        if (isinstance(auxout, typing.Sequence) and not all(isinstance(v, AuxiliaryOutput) for v in auxout)) or not isinstance(auxout, AuxiliaryOutput):
+            raise TypeError(f"'auxout' expected to be an AuxiliaryOutput or a sequence of AuxiliaryOutput, or None")
 
-    return Source(name, adc, dac, syn, aux, out)
+    return Source(name, adc, dac, syn, auxin, auxout)
 
 class _LTPFilesSimulator_(QtCore.QThread):
     """
@@ -1312,6 +1316,7 @@ class LTPOnline(QtCore.QObject):
     
 
     def __init__(self, *args,
+                 episode: typing.Union[str, tuple] = "baseline",
                  useEmbeddedProtocol:bool=True,
                  trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
@@ -1332,6 +1337,21 @@ class LTPOnline(QtCore.QObject):
     
         One or more ephys.Source specifying the logical association between
         input and outputs in this experiment.
+    
+        Named parameters:
+        ------------------
+    
+        episode: str, or tuple, default is 'baseline' (case-sensitive!)
+            LTPOnline begins with this episode (by default this is a baseline 
+                episode, recording synaptic responses before any conditioning)
+    
+            When a str: this is the name of the initial episode (by default, 'baseline')
+    
+            When a tuple, 
+    
+            ALL sources undergo the same episode at the same time; i.e., applying
+            conditioning to one source while recording baseline (or chase) from 
+            another source is not allowed. FIXME/TODO remove this constraint
     
         trackingClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp
             or ephys.ClampMode.CurrentClamp, or their respective int values (2, 4)
@@ -1360,9 +1380,11 @@ class LTPOnline(QtCore.QObject):
         
         super().__init__(parent=parent)
         
-        if not self._parse_args_(args):
-            raise RuntimeError("Cannot parse arguments")
+        self._running_ = False
         
+        self._currentEpisodeName_ = episode if isinstance(episode, str) and len(episode.strip()) else "baseline"
+        
+        self._parse_args_(*args)
         self._setup_data_()
         
         self._episodeResults_ = dict()
@@ -1644,8 +1666,6 @@ class LTPOnline(QtCore.QObject):
         
         self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
         
-        self._running_ = False
-        
         if isinstance(simulate, dict):
             files = simulate.get("files", None)
             timeout = simulate.get("timeout", 2000) # ms
@@ -1679,26 +1699,34 @@ class LTPOnline(QtCore.QObject):
             self._running_ = True
 
     def __del__(self):
-        if self._running_:
+        # we need to check attribute existence to cover the case when we delete
+        # an incompletely initialized object
+        if hasattr(self, "_running_") and self._running_:
             self.stop()
         try:
-            for viewer in self._viewers_.values():
-                viewer.close()
-            if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            if hasattr(self, "_viewers_"):
+                for viewer in self._viewers_.values():
+                    viewer.close()
+                    
+            if hasattr(self, "_emitterWindow_") and self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-            if isinstance(self._simulatorThread_, _LTPFilesSimulator_):
+                
+            if hasattr(self, "_simulatorThread_") and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
                 self._simulatorThread_.requestInterruption()
                 self._simulatorThread_.quit()
                 self._simulatorThread_.wait()
                 self._simulatorThread_.deleteLater()
-            self._abfSupplierThread_.abfListener.stop()
-            self._abfSupplierThread_.quit()
-            self._abfSupplierThread_.wait()
-            self._abfProcessorThread_.quit()
-            self._abfProcessorThread_.wait()
+            
+            if hasattr(self, "_abfSupplierThread_") and hasattr(self, "_abfProcessorThread_"):
+                self._abfSupplierThread_.abfListener.stop()
+                self._abfSupplierThread_.quit()
+                self._abfSupplierThread_.wait()
                 
-            self._abfSupplierThread_.deleteLater()
-            self._abfProcessorThread_.deleteLater()
+                self._abfProcessorThread_.quit()
+                self._abfProcessorThread_.wait()
+                
+                self._abfSupplierThread_.deleteLater()
+                self._abfProcessorThread_.deleteLater()
             
         except:
             traceback.print_exc()
@@ -1844,12 +1872,24 @@ class LTPOnline(QtCore.QObject):
             
             #
             #### END   Checks
+            
+        # return True
                 
     def _setup_data_(self):
-        self._data_ = dict((src.name, dict((("source",          src),
-                                            ("baseline",        dict(src.syn_blocks)),
-                                            ("conditioning",    dict(src.syn_blocks)),
-                                            ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
+        if not hasattr(self, "_data_") or not isinstance(self._data_, dict):
+            self._data_ = dict((src.name, dict((("source",          src),
+                                                (self._currentEpisodeName_,        dict(src.syn_blocks))))) for src in self._sources_)
+            
+        else:
+            # for each source add new episode to data (named after the current episode name)
+            for src in self._sources_:
+                if self._currentEpisodeName_ not in self._data_[src.name].keys():
+                    self._data_[src.name][self._currentEpisodeName_] = dict(src.syn_blocks)
+            
+        # self._data_ = dict((src.name, dict((("source",          src),
+        #                                     ("baseline",        dict(src.syn_blocks)),
+        #                                     ("conditioning",    dict(src.syn_blocks)),
+        #                                     ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
         
         
     
