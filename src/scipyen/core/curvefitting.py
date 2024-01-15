@@ -1080,6 +1080,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     
     fkwargs: dict with keyword parameters to `func`
     
+    coef_names: tuple with model parameter names or symbols (str)
+    
     The following are passed directly to scipy.optimize.least_squares:
     bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
     diff_step, tr_solver, tr_options, jac_sparsity, verbose
@@ -1213,6 +1215,23 @@ def fit_model(data, func, p0, *args, **kwargs):
         xdata = x[realDataNdx]
     
     x0 = p0 # sequence of initial values for the model parameters
+    
+    coef_names = kwargs.pop("coef_names", None)
+    
+    if isinstance(coef_names, typing.Sequence):
+        if len(coef_names) == 0:
+            coef_names = [f"Coefficient {k}" for k in range(len(p0))]
+        else:
+            if len(coef_names) < len(p0):
+                coef_names = tuple([n for n in coef_names] + [f"Coefficient_{k}" for k in range(len(p0)-len(coef_names))])
+                
+            elif len(coef_names) > len(p0):
+                coef_names = coef_names[0:len(p0)]
+                
+    else:
+        coef_names = [f"Coefficient {k}" for k in range(len(p0))]
+        
+            
     lo = list()
     up = list()
     
@@ -1323,6 +1342,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     result["Model"] = f"{func.__module__}.{func.__name__}"
     result["Fit"] = res
     result["Coefficients"] = res_x
+    result["Coefficient Names"] = coef_names
     result["GoF"] = dict()
     result["GoF"]["Rsq"] = rsq
     result["GoF"]["R2adj"] = arsq
