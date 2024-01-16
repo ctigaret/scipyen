@@ -1060,20 +1060,15 @@ class RecordingEpisode(Episode):
     #              # ascending:typing.Optional[bool] = None,
     #              # glob:bool = True,
     #              **kwargs):
-    def __init__(self, protocol:ElectrophysiologyProtocol, source:RecordingSource, /, 
-                 episodeType:RecordingEpisodeType = RecordingEpisodeType.Tracking,
+    def __init__(self, episodeType:RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name:typing.Optional[str] = None,
+                 protocol:typing.Optional[ElectrophysiologyProtocol]=None, 
+                 sources:typing.Optional[typing.Sequence[RecordingSource]] = None,
                  segments:typing.Optional[GeneralIndexType] = None,
-                 # adcChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
-                 # dacChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
-                 # digChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
                  electrodeMode:ElectrodeMode = ElectrodeMode.WholeCellPatch,
-                 pathways:typing.Optional[typing.List[SynapticPathway]] = None,
+                 pathways:typing.Optional[typing.Sequence[SynapticPathway]] = None,
                  xtalk:typing.Optional[dict[int, tuple[int,int]]] = None ,
                  triggers:typing.Optional[TriggerEvent] = None,
-                 # sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
-                 # ascending:typing.Optional[bool] = None,
-                 # glob:bool = True,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1123,16 +1118,12 @@ class RecordingEpisode(Episode):
         super().__init__(name, **kwargs)
         
         self._type_ = episodeType
-#         
-#         if not isinstance(protocol, ElectrophysiologyProtocol):
-#             raise TypeError(f"Expecting an ElectrophysiologyProtocol (e.g. pyabfbridge.ABFProtocol); instead, got a {type(protocol).__name__}")
-        
-        
+
         self.protocol = protocol
         
-        self.adcChannels = adcChannels
-        self.dacChannels = dacChannels
-        self.digChannels = digChannels
+        # self.adcChannels = adcChannels
+        # self.dacChannels = dacChannels
+        # self.digChannels = digChannels
         
         if not isinstance(electrodeMode, ElectrodeMode):
             electrodeMode = ElectrodeMode.Field
@@ -1339,31 +1330,11 @@ class SynapticPathwayType(TypeEnum):
     
 @with_doc(BaseScipyenData, use_header=True)
 class SynapticPathway(BaseScipyenData):
-    """Encapsulates a logical stimulus-response relationship between signals.
+    """Logical association of a SynapticStimulus with a Schedule.
+    Also specifies the "type" of the SynapticPathway - specifies the role of
+    the SynapticPathway in an experiment.
 
-    Signals are identified by name or their integer index in the collection of a 
-    neo.Segment (sweep) analogsignals. 
-
-    These signals are:
-    • response (analog, regularly sampled): recorded synaptic responses
-    
-    • analogCommandSignal (analog, regularly sampled): the recorded command waveform;
-        typically, this is a record of the secondary output of the amplifier, 
-        when available, that has been fed into an auxiliary analog input port of
-        the acquisition device; this signal carries the amplifier "command", e.g. 
-        the voltage command in voltage clamp, or injected current, in current clamp.
-    
-    • digitalCommandSignal (analog, regularly sampled): the TTL (a.k.a the "digital")
-        output signal from the acquisition board, typically recorded by feeding this 
-        output into an analog input port, when available.
-    
-    Of these, only the first ("response") is required, whereas the others can be
-    None. When present, these command signals are analysed to determine the 
-    protocol used (i.e., the clamping voltage, and the timings of the presynaptic
-    stimulation). Otherwise, these parameters need to be entered manually for 
-    further analysis.
-
-    In addition, the synaptic pathway has a pathwayType attribute which specifies
+    SynapticPayhway objects  has a pathwayType attribute which specifies
     the pathway's role in a synaptic plasticity experiment.
     
     """
@@ -1391,15 +1362,14 @@ class SynapticPathway(BaseScipyenData):
     #              digitalCommandSignal:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
     #              schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
     #              **kwargs):
+    
+    # NOTE: 2024-01-16 18:58:10
+    # below, segments is not needed - contained in Schedule's Episodes
     @with_doc(concatenate_blocks, use_header = True)
     def __init__(self, *args, stim:typing.Optional[SynapticStimulus] = None, 
                  pathwayType:SynapticPathwayType = SynapticPathwayType.Test, 
                  name:typing.Optional[str]=None, 
                  index:int = 0,
-                 segments:GeneralIndexType=0,
-                 responseSignal:typing.Optional[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]]=None, 
-                 analogCommandSignal:typing.Union[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]] = None, 
-                 digitalCommandSignal:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
                  schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
                  **kwargs):
         """SynapticPathway constructor.
