@@ -4750,6 +4750,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_dockWidgetVisibilityChanged)
 
         # BEGIN file system view,  navigation widgets & actions
+        # self.fileSystemTreeView.setUniformRowHeights(True) # set in the ui file
         self.fileSystemTreeView.setModel(self.fileSystemModel)
         self.fileSystemTreeView.setAlternatingRowColors(True)
         self.fileSystemTreeView.activated[QtCore.QModelIndex].connect(
@@ -4762,6 +4763,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_fileSystemContextMenuRequest)
         self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.fileSystemTreeView.setRootIsDecorated(True)
+        self.fileSystemTreeView.setHorizontalScrollBarPolicy(
+            QtCore.Qt.ScrollBarAsNeeded)        
+        # self.fileSystemTreeView.setHorizontalScrollBarPolicy(
+        #     QtCore.Qt.ScrollBarAlwaysOn)        
 
         self.fileSystemModel.directoryLoaded[str].connect(
             self.slot_resizeFileTreeColumnForPath)
@@ -5453,6 +5458,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.fileSystemTreeView.resizeColumnToContents(0)
         self.fileSystemTreeView.setHorizontalScrollBarPolicy(
             QtCore.Qt.ScrollBarAsNeeded)
+        # self.fileSystemTreeView.setHorizontalScrollBarPolicy(
+        #     QtCore.Qt.ScrollBarAlwaysOn)
 
     def _resizeWorkspaceViewFirstColumn_(self):
         self.workspaceView.setHorizontalScrollBarPolicy(
