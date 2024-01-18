@@ -7223,8 +7223,8 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         #         # NOTE: in neo >= 0.10.0 segment.spiketrains is a neo.SpikeTrainList
         #         list(segment.spiketrains)[k] = ap_train
                 
-    else:
-        segment.spiketrains.append(ap_train)
+    # else:
+    segment.spiketrains.append(ap_train)
         
     result["Injected_current"] = Iinj
     result["Injection_timings"] = i_timings

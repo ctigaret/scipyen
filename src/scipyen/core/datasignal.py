@@ -1,5 +1,5 @@
 from copy import deepcopy
-import numbers, warnings
+import numbers, warnings, typing
 import numpy as np
 
 import quantities as pq
@@ -310,7 +310,7 @@ class DataSignal(BaseSignal):
         # print(f"{self.__class__.__name__}.__init__ call_args {call_args}\n")
         # print(f"{self.__class__.__name__}.__init__ strings {strings}\n")
         # print(f"{self.__class__.__name__}.__init__ quants {quants}\n")
-        print(f"{self.__class__.__name__}.__init__ domainargs {domainargs}\n")
+        # print(f"{self.__class__.__name__}.__init__ domainargs {domainargs}\n")
         # print(f"{self.__class__.__name__}.__init__ annots {annots}\n")
         
         if isinstance(domainargs["sampling_period"], pq.Quantity):
@@ -1234,7 +1234,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         # • the data itself (as a Quantity) - here, needs `units`, `dtype`, `copy`
         # • attribute `segment`
         # • attribute `domain` as a Quantity - here, needs domain_units, domain_dtype
-        quants = {"units": None, "domain_units": None}
+        quants = {"units": None, "domain_units": None}#, "time_units": None}
         
         dtypes = {"dtype":None, "domain_dtype": None}
         
@@ -1246,16 +1246,49 @@ class IrregularlySampledDataSignal(BaseSignal):
         
         call_args = dict()
         
+        # collapse domain_units and time_units into one argument
+        
+        if not isinstance(domain_units, pq.Quantity):
+            if isinstance(time_units, pq.Quantity):
+                domain_units = time_units
+            else:
+                domain_units = None
+        else:
+            domain_units = None
+        
+        default_domain_units = pq.dimensionless
+        default_signal_units = pq.dimensionless
+        
+        # check signal, infer units is possible
         if isinstance(signal, (neo.AnalogSignal, DataSignal)):
             call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
             call_args["copy"] = copy
             segment = signal.segment
+            quants["units"] = signal.units
             
+        elif isinstance(signal, typing.Sequence):
+            if not all(isinstance(v, pq.Quantity) for v in signal):
+                if any(isinstance(v, pq.Quantity) for v in signal):
+                    raise TypeError("Signal data cannot mix quantities and non-quantities")
+                
+            else:
+                quants["units"] = signal[0].units # this WILL fail in Quantities module if units of the other elements are not convertible
+            
+        # check domain, infer domain_units if possible
         if isinstance(domain, (pq.Quantity)):
             call_args["domain"] = domain
+            quants["domain_units"] = domain.units
+            
+        elif isinstance(domain, typing.Sequence):
+            if not all(isinstance(v, pq.Quantity) for v in domain):
+                if any(isinstance(v, pq.Quantity) for v in domain):
+                    raise TypeError("Domain data cannot mix quantities and non-quantities")
+                
+            else:
+                quants["domain_units"] = domain[0].units # this WILL fail in Quantities module if units of the other elements are not convertible
         
         # NOTE: 2022-11-24 11:57:08
-        # see NOTE: 2022-11-24 11:59:04 and NOTE: 2022-11-24 11:22:34 for the logic
+        # see NOTE: 2022-11-24 11:59:04 and NOTE: 2022-11-24 11:22:34 for the logic → FIXME
         for v in call_arg_names + ("copy",):
             val = eval(v)
             if v in call_args:
@@ -1272,36 +1305,52 @@ class IrregularlySampledDataSignal(BaseSignal):
                 if k in ("dtype", "domain_dtype"):
                     dtypes[k] = v
 
-            elif isinstance(v, pq.Quantity):
-                if v.size == 1: # a scalar ; note signal is treated from the outset
-                    if k in ("units", "domain_units", "time_units"):
-                        quants[k] = v
-                    
-        if quants["units"] is None:
-            quants["units"] = pq.dimensionless
+        # deal with units specifications
+        
+        if not isinstance(quants["units"], pq.Quantity):
+            if isinstance(units, pq.Quantity):
+                quants["units"] = units if isinstance(units, pq.UnitQuantity) else units.units
+            else:    
+                quants["units"] = pq.dimensionless
             
-        if quants["domain_units"] is None:
-            if quants["time_units"] is None:
-                quants["domain_units"] = pq.dimensionless
+        else:
+            # units specified on the command line; check if they are compatible with
+            # what has been inferred from above
+            # in other words we DO NOT allow overriding the units inferred from the data
+            # but we do allow rescaling
+            # If this behaviour is not what you want then pass a non-quantity array as signal
+            if isinstance(units, pq.Quantity):
+                if not units_convertible(quants["units"], units):
+                    raise TypeError(f"Specified units {units} are incompatible with those inferred from the signal data {quants['units']}")
+                
+                
+        if not isinstance(quants["domain_units"], pq.Quantity):
+            if isinstance(domain_units, pq.Quantity):
+                quants["domain_units"] = domain_units if isinstance(domain_units.pq.UnitQuantity) else domain_units.units
+                
             else:
-                quants["domain_units"] = quants["time_units"]
-            
+                quants["domain_units"] = pq.dimensionless
+                
+        else:
+            if isinstance(domain_units, pq.Quantity):
+                if not units_convertible(quants["domain_units"], domain_units):
+                    raise TypeError(f"Specified domain units {domain_units} are incompatible with those inferred from the domain data {quants['domain_units']}")
+
+        # now,, rescale signal data if supplied as quantity(ies)
         if isinstance(signal, pq.Quantity):
             if signal.units != quants["units"]:
                 signal = signal.rescale(quants["units"])
                 
+        elif isinstance(signal, typing.Sequence) and all(isinstance(v, pq.Quantity) for v in signal):
+            signal = signal.__class__([v.rescale(quants["units"]) if v.units != quants["units"] else v for v in signal])
+                
         if isinstance(domain, pq.Quantity):
             if domain.units != quants["domain_units"]:
                 domain = domain.rescale(quants["domain_units"])
-                            
-#         if units is None:
-#             if not hasattr(signal, "units"):
-#                 units = pq.dimensionless
-#                 
-#         elif isinstance(signal, pq.Quantity):
-#             if units != signal.units:
-#                 signal = signal.rescale(units)
                 
+        elif isinstance(domain, typing.Sequence) and all(isinstance(v, pq.Quantity) for v in domain):
+            domain = domain.__class__([v.rescale(quants["domain_units"]) if v.units != quants["domain_units"] else v for v in domain])
+                            
         obj = pq.Quantity(signal, 
                           units=quants["units"], 
                           dtype=dtypes["dtype"], 
@@ -1589,7 +1638,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             
         elif isinstance(other, pq.Quantity):
             if other.size == 1:
-                if not scq.units_convertible(other.units, self.units):
+                if not units_convertible(other.units, self.units):
                     ret = np.full_like(self, False)
                 else:
                     ret = self.magnitude == (other.rescale(self.units)).magnitude
@@ -1603,7 +1652,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                 if other.shape != self.shape:
                     return False
                 
-                if not scq.units_convertible(other.units, self.units):
+                if not units_convertible(other.units, self.units):
                     ret = np.full_like(self, False)
                 else:
                     ret = self.magnitude == (other.rescale(self.units)).magnitude1
