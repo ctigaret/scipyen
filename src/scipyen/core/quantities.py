@@ -722,11 +722,18 @@ def name_from_unit(u, as_key:bool=False):
             else:
                 d_name = unitQuantity.name
                 
+                # print(f"d_name = {d_name}")
+                
                 derdims = unique([(u._reference.dimensionality, tuple(v)) for u, v in DERIVED.items()], 
                                 key = lambda x: x[1])
                 
+                # print(f"derdims = {derdims}")
+                
                 indices = index_of([d[0] for d in derdims], u._reference.dimensionality, 
                                 multiple=True, comparator = operator.eq)
+                
+                # print(f"indices = {indices}")
+                
                 
                 if isinstance(indices, list) and len(indices):
                     physQuants = unique(reduce(lambda x, y: x + y, (derdims[k][1] for k in indices)))
