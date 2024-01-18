@@ -145,7 +145,7 @@ import traceback, datetime, numbers, inspect, warnings, typing, types
 from collections import deque
 import collections.abc
 import operator
-from itertools import chain, filterfalse
+from itertools import (chain, filterfalse, pairwise)
 from functools import (partial, reduce, singledispatch)
 from copy import (copy, deepcopy)
 from enum import (Enum, IntEnum,)
@@ -692,6 +692,196 @@ def invert_time_ranges(time_ranges):
         i += 1
         
     return new_ranges
+
+def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nanmean,
+                           name:typing.Optional[str] = None) -> typing.Union[IrregularlySampledDataSignal, neo.IrregularlySampledSignal]:
+    """Fusion of irregularly sampled (data) signals.
+    
+    Given a sequence of irregularly sampled signals with compatible domains and 
+    signal units, the function returns a new irregularly sampled signal of the 
+    same class as the first signal in the `args` sequence, such that:
+    • the `times` attribute is a sorted combination of all the values in the
+        `times` attribute in individual signbals in the sequence in `args`
+    • to each domain point in `times`, the data value in the returned signal is 
+        either:
+        ∘ an accumulated result of the values of individual signals at that domain
+        value with np.nan in standing for missing values in signals where this
+        domain point is absent (calculated with the function given in the `func` 
+        parameter — by default, np.nanmean)
+        ∘ an 1D array of the values of individual signals at that domain value,
+        when `func` is None
+    
+    Examples:
+    
+    consider the following four signals in the sequence `sigs`:
+    
+    'domain -> value',          'domain -> value',          'domain -> value',          'domain -> value'
+    -----------------------------------------------------------------------------------------------------
+    -100.0 pA -> [nan] s        -100.0 pA -> [nan] s        -50.0 pA -> [nan] s         -50.0 pA -> [nan] s
+     100.0 pA -> [nan] s        100.0 pA -> [nan] s         0.0 pA -> [nan] s           0.0 pA -> [nan] s
+     300.0 pA -> [0.0935] s     300.0 pA -> [0.1093] s      50.0 pA -> [nan] s          50.0 pA -> [nan] s
+     500.0 pA -> [0.0863] s     500.0 pA -> [0.0882] s      100.0 pA -> [nan] s         100.0 pA -> [nan] s
+     700.0 pA -> [0.0847] s     700.0 pA -> [0.0848] s      150.0 pA -> [nan] s         150.0 pA -> [0.1145] s
+     900.0 pA -> [0.084] s      900.0 pA -> [0.0839] s      200.0 pA -> [0.1324] s      200.0 pA -> [0.1002] s
+     1100.0 pA -> [0.0813] s    1100.0 pA -> [0.0828] s     250.0 pA -> [0.1055] s      250.0 pA -> [0.0963] s
+                                                            300.0 pA -> [0.0981] s      300.0 pA -> [0.0925] s
+                                                            350.0 pA -> [0.0951] s      350.0 pA -> [0.091] s
+                                                            400.0 pA -> [0.0936] s      400.0 pA -> [0.0892] s
+                                                            450.0 pA -> [0.0933] s      450.0 pA -> [0.087] s
+                                                            500.0 pA -> [0.0924] s      500.0 pA -> [0.0851] s
+                                                            550.0 pA -> [0.0894] s      550.0 pA -> [0.0854] s
+                                                            600.0 pA -> [0.087] s       600.0 pA -> [0.085] s
+
+    Calling 
+    
+    fuse_irregular_signals(*sigs) returns:
+    
+    'domain -> value'
+    -----------------
+    -100.0 pA -> [nan] s
+    -50.0 pA -> [nan] s
+    0.0 pA -> [nan] s
+    50.0 pA -> [nan] s
+    100.0 pA -> [nan] s
+    150.0 pA -> [0.1145] s
+    200.0 pA -> [0.1163] s
+    250.0 pA -> [0.1009] s
+    300.0 pA -> [0.0983] s
+    350.0 pA -> [0.093] s
+    400.0 pA -> [0.0914] s
+    450.0 pA -> [0.0901] s
+    500.0 pA -> [0.088] s
+    550.0 pA -> [0.0874] s
+    600.0 pA -> [0.086] s
+    700.0 pA -> [0.0848] s
+    900.0 pA -> [0.0839] s
+    1100.0 pA -> [0.0821] s
+   
+    whereas calling fuse_irregular_signals(*sigs, func=None) returns:
+        
+    -100.0 pA -> [nan nan nan nan] s
+    -50.0 pA -> [nan nan nan nan] s
+    0.0 pA -> [nan nan nan nan] s
+    50.0 pA -> [nan nan nan nan] s
+    100.0 pA -> [nan nan nan nan] s
+    150.0 pA -> [   nan 0.1145    nan    nan] s
+    200.0 pA -> [0.1324 0.1002    nan    nan] s
+    250.0 pA -> [0.1055 0.0963    nan    nan] s
+    300.0 pA -> [0.0935 0.1093 0.0981 0.0925] s
+    350.0 pA -> [0.0951 0.091     nan    nan] s
+    400.0 pA -> [0.0936 0.0892    nan    nan] s
+    450.0 pA -> [0.0933 0.087     nan    nan] s
+    500.0 pA -> [0.0863 0.0882 0.0924 0.0851] s
+    550.0 pA -> [0.0894 0.0854    nan    nan] s
+    600.0 pA -> [0.087 0.085   nan   nan] s
+    700.0 pA -> [0.0847 0.0848    nan    nan] s
+    900.0 pA -> [0.084  0.0839    nan    nan] s
+    1100.0 pA -> [0.0813 0.0828    nan    nan] s
+    
+    Var-positional parameters:
+    --------------------------
+    A sequence of single-channel IrregularlySampledDataSignal or neo.IrregularlySampledSignal
+        objects
+    
+    Named parameters:
+    -----------------
+    func: callable — an accumulator function taking a 1D numpy array and returning
+        a scalar (e.g. np.mean, np.nanmean¹, etc), or None
+        Optional, default is np.nanmean
+    
+    name: str — the name of the returned signal; optional; default is "Fused signal"
+    
+    Returns:
+    --------
+    
+    • when `func` is a callable, returns an irregular signal with accumulated 
+        values at domains taken from all signals in args (see first example)
+    
+    • when `func` is None, return an irregular signal with all values at a given
+        domain as row vectors
+    
+    • when args is empty returns None
+    
+    • when args contains a single signal, returns this signal.
+
+"""
+    if len(args) == 0:
+        return
+    
+    assert(all(isinstance(v, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)) for v in args)), "Expecting only neo.IrregularlySampledSignal or IrregularlySampledDataSignal objects"
+    
+    if len(args) == 1:
+        return args[0]
+    
+    assert(all(lambda x: scq.units_convertible(x[0].times.units, x[1].times.units) for x in pairwise(args))), "Signals must have domains with compatible units"
+
+    assert(all(lambda x: scq.units_convertible(x[0].units, x[1].units) for x in pairwise(args))), "Signals must have compatible units"
+    
+    assert(all(lambda x: x[0].ndim == x[1].ndim for x in pairwise(args))), "Signals must have the same dimensions (i.e., number of axes)"
+    
+    assert(all(x.shape[1] == 1 for x in args)), "Only 1D (i.e. single-channel) signals are supported"
+
+    domain_units = args[0].times.units
+    signal_units = args[0].units
+
+    comb = list(zip(args[0].times, args[0]))
+    
+    tt = args[0].times.copy()
+
+    # print(f"tt = {tt}")
+    
+    for b in args[1:]:
+        ll = list(zip(b.times, b))
+        
+        for k, v in ll:
+            if k in tt:
+                ndx = list(tt).index(k)
+                # print(f"appending {v} at {ndx}")
+                val = np.append(comb[ndx][1], v) * signal_units
+                # print(f"val shape = {val.shape}")
+                comb[ndx] = (comb[ndx][0], val)
+                
+            else:
+                ndx = int(np.searchsorted(tt, k))
+                # print(f"inserting {v} at {ndx}")
+                tt = np.insert(tt, ndx, k) * domain_units
+                comb.insert(ndx, (k, v))
+            
+    if isinstance(func, typing.Callable):
+        for k, v in enumerate(comb):
+            nanv = np.isnan(v[1])
+            if np.all(nanv):
+                v_ = np.nan
+            elif np.any(nanv):
+                v_ = func(v[1][~nanv])
+            else:
+                v_ = func(v[1])
+                
+            # comb[k] = (v[0], func(v[1]))
+            comb[k] = (v[0], v_)
+            
+    else:
+        maxLen = np.max([v[1].size for v in comb])
+        # print(f"maxLen = {maxLen}")
+        for k, v in enumerate(comb):
+            val = v[1]
+            if val.size < maxLen:
+                v_ = np.full((maxLen,), fill_value = np.nan)
+                v_[:val.shape[0]] = val
+                comb[k] = (v[0], v_)
+                
+        
+    domain, values = zip(*comb)
+    
+    dd = np.array(domain) * domain_units
+    vv = np.array(values) * signal_units
+    
+    if name is None or (isinstance(name, str) and len(name.strip()) == 0):
+        name = "Fused signal"
+    
+    
+    return args[0].__class__(dd, vv, units = signal_units, time_units = domain_units, name=name)
+    
     
 # def get_member_collections(container:typing.Union[type, neo.core.container.Container], 
 #                            membertype:typing.Union[type, tuple, list]):
