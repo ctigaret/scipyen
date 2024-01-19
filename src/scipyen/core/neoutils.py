@@ -732,9 +732,38 @@ def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nan
                                                             550.0 pA -> [0.0894] s      550.0 pA -> [0.0854] s
                                                             600.0 pA -> [0.087] s       600.0 pA -> [0.085] s
 
-    Calling 
+    Examples:
+
+    1. Calling fuse_irregular_signals(*sigs, func=None) returns:
+        
+    -100.0 pA -> [nan nan nan nan] s
+    -50.0 pA -> [nan nan nan nan] s
+    0.0 pA -> [nan nan nan nan] s
+    50.0 pA -> [nan nan nan nan] s
+    100.0 pA -> [nan nan nan nan] s
+    150.0 pA -> [   nan 0.1145    nan    nan] s
+    200.0 pA -> [0.1324 0.1002    nan    nan] s
+    250.0 pA -> [0.1055 0.0963    nan    nan] s
+    300.0 pA -> [0.0935 0.1093 0.0981 0.0925] s
+    350.0 pA -> [0.0951 0.091     nan    nan] s
+    400.0 pA -> [0.0936 0.0892    nan    nan] s
+    450.0 pA -> [0.0933 0.087     nan    nan] s
+    500.0 pA -> [0.0863 0.0882 0.0924 0.0851] s
+    550.0 pA -> [0.0894 0.0854    nan    nan] s
+    600.0 pA -> [0.087 0.085   nan   nan] s
+    700.0 pA -> [0.0847 0.0848    nan    nan] s
+    900.0 pA -> [0.084  0.0839    nan    nan] s
+    1100.0 pA -> [0.0813 0.0828    nan    nan] s
     
-    fuse_irregular_signals(*sigs) returns:
+    i.e., each data point in the new domain associates an array of values
+    taken from the source signals at that domain data point (or NaN if that data 
+    point does not exist in the source signal)
+    
+    This creates a multi-channel IrregularlySampledDataSignal, however with the 
+    number of channels NOT NECESSARILYL equal to the number of source signals.
+    
+    2. Calling fuse_irregular_signals(*sigs) with `func` being the default
+    (np.nammean) returns:
     
     'domain -> value'
     -----------------
@@ -756,28 +785,10 @@ def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nan
     700.0 pA -> [0.0848] s
     900.0 pA -> [0.0839] s
     1100.0 pA -> [0.0821] s
-   
-    whereas calling fuse_irregular_signals(*sigs, func=None) returns:
-        
-    -100.0 pA -> [nan nan nan nan] s
-    -50.0 pA -> [nan nan nan nan] s
-    0.0 pA -> [nan nan nan nan] s
-    50.0 pA -> [nan nan nan nan] s
-    100.0 pA -> [nan nan nan nan] s
-    150.0 pA -> [   nan 0.1145    nan    nan] s
-    200.0 pA -> [0.1324 0.1002    nan    nan] s
-    250.0 pA -> [0.1055 0.0963    nan    nan] s
-    300.0 pA -> [0.0935 0.1093 0.0981 0.0925] s
-    350.0 pA -> [0.0951 0.091     nan    nan] s
-    400.0 pA -> [0.0936 0.0892    nan    nan] s
-    450.0 pA -> [0.0933 0.087     nan    nan] s
-    500.0 pA -> [0.0863 0.0882 0.0924 0.0851] s
-    550.0 pA -> [0.0894 0.0854    nan    nan] s
-    600.0 pA -> [0.087 0.085   nan   nan] s
-    700.0 pA -> [0.0847 0.0848    nan    nan] s
-    900.0 pA -> [0.084  0.0839    nan    nan] s
-    1100.0 pA -> [0.0813 0.0828    nan    nan] s
     
+    where the values in the right column are the result of np.nanmean over each
+         array in the right column of in Example 1
+   
     Var-positional parameters:
     --------------------------
     A sequence of single-channel IrregularlySampledDataSignal or neo.IrregularlySampledSignal
@@ -786,7 +797,8 @@ def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nan
     Named parameters:
     -----------------
     func: callable — an accumulator function taking a 1D numpy array and returning
-        a scalar (e.g. np.mean, np.nanmean¹, etc), or None
+        a scalar (e.g. np.mean, np.nanmean¹, etc), or None.
+    
         Optional, default is np.nanmean
     
     name: str — the name of the returned signal; optional; default is "Fused signal"
@@ -794,11 +806,13 @@ def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nan
     Returns:
     --------
     
-    • when `func` is a callable, returns an irregular signal with accumulated 
-        values at domains taken from all signals in args (see first example)
-    
     • when `func` is None, return an irregular signal with all values at a given
-        domain as row vectors
+        domain as row vectors (see Example 1 above) i.e. a possibly multi-channel 
+        signal. NOTE: The number of channels is <= number of source signals in 
+        `args`.
+    
+    • when `func` is a callable, returns an irregular signal with accumulated 
+        values at domains taken from all signals in args (see Example 2 above)
     
     • when args is empty returns None
     
@@ -828,22 +842,17 @@ def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nan
     
     tt = args[0].times.copy()
 
-    # print(f"tt = {tt}")
-    
     for b in args[1:]:
         ll = list(zip(b.times, b))
         
         for k, v in ll:
             if k in tt:
                 ndx = list(tt).index(k)
-                # print(f"appending {v} at {ndx}")
                 val = np.append(comb[ndx][1], v) * signal_units
-                # print(f"val shape = {val.shape}")
                 comb[ndx] = (comb[ndx][0], val)
                 
             else:
                 ndx = int(np.searchsorted(tt, k))
-                # print(f"inserting {v} at {ndx}")
                 tt = np.insert(tt, ndx, k) * domain_units
                 comb.insert(ndx, (k, v))
             
@@ -857,12 +866,10 @@ def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nan
             else:
                 v_ = func(v[1])
                 
-            # comb[k] = (v[0], func(v[1]))
             comb[k] = (v[0], v_)
             
     else:
         maxLen = np.max([v[1].size for v in comb])
-        # print(f"maxLen = {maxLen}")
         for k, v in enumerate(comb):
             val = v[1]
             if val.size < maxLen:

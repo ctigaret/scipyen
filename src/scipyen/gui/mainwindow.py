@@ -6944,25 +6944,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_runPythonSource(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
-
-            # worker = pgui.ProgressWorkerRunnable(self._run_python_source_code_, None, self._temp_python_filename_, {'paste': False})
-
-            # self.threadpool.start(worker)
-
-            self._run_python_source_code_(
-                self._temp_python_filename_, paste=False)
+            self._run_python_source_code_(self._temp_python_filename_, 
+                                          paste=False)
 
             if self._temp_python_filename_ not in self.recentScripts:
                 self.recentScripts.insert(0, self._temp_python_filename_)
-                # self.recentScripts.appendleft(self._temp_python_filename_)
                 self._refreshRecentScriptsMenu_()
 
             else:
                 if self._temp_python_filename_ != self.recentScripts[0]:
                     self.recentScripts.remove(self._temp_python_filename_)
                     self.recentScripts.insert(0, self._temp_python_filename_)
-                    # self.recentScripts.appendleft(self._temp_python_filename_)
-                    # self._refreshRecentScriptsMenu_()
 
             self._temp_python_filename_ = None
 
@@ -6987,6 +6979,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 try:
                     self.workspaceModel.preExecute()
+                    self.console.centralWidget().clear_last_input()
                     self.console.centralWidget()._flush_pending_stream()
                     self.console.execute(cmd, hidden=True, interactive=True)
                     self.workspaceModel.postRunCell(Bunch(success=True))

@@ -337,13 +337,29 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self._pending_text_flush_interval.setInterval(max(100,
                                                  int(time.time()-t)*1000)) # see NOTE: 2022-03-14 21:47:39 CMT
 
+    def clear_last_input(self):
+        """Clears the current block of input NOT executed.
+        Removes the last input block which has not been sent for execution.
+        Useful to remove any commands typed at the console, but not yet executed,
+        when an independent execution request is made (e.g. during launch of a script
+        from Scipyen's script manager).
+        Without this, the input line would still show the input text giving the 
+        false impresison that the text had been executed (run)
+        """
+        cursor = self._control.textCursor()
+        cursor.beginEditBlock()
+        cursor.movePosition(QtGui.QTextCursor.StartOfLine,
+                            QtGui.QTextCursor.MoveAnchor)
+        cursor.movePosition(QtGui.QTextCursor.EndOfBlock,
+                            QtGui.QTextCursor.KeepAnchor)
+        cursor.insertText('')
+        cursor.endEditBlock()
+        
+    
     @safeWrapper
     @pyqtSlot()
     def slot_clearConsole(self):
         self.clear()
-        # self.flush_clearoutput()
-        # self._show_interpreter_prompt()
-        #self.ipkernel.shell.run_line_magic("clear", "", 2)
         
     @safeWrapper
     @pyqtSlot()
