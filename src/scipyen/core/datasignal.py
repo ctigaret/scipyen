@@ -437,30 +437,34 @@ class DataSignal(BaseSignal):
     
     def __getitem__(self, i):
         obj = super(DataSignal, self).__getitem__(i)
+        
         if isinstance(i, (int, numbers.Integral, np.integer)): # a single point across all "channels"
             obj = pq.Quantity(obj.magnitude, units = obj.units)
             
         elif isinstance(i, tuple):
-            j, k = i
-            
-            if isinstance(j, (int, numbers.Integral, np.integer)): # => quantity array
-                obj = pq.Quantity(obj.magnitude, units=obj.units)
-                
-            elif isinstance(j, slice):
-                if j.start:
-                    obj.origin = (self.origin + j.start * self.sampling_period)
-                    
-                if j.step:
-                    obj.sampling_period *= j.step
-                        
-            elif isinstance(j, np.ndarray): # FIXME TODO
-                raise NotImplementedError("%s not suported" % (type(j).__name__))
-            
+            if len(i) == 1 and isinstance(i[0], np.ndarray): # advanced indexing
+                obj = pq.Quantity(obj.magnitude, units = obj.units)
             else:
-                raise TypeError("%s not suported" % (type(j).__name__))
-            
-            if isinstance(k, (int, numbers.Integral, np.integer)):
-                obj = obj.reshape(-1,1)
+                j, k = i
+                
+                if isinstance(j, (int, numbers.Integral, np.integer)): # => quantity array
+                    obj = pq.Quantity(obj.magnitude, units=obj.units)
+                    
+                elif isinstance(j, slice):
+                    if j.start:
+                        obj.origin = (self.origin + j.start * self.sampling_period)
+                        
+                    if j.step:
+                        obj.sampling_period *= j.step
+                            
+                # elif isinstance(j, np.ndarray): # FIXME TODO
+                #     raise NotImplementedError("%s not suported" % (type(j).__name__))
+                
+                else:
+                    raise TypeError("%s not suported" % (type(j).__name__))
+                
+                if isinstance(k, (int, numbers.Integral, np.integer)):
+                    obj = obj.reshape(-1,1)
                 
             # TODO channel index functionality: see neo/core/analogsignal.py
             
@@ -1326,7 +1330,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                 
         if not isinstance(quants["domain_units"], pq.Quantity):
             if isinstance(domain_units, pq.Quantity):
-                quants["domain_units"] = domain_units if isinstance(domain_units.pq.UnitQuantity) else domain_units.units
+                quants["domain_units"] = domain_units if isinstance(domain_units, pq.UnitQuantity) else domain_units.units
                 
             else:
                 quants["domain_units"] = pq.dimensionless
@@ -1577,30 +1581,39 @@ class IrregularlySampledDataSignal(BaseSignal):
             obj = pq.Quantity(obj.magnitude, units=obj.units)
             
         elif isinstance(i, tuple):
-            j, k = i
-            
-            if isinstance(j, (int, np.integer)):  # a single point in time across some channels
-                obj = pq.Quantity(obj.magnitude, units=obj.units)
+            if len(i) == 1 and isinstance(i[0], np.ndarray): # advanced indexing
+                obj = pq.Quantity(obj.magnitude, units = obj.units)
+                obj._domain_ = self.times.__getitem__((i[0][:,0],))
+            else:        
+                j, k = i
                 
-            else:
-                if isinstance(j, slice):
-                    obj._domain = self._domain.__getitem__(j)
+                if isinstance(j, (int, np.integer)):  # a single point in time across some channels
+                    obj = pq.Quantity(obj.magnitude, units=obj.units)
                     
-                elif isinstance(j, np.ndarray):
-                    # FIXME / TODO
-                    raise NotImplementedError("Arrays not yet supported")
-                
                 else:
-                    raise TypeError("%s not supported" % type(j))
-                
-                if isinstance(k, (int, np.integer)):
-                    obj = obj.reshape(-1, 1)
-                    # add if channel_index
+                    if isinstance(j, slice):
+                        obj._domain = self._domain.__getitem__(j)
+                        
+                    elif isinstance(j, np.ndarray):
+                        # FIXME / TODO
+                        raise NotImplementedError("Arrays not yet supported")
+                    
+                    else:
+                        raise TypeError("%s not supported" % type(j))
+                    
+                    if isinstance(k, (int, np.integer)):
+                        obj = obj.reshape(-1, 1)
+                        # add if channel_index
+
         elif isinstance(i, slice):
             obj._domain = self.times.__getitem__(i)
             
+        elif isinstance(i, np.ndarray):
+            obj._domain_ = self.times.__getitem__(i)
+            
         else:
             raise IndexError("index should be an integer, tuple or slice")
+        
         return obj
 
     def __setitem__(self, i, value):
