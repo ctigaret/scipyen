@@ -4319,8 +4319,15 @@ def truncate_to_10_power(x):
         if isinstance(x, pq.Quantity):
             u = x.units
             x = x.magnitude
+            
+        absx = np.abs(x)
         
-        pw10 = 10**np.trunc(np.log10(np.abs(x)))
+        x_ = absx >= 10.
+        
+        pw10 = np.full(x.shape, fill_value = 1.)
+        
+        pw10[x_,] = 10. ** np.trunc(np.log10(absx[x_,]))
+        # pw10 = 10**np.trunc(np.log10(np.abs(x)))
         
         ret = np.trunc(x/pw10) * pw10
         
@@ -4330,7 +4337,7 @@ def truncate_to_10_power(x):
         return ret
     
     elif isinstance(x, (float, int)):
-        pw10 = 10**math.trunc(math.log(math.abs(x),10))
+        pw10 = 1. if abs(x) < 10. else 10. ** math.trunc(math.log(abs(x), 10.))
         return math.trunc(x/pw10) * pw10
         
             
