@@ -425,6 +425,30 @@ class QRNameValidator(QtGui.QValidator):
     def fixup(self, value:str) -> str:
         return str2R(value)
         
+
+def make_ordinal(n):
+    '''
+    Convert an integer into its ordinal representation::
+
+        make_ordinal(0)   => '0th'
+        make_ordinal(3)   => '3rd'
+        make_ordinal(122) => '122nd'
+        make_ordinal(213) => '213th'
+
+    (Florian Brucker, StackOverflow:
+    https://stackoverflow.com/questions/9647202/ordinal-numbers-replacement,
+
+    modifed by me to use superscript unicode characters)
+    '''
+    n = int(n)
+    if 11 <= (n % 100) <= 13:
+        suffix = 'ᵗʰ'
+        # suffix = 'th'
+    else:
+        suffix = ['ᵗʰ', 'ˢᵗ', 'ⁿᵈ', 'ʳᵈ', 'ᵗʰ'][min(n % 10, 4)]
+        # suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
+    return str(n) + suffix
+
 def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, list]], 
                 precision:int=5, format:str="g", show_units=False) -> str:
     """Generates a string representation of numeric data in base 10.
