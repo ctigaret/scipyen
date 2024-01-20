@@ -7,6 +7,7 @@ import warnings
 import os, pickle
 import collections
 import itertools
+import functools
 import math
 from copy import deepcopy
 from dataclasses import (dataclass, asdict, MISSING)
@@ -6494,7 +6495,9 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                                                                    name="AP count")
         
         # NOTE: 2024-01-19 13:29:54
-        # DEPRECATED / OBSOLETE
+        # DEPRECATED / OBSOLETE - the rheobase-latency analysis is now included
+        # in the 'annotations' attribute of ret["First_AP_latency"]
+        #
         # augument result with rheobase-latency analysis
         # ret["rheobase_analysis"] = None
         
@@ -6520,12 +6523,47 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 traceback.print_exc()
                 print(f"\n\n *** rheobase_latency using 'fitrheo# {fitrheo} encountered and Error (see above); check data or toggle 'fitrheo'")
             
+        # NOTE: 2024-01-20 09:28:36
+        # add AP_ISI_0_1_Frequency to ret (taken from AP analysis script)
+        AP_isi_0_1_freq = frequency_isi0(ret)
+        ret["AP_ISI_0_1_Frequency"] = AP_isi_0_1_freq
         return ret
     
     except Exception as e:
         print("In %s:" % name)
         traceback.print_exc()
-        
+ 
+def frequency_isi(results_dict: dict, isi_start: int = 0, isi_span: int = 1):
+    """Calculates ISI frequencies vs injected current in a series of depolarizing current injections.
+    NOTE: Current injections are truncated to powers of 10
+
+    Parameters:
+    ============
+
+    results_dict: dict; output from membrane.analyse_AP_step_injection_series
+
+    isi_start: int: index of the first AP in the AP train; must be >= 0
+
+    isi_span: int: number of ISI intervals from the first; see also ephys.isiFrequency
+
+    """
+
+    from core import utilities
+
+    calculate_isi = functools.partial(
+        ephys.isiFrequency, start=isi_start, span=isi_span, isISI=False)
+
+    dom, vals = zip(*[(d["AP_analysis"]["Injected_current"], calculate_isi(d["AP_analysis"]["AP_train"].times)) for d in results_dict["Current_injection_steps"]])
+
+    ret = IrregularlySampledDataSignal(dom, vals, name = "ISI0_Frequency")
+    return ret
+
+
+def frequency_isi0(results_dict: dict):
+    """Particular case of frequency_isi for first two APs.
+    """
+    return frequency_isi(results_dict, isi_start=0, isi_span=1)
+
     
 def plot_rheobase_latency(data, 
                           xstart:typing.Optional[typing.Union[float, str]]="auto", 

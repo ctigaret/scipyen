@@ -1898,7 +1898,11 @@ Returns a tuple (start, stop, test_amplitude)"""
     return start, stop, test_amplitude 
         
 
-def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], start:int = 0, span:int=1, isISI:bool=False):
+def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], 
+                 start:int = 0, 
+                 span:int=1, 
+                 isISI:bool=False,
+                 useNan:bool=True):
     """Calculates the reciprocal of an inter-event interval.
     
     This can be the time interval between any two events with indices "start" &
@@ -1919,13 +1923,17 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], s
         or time intervals (when True).
         
         Optional, default is False (i.e. data is taken as a sequence of time stamps)
+
+    useNan:bool, flag to return NaN Hz when data contains at most one event.
+            Optional, default is True; when False, returns 0 Hz for such condition.
         
     Returns:
     ========
     The frequency (reciprocal of the interval's duration) as a scalar Quantity 
     in pq.Hz.
     
-    If the data is empty or contains only one element, returns 0 Hz
+    If the data is empty or contains only one element, returns 0 Hz or nan Hz
+    depending on the `useNan` parameter
     
     Example:
     ===========
@@ -1952,10 +1960,18 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], s
     
     In: isifrequency(Inter_AP_intervals, 0, 2, True) # NOTE the third parameter
     Out: array(16.3441) * Hz
+
+    CHANGELOG:
+    2024-01-20 09:44:10
+        • returns NaN Hz when data has at most one event; this behavour can be 
+            reverted to the previous one (i.e. return 0 Hz when there is at most
+            one event) by passing `useNan` False
+        • added the `useNan` flag to change what is returned when data has at
+            most one event
     
     """
     if len(data) <= 1:
-        return 0*pq.Hz
+        return np.nan * pq.Hz if useNan else 0*pq.Hz
     
     if start < 0:
         raise ValueError(f"'start' must be >= 0; got {start} instead")
