@@ -352,6 +352,10 @@ class MembranePropertiesAnalysisParameters:
     
     ADP_window:pq.Quantity = dataclasses.field(default_factory = lambda: 6 * pq.ms)
     # window duration for afterspike ADP analysis
+    
+    def __repr__(self):
+        ret = [f"{self.__class__.__name__}:"] + [f"\t{a} → {getattr(self, a)}" for a in self.__match_args__]
+        return "\n".join(ret)
 
 
 # NOTE: 2023-06-12 16:09:45
@@ -1572,9 +1576,16 @@ def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100)
     
     yy = None
     
+    # NOTE: 2024-01-20 13:38:53
+    # avoid divide by zero warnings
+    #### BEGIN
+    Inzndx = I != 0.
+    i_ret = np.full_like(I, fill_value = np.nan)
+    #### END
     if fitrheo:
         ii = 1/ii
-        i_ret = 1/I
+        i_ret[Inzndx,] = 1/I[Inzndx,] # see NOTE: 2024-01-20 13:38:53
+        # i_ret = 1/I
         
         popt, pcov = optimize.curve_fit(models.Frank_Fuortes2,
                                         ltcy, 
@@ -1592,7 +1603,8 @@ def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100)
         
     else:
         ii = Irh/ii
-        i_ret = Irh/I
+        i_ret[Inzndx, ] = Irh/I[Inzndx,] # see NOTE: 2024-01-20 13:38:53
+        # i_ret = Irh/I 
         
         popt, pcov = optimize.curve_fit(models.Frank_Fuortes,
                                         ltcy,
@@ -1638,18 +1650,25 @@ def rheobase_latency(*args, **kwargs):
     Var-positional parameters:
     --------------------------
     
-    args: comma-separated sequence of python dictionaries as returned by 
-        analyse_AP_step_injection_series() function, each containing the 
-        following mandatory items:
+    args: sequence of either:
+        • python dictionaries as returned by analyse_AP_step_injection_series() 
+            function, each containing the following mandatory items:
         
-        "Injected_current" : a list with the values of injected current
-        
-        "First_AP_latency" : a list with the latencies to the first AP
+            "Injected_current" : a list with the values of injected current
+            
+            "First_AP_latency" : a list with the latencies to the first AP
+    
+        or
+        • IrregularlySampledDataSignal objects containing AP latency (in time 
+            units) vs current injection amplitude (the 'domain', in electrical 
+            current units)
         
     Var-keyword parameters:
     -----------------------
-    plot: boolean, or matplotlib figure object, default False:
-        When True, plots the fitted curve in the current matplotlib figure
+    plot: boolean, or matplotlib Figure object, default False:
+        When True, plots the fitted curve in the current matplotlib figure;
+        when a Figure, plothe fitted curve in the specified Figure (previous
+        Figure contents are cleared first).
         
     minsteps: int (default 3) minimum number or current injection steps to use
         
@@ -1677,7 +1696,9 @@ def rheobase_latency(*args, **kwargs):
     Returns:
     --------
     
-    A dictionary with the following fields:
+    An IrregularlySampledDataSignal with latency vs current injection, with
+    the 'annotations' attribute containing a 'rheobase_latency_analysis' ↦ dict
+    where the dict contains the following key ↦ value mapping:
     
         Irh : experimentally determined rheobase current
         
@@ -1747,6 +1768,12 @@ def rheobase_latency(*args, **kwargs):
             be directly plotted:
         
             I = 1/f(latency)
+    
+    Side effects:
+    ------------
+    
+    When `plot` is True or a matplotlib Figure, also plots the latency v current
+        injection curve and the fitted model.
     
     CHANGELOG:
     ---------
@@ -6680,7 +6707,7 @@ def plot_rheobase_latency(data,
         if not isinstance(fit, dict):
             raise ValueError("Latency vs current data has not been yet fitted")
         
-        assert(all(k in fit.keys() for k in ("x", "y", "parameters", "Irh"))), "Thsi does not seem to be a fitted latency v current data"
+        assert(all(k in fit.keys() for k in ("x", "y", "parameters", "Irh"))), "This does not seem to be a fitted latency v current data"
         
         fitrheo = rheolat.get("fitrheo", False)
         
@@ -6697,17 +6724,10 @@ def plot_rheobase_latency(data,
         raise TypeError(f"Wrong data type {type(data).__name__}")
         
     try:
-#         x = data["Latency"].magnitude
-#         y = data["I"].magnitude
-#         
         if all(isinstance(x, numbers.Number) for x in (xstart, xend)) and all([np.isinf(x) for x in (xstart, xend)]):
             ndx = ~np.isnan(fit["x"])
             x1 = fit["x"][ndx]
             y1 = fit["y"][ndx]
-            # ndx = ~np.isnan(data["fit"]["x"])
-            # x1 = data["fit"]["x"][ndx]
-            # y1 = data["fit"]["y"][ndx]
-            
             
         else:
             if xstart is None:
@@ -6728,7 +6748,6 @@ def plot_rheobase_latency(data,
             #print("xstart", xstart, "xend", xend)
             
             popt = fit["parameters"]
-            # popt = data["fit"]["parameters"]
             
             x1 = np.linspace(xstart, xend, 100)
             
@@ -6738,6 +6757,8 @@ def plot_rheobase_latency(data,
             else:
                 y1 = 1/models.Frank_Fuortes(x1, *popt)
         
+        Irh = fit["Irh"]
+        
         if isinstance(fig, mpl.figure.Figure):
             plt.figure(fig)
 
@@ -6745,9 +6766,7 @@ def plot_rheobase_latency(data,
         
         if not fitrheo:
             # y is fit of I/Irh
-            Irh = fit["Irh"].magnitude
-            # Irh = data["fit"]["Irh"].magnitude
-            plt.plot(x, y/Irh, "o", label="Strength vs Latency")
+            plt.plot(x, y/Irh.magnitude, "o", label="Strength vs Latency")
             plt.plot(x1,y1, label="Fitted Strength vs Latency")
             plt.ylabel(r"$\mathrm{\mathsf{I}} \/ / \/\mathrm{\mathsf{I_{rheo}}}$")
             
@@ -6756,11 +6775,12 @@ def plot_rheobase_latency(data,
             plt.plot(x, y, "o", label="Current vs Latency")
             plt.plot(x1,y1, label = "Fitted Current vs Latency")
             plt.ylabel(r"$\mathrm{\mathsf{I}\ (%s)}$" % y_units.dimensionality) 
-            # plt.ylabel(r"$\mathrm{\mathsf{I}\ (%s)}$" % data["I"].units.dimensionality) 
             
         plt.xlabel("Latency (%s)" % x_units.dimensionality)
-        # plt.xlabel("Latency (%s)" % data["Latency"].units.dimensionality)
         
+        lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
+        plt.title(f"{lbl} = {Irh[0]}")
+        # plt.title(f"{lbl} = {rad['Irh'][0]}")
         plt.legend()
             
     except Exception as e:

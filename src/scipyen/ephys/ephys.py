@@ -1768,6 +1768,7 @@ class DataListener(QtCore.QObject):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
         
 class Analysis(BaseScipyenData):
+    """TODO Finalize me !!!"""
     _data_attributes_ = (
         ("measurements", list, list()),     # list of time-varying measurements, by default is empty
                                             # e.g., EPSP amplitude(s), fEPSP slope(s), RS, Rin, DC
