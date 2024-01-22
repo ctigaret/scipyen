@@ -353,10 +353,21 @@ class MembranePropertiesAnalysisParameters:
     ADP_window:pq.Quantity = dataclasses.field(default_factory = lambda: 6 * pq.ms)
     # window duration for afterspike ADP analysis
     
+    # __changed__ = False
+    
     def __repr__(self):
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
+    
+#     def __setattr__(self, name, value):
+#         if hasattr(self, name):
+#             object.__setattr__(self, name, value)
+#             self.__changed__ = True
+#             
+#     @property
+#     def changed(self):
+#         return self.__changed__
 
 
 # NOTE: 2023-06-12 16:09:45
