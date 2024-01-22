@@ -354,7 +354,8 @@ class MembranePropertiesAnalysisParameters:
     # window duration for afterspike ADP analysis
     
     def __repr__(self):
-        ret = [f"{self.__class__.__name__}:"] + [f"\t{a} → {getattr(self, a)}" for a in self.__match_args__]
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
 
@@ -6595,7 +6596,8 @@ def frequency_isi0(results_dict: dict):
 def plot_rheobase_latency(data, 
                           xstart:typing.Optional[typing.Union[float, str]]="auto", 
                           xend:typing.Optional[typing.Union[float, str]]="auto",
-                          fig:typing.Optional[mpl.figure.Figure] = None):
+                          fig:typing.Optional[mpl.figure.Figure] = None,
+                          title_prefix:typing.Optional[str] = None):
     """Plots rheobase-latency curve determined from rheobase-latency analysis.
     
     Parameters:
@@ -6779,7 +6781,11 @@ def plot_rheobase_latency(data,
         plt.xlabel("Latency (%s)" % x_units.dimensionality)
         
         lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
-        plt.title(f"{lbl} = {Irh[0]}")
+        if title_prefix is None or (isinstance(title_prefix, str) and len(title_prefix.strip()) == 0):
+            title = f"{lbl} = {Irh[0]}"
+        else:
+            title = f"{title_prefix} {lbl} = {Irh[0]}"
+        plt.title(title)
         # plt.title(f"{lbl} = {rad['Irh'][0]}")
         plt.legend()
             
