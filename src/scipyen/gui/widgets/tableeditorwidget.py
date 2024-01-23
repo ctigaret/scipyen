@@ -971,6 +971,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
                                 domain_name = getattr(self._modelData_,"domain_name", None)
                                 domain = getattr(self._modelData_, "domain", None)
+                                if isinstance(self._modelData_, neo.IrregularlySampledSignal):
+                                    domain_name = "Time"
+                                    domain = self._modelData_.times
                                 if isinstance(domain_name, str) and isinstance(domain, pq.Quantity):
                                     dname = f"{domain_name} ({domain.dimensionality})" if len(domain_name.strip()) else "Sample index"
                                     return QtCore.QVariant(dname)
