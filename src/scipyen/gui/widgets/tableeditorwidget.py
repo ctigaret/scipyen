@@ -971,6 +971,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
                                 domain_name = getattr(self._modelData_,"domain_name", None)
                                 domain = getattr(self._modelData_, "domain", None)
+                                # NOTE: 2024-01-23 23:45:53
+                                # better do this:
                                 if isinstance(self._modelData_, neo.IrregularlySampledSignal):
                                     domain_name = "Time"
                                     domain = self._modelData_.times
