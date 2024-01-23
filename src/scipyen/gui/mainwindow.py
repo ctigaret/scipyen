@@ -5578,7 +5578,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             # self.currentDir = targetDir
             self.currentDirectory = targetDir
-            self.currentDirLabel.setText(targetDir)
+            # self.currentDirLabel.setText(targetDir)
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
             # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")

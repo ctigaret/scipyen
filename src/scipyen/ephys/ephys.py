@@ -1932,9 +1932,15 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
     ========
     The frequency (reciprocal of the interval's duration) as a scalar Quantity 
     in pq.Hz.
+
+    If the data is empty returns nan Hz, or 0. Hz when `useNan` parameter is False.
     
-    If the data is empty or contains only one element, returns 0 Hz or nan Hz
-    depending on the `useNan` parameter
+    If the data contains only element:
+        • if the element is a time stamp (`isISI` parameter is False), returns 
+        nan Hz, unless `useNan` parameter is False, in which case returns 0.
+        
+        • if the element if an interval (`isISI` parameter is Trtue), returns
+        the reciprocal of that interval.
     
     Example:
     ===========
@@ -1971,8 +1977,14 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
             most one event
     
     """
-    if len(data) <= 1:
+    if len(data) == 0:
         return np.nan * pq.Hz if useNan else 0*pq.Hz
+        
+    if len(data) == 1:
+        if isISI: # just one inter-spike interval is given
+            return 1/data[0]
+        else: # data is just one time stamp - cannot calculate - return NaN or 0 depending on useNan
+            return np.nan * pq.Hz if useNan else 0*pq.Hz
     
     if start < 0:
         raise ValueError(f"'start' must be >= 0; got {start} instead")
@@ -1986,10 +1998,10 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
     if start + span >= len(data):
         raise ValueError(f"'span' cannot be larger than {len(data)-start}; got {span} instead")
     
-    if isISI:
+    if isISI: # data has inter-spike intervals
         return (1/np.sum(data[start:(start+span)])).rescale(pq.Hz)
     
-    else:
+    else: # data is time stamps
         stamps = data[start:(start+span+1)]
         return (1/(stamps[-1]-stamps[start])).rescale(pq.Hz)
     
