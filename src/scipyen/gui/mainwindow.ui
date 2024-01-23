@@ -47,7 +47,7 @@
      <x>0</x>
      <y>0</y>
      <width>1159</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -711,7 +711,7 @@ NOTE: you can click anywhere in the row to select</string>
           <enum>QFrame::StyledPanel</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Sunken</enum>
+          <enum>QFrame::Plain</enum>
          </property>
          <property name="lineWidth">
           <number>0</number>
