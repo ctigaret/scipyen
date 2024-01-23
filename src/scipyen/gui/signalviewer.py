@@ -9786,6 +9786,10 @@ signals in the signal collection.
         n PlotItem to display signals
         1 PlotItem to display events (e.g. triggers, etc)
         1 PlotItem to display spiketrains
+    
+        The PlotItem objects are stacked vertically in a pg.GraphicsLayout, bound
+        to the instance attribute `signalsLayout`, and associated with a
+        pg.GraphicsLayoutWidget bound to the instance attribute `viewerWidget`.
         
         NOTE: neo.Epoch objects are displayed using Linear Region Items, in all 
             axes

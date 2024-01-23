@@ -631,6 +631,9 @@ NOTE: you can click anywhere in the row to select</string>
        <property name="editable">
         <bool>true</bool>
        </property>
+       <property name="sizeAdjustPolicy">
+        <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+       </property>
       </widget>
      </item>
      <item row="2" column="0">
@@ -698,7 +701,7 @@ NOTE: you can click anywhere in the row to select</string>
           <bool>true</bool>
          </attribute>
          <attribute name="headerStretchLastSection">
-          <bool>false</bool>
+          <bool>true</bool>
          </attribute>
         </widget>
        </item>
