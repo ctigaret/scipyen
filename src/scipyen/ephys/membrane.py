@@ -2647,7 +2647,7 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
     return ret
 
 def ap_waveform_roots(w, value, interpolate=False):
-    """ Times where value occurs on the rising and decaying phases of the waveform w
+    """Times where `value` occurs on the rising and decaying phases of the waveform w
     
     Parameters:
     -----------
@@ -2736,7 +2736,7 @@ def ap_waveform_roots(w, value, interpolate=False):
             y1 = float(w[first_index_ge_value + 1])
     
         
-        else: #get chord slope AROUND this point
+        else: # get chord slope AROUND this point
             x0 = float(w.times[first_index_ge_value - 1])
             y0 = float(w[first_index_ge_value - 1])
         
@@ -4255,9 +4255,9 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
                              rtol = 1e-5, 
                              atol = 1e-8, 
                              vm_thr=0):
-    """Detects AP waveform timings in an AP train elicited by a step of depolarizing current injection.
-    
-    Detection is done primarily via thresholding on the 1st derivative of the Vm signal
+    """Detects timings of AP waveforms in an AP train during depolarizing current injection.
+
+    Detection is done primarily via thresholding on the 1st derivative of the Vm signal.
     
     Parameters:
     ===========
@@ -7402,6 +7402,9 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     
     # print(f"analyse_AP_step_injection_sweep kwargs thr {kwargs['thr']}")
     # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
+    
+    # NOTE: 2024-01-23 15:16:43
+    # next line returns (neo.SpikeTrain, typing.List[neo.AnalogSignal])
     ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
     # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
     

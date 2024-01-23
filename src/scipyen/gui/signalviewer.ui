@@ -190,10 +190,10 @@
       <addaction name="addDynamicMultiAxisVCursorAction"/>
       <addaction name="addDynamicMultiAxisCCursorAction"/>
      </widget>
-     <addaction name="addMultiAxesCursorMenu"/>
      <addaction name="addVerticalCursorAction"/>
      <addaction name="addHorizontalCursorAction"/>
      <addaction name="addCrosshairCursorAction"/>
+     <addaction name="addMultiAxesCursorMenu"/>
      <addaction name="separator"/>
      <addaction name="addDynamicVerticalCursorAction"/>
      <addaction name="addDynamicHorizontalCursorAction"/>
