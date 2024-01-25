@@ -2887,7 +2887,9 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
                         ignore_annotations:bool=True, ignore_array_annotations:bool=True, 
                         set_domain_start:typing.Optional[float] = None, 
                         force_contiguous:bool=True, 
-                        padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False, overwrite:bool=False):
+                        padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False,
+                        overwrite:bool=False,
+                        name:typing.Optional[str] = None):
     """Concatenates regularly sampled signals.
     
     Implements the functionality of neo.AnalogSignal's merge() and concatenate()
@@ -3042,13 +3044,17 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
         
         if sum(len(x) for x in descr) > 0:
             kwargs["description"] = f"{actionStr}(" + ", ".join(descr) + ")"
+                                                  
+        if isinstance(name, str) and len(name.strip()):
+            kwargs["name"] = name
             
-        if sum(len(x) for x in names) > 0:
-            if len(names) > 3:
-                kwargs["name"] = f"{actionStr} {len(signals)} signals "
-            else:
-                collated = ", ".join(names)
-                kwargs["name"] = f"{actionStr}( {collated} )"
+        else:
+            if sum(len(x) for x in names) > 0:
+                if len(names) > 3:
+                    kwargs["name"] = f"{actionStr} {len(signals)} signals "
+                else:
+                    collated = ", ".join(names)
+                    kwargs["name"] = f"{actionStr}( {collated} )"
                                
         if sum(len(x) for x in files) > 0:
             kwargs["file_origin"] = f"{actionStr}(" + ", ".join(files) + ")"
