@@ -4406,6 +4406,11 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     
     return ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2
     
+# def collect_AP_roots(w: neo.AnalogSignal, wave_k: int, ref_values: typing.Sequence[pq.Quantity]):
+#     
+#     ap_roots = ap_waveform_roots(w, ref_value, )
+    
+    
     
 def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = None, min_fast_rise_duration = None, min_ap_isi = 6e-3*pq.s, rtol = 1e-5, atol = 1e-8, use_min_detected_isi=True,smooth_window = 5,interpolate_roots = False,decay_intercept_approx = "linear",decay_ref = "hm",get_duration_at_Vm=None,return_all = False, vm_thr=0, **kwargs):
     """Detects action potentials in a Vm signal.
@@ -5020,10 +5025,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
             else:
                 rise_0mV_x, rise_0mV_y, rise_0mV_slope, decay_0mV_x, decay_0mV_y, decay_0mV_slope = ap_waveform_roots(w, ap_Vm_onset_values[k])
                 
-            
-            #print("decay_onset_Vm_x", decay_onset_Vm_x)
-
             if decay_onset_Vm_x is np.nan:
+                print(f"detect_AP_waveforms_in_train: wave {k} decay_onset_Vm_x", decay_onset_Vm_x)
                 # waveform is likely on a rising baseline
                 # there are two alternative workarounds:
                 # (a) extrapolate a straight line from the point on half-max and 
