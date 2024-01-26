@@ -1338,6 +1338,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._console_docked_ = False
         self._script_manager_autolaunch = False
         self._auto_remove_viewers_ = False
+        self._wspace_headers_ = [k for k in standard_obj_summary_headers if k != "Icon"]
 
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
 
@@ -3480,8 +3481,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def slot_variableItemActivated(self, ndx):
         """Called by double-click of left mouse button on item in workspace
         """
+        # headers = [k for k in standard_obj_summary_headers if k != "Icon"]
         source_ns = self.workspaceModel.item(
-            ndx.row(), standard_obj_summary_headers.index("Workspace")).text()
+            ndx.row(), self._wspace_headers_.index("Workspace")).text()
 
         if source_ns != "Internal":  # avoid standard menu for data in remote kernels
             # TODO separate menu for variables in remote namespaces
@@ -3776,8 +3778,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             return
 
+        # internal_var_indices = [ndx for ndx in indexList
+        #                         if self.workspaceModel.item(ndx.row(), standard_obj_summary_headers.index("Workspace")).text() == "Internal"]
         internal_var_indices = [ndx for ndx in indexList
-                                if self.workspaceModel.item(ndx.row(), standard_obj_summary_headers.index("Workspace")).text() == "Internal"]
+                                if self.workspaceModel.item(ndx.row(), self._wspace_headers_.index("Workspace")).text() == "Internal"]
 
         external_var_indices = [
             ndx for ndx in indexList if ndx not in internal_var_indices]
@@ -3801,8 +3805,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if not selected.isEmpty():
             modelIndex = selected.indexes()[0]
 
-            source_ns = self.workspaceModel.item(
-                modelIndex.row(), standard_obj_summary_headers.index("Workspace")).text()
+            # source_ns = self.workspaceModel.item(
+            #     modelIndex.row(), standard_obj_summary_headers.index("Workspace")).text()
+            source_ns = self.workspaceModel.item(modelIndex.row(), self._wspace_headers_.index("Workspace")).text()
             if source_ns != "Internal":  # avoid standard menu for data in remote kernels
                 # TODO separate menu for variables in remote namespaces
                 return
@@ -4165,7 +4170,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(indexList) == 0:
             return
 
-        wscol = standard_obj_summary_headers.index("Workspace")
+        # wscol = standard_obj_summary_headers.index("Workspace")
+        wscol = self._wspace_headers_.index("Workspace")
 
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
             varnames = ["'%s'" % self.workspaceModel.item(i.row(), 0).text(
@@ -4194,7 +4200,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(indexList) == 0:
             return
 
-        wscol = standard_obj_summary_headers.index("Workspace")
+        # wscol = standard_obj_summary_headers.index("Workspace")
+        wscol = self._wspace_headers_.index("Workspace")
 
         varNames = list()
 
@@ -4407,69 +4414,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         gname, prefix = loadWindowSettings(
             self.qsettings, self, group_name=self.__class__.__name__)
 
-        # ### BEGIN TODO/FIXME/BUG 2022-12-26 22:46:12 (see TODO/FIXME/BUG 2022-12-26 22:44:59)
-#         self.qsettings.beginGroup("Custom_GUI_Handlers")
-#
-#         # NOTE: 2022-12-26 22:39:13 FIXME/BUG:
-#         # The plugins framework will OVERRIDE this.
-#         # TODO: While having the viewers 'automagically' set up by the plugin
-#         # framework is a very useful thing, there should be a way to enable
-#         # user-configuration of how to handle variable types to override the
-#         # handling inferred by the plugins framework.
-#         for viewerClass in VTH.gui_handlers.keys():
-#             pfx = viewerClass.__name__
-#
-#             if viewerClass not in VTH.default_handlers.keys():
-#                 action = self.qsettings.value("%s_action" % pfx, "View")
-#                 type_names_list = self.qsettings.value("%s_types" % pfx, ["type(None)"])
-#                 types = [eval(t_name) for t_name in type_names_list]
-#                 if len(types) == 0:
-#                     continue
-#                 VTH.register(viewerClass, types, actionName=action)
-#
-#         # FIXME: 2019-11-03 22:56:20 -- inconsistency
-#         # what if a viewer doesn't have any types defined?
-#         # by default it would be skipped from the auto-menus, but
-#         # if one uses VTH.register() then types must be defined!
-#         #for viewerGroup in self.qsettings.childGroups():
-#             #customViewer = [v for v in VTH.gui_handlers.keys() if v.__name__ == viewerGroup]
-#             #if len(customViewer):
-#                 #viewerClass = customViewer[0]
-#                 #self.qsettings.beginGroup(viewerGroup)
-#                 #if "action" in self.qsettings.childKeys():
-#                     #action = self.qsettings.value("action", "View")
-#
-#                 #if "types" in self.qsettings.childKeys():
-#                     #type_names_list = self.qsettings.value("types", ["type(None)"])
-#                     #types = [eval(t_name) for t_name in type_names_list]
-#
-#                 #if len(types) == 0: # see FIXME: 2019-11-03 22:56:20
-#                     #self.qsettings.endGroup()
-#                     #continue
-#
-#                 #VTH.register(viewerClass, types, actionName=action)
-#                 #self.qsettings.endGroup()
-#
-#         self.qsettings.endGroup()
-        # ### END TODO/FIXME/BUG 2022-12-26 22:46:12
-
     # @processtimefunc
     def _configureUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
         '''
-        
-        # get the location of the gui module
-#         import gui
-#         
-#         guipath = pathlib.Path(gui.__file__) # path to the gui module incl. the py source
-#         guidir = guipath.parent
-#         iconsdir = guidir / "resources" / "icons"
-#         
-#         themePaths = QtGui.QIcon.themeSearchPaths()
-#         themePaths.append(str(iconsdir))
-#         QtGui.QIcon.setThemeSearchPaths(themePaths)
-        
         self.setDockNestingEnabled(True)
 
         # NOTE: 2021-04-15 10:12:33 TODO
@@ -4657,20 +4606,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # BEGIN workspace view
         self.workspaceView.setShowGrid(False)
         self.workspaceView.setModel(self.workspaceModel)
-        self.workspaceView.selectionModel(
-        ).selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
+        self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
         # NOTE 2021-07-28 14:26:09
         # avoid editing by db-click
-        self.workspaceView.setEditTriggers(
-            QtWidgets.QAbstractItemView.EditKeyPressed)
-        self.workspaceView.activated[QtCore.QModelIndex].connect(
-            self.slot_variableItemActivated)
+        self.workspaceView.setEditTriggers(QtWidgets.QAbstractItemView.EditKeyPressed)
+        self.workspaceView.activated[QtCore.QModelIndex].connect(self.slot_variableItemActivated)
         # NOTE: 2021-07-28 14:41:38
         # taken care of by selectionChanged?
-        self.workspaceView.pressed[QtCore.QModelIndex].connect(
-            self.slot_variableItemPressed)
-        self.workspaceView.customContextMenuRequested[QtCore.QPoint].connect(
-            self.slot_workspaceViewContextMenuRequest)
+        self.workspaceView.pressed[QtCore.QModelIndex].connect(self.slot_variableItemPressed)
+        self.workspaceView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_workspaceViewContextMenuRequest)
 
         # NOTE: 2019-12-01 13:30:02
         # is seems that for Qt > 5.12 setSortingEnabled must be set to False so
@@ -4681,27 +4625,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceView.setSortingEnabled(False)
         self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.workspaceView.setSortingEnabled(True)
-        self.workspaceView.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeToContents)
+        self.workspaceView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.workspaceView.horizontalHeader().setStretchLastSection(False)
 
-        self.workspaceModel.itemChanged.connect(
-            self.slot_variableItemNameChanged)
+        self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         
-        self.workspaceModel.modelContentsChanged.connect(
-            self.slot_updateWorkspaceView)
+        self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
         # END workspace view
 
         # BEGIN command history view
         self.historyTreeWidget.setHeaderLabels(
             ["Session, line:", "Statement, Date & time:"])
         # self.historyTreeWidget.setHeaderLabels(["Session, line:", "Statement", "Start date & time","Stop date & time"])
-        self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(
-            self.slot_historyItemActivated)
-        self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(
-            self.slot_historyContextMenuRequest)
-        self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(
-            self.slot_historyItemSelected)
+        self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
+        self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
+        self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
 
         # END command history view
         self.setWindowTitle("Scipyen")
@@ -4709,8 +4647,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.newViewersMenu = QtWidgets.QMenu("New", self)
         self.newViewersMenu.setTearOffEnabled(True)
         self.newViewersMenu.setToolTipsVisible(True)
-        self.newViewersMenu.addAction(
-            "Figure", lambda: self.newViewer(mpl.figure.Figure))
+        self.newViewersMenu.addAction("Figure", lambda: self.newViewer(mpl.figure.Figure))
         self.menuViewers.addMenu(self.newViewersMenu)
 
         # add new viewers menu as toolbar action, too
@@ -6607,11 +6544,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                      if i.column() == 0]
         if len(indexList) == 0:
             return
-        wscol = standard_obj_summary_headers.index("Workspace")
-        varnames = [self.workspaceModel.item(i.row(), 0).text(
-        ) for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
-        ns = self.external_console.window.find_tab_title(
-            self.external_console.window.active_frontend)
+        # headers = [k for k in standard_obj_summary_headers if k != "Icon"]
+        wscol = self._wspace_headers_.index("Workspace")
+        varnames = [self.workspaceModel.item(i.row(), 0).text() for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
+        ns = self.external_console.window.find_tab_title(self.external_console.window.active_frontend)
         for varname in varnames:
             # print("_slot_copyToExternalWS: varname = %s , data = %s" % (varname, self.workspace[varname]))
             self.external_console.execute(cmd_copy_to_foreign(varname, self.workspace[varname]),
@@ -6632,12 +6568,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(indexList) == 0:
             return
 
-        wscol = standard_obj_summary_headers.index("Workspace")
+        # headers = [k for k in standard_obj_summary_headers if k != "Icon"]
+        wscol = self._wspace_headers_.index("Workspace")
 
         # deal with those that belong to an external workspace
         for ns in self.workspaceModel.foreign_namespaces:
-            varnames = [self.workspaceModel.item(i.row(), 0).text(
-            ) for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == ns]
+            varnames = [self.workspaceModel.item(i.row(), 0).text() for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == ns]
 
             if len(varnames):
                 self.external_console.execute(

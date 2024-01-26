@@ -73,7 +73,7 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Object Type","Data Type (DType)", 
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
-                                ]
+                                "Icon"]
 
 GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]
 """Generic index type, used with normalized_indexed and similar functions"""
@@ -2643,6 +2643,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     the Scipyen main window.
     
     """
+    import builtins
     from core.datatypes import (abbreviated_type_names, dict_types, dict_typenames,
                                 ndarray_type, neo_containernames, 
                                 sequence_types, sequence_typenames, 
@@ -2663,6 +2664,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #TODO construct handlers for other object types as well including 
         #PyQt5 objects (maybe)
             
+    icon = QtGui.QIcon.fromTheme("object")
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
     
@@ -2676,7 +2678,11 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     ttip = ".".join([typemodulename, typename])
     
     if isinstance(obj, QtWidgets.QMainWindow):
+        icon = QtGui.QIcon.fromTheme("window")
         ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
+        
+    # if typename == "module":
+    #     icon = QtGui.QIcon.fromTheme("class-or-package")
     
     wspace_name = "Namespace: %s" % namespace
     
@@ -2693,6 +2699,8 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #except:
             #ttip = typename
     
+    # icon = None
+    
     result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
     
     tt = abbreviated_type_names.get(typename, typename)
@@ -2703,9 +2711,17 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     if tt == "instance":
         tt = abbreviated_type_names.get(clsname, clsname)
+        icon = QtGui.QIcon.fromTheme("class")
+        
+    if tt == "function":
+        icon = QtGui.QIcon.fromTheme("code-function")
 
+    if tt == "module":
+        icon = QtGui.QIcon.fromTheme("class-or-package")
+        
     if objtype is type:
         tt += f" <{obj.__name__}>"
+        icon = QtGui.QIcon.fromTheme("datatype") if obj.__name__ in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
         
     ttip = tt
         
@@ -2779,6 +2795,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
 
     try:
         if isinstance(obj, type):
+            # icon = QtGui.QIcon.fromTheme("datatype")
             pass
         elif isinstance(obj, sequence_types):
             if len(obj) and all([isinstance(v, Number) for v in obj]):
@@ -2966,11 +2983,12 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         result["Axes"]          = {"display": axes,         "tooltip" : "%s%s" % (axestip, axes)}
         result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
+        result["Icon"]          = icon
         
         # NOTE: 2021-06-12 12:22:38
         # append namespace name to the tooltip at the entries other than Name, as well
         for key, value in result.items():
-            if key != "Name":
+            if key not in ("Name", "Icon"):
                 value["tooltip"] = "\n".join([value["tooltip"], wspace_name])
         
     except Exception as e:

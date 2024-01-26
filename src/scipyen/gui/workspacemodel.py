@@ -159,9 +159,12 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # CAUTION this is volatile, DO NOT USE it to retrieve current var name
         # e.g., for the purpose of renaming
         # self.originalVarName = "" # varname cache for individual row changes
-        self.setColumnCount(len(standard_obj_summary_headers))
-        self.setHorizontalHeaderLabels(
-            standard_obj_summary_headers)  # defined in core.utilities
+        self._wspace_headers_ = [k for k in standard_obj_summary_headers if k != "Icon"]
+        self.setColumnCount(len(self._wspace_headers_))
+        self.setHorizontalHeaderLabels(self._wspace_headers_)  # defined in core.utilities
+        
+        # self.setColumnCount(len(standard_obj_summary_headers))
+        # self.setHorizontalHeaderLabels(standard_obj_summary_headers)  # defined in core.utilities
 
         self.mpl_figure_close_callback = mpl_figure_close_callback
         self.mpl_figure_click_callback = mpl_figure_click_callback
@@ -1573,10 +1576,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         item.setWhatsThis(tooltip)
         
     def _generateModelItemForObject_(self, propdict: dict, 
+                                     icon: typing.Optional[QtGui.QIcon] = None,
                                      editable: typing.Optional[bool] = False, 
                                      elidetip: typing.Optional[bool] = False, 
                                      background: typing.Optional[QtGui.QBrush] = None, 
-                                     foreground: typing.Optional[QtGui.QBrush] = None):
+                                     foreground: typing.Optional[QtGui.QBrush] = None) -> QtGui.QStandardItem:
         # print(f"_generateModelItemForObject_ propdict = {propdict}")
         item = QtGui.QStandardItem(propdict["display"])
 
@@ -1600,30 +1604,35 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         if isinstance(foreground, QtGui.QBrush):
             item.setForeground(foreground)
-
+            
         return item
 
     @safeWrapper
     def generateRowContents(self, dataname: str, 
                             data: object, 
                             namespace: str = "Internal"):
-        # print("generateRowContents", dataname, data, namespace)
-        obj_props = summarize_object_properties(
-            dataname, data, namespace=namespace)
-        # print("generateRowContents obj_props", obj_props)
+        obj_props = summarize_object_properties(dataname, data, namespace=namespace)
         return self.genRowFromPropDict(obj_props)
 
     def genRowFromPropDict(self, obj_props: dict, 
                            background: typing.Optional[QtGui.QBrush] = None, 
-                           foreground: typing.Optional[QtGui.QBrush] = None):
+                           foreground: typing.Optional[QtGui.QBrush] = None) -> typing.List[QtGui.QStandardItem]:
         """Returns a row of QStandardItems
         """
         # print(f"genRowFromPropDict obj_props = {obj_props}")
-        return [self._generateModelItemForObject_(obj_props[key],
-                editable=(key == "Name"),
-                elidetip=(key == "Name"),
-                background=background,
-                foreground=foreground) for key in standard_obj_summary_headers]
+        # print(f"Object Type: {obj_props['Object Type']['display']}")
+        # headers = [k for k in standard_obj_summary_headers if k != "Icon"]
+        ret = [self._generateModelItemForObject_(obj_props[key],
+                                                  editable=(key == "Name"),
+                                                  elidetip=(key == "Name"),
+                                                  background=background,
+                                                  foreground=foreground) for key in self._wspace_headers_]
+        icon = obj_props.get("Icon", None)
+        if isinstance(icon, QtGui.QIcon):
+            # print(f"{self.__class__.__name__}.genRowFromPropDict icon = {icon.name()}")
+            ret[0].setData(icon, QtCore.Qt.DecorationRole)
+            
+        return ret
 
     def getRowContents(self, row, asStrings=True):
         '''
@@ -1780,6 +1789,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # row = items[0].index().row()
             # generate model view row contents for existing item
             v_row = self.generateRowContents(dataname, data)
+            # print(f"{self.__class__.__name__}.updateRowForVariable2: len(v_row) = {len(v_row)}")
             self.updateRow(row, v_row)
             
             # BUG: 2023-09-16 09:55:11
@@ -1807,7 +1817,22 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         originalRow = self.getRowContents(rowindex, asStrings=False)
         # print("updateRow originalRow as str", self.getRowContents(rowindex, asStrings=True))
         if originalRow is not None:
-            # for col in range(self.columnCount()):
+            # NOTE: 2024-01-26 10:04:48 update decoration data (icon)
+            original_item0_icon = self.item(rowindex, 0).data(QtCore.Qt.DecorationRole)
+            new_item0_icon = newrowdata[0].data(QtCore.Qt.DecorationRole)
+            
+            if isinstance(original_item0_icon, QtGui.QIcon):
+                if isinstance(new_item0_icon, QtGui.QIcon):
+                    if new_item0_icon != original_item0_icon:
+                        self.item(rowindex, 0).setData(new_item0_icon, QtCore.Qt.DecorationRole)
+                else:
+                    self.item(rowindex, 0).setData(None, QtCore.Qt.DecorationRole)
+                    
+            else:
+                if isinstance(new_item0_icon, QtGui.QIcon):
+                    self.item(rowindex, 0).setData(new_item0_icon, QtCore.Qt.DecorationRole)
+                
+            
             for col in range(1, self.columnCount()):
                 # NOTE: 2021-07-28 10:42:17
                 # ATTENTION this emits itemChanged signal thereby will trigger
