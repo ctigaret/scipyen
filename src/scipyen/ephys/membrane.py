@@ -2690,6 +2690,9 @@ def ap_waveform_roots(w, value, interpolate=False):
     
     # "ge" stands for >= i.e. "greater than or equal"
     
+    # NOTE: 2024-01-28 21:46:54
+    # find out where the waveform is ≥ value ⇒ 
+    # True (1) if y ≥ value else False (0), for all y in waveform
     flags_ge_value = w >= value
     
     if not np.any(flags_ge_value):
@@ -2699,6 +2702,12 @@ def ap_waveform_roots(w, value, interpolate=False):
         
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
     
+    # NOTE: 2024-01-28 21:48:38
+    # 1D diff sets:
+    # •  1 for transitions from 0 (False) to 1 (True)
+    # • -1 transitions from 1 (True) to 0 (False)
+    # •  0 everywhere else
+    #
     flags_ge_value_diff = np.ediff1d(np.asfarray(flags_ge_value), to_begin=0)
     
     #print("flags_ge_value_diff", flags_ge_value_diff)
@@ -4454,13 +4463,15 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
         rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_waveform_roots(w, ref_value)
         
         if rise_x is np.nan:
-            print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
+            warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
+            # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
             
         if isinstance(rise_x, (tuple, list, np.ndarray)):
             rise_x = rise_x[0]
 
         if decay_x is np.nan:
-            print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
+            warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
+            # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
 
         if isinstance(decay_x, (tuple, list, np.ndarray)):
             decay_x = decay_x[0]
