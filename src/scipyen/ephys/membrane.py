@@ -4410,41 +4410,61 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
 #     
 #     ap_roots = ap_waveform_roots(w, ref_value, )
     
-def get_AP_waveform_crossings(w:neo.AnalogSignal, ref_value:pq.Quantity,
+def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
+                              onset: pq.Quantity, onset_time: pq.Quantity,
+                              peak: pq.Quantity, peak_time: pq.Quantity.
                               **kwargs):
     wave_index = kwargs.get("wave_index", None)
     step_index = kwargs.get("step_index", None)
-    ref_name = kwargs.get("ref_name", None)
     
-    if isinstance(ref_value, numbers.Number):
-        ref_value *= w.units
+    result = dict()
+    
+    if not isinstance(references, dict):
+        raise TypeError(f"References expected to be a mapping (dict) name ↦ Quantity or number; instead, got {type(references).__name__}")
+    
+    if len(references) == 0:
+        raise ValueError("No reference was specified")
+    
+    peak_index = w.time_index(peak_time)
+    
+    if np.all(w[peak_index:] > onset):
+        w = adjust_AP_waveform_polyfit(w, onset, onset_time, peak_time)
+        result["corr"] = w
+    
+    
+    for ref_name, ref_value in references.items():
+        if isinstance(ref_value, numbers.Number):
+            ref_value *= w.units
+    
+        if not isinstance(ref_value, pq.Quantity) or not scq.units_convertible(ref_value, w) or ref_value.size > 1:
+            raise TypeError(f"Reference {ref_name} expected to be a scalar float or Quantity; instead, got {type(ref_value).__name__}")
         
-    if not isinstance(ref_value, pq.Quantity) or not scq.units_convertible(ref_value, w):
-        return np.nan, np.nan
     
-    if ref_value < w.min() or ref_value > w.max():
-        warnings.warn(f"get_AP_waveform_crossings cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}")
+        if ref_value < w.min() or ref_value > w.max():
+            warnings.warn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}")
         
-        return np.nan, np.nan
+            result[ref_name] = (np.nan, np.nan)
     
-    ap_roots = ap_waveform_roots(w, ref_value)
-    rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_roots
-    
-    if rise_x is np.nan:
-        print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
+        rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_waveform_roots(w, ref_value)
         
-    if isinstance(rise_x, (tuple, list, np.ndarray)):
-        rise_x = rise_x[0]
+        if rise_x is np.nan:
+            print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
+            
+        if isinstance(rise_x, (tuple, list, np.ndarray)):
+            rise_x = rise_x[0]
 
-    if decay_x is np.nan:
-        print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
+        if decay_x is np.nan:
+            print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
 
-    if isinstance(decay_x, (tuple, list, np.ndarray)):
-        decay_x = decay_x[0]
+        if isinstance(decay_x, (tuple, list, np.ndarray)):
+            decay_x = decay_x[0]
+            
+        result[ref_name] = (rise_x, decay_x)
         
-    return rise_x, decay_x
+    return result
 
-def adjust_AP_waveform_polyfit(wave, onset, onset_time, peak_time):
+def adjust_AP_waveform_polyfit(wave, onset, onset_time, peak_time,
+                               plot: bool=False):
     # NOTE: 2024-01-28 10:57:21
     # while it is possible to determine the onset value and time
     # from `wave` itself (see ap_waveform_times), bny the time this function
@@ -4463,10 +4483,51 @@ def adjust_AP_waveform_polyfit(wave, onset, onset_time, peak_time):
     x = np.append(wave.times[0:onset_index+1], wave.times[nadir_index:])
     y = np.append(wave[:onset_index+1], wave[nadir_index])
     
+    # NOTE: 2024-01-28 14:43:17
+    #  no need to do anything
     if nadir <= onset:
+        if plot:
+            plt.clf()
+            plt.plot(wave.times, wave, label = "original wave")
+            plt.legend()
         return wave
         
+    from scipy.interpolate import (CubicSpline, PchipInterpolator, Akima1DInterpolator,
+                                   make_interp_spline)
     
+    ak1d_full = Akima1DInterpolator(x,y)
+    ak1d_interpolated_full = ak1d_full(wt)
+    
+    # NOTE: 2024-01-26 10:55:20
+    # bring back to same onset
+    ret =  wave - neo.AnalogSignal(ak1d_interpolated_full, units = wave.units, 
+                                   t_start = wave.t_start, sampling_rate = wave.sampling_rate,
+                                   name=f"{wave.name} DC corrected") + onset
+    
+    # NOTE: 2024-01-26 10:55:41
+    # reconstitute the wave up to onset
+    ret[0:onset_index] = wave[0:onset_index]
+    
+    if plot:
+        plt.clf()
+        plt.plot(wave.times, wave, label="original wave")
+        # plt.plot(x1, y1,'o', label = "interp points full")
+        # plt.plot(x, y,'o', label = "interp points")
+        # plt.plot(t_to_nadir, spl_interpolated, label = "cubic spline")
+        # plt.plot(wt, spl_interpolated_full, label = "cubic spline full")
+        # plt.plot(t_to_nadir, pchip_interpolated, label = "PCHIP")
+        # plt.plot(wt, pchip_interpolated_full, label = "PCHIP full")
+        # plt.plot(t_to_nadir, ak1d_interpolated, label = "Akima 1D")
+        
+        # this is oK
+        # plt.plot(wt, ak1d_interpolated_full, label = "Akima 1D full")
+    
+        plt.plot(ret.times, ret, label="corrected")
+    
+        plt.legend()
+    
+    return ret
+
 def detect_AP_waveforms_in_train(sig, iinj, 
                                  thr = 10, 
                                  before = 0.001, 
@@ -5076,33 +5137,66 @@ def detect_AP_waveforms_in_train(sig, iinj,
     times_of_refVm_on_rise = list()
     times_of_refVm_on_decay = list()
     
+    corrected_AP_waveforms = dict()
+    
     for k, w in enumerate(ap_waveform_signals):
         #print("detect_AP_waveforms_in_train: waveform %d" % k)
+        references = {"AP_durations_V_onset": ap_Vm_onset_values[k],
+                      "AP_durations_V_half_max": vm_at_half_max[k],
+                      "AP_durations_V_quart_max": vm_at_quart_max[k],
+                      "AP_durations_V_third_max": vm_at_third_max[k],
+                      "AP_durations_at_Ref_Vm": reference_Vm}
+        
+        references["AP_durations_V_0"] = 0 * w.units if ap_Vm_onset_values[k] < 0 * w.units else ap_Vm_onset_values[k]
+        
         try:
-            rise_onset_Vm_x, decay_onset_Vm_x = get_AP_waveform_crossings(w, ap_Vm_onset_values[k],
-                                                                          ref_name = "onset",
-                                                                          step_index = step_index,
-                                                                          wave_index = k)
+            ref_crossings = get_AP_waveform_crossings(w, references, 
+                                                      ap_Vm_onset_values[k], # onset value
+                                                      ap_fast_rise_start_times[k], # onset time
+                                                      ap_peak_values[k], # peak value
+                                                      ap_peak_times[k], # peak time
+                                                      step_index = step_index, wave_index = k)
             
-            hm_rise_x, hm_decay_x = get_AP_waveform_crossings(w, vm_at_half_max[k],
-                                                                ref_name = "half-max",
-                                                                step_index = step_index,
-                                                                wave_index = k)
+            w_corr = ref_crossing.get("corr", None)
+            if isinstance(w_corr, neo.AnalogSignal):
+                corrected_AP_waveforms[k] = w_corr
             
-            qm_rise_x, qm_decay_x = get_AP_waveform_crossings(w, vm_at_quart_max[k],
-                                                                ref_name = "quarter-max",
-                                                                step_index = step_index,
-                                                                wave_index = k)
+            rise_onset_Vm_x, decay_onset_Vm_x = ref_crossings["AP_durations_V_onset"]
             
-            tm_rise_x, tm_decay_x = get_AP_waveform_crossings(w, vm_at_third_max[k],
-                                                                ref_name = "third-max",
-                                                                step_index = step_index,
-                                                                wave_index = k)
+            hm_rise_x, hm_decay_x = ref_crossings["AP_durations_V_half_max"]
             
-            rise_refVm_x, decay_refVm_x = get_AP_waveform_crossings(w, reference_Vm,
-                                                                ref_name = f"reference {reference_Vm}",
-                                                                step_index = step_index,
-                                                                wave_index = k)
+            qm_rise_x, qm_decay_x = ref_crossings["AP_durations_V_quart_max"]
+            
+            tm_rise_x, tm_decay_x = ref_crossings["AP_durations_V_third_max"]
+            
+            rise_0mV_x, decay_0mV_x = ref_crossings["AP_durations_V_0"]
+            
+            rise_refVm_x, decay_refVm_x = ref_crossings["AP_durations_at_Ref_Vm"]
+            
+            # rise_onset_Vm_x, decay_onset_Vm_x = get_AP_waveform_crossings(w, ap_Vm_onset_values[k],
+            #                                                               ref_name = "onset",
+            #                                                               step_index = step_index,
+            #                                                               wave_index = k)
+            
+            # hm_rise_x, hm_decay_x = get_AP_waveform_crossings(w, vm_at_half_max[k],
+            #                                                     ref_name = "half-max",
+            #                                                     step_index = step_index,
+            #                                                     wave_index = k)
+            
+            # qm_rise_x, qm_decay_x = get_AP_waveform_crossings(w, vm_at_quart_max[k],
+            #                                                     ref_name = "quarter-max",
+            #                                                     step_index = step_index,
+            #                                                     wave_index = k)
+            
+            # tm_rise_x, tm_decay_x = get_AP_waveform_crossings(w, vm_at_third_max[k],
+            #                                                     ref_name = "third-max",
+            #                                                     step_index = step_index,
+            #                                                     wave_index = k)
+            
+            # rise_refVm_x, decay_refVm_x = get_AP_waveform_crossings(w, reference_Vm,
+            #                                                     ref_name = f"reference {reference_Vm}",
+            #                                                     step_index = step_index,
+            #                                                     wave_index = k)
             # NOTE: 2024-01-28 10:19:58
             # Detecting AP wave crossings at 0 mV:
             # • when Vm onset appears to be < 0 mV then AP waveform crosses
@@ -5112,16 +5206,16 @@ def detect_AP_waveforms_in_train(sig, iinj,
             #   something wrong happened with the recording) then take the 
             #   onset as reference value.
             #
-            if ap_Vm_onset_values[k] < 0 * w.units:
-                rise_0mV_x, decay_0mV_x = get_AP_waveform_crossings(w, 0 * w.units,
-                                                                    ref_name = f"zero",
-                                                                    step_index = step_index,
-                                                                    wave_index = k)
-            else:
-                rise_0mV_x, decay_0mV_x = get_AP_waveform_crossings(w, ap_Vm_onset_values[k],
-                                                                    ref_name = f"onset for zero",
-                                                                    step_index = step_index,
-                                                                    wave_index = k)
+            # if ap_Vm_onset_values[k] < 0 * w.units:
+            #     rise_0mV_x, decay_0mV_x = get_AP_waveform_crossings(w, 0 * w.units,
+            #                                                         ref_name = f"zero",
+            #                                                         step_index = step_index,
+            #                                                         wave_index = k)
+            # else:
+            #     rise_0mV_x, decay_0mV_x = get_AP_waveform_crossings(w, ap_Vm_onset_values[k],
+            #                                                         ref_name = f"onset for zero",
+            #                                                         step_index = step_index,
+            #                                                         wave_index = k)
             
             #print("find AP >= 0 Vm")
             # NOTE: 2019-04-25 13:48:32
@@ -5187,11 +5281,6 @@ def detect_AP_waveforms_in_train(sig, iinj,
             times_of_onset_vm_on_rise.append(rise_onset_Vm_x)
             times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
             
-            # if isinstance(decay_onset_Vm_x, (tuple, list, np.ndarray)):
-            #     times_of_onset_vm_on_decay.append(decay_onset_Vm_x[0])
-            # else:
-            #     times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
-            
         except Exception as e:
             print("in waveform %d:" % k)
             traceback.print_exc()
@@ -5210,6 +5299,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
     time_array_0mV_decay = np.array(times_of_0_vm_on_decay).flatten() * sig.times.units
     
     time_array_onset_Vm_rise = np.array(times_of_onset_vm_on_rise).flatten() * sig.times.units
+    
     #print("times_of_onset_vm_on_decay", times_of_onset_vm_on_decay)
     time_array_onset_Vm_decay = np.array(times_of_onset_vm_on_decay).flatten() * sig.times.units
     
@@ -5391,6 +5481,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
         train_annotations["AP_waveform_times"]       = ap_wave_times
         train_annotations["AP_dV_dt_waveforms"]      = ap_dvdt_waveform_signals
         train_annotations["AP_d2V_dt2_waveforms"]    = ap_d2vdt2_waveform_signals
+        train_annotations["Adjusted_AP_waveforms"]   = corrected_AP_waveforms
     
     ap_train.annotations.update(train_annotations)
     
