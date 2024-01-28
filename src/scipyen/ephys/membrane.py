@@ -1340,125 +1340,125 @@ def v_Nernst(x_out, x_in, z, temp):
     return constants.R * T * np.log(x_out/x_in) / (z * F)
     
 
-def __wave_interp_root_near_val__(w, value):
-    """Factored-out code in the for loop under NOTE:2017-09-04 22:09:38
-    """
-    # 1) get the waveform region where waveform >= value
-    index_ge_value = w >= value
-    
-    # 2) find the boundaries of this region
-    # NOTE: cannot use boolean indexing on AnalogSignal objects, but we can
-    # on their magnitude!
-    index_ge_diff = np.ediff1d(np.asfarray(index_ge_value), to_begin = 0)
-    
-    # if waveform >= value in more than one region this will have as many
-    # indices as there are regions
-    # might be empty if waveform is riding on a decreasing baseline
-    ge_starts = np.where(index_ge_diff == 1)[0]  
-    
-    # ditto; 
-    # might be empty if the waveform is riding on a rising baseline
-    ge_stops = np.where(index_ge_diff   == -1)[0]
-    
-    if len(ge_starts) == 0:
-        return np.nan, np.nan, np.nan, np.nan # nothing was found; nan is more meaningful
-        #return None, None, None, None # nothing was found
-    
-    # the earliest positive crossing in index_ge_diff is the first sample 
-    # index with sample >= value
-    # on a "conforming" AP waveform this is on the rising phase
-    first_ge_index = int(ge_starts[0])
-    
-    if len(ge_stops) == 0: # rising baseline !
-        samples_ge_value = w.magnitude[index_ge_value]
-        
-    else:
-        # the earliest negative crossing in index_ge_diff is one-past the
-        # last sample index in the first region with samples >= value
-        # index 
-        
-        last_ge_index = int(ge_stops[0]) 
-        
-        # we need to keep those samples >= value only for the FIRST occurence
-        # of segments that satisfy this condition
-        index_ge_value_corrected = np.full_like(index_ge_value, False)
-        
-        index_ge_value_corrected[ge_starts[0]:ge_stops[0]] = True
-        
-        index_ge_value = index_ge_value_corrected
-        
-    samples_ge_value = w.magnitude[index_ge_value]
-    
-    times_ge_value = w.times[index_ge_value.flatten()]
-    
-    # NOTE: 2019-04-29 12:16:34
-    # 2) now do a linear interpolation between this sample (see NOTE: 2019-04-29 12:15:23)
-    # and the previous one -- unles the first waveform sample is already >= value
-    # in which case interpolate between first & second samples with all the risk
-    # this entails, see NOTE: 2019-04-29 12:20:48
-    
-    rise_y1 = samples_ge_value[0]   # first sample value in the region >= value
-    rise_x1 = times_ge_value[0]     # time point of the above
-    
-    rise_x1_index = w.time_index(rise_x1)
-    
-    rise_x1 = rise_x1.magnitude
-    
-    if rise_x1_index > 0:
-        rise_y0 = w.magnitude[rise_x1_index - 1]
-        rise_x0 = w.times.magnitude[rise_x1_index - 1]
-        
-    else:
-        # NOTE: 2019-04-29 12:20:48
-        # this shouldn't happen, but it might for crazy recordings
-        # so we just do this to avoid raising exceptions, but the calculated
-        # values are almost certainly garbage
-        rise_y0 = w.magnitude[0]
-        rise_x0 = w.times.magnitude[0]
-        
-        rise_y1 = w.magnitude[1]
-        rise_x0 = w.times.magnitude[1]
-        
-    rise_slope = (rise_y1 - rise_y0) / (rise_x1 - rise_x0)
-    
-    time_at_value_rise = (value.magnitude - rise_y0) / rise_slope + rise_x0
-    
-    if len(ge_stops):
-        decay_y0 = samples_ge_value[-1] # last sample value in the region >= value
-        decay_x0 = times_ge_value[-1]   # the time point of the above
-        
-        decay_x0_index = w.time_index(decay_x0)
-        
-        decay_x0 = decay_x0.magnitude
-        
-        if decay_x0_index < len(w)-1:
-            decay_y1 = w.magnitude[decay_x0_index + 1]
-            decay_x1 = w.times.magnitude[decay_x0_index + 1]
-        
-        else: # this shouldn't happen, but it might for crazy recordings
-            # so we just do this to avoid raiing exceptions, but the calculated
-            # values are garbage
-            decay_y0 = w.magnitude[-2]
-            decay_x0 = w.times.magnitude[-2]
-            decay_y1 = w.magnitude[-1]
-            decay_x1 = w.times.magnitude[-1]
-            
-        decay_slope = (decay_y1 - decay_y0) / (decay_x1 - decay_x0)
-        
-        time_at_value_decay = (value.magnitude - decay_y0) / decay_slope + decay_x0
-        
-    else:
-        decay_slope = np.nan
-        time_at_value_decay = np.nan
-        
-    # NOTE: 2019-04-29 12:21:37
-    # an alternative way is to do a PCHIP interpolation but this would require
-    # a pre-determined end time point; it the latter is too large (i.e. too 
-    # late in the waveform) the result is unstable; on the other hand, PCHIP
-    # inteprolation on two adjacent samples is just overkill.
-    
-    return time_at_value_rise, time_at_value_decay, rise_slope, decay_slope
-
+# def __wave_interp_root_near_val__(w, value):
+#     """Factored-out code in the for loop under NOTE:2017-09-04 22:09:38
+#     """
+#     # 1) get the waveform region where waveform >= value
+#     index_ge_value = w >= value
+#     
+#     # 2) find the boundaries of this region
+#     # NOTE: cannot use boolean indexing on AnalogSignal objects, but we can
+#     # on their magnitude!
+#     index_ge_diff = np.ediff1d(np.asfarray(index_ge_value), to_begin = 0)
+#     
+#     # if waveform >= value in more than one region this will have as many
+#     # indices as there are regions
+#     # might be empty if waveform is riding on a decreasing baseline
+#     ge_starts = np.where(index_ge_diff == 1)[0]  
+#     
+#     # ditto; 
+#     # might be empty if the waveform is riding on a rising baseline
+#     ge_stops = np.where(index_ge_diff   == -1)[0]
+#     
+#     if len(ge_starts) == 0:
+#         return np.nan, np.nan, np.nan, np.nan # nothing was found; nan is more meaningful
+#         #return None, None, None, None # nothing was found
+#     
+#     # the earliest positive crossing in index_ge_diff is the first sample 
+#     # index with sample >= value
+#     # on a "conforming" AP waveform this is on the rising phase
+#     first_ge_index = int(ge_starts[0])
+#     
+#     if len(ge_stops) == 0: # rising baseline !
+#         samples_ge_value = w.magnitude[index_ge_value]
+#         
+#     else:
+#         # the earliest negative crossing in index_ge_diff is one-past the
+#         # last sample index in the first region with samples >= value
+#         # index 
+#         
+#         last_ge_index = int(ge_stops[0]) 
+#         
+#         # we need to keep those samples >= value only for the FIRST occurence
+#         # of segments that satisfy this condition
+#         index_ge_value_corrected = np.full_like(index_ge_value, False)
+#         
+#         index_ge_value_corrected[ge_starts[0]:ge_stops[0]] = True
+#         
+#         index_ge_value = index_ge_value_corrected
+#         
+#     samples_ge_value = w.magnitude[index_ge_value]
+#     
+#     times_ge_value = w.times[index_ge_value.flatten()]
+#     
+#     # NOTE: 2019-04-29 12:16:34
+#     # 2) now do a linear interpolation between this sample (see NOTE: 2019-04-29 12:15:23)
+#     # and the previous one -- unles the first waveform sample is already >= value
+#     # in which case interpolate between first & second samples with all the risk
+#     # this entails, see NOTE: 2019-04-29 12:20:48
+#     
+#     rise_y1 = samples_ge_value[0]   # first sample value in the region >= value
+#     rise_x1 = times_ge_value[0]     # time point of the above
+#     
+#     rise_x1_index = w.time_index(rise_x1)
+#     
+#     rise_x1 = rise_x1.magnitude
+#     
+#     if rise_x1_index > 0:
+#         rise_y0 = w.magnitude[rise_x1_index - 1]
+#         rise_x0 = w.times.magnitude[rise_x1_index - 1]
+#         
+#     else:
+#         # NOTE: 2019-04-29 12:20:48
+#         # this shouldn't happen, but it might for crazy recordings
+#         # so we just do this to avoid raising exceptions, but the calculated
+#         # values are almost certainly garbage
+#         rise_y0 = w.magnitude[0]
+#         rise_x0 = w.times.magnitude[0]
+#         
+#         rise_y1 = w.magnitude[1]
+#         rise_x0 = w.times.magnitude[1]
+#         
+#     rise_slope = (rise_y1 - rise_y0) / (rise_x1 - rise_x0)
+#     
+#     time_at_value_rise = (value.magnitude - rise_y0) / rise_slope + rise_x0
+#     
+#     if len(ge_stops):
+#         decay_y0 = samples_ge_value[-1] # last sample value in the region >= value
+#         decay_x0 = times_ge_value[-1]   # the time point of the above
+#         
+#         decay_x0_index = w.time_index(decay_x0)
+#         
+#         decay_x0 = decay_x0.magnitude
+#         
+#         if decay_x0_index < len(w)-1:
+#             decay_y1 = w.magnitude[decay_x0_index + 1]
+#             decay_x1 = w.times.magnitude[decay_x0_index + 1]
+#         
+#         else: # this shouldn't happen, but it might for crazy recordings
+#             # so we just do this to avoid raiing exceptions, but the calculated
+#             # values are garbage
+#             decay_y0 = w.magnitude[-2]
+#             decay_x0 = w.times.magnitude[-2]
+#             decay_y1 = w.magnitude[-1]
+#             decay_x1 = w.times.magnitude[-1]
+#             
+#         decay_slope = (decay_y1 - decay_y0) / (decay_x1 - decay_x0)
+#         
+#         time_at_value_decay = (value.magnitude - decay_y0) / decay_slope + decay_x0
+#         
+#     else:
+#         decay_slope = np.nan
+#         time_at_value_decay = np.nan
+#         
+#     # NOTE: 2019-04-29 12:21:37
+#     # an alternative way is to do a PCHIP interpolation but this would require
+#     # a pre-determined end time point; it the latter is too large (i.e. too 
+#     # late in the waveform) the result is unstable; on the other hand, PCHIP
+#     # inteprolation on two adjacent samples is just overkill.
+#     
+#     return time_at_value_rise, time_at_value_decay, rise_slope, decay_slope
+# 
     
 def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100):
     """Fits the Frank & Fuortes 1956 model through stimulus vs latency curve.
@@ -4410,9 +4410,79 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
 #     
 #     ap_roots = ap_waveform_roots(w, ref_value, )
     
+def get_AP_waveform_crossings(w:neo.AnalogSignal, ref_value:pq.Quantity,
+                              **kwargs):
+    wave_index = kwargs.get("wave_index", None)
+    step_index = kwargs.get("step_index", None)
+    ref_name = kwargs.get("ref_name", None)
     
+    if isinstance(ref_value, numbers.Number):
+        ref_value *= w.units
+        
+    if not isinstance(ref_value, pq.Quantity) or not scq.units_convertible(ref_value, w):
+        return np.nan, np.nan
     
-def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = None, min_fast_rise_duration = None, min_ap_isi = 6e-3*pq.s, rtol = 1e-5, atol = 1e-8, use_min_detected_isi=True,smooth_window = 5,interpolate_roots = False,decay_intercept_approx = "linear",decay_ref = "hm",get_duration_at_Vm=None,return_all = False, vm_thr=0, **kwargs):
+    if ref_value < w.min() or ref_value > w.max():
+        warnings.warn(f"get_AP_waveform_crossings cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}")
+        
+        return np.nan, np.nan
+    
+    ap_roots = ap_waveform_roots(w, ref_value)
+    rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_roots
+    
+    if rise_x is np.nan:
+        print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
+        
+    if isinstance(rise_x, (tuple, list, np.ndarray)):
+        rise_x = rise_x[0]
+
+    if decay_x is np.nan:
+        print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
+
+    if isinstance(decay_x, (tuple, list, np.ndarray)):
+        decay_x = decay_x[0]
+        
+    return rise_x, decay_x
+
+def adjust_AP_waveform_polyfit(wave, onset, onset_time, peak_time):
+    # NOTE: 2024-01-28 10:57:21
+    # while it is possible to determine the onset value and time
+    # from `wave` itself (see ap_waveform_times), bny the time this function
+    # is called (used) these data have already been determined therefore
+    # simplest thing is to pass them to this function as parameters.
+    wave_start_time = wave.times[0]
+    onset_index = wave.time_index(onset_time)
+    peak_index = wave.time_index(peak_time)
+    wave_decay_phase = wave[peak_index:]
+    nadir = wave_decay_phase.min()
+    nadir_index = np.argmin([wave_decay_phase]) + peak_index
+    nadir_time = wave.times[nadir_index]
+    t_to_nadir = wave.times[:nadir_index]
+    wt = wave.times
+    
+    x = np.append(wave.times[0:onset_index+1], wave.times[nadir_index:])
+    y = np.append(wave[:onset_index+1], wave[nadir_index])
+    
+    if nadir <= onset:
+        return wave
+        
+    
+def detect_AP_waveforms_in_train(sig, iinj, 
+                                 thr = 10, 
+                                 before = 0.001, 
+                                 after = None, 
+                                 min_fast_rise_duration = None, 
+                                 min_ap_isi = 6e-3*pq.s, #
+                                 rtol = 1e-5, atol = 1e-8, 
+                                 use_min_detected_isi=True,
+                                 smooth_window = 5,
+                                 interpolate_roots = False,
+                                 decay_intercept_approx = "linear",
+                                 decay_ref = "hm",
+                                 get_duration_at_Vm=None,
+                                 return_all = False, 
+                                 vm_thr=0, 
+                                 **kwargs):
     """Detects action potentials in a Vm signal.
     For use with experiments using "steps" of depolarizing current injections.
     
@@ -4512,8 +4582,8 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
         
     interpolate_roots: boolean, default False
         When true, use linear inerpolation to find the time coordinates of the
-        AP waveform rise and decay phases crossing over the onset, half-maximum
-        and 0 mV. 
+        points where the AP waveform rise and decay phases cross over the a preset
+        Vm value (e.g., onset, half-maximum, 0 mV, etc),
         
         When False, uss the time coordinate of the first & last sample >= Vm value
         (onset, half-max, or 0 mV) respectively, on the rise and decay phases of
@@ -4551,17 +4621,27 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
         When a scalar, the function reports the AP waveform durations at the specified
         Vm value, IN ADDITION TO the duration at 0 mV and half-max (which may vary
         across cells!)
-            
-    return_all: boolean, default False -- for debugging purposes only
     
+    return_all: boolean, default False -- for debugging purposes only
         When True, the function will also return a dictionary with various
         internal variables used or calculated during the AP waveform detection.
     
+    
+    vm_thr: floar scalar, default 0; — "putative"detected APs must overshoot
+        this value in roder to be consiered "actual" APs.
+    
+    Var-keyword parameters (**kwargs)
+    ---------------------------------
     t_start, t_stop: start, stop time of the spiketrain - relevant when detection
         takes place on a slice of the original signal; these values should reflect 
         the entire extend of the original signal
         
         Optional; default values are taken from `sig`.
+    
+    step_index: int; optional, default is None
+        When given, is represents the inex of the step current depolarization
+        in a series — used in feedback messages (warnings, errors, etc)
+    
         
     Returns:
     --------
@@ -4784,6 +4864,938 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
     
     t_start = kwargs.pop("t_start", sig.t_start)
     t_stop = kwargs.pop("t_stop", sig.t_stop)
+    step_index = kwargs.pop("step_index", None)
+    
+    # print(f"detect_AP_waveforms_in_train kwargs t_start {t_start} t_stop {t_stop}")
+    # ### END parse parameters
+    
+    #### BEGIN Detect APs by thresholding on the 1st derivative of the Vm signal
+    #
+    
+    # print(f"detect_AP_waveforms_in_train: thr = {thr}")
+    
+    #print(f"detect_AP_waveforms_in_train: vm_thr = {vm_thr}")
+    ap_waveform_times = detect_AP_waveform_times(sig, thr=thr, 
+                                                 smooth_window=smooth_window,
+                                                 min_ap_isi=min_ap_isi,
+                                                 min_fast_rise_duration=min_fast_rise_duration,
+                                                 rtol=rtol, atol=atol,
+                                                 vm_thr=vm_thr)
+
+    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = ap_waveform_times
+    
+    # print(f"detect_AP_waveforms_in_train: sig.units = {sig.units}")
+    # ### END detect APs by thresholding
+    
+    train_annotations = dict()
+    train_annotations["AP_peak_values"]          = None
+    train_annotations["AP_peak_amplitudes"]      = None
+    train_annotations["AP_onset_Vm"]             = None
+    train_annotations["AP_durations_V_onset"]    = None
+    train_annotations["AP_half_max"]             = None
+    train_annotations["AP_durations_V_half_max"] = None
+    train_annotations["AP_quart_max"]            = None
+    train_annotations["AP_durations_V_quart_max"]= None
+    train_annotations["AP_third_max"]            = None
+    train_annotations["AP_durations_V_third_max"]= None
+    train_annotations["AP_durations_V_0"]        = None
+    train_annotations["AP_ref_Vm"]               = reference_Vm
+    train_annotations["AP_durations_at_Ref_Vm"]  = None
+    train_annotations["AP_Maximum_dV_dt"]        = None
+    train_annotations["AP_waveform_times"]       = None
+    train_annotations["AP_dV_dt_waveforms"]      = None
+    train_annotations["AP_d2V_dt2_waveforms"]    = None
+    
+    # print(f"detect_AP_waveforms_in_train t_start {t_start} t_stop {t_stop}")
+    ap_train = neo.SpikeTrain([], t_start=t_start, t_stop = t_stop, units = pq.s)
+    
+    if ap_fast_rise_start_times is None:
+        ap_train.annotations.update(train_annotations)
+        return ap_train, []
+    
+    # indexing vector for the AP starts in the actual Vm trace
+    sig_AP_start_index = [sig.time_index(t) for t in ap_fast_rise_start_times]
+    
+    # print(f"detect_AP_waveforms_in_train: ap_fast_rise_start_times = {ap_fast_rise_start_times}")
+    # print(f"detect_AP_waveforms_in_train: AP_start_index = {sig_AP_start_index}")
+    # print(f"detect_AP_waveforms_in_train: sig at AP_start_index = {sig.magnitude[sig_AP_start_index]}")
+    
+    #### BEGIN Collect AP values
+    # See nested BEGIN - END comments for what are these
+    
+    ap_Vm_onset_values  = None
+    ap_Vm_peak_values   = None
+    ap_Vm_hmax_values   = None # half-max values
+    ap_Vm_qmax_values   = None # quarter-max values (1/4 from threshold)
+    ap_Vm_tmax_values   = None # third-max values (1/3 from threshold
+    ap_amplitudes       = None
+    ap_waveform_signals = None
+    
+    # ###   BEGIN Collect Vm values at AP onset
+    # NOTE: 2019-04-24 14:04:04
+    # this signal contains the Vm values at the times of AP onset (as determined
+    # at NOTE: 2019-04-25 09:22:13)
+    # the actual membrane AP threshold is the first sample in this signal
+    #
+    # NOTE: 2019-04-25 10:56:45
+    # stores Vm values at AP onset times (times of start of the fast rising phase)
+    #
+    ap_Vm_onset_values = neo.IrregularlySampledSignal(ap_fast_rise_start_times,
+                                                      sig.magnitude[sig_AP_start_index],
+                                                      units = sig.units, 
+                                                      time_units=ap_fast_rise_start_times.units, 
+                                                      name="%s_AP_onset_Vm" % sig.name, 
+                                                      description = "AP onset Vm for %s signal; dV/dt detection threshold: %g" % (sig.name, thr * pq.V/pq.s))
+    
+    # ###   END Collect Vm values at AP onset
+    
+    # ### BEGIN Collect the AP waveforms
+    #
+    # print(f"detect_AP_waveforms_in_train: iinj = {iinj}")
+    ap_waves = extract_AP_waveforms(sig, iinj, ap_fast_rise_start_times, before=before, after=after, use_min_isi=use_min_detected_isi)
+    
+    ## ap_waveform_signals is a list of neo.AnalogSignals!
+    ap_waveform_signals, inter_AP_intervals, wave_starts, wave_stops = ap_waves
+    
+    #
+    # ### END Collect the AP waveforms
+    
+    # ### BEGIN Collect AP peak values
+    #
+    # NOTE: 2019-04-24 14:04:18
+    # time points of the AP peaks: the times of the max values in each AP waveform
+    #
+    #    Each AP waveform is a time slice of the original Vm signal, therefore
+    #    the index of the AP waveform argmax() is also the index of the 
+    #    peak time in the original signal -- Neat !!!
+    #
+    # NOTE: 2019-04-24 14:05:15
+    # in theory ap_peak_times should be close (if not identical) to
+    # ap_rise_stops, but see NOTE: 2019-04-29 11:13:46 for why we don't use that
+    #
+
+    # NBOTE: 2019-05-03 13:32:22
+    # get the values at the peaks
+    ap_peak_values = np.array([w.max() for w in ap_waveform_signals]) * sig.units # must do this because we c'truct a new numpy array!
+    
+    # NOTE: 2019-04-25 10:58:41
+    # store peak values at peak times in an IrregularlySampledSignal
+    ap_Vm_peak_values = neo.IrregularlySampledSignal(ap_peak_times, 
+                                                     ap_peak_values,
+                                                     units = sig.units,
+                                                     time_units = sig.times.units,
+                                                     name = "%s_AP_peak_values" % (sig.name))
+    #
+    # ### END Collect AP peak values
+    
+    # ### BEGIN Collect AP amplitude values
+    #
+    # we define AP amplitude as the magnitude of the Vm excursion from the 
+    # onset value to the peak
+    
+    # NOTE: 2019-04-23 23:22:09
+    # we use the magnitudes instead of the signal themselves because, by design,
+    # their time stamps do not coincide (see NOTE: 2019-04-25 10:56:45 and
+    # NOTE: 2019-04-25 10:58:41)
+    #
+    ap_amplitude_values = ap_Vm_peak_values.magnitude - ap_Vm_onset_values.magnitude
+    
+    # NOTE: 2019-04-25 10:59:17
+    # store AP amplitudes at peak times in an IrregularlySampledSignal
+    ap_amplitudes = neo.IrregularlySampledSignal(ap_peak_times, 
+                                                 ap_amplitude_values,
+                                                 units = sig.units,
+                                                 time_units = sig.times.units,
+                                                 name = "%s_AP_amplitudes" % (sig.name))
+    #
+    # ### END Collect AP amplitude values
+    
+    # ### BEGIN Calculate AP durations at various levels
+    # 
+    # NOTE: 2019-04-30 11:12:42
+    # the onset Vm is a sample value (the value of the sample at sig_AP_start_index)
+    #   the time of its occurrence on the rising phase is at sig_AP_start_index
+    #   the time of its occurrence on the decay phase needs to be determined
+    #       by interpolation; however, if the baseline is sliding up, this will
+    #       be tricky
+    #
+    # the half-maximum Vm is calculated, hence the times of its occurrence in 
+    #   both rising and decay phases need to be calculated by interpolation
+    #
+    # The same stands for the 0 Vm (this being a sampled signal, no sample might
+    # actually have the value 0 in the data)
+    #
+    # NOTE: 2019-04-29 15:08:34
+    # calcuate the half-maximum value of the Vm = onset + half of amplitude
+    # CAUTION: Vm beign a sampled signal, none of its samples may have this
+    # CALCULATED value
+    #
+    #half_max = ap_Vm_onset_values.magnitude + ap_amplitudes.magnitude / 2. # NOT a quantity
+    #half_max = ap_amplitudes.magnitude / 2. # NOT a quantity
+    half_max = ap_amplitudes / 2. # Quantity array
+    
+    third_max = ap_amplitudes / 3. # Quantity array
+    
+    quarter_max = ap_amplitudes / 4.# Quantity array
+    
+    # NOTE: 2019-04-30 11:08:28
+    # Vm values at half max are calculated; to get their time points we need to
+    # interpolate on the waveform -- see NOTE: 2019-04-29 15:08:34
+    #vm_at_half_max = ap_Vm_onset_values + half_max 
+    # need to use their magnitudes because times do not match!
+    vm_at_half_max = (ap_Vm_onset_values.magnitude + half_max.magnitude) * sig.units 
+    vm_at_quart_max = (ap_Vm_onset_values.magnitude + quarter_max.magnitude) * sig.units 
+    vm_at_third_max = (ap_Vm_onset_values.magnitude + third_max.magnitude) * sig.units
+    
+    # NOTE:2017-09-04 22:09:38
+    # we need the time values where the Vm is around half-max on the rising phase
+    # and the decaying phase
+    #
+    # NOTE: 2019-04-25 11:04:35
+    # We lookup for Vm samples >= vm_at_half_max value to help us locate the 
+    # half-max time points, to help us with interpolation
+    #
+    # WARNING this MAY slow things down a bit
+    times_of_half_max_on_rise = list() # roots of interpolation on rise phases
+    times_of_half_max_on_decay = list() # roots of interpolation on decay phases
+    
+    times_of_quart_max_on_rise = list() # roots of interpolation on rise phases
+    times_of_quart_max_on_decay = list() # roots of interpolation on decay phases
+    
+    times_of_third_max_on_rise = list() # roots of interpolation on rise phases
+    times_of_third_max_on_decay = list() # roots of interpolation on decay phases
+    
+    # ditto for Vm == 0 mV
+    times_of_0_vm_on_rise = list()
+    times_of_0_vm_on_decay = list()
+    
+    # ditto for Vm = Vm at onset ("the instantaneous AP threshold")
+    times_of_onset_vm_on_rise = list()
+    times_of_onset_vm_on_decay = list()
+    
+    times_of_refVm_on_rise = list()
+    times_of_refVm_on_decay = list()
+    
+    for k, w in enumerate(ap_waveform_signals):
+        #print("detect_AP_waveforms_in_train: waveform %d" % k)
+        try:
+            rise_onset_Vm_x, decay_onset_Vm_x = get_AP_waveform_crossings(w, ap_Vm_onset_values[k],
+                                                                          ref_name = "onset",
+                                                                          step_index = step_index,
+                                                                          wave_index = k)
+            
+            hm_rise_x, hm_decay_x = get_AP_waveform_crossings(w, vm_at_half_max[k],
+                                                                ref_name = "half-max",
+                                                                step_index = step_index,
+                                                                wave_index = k)
+            
+            qm_rise_x, qm_decay_x = get_AP_waveform_crossings(w, vm_at_quart_max[k],
+                                                                ref_name = "quarter-max",
+                                                                step_index = step_index,
+                                                                wave_index = k)
+            
+            tm_rise_x, tm_decay_x = get_AP_waveform_crossings(w, vm_at_third_max[k],
+                                                                ref_name = "third-max",
+                                                                step_index = step_index,
+                                                                wave_index = k)
+            
+            rise_refVm_x, decay_refVm_x = get_AP_waveform_crossings(w, reference_Vm,
+                                                                ref_name = f"reference {reference_Vm}",
+                                                                step_index = step_index,
+                                                                wave_index = k)
+            # NOTE: 2024-01-28 10:19:58
+            # Detecting AP wave crossings at 0 mV:
+            # • when Vm onset appears to be < 0 mV then AP waveform crosses
+            #   0 mV at least during rise and typically also during decay
+            #
+            # • when Vm onset appears to be > 0 mV (WARNING this indicates 
+            #   something wrong happened with the recording) then take the 
+            #   onset as reference value.
+            #
+            if ap_Vm_onset_values[k] < 0 * w.units:
+                rise_0mV_x, decay_0mV_x = get_AP_waveform_crossings(w, 0 * w.units,
+                                                                    ref_name = f"zero",
+                                                                    step_index = step_index,
+                                                                    wave_index = k)
+            else:
+                rise_0mV_x, decay_0mV_x = get_AP_waveform_crossings(w, ap_Vm_onset_values[k],
+                                                                    ref_name = f"onset for zero",
+                                                                    step_index = step_index,
+                                                                    wave_index = k)
+            
+            #print("find AP >= 0 Vm")
+            # NOTE: 2019-04-25 13:48:32
+            # do the same for Vm = 0 mV
+            #rise_0mV_x, decay_0mV_x, rise_0mV_slope, decay_0mV_slope = __wave_interp_root_near_val__(w, 0 * w.units)
+#             if decay_onset_Vm_x is np.nan:
+#                 print(f"detect_AP_waveforms_in_train {step_index}, wave {k}: decay_onset_Vm_x = {decay_onset_Vm_x}")
+#                 # waveform is likely on a rising baseline
+#                 # there are two alternative workarounds:
+#                 # (a) extrapolate a straight line from the point on half-max and 
+#                 #   find its intercept with the Vm onset value
+#                 if decay_intercept_approx.strip().lower() == "linear":
+#                     #print("decay_ref", decay_ref)
+#                     if isinstance(decay_ref, str):
+#                         if decay_ref == "hm":
+#                             #print("hm_decay_slope", hm_decay_slope)
+#                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_half_max.magnitude[k]) / hm_decay_slope + hm_decay_x
+#                             
+#                         elif decay_ref == "qm":
+#                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - vm_at_quart_max.magnitude[k]) / qm_decay_slope + qm_decay_x
+#                             
+#                         else:
+#                             decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - 0) / decay_0mV_slope + decay_0mV_x
+#                             
+#                     else:
+#                         decay_onset_Vm_x = (ap_Vm_onset_values.magnitude[k] - decay_ref.magnitude) / decay_0mV_slope + decay_0mV_x
+#                         
+#                 # (b) determine a "pseudo-baseline" and use that as the onset Vm on the 
+#                 # decay side
+#                 else:
+#                     [lo, hi], _,_,_ = sigp.state_levels(w)
+#                     _,_,_,decay_onset_Vm_x,decay_onset_Vm_y,decay_onset_slope = ap_waveform_roots(w, lo)
+#                 
+#                 print(f"detect_AP_waveforms_in_train {step_index}, wave {k}: estimated decay_onset_Vm_x = {decay_onset_Vm_x}")
+                
+#             if isinstance(reference_Vm, pq.Quantity):
+#                 if reference_Vm >= ap_Vm_onset_values[k]:
+#                     rise_refVm_x, rise_refVm_y, rise_refVm_slope, decay_refVm_x, decay_refVm_y, decay_refVm_slope = ap_waveform_roots(w, reference_Vm)
+#                     
+#                     times_of_refVm_on_rise.append(rise_refVm_x)
+#                     times_of_refVm_on_decay.append(decay_refVm_x)
+#                     
+#                 else:
+#                     warnings.warn("cannot measure duration of waveform %d at Vm %s < onset Vm (%s)" % (k, reference_Vm, ap_Vm_onset_values[k]))
+#                     times_of_refVm_on_rise.append(np.nan)
+#                     times_of_refVm_on_decay.append(np.nan)
+                    
+            times_of_refVm_on_rise.append(rise_refVm_x)
+            times_of_refVm_on_decay.append(decay_refVm_x)
+            
+            times_of_half_max_on_rise.append(hm_rise_x) 
+            times_of_half_max_on_decay.append(hm_decay_x)
+
+            times_of_quart_max_on_rise.append(qm_rise_x) 
+            times_of_quart_max_on_decay.append(qm_decay_x)
+    
+            times_of_third_max_on_rise.append(tm_rise_x)
+            times_of_third_max_on_decay.append(tm_decay_x)
+    
+            times_of_0_vm_on_rise.append(rise_0mV_x)
+            times_of_0_vm_on_decay.append(decay_0mV_x)
+            
+            times_of_onset_vm_on_rise.append(rise_onset_Vm_x)
+            times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+            
+            # if isinstance(decay_onset_Vm_x, (tuple, list, np.ndarray)):
+            #     times_of_onset_vm_on_decay.append(decay_onset_Vm_x[0])
+            # else:
+            #     times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+            
+        except Exception as e:
+            print("in waveform %d:" % k)
+            traceback.print_exc()
+            raise e
+    
+    time_array_half_max_rise = np.array(times_of_half_max_on_rise).flatten() * sig.times.units
+    time_array_half_max_decay  = np.array(times_of_half_max_on_decay).flatten() * sig.times.units
+    
+    time_array_quart_max_rise = np.array(times_of_quart_max_on_rise).flatten() * sig.times.units
+    time_array_quart_max_decay  = np.array(times_of_quart_max_on_decay).flatten() * sig.times.units
+    
+    time_array_third_max_rise = np.array(times_of_third_max_on_rise).flatten() * sig.times.units
+    time_array_third_max_decay  = np.array(times_of_third_max_on_decay).flatten() * sig.times.units
+    
+    time_array_0mV_rise = np.array(times_of_0_vm_on_rise).flatten() * sig.times.units
+    time_array_0mV_decay = np.array(times_of_0_vm_on_decay).flatten() * sig.times.units
+    
+    time_array_onset_Vm_rise = np.array(times_of_onset_vm_on_rise).flatten() * sig.times.units
+    #print("times_of_onset_vm_on_decay", times_of_onset_vm_on_decay)
+    time_array_onset_Vm_decay = np.array(times_of_onset_vm_on_decay).flatten() * sig.times.units
+    
+    ap_Vm_hmax_values = neo.IrregularlySampledSignal(time_array_half_max_rise,
+                                                     vm_at_half_max,
+                                                     time_units = sig.times.units,
+                                                     name = "%s_AP_half_max_amplitude" % sig.name,
+                                                     description = "AP half-max amplitude for %s signal" % sig.name)
+    
+    ap_durations_hm = time_array_half_max_decay - time_array_half_max_rise
+    
+    ap_durations_Vhalf_max = neo.IrregularlySampledSignal(time_array_half_max_rise,
+                                                          ap_durations_hm,
+                                                          time_units = sig.times.units,
+                                                          name = "%s_AP_durations_at_half_max" % sig.name,
+                                                          description = "AP durations at half-maximum for %s" % sig.name)
+    
+    ap_Vm_qmax_values = neo.IrregularlySampledSignal(time_array_quart_max_rise,
+                                                     vm_at_quart_max,
+                                                     time_units = sig.times.units,
+                                                     name = "%s_AP_quart_max_amplitude" % sig.name,
+                                                     description = "AP quarter-max amplitude for %s signal" % sig.name)
+    
+    ap_durations_qm = time_array_quart_max_decay - time_array_quart_max_rise
+    
+    ap_durations_Vquart_max = neo.IrregularlySampledSignal(time_array_quart_max_rise,
+                                                          ap_durations_qm,
+                                                          time_units = sig.times.units,
+                                                          name = "%s_AP_durations_at_quart_max" % sig.name,
+                                                          description = "AP durations at quarter-maximum for %s" % sig.name)
+    
+    ap_Vm_tmax_values = neo.IrregularlySampledSignal(time_array_third_max_rise,
+                                                     vm_at_third_max,
+                                                     time_units = sig.times.units,
+                                                     name="%s_AP_third_max_amplitude" % sig.name,
+                                                          description = "AP third-max amplitude for %s" % sig.name)
+    
+    ap_durations_tm = time_array_third_max_decay - time_array_third_max_rise
+    ap_durations_Vthird_max = neo.IrregularlySampledSignal(time_array_third_max_rise,
+                                                          ap_durations_tm,
+                                                          time_units = sig.times.units,
+                                                          name = "%s_AP_durations_at_third_max" % sig.name,
+                                                          description = "AP durations at third-maximum for %s" % sig.name)
+
+    
+    ap_durations_0 = time_array_0mV_decay - time_array_0mV_rise
+    
+    ap_durations_V0 = neo.IrregularlySampledSignal(time_array_0mV_rise, 
+                                                   ap_durations_0, 
+                                                   time_units = sig.times.units,
+                                                   name = "%s_AP_durations_at_0_mV" % sig.name,
+                                                   description = "AP durations at 0 mV for %s" % sig.name)
+    
+    ap_durations_onset_Vm = time_array_onset_Vm_decay - time_array_onset_Vm_rise
+    
+    #assert(np.all(np.isclose(time_array_onset_Vm_rise.magnitude, ap_fast_rise_start_times.magnitude)))
+    
+    ap_durations_Vonset = neo.IrregularlySampledSignal(time_array_onset_Vm_rise,
+                                                       ap_durations_onset_Vm,
+                                                       time_units = sig.times.units,
+                                                       name = "%s_AP_durations_at_onset" % sig.name,
+                                                       description = "AP durations at onset Vm for %s" % sig.name)
+    
+    if len(times_of_refVm_on_rise)> 0 and len(times_of_refVm_on_rise) == len(times_of_refVm_on_decay):
+        time_array_refVm_rise = np.array(times_of_refVm_on_rise).flatten() * sig.times.units
+        time_array_refVm_decay = np.array(times_of_refVm_on_decay).flatten() * sig.times.units
+        
+        ap_durations_refVm = time_array_refVm_decay - time_array_refVm_rise
+        
+        ap_durations_Vref = neo.IrregularlySampledSignal(time_array_refVm_rise,
+                                                         ap_durations_refVm,
+                                                         time_units = sig.times.units,
+                                                         name = "%s_AP_durations_at_Reference_Vm" % sig.name,
+                                                         description = "AP durations at %s Vm for %s" % (reference_Vm, sig.name))
+        
+    else:
+        ap_durations_Vref = None
+        
+    # ### END Calculate AP durations at half-max, 0 mV, and onset Vm
+    
+    # ### BEGIN Collect dV/dt waveforms for each AP, also get maximum value of dV/dt for the waveform. 
+    # using the unsmoothed derivative!
+    # NOTE: 2017-09-04 21:09:43
+    # CAUTION when "after" is None and "use_min_detected_isi" is False, these waveforms
+    # will have different durations!
+    ap_dvdt_waveform_signals = [dv_dt.time_slice(w.t_start, w.t_stop) for w in ap_waveform_signals]
+    
+    maxDvDt_index = [w.argmax() for w in ap_dvdt_waveform_signals]
+    
+    maxDvDt = np.array([w[k] for (w, k) in zip(ap_dvdt_waveform_signals, maxDvDt_index)]) * dv_dt.units
+    
+    maxDvDt_times = np.array([w.times[k] for (w, k) in zip(ap_dvdt_waveform_signals, maxDvDt_index)]) * dv_dt.times.units
+    
+    ap_max_dvdt = neo.IrregularlySampledSignal(maxDvDt_times,
+                                               maxDvDt,
+                                               units = dv_dt.units,
+                                               time_units = sig.times.units,
+                                               name = "%s_Max_AP_dV/dt" % sig.name,
+                                               description = "Maximum AP rate of change for %s" % sig.name)
+    
+    # ### END Collect dV/dt for each AP, get maximum value of dV/dt for the waveform.
+    
+    # NOTE: 2019-04-24 15:19:22
+    # ### BEGIN store the second derivative wave forms (also unsmoothed)
+    # same algorithm and CAUTION as per NOTE: 2017-09-04 21:09:43
+    ap_d2vdt2_waveform_signals = [d2v_dt2.time_slice(w.t_start, w.t_stop) for w in ap_waveform_signals]
+    
+    #
+    # END store the second derivative wave forms
+    
+    # NOTE: 2019-04-25 10:31:00
+    # The way neo.SpikeTrain has been designed, I understand, requires that
+    # the waveforms is an array where the first axis is along the index of the spike
+    # 
+    if len(ap_waveform_signals) > 1:
+        # NOTE: 2019-05-03 13:32:58
+        # CAUTION see NOTE: 2017-09-04 21:09:43
+        # when using the actual inter-AP interval to extract the AP waveforms,
+        # these will have different lengths, so we will need to pad them at the
+        # end with np.nan
+        if all([w.size == ap_waveform_signals[0].size for w in ap_waveform_signals]):
+            waveform_length = len(ap_waveform_signals[0])
+            
+            maxWaveformLength = waveform_length
+            
+            ap_waveforms = np.concatenate([w.magnitude.T for w in ap_waveform_signals], axis=0)
+            #ap_waveforms = np.concatenate([w.magnitude for w in ap_waveform_signals], axis=1)
+            ap_wave_times = np.linspace(0, ap_waveform_signals[0].duration.magnitude, num=len(ap_waveform_signals[0])) * sig.times.units
+            
+        else: # trouble!
+            maxWaveformLength = np.max([len(w) for w in ap_waveform_signals])
+
+            #ap_waveforms = np.full([maxWaveformLength, len(ap_waveform_signals)], np.nan)
+            ap_waveforms = np.full([len(ap_waveform_signals), maxWaveformLength], np.nan)
+            
+            for k, w in enumerate(ap_waveform_signals):
+                ap_waveforms[k, 0:w.size] = w.magnitude[:,0].copy()
+                
+            ap_wave_times = np.linspace(0, maxWaveformLength * sig.sampling_period.magnitude, num = maxWaveformLength) * sig.times.units
+            
+    else:
+        ap_waveforms = ap_waveform_signals[0].magnitude.T
+        ap_wave_times = np.linspace(0, ap_waveform_signals[0].duration.magnitude, num=len(ap_waveform_signals[0])) * sig.times.units
+        maxWaveformLength = np.nan
+
+    # spike train where eack "spike" is the beginning of the waveform 
+    # "CONTAINING" a single AP
+    #
+    # NOTE: CAUTION: these times MAY be the beginning of the AP waveform 
+    # itself if the "before" argument is set to 0; else, they PRECEDE the
+    # the beginning of the actual AP waveform by an interval equal to 
+    # before (in s)
+    #
+    if len(ap_fast_rise_start_times):
+        ap_train = neo.SpikeTrain(ap_fast_rise_start_times,
+                                t_start = t_start,
+                                t_stop = t_stop,
+                                left_sweep = ap_fast_rise_start_times - sig.t_start,
+                                sampling_rate = sig.sampling_rate,
+                                name="%s_AP_train" % (sig.name),
+                                description = "AP train for %s signal; dV/dt detection threshold: %g" % (sig.name, thr * pq.V/pq.s))
+    
+        ap_train.waveforms = ap_waveforms
+    
+        train_annotations["AP_peak_values"]          = ap_Vm_peak_values
+        train_annotations["AP_peak_amplitudes"]      = ap_amplitudes
+        train_annotations["AP_onset_Vm"]             = ap_Vm_onset_values # Vm value at ap_fast_rise_start_times
+        train_annotations["AP_durations_V_onset"]    = ap_durations_Vonset
+        train_annotations["AP_half_max"]             = ap_Vm_hmax_values
+        train_annotations["AP_durations_V_half_max"] = ap_durations_Vhalf_max
+        train_annotations["AP_quart_max"]            = ap_Vm_qmax_values
+        train_annotations["AP_durations_V_quart_max"]= ap_durations_Vquart_max
+        train_annotations["AP_third_max"]            = ap_Vm_tmax_values
+        train_annotations["AP_durations_V_third_max"]= ap_durations_Vthird_max
+        train_annotations["AP_durations_V_0"]        = ap_durations_V0
+        train_annotations["AP_ref_Vm"]               = reference_Vm
+        train_annotations["AP_durations_at_Ref_Vm"]  = ap_durations_Vref
+        train_annotations["AP_Maximum_dV_dt"]        = ap_max_dvdt
+        train_annotations["AP_waveform_times"]       = ap_wave_times
+        train_annotations["AP_dV_dt_waveforms"]      = ap_dvdt_waveform_signals
+        train_annotations["AP_d2V_dt2_waveforms"]    = ap_d2vdt2_waveform_signals
+    
+    ap_train.annotations.update(train_annotations)
+    
+    # print(f"detect_AP_waveforms_in_train ap_train t_start {ap_train.t_start} t_stop {ap_train.t_stop}")
+    
+    return ap_train, ap_waveform_signals
+        
+def detect_AP_waveforms_in_train_old(sig, iinj, 
+                                 thr = 10, 
+                                 before = 0.001, 
+                                 after = None, 
+                                 min_fast_rise_duration = None, 
+                                 min_ap_isi = 6e-3*pq.s, #
+                                 rtol = 1e-5, atol = 1e-8, 
+                                 use_min_detected_isi=True,
+                                 smooth_window = 5,
+                                 interpolate_roots = False,
+                                 decay_intercept_approx = "linear",
+                                 decay_ref = "hm",
+                                 get_duration_at_Vm=None,
+                                 return_all = False, 
+                                 vm_thr=0, 
+                                 **kwargs):
+    """Detects action potentials in a Vm signal.
+    For use with experiments using "steps" of depolarizing current injections.
+    
+    Parameters:
+    ----------
+    
+    sig :       neo.AnalogSignal with Vm data (the "Vm signal"): 
+                units must be in V or mV
+                
+    iinj:       neo.AnalogSignal with the actual current injection step 
+                (without any tail that might have been added to sig)
+    
+                or a tuple with start/stop times for current injection
+    
+    thr :       scalar;
+                the rate of Vm rise threshold for AP detection (in V/s)
+                (optional, default is 10)
+    
+    before :    scalar, or Quantity;
+    
+                The number of ms to include in the AP waveform BEFORE its threshold)
+                (optional, default = 0.001 s)
+                
+                When a Quantity, it is expected to have units of "s"
+                
+    after :     scalar, Quantity or None (default);
+    
+                The number of ms to include in the AP waveform AFTER its threshold)
+                (optional, default = None)
+                
+                When a Quantity, it is expected to have units of "s".
+                
+                When None (the default) the Vm slice encompassing the actual AP
+                waveform is taken up to the onset of the next AP, or to the end
+                of the depolarizing current injection step.
+                
+                NOTE 1: This is useful to capture AHPs that follow the actual 
+                    AP waveform.
+        
+                NOTE 2: to generate waveforms of the AP only, set 
+                    "before" and "after" to zero.
+                
+    min_fast_rise_duration : None (default), scalar or Quantity;
+    
+                The minimum duration of the initial (fast) segment of the rising 
+                phase of a putative AP waveform.
+            
+                This is used to identify "fake" APs: regions of the Vm trace where 
+                the 1st derivative is above the rise threshold ("thr" above) but
+                the Vm values are still below AP threshold. "Fake" APs may be 
+                detected when the Vm rises very fast at the beginning of 
+                the current injection step (yet the Vm is still sub-threshold).
+                
+                When None, this parameter will be set to the next higher power of
+                10 above the sampling period of the signal.
+    
+                When a Quantity, it is expected to have units convertible to the 
+                Vm signal's time units.
+                
+    min_ap_isi : None, scalar or Quantity;
+    
+                Default is 6e-3 * pq.s
+    
+                Minimum interval between two consecutive AP fast rising times 
+                ("kinks"). Used to discriminate against suprious fast rising time
+                points that occur DURING the rising phase of AP waveforms.
+                
+                This can happen when the AP waveforms has prominent IS and the SD 
+                "spikes", 
+                
+                see Bean, B. P. (2007) The action potential in mammalian central neurons.
+                Nat.Rev.Neurosci (8), 451-465
+
+    rtol, atol: float scalars;
+                the relative and absolute tolerance, respectively, used in value 
+                comparisons (see numpy.isclose())
+                
+                defaults are:
+                rtol: 1e-5
+                atol: 1e-8
+                
+    use_min_detected_isi: boolean, default True
+    
+        Used when "after" is None.
+    
+        When True, individual AP waveforms cropped from the Vm signal "sig" will
+            have the duration equal to the minimum detected inter-AP interval.
+        
+        When False, the durations of the AP waveforms will be taken to the onset
+            of the next AP waveform, or the end of the Vm signal
+            
+    smooth_window: int >= 0; default is 5
+        The length (in samples) of a smoothing window (boxcar) used for the 
+        signal's derivatives.
+        
+        The length of the window will be adjusted if the signal is upsampled.
+        
+    interpolate_roots: boolean, default False
+        When true, use linear inerpolation to find the time coordinates of the
+        points where the AP waveform rise and decay phases cross over the a preset
+        Vm value (e.g., onset, half-maximum, 0 mV, etc),
+        
+        When False, uss the time coordinate of the first & last sample >= Vm value
+        (onset, half-max, or 0 mV) respectively, on the rise and decay phases of
+        the AP waveform.
+        
+        see ap_waveform_roots()
+        
+    decay_intercept_approx: str, one of "linear" (default) or "levels"
+        Used when the end of the decay phase cannot be estimated from the onset
+        Vm.
+        
+        The end of the decay is considerd to be the time point when the decaying
+        Vm crosses over (i.e. goes below) the onset value of the action potential.
+        
+        Whe the AP waveform is riing on a rising baseline, this time point cannot
+        be determined.
+        
+        Instead, it is estimated as specified by "decay_intercept_approx" parameter:
+        
+        When decay_intercept_approx is "linear", the function uses linear extrapolation
+        from a (higher than Vm onset) value specified by decay_ref (see below)
+        to the onset value.
+        
+        When decay_intercept_approx is "levels", the function estimates a "pseudo-baseline"
+        as the lowest of two state levels determined from the AP waveform histogram.
+        
+        The pseudo-baseline is then used to estimate the time intercept on the decay
+        phase.
+        
+    decay_ref: str, one of "hm" or "zero", or floating point scalar
+        Which Vm value should be used to approximate the end of the decay phase
+        when using the "linear" approximation method (see above)
+        
+    get_duration_at_Vm: None or scalar:
+        When a scalar, the function reports the AP waveform durations at the specified
+        Vm value, IN ADDITION TO the duration at 0 mV and half-max (which may vary
+        across cells!)
+    
+    return_all: boolean, default False -- for debugging purposes only
+        When True, the function will also return a dictionary with various
+        internal variables used or calculated during the AP waveform detection.
+    
+    
+    vm_thr: floar scalar, default 0; — "putative"detected APs must overshoot
+        this value in roder to be consiered "actual" APs.
+    
+    Var-keyword parameters (**kwargs)
+    ---------------------------------
+    t_start, t_stop: start, stop time of the spiketrain - relevant when detection
+        takes place on a slice of the original signal; these values should reflect 
+        the entire extend of the original signal
+        
+        Optional; default values are taken from `sig`.
+    
+    step_index: int; optional, default is None
+        When given, is represents the inex of the step current depolarization
+        in a series — used in feedback messages (warnings, errors, etc)
+    
+        
+    Returns:
+    --------
+    
+    ap_train, ap_waveform_signals
+    
+    The returned values, explained:
+    -------------------------------
+    
+    ap_train : neo.SpikeTrain.
+        The "times" attribute contains the time values of the AP thresholds
+        (starts of the rising phase).
+        
+        The "waveforms" attribute contains the AP waveforms as a 2D numpy array
+            (without time domain information, and shorter waveforms tail-padded
+            with np.nan to the length of the longest waveform)
+            
+            These AP waveforms as neo.AnalogSignals are also returned separately
+            as a list of AnalogSignals (not padded)
+            
+        The "annotations" attribute contains the following set of pre-defined keys:
+        
+        "AP_peak_values"
+        "AP_peak_amplitudes"
+        "AP_onset_Vm"
+        "AP_durations_V_onset"
+        "AP_half_max"
+        "AP_durations_V_half_max"
+        "AP_quart_max"
+        "AP_durations_V_quart_max"
+        "AP_third_max"
+        "AP_durations_V_third_max"
+        "AP_durations_V_0"
+        "AP_ref_Vm"
+        "AP_durations_at_Ref_Vm"
+        "AP_Maximum_dV_dt"
+        "AP_waveform_times"
+        "AP_dV_dt_waveforms"
+        "AP_d2V_dt2_waveforms"
+    
+        AP_peak_values: neo.IrregularlySampledSignal
+            Contains the Vm values at each peak of the APs in the Vm signal
+            The times of the AP peak in the Vm signal are in its "times"
+            attribute. 
+            
+        AP_peak_amplitudes: neo.IrregularlySampledSignal
+            Contains the amplitudes of each AP waveform, at the times of the 
+            AP peaks.
+            
+        AP_onset_Vm: neo.IrregularlySampledSignal 
+            Contains the Vm values at the onset of each AP in the Vm signal.
+            The times of the AP onsets in the Vm signal are in the "times" 
+            attribute of the signal. 
+            
+            The first value in this signal is the membrane AP threshold
+            (value of Vm where the first AP was fired)
+            
+        AP_ref_Vm: the value of the reference Vm to calculate AP width at,
+            or None if not specified
+            
+        AP_*_max: neo.IrregularlySampledSignal
+            The values of the AP at half-max, 1/4 of maximum and 
+            1/3 of maximum, from the onset value
+            
+        AP_durations_*: neo.IrregularlySampledSignal
+            Contains the AP durations at the specified Vm values (0 mV, onset,
+            half-max, etc...)
+        
+        AP_Maximum_dV_dt: new.IrregularlySampledSignal
+            Contains the maximum slope of each AP waveform. The "times" attribute
+            if the AP onset times.
+            
+        AP_waveform_times: Quantity array (in signal's time units)
+            Contains the time domain for the ap_train's "waveforms" attribute
+            (see blow). Useful for plotting.
+            
+        AP_dV_dt_waveforms: sequence of the fist order derivative of the AP 
+            waveforms as analog signals.
+            
+            WARNING: these do not have identical time domains (although they do
+                have the same sampling rate), and may have different lengths
+            
+        AP_d2V_dt2_waveforms: sequence of the second order derivative of the AP 
+            waveforms as analog signals
+            
+            WARNING: these do not have identical time domains (although they do
+                have the same sampling rate), and may have different lengths
+        
+        When no APs were found, the "times" and "waveforms" attributes are empty
+        and "annotations" keys are mapped to None except for AP_ref_Vm, if given.
+        
+    ap_waveform_signals is a sequence (list) of neo.AnalogSignals, 
+        each containing the AP waveform and any subsequent AHP (see NOTE 1);
+        
+        These do not have identical time domains (although they do have
+        the same sampling rate, they will have different t_start and t_stop values).
+        Depending on the value of the 'use_min_detected_isi' parmeter, they
+        may also have different durations.
+        
+            
+    References:
+    -----------
+    
+    Naundorf et al (2006). Unique features of action potential initiation in 
+        cortical neurons. Nature 440, 1060–1063.
+    
+    Brown & Randall (2009) Activity-dependent depression of the spike
+        after-depolarization generates long-lasting intrinsic plasticity 
+        in hippocampal CA3 pyramidal neurons. J Physiol 587(6) 1265-1281
+        
+    """
+    import scipy.interpolate
+    from scipy.interpolate import PchipInterpolator as pchip
+    # from scipy.signal import boxcar, convolve
+    from scipy.signal import convolve
+    from scipy.signal.windows import boxcar
+    
+    #### BEGIN parse parameters
+    # make sure before & after are quantities with compatible time units
+    
+    if isinstance(before, numbers.Real):
+        before *= pq.s
+        
+    elif isinstance(before, pq.Quantity):
+            raise TypeError("units of 'before' (%s) are not compatible with those of the signal's time domain (%s)" % (before.units, sig.time.units))
+
+    else:
+        raise TypeError("'before' expected to be a scalar or a Quantity; got %s instead" % type(before).__name__)
+        
+    if isinstance(after, numbers.Real):
+        after *= pq.s
+        
+    elif isinstance(after, pq.Quantity):
+        if not units_convertible(after, sig.times):
+            raise TypeError("units of 'after' (%s) are not compatible with those of the signal's time domain (%s)" % (after.units, sig.times.units))
+        
+    elif after is not None:
+        raise TypeError("'after' expected to be a scalar, a Quantity, or None; got %s instead" % type(after).__name__)
+        
+    if not isinstance(sig, neo.AnalogSignal):
+        raise TypeError("Expecting a neo.AnalogSignal; got %s instead" % type(sig).__name__)
+    
+    if sig.ndim > 2 or (sig.ndim == 2 and sig.shape[1] > 1):
+        raise TypeError("Signal must be a vector")
+    
+    if min_fast_rise_duration is None:
+        min_fast_rise_duration = (10**(np.floor(np.log10(sig.sampling_period.rescale(pq.s).magnitude)) + 1)) * pq.s
+        
+    elif isinstance(min_fast_rise_duration, numbers.Real):
+        min_fast_rise_duration *= pq.s
+    
+    elif isinstance(min_fast_rise_duration, pq.Quantity):
+        if not units_convertible(min_fast_rise_duration, sig.times):
+            raise TypeError("units of 'min_fast_rise_duration' (%s) are not compatible with those of the signal's time domain (%s)" % (min_fast_rise_duration.units, sig.times.units))
+        
+        if min_fast_rise_duration.units != sig.times.units:
+            min_fast_rise_duration.rescale(sig.times.units)
+    
+    else:
+        raise TypeError("'min_fast_rise_duration' expected to be a scalar, a Quantity, or None; got %s instead" % type(min_fast_rise_duration).__name__)
+    
+    if min_ap_isi is None:
+        min_ap_isi = 0 * pq.s
+        
+    elif isinstance(min_ap_isi, numbers.Real):
+        min_ap_isi *= pq.s
+        
+    elif isinstance(min_ap_isi, pq.Quantity):
+        if not units_convertible(min_ap_isi, sig.times):
+            raise TypeError("units of 'min_ap_isi' (%s) are not compatible with those of the signal's time domain (%s)" % (min_ap_isi.units, sig.times.units))
+    
+        if min_ap_isi.units != sig.times.units:
+            min_ap_isi.rescale(sig.times.units)
+    
+    else:
+        raise TypeError("'min_ap_isi' expected to be a scalar, a Quantity, or None; got %s instead" % type(min_ap_isi).__name__)
+    
+    if isinstance(decay_intercept_approx, str):
+        if decay_intercept_approx.strip().lower() not in ("linear", "levels"):
+            raise ValueError("'decay_intercept_approx' expected to be one of 'linear', 'levels'; got %s instead" % decay_intercept_approx)
+
+    else:
+        raise TypeError("'decay_intercept_approx' expected to be a str; got %s instead" % type(decay_intercept_approx).__name__)
+    
+    if isinstance(decay_ref, str):
+        if decay_ref.strip().lower() not in ("hm", "qm", "zero"):
+            raise ValueError("When a str, 'decay_ref' must be one of 'hm', 'qm', or 'zero'; got %s instead" % decay_ref)
+        
+    elif isinstance(decay_ref, numbers.Real):
+        decay_ref *= sig.units
+        
+    elif isinstance(decay_ref, pq.Quantity):
+        if not units_convertible(decay_ref, sig):
+            raise TypeError("'decay_ref' units (%s) are incompatible with the signal's units (%s)" % (decay_ref.units, sig.units))
+        
+        if decay_ref.units != sig.units:
+            decay_ref.rescale(sig.units)
+            
+    else:
+        raise TypeError("'decay_ref' has inappropriate type: %s" % type(decay_ref.__name__))
+    
+    if isinstance(get_duration_at_Vm, numbers.Real):
+        reference_Vm = get_duration_at_Vm * sig.units
+        
+    elif isinstance(get_duration_at_Vm, pq.Quantity):
+        if not units_convertible(get_duration_at_Vm, sig.units):
+            raise TypeError("get_duration_at_Vm expected to have %s units; got %s instead" % (sig.units.dimensionality, get_duration_at_Vm.units.dimensionality))
+        
+        if get_duration_at_Vm.units != sig.units:
+            reference_Vm = get_duration_at_Vm.rescale(sig.units)
+            
+        else:
+            reference_Vm = get_duration_at_Vm
+            
+    elif get_duration_at_Vm is None:
+        reference_Vm = None
+        
+    else:
+        raise TypeError("get_duration_at_Vm expected to be a scalar real, Quantity or None; got %s instead" % type(get_duration_at_Vm).__name__)
+    
+    t_start = kwargs.pop("t_start", sig.t_start)
+    t_stop = kwargs.pop("t_stop", sig.t_stop)
+    step_index = kwargs.pop("step_index", None)
     
     # print(f"detect_AP_waveforms_in_train kwargs t_start {t_start} t_stop {t_stop}")
     # ### END parse parameters
@@ -5019,6 +6031,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
             # NOTE: 2019-04-25 13:48:32
             # do the same for Vm = 0 mV
             #rise_0mV_x, decay_0mV_x, rise_0mV_slope, decay_0mV_slope = __wave_interp_root_near_val__(w, 0 * w.units)
+            # what is this for ?!?
             if ap_Vm_onset_values[k] < 0 * w.units:
                 rise_0mV_x, rise_0mV_y, rise_0mV_slope, decay_0mV_x, decay_0mV_y, decay_0mV_slope = ap_waveform_roots(w, 0 * w.units)
                 
@@ -5026,7 +6039,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
                 rise_0mV_x, rise_0mV_y, rise_0mV_slope, decay_0mV_x, decay_0mV_y, decay_0mV_slope = ap_waveform_roots(w, ap_Vm_onset_values[k])
                 
             if decay_onset_Vm_x is np.nan:
-                print(f"detect_AP_waveforms_in_train: wave {k} decay_onset_Vm_x", decay_onset_Vm_x)
+                print(f"detect_AP_waveforms_in_train {step_index}, wave {k}: decay_onset_Vm_x = {decay_onset_Vm_x}")
                 # waveform is likely on a rising baseline
                 # there are two alternative workarounds:
                 # (a) extrapolate a straight line from the point on half-max and 
@@ -5053,7 +6066,7 @@ def detect_AP_waveforms_in_train(sig, iinj, thr = 10, before = 0.001, after = No
                     [lo, hi], _,_,_ = sigp.state_levels(w)
                     _,_,_,decay_onset_Vm_x,decay_onset_Vm_y,decay_onset_slope = ap_waveform_roots(w, lo)
                 
-                #print("estimated decay_onset_Vm_x", decay_onset_Vm_x)
+                print(f"detect_AP_waveforms_in_train {step_index}, wave {k}: estimated decay_onset_Vm_x = {decay_onset_Vm_x}")
                 
             if isinstance(reference_Vm, pq.Quantity):
                 if reference_Vm >= ap_Vm_onset_values[k]:
@@ -7402,6 +8415,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # ap_train is always a SpikeTrain, even if empty
     kwargs["t_start"] = vm.t_start
     kwargs["t_stop"] = vm.t_stop
+    kwargs["step_index"] = segment.index
     
     # print(f"analyse_AP_step_injection_sweep kwargs thr {kwargs['thr']}")
     # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
