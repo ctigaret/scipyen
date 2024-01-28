@@ -4412,7 +4412,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
     
 def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
                               onset: pq.Quantity, onset_time: pq.Quantity,
-                              peak: pq.Quantity, peak_time: pq.Quantity.
+                              peak: pq.Quantity, peak_time: pq.Quantity,
                               **kwargs):
     wave_index = kwargs.get("wave_index", None)
     step_index = kwargs.get("step_index", None)
@@ -4427,12 +4427,18 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
     
     peak_index = w.time_index(peak_time)
     
-    if np.all(w[peak_index:] > onset):
-        w = adjust_AP_waveform_polyfit(w, onset, onset_time, peak_time)
+    nadir = w[peak_index:].min()
+    
+    
+    if nadir > onset:
+        w = polyfit_adjust_AP_waveform(w, onset, onset_time, peak_time)
         result["corr"] = w
-    
-    
+        
     for ref_name, ref_value in references.items():
+        if ref_value is None:
+            result[ref_name] = (np.nan, np.nan)
+            continue
+        
         if isinstance(ref_value, numbers.Number):
             ref_value *= w.units
     
@@ -4463,7 +4469,7 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
         
     return result
 
-def adjust_AP_waveform_polyfit(wave, onset, onset_time, peak_time,
+def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak_time,
                                plot: bool=False):
     # NOTE: 2024-01-28 10:57:21
     # while it is possible to determine the onset value and time
@@ -4481,7 +4487,7 @@ def adjust_AP_waveform_polyfit(wave, onset, onset_time, peak_time,
     wt = wave.times
     
     x = np.append(wave.times[0:onset_index+1], wave.times[nadir_index:])
-    y = np.append(wave[:onset_index+1], wave[nadir_index])
+    y = np.append(wave[:onset_index+1], wave[nadir_index:])
     
     # NOTE: 2024-01-28 14:43:17
     #  no need to do anything
@@ -5157,7 +5163,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
                                                       ap_peak_times[k], # peak time
                                                       step_index = step_index, wave_index = k)
             
-            w_corr = ref_crossing.get("corr", None)
+            w_corr = ref_crossings.get("corr", None)
             if isinstance(w_corr, neo.AnalogSignal):
                 corrected_AP_waveforms[k] = w_corr
             
