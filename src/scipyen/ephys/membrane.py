@@ -2698,7 +2698,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     if not np.any(flags_ge_value):
         # no sample is >= value
         # bail out gracefully
-        warnings.warn("ap_waveform_roots: no part of the signal is >= %s" % value, RuntimeWarning)
+        warnings.warn(f"ap_waveform_roots: no part of the signal is >= {value}", RuntimeWarning)
         
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
     
@@ -2726,7 +2726,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     
     if len(ge_value_starts) == 0:
         # bail out gracefully
-        warnings.warn("ap_waveform_roots: cannot find where signal becomes >= %s" % value, RuntimeWarning)
+        warnings.warn(f"ap_waveform_roots: cannot find where signal becomes >= {value}", RuntimeWarning)
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
         
     
@@ -2779,6 +2779,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     # in these situations we bail out
     
     if len(ge_value_ends):
+    # if len(gt_value_ends):
         # OK, there are regions of the AP waveform below this value
         # take index of the first sample past the last >= value in the 1st region
         # for conformant APs this falls on the decay phase
@@ -2809,7 +2810,7 @@ def ap_waveform_roots(w, value, interpolate=False):
                 
             decay_x = (float(value) - y0) / decay_cslope + x0
             decay_y = end_sample_ge_value# value of "central" sample 
-            
+
         else:
             decay_y = end_sample_ge_value
             decay_x = time_of_end_sample_ge_value
@@ -4456,21 +4457,21 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
         
     
         if ref_value < w.min() or ref_value > w.max():
-            warnings.warn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}")
+            warnings.warn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}", RuntimeWarning)
         
             result[ref_name] = (np.nan, np.nan)
     
         rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_waveform_roots(w, ref_value)
         
         if rise_x is np.nan:
-            warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
+            warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
             # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
             
         if isinstance(rise_x, (tuple, list, np.ndarray)):
             rise_x = rise_x[0]
 
         if decay_x is np.nan:
-            warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
+            warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
             # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
 
         if isinstance(decay_x, (tuple, list, np.ndarray)):
@@ -4497,12 +4498,13 @@ def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak_time,
     t_to_nadir = wave.times[:nadir_index]
     wt = wave.times
     
-    x = np.append(wave.times[0:onset_index+1], wave.times[nadir_index:])
-    y = np.append(wave[:onset_index+1], wave[nadir_index:])
+    x = np.append(wave.times[0:onset_index-1], wave.times[nadir_index:])
+    y = np.append(wave[:onset_index-1], wave[nadir_index:])
     
     # NOTE: 2024-01-28 14:43:17
     #  no need to do anything
-    if nadir <= onset:
+    # if nadir <= onset:
+    if nadir < onset:
         if plot:
             plt.clf()
             plt.plot(wave.times, wave, label = "original wave")
@@ -4523,7 +4525,7 @@ def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak_time,
     
     # NOTE: 2024-01-26 10:55:41
     # reconstitute the wave up to onset
-    ret[0:onset_index] = wave[0:onset_index]
+    ret[0:onset_index-1] = wave[0:onset_index-1]
     
     if plot:
         plt.clf()
