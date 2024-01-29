@@ -8647,15 +8647,14 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                     w.t_start = 0 * ap_train.times.units
                     
             
-            ahpWstop = [w.t_start + fAHP_window if w.t_start + fAHP_window < w.t_stop else w.t_stop for w in asp_waves if w is not None]
-            adpWstop = [w.t_start + ADP_window  if w.t_start + ADP_window  < w.t_stop else w.t_stop for w in asp_waves if w is not None]
+            ahpWstop = [(w.t_start + fAHP_window if w.t_start + fAHP_window < w.t_stop else w.t_stop) if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w in asp_waves]
+            adpWstop = [(w.t_start + ADP_window  if w.t_start + ADP_window  < w.t_stop else w.t_stop) if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w in asp_waves]
             
             ahpTimes = startTimes
             
-            asp_waves_endpoints = np.array([w[-1] for w in asp_waves if w is not None]).flatten()
+            asp_waves_endpoints = np.array([float(w[-1]) if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w in asp_waves]).flatten()
             
-            
-            ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() for w, t in zip(asp_waves, ahpWstop)])
+            ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w, t in zip(asp_waves, ahpWstop)])
             
             # print(f"asp_waves_endpoints shape {asp_waves_endpoints.shape}")
             # print(f"ahpPeakValues shape {ahpPeakValues.shape}")
@@ -8679,7 +8678,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
             # everything else set to 0
             ahpAmplis[ahpAmplis > 0] = 0.
             
-            adpPeakValues = np.array([w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max() for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
+            adpPeakValues = np.array([(w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max()) if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
             
             # First condition for an ADP:
             # the maximum value ("peak") is larger than last value of the waveform
