@@ -828,9 +828,9 @@ def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nan
     if len(args) == 1:
         return args[0]
     
-    assert(all(lambda x: scq.units_convertible(x[0].times.units, x[1].times.units) for x in pairwise(args))), "Signals must have domains with compatible units"
+    assert(all(lambda x: units_convertible(x[0].times.units, x[1].times.units) for x in pairwise(args))), "Signals must have domains with compatible units"
 
-    assert(all(lambda x: scq.units_convertible(x[0].units, x[1].units) for x in pairwise(args))), "Signals must have compatible units"
+    assert(all(lambda x: units_convertible(x[0].units, x[1].units) for x in pairwise(args))), "Signals must have compatible units"
     
     assert(all(lambda x: x[0].ndim == x[1].ndim for x in pairwise(args))), "Signals must have the same dimensions (i.e., number of axes)"
     
@@ -7745,7 +7745,7 @@ def plot_neo(obj: neo.core.basesignal.BaseSignal,
         
 
     times_units_str = obj.times.units.dimensionality.string
-    xlabel = "" if times_units_str == "dimensionless" else f"{cq.name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+    xlabel = "" if times_units_str == "dimensionless" else f"{name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
     name = obj.name
     if name is None or len(name.strip()) == 0:
         name = name_from_unit(obj.units.dimensionality)

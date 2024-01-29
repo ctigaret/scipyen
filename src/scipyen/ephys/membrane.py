@@ -7602,7 +7602,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 
         # apThr = list()
         # apLatency = list()
-        
+        print(f"analyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps")
         apThr = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
         apLatency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
         apFrequency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
@@ -8622,71 +8622,85 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     
     # print(f"fAHP_window = {fAHP_window}\nADP_window = {ADP_window}")
     
+    # NOTE: 2024-01-29 15:14:47
+    # extracting afterspikepotentials (ASPs)
     asp_waves = list()
     
-    if ap_train.size > 0:
-        startTimes = (ap_train.times.magnitude.flatten() + ap_train.annotations["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
-        startNdx = [w.time_index(t) for w, t in zip(ap_waveform_signals, startTimes)]
+    try:
+        if ap_train.size > 0:
+            # NOTE: 2024-01-29 15:19:10
+            # AP_durations_V_onset may contain NaNs ⇒ startTimes MAY contain NaNs
             
-        asp_waves = [w[int(k):] for w, k in zip(ap_waveform_signals, startNdx)]
-        
-        if relTime:
-            for w in asp_waves:
-                w.t_start = 0 * ap_train.times.units
+            startTimes = (ap_train.times.magnitude.flatten() + ap_train.annotations["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
+            
+            # therefore take this into account and assign np.nan to startNdx where required
+            startNdx = [w.time_index(t) if np.isfinite(t) else np.nan for w, t in zip(ap_waveform_signals, startTimes)]
                 
-        
-        ahpWstop = [w.t_start + fAHP_window if w.t_start + fAHP_window < w.t_stop else w.t_stop for w in asp_waves]
-        adpWstop = [w.t_start + ADP_window  if w.t_start + ADP_window  < w.t_stop else w.t_stop for w in asp_waves]
-        
-        ahpTimes = startTimes
-        
-        asp_waves_endpoints = np.array([w[-1] for w in asp_waves]).flatten()
-        
-        
-        ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() for w, t in zip(asp_waves, ahpWstop)])
-        
-        # print(f"asp_waves_endpoints shape {asp_waves_endpoints.shape}")
-        # print(f"ahpPeakValues shape {ahpPeakValues.shape}")
-        
-        onsetVms = ap_train.annotations["AP_onset_Vm"].magnitude.flatten()
-        
-        # First condition for a fAHP:
-        # the minimum value ("trough") needs to be smaller than last value of the waveform
-        # (else, set this to the corresponding onset Vm -> ahpAmpli becomes 0)
-        #
-        # NOTE BUG 2023-09-25 13:11:12 FIXME
-        # this is problematic when the AP is unique and end of waveform ends well below the trough...
-        # badAHPndx = ahpPeakValues >= asp_waves_endpoints
-        # # print(f"badAHPndx = {badAHPndx}")
-        # ahpPeakValues[badAHPndx] = onsetVms[badAHPndx]
-        
-        ahpAmplis = ahpPeakValues - onsetVms
-        
-        # Second condition for a fAHP:
-        # amplitude (calculated by subtracting the AP onset Vm from the trough value) must be <=0
-        # everything else set to 0
-        ahpAmplis[ahpAmplis > 0] = 0.
-        
-        adpPeakValues = np.array([w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max() for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
-        
-        # First condition for an ADP:
-        # the maximum value ("peak") is larger than last value of the waveform
-        # (else, set to the corresponding onset Vm -> adpAmpli becomes 0)
-        badADPndx = adpPeakValues <= asp_waves_endpoints
-        adpPeakValues[badADPndx] = onsetVms[badADPndx]
-        
-        adpAmplis = adpPeakValues - onsetVms
-        
-        # Second condition for an ADP:
-        # amplitude (calcuated by subtracting the AP onset Vm from the peak value) must be >= 0
-        # everything else set to 0
-        adpAmplis[(adpAmplis < 0)] = 0.
-        
-        fAHP_amplitudes = neo.IrregularlySampledSignal(startTimes, ahpAmplis, units = ap_waveform_signals[0].units,
-                                                       name="fAHP Amplitude")
-        
-        ADP_amplitudes = neo.IrregularlySampledSignal(startTimes, adpAmplis, units = ap_waveform_signals[0].units,
-                                                      name = "ADP Amplitude")
+            # and skip those waves where duration at onset could not be determined
+            # 
+            asp_waves = [w[int(n):] if np.isfinite(n) else None for w, n in zip(ap_waveform_signals, startNdx)]
+            
+            if relTime:
+                for w in asp_waves:
+                    if w is None:
+                        continue
+                    w.t_start = 0 * ap_train.times.units
+                    
+            
+            ahpWstop = [w.t_start + fAHP_window if w.t_start + fAHP_window < w.t_stop else w.t_stop for w in asp_waves if w is not None]
+            adpWstop = [w.t_start + ADP_window  if w.t_start + ADP_window  < w.t_stop else w.t_stop for w in asp_waves if w is not None]
+            
+            ahpTimes = startTimes
+            
+            asp_waves_endpoints = np.array([w[-1] for w in asp_waves if w is not None]).flatten()
+            
+            
+            ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() for w, t in zip(asp_waves, ahpWstop)])
+            
+            # print(f"asp_waves_endpoints shape {asp_waves_endpoints.shape}")
+            # print(f"ahpPeakValues shape {ahpPeakValues.shape}")
+            
+            onsetVms = ap_train.annotations["AP_onset_Vm"].magnitude.flatten()
+            
+            # First condition for a fAHP:
+            # the minimum value ("trough") needs to be smaller than last value of the waveform
+            # (else, set this to the corresponding onset Vm -> ahpAmpli becomes 0)
+            #
+            # NOTE BUG 2023-09-25 13:11:12 FIXME
+            # this is problematic when the AP is unique and end of waveform ends well below the trough...
+            # badAHPndx = ahpPeakValues >= asp_waves_endpoints
+            # # print(f"badAHPndx = {badAHPndx}")
+            # ahpPeakValues[badAHPndx] = onsetVms[badAHPndx]
+            
+            ahpAmplis = ahpPeakValues - onsetVms
+            
+            # Second condition for a fAHP:
+            # amplitude (calculated by subtracting the AP onset Vm from the trough value) must be <=0
+            # everything else set to 0
+            ahpAmplis[ahpAmplis > 0] = 0.
+            
+            adpPeakValues = np.array([w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max() for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
+            
+            # First condition for an ADP:
+            # the maximum value ("peak") is larger than last value of the waveform
+            # (else, set to the corresponding onset Vm -> adpAmpli becomes 0)
+            badADPndx = adpPeakValues <= asp_waves_endpoints
+            adpPeakValues[badADPndx] = onsetVms[badADPndx]
+            
+            adpAmplis = adpPeakValues - onsetVms
+            
+            # Second condition for an ADP:
+            # amplitude (calcuated by subtracting the AP onset Vm from the peak value) must be >= 0
+            # everything else set to 0
+            adpAmplis[(adpAmplis < 0)] = 0.
+            
+            fAHP_amplitudes = neo.IrregularlySampledSignal(startTimes, ahpAmplis, units = ap_waveform_signals[0].units,
+                                                        name="fAHP Amplitude")
+            
+            ADP_amplitudes = neo.IrregularlySampledSignal(startTimes, adpAmplis, units = ap_waveform_signals[0].units,
+                                                        name = "ADP Amplitude")
+    except:
+        traceback.print_exc()
         
         
     result["Afterspike_potentials"]["fAHP_amplitudes"] = fAHP_amplitudes
