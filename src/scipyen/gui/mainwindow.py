@@ -7508,7 +7508,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     def viewObject(self, obj, objname, winType=None, 
                    newWindow=False, askForParams=False):
-        """Actually displays a python object in user's workspace
+        """Actually displays a python object in user's workspace.
         Delegates to appropriate viewer according to object type, creates a new
         viewer if necessary.
         Call this function when the intention is to display variables that are 
@@ -7621,19 +7621,33 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     if chkb.selection():
                         plt.clf()
 
-            if isinstance(obj, neo.core.basesignal.BaseSignal) and hasattr(obj, "times"):
-                plt.plot(obj.times, obj)
-                times_units_str = obj.times.units.dimensionality.string
-                xlabel = "" if times_units_str == "dimensionless" else f"{cq.name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
-                name = obj.name
-                if name is None or len(name.strip()) == 0:
-                    name = cq.name_from_unit(obj.units.dimensionality)
-                    # name = cq.name_from_unit(obj.units.dimensionality.string)
-                ylabel = f"{name} ({obj.units.dimensionality.string})"
-                plt.xlabel(xlabel)
-                plt.ylabel(ylabel)
-                if isinstance(objname, str) and len(objname.strip()):
-                    plt.title(objname)
+            # if isinstance(obj, neo.core.basesignal.BaseSignal) and hasattr(obj, "times"):
+            #     plt.plot(obj.times, obj)
+            #     times_units_str = obj.times.units.dimensionality.string
+            #     xlabel = "" if times_units_str == "dimensionless" else f"{cq.name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+            #     name = obj.name
+            #     if name is None or len(name.strip()) == 0:
+            #         name = cq.name_from_unit(obj.units.dimensionality)
+            #         # name = cq.name_from_unit(obj.units.dimensionality.string)
+            #     ylabel = f"{name} ({obj.units.dimensionality.string})"
+            #     plt.xlabel(xlabel)
+            #     plt.ylabel(ylabel)
+            #     if isinstance(objname, str) and len(objname.strip()):
+            #         plt.title(objname)
+            if isinstance(obj, neo.core.basesignal.BaseSignal):
+                neoutils.plot_neo(obj, win)
+                # plt.plot(obj.times, obj)
+                # times_units_str = obj.times.units.dimensionality.string
+                # xlabel = "" if times_units_str == "dimensionless" else f"{cq.name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+                # name = obj.name
+                # if name is None or len(name.strip()) == 0:
+                #     name = cq.name_from_unit(obj.units.dimensionality)
+                #     # name = cq.name_from_unit(obj.units.dimensionality.string)
+                # ylabel = f"{name} ({obj.units.dimensionality.string})"
+                # plt.xlabel(xlabel)
+                # plt.ylabel(ylabel)
+                # if isinstance(objname, str) and len(objname.strip()):
+                #     plt.title(objname)
             else:
                 plt.plot(obj)
 

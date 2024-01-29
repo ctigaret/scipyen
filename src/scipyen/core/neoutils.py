@@ -170,6 +170,7 @@ from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
 import pyqtgraph as pg
 
+import matplotlib.pyplot as plt
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -7682,3 +7683,77 @@ def parse_acquisition_metadata(data:neo.Block, configuration:[type(None), dict] 
     if "software" in data.annotations:
         pass
 
+def plot_neo(obj: neo.core.basesignal.BaseSignal, 
+             fig: typing.Optional[typing.Union[mpl.figure.Figure, int]] = None, 
+             pfun: typing.Callable = plt.plot,
+             **kwargs):
+    """Wrapper to matplotlib.pyplot for `neo` signal objects.
+    
+    Parameters:
+    ------------
+    obj: object derived from neo BaseSignal class
+    
+    fig: matplotlib Figure object, int ('handle' for mpl figure) or None (default)
+        When None, the current figure will be used or a new one will be created
+        is not figure is abailable
+    
+    pfun: callable, default is pyplot.plot; other functions that can be used are
+        limited to basic 1D plotting, such as `step`, `stem`, `scatter`.
+        For more fancy plotting the users are encouraged to write their own 
+        wrappers.
+    
+    Var-keyword parameters:
+    -----------------------
+    
+    Parameters for the appearance of the plot lines and markers.
+    
+    All are passed to the matlotlib.pyplot.plot(…) function - see documentation 
+    for pyplot.plot function.
+    
+    NOTE: Title, axes labels and legend labels for the channels of `obj` taken 
+        from the data in `obj`.
+    
+    """
+    if isinstance(fig, (mpl.figure.Figure, int)):
+        if isinstance(fig, int):
+            plt.figure(fig) 
+        else:
+            plt.figure(fig.number)
+        
+    else:
+        plt.gcf()
+        
+    if hasattr(obj, "times"):
+        times = obj.times
+        times_units = times.units
+    else:
+        times = np.arange(0, obj.shape[0], 1)
+        times_units = pq.dimensionless
+        
+    if hasattr(obj, "array_annotations") and len(obj.array_annotations) and "channel_names" in obj.array_annotations:
+        labels = list(obj.array_annotations["channel_names"])
+        
+    else:
+        labels = [f'channel {k}' for k in range(obj.shape[1])]
+        
+    if obj.shape[1] == 1:
+        pfun(times, obj, label = labels[0], **kwargs)
+        
+    else:
+        for k in range(obj.shape[1]):
+            pfun(times, obj[:,k], label = labels[k], **kwargs)
+        
+
+    times_units_str = obj.times.units.dimensionality.string
+    xlabel = "" if times_units_str == "dimensionless" else f"{cq.name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+    name = obj.name
+    if name is None or len(name.strip()) == 0:
+        name = name_from_unit(obj.units.dimensionality)
+    ylabel = f"{name} ({obj.units.dimensionality.string})"
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if isinstance(objname, str) and len(objname.strip()):
+        plt.title(objname)
+        
+    plt.legend()
+    

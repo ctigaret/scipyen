@@ -7600,34 +7600,53 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 ret["Delta_I_step"]         = 0 * i_units 
                 
                 
-        apThr = list()
-        apLatency = list()
+        # apThr = list()
+        # apLatency = list()
         
-        for seg_res in ret["Current_injection_steps"]:
+        apThr = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
+        apLatency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
+        apFrequency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
+        apFreqUnits = None
+        nAPs = np.full((len(ret["Current_injection_steps"]), 1), fill_value = 0)
+        
+        for kseg, seg_res in enumerate(ret["Current_injection_steps"]):
             if isinstance(seg_res["AP_analysis"]["AP_train"], neo.SpikeTrain) and len(seg_res["AP_analysis"]["AP_train"]):
                 val = seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"]
-                if val is None:
-                    apThr.append(np.nan)
-                else:
-                    apThr.append(float(val[0]))
+                if val is not None:
+                    apThr[kseg] = float(val.magnitude[0])
+                # if val is None:
+                #     apThr.append(np.nan)
+                # else:
+                #     apThr.append(float(val[0]))
                     
-                apLatency.append(seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start)
+                latval = seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start
+                apLatency[kseg] = latval.magnitude
+                # apLatency.append(seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start)
                 
-            else:
-                apThr.append(np.nan)
-                apLatency.append(np.nan * vstep.times.units)
-                
-        apThr = (np.array(apThr))[:,np.newaxis] * vstep.units
+#             else:
+#                 apThr.append(np.nan)
+#                 apLatency.append(np.nan * vstep.times.units)
+#                 
+            ap_freq = seg_res["AP_analysis"]["Mean_AP_Frequency"]
+            if apFreqUnits is None:
+                apFreqUnits = ap_freq.units
+            apFrequency[kseg] = ap_freq.magnitude
+            nAPs[kseg] = int(seg_res["AP_analysis"]["Number_of_APs"])
+#         apThr = (np.array(apThr))[:,np.newaxis] * vstep.units
+        
+        apThr *= vstep.units
+        apLatency *= vstep.times.units
+        apFrequency *= apFreqUnits
         
         #apThr = [seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"][0] for seg_res in ret["Current_injection_steps"]]
         
         #apLatency = [seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"][0].t_start for seg_res in ret["Current_injection_steps"]]
         
-        apFrequency = [seg_res["AP_analysis"]["Mean_AP_Frequency"] for seg_res in ret["Current_injection_steps"]]
+        # apFrequency = [seg_res["AP_analysis"]["Mean_AP_Frequency"] for seg_res in ret["Current_injection_steps"]]
         
         #f_units = apFrequency[0].units
         
-        nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Current_injection_steps"]]
+        # nAPs = [seg_res["AP_analysis"]["Number_of_APs"] for seg_res in ret["Current_injection_steps"]]
         
         # print(f"Iinj = {Iinj}")
         # print(f"apThr = {apThr}")
@@ -7647,7 +7666,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         
         ret["Mean_AP_Frequency"]    = IrregularlySampledDataSignal(domain = Iinj,
                                                                    signal = apFrequency,
-                                                                   units = apFrequency[0].units, 
+                                                                   units = apFreqUnits, 
                                                                    dtype = np.dtype("float64"),
                                                                    domain_units = i_units,
                                                                    name="Mean AP Frequency")
