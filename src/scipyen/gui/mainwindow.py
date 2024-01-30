@@ -114,7 +114,14 @@ from core import prog
 from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type,
                        filter_attribute, filterfalse_attribute,
-                       scipywarn)
+                       timefunc, timeblock, processtimefunc, 
+                       processtimeblock, Timer, scipywarn, warn_with_traceback, 
+                       get_properties)
+
+# NOTE: 2024-01-30 22:00:13
+# use our own warning - OK for scipyen console
+warnings.showwarning = prog.showwarning
+
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test, unique, index_of, 
@@ -136,8 +143,6 @@ from plots import plots as plots
 from core.scipyen_config import scipyen_config as scipyen_settings
 from core import scipyen_config as scipyenconf
 from core.scipyenmagics import ScipyenMagics
-from core.prog import (timefunc, timeblock, processtimefunc, processtimeblock,
-                       Timer, safeWrapper, warn_with_traceback, get_properties)
 import core.quantities as cq
 from jupyter_client.session import Message
 from IPython.display import set_matplotlib_formats

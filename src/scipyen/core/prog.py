@@ -925,12 +925,53 @@ def _myshowarning(msg:WarningMessage):#, category, filename, lineno, file=None, 
             # warnings get lost
             return
     category = msg.category.__name__
-    s =  f"{msg.filename}:{msg.lineno}: \x1b[0;33m{category}\x1b[0m:\n {msg.message}\n"
+    s =  f"In {msg.filename}, line {msg.lineno}: \n\x1b[0;33m{category}\x1b[0m: {msg.message}\n"
     # s =  f"{msg.filename}:{msg.lineno}:\n\x1b[0;33;47m{category}\x1b[0m:\n {msg.message}\n"
     try:
         file.write(s)
     except:
         pass
+    
+def showwarning(message, category, filename, lineno, file=None, line=None):
+    """To replace stock Python warnings.showwarning"""
+    if file is None:
+        file = sys.stderr
+        if file is None:
+            return
+        
+    if isinstance(category, type):
+        category = category.__name__
+        
+    text = f"In {filename}, line {lineno}: \n\x1b[0;33m{category}\x1b[0m: {message}\n"
+                                                           
+    if line is None:
+        try:
+            import linecache
+            line = linecache.getline(filename, lineno)
+        except Exception:
+            # When a warning is logged during Python shutdown, linecache
+            # and the import machinery don't work anymore
+            line = None
+            linecache = None
+
+    if line:
+        line = line.strip()
+        text += f"  \x1b[0;36m{line}\x1b[0m\n"
+                                         
+    try:
+        file.write(text)
+    except OSError:
+        # the file (probably stderr) is invalid - this warning gets lost.
+        pass
+    # return text
+    
+# def formatwarning(message, category, filename, lineno, line=None):
+#     """To replace stock Python warnings.formatwarning
+#     TODO
+#     Do NOT use yet
+#     """
+#     s =  f"{filename}:{lineno}: {category}: {message}\n"
+#     return s
         
 def term_has_colors():
     if "NO_COLOR" in os.environ:
