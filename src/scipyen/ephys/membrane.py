@@ -66,7 +66,7 @@ from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, 
 #import imaging.scandata
 from imaging.scandata import ScanData
 
-from core.prog import safeWrapper, with_doc
+from core.prog import (safeWrapper, with_doc, scipywarn)
 #from core.patchneo import *
 
 #### END pict.core modules
@@ -763,7 +763,8 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
     domain_units = im_signal.times.units
     
     if not units_convertible(im_signal, pq.A):
-        warnings.warn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
+        scipywarn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
+        # warnings.warn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         
         klass = type(im_signal)
         im_signal = klass(im_signal.magnitude, units = pq.pA, 
@@ -775,7 +776,8 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
         
     if isinstance(testVm, (neo.AnalogSignal, DataSignal, pq.Quantity)):
         if not units_convertible(testVm, pq.V):
-            warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
+            scipywarn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
+            # warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
     
             if isinstance(testVm, neo.base.basesignal.BaseSignal):
                 klass = type(testVm)
@@ -1181,7 +1183,8 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     domain_units = signal.times.units
     
     if not units_convertible(signal, pq.A):
-        warnings.warn(f"'signal' expected to have units of membrane current, not {signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
+        scipywarn(f"'signal' expected to have units of membrane current, not {signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
+        # warnings.warn(f"'signal' expected to have units of membrane current, not {signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         
         klass = type(signal)
         signal = klass(signal.magnitude, units = pq.pA, 
@@ -1193,7 +1196,8 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         
     if isinstance(vstep, (neo.AnalogSignal, DataSignal, pq.Quantity)):
         if not units_convertible(vstep, pq.V):
-            warnings.warn(f"'vstep' signal is expected to have units of membrane potential, not {vstep.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
+            # warnings.warn(f"'vstep' signal is expected to have units of membrane potential, not {vstep.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
+            scipywarn(f"'vstep' signal is expected to have units of membrane potential, not {vstep.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
     
             if isinstance(vstep, neo.base.basesignal.BaseSignal):
                 klass = type(vstep)
@@ -2698,7 +2702,8 @@ def ap_waveform_roots(w, value, interpolate=False):
     if not np.any(flags_ge_value):
         # no sample is >= value
         # bail out gracefully
-        warnings.warn(f"ap_waveform_roots: no part of the signal is >= {value}", RuntimeWarning)
+        # warnings.warn(f"ap_waveform_roots: no part of the signal is >= {value}", RuntimeWarning)
+        scipywarn(f"ap_waveform_roots: no part of the signal is >= {value}", RuntimeWarning)
         
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
     
@@ -2726,7 +2731,8 @@ def ap_waveform_roots(w, value, interpolate=False):
     
     if len(ge_value_starts) == 0:
         # bail out gracefully
-        warnings.warn(f"ap_waveform_roots: cannot find where signal becomes >= {value}", RuntimeWarning)
+        # warnings.warn(f"ap_waveform_roots: cannot find where signal becomes >= {value}", RuntimeWarning)
+        scipywarn(f"ap_waveform_roots: cannot find where signal becomes >= {value}", RuntimeWarning)
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
         
     
@@ -2806,7 +2812,8 @@ def ap_waveform_roots(w, value, interpolate=False):
             decay_cslope = (y1-y0) / (x1-x0)
             
             if decay_cslope > 0:
-                warnings.warn("positive slope on the decay phase", RuntimeWarning)
+                # warnings.warn("positive slope on the decay phase", RuntimeWarning)
+                scipywarn("positive slope on the decay phase", RuntimeWarning)
                 
             decay_x = (float(value) - y0) / decay_cslope + x0
             decay_y = end_sample_ge_value# value of "central" sample 
@@ -4250,7 +4257,8 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
     # resample the Vm signal (the sliced one)
     if resample_with_period is not None:
         if resample_with_period > vstep.sampling_period:
-            warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
+            # warnings.warn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
+            scipywarn("A sampling period larger than the signal's sampling period (%s) was requested (%s); the signal will be DOWNSAMPLED" % (vstep.sampling_period, resample_with_period), RuntimeWarning)
 
         vstep = sigp.resample_pchip(vstep, resample_with_period)
         
@@ -4457,21 +4465,24 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
         
     
         if ref_value < w.min() or ref_value > w.max():
-            warnings.warn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}", RuntimeWarning)
+            # warnings.warn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}", RuntimeWarning)
+            scipywarn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}", RuntimeWarning)
         
             result[ref_name] = (np.nan, np.nan)
     
         rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_waveform_roots(w, ref_value)
         
         if rise_x is np.nan:
-            warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+            # warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+            scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
             # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
             
         if isinstance(rise_x, (tuple, list, np.ndarray)):
             rise_x = rise_x[0]
 
         if decay_x is np.nan:
-            warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+            # warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+            scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
             # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
 
         if isinstance(decay_x, (tuple, list, np.ndarray)):
@@ -6186,7 +6197,8 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
                     times_of_refVm_on_decay.append(decay_refVm_x)
                     
                 else:
-                    warnings.warn("cannot measure duration of waveform %d at Vm %s < onset Vm (%s)" % (k, reference_Vm, ap_Vm_onset_values[k]))
+                    # warnings.warn("cannot measure duration of waveform %d at Vm %s < onset Vm (%s)" % (k, reference_Vm, ap_Vm_onset_values[k]))
+                    scipywarn("cannot measure duration of waveform %d at Vm %s < onset Vm (%s)" % (k, reference_Vm, ap_Vm_onset_values[k]))
                     times_of_refVm_on_rise.append(np.nan)
                     times_of_refVm_on_decay.append(np.nan)
                     
@@ -6517,7 +6529,8 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
     
     if not units_convertible(vm.units, pq.V):
-        warnings.warn("'vm' this does not seem to contain a Vm signal")
+        # warnings.warn("'vm' this does not seem to contain a Vm signal")
+        scipywarn("'vm' this does not seem to contain a Vm signal")
     
     if vm.ndim > 2 or (vm.ndim == 2 and vm.shape[1] > 1):
         raise ValueError("Cannot operate on signal with %d dimensions " % (vm.ndim))
@@ -6572,7 +6585,8 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
     
     if not units_convertible(vm.units, pq.V):
-        warnings.warn("this does not seem to be a Vm signal")
+        # warnings.warn("this does not seem to be a Vm signal")
+        scipywarn("this does not seem to be a Vm signal")
     
     if vm.ndim > 2 or (vm.ndim == 2 and vm.shape[1] > 1):
         raise ValueError("Cannot operate on signal with %d dimensions " % (vm.ndim))
@@ -7602,7 +7616,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 
         # apThr = list()
         # apLatency = list()
-        print(f"analyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps")
+        print(f"\n***\nanalyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps\n***\n")
         apThr = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
         apLatency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
         apFrequency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
@@ -8647,14 +8661,14 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                     w.t_start = 0 * ap_train.times.units
                     
             
-            ahpWstop = [(w.t_start + fAHP_window if w.t_start + fAHP_window < w.t_stop else w.t_stop) if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w in asp_waves]
-            adpWstop = [(w.t_start + ADP_window  if w.t_start + ADP_window  < w.t_stop else w.t_stop) if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w in asp_waves]
+            ahpWstop = [(w.t_start + fAHP_window if w.t_start + fAHP_window < w.t_stop else w.t_stop) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w in asp_waves]
+            adpWstop = [(w.t_start + ADP_window  if w.t_start + ADP_window  < w.t_stop else w.t_stop) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w in asp_waves]
             
             ahpTimes = startTimes
             
-            asp_waves_endpoints = np.array([float(w[-1]) if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w in asp_waves]).flatten()
+            asp_waves_endpoints = np.array([float(w[-1]) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w in asp_waves]).flatten()
             
-            ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w, t in zip(asp_waves, ahpWstop)])
+            ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w, t in zip(asp_waves, ahpWstop)])
             
             # print(f"asp_waves_endpoints shape {asp_waves_endpoints.shape}")
             # print(f"ahpPeakValues shape {ahpPeakValues.shape}")
@@ -8678,7 +8692,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
             # everything else set to 0
             ahpAmplis[ahpAmplis > 0] = 0.
             
-            adpPeakValues = np.array([(w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max()) if isinstance(w, neo.core.basesignal.BaseSignal) else np.nan for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
+            adpPeakValues = np.array([(w.time_slice(w.t_start + ahpS, t).max() if t > ahpS else w.time_slice(w.t_start, ahpS).max()) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0 )else np.nan for w, ahpS, t in zip(asp_waves, ahpWstop, adpWstop)])
             
             # First condition for an ADP:
             # the maximum value ("peak") is larger than last value of the waveform
@@ -8721,12 +8735,14 @@ def extract_afterSpikePotentials(data:dict, Iinj:pq.Quantity,
     stepFlags = np.isclose(data["Injected_current"].magnitude, Iinj.magnitude,
                            atol = atol, rtol = rtol)
     if not np.any(stepFlags):
-        warnings.warn(f"No steps with current injection close to {Iinj} found within absolute and relative tolerances of {atol} and {rtol}, respectively. Bailing out...")
+        # warnings.warn(f"No steps with current injection close to {Iinj} found within absolute and relative tolerances of {atol} and {rtol}, respectively. Bailing out...")
+        scipywarn(f"No steps with current injection close to {Iinj} found within absolute and relative tolerances of {atol} and {rtol}, respectively. Bailing out...")
         return
     
     ndx = np.where(stepFlags)[0]
     if ndx.size > 1:
-        warnings.warn(f"Too many ({ndx.size}) steps with current injection close to {Iinj} were found within absolute and relative tolerances of {atol} and {rtol}, respectively.  Bailing out...")
+        # warnings.warn(f"Too many ({ndx.size}) steps with current injection close to {Iinj} were found within absolute and relative tolerances of {atol} and {rtol}, respectively.  Bailing out...")
+        scipywarn(f"Too many ({ndx.size}) steps with current injection close to {Iinj} were found within absolute and relative tolerances of {atol} and {rtol}, respectively.  Bailing out...")
         return
     
     step = data["Current_injection_steps"][int(ndx[0])]
@@ -8942,7 +8958,8 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
     domain_units = im_signal.times.units
     
     if not units_convertible(im_signal, pq.A):
-        warnings.warn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
+        # warnings.warn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
+        scipywarn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         
         klass = type(im_signal)
         im_signal = klass(im_signal.magnitude, units = pq.pA, 
@@ -8954,7 +8971,8 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         
     if isinstance(testVm, (neo.AnalogSignal, DataSignal, pq.Quantity)):
         if not units_convertible(testVm, pq.V):
-            warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nA new signal will be generated with units of mV. Be careful how you interpret the results")
+            # warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nA new signal will be generated with units of mV. Be careful how you interpret the results")
+            scipywarn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nA new signal will be generated with units of mV. Be careful how you interpret the results")
     
             if isinstance(testVm, neo.base.basesignal.BaseSignal):
                 klass = type(testVm)
@@ -10096,7 +10114,8 @@ def batch_EventDetection(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[
         raise TypeError(f"Expecting a neo.Block, a neo.Segment, or a sequence of neo.Segments; got {type(x).__name__} instead")
     
     if len(segments) == 0:
-        warnings.warn("No data to analyse")
+        # warnings.warn("No data to analyse")
+        scipywarn("No data to analyse")
         return None, None
     
     for k, s in enumerate(segments):
@@ -10114,7 +10133,8 @@ def batch_EventDetection(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[
                 continue
             
         except:
-            warnings.warn(f"No membrane current signal with index or name {Im} is found in segment {k}")
+            # warnings.warn(f"No membrane current signal with index or name {Im} is found in segment {k}")
+            scipywarn(f"No membrane current signal with index or name {Im} is found in segment {k}")
             result.append(None)
             continue
         
@@ -10148,14 +10168,16 @@ def batch_EventDetection(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[
                 
         else:
             if len(s.epochs) == 0:
-                warnings.warn(f"The {k}-th segment of {data_name} Block has no epochs!")
+                # warnings.warn(f"The {k}-th segment of {data_name} Block has no epochs!")
+                scipywarn(f"The {k}-th segment of {data_name} Block has no epochs!")
                 result.append(None)
                 continue
             
             if isinstance(epoch, str):
                 mPSCdetectepochs = [e for e in s.epochs if e.name == epoch]
                 if len(mPSCdetectepochs) == 0:
-                    warnings.warn(f"The {k}-th segment of {data_name} Block does not have epoch(s) named {epoch}")
+                    # warnings.warn(f"The {k}-th segment of {data_name} Block does not have epoch(s) named {epoch}")
+                    scipywarn(f"The {k}-th segment of {data_name} Block does not have epoch(s) named {epoch}")
                     result.append(None)
                     continue
                 
@@ -10164,7 +10186,8 @@ def batch_EventDetection(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[
                     mPSCdetectepochs = [s.epochs[epoch]]
                     
                 else:
-                    warnings.warn(f"Epoch index {epoch} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
+                    # warnings.warn(f"Epoch index {epoch} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
+                    scipywarn(f"Epoch index {epoch} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
                     result.append(None)
                     continue
                 
@@ -10175,18 +10198,21 @@ def batch_EventDetection(x:typing.Union[neo.Block, neo.Segment, typing.Sequence[
                     if isinstance(e, str):
                         me_ = [e_ for e_ in s.epochs if e_.name == e]
                         if len(me_) == 0:
-                            warnings.warn(f"The {k}-th segment of {data_name} Block has no epoch named {e}")
+                            # warnings.warn(f"The {k}-th segment of {data_name} Block has no epoch named {e}")
+                            scipywarn(f"The {k}-th segment of {data_name} Block has no epoch named {e}")
                         mPSCdetectepochs.extend(me_)
                         
                     elif isinstance(e, int):
                         if e in range(-1*len(s.epochs), len(s.epochs)):
                             mPSCdetectepochs.append(s.epochs[e])
                         else:
-                            warnings.warn(f"Epoch index {e} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
+                            # warnings.warn(f"Epoch index {e} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
+                            scipywarn(f"Epoch index {e} is not valid for the {k}-th segment of {data_name} Block with {len(s.epochs)} epochs")
                             
             
             if len(mPSCdetectepochs) == 0:
-                warnings.warn(f"No epochs with specified name or index wwere found in the {k}-th segment of {data_name} Block")
+                # warnings.warn(f"No epochs with specified name or index wwere found in the {k}-th segment of {data_name} Block")
+                scipywarn(f"No epochs with specified name or index wwere found in the {k}-th segment of {data_name} Block")
                 result.append(None)
                 continue
             

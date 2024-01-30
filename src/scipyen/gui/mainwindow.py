@@ -113,7 +113,8 @@ from core.traitcontainers import DataBag
 from core import prog
 from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type,
-                       filter_attribute, filterfalse_attribute)
+                       filter_attribute, filterfalse_attribute,
+                       scipywarn)
 from core.utilities import (summarize_object_properties,
                             standard_obj_summary_headers,
                             safe_identity_test, unique, index_of, 
