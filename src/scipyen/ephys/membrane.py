@@ -4447,10 +4447,12 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
     
     nadir = w[peak_index:].min()
     
-    
     if nadir > onset:
-        w = polyfit_adjust_AP_waveform(w, onset, onset_time, peak_time)
-        result["corr"] = w
+        w_corr = polyfit_adjust_AP_waveform(w, onset, onset_time, peak_time)
+        result["corr"] = w_corr
+        
+    else:
+        w_corr = None
         
     for ref_name, ref_value in references.items():
         if ref_value is None:
@@ -4481,8 +4483,16 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
             rise_x = rise_x[0]
 
         if decay_x is np.nan:
+            if w_corr is not None:
+                scipywarn(f"\x1b[1;36mUsing waveform with a polynomially interpolated envelope for decay crossing of {ref_name} ({ref_value})\x1b[0m in wave {wave_index} of step {step_index}", RuntimeWarning)
+                roots_corr = ap_waveform_roots(w_corr, ref_value)
+                raise_x_corr, raise_y_corr, raise_slope_corr, decay_x, decay_y, decay_slope = roots_corr
+                
+            if decay_x is np.nan:
+                scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+                
             # warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
-            scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+            
             # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
 
         if isinstance(decay_x, (tuple, list, np.ndarray)):
@@ -7555,7 +7565,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             except:
                 # NOTE: 2023-08-14 17:45:52
                 # this usually happens when no current injection is detected in Im
-                print(f"Skipping segment {k} of {name} because of the following exception:")
+                print(f"\x1b[1;31mSkipping segment {k} of {name} because of the following exception:\x1b[0m")
                 traceback.print_exc()
                 continue
             
@@ -7574,6 +7584,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             # ret["Depolarising_steps"].append(segment_result)
             ret["Current_injection_steps"].append(segment_result)
         
+        print(f"\x1b[1;32m\n***\nanalyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps\n***\n\x1b[0m")
     
         seg_times = [s.analogsignals[0].t_start for s in segments]
         
@@ -7616,7 +7627,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                 
         # apThr = list()
         # apLatency = list()
-        print(f"\n***\nanalyse_AP_step_injection_series: {len(ret['Current_injection_steps'])} injection steps\n***\n")
+        
         apThr = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
         apLatency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
         apFrequency = np.full((len(ret["Current_injection_steps"]), 1), fill_value = np.nan)
