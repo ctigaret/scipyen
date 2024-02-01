@@ -7826,6 +7826,67 @@ def plot_rheobase_latency(data,
             if data["Name"] != "rheobase_latency_analysis":
                 raise ValueError("data does not seem to contain a rheobase-latency fit")
                 
+        elif all([v in data for v in ("Irh", "tau", "fit", "fitrheo", "metadata", "plot_data")]):
+            fitrheo = data["fitrheo"]
+            x = data["plot_data"]["X"]
+            y = data["plot_data"]["Y"]
+            x1 = data["plot_data"]["Xfit"]
+            y1 = data["plot_data"]["Yfit"]
+            Irh = data["fit"]["Irh"]
+            tau = data["tau"]
+            x_units = tau.units
+            y_units = Irh.units
+            
+            if all(isinstance(x, numbers.Number) for x in (xstart, xend)) and all([np.isinf(x) for x in (xstart, xend)]):
+                ndx = ~np.isnan(x)
+                x1 = x1[ndx,]
+                y1 = y1[ndx,]
+                
+            else:
+                if xstart is None:
+                    xstart = 0
+                    
+                elif xstart == "auto":
+                    xstart = x[y.argmax()]
+                    
+                elif not isinstance(xstart, (float, int)):
+                    raise TypeError(f"'xstart' expected to be None, a float (in s) or the string 'auto'; got {xstart} instead")
+                
+                if xend in (None, "auto"):
+                    xend = np.nanmax(x)
+                    
+                elif not isinstance(xend, (float, int)):
+                    raise TypeError(f"'xend' expected to be None, a float (in s) or the string 'auto'; got {xend} instead")
+                
+            if isinstance(fig, mpl.figure.Figure):
+                plt.figure(fig)
+
+            plt.clf() # this will also create a new figure when fig is None
+            
+            if not fitrheo:
+                # y is fit of I/Irh
+                plt.plot(x, y, "o", label="Strength vs Latency")
+                plt.plot(x1,y1, label="Fitted Strength vs Latency")
+                plt.ylabel(r"$\mathrm{\mathsf{I}} \/ / \/\mathrm{\mathsf{I_{rheo}}}$")
+                
+            else:
+                # y is fit of I
+                plt.plot(x, y, "o", label="Current vs Latency")
+                plt.plot(x1,y1, label = "Fitted Current vs Latency")
+                plt.ylabel(r"$\mathrm{\mathsf{I}\ (%s)}$" % y_units.dimensionality) 
+                
+            plt.xlabel("Latency (%s)" % x_units.dimensionality)
+            
+            lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
+            if title_prefix is None or (isinstance(title_prefix, str) and len(title_prefix.strip()) == 0):
+                title = f"{lbl} = {Irh[0]}"
+            else:
+                title = f"{title_prefix} {lbl} = {Irh[0]}"
+            plt.title(title)
+            # plt.title(f"{lbl} = {rad['Irh'][0]}")
+            plt.legend()
+            
+            return
             
         else:
             raise ValueError("data does not seem to contain a rheobase-latency fit")
@@ -7869,7 +7930,7 @@ def plot_rheobase_latency(data,
         if not isinstance(fit, dict):
             raise ValueError("Latency vs current data has not been yet fitted")
         
-        assert(all(k in fit.keys() for k in ("x", "y", "parameters", "Irh"))), "Thsi does not seem to be a fitted latency v current data"
+        assert(all(k in fit.keys() for k in ("x", "y", "parameters", "Irh"))), "This does not seem to be a fitted latency v current data"
         
         fitrheo = data.get("fitrheo", False)
         
