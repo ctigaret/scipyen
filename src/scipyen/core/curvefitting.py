@@ -854,7 +854,7 @@ def scale_fit_wave2(x, y, p0 = (1,0)):
     return res
     
 def fit_nsfa(data, p0, **kwargs):
-    """Fit the parabola y = x * i - x²/N + b throgh the observed variable data.
+    """Fit the parabola y = x * i - x²/N + b through the observed variable data.
     Parameters:
     ===========
     data: the observed variable
@@ -1143,45 +1143,7 @@ def fit_model(data, func, p0, *args, **kwargs):
     fargs       = kwargs.pop("fargs",       tuple())
     fkwargs     = kwargs.pop("fkwargs",     dict())
     
-    # def __cost_fun__(x0, t, y, *args, **kwargs):  # returns residuals
     def __cost_fun__(x0, t, y):  # returns residuals
-        # func = model function passed in the params to fit_model
-        # t = independent variable (e.g. time; this is `x` in the main body of fit-model!)
-        # x0 = sequence with initial values for the model parameters!
-        # WARNING do not confuse x0 here with p0 above
-        #
-        # NOTE: 2023-10-19 10:02:24
-        # the below is a BUG
-        # eazy FIXME is to only feed func of the signature
-        # f(x, p, **kwargs)
-        # CAUTION: the model function `func` signature MIGHT expect these parameters
-        # to be passed unpacked (i.e. individually)
-        #
-        # where x is a scalar, p is a SEQUENCE of model parameters
-        #
-        # So here we have two accept two types of signatures:
-        #   func(t, x0, *args, **kwargs) -> TWO named parameters
-        #   OR
-        #   func(t, *args, **kwargs) -> ONE named parameter (with initial parameter
-        #       values contained in *args)
-        # the lines below adapt for that
-#         sig = prog.signature2Dict(func)
-#         namedPars = list(sig["named"].keys())
-#         if len(sig["named"]) == 2:
-#             par2 = sig["named"][namedPars[1]]
-#             if isinstance(par2[1], typing._UnionGenericAlias):
-#                 # function expects a sequence of parameters
-#                 if fargs is None:
-#                     fargs = tuple(p0)
-#                 yf = func(t, x0, *fargs, **fkwargs)
-#             else:
-#                 # function may expect a single model parameter , or model parameters
-#                 # are packed into a single siequence object
-#                 yf = func(t, x0, p0, **fkwargs)
-#                 
-#         else:        
-#             yf = func(t, x0, *fargs, **fkwargs)
-#         
         yf = func(t, x0, **fkwargs)
         ret = y-yf
         
@@ -1206,7 +1168,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         
     else:
         if not isinstance(x, np.ndarray): 
-            raise TypeError(f"When data id a numpy array, x must be given as a numpy array")
+            raise TypeError(f"When data is a numpy array, x must be given as a numpy array")
         
         if x.shape != data.shape:
             raise ValueError(f"x shape {x.shape} is different to to data shape {data.shape}")
