@@ -15,8 +15,8 @@ from neo.core.baseneo import BaseNeo, _check_annotations
                         #_event_channel_dtype)
 
 #from core.axonrawio_patch import AxonRawIO_v1
-from core.neoevent import (_new_Event_v1, _new_Event_v2,)
-from core.neoepoch import _new_Epoch_v1
+# from core.neoevent import (_new_Event_v1, _new_Event_v2,)
+# from core.neoepoch import _new_Epoch_v1
 
 from core.prog import (safeWrapper, signature2Dict,)
 
