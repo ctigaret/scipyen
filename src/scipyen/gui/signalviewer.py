@@ -3891,7 +3891,8 @@ anything else       anything else       ❌
         #pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
         pXData = (i.xData[~np.isnan(i.xData) & ~np.isinf(i.xData)] for i in axis.items if isinstance(i, pg.PlotDataItem) and sgp.nansize(i.xData) > 1)
         
-        precisions = [int(abs(np.round(np.log10((np.diff(x)).mean())))) for x in pXData]
+        # precisions = [int(abs(np.round(np.log10((np.diff(x)).mean())))) for x in pXData]
+        precisions = [int(abs(np.round(np.log10(np.nanmean(np.diff(x)))))) for x in pXData]
         if len(precisions):
             return min(precisions)
             

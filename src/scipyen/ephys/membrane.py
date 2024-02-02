@@ -6559,6 +6559,8 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
             
     ret = IrregularlySampledDataSignal(vm.magnitude * vm.units, 
                                           dvdt.magnitude * dvdt.units, 
+                                          # domain_units = vm.units,
+                                          # units = dvdt.units, 
                                           name="dV/dt",
                                           description="Phase plot data of %s" % vm.name)
     

@@ -1264,7 +1264,8 @@ class IrregularlySampledDataSignal(BaseSignal):
         default_signal_units = pq.dimensionless
         
         # check signal, infer units is possible
-        if isinstance(signal, (neo.AnalogSignal, DataSignal)):
+        # if isinstance(signal, (neo.AnalogSignal, DataSignal)):
+        if isinstance(signal, pq.Quantity):
             call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
             call_args["copy"] = copy
             segment = signal.segment
@@ -1310,7 +1311,8 @@ class IrregularlySampledDataSignal(BaseSignal):
                     dtypes[k] = v
 
         # deal with units specifications
-        
+        # when quants["units"] were determined as above, ignore the "units" argument
+        # 
         if not isinstance(quants["units"], pq.Quantity):
             if isinstance(units, pq.Quantity):
                 quants["units"] = units if isinstance(units, pq.UnitQuantity) else units.units

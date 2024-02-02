@@ -5636,6 +5636,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
+        """Opens files via (triggered from) context menu in File system browser"""
         selectedItems = [self.fileSystemModel.filePath(item) for item in self.fileSystemTreeView.selectedIndexes()
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
 
@@ -5674,7 +5675,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # Now THIS works like a charm...
         # NOTE: 2023-07-12 11:50:19
         # this below using updateUi=False <feels> faster
-        # NOTE: 62023-10-02 10:51:01
+        # NOTE: 2023-10-02 10:51:01
         # self.loadFiles defined in WorkspaceGuiMixin (inherited by this class)
         # which then calls self._openSelectedFileItemsThreaded in a separate 
         # GUI thread.
@@ -6414,7 +6415,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot()
     @safeWrapper
     def slot_openFiles(self):
-        """Opening of several files. Triggered from the 'File/Open' menu action.
+        """Opening of several files via (triggered from) the 'File/Open' menu action.
         """
         from core.utilities import make_file_filter_string
 

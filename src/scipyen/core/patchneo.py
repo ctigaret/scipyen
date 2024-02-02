@@ -15,8 +15,8 @@ from neo.core.baseneo import BaseNeo, _check_annotations
                         #_event_channel_dtype)
 
 #from core.axonrawio_patch import AxonRawIO_v1
-#from core.neoevent import (_new_Event_v1, _new_Event_v2,)
-#from core.neoepoch import _new_Epoch_v1
+from core.neoevent import (_new_Event_v1, _new_Event_v2,)
+from core.neoepoch import _new_Epoch_v1
 
 from core.prog import (safeWrapper, signature2Dict,)
 
@@ -30,10 +30,12 @@ original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal
            } 
 
 def _patch_new_neo(original_f, *args, **kwargs):
+    """All params in neo's _new_* factory functions are NAMED !!!"""
     sig = signature2Dict(original_f)
-    #print(f"sig: {sig}")
+    # print(f"originalsignature: {sig}\n")
     sig_named = list(sig.named.keys())
-    named = dict()
+    # print(f"named parameters= {sig_named}\n")
+    # named = dict()
     var = list()
     
     # first eat up the *args - CAUTION these may contain named params, but 
@@ -45,23 +47,40 @@ def _patch_new_neo(original_f, *args, **kwargs):
             
         elif k in range(len(sig.positional), len(sig_named)):
             var.append(a)
-            #name = sig_named[k-len(sig.positional)]
-            #val = sig.named[name]
-            #named[name] = a
         
         # NOTE: if there is an excess of positional parameters, leave them out
         #else:
             #var.append(a)
+            
+    annotations_index = sig_named.index("annotations")
+    # print(f"annotations_index = {annotations_index}")
     # now eat up kwargs - distribute across named or a new kw
     kw = list(kwargs.keys())
     
     for k in kw:
         v = kwargs.pop(k)
         if k in sig.named:
-            named[k] = v
+            # named[k] = v
+            # CAUTION: 2024-02-02 16:35:41
+            # could overwrite staff in vars
+            k_ndx = sig_named.index(k)
+            var[k_ndx] = v
             
-    #print(f" var {var}, named {named}, kwargs {kwargs}")
-    return original_f(*var, **named, **kwargs)
+    if len(kwargs):
+        # merge unused kwargs into annotations
+        if isinstance(var[annotations_index], dict):
+            var[annotations_index].update(kwargs)
+        else:
+            var[annotations_index] = kwargs
+            
+    if var[annotations_index] is None:
+        var[annotations_index] = dict()
+            
+    # print(f"vars:")
+    # for k in range(len(var)):
+    #     print(f"{k}: {var[k]}")
+            
+    return original_f(*var)
 
 
 patches = dict((k, partial(_patch_new_neo, v)) for k,v in original.items())
