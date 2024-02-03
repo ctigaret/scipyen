@@ -1110,17 +1110,18 @@ def loadPickleFile(fileName):
     
     try:
         with open(fileName, mode="rb") as fileSrc:
-            return pickle.load(fileSrc)
-        
+            ret = pickle.load(fileSrc)
+        return ret
     except Exception as e:
-        if isinstance(e, ModuleNotFoundError):
+        # print(f"loadPickleFile exception {type(e).__name__}:\n {str(e)}")
+        if isinstance(e, (ModuleNotFoundError, TypeError, ValueError)):
             try:
                 pneo.patch_neo_new()
                 with open(fileName, mode="rb") as fileSrc:
                     ret = pickle.load(fileSrc)
                 pneo.restore_neo_new()
-            except Exception as e:
-                print(f"loadPickleFile exception {type(e).__name__}:\n {str(e)}")
+            except Exception as e1:
+                # print(f"loadPickleFile exception {type(e1).__name__}:\n {str(e1)}")
                 pneo.restore_neo_new()
                 raise
             return ret
