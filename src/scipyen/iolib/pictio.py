@@ -1108,6 +1108,7 @@ def loadPickleFile(fileName):
     import_relocated_module("neoevent")
     import_relocated_module("datatypes")
     
+    
     try:
         with open(fileName, mode="rb") as fileSrc:
             ret = pickle.load(fileSrc)

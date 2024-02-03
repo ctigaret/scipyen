@@ -2,9 +2,10 @@
 """
 
 #__all__ = ["neo"]
-
+import sys, os
 import traceback
 import inspect
+import importlib
 from functools import partial
 from copy import deepcopy, copy
 import numpy as np
@@ -20,14 +21,14 @@ from neo.core.baseneo import BaseNeo, _check_annotations
 #from core.axonrawio_patch import AxonRawIO_v1
 # # from core.neoevent import (_new_Event_v1, _new_Event_v2,)
 import core
+from core.workspacefunctions import scipyentopdir
 from core.neoevent import Event
 # # from core.neoepoch import _new_Epoch_v1
 from core import neoepoch
 from core.neoepoch import Epoch, _new_Epoch
 
 # print(f"_new_Epoch: {_new_Epoch.__name__} in {_new_Epoch.__module__}")
-
-from core.prog import (safeWrapper, signature2Dict,)
+from core.prog import (safeWrapper, signature2Dict, SpecFinder)
 
 # #neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
 
@@ -51,6 +52,7 @@ def _patch_new_neo(original_f, *args, **kwargs):
     # print(f"\n_patch_new_neo for class {Fore.GREEN}{cls.__name__}:{Style.RESET_ALL}")
     
     # print(f"_patch_new_neo original_f: {original_f}")
+    
     sig = signature2Dict(original_f)
     # print(f"originalsignature: {sig}\n")
     # print(f" {len(sig.positional)} positional parameters\n")
@@ -63,8 +65,15 @@ def _patch_new_neo(original_f, *args, **kwargs):
     # 'without' the names ... place these into args
     
     for k, a in enumerate(args):
+        # NOTE: 2024-02-03 14:04:06 skip ChannelIndex
+        # the module is reinstated temporarily so that pickle can find the 
+        # definition of ChannelIndex; however, snce its removal from neo package,
+        # neo object constructurs are oblivious to ChannelIndex
         if k < len(sig.positional):
-            var.append(a)
+            if type(a).__name__ == "ChannelIndex":
+                var.append(None)
+            else:
+                var.append(a)
             
         elif k in range(len(sig.positional), len(sig_named)):
             var.append(a)
@@ -96,7 +105,7 @@ def _patch_new_neo(original_f, *args, **kwargs):
         else:
             var[annotations_index] = kwargs
             
-    if var[annotations_index] is None:
+    if not isinstance(var[annotations_index], dict):
         var[annotations_index] = dict()
             
     # print(f" {Fore.YELLOW}{original_f.__name__}{Style.RESET_ALL} will be called with {len(var)} arguments:")
@@ -115,6 +124,10 @@ def _patch_new_neo(original_f, *args, **kwargs):
                 var[annotations_index] = tmp
                 return original_f(*var)
             
+            if "Array annotations must not be None" in str(e):
+                var[array_annotations_index] = dict()
+                return original_f(*var)
+            
         raise
                 
 
@@ -122,8 +135,38 @@ patches = dict((k, partial(_patch_new_neo, v)) for k,v in original.items())
 
 # print(f"module patchneo: patches = {patches}")
 
+def patch_channelindex():
+    file_name = os.path.join(scipyentopdir(), "legacy", "neo", "core", "channelindex.py")
+    module_name = inspect.getmodulename(file_name)
+    module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+    module = importlib.util.module_from_spec(module_spec)
+    sys.modules["neo.core.channelindex"] = module
+    module_spec.loader.exec_module(module)
+    specFinder = SpecFinder({})
+    specFinder.path_map[module_name] = file_name
+    sys.meta_path.append(specFinder)
+
+def unpatch_channelindex():
+    sys.modules.pop("neo.core.channelindex", None)
+    file_name = os.path.join(scipyentopdir(), "legacy", "neo", "core", "channelindex.py")
+    module_name = inspect.getmodulename(file_name)
+    
+    finders_for_modules = [p for p in sys.meta_path if (hasattr(p, "path_map") and module_name in p.path_map.keys())]
+    
+    for i in finders_for_modules:
+        ndx = sys.meta_path.index(i)
+        del sys.meta_path[ndx]
+        
 @safeWrapper
 def patch_neo_new():
+#     from legacy.neo.core import channelindex
+#     neo.core.channelindex = channelindex
+#     
+#     print(f"channelindex: {channelindex}")
+#     print(f"neo.core.channelindex: {neo.core.channelindex}")
+    
+    # patch_channelindex()
+    
     for key, value in patches.items():
         try:
             if '.' in key:
@@ -146,6 +189,7 @@ def patch_neo_new():
             
 @safeWrapper
 def restore_neo_new():
+    # unpatch_channelindex()
     for key, value in original.items():
         try:
             if '.' in key:
