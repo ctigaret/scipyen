@@ -56,7 +56,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from core import pyabfbridge as pab
 
-from core import (xmlutils, strutils, datasignal, neoepoch, neoevent)
+from core import (xmlutils, strutils, datasignal)#, neoepoch, neoevent)
 
 from core.prog import (ContextExecutor, safeWrapper,)
 
@@ -1107,16 +1107,25 @@ def loadPickleFile(fileName):
     import_relocated_module("neoepoch")
     import_relocated_module("neoevent")
     import_relocated_module("datatypes")
+    
     try:
-        pneo.patch_neo_new()
         with open(fileName, mode="rb") as fileSrc:
-            ret = pickle.load(fileSrc)
-        pneo.restore_neo_new()
+            return pickle.load(fileSrc)
+        
     except Exception as e:
-        print(f"loadPickleFile exception {type(e).__name__}:\n {str(e)}")
-        pneo.restore_neo_new()
+        if isinstance(e, ModuleNotFoundError):
+            try:
+                pneo.patch_neo_new()
+                with open(fileName, mode="rb") as fileSrc:
+                    ret = pickle.load(fileSrc)
+                pneo.restore_neo_new()
+            except Exception as e:
+                print(f"loadPickleFile exception {type(e).__name__}:\n {str(e)}")
+                pneo.restore_neo_new()
+                raise
+            return ret
+        
         raise
-    return ret
         
     
 @safeWrapper            

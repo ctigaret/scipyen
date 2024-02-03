@@ -52,6 +52,7 @@ from core import xmlutils
 from core import strutils
 from core.prog import safeWrapper, is_hashable, is_type_or_subclass, ImmutableDescriptor
 from core.datazone import DataZone
+from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 
 #### END pict.core.modules
 

@@ -760,7 +760,7 @@ def name_from_unit(u, as_key:bool=False):
                                 
                         return physQname.capitalize() if not as_key else physQname[0].upper()
                 
-                if "arbitrary unit" in d_name:
+                if "arbitrary unit" in d_name.lower():
                     return "Quantity" if not as_key else "?"
                     #d_name = "A.U."
                 
@@ -770,40 +770,40 @@ def name_from_unit(u, as_key:bool=False):
                 if d_name in ("arcdegree"):
                     return "Angle" if not as_key else "Theta"
                     
-                if "volt" in d_name:
+                if "volt" in d_name.lower():
                     return "Potential" if not as_key else "Psi"
                     
-                if "ampere" in d_name:
+                if "ampere" in d_name.lower():
                     return "Current" if not as_key else "I"
                     
-                if "siemens" in d_name:
+                if "siemens" in d_name.lower():
                     return "Conductance" if not as_key else "G"
                     
-                if "ohm" in d_name:
+                if "ohm" in d_name.lower():
                     return "Resistance" if not as_key else "R"
                     
-                if "coulomb" in d_name:
+                if "coulomb" in d_name.lower():
                     return "Charge" if not as_key else "Q"
                     
-                if "farad" in d_name:
+                if "farad" in d_name.lower():
                     return "Capacitance" if not as_key else "C"
                     
-                if "hertz" in d_name:
+                if "hertz" in d_name.lower():
                     return "Frequency" if not as_key else "f"
                 
-                if any([v in d_name for v in ("meter", "foot", "mile", "yard")]):
+                if any([v in d_name.lower() for v in ("meter", "foot", "mile", "yard")]):
                     return "Length" if not as_key else "L"
                     
-                if "postnatal" in d_name:
+                if "postnatal" in d_name.lower():
                     return "Age"
                     
-                if "in vitro" in d_name:
+                if "in vitro" in d_name.lower():
                     return "Age in vitro" if not as_key else "aiv"
                     
-                if "embryonic" in d_name:
+                if "embryonic" in d_name.lower():
                     return "Embryonic age" if not as_key else "ed"
                     
-                if any([v in d_name for v in ("second", "minute", "day","week", "month", "year")]):
+                if any([v in d_name.lower() for v in ("second", "minute", "day","week", "month", "year")]):
                     return "Time" if not as_key else "t"
                     
                 return "Quantity" if not as_key else "?"

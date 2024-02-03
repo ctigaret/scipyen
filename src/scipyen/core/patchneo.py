@@ -9,6 +9,8 @@ from functools import partial
 from copy import deepcopy, copy
 import numpy as np
 import quantities as pq
+from colorama import Fore, Back, Style
+import termcolor
 
 import neo
 from neo.core.baseneo import BaseNeo, _check_annotations
@@ -16,18 +18,18 @@ from neo.core.baseneo import BaseNeo, _check_annotations
                         #_event_channel_dtype)
 
 #from core.axonrawio_patch import AxonRawIO_v1
-# from core.neoevent import (_new_Event_v1, _new_Event_v2,)
+# # from core.neoevent import (_new_Event_v1, _new_Event_v2,)
 import core
 from core.neoevent import Event
-# from core.neoepoch import _new_Epoch_v1
+# # from core.neoepoch import _new_Epoch_v1
 from core import neoepoch
 from core.neoepoch import Epoch, _new_Epoch
 
-print(f"_new_Epoch: {_new_Epoch.__name__} in {_new_Epoch.__module__}")
+# print(f"_new_Epoch: {_new_Epoch.__name__} in {_new_Epoch.__module__}")
 
 from core.prog import (safeWrapper, signature2Dict,)
 
-#neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
+# #neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
 
 original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal._new_AnalogSignalArray,
            "neo.core.irregularlysampledsignal._new_IrregularlySampledSignal":neo.core.irregularlysampledsignal._new_IrregularlySampledSignal,
@@ -40,12 +42,20 @@ original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal
            } 
 
 def _patch_new_neo(original_f, *args, **kwargs):
-    """All params in neo's _new_* factory functions are NAMED !!!"""
+    """Workarounds to load pickled neo data created a long time ago..."""
+    # All params in neo's _new_* factory functions are NAMED !!!
+    # since this 'patches' _new_* functions, the first element in args is
+    # the actual class of the array type being created:
+    
+    cls = args[0]
+    # print(f"\n_patch_new_neo for class {Fore.GREEN}{cls.__name__}:{Style.RESET_ALL}")
+    
     # print(f"_patch_new_neo original_f: {original_f}")
     sig = signature2Dict(original_f)
     # print(f"originalsignature: {sig}\n")
+    # print(f" {len(sig.positional)} positional parameters\n")
     sig_named = list(sig.named.keys())
-    # print(f"named parameters= {sig_named}\n")
+    # print(f" {len(sig_named)} named parameters = {sig_named}\n")
     # named = dict()
     var = list()
     
@@ -64,7 +74,9 @@ def _patch_new_neo(original_f, *args, **kwargs):
             #var.append(a)
             
     annotations_index = sig_named.index("annotations")
-    # print(f"_patch_new_neo annotations_index = {annotations_index}")
+    # print(f" annotations_index = {annotations_index}")
+    array_annotations_index = sig_named.index("array_annotations")
+    # print(f" array_annotations_index = {array_annotations_index}")
     # now eat up kwargs - distribute across named or a new kw
     kw = list(kwargs.keys())
     
@@ -87,11 +99,24 @@ def _patch_new_neo(original_f, *args, **kwargs):
     if var[annotations_index] is None:
         var[annotations_index] = dict()
             
-    # print(f"_patch_new_neo vars {original_f.__name__} will be called with {len(var)} arguments:")
+    # print(f" {Fore.YELLOW}{original_f.__name__}{Style.RESET_ALL} will be called with {len(var)} arguments:")
     # for k in range(len(var)):
-    #     print(f"{k}: {var[k]}")
+    #     arg_name = f" ({sig_named[k]})" #if k in sig.named else ""
+    #     print(f"  {k}: {var[k]}{arg_name}")
             
-    return original_f(*var)
+    try:
+        return original_f(*var)
+    except Exception as e:
+        if isinstance(e, ValueError):
+            if "Incorrect length of array annotation" in str(e):
+                # swap annotations with array annotations
+                tmp = var[array_annotations_index]
+                var[array_annotations_index] = dict()
+                var[annotations_index] = tmp
+                return original_f(*var)
+            
+        raise
+                
 
 patches = dict((k, partial(_patch_new_neo, v)) for k,v in original.items())
 
@@ -110,7 +135,7 @@ def patch_neo_new():
                 objpath = key
                 fname = value.args[0].__name__ # NOTE: 2024-02-02 23:34:15 value is a partial!
                 module = value.args[0].__module__
-            print(f"patch_neo_new:\n\tkey = {key},\n\tobjpath = {objpath},\n\tmodule = {module}")
+            # print(f"\npatch_neo_new:\n\tkey = {key},\n\tobjpath = {objpath},\n\tmodule = {module}")
             if inspect.ismodule(module):
                 setattr(module, fname, value)
                 

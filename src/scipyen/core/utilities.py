@@ -29,6 +29,7 @@ import pandas as pd
 import quantities as pq
 import vigra
 import pyqtgraph # for their own eq operator
+import matplotlib as mpl
 #import language_tool_python
 
 from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
@@ -2677,9 +2678,10 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     fqual = ".".join([objcls.__module__, clsname])
     ttip = ".".join([typemodulename, typename])
     
-    if isinstance(obj, QtWidgets.QMainWindow):
+    if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
         icon = QtGui.QIcon.fromTheme("window")
-        ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
+        if isinstance(obj, QtWidgets.QMainWindow):
+            ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
         
     # if typename == "module":
     #     icon = QtGui.QIcon.fromTheme("class-or-package")
