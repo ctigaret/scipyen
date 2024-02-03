@@ -48,6 +48,7 @@ import neo
 
 #### BEGIN pict.core modules
 import core.workspacefunctions as wf
+import core.pyabfbridge as pab
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.models as models

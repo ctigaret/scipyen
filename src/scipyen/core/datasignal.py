@@ -1268,7 +1268,10 @@ class IrregularlySampledDataSignal(BaseSignal):
         if isinstance(signal, pq.Quantity):
             call_args = dict((name, getattr(signal, name, None)) for name in call_arg_names)
             call_args["copy"] = copy
-            segment = signal.segment
+            if isinstance(signal, neo.core.basesignal.BaseSignal):
+                segment = signal.segment
+            # else:
+            #     segment = None
             quants["units"] = signal.units
             
         elif isinstance(signal, typing.Sequence):
