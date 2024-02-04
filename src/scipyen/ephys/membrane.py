@@ -395,7 +395,7 @@ def parse_current_injection_timings(data:neo.Block):
     NOTE: When the protocol defines more than one such epoch, the first epoch
     will be used
 
-Returns a 
+Returns a tuple (Istart, Istop, Iinj_0, delta_I)
 
 """
     protocol = pab.ABFProtocol(data)#, generateOutputConfigs=False)
@@ -437,7 +437,7 @@ Returns a
         Istart  = dac.getEpochActualRelativeStartTime(currentInjectionEpoch, 0)
         Istop   = Istart + dac.getEpochActualDuration(currentInjectionEpoch, 0)
         
-    return Istart, Istop, Ignalinj_0, delta_I
+    return Istart, Istop, Iinj_0, delta_I
     
 
 # NOTE: 2023-06-12 16:09:45
