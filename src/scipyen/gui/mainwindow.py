@@ -5101,7 +5101,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.loadFiles(file_paths, self._openSelectedFileItemsThreaded, updateUi=False)
             
             if target_dir and os.path.isdir(target_dir):
-                self.slot_changeDirectory(path)
+                self.slot_changeDirectory(target_dir)
             # for url in urls:
             #     if url.isValid():
             #         if url.isRelative() or url.isLocalFile():
