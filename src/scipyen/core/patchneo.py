@@ -11,7 +11,7 @@ from copy import deepcopy, copy
 import numpy as np
 import quantities as pq
 from colorama import Fore, Back, Style
-import termcolor
+# import termcolor
 
 import neo
 from neo.core.baseneo import BaseNeo, _check_annotations

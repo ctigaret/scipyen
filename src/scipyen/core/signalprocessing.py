@@ -1347,7 +1347,7 @@ def detrend(x:typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
         
     elif detrend_type.lower() == "constant":
         if isinstance(bp, pq.Quantity):
-            if bp.size == 1 and units_convertible(bp, x):
+            if bp.size == 1 and scq.units_convertible(bp, x):
                 return x-bp
             else:
                 raise TypeError(f"Wrong constant value in bp: {bp} for {detrend_type} detrending")
@@ -1593,7 +1593,7 @@ def resample_pchip(sig, new_sampling_period, old_sampling_period = 1):
     
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         if isinstance(new_sampling_period, pq.Quantity):
-            if not units_convertible(new_sampling_period, sig.sampling_period):
+            if not scq.units_convertible(new_sampling_period, sig.sampling_period):
                 raise TypeError("new sampling period units (%s) are incompatible with those of the signal's sampling period (%s)" % (new_sampling_period.units, sig.sampling_period.units))
             
             new_sampling_period.rescale(sig.sampling_period.units)

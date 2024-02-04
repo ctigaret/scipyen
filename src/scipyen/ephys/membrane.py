@@ -354,6 +354,8 @@ class MembranePropertiesAnalysisParameters:
     ADP_window:pq.Quantity = dataclasses.field(default_factory = lambda: 6 * pq.ms)
     # window duration for afterspike ADP analysis
     
+    resample:typing.Optional[pq.Quantity] = None
+    
     # __changed__ = False
     
     def __repr__(self):
@@ -371,10 +373,76 @@ class MembranePropertiesAnalysisParameters:
 #         return self.__changed__
 
 
+def parse_current_injection_timings(data:neo.Block):
+    """
+    Extract current injection timings from the data.
+    Data is a neo.Block containing a series of sweeps (a.k.a, segments) with 
+    rectangular current injection waveforms. The injected current may be 
+    hyperpolarizing (for passive membrane properties) and/or depolarizing 
+    (for AP firing properties).
+
+    In the ABF protocol used for recording, these current injections are specified 
+    as Epochs of type "Step".
+
+    The rectangular current injections waveforms may change step-wise by a constant
+    value ('delta duration') from one sweep to the next, although the most common
+    case is to use the same duration for current injections in all sweeps.
+
+    The amplitude of the current injection is expected to change step-wise by a 
+    constant value ('delta level') from one sweep to the next. The amplitude for 
+    the first sweep must  be != 0.
+
+    NOTE: When the protocol defines more than one such epoch, the first epoch
+    will be used
+
+Returns a 
+
+"""
+    protocol = pab.ABFProtocol(data)#, generateOutputConfigs=False)
+    dac = protocol.outputConfiguration(protocol.activeDACChannelIndex)
+
+    if not scq.units_convertible(dac.units, pq.A):
+        scipywarn(
+            f"Data block {data.name} does not appear to be a current clamp experiment. Expecting a DAC command in current units; instead, got {dac.dacUnits}")
+        useProtocol = False
+
+    # currentInjectionEpochs = [e for e in dac.epochs if e.epochType == pab.ABFEpochType.Step and e.firstLevel !=
+    #                             0 * dac.units and e.deltaLevel != 0 * dac.units and e.deltaDuration == 0 * pq.ms]
+
+    # currentInjectionEpochs = [e for e in dac.epochs if e.epochType == pab.ABFEpochType.Step and e.deltaLevel != 
+    #                           0 * dac.units and e.deltaDuration == 0 * pq.ms]
+    
+    currentInjectionEpochs = [e for e in dac.epochs if e.epochType == pab.ABFEpochType.Step and e.firstLevel != 0 * dac.units ]
+
+    if len(currentInjectionEpochs) == 0:
+        scipywarn(
+            f"Data block {data.name} does not have a suitable current injection epoch")
+        useProtocol = False
+
+    elif len(currentInjectionEpochs) > 1:
+        scipywarn(
+            f"Data block {data.name} appears to have more than one ABF epoch defining a current injection step.\n Will use the first suitable epoch")
+
+    currentInjectionEpoch = currentInjectionEpochs[0]
+    
+    Iinj_0  = currentInjectionEpoch.firstLevel
+    delta_I = currentInjectionEpoch.deltaLevel
+    delta_t = currentInjectionEpoch.deltaDuration
+    
+    if delta_t != 0 * pq.s:
+        Istart  = [dac.getEpochActualRelativeStartTime(currentInjectionEpoch, k) for k in range(protocol.nSweeps)]
+        Istop   = [Istart[k] + dac.getEpochActualDuration(currentInjectionEpoch, k) for k in range(protocol.nSweeps)]
+        
+    else:
+        Istart  = dac.getEpochActualRelativeStartTime(currentInjectionEpoch, 0)
+        Istop   = Istart + dac.getEpochActualDuration(currentInjectionEpoch, 0)
+        
+    return Istart, Istop, Ignalinj_0, delta_I
+    
+
 # NOTE: 2023-06-12 16:09:45
 # measure_Rs_Rin must be defined early so that it can be picked up by the with_doc
 # decorator, later
-
 @safeWrapper
 def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
                   command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity, numbers.Number],
@@ -4030,13 +4098,12 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
     
     im: neo.AnalogSignal (with current injection rectangular waveform) or
         a tuple of three python Quantity objects as follows: 
-            current injection amplitude (pA), t_start (pq.s) and t_stop (pq.s)
-            
-        where t_start and t_stop are the onset and the end of the current 
-        injection waveform.
+            current injection amplitude (pA), t_start (pq.s) and t_stop (pq.s),
+            where t_start and t_stop are the onset and the end of the current 
+            injection waveform.
             
         If 'im' is an AnalogSignal then t_start and t_stop will be determined
-        form the waveform, assuming it is a rectangular wave.
+        from the waveform, assuming it is a rectangular wave.
         
     tail: non-negative scalar Quantity (units: "s"); default is 0.5 s
         duration to be added to t_stop (see above) before slicing the signals
@@ -7435,6 +7502,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     
     Istart = kwargs.pop("Istart", None)
     Istop = kwargs.pop("Istop", None)
+    
     Itimes_samples = kwargs.pop("Itimes_samples", False)
     Itimes_relative = kwargs.pop("Itimes_relative", True)
     
