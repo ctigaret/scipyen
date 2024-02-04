@@ -287,6 +287,7 @@ except:
 # END pyqtdarktheme
 
 
+import colorama # for console output styles
 
 # from IPython.lib.deepreload import reload as dreload
 
