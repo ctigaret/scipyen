@@ -5069,6 +5069,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @pyqtSlot(object, bool, QtCore.QPoint)
     @safeWrapper
     def slot_loadDroppedURLs(self, urls, chdirs, pos):
+        # print(f"{self.__class__.__name__}.slot_loadDroppedURLs")
         if isinstance(urls, (tuple, list)) and all([isinstance(url, QtCore.QUrl) for url in urls]):
             if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
                 # check if this is a python source file
@@ -5078,27 +5079,49 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 if all([s in mimeType.name() for s in ("text", "python")]):
                     self.slot_handlePythonTextFile(urls[0].path(), pos)
                     return
-
-            for url in urls:
-                if url.isValid():
-                    if url.isRelative() or url.isLocalFile():
-                        path = url.path()
-                        if os.path.isdir(path):
-                            self.slot_changeDirectory(path)
-
-                        elif os.path.isfile(path):
-                            if chdirs:
-                                self.slot_changeDirectory(
-                                    os.path.dirname(path))
-
-                            self.loadFile(path)
-
-                        else:
-                            warnings.warn(
-                                "ScipyenWindow.slot_loadDroppedURLs: I don't know how to handle %s" % path)
-                    else:
-                        warnings.warn(
-                            "ScipyenWindow.slot_loadDroppedURLs: Remote URLs not yet supported", NotImplemented)
+                
+            # NOTE: 2024-02-04 10:22:37
+            # deal with directories first; when several are dropped just navigate 
+            # to the most recent one.
+            
+            valid_urls = [u for u in urls if u.isValid() and (u.isRelative() or u.isLocalFile())]
+            
+            if len(valid_urls) == 0:
+                scipywarn(f"{self.__class__.__name__}.slot_loadDroppedURLs: Remote URLs not yet supported", NotImplemented)
+                
+            
+            url_dirs = [u.path() for u in valid_urls if os.path.isdir(u.path()) or (os.path.isfile(u.path()) and chdirs) ]
+            
+            target_dir = None
+            if len(url_dirs):
+                target_dir = url_dirs[-1]
+                
+            file_urls = [u for u in valid_urls if os.path.isfile(u.path())]
+            file_paths = [u.path() for u in file_urls]
+            self.loadFiles(file_paths, self._openSelectedFileItemsThreaded, updateUi=False)
+            
+            if target_dir and os.path.isdir(target_dir):
+                self.slot_changeDirectory(path)
+            # for url in urls:
+            #     if url.isValid():
+            #         if url.isRelative() or url.isLocalFile():
+            #             path = url.path()
+            #             if os.path.isdir(path):
+            #                 self.slot_changeDirectory(path)
+            # 
+            #             elif os.path.isfile(path):
+            #                 if chdirs:
+            #                     self.slot_changeDirectory(
+            #                         os.path.dirname(path))
+            # 
+            #                 self.loadFile(path)
+            # 
+            #             else:
+            #                 warnings.warn(
+            #                     "ScipyenWindow.slot_loadDroppedURLs: I don't know how to handle %s" % path)
+            #         else:
+            #             warnings.warn(
+            #                 "ScipyenWindow.slot_loadDroppedURLs: Remote URLs not yet supported", NotImplemented)
 
     @pyqtSlot(QtCore.QPoint)
     @safeWrapper
@@ -5679,6 +5702,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.loadFiles defined in WorkspaceGuiMixin (inherited by this class)
         # which then calls self._openSelectedFileItemsThreaded in a separate 
         # GUI thread.
+        # print(f"{self.__class__.__name__}.slot_openSelectedFileItems")
         self.loadFiles(selectedItems, 
                        self._openSelectedFileItemsThreaded, updateUi=False)
         # self.loadFiles(selectedItems, 

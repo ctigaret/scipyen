@@ -6126,7 +6126,7 @@ def average_irregular_signals(*args, fun = np.mean, name:typing.Optional[str]=No
                              name=name,
                              description = "Averaged signal")
     
-@safeWrapper
+# @safeWrapper
 def average_signals(*args, fun=np.mean, name:typing.Optional[str]=None):
     """ Returns an AnalogSignal containing the element-by-element average of several neo.AnalogSignals.
     All signals must be single-channel and have compatible shapes and sampling rates.
@@ -6138,6 +6138,9 @@ def average_signals(*args, fun=np.mean, name:typing.Optional[str]=None):
     if len(args) == 1 and isinstance(args[0], (list, tuple)) and all([isinstance(a, (neo.core.analogsignal.AnalogSignal, DataSignal)) for a in args[0]]):
         args = args[0]
 
+    if len(args) == 0:
+        return
+    
     assert all(isinstance(a, neo.AnalogSignal) for a in args) or all(isinstance(a, DataSignal) for a in args), "This function only supports all neo.AnalogSignal OR all DataSignal objects (no mixing of types)"
 
     if any([s.size != args[0].size for s in args]):

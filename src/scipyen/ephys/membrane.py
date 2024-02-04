@@ -7863,6 +7863,10 @@ def plot_rheobase_latency(data,
     
     xend: like xstart, for the maximum latency in the plot
     
+    Returns:
+    ========
+    The plot axes, or None if anything goes wrong.
+    
     CHANGELOG:
     2024-01-19 11:54:50
     """
@@ -7957,7 +7961,7 @@ def plot_rheobase_latency(data,
             # plt.title(f"{lbl} = {rad['Irh'][0]}")
             plt.legend()
             
-            return
+            return plt.gca()
             
         else:
             raise ValueError("data does not seem to contain a rheobase-latency fit")
@@ -8101,6 +8105,8 @@ def plot_rheobase_latency(data,
         plt.title(title)
         # plt.title(f"{lbl} = {rad['Irh'][0]}")
         plt.legend()
+        
+        return plt.gca()
             
     except Exception as e:
         print("data does not seem to contain a rheobase-latency fit")

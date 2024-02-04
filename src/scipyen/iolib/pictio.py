@@ -1089,14 +1089,15 @@ def importDataFrame(fileName):
 def loadPickleFile(fileName):
     """Loads pickled data.
     ATTENTION: 
-    Doesn't load data from pickle files saved with old (pre-git) Scipyen versions
-    where module hierarchies (and paths) have changed.
+    Work in progress to enable loading data from pickle files saved with old 
+    (pre-git) Scipyen versions where module hierarchies (and paths) have changed.
+    
+    NOTE: Pickled neo objects containing "ChannelView" (neo versions < 0.10) will
+    NOT be loaded.
     
     Will also fail to load pickle files that contain objects of dynamic types
     such as those created in the user workspace - a good example is that of
     namedtuple instances - unless they are defined in a loaded module.
-    
-    Moreover it will fail to load neo objects created with older neo versions.
     
     """
     from core import patchneo as pneo

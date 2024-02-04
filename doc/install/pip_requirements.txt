@@ -201,6 +201,7 @@ terminado
 testpath
 thinc
 tiffile
+termcolor
 tokenizers
 traitlets
 transformers
