@@ -154,6 +154,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
     @property
     def selectedColumnIndex(self) -> typing.Optional[int]:
+        """DEPRECATED"""
         # warnings.warn("This property is deprecated; please use self.selectedColumnIndexes")
         return self._selectedColumnIndex_
     
