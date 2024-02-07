@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 #### BEGIN core python modules
-import os, sys, traceback, inspect, numbers, warnings, pathlib, time
+import os, sys, traceback, inspect, numbers, warnings, pathlib, time, io
 import functools, itertools
 import collections, enum
 import typing, types
@@ -207,7 +207,8 @@ class _LTPFilesSimulator_(QtCore.QThread):
     
     defaultTimeout = 10000 # ms
     
-    def __init__(self, parent, simulation:dict = None):
+    def __init__(self, parent, simulation:dict = None,
+                 out: typing.Optional[io.TextIOBase] = None):
         super().__init__(parent=parent)
         
         # print(f"Simulating a supply of ABF (Axon) binary data files")
@@ -216,6 +217,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
         self._simulationCounter_ = 0
         self._simulationFiles_ = []
         self._simulationTimeOut_ = self.defaultTimeout
+        self._stdout_ = out
         
         files = None
         
@@ -248,7 +250,12 @@ class _LTPFilesSimulator_(QtCore.QThread):
     def run(self):
         self._simulationCounter_ = 0
         for k,f in enumerate(self._simulationFiles_):
-            print(f"{k}ᵗʰ file: {f}\n")
+            if isinstance(self._stdout_, io.TextIOBase):
+                # print(f"file {k}: {f} (print to stream {self._stdout_})\n", file=self._stdout_)
+                print(f"file {k}: {f}", file=self._stdout_)
+            else:
+                # print(f"file {k}: {f} (print to stream {sys.stdout})\n")
+                print(f"file {k}: {f}\n")
             self.simulateFile()
             QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             if self.isInterruptionRequested():
@@ -274,7 +281,8 @@ class _LTPOnlineSupplier_(QtCore.QThread):
                  abfRunBuffer: collections.deque, 
                  emitterWindow: QtCore.QObject,
                  directory: pathlib.Path,
-                 simulator: typing.Optional[_LTPFilesSimulator_] = None):
+                 simulator: typing.Optional[_LTPFilesSimulator_] = None,
+                 out: typing.Optional[io.TextIOBase] = None):
         """
         """
         QtCore.QThread.__init__(self, parent)
@@ -476,7 +484,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                  landmarks:dict,
                  data:dict, 
                  resultsAnalysis:dict,
-                 viewers:dict):
+                 viewers:dict,
+                 out: typing.Optional[io.TextIOBase] = None):
         QtCore.QThread.__init__(self, parent)
         
         self._abfRunBuffer_ = abfBuffer
@@ -1329,8 +1338,8 @@ class LTPOnline(QtCore.QObject):
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
                  autoStart:bool=False, # NOTE: change to True when done coding TODO
                  parent=None,
-                 simulate = None
-                 ):
+                 simulate = None,
+                 out: typing.Optional[io.TextIOBase] = None):
         """
         Var-positional parameters:
         --------------------------
@@ -1656,7 +1665,8 @@ class LTPOnline(QtCore.QObject):
                                                              self._landmarks_,
                                                              self._data_, 
                                                              self._results_, 
-                                                             self._viewers_)
+                                                             self._viewers_,
+                                                             out)
         
         self._simulation_ = None
         
@@ -1681,14 +1691,16 @@ class LTPOnline(QtCore.QObject):
             self._simulator_params_ = dict(files=None, timeout = int(simulate))
         
         if self._doSimulation_:
-            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_)
+            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, out)
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
-                                        simulator = self._simulatorThread_)
+                                        simulator = self._simulatorThread_,
+                                        out = out)
             
         else:
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
-                                        self._emitterWindow_, self._watchedDir_)
+                                        self._emitterWindow_, self._watchedDir_,
+                                        out = out)
         
         self._abfSupplierThread_.abfRunReady.connect(self._abfProcessorThread_.processAbfFile,
                                                      QtCore.Qt.QueuedConnection)
@@ -1735,6 +1747,7 @@ class LTPOnline(QtCore.QObject):
             super().__del__()
             
     def _parse_args_(self, *args):
+        # print(f"{self.__class__.__name__}._parse_args_: args = {args}")
         if len(args) == 0:
             self._sources_ = None
             # TODO: 2024-01-04 22:19:44 
@@ -1744,10 +1757,9 @@ class LTPOnline(QtCore.QObject):
             if not all(isinstance(a, RecordingSource) for a in args):
                 raise TypeError(f"Expecting one or more RecordingSource objects")
             
-            sset = set(args)
+            dupsrc = duplicates(args, indices=True)
             
-            if len(sset) < len(args):
-                dupsrc = duplicates(args, indices=True)
+            if len(dupsrc):
                 raise ValueError(f"Duplicate sources detected in 'args': {dupsrc}")
         
             # parse sources from args; make sure there are identical names
@@ -3644,3 +3656,23 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
     
     return result
 
+def make2PathwaysLTPSource(name:str, adc:int=0, dac:int=0, dig0:int=0, dig1:int=1):
+    """Factory function for a RecordingSource in two pathways LTP.
+    
+    Named parameters:
+    -----------------
+    adc, dac: int, index of the ADC and DAC channels used in the experiment
+    
+    """
+    assert all(isinstance(v, int) for v in (adc, dac, dig0, dig1)), "The `adc`, `dac`, `dig0`, `dig1` parameters must be of type int"
+    assert dig0 != dig1, "In two pathway experiments the digital stimulation channels must be distinct"
+    
+    digs = (dig0, dig1)
+    if any(d < 0 for d in digs):
+        raise ValueError(f"All digital channels must be >= 0; got {digs} instead")
+    
+    
+    synStims = [SynapticStimulus(f"path{k}", digs[k]) for k in range(len(digs))]
+    
+    return RecordingSource(name, 0, 0, synStims)
+    

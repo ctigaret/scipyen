@@ -4369,4 +4369,3 @@ command signal.
 # should also pass an abf object; 
 # find out adc names and units ⇒ recorded signal
 # then for the DAC: dacNames, dacUnits ⇒ "command signal"
-    
