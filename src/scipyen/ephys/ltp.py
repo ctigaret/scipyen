@@ -123,10 +123,93 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
-def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None,
-                      path0:int=0, path1:int=1, name:str="cell", 
+def plasticityInductionSource(adc:typing.Union[int, str] = 0, dac:typing.Optional[int] = None, path:int=0, 
+              pathname:typing.Optional[str]=None,
+              name:str = "cell", **kwargs):
+    """Factory for RecordingSource for plasticity induction.
+    
+    Parameters:
+    -----------------
+    adc, dac, name: See ephys.ephys.RecordingSource constructor for a full description.
+        Briefly:
+        adc, dac: int, physical indexes of the ADC & DAC used 
+        name: str, name of the source (e.g. 'cell01')
+        
+    NOTE: for convenience, a string may be passed as first parameter (in place of `adc`). 
+    This will be used as the 'name' of the source, and `adc` will be set to 0 (zero). 
+    In this case, specifying the `name` parameter again will raise an exception.
+    
+    path: int — the index of the digital output channel
+    pathname: str, None — the name of the synaptic stimulus; 
+        When None (the default) the synaptic stimulus will be named as "pathX"
+        where "X" is the value of the `path` parameter.
+        
+    Here, the default parameter values associate `adc` 0 with `dac` 0 and one 
+    SynapticStimulus object using the first digital output channel (0).
+    
+    Var-keyword parameters:
+    --------------------------
+    These are `auxin` and `auxout`, and by default are set to None.
+    
+    In a given application, the 'name' field of RecordingSource objects should have unique
+    values in order to allow the lookup of these objects according to this field.
+    
+    Returns:
+    --------
+    An immutable ephys.ephys.RecordingSource object (a NamedTuple). 
+    
+    One can create a modified version using the '_replace' method:
+    (WARNING: Remember to also change the value of the RecordingSource's 'name' field)
+    
+    """
+    if pathname is None or (isinstance(pathname, str) and len(pathname.strip()) == 0):
+        pathname = f"path{path}"
+        
+    elif not isinstance(pathname, str):
+        raise TypeError(f"'pathname' expected an int or None; instead, got {type(pathname).__name__}")
+    
+    _name = None
+    if isinstance(adc, str) and len(adc.strip()):
+        _name = adc
+        adc = 0
+        
+    if name is None:
+        if isinstance(_name, str):
+            name = _name
+        else:
+            name = "cell"
+        
+    elif isinstance(name, str):
+        if isinstance(_name, str):
+            raise SyntaxError("'name' was already specified by first parameter")
+        
+        if len(name.strip()) == 0:
+            name = "cell"
+            
+    else:
+        raise TypeError(f"'name' expected to be  str or None; instead, got {type(name).__name__}")
+        
+    syn = SynapticStimulus(pathname, path)
+    auxin   = kwargs.pop("auxin", None)
+    auxout  = kwargs.pop("auxout", None)
+    
+    if auxin is not None:
+        if (isinstance(auxin, typing.Sequence) and not all(isinstance(v, AuxiliaryInput) for v in auxin)) or not isinstance(auxin, AuxiliaryInput):
+            raise TypeError(f"'auxin' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
+    
+    if auxout is not None:
+        if (isinstance(auxout, typing.Sequence) and not all(isinstance(v, AuxiliaryOutput) for v in auxout)) or not isinstance(auxout, AuxiliaryOutput):
+            raise TypeError(f"'auxout' expected to be an AuxiliaryOutput or a sequence of AuxiliaryOutput, or None")
+
+    
+    return RecordingSource(name, adc, dac, syn, auxin, auxout)
+
+
+def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=None,
+                      path0:int=0, path1:int=1, name:typing.Optional[str]=None, 
+                      
                       **kwargs):
-    """Factory for a data source in two-pathways synaptic plasticity experiments.
+    """Factory for a RecordingSource in two-pathways synaptic plasticity experiments.
     
     Synaptic stimulation is carried out via extracellular electrodes using
     simulus devices driven by TTLs via DIG channels.
@@ -155,15 +238,22 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
     Named parameters:
     -----------------
     adc, dac, name: See ephys.ephys.RecordingSource constructor for a full description.
-    path0, path1 (int) >= 0 indices of DIG channels used to stimulate the pathways.
+        Briefly:
+        adc, dac: int, physical indexes of the ADC & DAC used 
+        name: str, name of the source (e.g. 'cell01')
     
+    NOTE: for convenience, a string may be passed as first parameter (in place of `adc`). 
+    This will be used as the 'name' of the source, and `adc` will be set to 0 (zero). 
+    In this case, specifying the `name` parameter again will raise an exception.
+                
+    path0, path1 (int) >= 0 indices of DIG channels used to stimulate the pathways.
     
     Here, the default parameter values associate 'adc' 0 with 'dac' 0 and two 
     SynapticStimulus objects, using 'dig' 0 and 'dig' 1, respectively.
     
     Var-keyword parameters:
     --------------------------
-    These are 'auxin' and 'auxout', and by default are set to 'None'.
+    These are `auxin` and `auxout`, and by default are set to 'None'.
     
     In a given application, the 'name' field of RecordingSource objects should have unique
     values in order to allow the lookup of these objects according to this field.
@@ -185,6 +275,29 @@ def twoPathwaysSource(adc:int=0, dac:typing.Optional[typing.Union[int,str]]=None
     ¹ It is illegal to use Python keywords as name here.
     
     """
+    _name = None
+    if isinstance(adc, str) and len(adc.strip()):
+        _name = adc
+        adc = 0
+        
+    if name is None:
+        if isinstance(_name, str):
+            name = _name
+        else:
+            name = "cell"
+        
+    elif isinstance(name, str):
+        if isinstance(_name, str):
+            raise SyntaxError("'name' was already specified by first parameter")
+        
+        if len(name.strip()) == 0:
+            name = "cell"
+            
+    else:
+        raise TypeError(f"'name' expected to be  str or None; instead, got {type(name).__name__}")
+    
+    assert path0 != path1, f"Test and control pathways must correspond to output channels with distinct indexes; instead got test path: {test_path}, control path: {control_path}"
+        
     syn     = (SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)) 
     auxin   = kwargs.pop("auxin", None)
     auxout  = kwargs.pop("auxout", None)
@@ -246,16 +359,17 @@ class _LTPFilesSimulator_(QtCore.QThread):
                 
         if len(self._simulationFiles_) == 0:
             print(f"No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
-                
+               
+    def print(self, msg):
+        if isinstance(self._stdout_, io.TextIOBase):
+            print(msg, file = self._stdout_)
+        else:
+            print(msg)
+               
     def run(self):
         self._simulationCounter_ = 0
         for k,f in enumerate(self._simulationFiles_):
-            if isinstance(self._stdout_, io.TextIOBase):
-                # print(f"file {k}: {f} (print to stream {self._stdout_})\n", file=self._stdout_)
-                print(f"file {k}: {f}", file=self._stdout_)
-            else:
-                # print(f"file {k}: {f} (print to stream {sys.stdout})\n")
-                print(f"file {k}: {f}\n")
+            self.print(f"{self.__class__.__name__}.run: reading file {k}: {f}")
             self.simulateFile()
             QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             if self.isInterruptionRequested():
@@ -291,6 +405,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
         self._simulator_ = simulator
+        self._stdout_ = out
         
         wsp = wf.user_workspace()
         
@@ -432,6 +547,12 @@ class _LTPOnlineSupplier_(QtCore.QThread):
             if abf in self._filesQueue_:
                 self._filesQueue_.remove(abf)
             
+    def print(self, msg):
+        if isinstance(self._stdout_, io.TextIOBase):
+            print(msg, self._stdout_)
+        else:
+            print(msg)
+               
     def run(self):
         # print(f"{self.__class__.__name__}.run(): simulator = {self._simulator_}")
         if isinstance(self._simulator_, _LTPFilesSimulator_):
@@ -477,6 +598,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     """Helper class for LTPOnline.
         Runs analysis on a single Clampex trial in a separate thread.
     """
+    # NOTE: 2024-02-08 15:05:35
+    # for each source in _runData_.sources, determine the relationships between
+    # a DAC, input signal (logical ADC) and stimulus channels
+    # CAUTION: all ADC/DAC signals indexes in a source are PHYSICAL indexes
+    #
+    # also, each paths have "equal" until an induction protocol is supplied,
+    # which will determine the identity of test and control pathways
+    #
     def __init__(self, parent:QtCore.QObject, 
                  abfBuffer:collections.deque,
                  abfRunParams:dict,
@@ -489,24 +618,35 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         QtCore.QThread.__init__(self, parent)
         
         self._abfRunBuffer_ = abfBuffer
-        self._runParams_ = abfRunParams
+        self._runData_ = abfRunParams
         self._presynaptic_triggers_ = presynapticTriggers
         self._landmarks_ = landmarks
         self._data_ = data
         self._results_ = resultsAnalysis
         self._viewers_ = viewers
+        self._stdout_ = out
+        
+    def print(self, msg):
+        if isinstance(self._stdout_, io.TextIOBase):
+            print(msg, file=self._stdout_)
+        else:
+            print(msg)
         
     @safeWrapper
     @pyqtSlot(pathlib.Path)
     def processAbfFile(self, abfFile:pathlib.Path):
         """Reads and ABF protocol from the ABF file and analyses the data
         """
-        
+        msg = f"{self.__class__.__name__}.processAbfFile received {abfFile}"
+        self.print(msg)
+            
         try:
+            # NOTE: 2024-02-08 14:18:32
+            # abfRun should be a neo.Block
             abfRun = pio.loadAxonFile(str(abfFile))
-            self._runParams_.abfRunTimesMinutes.append(abfRun.rec_datetime)
-            deltaMinutes = (abfRun.rec_datetime - self._runParams_.abfRunTimesMinutes[0]).seconds/60
-            self._runParams_.abfRunDeltaTimesMinutes.append(deltaMinutes)
+            self._runData_.abfRunTimesMinutes.append(abfRun.rec_datetime)
+            deltaMinutes = (abfRun.rec_datetime - self._runData_.abfRunTimesMinutes[0]).seconds/60
+            self._runData_.abfRunDeltaTimesMinutes.append(deltaMinutes)
             
             # NOTE: 2023-12-29 14:59:01
             # get the ADC channels from the signals in abfRun
@@ -520,42 +660,35 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # and set an appropriate interval between successive trials !
             assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
-#             if isinstance(self._runParams_.dacChannels, int):
-#                 dacs = [protocol.outputConfiguration(c) for c in range(self._runParams_.dacChannels)]
-#                 
-#             elif isinstance(self._runParams_.dacChannels, (tuple, list)) and all(isinstance(v, int) for v in self._runParams_.dacChannels):
-#                 dacs = [protocol.outputConfiguration(c) for c in self._runParams_.dacChannels]
+            self.print(self._runData_.sources)
             
-            # if protocol.activeDACChannelIndex not in [d.number for d in dacs]:
-            #     raise ValueError(f"Neither dac in {self._runParams_.dacChannels} is the active DAC channel for this protocol")
-            
-#             if len(self._runParams_.episodes) == 0:
-#                 # this is the first run ever ⇒ create a new recording episode
-#                 episodeName = self._runParams_.episodeName
-#                 if not isinstance(episodeName, str) or len(episodeName.strip()) == 0:
-#                     episodeName = protocol.name
-#                     
-#             episodes = list(self._results_.keys())
             
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
             # 
-            # upon first run, self._runParams_.protocol is None
-            if not isinstance(self._runParams_.currentProtocol, pab.ABFProtocol):
-                self._runParams_.currentProtocol = protocol
+            # upon first run, self._runData_.protocol is None
+            if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
+                self._runData_.currentProtocol = protocol
+                self._runData_.newEpisode = False
                 # set up new episode
                 # since Clampex only runs on Windows, we simply split the string up:
                 #
                 episodeName = protocol.name
                 
-            elif protocol != self._runParams_.currentProtocol:
+                self.print(f"initial protocol = {protocol.name}")
+                
+                # self.processProtocol(protocol)
+                
+                
+            elif protocol != self._runData_.currentProtocol:
                 # a different protocol - here, newEpisode should have been "True"
                 # if not, then automatically set a new episode and "invent" a name 
                 # for it
-                if not self._runParams_.newEpisode:
-                    self._runParams_.newEpisode = True
-                    episodeName = self._runParams_.currentEpisodeName
-                    newEpisodeName = utilities.counter_suffix(episodeName, self._runParams_.episodes)
+                self.print(f"new protocol: {protocol.name}")
+                if not self._runData_.newEpisode:
+                    self._runData_.newEpisode = True
+                    episodeName = self._runData_.episodeName
+                    newEpisodeName = utilities.counter_suffix(episodeName, self._runData_.episodes)
                     
             
 
@@ -587,8 +720,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # which should have the same monitoring protocol
             #
             
-#             if self._runParams_.currentProtocol is None:
-#                 if protocol.clampMode() == self._runParams_.clampMode:
+#             if self._runData_.currentProtocol is None:
+#                 if protocol.clampMode() == self._runData_.clampMode:
 #                     assert(protocol.nSweeps in range(1,3)), f"Protocols with {protocol.nSweeps} are not supported"
 #                     if protocol.nSweeps == 2:
 #                         assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
@@ -596,27 +729,27 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                         
 #                         # TODO check for alternate digital outputs → True ; alternate waveform → False
 #                         # → see # NOTE: 2023-10-07 21:35:39 - DONE ?!?
-#                     # self._runParams_.monitorProtocol = protocol
-#                     self._runParams_.currentProtocol = protocol
-#                     self._runParams_.newEpisode = False
+#                     # self._runData_.monitorProtocol = protocol
+#                     self._runData_.currentProtocol = protocol
+#                     self._runData_.newEpisode = False
 #                     self.processTrackingProtocol(protocol)
 #                 else:
-#                     raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._runParams_.clampMode}")
+#                     raise ValueError(f"First run protocol has unexpected clamp mode: {protocol.clampMode()} instead of {self._runData_.clampMode}")
 #                 
 #             else:
-#                 # if protocol != self._runParams_.monitorProtocol:
-#                 if protocol != self._runParams_.currentProtocol:
-#                     if self._runParams_.newEpisode:
-#                         if self._runParams_.currentEpisodeName is None:
-#                             self._runParams_.currentEpisodeName = protocol.name
-#                         if self._runParams_.currentProtocolIsConditioning:
-#                             self._runParams_.conditioningProtocols.append(protocol)
+#                 # if protocol != self._runData_.monitorProtocol:
+#                 if protocol != self._runData_.currentProtocol:
+#                     if self._runData_.newEpisode:
+#                         if self._runData_.currentEpisodeName is None:
+#                             self._runData_.currentEpisodeName = protocol.name
+#                         if self._runData_.currentProtocolIsConditioning:
+#                             self._runData_.conditioningProtocols.append(protocol)
 #                         else:
-#                             self._runParams_.monitoringProtocols.append(protocol)
+#                             self._runData_.monitoringProtocols.append(protocol)
 #                             
-#             if self._runParams_.currentProtocol.nSweeps == 2:
+#             if self._runData_.currentProtocol.nSweeps == 2:
 #                 # if not self._monitorProtocol_.alternateDigitalOutputStateEnabled:
-#                 if not self._runParams_.currentProtocol.alternateDigitalOutputStateEnabled:
+#                 if not self._runData_.currentProtocol.alternateDigitalOutputStateEnabled:
 #                     # NOTE: this is moot, because the protocol has already been checked
 #                     # in the processTrackingProtocol
 #                     raise ValueError("When the protocol defines two sweeps, alternate digtal outputs MUST have been enabled in the protocol")
@@ -634,8 +767,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                 
 #             # From here on we do things differently, depending on whether protocol is a
 #             # the monitoring protocol or the conditioning protocol
-#             if protocol == self._runParams_.currentProtocol:
-#                 adc = protocol.inputConfiguration(self._runParams_.adcChannel)
+#             if protocol == self._runData_.currentProtocol:
+#                 adc = protocol.inputConfiguration(self._runData_.adcChannel)
 #                 sigIndex = neoutils.get_index_of_named_signal(abfRun.segments[0].analogsignals, adc.name)
 #                 # for k, seg in enumerate(abfRun.segments[:1]): # use this line for debugging
 #                 for k, seg in enumerate(abfRun.segments):
@@ -648,8 +781,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                     sweepStartTime = protocol.sweepTime(k)
 #                     
 #                     # self._data_["baseline"][pndx].segments.append(abfRun.segments[k])
-#                     self._data_[self._runParams_.currentEpisodeName][pndx].segments.append(abfRun.segments[k])
-#                     if isinstance(self._presynaptic_triggers_[self._runParams_.currentEpisodeName][pndx], TriggerEvent):
+#                     self._data_[self._runData_.currentEpisodeName][pndx].segments.append(abfRun.segments[k])
+#                     if isinstance(self._presynaptic_triggers_[self._runData_.currentEpisodeName][pndx], TriggerEvent):
 #                         self._data_["baseline"][pndx].segments[-1].events.append(self._presynaptic_triggers_[pndx])
 #                         
 #                     viewer = self._viewers_[pndx]#["synaptic"]
@@ -899,6 +1032,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
 
     def processProtocol(self, protocol:pab.ABFProtocol):
+        self.print(f"{self.__class__.__name__}.processProtocol {protocol.name}")
+        for source in self._runData_.sources:
+            pass
         clampMode = protocol.clampMode(self._adcChannel_, self._dacChannel_)
         adc = protocol.inputConfiguration(self._adcChannel_)
         dac = protocol.outputConfiguration(self._dacChannel_)
@@ -911,18 +1047,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
             assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
             
-        if self._runParams_.protocol is None:
-            self._runParams_.newEpisode = True
+        if self._runData_.protocol is None:
+            self._runData_.newEpisode = True
             
-        self._runParams_.protocol = protocol
+        self._runData_.protocol = protocol
         
-        if self._runParams_.currentProtocolIsConditioning:
-            self._runParams_.newEpisode
-            self._runParams_.conditioningProtocols.append(protocol)
+        if self._runData_.currentProtocolIsConditioning:
+            self._runData_.newEpisode
+            self._runData_.conditioningProtocols.append(protocol)
         else:
-            self._runParams_.monitoringProtocols.append(protocol)
+            self._runData_.monitoringProtocols.append(protocol)
         
-        if self._runParams_.newEpisode:
+        if self._runData_.newEpisode:
             self.processTrackingProtocol(protocol)
         
 
@@ -1497,10 +1633,31 @@ class LTPOnline(QtCore.QObject):
         
         # place analysis results inside each episode sub-dict ⇒ do away with _episodeResults_
         
-        self._runParams_ = DataBag(sources = self._sources_,
+        # NOTE: 2024-02-08 15:20:08 in _runData_:
+        # episodes is a mapping episode name (str) ↦ episode data (dict)
+        #
+        # episode data is a mapping:
+        #   source name (str) ↦ source data (dict)
+        #  
+        # source data is a mapping:
+        #   "input" ↦ input signal index (int) ≡ logical ADC index ← to be inferred form the protocol
+        #                                       using the physical ADC index supplied by the source
+        #
+        #   "responses" ↦ sequence (list) of ephys.LocationMeasure objects (see below):
+        #
+        #   "results" ↦ sequence (list) of result dicts (see below)
+        #
+        # A 
+        #
+        #   "location" ↦
+        #           locations and functors for determining a measure of synaptic response
+        #
+        
+        self._runData_ = DataBag(sources = self._sources_,
                                    data = self._data_,
                                    newEpisode = True,
                                    episodeName = None, # default is "baseline"
+                                   episodes = dict(), # map episode name to data
                                    abfRunTimesMinutes = list(),
                                    abfRunDeltaTimesMinutes = list(),
                                    baselineDurations = baselineDurations,
@@ -1524,12 +1681,12 @@ class LTPOnline(QtCore.QObject):
         # WARNING: 2023-10-05 12:10:40
         # below, all timings in self._landmarks_ are RELATIVE to the start of the sweep!
         # timings are stored as [start time, duration] (all Quantity scalars, with units of time)
-        if self._runParams_.trackingClampMode == ephys.ClampMode.VoltageClamp:
+        if self._runData_.trackingClampMode == ephys.ClampMode.VoltageClamp:
             self._episodeResults_ = {"path0": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
                               "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
                               "DC": [], "Rs":[], "Rin":[], }
             
-            self._landmarks_ = {"Rbase":[self._runParams_.signalBaselineStart, self._runParams_.signalBaselineDuration], 
+            self._landmarks_ = {"Rbase":[self._runData_.signalBaselineStart, self._runData_.signalBaselineDuration], 
                                 "Rs":[None, None], 
                                 "Rin":[None, None], 
                                 "PSCBase":[None, None],
@@ -1542,15 +1699,15 @@ class LTPOnline(QtCore.QObject):
                               "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
                               "tau":[], "Rin":[], "Cap":[], }
             
-            if self._runParams_.useSlopeInIClamp:
-                self._landmarks_ = {"Base":[self._runParams_.signalBaselineStart, self._runParams_.signalBaselineDuration], 
+            if self._runData_.useSlopeInIClamp:
+                self._landmarks_ = {"Base":[self._runData_.signalBaselineStart, self._runData_.signalBaselineDuration], 
                                     "VmTest":[None, None], 
                                     "PSP0Base":[None, None],
                                     "PSP0Peak":[None, None],
                                     "PSP1Base":[None, None],
                                     "PSP1Peak":[None, None]}
             else:
-                self._landmarks_ = {"Base":[self._runParams_.signalBaselineStart, self._runParams_.signalBaselineDuration], 
+                self._landmarks_ = {"Base":[self._runData_.signalBaselineStart, self._runData_.signalBaselineDuration], 
                                     "VmTest":[None, None], 
                                     "PSPBase":[None, None],
                                     "PSP0Peak":[None, None],
@@ -1661,7 +1818,7 @@ class LTPOnline(QtCore.QObject):
         
         self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self, 
                                                              self._abfRunBuffer_,
-                                                             self._runParams_,
+                                                             self._runData_,
                                                              self._presynaptic_triggers_, 
                                                              self._landmarks_,
                                                              self._data_, 
