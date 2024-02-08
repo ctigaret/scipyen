@@ -1545,7 +1545,7 @@ class LTPOnline(QtCore.QObject):
         # group accordingly.
         #
         # Epsiodes: 
-        # A synaptic plasticity experiment occurs in three episodes (or stages):
+        # A synaptic plasticity experiment occurs (typically) in three episodes (or stages):
         #
         # 1. baseline      — records the evolution of synaptic responses BEFORE
         #                   conditioning (see below); responses are recorded as 
@@ -1587,6 +1587,9 @@ class LTPOnline(QtCore.QObject):
         #                   At the time of writing, this code supports only 
         #                   ABF/Clampex files.
         #
+        # 1.a drug wash in - optional, when testing the effect fo a drug on, say,
+        #                    induction of plasticity
+        #
         # 2. conditioning  — the protocol (a combination of synaptic and postsynaptic
         #                   activity) used to induce (or attempt to induce) synaptic
         #                   plasticity at a defined synaptic pathway — i.e., the 
@@ -1600,10 +1603,16 @@ class LTPOnline(QtCore.QObject):
         #                   
         # 3. chase         — records synaptic responses AFTER conditioning — 
         #                   signal layout is identical to that of the baseline episode.
+        #
+        #                   The drug wash out may take place inat the beginning 
+        #                   o the chase episode
         # 
         
-        # Data is organized by RecordingSource; for each RecordingSource we may have more than one
-        # SynapticStimulus configuration
+        # Data is organized by RecordingSource; for each RecordingSource we may 
+        #   have more than one SynapticStimulus configuration,. such that each 
+        #   SynapticStimulus corresponds to one synaptic pathway. Ideally, and 
+        #   when possible, there should be two such pathway, with conditioning
+        #   being applied only to one of them ("test" pathway)
         
         # technically, Conditioning should only use ONE pathway; since an empty
         #       neo.Block does not use much resources, we leave this empty
@@ -1634,19 +1643,46 @@ class LTPOnline(QtCore.QObject):
         # place analysis results inside each episode sub-dict ⇒ do away with _episodeResults_
         
         # NOTE: 2024-02-08 15:20:08 in _runData_:
-        # episodes is a mapping episode name (str) ↦ episode data (dict)
+        # episodes is a mapping of episode name (str) ↦ episode data (dict)
         #
-        # episode data is a mapping:
-        #   source name (str) ↦ source data (dict)
+        # episode data is a mapping of source name (str) ↦ source data (dict)
         #  
-        # source data is a mapping:
-        #   "input" ↦ input signal index (int) ≡ logical ADC index ← to be inferred form the protocol
-        #                                       using the physical ADC index supplied by the source
+        # source data is inferred from the RecordingSource objects passed as parameter(s)
+        #   to the constructor (*args) and the protocols parsed from the ABF files
+        #   as they are read, and is a mapping of:
+        #   "input" ↦ input signal index (int) ≡ logical ADC index ← to be inferred 
+        #                   from the protocol 'parsed' from the ABf file, and using 
+        #                   the physical ADC index supplied by the RecordingSource's `adc` 
+        #                   field
         #
-        #   "responses" ↦ sequence (list) of ephys.LocationMeasure objects (see below):
+        #   "responses" ↦ sequence (list) of ephys.LocationMeasure objects ← to be
+        #                   inferred from the protocol using the number and timings
+        #                   of the synaptic stimuli, and the clamping mode (also 
+        #                   inferred from the protocol)
         #
-        #   "results" ↦ sequence (list) of result dicts (see below)
+        #                   NOTE the protocol itself is parsed from the ABF file.
+        #                   
         #
+        #   "results" ↦ sequence (list) of path result dictionaries, one for each
+        #                   SynapticStimulus in the RecordingSource
+        #
+        #   A path result dictionary is a mapping with contents dictated by the 
+        #       clamping mode and the location measures, as follows:
+        #       • voltage clamp:
+        #           "Rs"    ↦ neo.IrregularlySampledSignal
+        #           "Rin"   ↦ neo.IrregularlySampledSignal
+        #           "PSC𝑘"  ↦ neo.IrregularlySampledSignal, where 𝑘 is an int from
+        #                   0 to the number of stimulus pulses in the SynapticStimulus
+        #                   less one (this number if parsed from an appropro)
+        #           "PPR𝑛"  ↦ neo.IrregularlySampledSignal, with paired pulse ratios
+        #                   i.e. the ratio of response magnitude of response 𝑛 / response 0,
+        #                   where 𝑛 is an int from 1 to number of synaptic stimulations
+        #                   in the RecordingSource, less one
+        #   
+        #       • current clamp (or no clamp, for field recordings):
+        #           "Rin"   ↦ neo.IrregularlySampledSignal - input resistance
+        #           "τ"     ↦ neo.IrregularlySampledSignal - membrane time constant
+        #           "PSP"
         # A 
         #
         #   "location" ↦

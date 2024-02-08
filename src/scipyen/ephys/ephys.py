@@ -1649,8 +1649,8 @@ class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locati
         functions listed above, but use datazone.Interval instead of gui.Signalcursor
         objects.
         
-    3) epoch-based functors and functions — as the cursor-based functions, using
-        neo.Epoch or datazone.DataZone objects
+    3) epoch-based functors and functions — similar to cursor-based functions, 
+        using neo.Epoch or datazone.DataZone objects as locations.
         
     NOTE:
         ¹ A signal `channel` is a numeric data vector, not to be confused with 
@@ -1700,7 +1700,7 @@ class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locati
     containing, say, and evoked excitatory synaptic current (EPSC).
 
     1) Calculate the average of signal samples at a vertical cursor, which marks
-    the signal region corresponding to the cursor's xwindow extended symmetrically
+    the signal region corresponding to the cursor's x window extended symmetrically
     around the cursor's x coordinate. The cursors is bound to a symbol 'cursor' in
     the workspace.
 

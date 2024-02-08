@@ -487,6 +487,7 @@ from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
 # from iolib import pictio as pio # NOTE: not here, so we can import this from
 # pictiio (pio); instead we import pio where it is needed i.e. in getABF()
+from ephys.ephys import (ClampMode, ElectrophysiologyProtocol)
 
 from pyabf.abf1.headerV1 import HeaderV1
 from pyabf.abf2.headerV2 import HeaderV2
@@ -494,8 +495,6 @@ from pyabf.abf2.section import Section
 from pyabf.abfReader import AbfReader
 from pyabf.stimulus import (findStimulusWaveformFile, 
                             stimulusWaveformFromFile)
-
-from ephys.ephys import ElectrophysiologyProtocol
 
 # useful alias:
 ABF = pyabf.ABF
@@ -958,9 +957,9 @@ class ABFEpoch:
         else:
             return False
 
+# These two will be (properly) redefined further below
 class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
     pass
-# will be (properly) redefined further below
 class ABFInputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
     pass                         # will be (properly) redefined further below
 
@@ -1591,12 +1590,45 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([e.usedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
-    def getClampMode(self, adcIndex:int = 0,
-                  dacIndex:typing.Optional[int] = None,
-                  physicalADC:bool=False,
-                  physicalDAC:bool=False):
-        from ephys.ephys import ClampMode
-        adc = self.inputConfiguration(adcIndex, physical=physicalADC) # get first (primary) input by default
+    def getClampMode(self, adcIndex:typing.Union[int, str] = 0,
+                  dacIndex:typing.Optional[typing.Union[int, str]] = None,
+                  physicalADC:bool=True,
+                  physicalDAC:bool=True) -> ClampMode:
+        """Infers the clamping mode used in the experiemnt run with this protocol.
+        
+        The inferrence is based on the physical units of the input - output signal
+        pair, as follows:
+        
+        Input units             Output units:           Clamping mode:
+        -----------------------------------------------------------
+        electrical current      electrical potential    voltage clamp
+        electrical potential    electrical current      current clamp
+        
+        In any other combination: no clamping. NOTE that this is not necessarily
+        encountered in practice. Rather, one can have membrane voltage recorded
+        in the input, with current units for any signal sent on the output as 
+        "command voltage", but with the amplifier set to voltage follower mode 
+        (e.g. 'I=0' setting in some amplifiers). Technically, this is a NoClamp
+        case, although the DAQ device may not be able to detect this.
+        
+        Parameters:
+        -----------
+        adcIndex: int or str, default is 0
+            Index (logical or physical) or name of the ADC channel involved in 
+            the experiment
+        
+        dacIndex: int or str, or None; default is None
+            Index (logical or physical) or name of the DAC channel involved in 
+            the experiment.
+            When None (the default) the method used the active DAC channel as 
+            defined in the protocol.
+        
+        physicalADC, physicalDAC: bool (default is True for both) indicate if 
+            the adcIndex, respectively dacIndex are physical or logical indexes.
+            Ignored when those indexes are given as strings (channel names).
+        """
+        adc = self.getADC(adcIndex, physical=physicalADC) # get first (primary) input by default
+        # adc = self.inputConfiguration(adcIndex, physical=physicalADC) # get first (primary) input by default
 
         if adc is None:
             raise ValueError(f"{'Physical' if physicalADC else 'Logical'} ADC index {adcIndex} is invalid for this protocol")
@@ -1624,13 +1656,29 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def inputs(self):
+        """List of input configurations (ADC channels); alias to self.ADCs"""
         return self.ADCs
     
     @property
     def ADCs(self):
+        """List of input configurations (ADC channels)"""
         return self._inputs_
     
-    def getADC(self, adcChannel:typing.Union[int, str] = 0, physical:bool=False) -> ABFInputConfiguration:
+    def getADC(self, adcChannel:typing.Union[int, str] = 0, 
+               physical:bool=False) -> ABFInputConfiguration:
+        """Access the input configuration of an ADC channel with a given index or name.
+        
+        Parameters:
+        -----------
+        index: int or str, or None. Optional, default is None
+            When an int, it represents the index (physical or logical) of the ADC.
+            When a str, it represents the name of the ADC.
+        
+        Returns:
+        --------
+        An ABFInputConfiguration
+        
+        """
         if isinstance(adcChannel, str):
             if adcChannel not in self.adcNames:
                 raise ValueError(f"Invalid ADC channel name {adcChannel}")
@@ -1649,53 +1697,71 @@ class ABFProtocol(ElectrophysiologyProtocol):
             raise ValueError(f"Invalid {chtype} ADC channel specified {adcChannel}")
 
     def getInput(self, adcChannel:int = 0, physical:bool=False) -> ABFInputConfiguration:
-        """Shorthand to self.getADC"""
+        """Calls self.getADC(…)"""
         return self.getADC(adcChannel, physical=physical)
     
     def inputConfiguration(self, adcChannel:typing.Union[int, str] = 0, 
                            physical:bool=False) -> ABFInputConfiguration:
-        """Calls getADC(…)"""
+        """Calls self.getADC(…)"""
         return self.getADC(adcChannel, physical=physical)
         
     @property
     def DACs(self):
+        """List of output configurations (DAC channels)"""
         return self._outputs_
     
     @property
     def outputs(self):
+        """List of output configurations (DAC channels); alias to self.DACs"""
         return self.DACs
     
-    def getDAC(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+    def getDAC(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
-        # if not isinstance(dacChannel, int):
-        if dacChannel is None:
-            dacChannel = self.activeDACChannelIndex
+        """Access the output configuration of a DAC channel with a given index or name.
+        
+        Parameters:
+        -----------
+        index: int or str, or None. Optional, default is None
+            When an int, it represents the index (physical or logical) of the DAC.
+            When a str, it represents the name of the DAC.
+        
+        Returns:
+        --------
+        An ABFOutputConfiguration
+        
+        """
+        # if not isinstance(index, int):
+        if index is None:
+            index = self.activeDACChannelIndex
             
-        elif isinstance(dacChannel, str):
-            if dacChannel not in self.dacNames:
-                raise ValueError(f"invaid DAC channel name {dacChannel}")
+        elif isinstance(index, str):
+            if index not in self.dacNames:
+                raise ValueError(f"Invalid DAC channel name {index}")
             
-            dacChannel = self.dacNames.index(dacChannel)
+            index = self.dacNames.index(index)
             
             if physical:
-                dacChannel = self.dacLogical2PhysicalIndexMap[dacChannel]
+                index = self.dacLogical2PhysicalIndexMap[index]
 
-        outputConfs = list(filter(lambda x: x.logicalIndex == dacChannel if physical else x.physicalIndex == dacChannel, self._outputs_))
+        outputConfs = list(filter(lambda x: x.logicalIndex == index if physical else x.physicalIndex == index, self._outputs_))
 
         if len(outputConfs):
             return outputConfs[0]
         else:
             chtype = "physical" if physical else "logical"
-            raise ValueError(f"Invalid {chtype} DAC channel specified {dacChannel}")
+            raise ValueError(f"Invalid {chtype} DAC channel specified {index}")
             
-    def outputConfiguration(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+    def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
-        """Reintroduced temporarily for back compatibility with existing scripts"""
-        return self.getDAC(dacChannel, physical)
+        """Reintroduced temporarily for back compatibility with existing scripts.
+            Calls self.getDAC(…)
+        """
+        return self.getDAC(index, physical)
     
-    def getOutput(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+    def getOutput(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
-        return self.getDAC(dacChannel, physical)
+        """Calls self.getDAC(…)"""
+        return self.getDAC(index, physical)
     
 class ABFInputConfiguration:
     """Deliberately thin class with basic info about an ADC input in Clampex.
@@ -1883,16 +1949,58 @@ class ABFOutputConfiguration:
         
     The class only makes sense for episodic stimulation experiments in Clampex.
         
+    An ABF DAC channel can be indentified by its numeric index (logical or physical)
+    or by its name.
+        • the physical index of a DAC channel is contained in the DAC section of
+            the ABF protocol, under the 'nDACNum' attribute, which is a list; the
+            whereas the logical index is in fact the index of the physical index 
+            in that list.
+        
+        In general the ABF protocol seems to ascribe the same value to both the 
+        logical and physical index of a DAC channel. This is unlike the ADC channels
+        where the logical ADC index depends on how many ADC channel are selected
+        in the "Inputs" tab of the Clampex protocol editor. In contrast, one cannot
+        'select' individual DAC channels in the "Outputs" tab of the protocol
+        editor.
+        
+        • the name of a DAC channel is stored in the strings section of the 
+        protocol, in the '_indexedStrings' attribute. A DAC with a physical index 
+        𝑖 located at the logical index 𝑗 in 'nDACNum' has its name located at
+        index 𝑗 in '_indexedStrings'
+        
     """
+    # NOTE: 2024-02-08 21:40:30
+    # it seems to me that in ABF files the DAC channels physical indexes are the 
+    # same as the logical indeFxes i.e. they are ALWAYS present in the protocol.
+    #
+    # This is unlike the ADC channels, where the logical index depends on whether 
+    # other input channels are also selected in the "Inputs" tab. In contrast,
+    # one cannot "unselect" DACs in the "Outputs" tab — they always seem to be
+    # present. Instead, their analog waveform can be turned ON/OFF thus controlling
+    # whether individual DACs are used for sending analog sommand waveforms or not
+    # 
+    # Things are different for digital outputs — these are NOT normally sent out
+    #   via DAC channels (unless one uses a DAC channel to emulate digital TTLs).
+    #   Yet, they appear to be associated with a particular DAC by activating 
+    #   the digital output feature in the configruation tab for that DAC output
+    #   channel. This may give the false impression that a digital signal IS
+    #   carried by / associated with an individual DAC. In reality, it is just 
+    #   a (maybe not so) convenient way to configure digital outputs inside the 
+    #   analog waveform epochs ascribed to a particular DAC.
+    # 
+    #
     # NOTE: 2023-09-17 23:41:15
     # index of the DAC where Digital output IS enabled is given by 
     #   annotations["protocol"]["nActiveDACChannel"]
     #       (counter-intuitive: expecting to see this from nDigitalDACChannel and nDigitalEnable
     #       but these seem to be 0 and 1 regardless of which DAC has waveform enabled and dig enabled)
     #
-    # index of the DAC where waveform is enabled is the κ index in annotations["listDACInfo"],
-    # where 
-    #   annotations["listDACInfo"][κ]["nWaveformEnable"] == 1
+    #  I guess nDigitalEnable is rather to be used as a bool flag indicating
+    # that the protocol enables digital signals to be sent to other devices.
+    #
+    # The index of the DAC where analog waveform is enabled is the κ index in 
+    #   annotations["listDACInfo"] where:
+    #       annotations["listDACInfo"][κ]["nWaveformEnable"] == 1
     # 
     # there are the following possibilities:
     # Alt waveform  | Alt Dig | DAC waveform enabled | DAC Digital output enabled
@@ -1915,41 +2023,27 @@ class ABFOutputConfiguration:
             abfVer = obj.abfVersion["major"]
             if abfVer == 1:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
-                # if dacChannel > 1:
-                #     dacChannel = 0
-                # self._interEpisodeLevel_ = bool(obj._headerV1.nInterEpisodeLevel[dacChannel])
-                # self._dacChannel_ = dacChannel
                 # TODO finalize this...
                 
             elif abfVer == 2:
-                if physical:
+                if physical: # specify via its physical index
                     if dacChannel in obj._dacSection.nDACNum:
                         self._physicalChannelIndex_ = dacChannel
                         logical = obj._dacSection.nDACNum.index(dacChannel)
                         self._dacChannel_ = logical
                         
-                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[logical]]
-                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[logical]]
-                        
-                        # dacName = obj.dacNames[logical]
-                        # dacUnits = obj.dacUnits[logical]
+                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[self._dacChannel_]]
+                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[self._dacChannel_]]
                         
                     else:
                         raise ValueError(f"Invalid physical DAC channel index specified ({dacChannel}) for physical DAC channels {obj._dacSection.nDACNum}")
-                        # self._dacChannel_ = None
-                        # self._physicalChannelIndex_ = None
-                        # dacName = ""
-                        # dacUnits = ""
-                        
-                else:
-                    # if dacChannel in range(len(obj.dacNames)):
+
+                else: # specify via its logical index
                     if dacChannel in range(len(obj._dacSection.nDACNum)):
                         self._dacChannel_ = dacChannel
                         self._physicalChannelIndex_ = obj._dacSection.nDACNum[dacChannel]
-                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[dacChannel]]
-                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[dacChannel]]
-                        # dacName = obj.dacNames[dacChannel]
-                        # dacUnits = obj.dacUnits[dacChannel]
+                        dacName = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelNameIndex[self._dacChannel_]]
+                        dacUnits = obj._stringsSection._indexedStrings[obj._dacSection.lDACChannelUnitsIndex[self._dacChannel_]]
                         
                     else:
                         raise ValueError(f"Invalid logical DAC channel index specified {dacChannel} for {len(obj._dacSection.nDACNum)} channels")
@@ -1957,9 +2051,6 @@ class ABFOutputConfiguration:
                         self._physicalChannelIndex_ = None
                         dacName =""
                         dacUnits = ""
-                
-                # dacName = obj.dacNames[dacChannel]# if dacChannel in obj.dacNames else ""
-                # dacUnits = obj.dacUnits[dacChannel]# if dacChannel in obj.dacUnits else "mV"
                 
                 self._dacName_ = dacName 
                 self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
@@ -1988,7 +2079,7 @@ class ABFOutputConfiguration:
             # if dacChannel not in (c["nDACNum"] for c in obj.annotations["listDACInfo"]):
             #     raise ValueError(f"Invalid DAC channel index {dacChannel}")
             
-            if physical:
+            if physical: # specify via its physical index
                 p = [v["nDACNum"] for v in obj.annotations["listDACInfo"]]
                 if dacChannel in p:
                     self._physicalChannelIndex_ = dacChannel
@@ -2001,7 +2092,8 @@ class ABFOutputConfiguration:
                     self._dacChannel_ = None
                     dacName = ""
                     dacUnits = ""
-            else:
+                    
+            else: # specify via its logical index
                 if dacChannel in range(len(obj.annotations["listDACInfo"])):
                     self._dacChannel_ = dacChannel
                     self._physicalChannelIndex_ = obj.annotations["listDACInfo"][dacChannel]["nDACNum"]
