@@ -1161,6 +1161,32 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     
         return ret
     
+    def logicalADCIndex(self, index:int) -> int:
+        """Returns the logical index of the ADC with specified physical index.
+    
+        See also self.physicalADCIndex
+        """
+        if not isinstance(index, int):
+            raise TypeError(f"Expecting an int; instead, got {type(index).__name__}")
+        indexingMap = self.adcPhysical2LogicalIndexMap 
+        if index in indexingMap:
+            return indexingMap[index]
+        
+        raise ValueError(f"Invalid physical ADC index: {index}")
+    
+    def physicalADCIndex(self, index:int) -> int:
+        """Returns the physical index of the ADC with specified logical index.
+        
+        See also self.logicalADCIndex."""
+        if not isinstance(index, int):
+            raise TypeError(f"Expecting an int; instead, got {type(index).__name__}")
+    
+        indexingMap = self.adcLogical2PhysicalIndexMap 
+        if index in indexingMap:
+            return indexingMap[index]
+        
+        raise ValueError(f"Invalid logical ADC index: {index}")
+    
     @property
     def adcNames(self):
         return [i.name for i in self.inputs]
@@ -1208,18 +1234,29 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def activeDACChannel(self) -> int:
-        """Index of the "active" DAC channel, as reported by Clampex.
+        """Index of the "active" DAC channel as reported in the ABF file protocol.
         
-        The active DAC channel is the DAC channel that:
+        This can be somewhat confusing — a DAC channel is `active` in a given 
+        protocol if:
         
-        • has "Digital Outputs" enabled in the corresponding 'Channel #' sub-tab
-            of the "Waveform" tab in Clampex protocol editor; 
+        • it has "Digital Outputs" enabled in the corresponding 'Channel #' 
+            sub-tab of the "Waveform" tab in Clampex protocol editor; 
         
             NOTE:
             ∘ when "Alternate Digital Outputs" is disabled in the "Waveform" tab:
                 ⋆ this is the only DAC that associates digital output in the protocol
+        
                 ⋆ the digital pattern defined in an epoch under this DAC's "Channel #"
                 sub-tab will be sent out with every sweep;
+        
+                ⋆ the pattern will be emitted on the digital channel index
+                corresponding to the actual index of the bit (highest on the left)
+                in the DIG channels bank; e.g., for the top bank (3-0):
+        
+                0001 → emits a TTL PULSE on DIG0 
+                000* → emits a TTL TRAIN on DIG0
+                0010 → emits a TTL PULSE on DIG1
+                00*0 → emits a TTL TRAIN on DIG1
         
             ∘ when "Alternate Digital Outputs" is enabled in the "Waveform" tab:
                 ⋆ this DAC will send the pattern defined under this DAC's
@@ -1230,8 +1267,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     sub-tab and will be emitted during odd-numbered sweeps
                     (1, 3, 5, ...); this is the ALTERNATIVE digital pattern
         
+        
                 ⋆ there can be only one alternate DIG pattern defined in any 
                     other DAC
+        
+                ⋆ the pattern is determined as described above; 
+                
+            WARNING: In a two-pathways experiment, the MAIN and ALTERNATE patterns
+            should use bits corresponding to distinct DIG channels.
         
             NOTE: The association between the alternate DIG pattern and a particular DAC
         is only for GUI purposes - it does NOT engage the "other" DAC in any way

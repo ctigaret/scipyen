@@ -1344,8 +1344,9 @@ class LTPOnline(QtCore.QObject):
         Var-positional parameters:
         --------------------------
     
-        One or more ephys.RecordingSource specifying the logical association between
-        input and outputs in this experiment.
+        One or more ephys.RecordingSource specifying the logical association
+        between physical indices of input and output channels used to record 
+        data form a particular source (cell, field) in this experiment.
     
         Named parameters:
         ------------------
