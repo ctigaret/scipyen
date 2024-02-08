@@ -3656,23 +3656,23 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
     
     return result
 
-def make2PathwaysLTPSource(name:str, adc:int=0, dac:int=0, dig0:int=0, dig1:int=1):
-    """Factory function for a RecordingSource in two pathways LTP.
-    
-    Named parameters:
-    -----------------
-    adc, dac: int, index of the ADC and DAC channels used in the experiment
-    
-    """
-    assert all(isinstance(v, int) for v in (adc, dac, dig0, dig1)), "The `adc`, `dac`, `dig0`, `dig1` parameters must be of type int"
-    assert dig0 != dig1, "In two pathway experiments the digital stimulation channels must be distinct"
-    
-    digs = (dig0, dig1)
-    if any(d < 0 for d in digs):
-        raise ValueError(f"All digital channels must be >= 0; got {digs} instead")
-    
-    
-    synStims = [SynapticStimulus(f"path{k}", digs[k]) for k in range(len(digs))]
-    
-    return RecordingSource(name, 0, 0, synStims)
-    
+# def make2PathwaysLTPSource(name:str, adc:int=0, dac:int=0, dig0:int=0, dig1:int=1):
+#     """Factory function for a RecordingSource in two pathways LTP.
+#     
+#     Named parameters:
+#     -----------------
+#     adc, dac: int, index of the ADC and DAC channels used in the experiment
+#     
+#     """
+#     assert all(isinstance(v, int) for v in (adc, dac, dig0, dig1)), "The `adc`, `dac`, `dig0`, `dig1` parameters must be of type int"
+#     assert dig0 != dig1, "In two pathway experiments the digital stimulation channels must be distinct"
+#     
+#     digs = (dig0, dig1)
+#     if any(d < 0 for d in digs):
+#         raise ValueError(f"All digital channels must be >= 0; got {digs} instead")
+#     
+#     
+#     synStims = [SynapticStimulus(f"path{k}", digs[k]) for k in range(len(digs))]
+#     
+#     return RecordingSource(name, 0, 0, synStims)
+#     

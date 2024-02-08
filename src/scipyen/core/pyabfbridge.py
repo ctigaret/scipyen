@@ -1219,11 +1219,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             ∘ when "Alternate Digital Outputs" is disabled in the "Waveform" tab:
                 ⋆ this is the only DAC that associates digital output in the protocol
                 ⋆ the digital pattern defined in an epoch under this DAC's "Channel #"
-                sub-tab will be sent out with every sweep; this is the 
+                sub-tab will be sent out with every sweep;
         
             ∘ when "Alternate Digital Outputs" is enabled in the "Waveform" tab:
-                ⋆ this DAC will send the pattern defined here (under this DAC's
-                    "Channel #" sub-tab), ONLY during even-numbered sweeps 
+                ⋆ this DAC will send the pattern defined under this DAC's
+                    "Channel #" sub-tab, ONLY during even-numbered sweeps 
                     (0, 2, 4, ...); this is the MAIN digital pattern
         
                 ⋆ the "alternative" pattern needs to be defined in ANOTHER DAC
@@ -1501,6 +1501,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if not hasattr(self, "_name_"):
             self._name_ = "protocol"
         return self._name_
+    
+    @property
+    def file(self):
+        return self._protocolFile_
     
     @property
     def duration(self) -> pq.Quantity:
