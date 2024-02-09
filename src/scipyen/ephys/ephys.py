@@ -1892,7 +1892,7 @@ class LocationMeasure:
             kwargs["relative"] = self.relative
             
         # print(f"{self.__class__.__name__}.call: relative = {self.relative}")
-        print(f"{self.__class__.__name__}.call: func = {self.func}")
+        # print(f"{self.__class__.__name__}.call: func = {self.func}")
         return self.func(*args, **kwargs)
   
 class DataListener(QtCore.QObject):
@@ -2611,8 +2611,8 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
         t0, t1 = cursor
         
     elif isinstance(cursor, DataCursor):
-        t0 = cursor.coord
-        t1 = cursor.span
+        t0 = cursor.coord - cursor.span/2
+        t1 = cursor.span + cursor.span/2
         
     else:
         raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor or a 2-tuple of scalars; got {cursors} instead")
@@ -2709,8 +2709,8 @@ def cursor_reduce(func:types.FunctionType,
         t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
         
     elif isinstance(cursor, DataCursor):
-        t0 = cursor.coord
-        t1 = cursor.span
+        t0 = cursor.coord - cursor.span/2
+        t1 = cursor.coord + cursor.span/2
         
     elif isinstance(cursor, tuple) and len(cursor) == 2:
         t0, t1 = cursor
@@ -2740,7 +2740,7 @@ def cursor_reduce(func:types.FunctionType,
         t0 += signal.t_start
         t1 += signal.t_start
         
-    print(f"In cursor_reduce: func = {func}; t0 = {t0}, t1 = {t1}, relative = {relative}")
+    # print(f"In cursor_reduce: func = {func}; t0 = {t0}, t1 = {t1}, relative = {relative}")
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -3205,7 +3205,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     kw = {"relative": relative}
     
-    print(f"In cursors_difference: func = {func}, functor = {functor}")
+    # print(f"In cursors_difference: func = {func}, functor = {functor}")
     
     if functor:
         if not isinstance(subfun, (typing.Callable, types.FunctionType)):
@@ -4143,8 +4143,12 @@ def _(locator, func, signal, channel=None,
       duration=False, locatorIndex:int=None):
     return epoch_reduce(func, signal, locator, 
                         index=locatorIndex, channel=channel)
+@singledispatch
+def amplitudeMeasure() -> LocationMeasure:
+    raise NotImplementedError
 
-def amplitudeMeasure(refX: typing.Union[float, pq.Quantity], 
+@amplitudeMeasure.register(float)
+def _(refX: typing.Union[float, pq.Quantity], 
                      refW: typing.Union[float, pq.Quantity],
                      locX: typing.Union[float, pq.Quantity], 
                      locW: typing.Union[float, pq.Quantity],
@@ -4168,6 +4172,21 @@ def amplitudeMeasure(refX: typing.Union[float, pq.Quantity],
                            (DataCursor(refX, refW), 
                             DataCursor(locX, locW)),
                            name, True)
+                           
+@amplitudeMeasure.register(DataCursor)
+def _(c0:DataCursor,c1:DataCursor, name:str = "amplitude", relative:bool = True) -> LocationMeasure:
+    return LocationMeasure(cursors_difference, 
+                           (c0,c1),
+                           name, True)
+                           
+@amplitudeMeasure.register(SignalCursor)
+def _(c0:SignalCursor, c1:SignalCursor, name="amplitude", relative:bool = True):
+    return LocationMeasure(cursors_difference, 
+                           (c0.dataCursors[0],c1.dataCursors[0]),
+                           name, True)
+                           
+    
+    
     
 def signal_measures_in_segment(s: neo.Segment, 
                             signal: typing.Union[int, str],
