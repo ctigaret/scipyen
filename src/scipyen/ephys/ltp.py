@@ -103,10 +103,11 @@ import iolib.pictio as pio
 
 import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
-                         RecordingSource, SynapticStimulus, 
-                         AuxiliaryInput, AuxiliaryOutput,
-                         synstim, auxinput, auxoutput)
+                         RecordingSource, RecordingEpisode, RecordingEpisodeType,
+                         SynapticStimulus, AuxiliaryInput, AuxiliaryOutput,
+                         synstim, auxinput, auxoutput, amplitudeMeasure)
 import ephys.membrane as membrane
+from gui.cursors import DataCursor
 
 
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
@@ -116,9 +117,6 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
     
 
-#__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"))
-# __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LTPWindow.ui"), 
-# __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__ui_path__,"LTPWindow.ui"), 
 __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
@@ -375,6 +373,17 @@ class _LTPFilesSimulator_(QtCore.QThread):
             if self.isInterruptionRequested():
                 break
             
+    def resume(self):
+        """Resumes simulation"""
+        if self._simulationCounter_ < len(self._simulationFiles_):
+            for k in range(self._simulationCounter_, len(self._simulationFiles_)):
+                f = self._simulationFiles_[k]
+                self.print(f"{self.__class__.__name__}.run: reading file {k}: {f}")
+                self.simulateFile()
+                QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
+                if self.isInterruptionRequested():
+                    break
+                
     @pyqtSlot()
     def simulateFile(self):
         if self._simulationCounter_ >= len(self._simulationFiles_):
@@ -803,7 +812,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                     # viewer.currentAxis.vb.autoRange()
 #                     self._signalAxes_[pndx].vb.enableAutoRange()
 #                     
-#                     cnames = [c.name for c in viewer.dataCursors]
+#                     cnames = [c.name for c in viewer.signalCursors]
 #                     
 #                     if self._clampMode_ == ephys.ClampMode.VoltageClamp:
 #                         for landmarkname, landmarkcoords in self._landmarks_.items():
@@ -849,13 +858,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                         
 #                         if k == 0:
 #                             # calculate DC, Rs, and Rin for pathway 0 only
-#                             Rbase_cursor = viewer.dataCursor("Rbase")
+#                             Rbase_cursor = viewer.signalCursor("Rbase")
 #                             coords = ((Rbase_cursor.x - Rbase_cursor.xwindow/2) * pq.s, (Rbase_cursor.x + Rbase_cursor.xwindow/2) * pq.s)
 #                             Idc = np.mean(adcSignal.time_slice(*coords))
 #                                         
 #                             self._results_["DC"].append(Idc)
 #                             
-#                             Rs_cursor = viewer.dataCursor("Rs")
+#                             Rs_cursor = viewer.signalCursor("Rs")
 #                             coords = ((Rs_cursor.x - Rs_cursor.xwindow/2) * pq.s, (Rs_cursor.x + Rs_cursor.xwindow/2) * pq.s)
 #                             if self._mbTestAmplitude_ > 0:
 #                                 Irs = np.max(adcSignal.time_slice(*coords))
@@ -866,7 +875,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                             
 #                             self._results_["Rs"].append(Rs)
 #                             
-#                             Rin_cursor = viewer.dataCursor("Rin")
+#                             Rin_cursor = viewer.signalCursor("Rin")
 #                             coords = ((Rin_cursor.x - Rin_cursor.xwindow/2) * pq.s, (Rin_cursor.x + Rin_cursor.xwindow/2) * pq.s)
 #                             Irin = np.mean(adcSignal.time_slice(*coords))
 #                                 
@@ -875,12 +884,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                             self._results_["Rin"].append(Rin)
 #                             
 #                             
-#                         Ipsc_base_cursor = viewer.dataCursor("PSCBase")
+#                         Ipsc_base_cursor = viewer.signalCursor("PSCBase")
 #                         coords = ((Ipsc_base_cursor.x - Ipsc_base_cursor.xwindow/2) * pq.s, (Ipsc_base_cursor.x + Ipsc_base_cursor.xwindow/2) * pq.s)
 #                         
 #                         IpscBase = np.mean(adcSignal.time_slice(*coords))
 #                         
-#                         Ipsc0Peak_cursor = viewer.dataCursor("PSC0Peak")
+#                         Ipsc0Peak_cursor = viewer.signalCursor("PSC0Peak")
 #                         coords = ((Ipsc0Peak_cursor.x - Ipsc0Peak_cursor.xwindow/2) * pq.s, (Ipsc0Peak_cursor.x + Ipsc0Peak_cursor.xwindow/2) * pq.s)
 #                         
 #                         Ipsc0Peak = np.mean(adcSignal.time_slice(*coords))
@@ -890,7 +899,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                         self._results_[pndx]["Response0"].append(Ipsc0)
 #                         
 #                         if self._presynaptic_triggers_[pndx].size > 1:
-#                             Ipsc1Peak_cursor = viewer.dataCursor("PSC1Peak")
+#                             Ipsc1Peak_cursor = viewer.signalCursor("PSC1Peak")
 #                             coords = ((Ipsc1Peak_cursor.x - Ipsc1Peak_cursor.xwindow/2) * pq.s, (Ipsc1Peak_cursor.x + Ipsc1Peak_cursor.xwindow/2) * pq.s)
 #                             
 #                             Ipsc1Peak = np.mean(adcSignal.time_slice(*coords))
@@ -1464,7 +1473,7 @@ class LTPOnline(QtCore.QObject):
                  episode: typing.Union[str, tuple] = "baseline",
                  useEmbeddedProtocol:bool=True,
                  trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
-                 conditioningClampMode:typing.Union[int, ephys.ClampMode]=ephys.ClampMode.CurrentClamp,
+                 conditioningClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.CurrentClamp,
                  baselineDurations:pq.Quantity = 5 * pq.ms,
                  steadyStateIClampMbTestDuration = 0.05 * pq.s,
                  useSlopeInIClamp:bool = True,
@@ -1545,9 +1554,10 @@ class LTPOnline(QtCore.QObject):
         # group accordingly.
         #
         # Epsiodes: 
-        # A synaptic plasticity experiment occurs (typically) in three episodes (or stages):
+        # A synaptic plasticity experiment occurs (typically) in three episodes
+        #   (or stages), encapsulated in ephys.RecordingEpisode objects:
         #
-        # 1. baseline      — records the evolution of synaptic responses BEFORE
+        # 1. baseline       records the evolution of synaptic responses BEFORE
         #                   conditioning (see below); responses are recorded as 
         #                   analog signals via a specific ADC.
         #
@@ -1587,26 +1597,59 @@ class LTPOnline(QtCore.QObject):
         #                   At the time of writing, this code supports only 
         #                   ABF/Clampex files.
         #
-        # 1.a drug wash in - optional, when testing the effect fo a drug on, say,
-        #                    induction of plasticity
+        #                   Episode type: ephys.RecordingEpisodeType.Tracking
         #
-        # 2. conditioning  — the protocol (a combination of synaptic and postsynaptic
-        #                   activity) used to induce (or attempt to induce) synaptic
-        #                   plasticity at a defined synaptic pathway — i.e., the 
-        #                   'Test' pathway.
+        # 1.a baseline crosstalk
+        #                   optional, tests pathway overlap
+        #
+        #                   Episode type: ephys.RecordingEpisodeType.Tracking
+        #
+        # 1.b drug wash in  
+        #                   optional, when testing the effect fo a drug on, say,
+        #                   induction of plasticity
+        #
+        #                   Episode type: ephys.RecordingEpisodeType.Tracking | ephys.RecordingEpisodeType.Drug
+        #
+        # 2. conditioning   
+        #                   stimulation pattern (a combination of synaptic and 
+        #                   postsynaptic activity) used in order to induce 
+        #                   synaptic plasticity on one of the synaptic pathways
+        #                   (the 'Test' pathway).
         #
         #                   The electrical behaviour of the RecordingSource (cell or field)
         #                   is optionally recorded via the same ADC as the one
         #                   used to record the baseline responses. Obviously, when
         #                   recorded, the all sweeps of the trial will contain 
         #                   synaptic responses only from the conditioned pathway.
-        #                   
-        # 3. chase         — records synaptic responses AFTER conditioning — 
-        #                   signal layout is identical to that of the baseline episode.
         #
-        #                   The drug wash out may take place inat the beginning 
-        #                   o the chase episode
-        # 
+        #                   LTPOnline does not perform measurements during this
+        #                   episode, is because these measurements depend on what 
+        #                   question is being asked, and therefore are better 
+        #                   performed in a post hoc analysis, off-line.
+        #                   
+        #                   Episode type: ephys.RecordingEpisodeType.Conditioning
+        #
+        # 3. chase          records synaptic responses AFTER conditioning — 
+        #                   signal layout and measurements are identical to those
+        #                   for the baseline episode.
+        #
+        #                   The drug wash out may take place at the beginning 
+        #                   of the chase episode
+        #
+        #                   Episode type: ephys.RecordingEpisodeType.Tracking
+        #
+        # 3.a chase crosstalk
+        #                   optional, test pathway overlap during chase (typically
+        #                   this is done during the baseline, but there may be 
+        #                   a good case for doing it during the chase)
+        #
+        #                   Episode type: ephys.RecordingEpisodeType.Tracking
+        #
+        # 3.b chase drug
+        #                   optional, test a drug effect on plasticity expression
+        #
+        #                   Episode type: ephys.RecordingEpisodeType.Tracking | ephys.RecordingEpisodeType.Drug
+        #
         
         # Data is organized by RecordingSource; for each RecordingSource we may 
         #   have more than one SynapticStimulus configuration,. such that each 
@@ -1708,8 +1751,6 @@ class LTPOnline(QtCore.QObject):
                                    useEmbeddedProtocol = useEmbeddedProtocol)
         
         
-        # self._episode_ = "baseline"
-
         # TODO: 2024-01-08 00:04:55 FIXME
         # FINALIZE THIS !!!
         #
@@ -2107,14 +2148,36 @@ class LTPOnline(QtCore.QObject):
     def data(self) -> dict:
         return self._data_
     
+    def pause(self):
+        """Pause the simulation.
+        Does nothing when LTPOnline is running in normal mode (i.e. is waiting for
+        files produced by the acquisition software).
+        """
+        if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
+            self._simulatorThread_.requestInterruption()
+            # self._simulatorThread_.quit()
+            # self._simulatorThread_.wait()
+        
+    def resume(self):
+        """Resumes simulation, if there are files left in the simulation stack.
+        Does nothing when LTPOnline is running in normal mode (i.e. is waiting for
+        files produced by the acquisition software).
+        
+        """
+        if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
+            self._simulatorThread_.resume()
+        
+        
     def stop(self):
         if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
             self._simulatorThread_.requestInterruption()
             self._simulatorThread_.quit()
             self._simulatorThread_.wait()
             
-        if isinstance(self._abfSupplierThread_, FileStatChecker):
-            self._abfSupplierThread_.abfListener.stop()
+        # NOTE: 2024-02-09 08:14:30
+        # this will never occur
+        # if isinstance(self._abfSupplierThread_, FileStatChecker):
+        #     self._abfSupplierThread_.abfListener.stop()
             
             
         self._abfSupplierThread_.quit()
@@ -3676,6 +3739,7 @@ def plotAverageLTPPathways(data, state, viewer0=None, viewer1=None,
     if len(viewer1.verticalCursors) == 0 or not keepCursors:
         viewer1.currentAxes = 0
         setupLTPCursors(viewer1, data["LTPOptions"], 1)
+        
     
 def setupLTPCursors(viewer, LTPOptions, pathway, axis=None):
     """ Convenience function for setting up cursors for LTP experiments:

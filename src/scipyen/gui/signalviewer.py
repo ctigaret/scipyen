@@ -3272,7 +3272,7 @@ anything else       anything else       ❌
         if not self._hasCursor_(id1):
             raise ValueError("SignalCursor %s not found" % id1)
 
-        ct = self.dataCursor(id1).cursorType()
+        ct = self.signalCursor(id1).cursorType()
         
         other = list()
         
@@ -3280,12 +3280,12 @@ anything else       anything else       ❌
             if not self._hasCursor_(cid):
                 raise ValueError("SignalCursor %s not found" % cid)
             
-            if self.dataCursor(cid).cursorType() != ct:
+            if self.signalCursor(cid).cursorType() != ct:
                 raise ValueError("Cannot link cursors of different types")
 
-            other.append(self.dataCursor(cid))
+            other.append(self.signalCursor(cid))
         
-        self.dataCursor(id1).linkTo(*other)
+        self.signalCursor(id1).linkTo(*other)
             
     def unlinkCursors(self, id1=None, *ids):
         """Unlinks several linked cursors.
@@ -3302,17 +3302,17 @@ anything else       anything else       ❌
         if not self._hasCursor_(id1):
             raise ValueError("SignalCursor %s not found" % id1)
         
-        ct = self.dataCursor(id1).cursorType()
+        ct = self.signalCursor(id1).cursorType()
         
         if len(ids) == 1: 
             if isinstance(ids[0], str): # it is a cursor ID
                 if not self._hasCursor_(ids[0]):
                     raise ValueError("SignalCursor %s not found" % ids[0])
                 
-                if self.dataCursor(id1).cursorType() != self.dataCursor(ids[0]).cursorType():
+                if self.signalCursor(id1).cursorType() != self.signalCursor(ids[0]).cursorType():
                     raise ValueError("Cursors of different types cannot be linked")
                     
-                self.dataCursor(id1).unlinkFrom(self.dataCursor(ids[0]))
+                self.signalCursor(id1).unlinkFrom(self.signalCursor(ids[0]))
                 
             elif isinstance(ids[0], tuple) or isinstance(ids[0], list):# this is a tuple or list of cursor IDs: we unlink id1 from each one, keep their link state unchanged
                 other = list()
@@ -3320,12 +3320,12 @@ anything else       anything else       ❌
                     if not self._hasCursor_(cid):
                         raise ValueError("SignalCursor %s not found" % cid)
                     
-                    if self.dataCursor(cid).cursorType() != ct:
+                    if self.signalCursor(cid).cursorType() != ct:
                         raise ValueError("Cursors of different types cannot be linked")
                     
-                    other.append(self.dataCursor(cid))
+                    other.append(self.signalCursor(cid))
                 
-                self.dataCursor(id1).unlinkFrom(*other)
+                self.signalCursor(id1).unlinkFrom(*other)
                 
         elif len(ids) > 1: # a comma-seprated list of cursor IDs: unlink _ALL_ of them
             other = list()
@@ -3334,18 +3334,18 @@ anything else       anything else       ❌
                 if not self._hasCursor_(cid):
                     raise ValueError("SignalCursor %s not found " % cid)
                 
-                if self.dataCursor(cid).cursorType() != ct:
+                if self.signalCursor(cid).cursorType() != ct:
                     raise ValueError("Cursors of different types cannot be linked")
                 
-                other.append(self.dataCursor(cid))
+                other.append(self.signalCursor(cid))
             
-            self.dataCursor(id1).unlinkFrom(*other)
+            self.signalCursor(id1).unlinkFrom(*other)
             
             for c in other:
                 c.unlink()
                 
         else: # unlink ALL
-            self.dataCursor(id1).unlink()
+            self.signalCursor(id1).unlink()
 
     #"def" selectCursor(self, ID):
         #self.slot_selectCursor(ID)
@@ -3709,7 +3709,7 @@ anything else       anything else       ❌
             cursor = self.selectedDataCursor # get the selected cursor if no ID given
                 
         else:
-            cursor = self.dataCursor(crsId) # otherwise try to get cursor with given ID
+            cursor = self.signalCursor(crsId) # otherwise try to get cursor with given ID
             
         # if neither returned a valid cursor, then 
         if cursor is None:
@@ -3817,7 +3817,7 @@ anything else       anything else       ❌
         if d.exec() == QtWidgets.QDialog.Accepted:
             if choose: # choose cursor as per dialog; otherwise cursor is set above
                 crsId = cursorComboBox.text() 
-                cursor = self.dataCursor(crsId)
+                cursor = self.signalCursor(crsId)
                 initialID = crsId
                 
             if cursor is None: # bail out
@@ -4551,7 +4551,7 @@ anything else       anything else       ❌
                     if len(cid) == 0:
                         cid = d.cursorComboBox.variable.itemText(0)
             
-        c = self.dataCursor(cid)
+        c = self.signalCursor(cid)
             
         if not isinstance(c, SignalCursor):
             return
@@ -4671,7 +4671,7 @@ anything else       anything else       ❌
             if len(selItems) == 0:
                 return
             
-            cursors = [self.dataCursor(name) for name in selItems]
+            cursors = [self.signalCursor(name) for name in selItems]
             
             if len(cursors) == 0:
                 return
@@ -4743,7 +4743,7 @@ anything else       anything else       ❌
             if len(selItems) == 0:
                 return
             
-            cursors = [self.dataCursor(name) for name in selItems]
+            cursors = [self.signalCursor(name) for name in selItems]
             
 #             print(cursors)
 #             
@@ -4912,8 +4912,8 @@ anything else       anything else       ❌
                 if c2ID is None or len(c2ID) == 0:
                     return
                 
-                c1 = self.dataCursor(c1ID)
-                c2 = self.dataCursor(c2ID)
+                c1 = self.signalCursor(c1ID)
+                c2 = self.signalCursor(c2ID)
                 
                 if c1 is None or c2 is None:
                     return
@@ -4945,7 +4945,7 @@ anything else       anything else       ❌
                     if len(cid) == 0:
                         cid = d.cursorComboBox.variable.itemText(0)
             
-        c = self.dataCursor(cid)
+        c = self.signalCursor(cid)
                 
         if not isinstance(c, SignalCursor):
             return
@@ -5059,8 +5059,8 @@ anything else       anything else       ❌
             if c2ID is None or len(c2ID) == 0:
                 return
             
-            c1 = self.dataCursor(c1ID)
-            c2 = self.dataCursor(c2ID)
+            c1 = self.signalCursor(c1ID)
+            c2 = self.signalCursor(c2ID)
             
             if c1 is None or c2 is None:
                 return
@@ -7264,26 +7264,29 @@ signals in the signal collection.
             
         axis.setLabel("left", lbl, **lblStyle)
         
-    def dataCursor(self, ID):
+    def signalCursor(self, ID:str) -> SignalCursor:
         """Not to be confused with the Qt method self.cursor() !!!
         """
         if len(self._data_cursors_) and ID in self._data_cursors_:
             return self._data_cursors_[ID]
         
-    def cursorWindow(self, crsID):
+    # def signalCursor(self, ID:str) -> SignalCursor:
+    #     return self.signalCursor(ID)
+        
+    def cursorWindow(self, crsID:str) -> numbers.Number:
         if self._hasCursor_(crsID):
             #print(crsID)
             return (self._data_cursors_[crsID].xwindow, self._data_cursors_[crsID].ywindow)
         else:
             raise Exception("SignalCursor %s not found" % crsID)
         
-    def cursorX(self, crsID):
+    def cursorX(self, crsID:str) -> numbers.Number:
         if self._hasCursor_(crsID):
             return self._data_cursors_[crsID].x
         else:
             return None
         
-    def cursorY(self, crsID):
+    def cursorY(self, crsID:str) -> numbers.Number:
         if self._hasCursor_(crsID):
             return self._data_cursors_[crsID].y
 
@@ -7339,8 +7342,8 @@ signals in the signal collection.
             
         return ret
     
-    def getDataCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]=None):
-        """Returns the dictioniary of cursors with the specified type.
+    def getSignalCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]=None):
+        """Returns the dictionary of SignalCursor objects with the specified type.
         All cursors with the same cursor type are stored in the same dictionary
         regardless whether they are atatched to a specific axis or not.
         Hence, no two cursors of the same type can have the same ID.
@@ -7358,17 +7361,21 @@ signals in the signal collection.
         
         return getattr(self, attr, dict())
     
-    def getSignalCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]):
-        """ Alias to self.getDataCursors """
-        return self.getDataCursors(cursorType)
+    def getDataCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]):
+        """ Calls self.getSignalCursors: 
+        Returns a dictionary of SignalCursor objects with the specified type."""
+        return self.getSignalCursors(cursorType)
+    
+    def getCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]):
+        return self.getSignalCursors(cursorType)
     
     def registerCursor(self, cursor, cursorDict:typing.Optional[dict]=None, **kwargs):
         """Register externally-created cursors.
-    """
+        """
         # TODO: 2023-06-12 23:11:50
         # Use for internally created cursors as well (to call from _addCursor_)
         if not isinstance(cursorDict, dict):
-            cursorDict = self.getDataCursors(cursor.cursorType)
+            cursorDict = self.getSignalCursors(cursor.cursorType)
             
         crsId = cursor.ID
         if crsId in cursorDict:
@@ -10137,7 +10144,7 @@ signals in the signal collection.
                 lbl = lbls
                 
             else:
-                n_existing_cursors = self.getDataCursors(cursorType)
+                n_existing_cursors = self.getSignalCursors(cursorType)
                 lbl = f"{cursorType.name[0]}{len(n_existing_cursors)}"
                 
             if isinstance(ax, (int, pg.PlotItem, str)):
@@ -10345,12 +10352,6 @@ signals in the signal collection.
         ATTENTION: the list is NOT ordered.
         """
         return list(self._data_cursors_.values())
-    
-    @property
-    def dataCursors(self):
-        """Alias to cursors property
-        """
-        return self.cursors
     
     @property
     def signalCursors(self):

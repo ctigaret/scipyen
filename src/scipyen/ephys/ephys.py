@@ -162,7 +162,8 @@ import warnings
 import typing, types
 from enum import Enum, IntEnum
 from abc import ABC
-from dataclasses import (dataclass, MISSING)
+from dataclasses import (dataclass, KW_ONLY, MISSING, field)
+# from dataclasses import (dataclass, MISSING)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -197,7 +198,6 @@ from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
-# from core import pyabfbridge as pab # avoid circular imports!
 
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
@@ -213,7 +213,7 @@ from core.quantities import (units_convertible, check_time_units,
                              check_electrical_current_units, 
                              check_electrical_potential_units)
 
-from gui.cursors import (SignalCursor, SignalCursorTypes)
+from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
 #from .patchneo import neo
 
@@ -226,7 +226,7 @@ if __debug__:
 
     __debug_count__ = 0
     
-LOCATOR_TYPES = (SignalCursor, neo.Epoch, DataZone, Interval, type(MISSING))
+LOCATOR_TYPES = (SignalCursor, DataCursor, neo.Epoch, DataZone, Interval, type(MISSING))
 
 LocatorTypeVar = typing.TypeVar('LocatorTypeVar', *LOCATOR_TYPES)
 
@@ -902,6 +902,7 @@ class RecordingEpisodeType(TypeEnum):
     
     Conditioning    = 4 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
+                        
 
 
 class ElectrophysiologyProtocol(ABC):
@@ -1576,7 +1577,10 @@ class SynapticPathway(BaseScipyenData):
                                digitalCommandSignal=digitalCommandSignal,
                                schedule=schedule)
         
-class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locations", "name", "channel"))):
+# class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locations", "name", "channel"))):
+
+@dataclass
+class LocationMeasure:
     """Functor to calculate a signal measure at a location using a suitable function or functor.
 
     In turn, a `location` is an object with one of the following types ('locator' types):
@@ -1646,7 +1650,7 @@ class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locati
                 the chord slope between the cursor_average at the two cursors.
         
     2) interval-based functors and functions — these are similar to the cursor-based
-        functions listed above, but use datazone.Interval instead of gui.Signalcursor
+        functions listed above, but use datazone.Interval instead of gui.SignalCursor
         objects.
         
     3) epoch-based functors and functions — similar to cursor-based functions, 
@@ -1857,20 +1861,32 @@ class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locati
     Indeed:
 
     assert (Rin.ndim == 0) # ⇒ is True
+        
+    Changelog:
+    ----------
+    2024-02-09 09:41:11 made this a DataClass to enable mutations
+        WARNING: In order to be fully mutable when locations are specified as 
+        sequences of scalars, the sequences must also be mutable
     
 """
-    __slots__ = ()
+    func: typing.Callable
+    locations: typing.Union[typing.Sequence, DataCursor, Interval, SignalCursor, DataZone, neo.Epoch]
+    name: str = "measure"
+    channel:int  = 0
+    relative:bool = True
+    
+    # __slots__ = ()
     
     def __call__(self, *args, **kwargs):
         # *args is a signal or sequence of signals
         
-        if isinstance(self.locations, (list, tuple)) and not isinstance(self.locations, Interval):
+        if isinstance(self.locations, (list, tuple)):# and not isinstance(self.locations, Interval):
             args = args + tuple(self.locations)
             
         else:
             args = args + (self.locations,)
             
-        return self.func(*args, **kwargs)
+        return self.func(*args, relative=self.relative, **kwargs)
   
 class DataListener(QtCore.QObject):
     """
@@ -2577,7 +2593,7 @@ def event_amplitude_at_intervals(signal:typing.Union[neo.AnalogSignal, DataSigna
     
 
 def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  cursor: typing.Union[SignalCursor, tuple]) -> typing.Union[neo.AnalogSignal, DataSignal]:
+                  cursor: typing.Union[SignalCursor, tuple, DataCursor]) -> typing.Union[neo.AnalogSignal, DataSignal]:
     """Returns a slice of the signal corresponding to a cursor's xwindow"""
     
     if isinstance(cursor, SignalCursor):
@@ -2587,22 +2603,26 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
     elif isinstance(cursor, tuple) and len(cursor) == 2:
         t0, t1 = cursor
         
-        if not isinstance(t0, pq.Quantity):
-            t0 *= signal.times.units
-            
-        else:
-            if not units_convertible(t0, signal.times.units):
-                raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
-    
-        if not isinstance(t1, pq.Quantity):
-            t1 *= signal.times.units
-    
-        else:
-            if not units_convertible(t1, signal.times.units):
-                raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
+    elif isinstance(cursor, DataCursor):
+        t0 = cursor.coord
+        t1 = cursor.span
         
     else:
-        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor or a 2-tuple of scalars; got {cursors} instead")
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor or a 2-tuple of scalars; got {cursors} instead")
+    
+    if not isinstance(t0, pq.Quantity):
+        t0 *= signal.times.units
+        
+    else:
+        if not units_convertible(t0, signal.times.units):
+            raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
+
+    if not isinstance(t1, pq.Quantity):
+        t1 *= signal.times.units
+
+    else:
+        if not units_convertible(t1, signal.times.units):
+            raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -2614,8 +2634,9 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
 def cursor_reduce(func:types.FunctionType, 
                   signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[SignalCursor, tuple], 
-                  channel: typing.Optional[int] = None) -> pq.Quantity:
+                  cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+                  channel: typing.Optional[int] = None,
+                  relative:bool = True) -> pq.Quantity:
     """Calculates reduced signal values (e.g. min, max, median etc) across a cursor's window.
     
     The reduced signal value is the value calculated by the `func` parameter
@@ -2647,7 +2668,15 @@ def cursor_reduce(func:types.FunctionType,
     signal: neo.AnalogSignal, DataSignal
     
     cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+        When a tuple, its elements (`x` and `window`) represent a notional
+            vertical cursor at `x` coordinate, with a horizontal span given by 
+            `window` such that `x` is at the center of the span.
     
+            Both elements are numeric scalars (that will assume the domain units
+            of the signal where the notional cursor is applied), or python Quantities
+            (their units are expected to be convertible to the units of the signal's
+            domain, e.g. time units for neo.AnalogSignal, etc).
+        
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
         0 <= channel < signal.shape[1]
@@ -2665,32 +2694,44 @@ def cursor_reduce(func:types.FunctionType,
     """
     # from gui.signalviewer import SignalCursor as SignalCursor
     
-    if not isinstance(func, types.FunctionType):
-        raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
+    # if not isinstance(func, types.FunctionType):
+    #     raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
     
     if isinstance(cursor, SignalCursor):
         t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
         t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
         
+    elif isinstance(cursor, DataCursor):
+        t0 = cursor.coord
+        t1 = cursor.span
+        
     elif isinstance(cursor, tuple) and len(cursor) == 2:
         t0, t1 = cursor
         
-        if not isinstance(t0, pq.Quantity):
-            t0 *= signal.times.units
-            
-        else:
-            if not units_convertible(t0, signal.times.units):
-                raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
+    else:
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursors} instead")
     
-        if not isinstance(t1, pq.Quantity):
-            t1 *= signal.times.units
-    
-        else:
-            if not units_convertible(t1, signal.times.units):
-                raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
+    if not isinstance(t0, pq.Quantity):
+        t0 *= signal.times.units
         
     else:
-        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor or a 2-tuple of scalars; got {cursors} instead")
+        if not units_convertible(t0, signal.times.units):
+            raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
+        
+        t0 = t0.rescale(signal.time.units)
+
+    if not isinstance(t1, pq.Quantity):
+        t1 *= signal.times.units
+
+    else:
+        if not units_convertible(t1, signal.times.units):
+            raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
+        
+        t1 = t1.rescale(signal.times.units)
+        
+    if relative:
+        t0 += signal.t_start
+        t1 += signal.t_start
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -2707,27 +2748,30 @@ def cursor_reduce(func:types.FunctionType,
 
 @safeWrapper
 def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-               cursor: typing.Union[SignalCursor, tuple], 
-               channel: typing.Optional[int] = None) -> typing.Union[float, pq.Quantity]:
+               cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+               channel: typing.Optional[int] = None,
+               relative: bool=True) -> typing.Union[float, pq.Quantity]:
     """The maximum value of the signal across the cursor's window.
     Calls cursor_reduce with np.max as `func` parameter.
     """
-    return cursor_reduce(np.max, signal, cursor, channel)
+    return cursor_reduce(np.max, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-               cursor: typing.Union[SignalCursor, tuple], 
-               channel: typing.Optional[int] = None) -> typing.Union[float, pq.Quantity]:
+               cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+               channel: typing.Optional[int] = None,
+               relative: bool=True) -> typing.Union[float, pq.Quantity]:
     """The maximum value of the signal across the cursor's window.
     Calls cursor_reduce with np.min as `func` parameter.
     """
-    return cursor_reduce(np.min, signal, cursor, channel)
+    return cursor_reduce(np.min, signal, cursor, channel, relaive)
 
 
 @safeWrapper
 def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[SignalCursor, tuple], 
-                  channel: typing.Optional[int] = None):
+                  cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+                  channel: typing.Optional[int] = None,
+                  relative: bool=True) -> int:
     """The index of maximum value of the signal across the cursor's window.
 
     Parameters:
@@ -2748,12 +2792,13 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
     the signal.
     """
     
-    return cursor_reduce(np.argmax, signal, cursor, channel)
+    return cursor_reduce(np.argmax, signal, cursor, channel, relative)
     
 @safeWrapper
 def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[tuple, SignalCursor], 
-                  channel: typing.Optional[int] = None):
+                  cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                  channel: typing.Optional[int] = None,
+                  relative: bool=True) -> int:
     """The index of minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -2774,12 +2819,13 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     the signal.
     """
     
-    return cursor_reduce(np.argmin, signal, cursor, channel)
+    return cursor_reduce(np.argmin, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[tuple, SignalCursor], 
-                  channel: typing.Optional[int] = None):
+                  cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                  channel: typing.Optional[int] = None,
+                  relative: bool=True) -> tuple:
     """The maximum and minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -2802,33 +2848,37 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     """
     
-    return cursor_reduce(sigp.maxmin, signal, cursor, channel)
+    return cursor_reduce(sigp.maxmin, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_minmax(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[tuple, SignalCursor], 
-                  channel: typing.Optional[int]=None):
-    return cursor_reduce(sigp.minmax, signal, cursor, channel)
+                  cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                  channel: typing.Optional[int]=None,
+                  relative: bool=True) -> tuple:
+    return cursor_reduce(sigp.minmax, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                     cursor: typing.Union[tuple, SignalCursor], 
-                     channel: typing.Optional[int] = None):
+                     cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                     channel: typing.Optional[int] = None,
+                     relative: bool=True) -> tuple:
     """The indices of signal maximum and minimum across the cursor's window.
     """
-    return cursor_reduce(sigp.argmaxmin, signal, cursor, channel)
+    return cursor_reduce(sigp.argmaxmin, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_argminmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                     cursor: typing.Union[tuple, SignalCursor], 
-                     channel: typing.Optional[int]=None):
-    return cursor_reduce(sigp.argminmax, signal, cursor, channel)
+                     cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                     channel: typing.Optional[int]=None,
+                     relative:bool = True) -> tuple:
+    return cursor_reduce(sigp.argminmax, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                   cursor: typing.Union[tuple, SignalCursor], 
+                   cursor: typing.Union[tuple, SignalCursor, DataCursor], 
                    channel: typing.Optional[int]=None,
-                   usenan: bool=False):
+                   relative: bool = True,
+                   usenan: bool = False):
     """Average of signal samples across the window of a vertical cursor.
     Calls cursor_reduce with np.mean as `func` parameter
     
@@ -2859,14 +2909,15 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     """
     fcn = np.nanmean if usenan else np.mean
-    return cursor_reduce(fcn, signal, cursor, channel)
+    return cursor_reduce(fcn, signal, cursor, channel, relative)
 
 cursor_mean = cursor_average
 
 @safeWrapper
 def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple], 
-                 channel: typing.Optional[int] = None):
+                 cursor: typing.Union[float, SignalCursor, DataCursor, pq.Quantity, tuple], 
+                 channel: typing.Optional[int] = None, 
+                 relative:bool = True):
     """Value of signal at the vertical cursor's time coordinate.
     
     Signal sample values are NOT averaged across the cursor's window.
@@ -2901,7 +2952,7 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     """
     # from gui.signalviewer import SignalCursor as SignalCursor
     
-    data_index = cursor_index(signal, cursor)
+    data_index = cursor_index(signal, cursor, relative)
     
     ret = signal[data_index,:]
     
@@ -2912,7 +2963,8 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
 
 @safeWrapper
 def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]):
+                 cursor: typing.Union[float, SignalCursor, DataCursor, pq.Quantity, tuple],
+                 relative: bool = True):
     """Index of signal sample at the vertical cursor's time coordinate.
     
     Parameters:
@@ -2950,11 +3002,31 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         
         t = cursor.x * signal.times.units
         
+    elif isinstance(cursor, DataCursor):
+        t = cursor.coord
+        if isinstance(t, numbers.Number):
+            t *= signal.times.units
+            
+        elif isinstance(t, pq.Quantity):
+            if t.size != 1:
+                raise ValueError(f"Expecting a scalar quantity instead, got {t}")
+            
+            if not units_convertible(t, signal.times.units):
+                raise TypeError(f"Domain coordinate has wrong units {t.units} instead of {signal.times.units}")
+            
+            t = t.rescale(signal.times.units)
+            
+        else:
+            raise TypeError(f"Invalid domain coordinate {t}")
+        
     elif isinstance(cursor, pq.Quantity):
+        if cursor.size != 1:
+            raise ValueError(f"Expecting a scalar quantity; instead, got {cursor}")
+        
         if not units_convertible(cursor, signal.times.units):
             raise TypeError("Expecting %s for cursor units; got %s instead" % (signal.times.units, cursor.units))
         
-        t = cursor
+        t = cursor.rescale(signal.time.units)
         
     elif isinstance(cursor, (tuple, list)) and len(cursor) in (2,3) and all([isinstance(c, (numbers.Number, pq.Quantity)) for v in cursor[0:2] ]):
         # cursor parameter sequence
@@ -2963,7 +3035,10 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         if isinstance(t, numbers.Number):
             t *= signal.times.units
             
-        else:
+        elif isinstance(t, pq.Quantity):
+            if t.size != 1:
+                raise ValueError(f"Expecting a scalar quantity; instead got {t}")
+            
             if t.units != signal.times.units:
                 if not units_convertible(t, signal.times):
                     raise TypeError("Incompatible units for cursor time")
@@ -2971,19 +3046,23 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
             t = t.rescale(signal.times.units)
         
     else:
-        raise TypeError("Cursor expected to be a float, python Quantity or SignalCursor; got %s instead" % type(cursor).__name__)
+        raise TypeError("Cursor expected to be a float, python Quantity, DataCursor or SignalCursor; got %s instead" % type(cursor).__name__)
     
+    if relative:
+        t += signal.t_start
+        
     data_index = signal.time_index(t)
     
     return data_index
 
 @safeWrapper
 def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                       cursor0: typing.Union[SignalCursor, tuple], 
-                       cursor1: typing.Union[SignalCursor, tuple], 
+                       cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
+                       cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
                        func: typing.Optional[typing.Union[typing.Callable, types.FunctionType]] = None,
                        channel: typing.Optional[int] = None,
-                       subfun: typing.Optional[typing.Union[typing.Callable, types.FunctionType]] = None) -> pq.Quantity:
+                       subfun: typing.Optional[typing.Union[typing.Callable, types.FunctionType]] = None,
+                       relative:bool = True) -> pq.Quantity:
     """Calculates the signal amplitude between two notional vertical cursors.
     
     amplitude = y1 - y0
@@ -2995,8 +3074,11 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     -----------
     signal:neo.AnalogSignal, datatypes.DataSignal
     
-    cursor0, cursor1: (x, window) tuples representing, respectively, the 
-        cursor's x coordinate (time) and window (horizontal extent).
+    cursor0, cursor1: SignalCursor of vertical type, or (x, window) tuples 
+        representing, respectively, the cursor's x coordinate (time) and window 
+        (horizontal extent). When tuples, the `x` and `window` must be numeric
+        scalars (float) or scalar python Quantity objects. For details, see the
+        documentation for cursor_reduce(…)
     
     func: a callable applied to the signal at both cursors. Optional, the default
         is cursor_average(…)
@@ -3056,11 +3138,11 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     (1, ) when channel is specified.
         
     """
-    from gui.cursors import SignalCursor as SignalCursor
+    # from gui.cursors import SignalCursor as SignalCursor
     
     if func is None:
         func = cursor_average
-        functor=False
+        functor = False
         
     elif isinstance(func, (typing.Callable, types.FunctionType)):
         # NOTE: 2023-06-16 11:26:59
@@ -3108,30 +3190,26 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
         raise TypeError(f"'func' must be a callable; got {type(func).__name__} instead")
 
     # NOTE: 2023-06-18 18:08:24
-    # below, we use numpy diff, but this will return a 2D array
+    # below, we use numpy diff, but this will return a 2D array;
     # this is DELIBERATE and is left up to the caller to decide that to do
     # (e.g. call np.squeeze() on the result, if that is suitable)
+    
+    kw = {"relative": relative}
     if functor:
         if not isinstance(subfun, (typing.Callable, types.FunctionType)):
             raise TypeError(f"When 'func' is a functor, 'subfun' must be a callable or function; got {type(subfun).__name__} instead" )
         
-        data = np.array([func(subfun, signal, c, channel=channel) for c in (cursor0, cursor1)]) * signal.units
+        data = np.array([func(subfun, signal, c, channel=channel, **kw) for c in (cursor0, cursor1)]) * signal.units
         
-        # y0 = func(subfun, signal, cursor0, channel=channel)
-        # y1 = func(subfun, signal, cursor1, channel=channel)
     else:
-        data = np.array([func(signal, c, channel=channel) for c in (cursor0, cursor1)]) * signal.units
-        # y0 = func(signal, cursor0, channel=channel)
-        # y1 = func(signal, cursor1, channel=channel)
+        data = np.array([func(signal, c, channel=channel, **kw) for c in (cursor0, cursor1)]) * signal.units
     
     return np.diff(data, axis=0)
-    # return np.ediff1d(data)
-    # return y1-y0
 
 @safeWrapper
 def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                     cursor0: typing.Union[SignalCursor, tuple], 
-                     cursor1: typing.Union[SignalCursor, tuple], 
+                     cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
+                     cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
                      channel: typing.Optional[int] = None):
     """Distance between two cursors, in signal samples.
     
@@ -3228,8 +3306,8 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
 @safeWrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                        cursor0: typing.Union[SignalCursor, tuple], 
-                        cursor1: typing.Union[SignalCursor, tuple], 
+                        cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
+                        cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
                         channel: typing.Optional[int] = None):
     """Signal chord slope between two vertical cursors.
     
@@ -3250,7 +3328,7 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
         gui.signalviewer.SignalCursor of type "vertical"
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    # from gui.signalviewer import SignalCursor as SignalCursor
 
     t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x
     
@@ -3269,11 +3347,34 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return (y1-y0)/(t1-t0).simplified
 
 def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                       cursor:SignalCursor, 
+                       cursor:typing.Union[SignalCursor, DataCursor], 
                        channel:typing.Optional[int]=None):
-    t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
-    t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
-    
+    if isinstance(cursor, Signalcursor):
+        t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
+        t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
+        
+    elif isinstance(cursor, DataCursor):
+        t0 = cursor.coord - cursor.span/2
+        t1 = cursor.coord + cursor.span/2
+        
+        if isinstance(t0, numbers.Number):
+            t0 *= signal.times.units
+            
+        elif isinstance(t0, pq.Quantity):
+            if not units_convertible(t0, signal.times.units):
+                raise TypeError(f"Expecting {signal.times.units}; instead got {t0.units}")
+            
+            t0 = t0.rescale(signkal.times.units)
+        
+        if isinstance(t1, numbers.Number):
+            t1 *= signal.times.units
+            
+        elif isinstance(t1, pq.Quantity):
+            if not units_convertible(t1, signal.times.units):
+                raise TypeError(f"Expecting {signal.times.units}; instead got {t1.units}")
+            
+            t1 = t1.rescale(signkal.times.units)
+        
     if t1 == t0:
         raise ValueError(f"Cursor xwindow is 0")
     
@@ -3976,7 +4077,7 @@ def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal]
     
 def cursors_measure(func: typing.Callable,
                     signal:typing.Union[neo.AnalogSignal, DataSignal],
-                    cursors: typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor]],
+                    cursors: typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor], typing.Sequence[DataCursor]],
                     channel: typing.Optional[int]=None) -> list:
     """Calculates a signal measure from signal data at cursors locations.
     
@@ -3997,7 +4098,8 @@ def cursors_measure(func: typing.Callable,
 
 # NOTE: 2023-06-14 14:38:31
 # migrating to single dispatch paradigm (dispatches on the locator type, which
-# can be a cursor, an epoch, or an interval)
+# can be a cursor, an epoch, an interval, or NOTE: 2024-02-09 08:50:35 a scalar 
+# time quantity (TODO))
 @singledispatch
 def reduce(locator, func:typing.Callable, 
            signal:typing.Union[neo.AnalogSignal, DataSignal],
@@ -4030,6 +4132,31 @@ def _(locator, func, signal, channel=None,
     return epoch_reduce(func, signal, locator, 
                         index=locatorIndex, channel=channel)
 
+def amplitudeMeasure(refX: typing.Union[float, pq.Quantity], 
+                     refW: typing.Union[float, pq.Quantity],
+                     locX: typing.Union[float, pq.Quantity], 
+                     locW: typing.Union[float, pq.Quantity],
+                     name:str = "amplitude",
+                     relative: bool = True) -> LocationMeasure:
+    """LocationMeasure factory for an amplitude of a signal.
+
+    The amplitude is measured as the difference between signal averages at a
+    a location, and a baseline. These two locations are indicated, each,
+    by a single coordinate and a span window centered on the coordinate.
+
+    Parameters:
+    ----------
+    refX, refW: scalars with the X coordinate (e.g., time) and a span window
+        centered on baseX, defining the "baseline" or "reference" 
+
+    locX, locW: as above, defining the 
+    
+    """
+    return LocationMeasure(cursors_difference, 
+                           (DataCursor(refX, refW), 
+                            DataCursor(locX, locW)),
+                           name, True)
+    
 def signal_measures_in_segment(s: neo.Segment, 
                             signal: typing.Union[int, str],
                             command_signal: typing.Optional[typing.Union[int, str]] = None,

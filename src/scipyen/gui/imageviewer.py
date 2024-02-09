@@ -791,7 +791,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def _removePlanarGraphicsByName(self, name, cursors:bool=True):
         objs = []
         if cursors:
-            if name in iter_attribute(self.dataCursors, "name"):
+            if name in iter_attribute(self.graphicsCursors, "name"):
                 objs = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == name]
             else:
                 return
@@ -806,10 +806,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 
     def _removePlanarGraphics(self, name:typing.Optional[str]=None, cursors:bool=True):
         if cursors:
-            if len([o for o in self.dataCursors]) == 0:
+            if len([o for o in self.graphicsCursors]) == 0:
                 return
             
-            objNames = sorted([o.name for o in self.dataCursors])
+            objNames = sorted([o.name for o in self.graphicsCursors])
 
         else:
             if len([o for o in self.rois]) == 0:
@@ -857,11 +857,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 
         
     def _cursorEditor(self, crsId:str=None):
-        if len([o for o in self.dataCursors]) == 0:
+        if len([o for o in self.graphicsCursors]) == 0:
             return
         
         if not isinstance(crsId, str) or len(crsId.strip()) == 0:
-            selectionDialog = ItemsListDialog(self, sorted([c.name for c in self.dataCursors]), "Select cursor")
+            selectionDialog = ItemsListDialog(self, sorted([c.name for c in self.graphicsCursors]), "Select cursor")
             
             a = selectionDialog.exec_()
             
@@ -1013,7 +1013,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             if newName is not None and len(newName.strip()) > 0:
                 if newName != old_name:
-                    if newName in [o.name for o in self.dataCursors]:
+                    if newName in [o.name for o in self.graphicsCursors]:
                         QtWidgets.QMessageBox.critical(self, "Cursor name clash", "A cursor named %s already exists" % newName)
                         return
                     
@@ -1622,11 +1622,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot()
     @safeWrapper
     def slot_editCursor(self):
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
             self._cursorEditor(self._cursorContextMenuSourceId)
             
     def propagateCursorState(self):
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
             cursor = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name == self._cursorContextMenuSourceId, self.graphicsObjects)]
             if len(cursor) == 0:
                 return
@@ -1661,7 +1661,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot(str, QtCore.QPoint)
     @safeWrapper
     def slot_graphicsObjectMenuRequested(self, objId, pos):
-        if objId in iter_attribute(self.dataCursors,"name"):
+        if objId in iter_attribute(self.graphicsCursors,"name"):
             self._cursorContextMenuSourceId = objId
             
             cm = QtWidgets.QMenu("Cursor Menu", self)
@@ -1701,7 +1701,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         # or a unique selection PER GROUP of graphics object type (i.e. cursors
         # vs rois)?
         # I'm partial to the second option...'
-        if objId in iter_attribute(self.dataCursors, "name"):
+        if objId in iter_attribute(self.graphicsCursors, "name"):
             obj = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == objId]
             if len(obj):
                 self.selectedCursor = obj[0]
@@ -1727,7 +1727,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         """To keep track of what cursor is selected, 
         independently of the underlying graphics view fw.
         """
-        if cId in iter_attribute(self.dataCursors, "name"):
+        if cId in iter_attribute(self.graphicsCursors, "name"):
             if sel:
                 c = [o for o in self.graphicsObjects if o.backend.name == cId]
                 if len(c):
@@ -1783,7 +1783,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot(str)
     @safeWrapper
     def slot_selectCursor(self, crsId):
-        if crsId in iter_attribute(self.dataCursors, "name"):
+        if crsId in iter_attribute(self.graphicsCursors, "name"):
             self.slot_setSelectedCursor(crsId, True)
       
     @pyqtSlot(str)
@@ -1804,8 +1804,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot(str, "QPointF")
     @safeWrapper
     def slot_reportCursorPos(self, crsId, pos):
-        if crsId in iter_attribute(self.dataCursors, "name"):
-            obj = [o for o in self.dataCursor(crsId)]
+        if crsId in iter_attribute(self.graphicsCursors, "name"):
+            obj = [o for o in self.imageCursor(crsId)]
             
             if len(obj) == 0:
                 return
@@ -1847,10 +1847,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @pyqtSlot()
     @safeWrapper
     def slot_removeCursor(self):
-        if len([o for o in self.dataCursors]) == 0:
+        if len([o for o in self.graphicsCursors]) == 0:
             return
         
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
             self.slot_removeCursorByName(self._cursorContextMenuSourceId)
         
     @pyqtSlot(str)
@@ -1957,7 +1957,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return filterfalse_type(self.planarGraphics, pgui.Cursor)
     
     @property
-    def dataCursors(self):
+    def graphicsCursors(self):
         """All PlanarGraphics Cursors with frontends in the scene.
         """
         return filter_type(self.planarGraphics, pgui.Cursor)
@@ -2036,7 +2036,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return filter_attribute(ret, attribute, value, predicate)
         
     @safeWrapper
-    def dataCursor(self, value:typing.Optional[typing.Any] = None, attribute:str="name", predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, **kwargs):
+    def imageCursor(self, value:typing.Optional[typing.Any] = None, 
+                     attribute:str="name",
+                     predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
+                     **kwargs):
         """Iterates through Cursors with specific attributes.
         
         Data cursors are selected by comparing the value of a specific cursor 
@@ -2050,7 +2053,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         value: any type; optional, default is None
             The value against which the value of the named attribute is compared.
             
-            When None, returns self.dataCursors property directly.
+            When None, returns self.graphicsCursors property directly.
             
         Named Parameters:
         =================
@@ -2079,7 +2082,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             'attribute' parameters described above.
             
             e.g.:
-            dataCursor(name=lambda x: x=="some_name")
+            imageCursor(name=lambda x: x=="some_name")
             
         Returns:
         ========
@@ -2094,9 +2097,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         if len(kwargs):
             ret = list()
             for n, f in kwargs.items():
-                ret.append(filter_attribute(self.dataCursors, n, f))
+                ret.append(filter_attribute(self.graphicsCursors, n, f))
         else:
-            ret = self.dataCursors
+            ret = self.graphicsCursors
             
         return filter_attribute(ret, attribute, value, predicate)
     
@@ -2611,14 +2614,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return list(set(self.viewerWidget.planarGraphics))
     
     @property
-    def dataCursors(self):
+    def graphicsCursors(self):
         """List of Cursor planar graphics.
         This is the list of unique planar graphics cursor backends for the 
         displayed cursors
         """
-        return list(self.viewerWidget.dataCursors)
+        return list(self.viewerWidget.graphicsCursors)
     
-    def getDataCursors(self, **kwargs):
+    def getGraphicsCursors(self, **kwargs):
         """List with a specific subset of Cursor planar graphics objects.
         
         Var-keyword parameters
@@ -2627,23 +2630,23 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             subset.
             
             When no var-keyword parameters are passed, the function returns 
-            self.dataCursors property directly.
+            self.graphicsCursors property directly.
         
         (see core.prog.filter_attr)
         """
         if len(kwargs):
-            return list(filter_attr(self.viewerWidget.dataCursors, **kwargs))
+            return list(filter_attr(self.viewerWidget.graphicsCursors, **kwargs))
         
-        return self.dataCursors
+        return self.graphicsCursors
     
     @safeWrapper
-    def dataCursor(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
+    def imageCursor(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
         """Returns a list of pictgui.Cursor selected by one or more attributes.
         
         By default, compares the value of the 'name' attribute of the 
         PlanarGraphics Cursor object to the 'value' parameter.
         
-        Delegates to GraphicsImageViewerWidget.dataCursor, documented below
+        Delegates to GraphicsImageViewerWidget.imageCursor, documented below
         
         Parameters: (from GraphicsImageViewerWidget.cursor(...) docstring)
         ==========
@@ -2669,15 +2672,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             Optional: default is the identity (lambda x,y: x==y)
         """
-        return list(self.viewerWidget.dataCursor(value, *args, **kwargs))
+        return list(self.viewerWidget.imageCursor(value, *args, **kwargs))
 
     @safeWrapper
     def hasCursor(self, *args, **kwargs):
         """Tests for existence of a GraphicsObject cursor with specified ID or name (label).
         
-        Delegates to self.dataCursor(...)
+        Delegates to self.imageCursor(...)
         """
-        return len(set(self.dataCursor(*args, **kwargs))) > 0
+        return len(set(self.imageCursor(*args, **kwargs))) > 0
     
     @property
     def rois(self):
@@ -3502,7 +3505,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         try:
             # there may be a previous image stored here
-            if self._data_ is not None and len(self.dataCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
+            if self._data_ is not None and len(self.graphicsCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
                 if self._data_.shape[layout.horizontalAxis] != img.shape[layout.horizontalAxis] or \
                     self._data_.shape[layout.verticalAxis] != img.shape[layout.verticalAxis]:
                     self.questionMessage("Imageviewer:", "New image geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
@@ -3512,7 +3515,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     if ret == QtWidgets.QMessageBox.Cancel:
                         return False
                     
-                    for c in self.dataCursors:
+                    for c in self.graphicsCursors:
                         c.rangeX = img.shape[layout.horizontalAxis]
                         c.rangeY = img.shape[layout.verticalAxis]
                         c.setPos(img.shape[layout.horizontalAxis]/2, img.shape[layout.verticalAxis]/2)
