@@ -2725,7 +2725,7 @@ def cursor_reduce(func:types.FunctionType,
         if not units_convertible(t0, signal.times.units):
             raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
         
-        t0 = t0.rescale(signal.time.units)
+        t0 = t0.rescale(signal.times.units)
 
     if not isinstance(t1, pq.Quantity):
         t1 *= signal.times.units
@@ -3003,7 +3003,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
     # channels in the signal sharethe domain and have the same number of
     # samples
     if isinstance(cursor, float):
-        t = cursor * signal.time.units
+        t = cursor * signal.times.units
         
     elif isinstance(cursor, SignalCursor):
         if cursor.cursorType not in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
@@ -3035,7 +3035,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         if not units_convertible(cursor, signal.times.units):
             raise TypeError("Expecting %s for cursor units; got %s instead" % (signal.times.units, cursor.units))
         
-        t = cursor.rescale(signal.time.units)
+        t = cursor.rescale(signal.times.units)
         
     elif isinstance(cursor, (tuple, list)) and len(cursor) in (2,3) and all([isinstance(c, (numbers.Number, pq.Quantity)) for v in cursor[0:2] ]):
         # cursor parameter sequence
@@ -4182,7 +4182,8 @@ def _(c0:DataCursor,c1:DataCursor, name:str = "amplitude", relative:bool = True)
 @amplitudeMeasure.register(SignalCursor)
 def _(c0:SignalCursor, c1:SignalCursor, name="amplitude", relative:bool = True):
     return LocationMeasure(cursors_difference, 
-                           (c0.dataCursors[0],c1.dataCursors[0]),
+                           (c0,c1),
+                           # (c0.dataCursors[0],c1.dataCursors[0]),
                            name, True)
                            
     
