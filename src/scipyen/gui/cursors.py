@@ -905,10 +905,11 @@ class SignalCursor(QtCore.QObject):
         return ret
     
     @property
-    def dataCursors(self):
-        """A DataCursor or a tuple of DataCursor objects, depending on this cursor type.
-        If this cursor if of crosshair type, rthis property is tuple of DataCursor
-        objects in this order: horizontal, vertical
+    def dataCursors(self) -> typing.Tuple[DataCursor]:
+        """A tuple of DataCursor objects.
+        For crosshair cursors, the tuple has DataCursor objects, respectively,
+        for the horizontal and vertical components. For all other types of 
+        SignalCursors the tuple, has only one DataCursor object.
         """
         
         if self.cursorType == SignalCursorTypes.crosshair:
@@ -916,11 +917,11 @@ class SignalCursor(QtCore.QObject):
             # return (DataCursor(self._x_, self._hWin_), DataCursor(self._y_, self._vWin_))
         
         elif self.cursorType == SignalCursorTypes.horizontal:
-            return self._hDataCursor_
+            return (self._hDataCursor_, )
             # return DataCursor(self._x_, self._hWin_)
         
         else:
-            return self._vDataCursor_
+            return (self._vDataCursor_, )
             # return DataCursor(self._y_, self._vWin_)
             
     @safeWrapper
