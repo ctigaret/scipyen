@@ -157,7 +157,24 @@ class SignalCursor(QtCore.QObject):
 
     default_precision = 3
     
-    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], /, x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:float=0.0, ywindow:float=0.0, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, cursorID:str="c", follower:bool=False, relative:bool=False, parent:typing.Optional[typing.Union[pg.GraphicsItem,pg.PlotItem, QtWidgets.QWidget]]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, pen:typing.Optional[QtGui.QPen]=None, hoverPen:typing.Optional[QtGui.QPen]=None, linkedPen:typing.Optional[QtGui.QPen]=None, movable_label:bool=True, show_value:bool=False, precision:int=3, **kwargs):
+    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], /, 
+                 x:typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]]=None, 
+                 y:typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]]=None, 
+                 xwindow:float=0.0, 
+                 ywindow:float=0.0, 
+                 cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, 
+                 cursorID:str="c", 
+                 follower:bool=False, 
+                 relative:bool=False, 
+                 parent:typing.Optional[typing.Union[pg.GraphicsItem,pg.PlotItem, QtWidgets.QWidget]]=None, 
+                 xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                 yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                 pen:typing.Optional[QtGui.QPen]=None, 
+                 hoverPen:typing.Optional[QtGui.QPen]=None, 
+                 linkedPen:typing.Optional[QtGui.QPen]=None, 
+                 movable_label:bool=True, 
+                 show_value:bool=False, 
+                 precision:int=3, **kwargs):
         """ SignalCursor constructor.
             
             By default, this creates a crosshair cursor.
@@ -170,14 +187,20 @@ class SignalCursor(QtCore.QObject):
             
             Named parameters (key/value pairs):
             ===================================
-            x: numeric or quantity scalar, or None (default) - the cursor's
+            x: numeric or quantity scalar, DataCursor, or None (default) - the cursor's
                 horizontal coordinate
+    
+                When `x` is a DataCursor, it will be used for the vertical component.
             
-            y: numeric or quantity scalar, or None (default) - the cursor's
+            y: numeric or quantity scalar, DataCursor, or None (default) - the cursor's
                 vertical coordinate
+            
+                When `y` is a DataCursor, it will be used for the horizontal component.
             
             xwindow, ywindow: float (default 0.0); horizontal and vertical 
                 cursor windows
+    
+                Ignored when either x` or `y` are DaataCursor objects.
             
             cursor_type: str, SignalCursorTypes value, or a pair of bool flags 
                 (as a list or tuple) specifying which cursor spine is present, 
@@ -186,9 +209,13 @@ class SignalCursor(QtCore.QObject):
                 (True, False)  -> vertical cursor
                 (True, True)   -> crosshair cursor
                 (False, False) -> point cursor
+    
+                Ignored when either `x` or `y` are DataCursor objects. In this
+                case cursor type will be inferred.
             
-            cursor_ID: str; optional, default is "c"
-            
+            cursor_ID: str; optional, default is "v", "h", or "c" depending on 
+                the cursor type
+    
             relative:bool, optional, default is False
                 
                 Because the cursor's coordinates and in the axes domains, when 
@@ -207,7 +234,8 @@ class SignalCursor(QtCore.QObject):
                 When True, the cursor will follow the mouse pointer (a.k.a "dynamic"
                 cursor).
             
-            parent: 
+            parent: pyqtgraph.GraphicsItem, pyqtgraph.PlotItem, QtWidgets.QWidget
+                The parent Qt object where the cursor is shown.
             
             xBounds, yBounds: tuple, list, pq.Quantity, np.ndarray or None (the default)
                 The min & max X and Y coordinates
@@ -984,107 +1012,142 @@ class SignalCursor(QtCore.QObject):
             
         self._add_lines_to_host_()
         
-    def _setup_(self, host:pg.GraphicsItem, cursor_type:typing.Union[str,SignalCursorTypes, tuple, list]="crosshair", x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:typing.Optional[float]=None, ywindow:typing.Optional[float]=None, follower:bool=False, cursorID:typing.Optional[str]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, **kwargs):
+    def _setup_(self, host:pg.GraphicsItem, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]]=None, 
+                x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                xwindow:typing.Optional[float]=None, ywindow:typing.Optional[float]=None, 
+                follower:bool=False, 
+                cursorID:typing.Optional[str]=None, 
+                xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, **kwargs):
         """See docstring for __init__
         """
         #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
         
         show_lines = (False, False)
         
-        if isinstance(cursor_type, str):
-            if len(cursor_type) == 1:
-                c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
-                if len(c_type_name):
-                    cursor_type = SignalCursorTypes[c_type_name[0]]
-                    
-                else:
-                    cursor_type = None
-                
-            else:
-                if cursor_type in SignalCursorTypes.names():
-                    cursor_type = SignalCursorTypes[cursor_type]
-                    
-                else:
-                    cursor_type = None
-                
-        elif isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(b, bool) for c in cursor_type]):
-            cursor_type = Signalcursor.SignalCursorTypes.getType(cursor_type) # this may return None
-            
-        elif not isinstance(cursor_type, SignalCursorTypes):
-            raise TypeError("cursor_type expected to be a str, a tuple of two booleans or a SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
-            
-        # to avoid doubts, is cursor_type is None then fallback to the default (crosshair)
-        if cursor_type is None:
-            cursor_type = SignalCursorTypes.crosshair
-            
-        # now we can set which lines are shown
-        show_lines = cursor_type.value
+        self._cursor_type_ = None
         
-        self._cursor_type_ = cursor_type
-            
         # will set self._x_range_ and self._y_range
         self.setBounds(host, xBounds=xBounds, yBounds=yBounds)
         
-        if isinstance(x, numbers.Number):
-            _x = x
-            # self._x_ = x
-            
-        elif isinstance(x, pq.Quantity):
-            _x = x.magnitude.flatten()[0]
-            # self._x_ = x.magnitude.flatten()[0]
-            
-        elif x is None:
-            _x = self._x_range_[0] + np.diff(self._x_range_)/2
-            # self._x_ = self._x_range_[0] + np.diff(self._x_range_)/2
-            
+        if any(isinstance(v, DataCursor) for v in (x,y)):
+            if isinstance(x, DataCursor):
+                self._vDataCursor_ = x
+                if isinstance(y, DataCursor):
+                    self._hDataCursor_ = y
+                    self._cursor_type_ = SignalCursorTypes.crosshair
+                else:
+                    self._hDataCursor_ = DataCursor(self._y_range_[0] + np.diff(self._y_range_)/2, 0.)
+                    self._cursor_type_ = SignalCursorTypes.vertical
+                    
+            elif isinstance(y, DataCursor):
+                self._hDataCursor_ = y
+                if isinstance(x, DataCursor): # will never be reached ?!?
+                    self._vDataCursor_ = x
+                    self._cursor_type_ = SignalCursorTypes.crosshair
+                else:
+                    self._vDataCursor_ = DataCursor(self._x_range_[0] + np.diff(self._x_range_)/2, 0.)
+                    self._cursor_type_ = SignalCursorTypes.horizontal
+                    
         else:
-            raise TypeError("x expected to be a number, python Quantity or None; got %s instead" % type(x).__name__)
-            
-        if isinstance(y, numbers.Number):
-            _y = y
-            # self._y_ = y
-            
-        elif isinstance(y, pq.Quantity):
-            _y = y.magnitude.flatten()[0]
-            # self._y_ = y.magnitude.flatten()[0]
-            
-        elif y is None:
-            _y = self._y_range_[0] + np.diff(self._y_range_)/2
-            # self._y_ = self._y_range_[0] + np.diff(self._y_range_)/2
         
-        else:
-            raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
+            if isinstance(x, numbers.Number):
+                _x = x
+                # self._x_ = x
+                
+            elif isinstance(x, pq.Quantity):
+                _x = x.magnitude.flatten()[0]
+                # self._x_ = x.magnitude.flatten()[0]
+                
+            elif x is None:
+                _x = self._x_range_[0] + np.diff(self._x_range_)/2
+                # self._x_ = self._x_range_[0] + np.diff(self._x_range_)/2
+                
+            else:
+                raise TypeError("x expected to be a number, python Quantity or None; got %s instead" % type(x).__name__)
+                
+            if isinstance(y, numbers.Number):
+                _y = y
+                # self._y_ = y
+                
+            elif isinstance(y, pq.Quantity):
+                _y = y.magnitude.flatten()[0]
+                # self._y_ = y.magnitude.flatten()[0]
+                
+            elif y is None:
+                _y = self._y_range_[0] + np.diff(self._y_range_)/2
+                # self._y_ = self._y_range_[0] + np.diff(self._y_range_)/2
             
-        if isinstance(xwindow, numbers.Number):
-            _hWin = xwindow
-            # self._hWin_ = xwindow
+            else:
+                raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
+                
+            if isinstance(xwindow, numbers.Number):
+                _hWin = xwindow
+                # self._hWin_ = xwindow
+                
+            elif isinstance(xwindow, pq.Quantity):
+                _hWin = xwindow.magnitude.flatten()[0]
+                # self._hWin_ = xwindow.magnitude.flatten()[0]
+                
+            elif xwindow is None:
+                _hWin = 0.0
+                # self._hWin_ = 0.0
+                
+            else:
+                raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
+                
+            if isinstance(ywindow, numbers.Number):
+                _vWin = ywindow
+                # self._vWin_ = ywindow
+                
+            elif isinstance(ywindow, pq.Quantity):
+                _vWin = ywindow.magnitude.flatten()[0]
+                # self._vWin_ = ywindow.magnitude.flatten()[0]
+                
+            elif ywindow is None:
+                _vWin = 0.0
+                # self._vWin_ = 0.0
+                
+            else:
+                raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
             
-        elif isinstance(xwindow, pq.Quantity):
-            _hWin = xwindow.magnitude.flatten()[0]
-            # self._hWin_ = xwindow.magnitude.flatten()[0]
+            self._vDataCursor_ = DataCursor(_x, _hWin)
+            self._hDataCursor_ = DataCursor(_y, _vWin)
             
-        elif xwindow is None:
-            _hWin = 0.0
-            # self._hWin_ = 0.0
+        if not isinstance(self._cursor_type_, SignalCursorTypes): # might have been set above
+            if isinstance(cursor_type, str):
+                if len(cursor_type) == 1:
+                    c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
+                    if len(c_type_name):
+                        cursor_type = SignalCursorTypes[c_type_name[0]]
+                        
+                    else:
+                        cursor_type = None
+                    
+                else:
+                    if cursor_type in SignalCursorTypes.names():
+                        cursor_type = SignalCursorTypes[cursor_type]
+                        
+                    else:
+                        cursor_type = None
+                    
+            elif isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(b, bool) for c in cursor_type]):
+                cursor_type = Signalcursor.SignalCursorTypes.getType(cursor_type) # this may return None
+                
+            elif not isinstance(cursor_type, SignalCursorTypes):
+                raise TypeError("cursor_type expected to be a str, a tuple of two booleans or a SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
             
-        else:
-            raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
+            # to avoid doubts, if cursor_type is still None then fallback to the default (crosshair)
+            if cursor_type is None:
+                cursor_type = SignalCursorTypes.crosshair
+                
+            self._cursor_type_ = cursor_type
             
-        if isinstance(ywindow, numbers.Number):
-            _vWin = ywindow
-            # self._vWin_ = ywindow
-            
-        elif isinstance(ywindow, pq.Quantity):
-            _vWin = ywindow.magnitude.flatten()[0]
-            # self._vWin_ = ywindow.magnitude.flatten()[0]
-            
-        elif ywindow is None:
-            _vWin = 0.0
-            # self._vWin_ = 0.0
-            
-        else:
-            raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
+        # now we can set which lines are shown
+        show_lines = self._cursor_type_.value
         
+        # print(f"{self.__class__.__name__}._setup_ cursor type = {self._cursor_type_}")
         if cursorID is None or (isinstance(cursorID, str) and len(cursorID.strip())==0):
             # by now self._cursor_type_ is a SignalCursorTypes value
             if self._cursor_type_ == SignalCursorTypes.crosshair:
@@ -1096,9 +1159,6 @@ class SignalCursor(QtCore.QObject):
             else:
                 cursorID = "dv" if follower else "v"
                 
-        self._vDataCursor_ = DataCursor(_x, _hWin)
-        self._hDataCursor_ = DataCursor(_y, _vWin)
-        
         self._cursorId_ = cursorID
         
         self._follows_mouse_ = follower

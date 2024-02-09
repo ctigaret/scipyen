@@ -180,7 +180,7 @@ from gui import scipyen_colormaps as colormaps
 
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
 from gui.dictviewer import (InteractiveTreeWidget, DataViewer,)
-from gui.cursors import (SignalCursor, SignalCursorTypes, cursors2epoch)
+from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes, cursors2epoch)
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import GuiWorker
 from gui.itemslistdialog import ItemsListDialog
@@ -2686,6 +2686,8 @@ anything else       anything else       ❌
         • for vertical and horizontal cursors the coordinates must be
             given as a comma-separated sequence of floats, or a float numpy array
             with shape (N,) or (N,1) where N is the number of cursors.
+        
+        • alternatively, each "cursor" above can be specified by DataCursor objects.
                     
         Var-keyword arguments ("name=value" pairs):
         ===========================================
@@ -2804,11 +2806,22 @@ anything else       anything else       ❌
                 self._use_coords_sequence_(args[0], xwindow, ywindow, labels, axis, cursorType)
                 return
                 
-            x, y = self._addCursors_parse_coords_(args[0], cursorType)
+            elif isinstance(args[0], (tuple, list)):
+                x, y = self._addCursors_parse_coords_(args[0], cursorType)
+                
+            elif isinstance(args[0], DataCursor):
+                self.addCursor(cursorType, args[0])
             
-        elif isinstance(args, (tuple, list, np.ndarray)):
-            self._use_coords_sequence_(args, xwindow, ywindow, labels, axis, cursorType)
-            return
+        elif isinstance(args, (tuple, list)):
+            if all(isinstance(a, numbers.Number) for a in args):
+                self._use_coords_sequence_(args, xwindow, ywindow, labels, axis, cursorType)
+                return
+            
+            elif all(isinstance(a, DataCursor) for a in args):
+                if len(args) > 2:
+                    raise SyntaxError(f"Too many DataCursor objects passed: expecting at most two, got {len(args)}")
+            
+                
 
         self.addCursor(cursorType=cursorType, x=x, y=y, 
                        xwindow=xwindow, ywindow=ywindow,
@@ -2818,9 +2831,9 @@ anything else       anything else       ❌
                        editFirst = showEditor)
         
     
-    def addCursor(self, cursorType: typing.Union[str, SignalCursorTypes] = "c", 
-                  x: typing.Optional[numbers.Number] = None, 
-                  y: typing.Optional[numbers.Number] = None, 
+    def addCursor(self, cursorType: typing.Optional[typing.Union[str, SignalCursorTypes]] = None, 
+                  x: typing.Optional[typing.Union[numbers.Number, DataCursor]] = None, 
+                  y: typing.Optional[typing.Union[numbers.Number, DataCursor]] = None, 
                   xwindow: typing.Optional[numbers.Number] = None, 
                   ywindow: typing.Optional[numbers.Number] = None, 
                   xBounds: typing.Optional[numbers.Number] = None, 
@@ -3453,12 +3466,12 @@ anything else       anything else       ❌
             self.configurable_traits[traitname] = name
         
     def _addCursor_(self, cursor_type: typing.Union[str, SignalCursorTypes], 
-                    x: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    y: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, 
-                    xwindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None,
-                    ywindow: typing.Union[numbers.Number, pq.Quantity, type(None)] = None, 
-                    xBounds: typing.Union[tuple, type(None)] = None,
-                    yBounds: typing.Union[tuple, type(None)] = None,
+                    x: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]] = None,
+                    y: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]] = None, 
+                    xwindow: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
+                    ywindow: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None, 
+                    xBounds: typing.Optional[tuple] = None,
+                    yBounds: typing.Optional[tuple] = None,
                     axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None,
                     label:typing.Optional[str] = None, 
                     follows_mouse: bool = False, 
@@ -3470,24 +3483,7 @@ anything else       anything else       ❌
         """
         # print(f"{self.__class__.__name__}_addCursor_ cursor_type = {cursor_type}, x = {x} ,y = {y}, xwindow = {xwindow}, ywindow = {ywindow},xBounds = {xBounds},yBounds = {yBounds}, axis={axis}, label= {label}, follows_mouse = {follows_mouse}")
         relative = kwargs.pop("relative", True)
-        if xwindow is None:
-            xwindow = self.defaultCursorWindowSizeX
-            
-        elif isinstance(xwindow, pq.Quantity):
-            xwindow = float(xwindow.magnitude.flatten()[0])
-            
-        elif not isinstance(xwindow, numbers.Number):
-            raise TypeError("Unexpected type for xwindow: %s" % type(xwindow).__name__)
-            
-        if ywindow is None:
-            ywindow = self.defaultCursorWindowSizeY
-            
-        elif isinstance(ywindow, pq.Quantity):
-            ywindow = float(ywindow.magnitude.flatten()[0])
-            
-        elif not isinstance(ywindow, numbers.Number):
-            raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
-            
+        
         #### BEGIN Figure out cursors destination: axis or scene
         # NOTE: it seemingly makes no sense to add a cursors when there are no
         # plot items (axes); nevertheless the cursor can and should be added
@@ -3516,6 +3512,28 @@ anything else       anything else       ❌
             
         #### END Figure out cursors destination: axis or scene
         
+        if any(isinstance(v, DataCursor) for v in (x,y)):
+            cursor_type = SignalCursorTypes.getType((isinstance(y, DataCursor), isinstance(x, DataCursor)))
+            # print(f"{self.__class__.__name__}._addCursor_ (DataCursor): cursor_type = {cursor_type}")
+        
+        if xwindow is None:
+            xwindow = self.defaultCursorWindowSizeX
+            
+        elif isinstance(xwindow, pq.Quantity):
+            xwindow = float(xwindow.magnitude.flatten()[0])
+            
+        elif not isinstance(xwindow, numbers.Number):
+            raise TypeError("Unexpected type for xwindow: %s" % type(xwindow).__name__)
+            
+        if ywindow is None:
+            ywindow = self.defaultCursorWindowSizeY
+            
+        elif isinstance(ywindow, pq.Quantity):
+            ywindow = float(ywindow.magnitude.flatten()[0])
+            
+        elif not isinstance(ywindow, numbers.Number):
+            raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
+            
         #### BEGIN check cursors coordinates
         if isinstance(axis, pg.PlotItem): # single-axis cursor - a.k.a cursor in axis
             if axis not in self.signalsLayout.items:
@@ -3530,7 +3548,7 @@ anything else       anything else       ❌
             elif isinstance(x, pq.Quantity):
                 x = float(x.magnitude.flatten()[0])
                 
-            elif not isinstance(x, numbers.Number):
+            elif not isinstance(x, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
             
             if xBounds is None:
@@ -3543,7 +3561,7 @@ anything else       anything else       ❌
             elif isinstance(y, pq.Quantity):
                 y = float(y.magnitude.flatten()[0])
             
-            elif not isinstance(y, numbers.Number):
+            elif not isinstance(y, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__ )
             
             if yBounds is None:
@@ -3593,7 +3611,7 @@ anything else       anything else       ❌
             elif isinstance(x, pq.Quantity):
                 x = float(x.magnitude.flatten()[0])
                 
-            elif not isinstance(x, numbers.Number):
+            elif not isinstance(x, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
             
             if y is None:
@@ -3603,7 +3621,7 @@ anything else       anything else       ❌
             elif isinstance(y, pq.Quantity):
                 y = float(y.magnitude.flatten()[0])
                 
-            elif not isinstance(y, numbers.Number):
+            elif not isinstance(y, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
                     
             # print(f"{self.__class__.__name__}._addCursor_ multi-axis x = {x}")
@@ -3612,13 +3630,13 @@ anything else       anything else       ❌
         
         if not isinstance(cursor_type, (str, SignalCursorTypes)):
             raise TypeError("cursor_type expected to be a str or a SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
-        
+
         if isinstance(cursor_type, SignalCursorTypes):
             cursor_type = cursor_type.name
         
         if cursor_type in ("vertical", "v", SignalCursorTypes.vertical):
             cursorDict = self._verticalSignalCursors_
-            crsPrefix = "v"
+            crsPrefix = "dv" if follows_mouse else "v"
             
             ywindow = 0.0
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
@@ -3628,7 +3646,7 @@ anything else       anything else       ❌
             
         elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal):
             cursorDict = self._horizontalSignalCursors_
-            crsPrefix = "h"
+            crsPrefix = "dh" if follows_mouse else "h"
             xwindow = 0.0
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
             linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
@@ -3637,7 +3655,7 @@ anything else       anything else       ❌
             
         elif cursor_type in ("crosshair", "c", SignalCursorTypes.crosshair):
             cursorDict = self._crosshairSignalCursors_
-            crsPrefix = "c"
+            crsPrefix = "dc" if follows_mouse else "c"
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
             linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
             pen.setCosmetic(True)
@@ -3650,6 +3668,8 @@ anything else       anything else       ❌
         hoverPen.setCosmetic(True)
         
         nCursors = len(cursorDict)
+        
+        # print(f"{self.__class__.__name__}._addCursor_ crsPrefix = {crsPrefix}")
         
         if label is None:
             crsId = "%s%s" % (crsPrefix, str(nCursors))
@@ -10038,20 +10058,6 @@ signals in the signal collection.
             elif len(coords) == 2:
                 x,y = coords # distribute coordinates to individual values
                 
-#                 elif len(coords)> 2:
-#                     if cursorType in ("v", "vertical", "Vertical",
-#                                       SignalCursorTypes.vertical):
-#                         x = coords
-#                         y = None
-#                         
-#                     elif cursorType in ("h", "horizontal", "Horizontal",
-#                                         SignalCursorTypes.horizontal):
-#                         y = coords,
-#                         x = None
-#                         
-#                     else:
-#                         raise ValueError(f"Expecting cursorType verticl or horizontal when more than two coordinates are passed; instead, got {cursorType}")
-
             else:
                 raise ValueError(f"Invalid coordinates specified - expecting at most two; instead, got  {coords}")
                     
