@@ -3341,15 +3341,24 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     """
     # from gui.signalviewer import SignalCursor as SignalCursor
+    
+    if not isinstance(cursor0, (SignalCursor, DataCursor)):
+        raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor0).__name__}")
 
-    t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x
+    if not isinstance(cursor1, (SignalCursor, DataCursor)):
+        raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor1).__name__}")
+
+    t0 = cursor0.x if isinstance(x, SignalCursor) else cursor0.coord
+    # t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x if isinstance(x, SignalCursor) else cursor0.coord
     
     y0 = cursor_average(signal, cursor0, channel=channel)
     
+
     if isinstance(t0, float):
         t0 *= signal.times.units
         
-    t1 = cursor1[0] if isinstance(cursor1, tuple) else cursor1.x
+    t1 = cursor1.x if isinstance(cursor1, SignalCursor) else cursor1.coord
+    # t1 = cursor1[0] if isinstance(cursor1, tuple) else cursor1.x if isinstance(cursor1, SignalCursor) else cursor1.coord
 
     if isinstance(t1, float):
         t1 *= signal.times.units
@@ -3386,6 +3395,9 @@ def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
                 raise TypeError(f"Expecting {signal.times.units}; instead got {t1.units}")
             
             t1 = t1.rescale(signkal.times.units)
+            
+    else:
+        raise TypeError(f"Invalid cursor specification: expecting a SignalCursor or a DataCursor instead got a {type(cursor).__name__}")
         
     if t1 == t0:
         raise ValueError(f"Cursor xwindow is 0")
@@ -4171,24 +4183,36 @@ def _(refX: typing.Union[float, pq.Quantity],
     return LocationMeasure(cursors_difference, 
                            (DataCursor(refX, refW), 
                             DataCursor(locX, locW)),
-                           name, True)
+                           name, relative)
                            
 @amplitudeMeasure.register(DataCursor)
 def _(c0:DataCursor,c1:DataCursor, name:str = "amplitude", relative:bool = True) -> LocationMeasure:
     return LocationMeasure(cursors_difference, 
                            (c0,c1),
-                           name, True)
+                           name, relative)
                            
 @amplitudeMeasure.register(SignalCursor)
-def _(c0:SignalCursor, c1:SignalCursor, name="amplitude", relative:bool = True):
+def _(c0:SignalCursor, c1:SignalCursor, name="amplitude", relative:bool = True) -> LocationMeasure:
     return LocationMeasure(cursors_difference, 
                            (c0,c1),
-                           # (c0.dataCursors[0],c1.dataCursors[0]),
-                           name, True)
+                           name, relative)
                            
+@singledispatch
+def chordSlopeMeasure() -> LocationMeasure:
+    raise NotImplementedError
+
+@chordSlopeMeasure.register(DataCursor, SignalCursor)
+def _(*args, name:str="chord_slope", relative:bool=True) -> LocationMeasure:
+    if len(args) == 1:
+        return LocationMeasure(cursor_chord_slope, args[0], name, relative)
     
+    elif len(args) == 2:
+        return LocationMeasure(cursors_chord_slope, *args, name, relative)
     
+    else:
+        raise SyntaxError(f"Expecting at most two cursors; got {len(args)} instead")
     
+
 def signal_measures_in_segment(s: neo.Segment, 
                             signal: typing.Union[int, str],
                             command_signal: typing.Optional[typing.Union[int, str]] = None,
