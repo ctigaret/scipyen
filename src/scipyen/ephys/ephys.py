@@ -1886,7 +1886,14 @@ class LocationMeasure:
         else:
             args = args + (self.locations,)
             
-        return self.func(*args, relative=self.relative, **kwargs)
+        relative = kwargs.get("relative", None)
+        
+        if not isinstance(relative, bool):
+            kwargs["relative"] = self.relative
+            
+        # print(f"{self.__class__.__name__}.call: relative = {self.relative}")
+        print(f"{self.__class__.__name__}.call: func = {self.func}")
+        return self.func(*args, **kwargs)
   
 class DataListener(QtCore.QObject):
     """
@@ -2732,6 +2739,8 @@ def cursor_reduce(func:types.FunctionType,
     if relative:
         t0 += signal.t_start
         t1 += signal.t_start
+        
+    print(f"In cursor_reduce: func = {func}; t0 = {t0}, t1 = {t1}, relative = {relative}")
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -3195,6 +3204,9 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     # (e.g. call np.squeeze() on the result, if that is suitable)
     
     kw = {"relative": relative}
+    
+    print(f"In cursors_difference: func = {func}, functor = {functor}")
+    
     if functor:
         if not isinstance(subfun, (typing.Callable, types.FunctionType)):
             raise TypeError(f"When 'func' is a functor, 'subfun' must be a callable or function; got {type(subfun).__name__} instead" )
