@@ -1083,22 +1083,6 @@ class RecordingEpisode(Episode):
     
 """
     # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
-    # def __init__(self, /, *args, protocol:typing.Optional[ElectrophysiologyProtocol] = None,
-    #              episodeType:RecordingEpisodeType = RecordingEpisodeType.Tracking,
-    #              source:typing.Optional[RecordingSource] = None,
-    #              name:typing.Optional[str] = None,
-    #              segments:typing.Optional[GeneralIndexType] = None,
-    #              adcChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
-    #              dacChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
-    #              digChannels:typing.Optional[typing.Union[str, int, typing.Sequence[str], typing.Sequence[int]]] = None, 
-    #              electrodeMode:ElectrodeMode = ElectrodeMode.WholeCellPatch,
-    #              pathways:typing.Optional[typing.List[SynapticPathway]] = None,
-    #              xtalk:typing.Optional[dict[int, tuple[int,int]]] = None ,
-    #              triggers:typing.Optional[TriggerEvent] = None,
-    #              # sortby:typing.Optional[typing.Union[str, typing.Callable]] = None,
-    #              # ascending:typing.Optional[bool] = None,
-    #              # glob:bool = True,
-    #              **kwargs):
     def __init__(self, episodeType:RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name:typing.Optional[str] = None,
                  protocol:typing.Optional[ElectrophysiologyProtocol]=None, 
@@ -2795,10 +2779,6 @@ def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSi
     
     return t0
             
-            
-    
-    
-
 @safeWrapper
 def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                cursor: typing.Union[SignalCursor, tuple, DataCursor], 
@@ -4336,6 +4316,26 @@ def _(*args, name:str="chord_slope", channel:int = 0, relative:bool=True) -> Loc
     
 @singledispatch
 def durationMeasure() -> LocationMeasure:
+    """LocationMeasure factory for the distance between two locations in the signal.
+    The locations are specified as two (vertical) SignalCursor or two DataCursor
+    objects. Bt default, the distance between them can be reported in signal domain
+    units — e.g., time units — but it can be reported in samples.
+    
+    Syntax:
+    -------
+    durationMeasure(c0: typing.Union[DataCursor, SignalCursor], c1: typing.Union[DataCursor, SignalCursor],
+                    name: str = "duration", relative: bool = True) -> LocationMeasure
+    
+    Parameters:
+    ----------
+    c0, c1: DataCursor or SignalCursor (vertical) objects
+    
+    name: str       — name of the LocationMeasure object; default is 'chord_slope'
+    
+    relative: bool  — flag specifying whether the time stamps of the cursors are
+                    to be adjusted relative to the limits of the signal's domain;
+                    default is True
+"""    
     raise NotImplementedError
 
 @durationMeasure.register(DataCursor)
@@ -4344,6 +4344,31 @@ def _(c0: typing.Union[DataCursor, SignalCursor], c1: typing.Union[DataCursor, S
       name: str = "duration", relative: bool = True) -> LocationMeasure:
     return LocationMeasure(cursors_distance, (c0,c1), name, relative)
 
+def membraneTestVClampMeasure(base: typing.Union[DataCursor, SignalCursor],
+                              Rs: typing.Union[DataCursor, SignalCursor],
+                              Rin: typing.Union[DataCursor, SignalCursor],
+                              name:str = "membrane_test_vc",
+                              channel: int = 0,
+                              relative:bool=False) -> LocationMeasure:
+    """LocationMeasure factory for membrane test in voltage-clamp.
+    Calculates DC, Rs and Rin based on three cursors (baseline, Rs and Rin).
+
+    Rs cursor is located on the extremum of the first current transient at the 
+    start of the membrane potential change during the test; this extremum can be 
+    a peak (for depolarizing Vm step) or a trough (hyperpolarizing Vm step)
+
+    Returns a tuple (DC, Rs, Rin) where DC is the baseline current, Rs and Rin 
+    are, respectively, the series and input membrane resistance.
+    """
+    def _func_(s, c1, c2, c3, testVmDelta:pq.Quantity, channel:int = 0, relative:bool = True):
+        _dc  = cursor_average(s, c1)
+        _rin = (testVmDelta / (cursor_average(s, c3) - _dc)).rescale(pq.megaohm)
+        _rs  = (testVmDelta / ((cursor_max(s, c2) if testVmDelta > 0 else cursor_min(s, c2)) - _dc)).rescale(pq.megaohm)
+        
+        return (_dc, _rs, _rin)
+    
+    return LocationMeasure(_func_, (base, Rs, Rin), name, channel, relative)
+    
 
 def signal_measures_in_segment(s: neo.Segment, 
                             signal: typing.Union[int, str],

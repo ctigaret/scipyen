@@ -2839,6 +2839,7 @@ anything else       anything else       ❌
                   xBounds: typing.Optional[numbers.Number] = None, 
                   yBounds: typing.Optional[numbers.Number] = None, 
                   label: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None, 
+                  name: typing.Optional[typing.Union[int, str, pg.PlotItem]] = None, 
                   follows_mouse: bool = False, 
                   axis: typing.Optional[int] = None, 
                   editFirst: bool=False,
@@ -2894,6 +2895,9 @@ anything else       anything else       ❌
         # creates the cursor DIRECTLY at the specified coordinates
         kwargs["show_value"] = self._cursorsShowValue_ == True
         precision = kwargs.pop("precision", self.cursorLabelPrecision)
+        
+        
+        cname = label if (isinstance(label, str) and len(label.strip())) else name if (isinstance(name, str) and len(name.strip())) else None
         
         crsID = self._addCursor_(cursor_type = cursorType,
                                 x = x, y = y, xwindow = xwindow, ywindow = ywindow,

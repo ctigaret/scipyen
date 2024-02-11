@@ -1542,196 +1542,7 @@ class LTPOnline(QtCore.QObject):
         
         self._parse_args_(*args)
         self._setup_data_()
-        
-        self._episodeResults_ = dict()
-        self._landmarks_ = dict()
         self._results_ = dict() 
-        
-        # stores the data received from Clampex 
-        # ATTENTION 
-        # Clampex sends one trial per ABF file → one neo.Block containing ALL 
-        # data in a trial (i.e. segments = sweeps, each segment with same 
-        # number of analogsignals); we need information in self._sources_ to
-        # group accordingly.
-        #
-        # Epsiodes: 
-        # A synaptic plasticity experiment occurs (typically) in three episodes
-        #   (or stages), encapsulated in ephys.RecordingEpisode objects:
-        #
-        # 1. baseline       records the evolution of synaptic responses BEFORE
-        #                   conditioning (see below); responses are recorded as 
-        #                   analog signals via a specific ADC.
-        #
-        #                   Responses can be recorded on two synaptic pathways in
-        #                   the same RecordingSource: e.g., a 'Test' pathway receiving the
-        #                   conditioning protocol (see below), and a 'Control' 
-        #                   pathway (not stimulated during conditioning).
-        #
-        #                   Responses in both pathways are recorded using the 
-        #                   same electrode, but are evoked with TTL signals sent
-        #                   via two distinct digital channels, two distinct DAC
-        #                   channels (as analog signals emulating TTL pulses), 
-        #                   or a combination of a digital and a DAC channel.
-        #                   In order to distinguish the pathway origin of the
-        #                   responses, the pathways are recorded in alternative 
-        #                   sweeps (segments). 
-        #
-        #                   NOTE Clampex (pClamp) has no means to specify the 
-        #                   particular sweeps when a given DIG (or DAC-emulated)
-        #                   TTL should be output. However, Clampex does allow TWO 
-        #                   alternative DIG outputs, with each one active on 
-        #                   alternative sweeps — hence Clampex trials (written 
-        #                   as ABF files) will contain recordings from one
-        #                   pathway in odd-numbered sweeps, and from the other 
-        #                   in even-numbered sweeps.
-        #
-        #                   NOTE: CED Signal is more flexible in this respect,
-        #                   as it allows a definition of 'states', with each state
-        #                   defining a set of 'pulses'; states can then be run in 
-        #                   a user-defined sequence (a.k.a., 'protocol') such that
-        #                   a given 'state' is applied every 𝒏 sweeps, or only
-        #                   once, in a sweep of your choice, during a trial ⟹
-        #                   one can in principle enure interleaved stimulation
-        #                   of more than two pathways (provided the outputs are 
-        #                   physically available).
-        #
-        #                   At the time of writing, this code supports only 
-        #                   ABF/Clampex files.
-        #
-        #                   Episode type: ephys.RecordingEpisodeType.Tracking
-        #
-        # 1.a baseline crosstalk
-        #                   optional, tests pathway overlap
-        #
-        #                   Episode type: ephys.RecordingEpisodeType.Tracking
-        #
-        # 1.b drug wash in  
-        #                   optional, when testing the effect fo a drug on, say,
-        #                   induction of plasticity
-        #
-        #                   Episode type: ephys.RecordingEpisodeType.Tracking | ephys.RecordingEpisodeType.Drug
-        #
-        # 2. conditioning   
-        #                   stimulation pattern (a combination of synaptic and 
-        #                   postsynaptic activity) used in order to induce 
-        #                   synaptic plasticity on one of the synaptic pathways
-        #                   (the 'Test' pathway).
-        #
-        #                   The electrical behaviour of the RecordingSource (cell or field)
-        #                   is optionally recorded via the same ADC as the one
-        #                   used to record the baseline responses. Obviously, when
-        #                   recorded, the all sweeps of the trial will contain 
-        #                   synaptic responses only from the conditioned pathway.
-        #
-        #                   LTPOnline does not perform measurements during this
-        #                   episode, is because these measurements depend on what 
-        #                   question is being asked, and therefore are better 
-        #                   performed in a post hoc analysis, off-line.
-        #                   
-        #                   Episode type: ephys.RecordingEpisodeType.Conditioning
-        #
-        # 3. chase          records synaptic responses AFTER conditioning — 
-        #                   signal layout and measurements are identical to those
-        #                   for the baseline episode.
-        #
-        #                   The drug wash out may take place at the beginning 
-        #                   of the chase episode
-        #
-        #                   Episode type: ephys.RecordingEpisodeType.Tracking
-        #
-        # 3.a chase crosstalk
-        #                   optional, test pathway overlap during chase (typically
-        #                   this is done during the baseline, but there may be 
-        #                   a good case for doing it during the chase)
-        #
-        #                   Episode type: ephys.RecordingEpisodeType.Tracking
-        #
-        # 3.b chase drug
-        #                   optional, test a drug effect on plasticity expression
-        #
-        #                   Episode type: ephys.RecordingEpisodeType.Tracking | ephys.RecordingEpisodeType.Drug
-        #
-        
-        # Data is organized by RecordingSource; for each RecordingSource we may 
-        #   have more than one SynapticStimulus configuration,. such that each 
-        #   SynapticStimulus corresponds to one synaptic pathway. Ideally, and 
-        #   when possible, there should be two such pathway, with conditioning
-        #   being applied only to one of them ("test" pathway)
-        
-        # technically, Conditioning should only use ONE pathway; since an empty
-        #       neo.Block does not use much resources, we leave this empty
-        # 
-        
-        # set up data dictionary ⇒ to be populated with recorded data from ABF files
-        # e.g.: {name1 ↦ {source         ↦ src,
-        #
-        #                 baseline       ↦ { 'path0' ↦ neo.Block,
-        #                                    'path1' ↦ neo.block},
-        #
-        #                 conditioning   ↦ { 'path0' ↦ neo.Block,
-        #                                    'path1' ↦ neo.block},
-        #
-        #                 chase          ↦ { 'path0' ↦ neo.Block,
-        #                                    'path1' ↦ neo.block}
-        #                },
-        #
-        #       name2 ↦ … as above …
-        #       }
-        #
-        # self._data_ = dict((src.name, dict((("source",          src),
-        #                                     ("baseline",        dict(src.syn_blocks)),
-        #                                     ("conditioning",    dict(src.syn_blocks)),
-        #                                     ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
-        
-        
-        # place analysis results inside each episode sub-dict ⇒ do away with _episodeResults_
-        
-        # NOTE: 2024-02-08 15:20:08 in _runData_:
-        # episodes is a mapping of episode name (str) ↦ episode data (dict)
-        #
-        # episode data is a mapping of source name (str) ↦ source data (dict)
-        #  
-        # source data is inferred from the RecordingSource objects passed as parameter(s)
-        #   to the constructor (*args) and the protocols parsed from the ABF files
-        #   as they are read, and is a mapping of:
-        #   "input" ↦ input signal index (int) ≡ logical ADC index ← to be inferred 
-        #                   from the protocol 'parsed' from the ABf file, and using 
-        #                   the physical ADC index supplied by the RecordingSource's `adc` 
-        #                   field
-        #
-        #   "responses" ↦ sequence (list) of ephys.LocationMeasure objects ← to be
-        #                   inferred from the protocol using the number and timings
-        #                   of the synaptic stimuli, and the clamping mode (also 
-        #                   inferred from the protocol)
-        #
-        #                   NOTE the protocol itself is parsed from the ABF file.
-        #                   
-        #
-        #   "results" ↦ sequence (list) of path result dictionaries, one for each
-        #                   SynapticStimulus in the RecordingSource
-        #
-        #   A path result dictionary is a mapping with contents dictated by the 
-        #       clamping mode and the location measures, as follows:
-        #       • voltage clamp:
-        #           "Rs"    ↦ neo.IrregularlySampledSignal
-        #           "Rin"   ↦ neo.IrregularlySampledSignal
-        #           "PSC𝑘"  ↦ neo.IrregularlySampledSignal, where 𝑘 is an int from
-        #                   0 to the number of stimulus pulses in the SynapticStimulus
-        #                   less one (this number if parsed from an appropro)
-        #           "PPR𝑛"  ↦ neo.IrregularlySampledSignal, with paired pulse ratios
-        #                   i.e. the ratio of response magnitude of response 𝑛 / response 0,
-        #                   where 𝑛 is an int from 1 to number of synaptic stimulations
-        #                   in the RecordingSource, less one
-        #   
-        #       • current clamp (or no clamp, for field recordings):
-        #           "Rin"   ↦ neo.IrregularlySampledSignal - input resistance
-        #           "τ"     ↦ neo.IrregularlySampledSignal - membrane time constant
-        #           "PSP"
-        # A 
-        #
-        #   "location" ↦
-        #           locations and functors for determining a measure of synaptic response
-        #
         
         self._runData_ = DataBag(sources = self._sources_,
                                    data = self._data_,
@@ -1756,57 +1567,6 @@ class LTPOnline(QtCore.QObject):
         # FINALIZE THIS !!!
         #
         
-        # WARNING: 2023-10-05 12:10:40
-        # below, all timings in self._landmarks_ are RELATIVE to the start of the sweep!
-        # timings are stored as [start time, duration] (all Quantity scalars, with units of time)
-        if self._runData_.trackingClampMode == ephys.ClampMode.VoltageClamp:
-            self._episodeResults_ = {"path0": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
-                              "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
-                              "DC": [], "Rs":[], "Rin":[], }
-            
-            self._landmarks_ = {"Rbase":[self._runData_.signalBaselineStart, self._runData_.signalBaselineDuration], 
-                                "Rs":[None, None], 
-                                "Rin":[None, None], 
-                                "PSCBase":[None, None],
-                                            
-                                "PSC0Peak":[None, None], 
-                                "PSC1Peak":[None, None]}
-    
-        else:
-            self._episodeResults_ = {"path0": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
-                              "path1": {"Response0":[], "Response1":[], "PairedPulseRatio":[]},
-                              "tau":[], "Rin":[], "Cap":[], }
-            
-            if self._runData_.useSlopeInIClamp:
-                self._landmarks_ = {"Base":[self._runData_.signalBaselineStart, self._runData_.signalBaselineDuration], 
-                                    "VmTest":[None, None], 
-                                    "PSP0Base":[None, None],
-                                    "PSP0Peak":[None, None],
-                                    "PSP1Base":[None, None],
-                                    "PSP1Peak":[None, None]}
-            else:
-                self._landmarks_ = {"Base":[self._runData_.signalBaselineStart, self._runData_.signalBaselineDuration], 
-                                    "VmTest":[None, None], 
-                                    "PSPBase":[None, None],
-                                    "PSP0Peak":[None, None],
-                                    "PSP1Peak":[None, None]}
-        
-                
-        #### BEGIN about ABF epochs
-
-        # expected epochs layout (and order):
-        #
-        # Role                              ABF Epoch                   Comments
-        # ======================================================================
-        # baseline (for DC, Rs and Rin)     A or None                   When None use DAC holding time
-        #
-        # membrane test                     B (when A present)          Can be AFTER synaptic response
-        #
-        # synaptic baseline                 C (when A, B present)       Can be the baseline when mb test AFTER syn resp
-        #
-        # synaptic response                 D (1 or 2 pulses DIG train) The first epoch with a DIG train
-
-
         # just one Epoch;
         # • if ABF Epoch, then it needs to be the first one, type Step,
         #   ∘ first duration > 0, delta duration == 0
@@ -1982,6 +1742,48 @@ class LTPOnline(QtCore.QObject):
         if hasattr(super(object, self), "__del__"):
             super().__del__()
             
+    def _make_episode_dict(self, source: RecordingSource, name:str, 
+                           locationMeasures:typing.List[LocationMeasure],
+                           protocol: pab.ABFProtocol) -> dict:
+        ret = dict()
+        
+        # → logical ADC index = index of signal containing recorded responses,
+        # in the Block's segments `analogsignals` attributes ⇒ this is the signal
+        # where measurements are made
+        ret["input"] = protocol.logicalADCIndex(src.adc) 
+        
+        # → logical DAC index = (normally) the index of the "active" DAC channel;
+        # this is the one that sends commands to the recorded cell (in voltage/current clamp)
+        # ATTENTION: This is not enecssarily the `activeDACChannel` property of 
+        # the protocol. In particular, src.dac is None for field recording (i.e..
+        # no command signal for clamping is being used); however, the active 
+        # DAC channel still points to the DAC where digital outputs are enabled 
+        # (in Clampex) and where epochs for triggering DIG outputs are defined.
+        # ret["output"] = protocol.logicalDACIndex(src.dac) if isinstance(src.dac, int) else protocol.logicalDACIndex(protocol.activeDACChannel)
+        ret["output"] = src.dac if isinstance(src.dac, int) else protocol.activeDACChannel # physical index of DAC used for command signal and/or DIG outputs
+        
+        # physDAC = src.dac if isinstance(src.dac, int) else protocol.logicalDACIndex
+        
+        ret["clamping"] = protocol.getClampMode(src.adc, ret["output"])
+        
+        if ret["clamping"] == ClampMode.VoltageClamp:
+            ret["membrane_test"] = {"Rs": None, "Rin": None, "DC": None} # TODO: IrregularlySampledSignal
+            
+        elif ret["clamping"] == ClampMode.CurrentClamp:
+            ret["membrane_test"] = {"Rm": None, "tau": None, "Cm": None} # TODO: IrregularlySampledSignal
+            
+        ret["measures"] = dict()
+        ret["measures"]["membrane_test"] = None # to be setup in _LTPOnlineFileProcessor_.processAbfFile
+        ret["measures"]["pathways"] = dict() # to be setup in _LTPOnlineFileProcessor_.processAbfFile
+        
+        # for syn in src.syn:
+        #     ret["measures"]["pathways"][syn.name] = self._make_pathway_dict(syn, clamping)
+            # ret["pathways"][syn.name] = syn
+        
+    # def _make_pathway_measures(self, syn:SynapticStimulus, clamping:ClampMode):
+    #     return {"stimulus": syn, "responses": dict()}
+        
+            
     def _parse_args_(self, *args):
         # print(f"{self.__class__.__name__}._parse_args_: args = {args}")
         if len(args) == 0:
@@ -2156,8 +1958,6 @@ class LTPOnline(QtCore.QObject):
         """
         if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
             self._simulatorThread_.requestInterruption()
-            # self._simulatorThread_.quit()
-            # self._simulatorThread_.wait()
         
     def resume(self):
         """Resumes simulation, if there are files left in the simulation stack.
