@@ -269,7 +269,7 @@ class SignalCursor(QtCore.QObject):
             self._host_graphics_item_ = plot_item
             
         else:
-            raise TypeError("plot_item expected to be a pyqtgraph.PlotItem object or a pyqtgraph.GraphicsScene object got %s instead" % type(plot_items).__name__)
+            raise TypeError("plot_item expected to be a pyqtgraph.PlotItem object or a pyqtgraph.GraphicsScene object got %s instead" % type(plot_item).__name__)
             
         self._cursorId_ = None
         

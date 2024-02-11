@@ -142,7 +142,7 @@ from core.neoutils import (get_domain_name,
                            segment_start,
                            )
 
-from core.prog import (safeWrapper, show_caller_stack, with_doc)
+from core.prog import (safeWrapper, show_caller_stack, with_doc, scipywarn)
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index, 
@@ -3512,12 +3512,12 @@ anything else       anything else       ❌
             
         #### END Figure out cursors destination: axis or scene
         
-        if any(isinstance(v, DataCursor) for v in (x,y)):
-            cursor_type = SignalCursorTypes.getType((isinstance(y, DataCursor), isinstance(x, DataCursor)))
-            # print(f"{self.__class__.__name__}._addCursor_ (DataCursor): cursor_type = {cursor_type}")
-        
+        #### BEGIN sort out cursor windows
         if xwindow is None:
-            xwindow = self.defaultCursorWindowSizeX
+            if isinstance(x, DataCursor):
+                xwindow = x.span
+            else:
+                xwindow = self.defaultCursorWindowSizeX
             
         elif isinstance(xwindow, pq.Quantity):
             xwindow = float(xwindow.magnitude.flatten()[0])
@@ -3526,13 +3526,61 @@ anything else       anything else       ❌
             raise TypeError("Unexpected type for xwindow: %s" % type(xwindow).__name__)
             
         if ywindow is None:
-            ywindow = self.defaultCursorWindowSizeY
+            if isinstance(y, DataCursor):
+                ywindow = y.span
+            else:
+                ywindow = self.defaultCursorWindowSizeY
             
         elif isinstance(ywindow, pq.Quantity):
             ywindow = float(ywindow.magnitude.flatten()[0])
             
         elif not isinstance(ywindow, numbers.Number):
             raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
+        
+        #### END sort out cursor windows
+        
+        #### BEGIN figure out cursor type ⇒
+        # • identify` cursor_dict
+        # • adjust cursor windows as needed (set 0 for unused cursor lines)
+        #
+        if any(isinstance(v, DataCursor) for v in (x,y)):
+            cursor_type = SignalCursorTypes.getType((isinstance(y, DataCursor), isinstance(x, DataCursor)))
+            # print(f"{self.__class__.__name__}._addCursor_ (DataCursor): cursor_type = {cursor_type}")
+        else:
+            if isinstance(cursor_type, SignalCursorTypes):
+                cursor_type = cursor_type.name
+            
+        if cursor_type in ("vertical", "v", SignalCursorTypes.vertical):
+            cursorDict = self._verticalSignalCursors_
+            crsPrefix = "dv" if follows_mouse else "v"
+            
+            ywindow = 0.0
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+            pen.setCosmetic(True)
+            linkedPen.setCosmetic(True)
+            
+        elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal):
+            cursorDict = self._horizontalSignalCursors_
+            crsPrefix = "dh" if follows_mouse else "h"
+            xwindow = 0.0
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
+            pen.setCosmetic(True)
+            linkedPen.setCosmetic(True)
+            
+        elif cursor_type in ("crosshair", "c", SignalCursorTypes.crosshair):
+            cursorDict = self._crosshairSignalCursors_
+            crsPrefix = "dc" if follows_mouse else "c"
+            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
+            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
+            pen.setCosmetic(True)
+            linkedPen.setCosmetic(True)
+            
+        else:
+            raise ValueError("unsupported cursor type %s" % cursor_type)
+        #### END figure out cursor type; adjust cursor windows as needed (set 0 for unused cursor lines)
+            
             
         #### BEGIN check cursors coordinates
         if isinstance(axis, pg.PlotItem): # single-axis cursor - a.k.a cursor in axis
@@ -3631,39 +3679,6 @@ anything else       anything else       ❌
         if not isinstance(cursor_type, (str, SignalCursorTypes)):
             raise TypeError("cursor_type expected to be a str or a SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
 
-        if isinstance(cursor_type, SignalCursorTypes):
-            cursor_type = cursor_type.name
-        
-        if cursor_type in ("vertical", "v", SignalCursorTypes.vertical):
-            cursorDict = self._verticalSignalCursors_
-            crsPrefix = "dv" if follows_mouse else "v"
-            
-            ywindow = 0.0
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-            pen.setCosmetic(True)
-            linkedPen.setCosmetic(True)
-            
-        elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal):
-            cursorDict = self._horizontalSignalCursors_
-            crsPrefix = "dh" if follows_mouse else "h"
-            xwindow = 0.0
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, QtCore.Qt.SolidLine)
-            pen.setCosmetic(True)
-            linkedPen.setCosmetic(True)
-            
-        elif cursor_type in ("crosshair", "c", SignalCursorTypes.crosshair):
-            cursorDict = self._crosshairSignalCursors_
-            crsPrefix = "dc" if follows_mouse else "c"
-            pen = QtGui.QPen(QtGui.QColor(self.cursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
-            linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["crosshair"]), 1, QtCore.Qt.SolidLine)
-            pen.setCosmetic(True)
-            linkedPen.setCosmetic(True)
-            
-        else:
-            raise ValueError("unsupported cursor type %s" % cursor_type)
-        
         hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1, QtCore.Qt.SolidLine)
         hoverPen.setCosmetic(True)
         
@@ -3687,7 +3702,7 @@ anything else       anything else       ❌
                 if len(self.plotItems):
                     pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                     precision = min(pi_precisions)
-                    
+        # print(f"{self.__class__.__name__}._addCursor_ x = {x}, xwindow = {xwindow}, y = {y}, ywindow = {ywindow}")
         cursor = SignalCursor(axis, 
                                    x = x, y = y, xwindow=xwindow, ywindow=ywindow,
                                    cursor_type = cursor_type,

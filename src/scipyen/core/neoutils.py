@@ -179,8 +179,7 @@ from .prog import (safeWrapper, deprecation,
                    filter_attr, filterfalse_attr,
                    filter_type, filterfalse_type,
                    iter_attribute, signature2Dict, 
-                   with_doc,
-                   )#SignatureDict)
+                   with_doc, scipywarn,)
 
 from .datatypes import (is_string, is_vector,
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
@@ -2235,21 +2234,28 @@ def get_sample_at_time(data, t, channel=None):
         else:
             t *= u
             
-    if isinstance(data, IrregularlySampledDataSignal):
-        try:
-            ret = data.time_slice(t,t)
-        except:
-            ret = np.nan * data.units
-    else:
-        i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
-        if len(i):
-            i = int(i[-1])
-            ret = data[i]
-        else:
-            ret = np.nan*data.units
-            # raise ValueError(f"domain value {t} not found")
-        
-    return ret
+    ndx = get_domain_index(data, t)
+    
+    if isinstance(ndx, int):
+        return data[ndx,:]
+    
+            
+#     if not isinstance(data, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)):
+#         try:
+#             ret = data.time_slice(t,t).magnitude * data.units
+#         except:
+#             traceback.print_exc()
+#             ret = np.nan * data.units
+#     else:
+#         i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
+#         if len(i):
+#             i = int(i[-1])
+#             ret = data[i]
+#         else:
+#             ret = np.nan*data.units
+#             # raise ValueError(f"domain value {t} not found")
+#         
+#     return ret
 
 def get_workspace_neo_blocks(*args, sortby:typing.Optional[typing.Union[str, typing.Callable]]=None,
                              ascending:bool=False):
@@ -2329,7 +2335,7 @@ def get_domain_index(data, t):
         else:
             t *= u
             
-    if isinstance(data, IrregularlySampledDataSignal):
+    if isinstance(data, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)):
         try:
             i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
             if len(i):

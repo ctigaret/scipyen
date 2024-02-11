@@ -899,7 +899,7 @@ def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     else:
         return 1.0
     
-def units_convertible(x, y):
+def units_convertible(x: pq.Quantity, y: pq.Quantity) -> bool:
     """Checks that the units of python Quantities x and y are identical or convertible to each other.
     NOTE: To check that x and y have IDENTICAL units simply call 'x.units == y.units'
     """
@@ -910,6 +910,17 @@ def units_convertible(x, y):
         raise TypeError("y expected to be a python UnitQuantity or Quantity; got %s instead" % type(y).__name__)
     
     return x._reference.dimensionality == y._reference.dimensionality
+
+def check_rescale(x: pq.Quantity, y: pq.Quantity) -> pq.Quantity:
+    """Checks that units of `x` are convertible to units of `y`.
+    
+    Returns `x` rescaled to units of `y`, or raises AssertionError if `x` units 
+    and `y` units are not convertible to each other (or not identical)
+    
+    """
+    assert(units_convertible(x,y)), f"Cannot convert {x.units} to {y.units}"
+    
+    return x if x.units == y.units else x.rescale(y.units)
 
 def unit_quantity_from_name_or_symbol(s):
     if not isinstance(s, str):

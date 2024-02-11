@@ -105,7 +105,8 @@ import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
                          RecordingSource, RecordingEpisode, RecordingEpisodeType,
                          SynapticStimulus, AuxiliaryInput, AuxiliaryOutput,
-                         synstim, auxinput, auxoutput, amplitudeMeasure)
+                         synstim, auxinput, auxoutput, 
+                         amplitudeMeasure, chordSlopeMeasure, durationMeasure)
 import ephys.membrane as membrane
 from gui.cursors import DataCursor
 

@@ -238,6 +238,7 @@ import seaborn as sb  # statistical data visualization
 from gui.pyqtgraph_patch import pyqtgraph as pg
 # END migration to pyqtgraph -- setup global parameters
 
+from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
 # BEGIN matplotlib modules
 import matplotlib as mpl
