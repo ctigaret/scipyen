@@ -122,87 +122,88 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
                                                    from_imports=True, 
                                                    import_from="gui") #  so that resources can be imported too
 
-def plasticityInductionSource(adc:typing.Union[int, str] = 0, dac:typing.Optional[int] = None, path:int=0, 
-              pathname:typing.Optional[str]=None,
-              name:str = "cell", **kwargs):
-    """Factory for RecordingSource for plasticity induction.
-    
-    Parameters:
-    -----------------
-    adc, dac, name: See ephys.ephys.RecordingSource constructor for a full description.
-        Briefly:
-        adc, dac: int, physical indexes of the ADC & DAC used 
-        name: str, name of the source (e.g. 'cell01')
-        
-    NOTE: for convenience, a string may be passed as first parameter (in place of `adc`). 
-    This will be used as the 'name' of the source, and `adc` will be set to 0 (zero). 
-    In this case, specifying the `name` parameter again will raise an exception.
-    
-    path: int — the index of the digital output channel
-    pathname: str, None — the name of the synaptic stimulus; 
-        When None (the default) the synaptic stimulus will be named as "pathX"
-        where "X" is the value of the `path` parameter.
-        
-    Here, the default parameter values associate `adc` 0 with `dac` 0 and one 
-    SynapticStimulus object using the first digital output channel (0).
-    
-    Var-keyword parameters:
-    --------------------------
-    These are `auxin` and `auxout`, and by default are set to None.
-    
-    In a given application, the 'name' field of RecordingSource objects should have unique
-    values in order to allow the lookup of these objects according to this field.
-    
-    Returns:
-    --------
-    An immutable ephys.ephys.RecordingSource object (a NamedTuple). 
-    
-    One can create a modified version using the '_replace' method:
-    (WARNING: Remember to also change the value of the RecordingSource's 'name' field)
-    
-    """
-    if pathname is None or (isinstance(pathname, str) and len(pathname.strip()) == 0):
-        pathname = f"path{path}"
-        
-    elif not isinstance(pathname, str):
-        raise TypeError(f"'pathname' expected an int or None; instead, got {type(pathname).__name__}")
-    
-    _name = None
-    if isinstance(adc, str) and len(adc.strip()):
-        _name = adc
-        adc = 0
-        
-    if name is None:
-        if isinstance(_name, str):
-            name = _name
-        else:
-            name = "cell"
-        
-    elif isinstance(name, str):
-        if isinstance(_name, str):
-            raise SyntaxError("'name' was already specified by first parameter")
-        
-        if len(name.strip()) == 0:
-            name = "cell"
-            
-    else:
-        raise TypeError(f"'name' expected to be  str or None; instead, got {type(name).__name__}")
-        
-    syn = SynapticStimulus(pathname, path)
-    auxin   = kwargs.pop("auxin", None)
-    auxout  = kwargs.pop("auxout", None)
-    
-    if auxin is not None:
-        if (isinstance(auxin, typing.Sequence) and not all(isinstance(v, AuxiliaryInput) for v in auxin)) or not isinstance(auxin, AuxiliaryInput):
-            raise TypeError(f"'auxin' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
-    
-    if auxout is not None:
-        if (isinstance(auxout, typing.Sequence) and not all(isinstance(v, AuxiliaryOutput) for v in auxout)) or not isinstance(auxout, AuxiliaryOutput):
-            raise TypeError(f"'auxout' expected to be an AuxiliaryOutput or a sequence of AuxiliaryOutput, or None")
-
-    
-    return RecordingSource(name, adc, dac, syn, auxin, auxout)
-
+# def conditioningSource(adc:typing.Union[int, str] = 0, dac:typing.Optional[int] = None, path:int=0, 
+#               pathname:typing.Optional[str]=None,
+#               name:str = "cell", **kwargs):
+#     """Factory for RecordingSource for plasticity induction.
+#     
+#     Parameters:
+#     -----------------
+#     adc, dac, name: See ephys.ephys.RecordingSource constructor for a full description.
+#         Briefly:
+#         adc, dac: int, physical indexes of the ADC & DAC used 
+#         name: str, name of the source (e.g. 'cell01')
+#         
+#     NOTE: for convenience, a string may be passed as first parameter (in place of `adc`). 
+#     This will be used as the 'name' of the source, and `adc` will be set to 0 (zero). 
+#     In this case, specifying the `name` parameter again will raise an exception.
+#     
+#     path: int — the index of the digital output channel
+#     pathname: str, None — the name of the synaptic stimulus; 
+#         When None (the default) the synaptic stimulus will be named as "pathX"
+#         where "X" is the value of the `path` parameter.
+#         
+#     Here, the default parameter values associate `adc` 0 with `dac` 0 and one 
+#     SynapticStimulus object using the first digital output channel (0).
+#     
+#     Var-keyword parameters (kwargs):
+#     --------------------------------
+#     These are `auxin` and `auxout`, and by default are set to None.
+#     
+#     In a given application, the 'name' field of RecordingSource objects should 
+#     have unique values in order to allow the lookup of these objects according 
+#     to their `name` field.
+#     
+#     Returns:
+#     --------
+#     An immutable ephys.ephys.RecordingSource object (a NamedTuple). 
+#     
+#     One can create a modified version using the '_replace' method:
+#     (WARNING: Remember to also change the value of the RecordingSource's 'name' field)
+#     
+#     """
+#     if pathname is None or (isinstance(pathname, str) and len(pathname.strip()) == 0):
+#         pathname = f"path{path}"
+#         
+#     elif not isinstance(pathname, str):
+#         raise TypeError(f"'pathname' expected an int or None; instead, got {type(pathname).__name__}")
+#     
+#     _name = None
+#     if isinstance(adc, str) and len(adc.strip()):
+#         _name = adc
+#         adc = 0
+#         
+#     if name is None:
+#         if isinstance(_name, str):
+#             name = _name
+#         else:
+#             name = "cell"
+#         
+#     elif isinstance(name, str):
+#         if isinstance(_name, str):
+#             raise SyntaxError("'name' was already specified by first parameter")
+#         
+#         if len(name.strip()) == 0:
+#             name = "cell"
+#             
+#     else:
+#         raise TypeError(f"'name' expected to be  str or None; instead, got {type(name).__name__}")
+#         
+#     syn = SynapticStimulus(pathname, path)
+#     auxin   = kwargs.pop("auxin", None)
+#     auxout  = kwargs.pop("auxout", None)
+#     
+#     if auxin is not None:
+#         if (isinstance(auxin, typing.Sequence) and not all(isinstance(v, AuxiliaryInput) for v in auxin)) or not isinstance(auxin, AuxiliaryInput):
+#             raise TypeError(f"'auxin' expected to be an AuxiliaryInput or a sequence of AuxiliaryInput, or None")
+#     
+#     if auxout is not None:
+#         if (isinstance(auxout, typing.Sequence) and not all(isinstance(v, AuxiliaryOutput) for v in auxout)) or not isinstance(auxout, AuxiliaryOutput):
+#             raise TypeError(f"'auxout' expected to be an AuxiliaryOutput or a sequence of AuxiliaryOutput, or None")
+# 
+#     
+#     return RecordingSource(name, adc, dac, syn, auxin, auxout)
+# 
 
 def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=None,
                       path0:int=0, path1:int=1, name:typing.Optional[str]=None, 

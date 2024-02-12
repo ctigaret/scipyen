@@ -1058,13 +1058,14 @@ class RecordingEpisode(Episode):
     def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name: typing.Optional[str] = None,
                  protocol: typing.Optional[ElectrophysiologyProtocol]=None, 
-                 sources: typing.Optional[typing.Sequence[RecordingSource]] = None,
+                 sources: typing.Sequence[RecordingSource] = list(),
+                 electrodeMode: typing.Sequence[ElectrodeMode] = list(),
+                 clampMode: typing.Sequence[ClampMode] = list(),
                  segments: typing.Optional[GeneralIndexType] = None,
-                 electrodeMode: typing.Optional[ElectrodeMode] = None,
-                 clampMode: typing.Optional[ClampMode] = None,
-                 pathways: typing.Optional[typing.Sequence[SynapticPathway]] = None,
+                 # clampMode: typing.Optional[ClampMode] = None,
+                 pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[dict[int, tuple[int,int]]] = None ,
-                 triggers: typing.Optional[TriggerEvent] = None,
+                 triggers: typing.Sequence[TriggerEvent] = list(),
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1109,14 +1110,15 @@ class RecordingEpisode(Episode):
 
         See also the class documentation.
         """
+        self._type_ = episodeType
         if not isinstance(name, str):
-            name = ""
+            name = self._type_.name
             
         super().__init__(name, **kwargs)
         
-        self._type_ = episodeType
 
         self.protocol = protocol
+        
         
         if not isinstance(electrodeMode, ElectrodeMode):
             electrodeMode = ElectrodeMode.Field
@@ -1293,8 +1295,9 @@ class SynapticPathwayType(TypeEnum):
                     # • present throughout
     UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
     
-@with_doc(BaseScipyenData, use_header=True)
-class SynapticPathway(BaseScipyenData):
+# @with_doc(BaseScipyenData, use_header=True)
+@dataclass
+class SynapticPathway():
     """Logical association of a SynapticStimulus with a Schedule.
     Also specifies the "type" of the SynapticPathway - specifies the role of
     the SynapticPathway in an experiment.
@@ -1303,19 +1306,24 @@ class SynapticPathway(BaseScipyenData):
     the pathway's role in a synaptic plasticity experiment.
     
     """
-    _data_children_ = (
-        ("data", neo.Block(name="Data")),
-        )
-    
-    _data_attributes_ = (
-        ("pathwayType", SynapticPathwayType, SynapticPathwayType.Null),
-        ("responseSignal", (str, int, tuple, list), 0),
-        ("analogCommandSignal", (str, int, tuple, list), 1),
-        ("digitalCommandSignal", (int, tuple, list), 2),
-        ("schedule", Schedule, Schedule()), # one or more RecordingEpisode objects
-        )
-    
-    _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
+    pathwayType: SynapticPathwayType = SynapticPathwayType.Null
+    source: typing.Optional[RecordingSource] = None
+    schedule: typing.Optional[RecordingSchedule] = None
+    # from core import pyabfbridge as pab
+#     _data_children_ = (
+#         ("data", neo.Block(name="Data")),
+#         )
+#     
+#     _data_attributes_ = (
+#         ("pathwayType", SynapticPathwayType, SynapticPathwayType.Null),
+#         ("source", RecordingSource)
+#         # ("responseSignal", (str, int, tuple, list), 0),
+#         # ("analogCommandSignal", (str, int, tuple, list), 1),
+#         # ("digitalCommandSignal", (int, tuple, list), 2),
+#         ("schedule", Schedule, Schedule()), # one or more RecordingEpisode objects
+#         )
+#     
+#     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
     
     # def __init__(self, *args, data:typing.Optional[neo.Block] = None, 
     #              pathwayType:SynapticPathwayType = SynapticPathwayType.Test, 
@@ -1330,174 +1338,17 @@ class SynapticPathway(BaseScipyenData):
     
     # NOTE: 2024-01-16 18:58:10
     # below, segments is not needed - contained in Schedule's Episodes
-    @with_doc(concatenate_blocks, use_header = True)
-    def __init__(self, *args, stim:typing.Optional[SynapticStimulus] = None, 
-                 pathwayType:SynapticPathwayType = SynapticPathwayType.Test, 
-                 name:typing.Optional[str]=None, 
-                 index:int = 0,
-                 schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
-                 **kwargs):
-        """SynapticPathway constructor.
-
-        Var-positional parameters (may be empty)
-        -----------------------------------------
-        When present, they specify source neo.Block objects wthat will need to be 
-            concatenated to create the underlying data. A single neo.Block can be
-        passed here - it may be itself generated beforehand by concatenating
-        several recorded neo.Block objects.
-
-        Named parameters:
-        -----------------
-        stim: A SynapticStimulus, which specifies the logical association of 
-            synaptic stimulus(i) with digital or analog output channels in the 
-            protocol used to record the data in `args`.
-            
-            Optional; default is None.
-    
-            NOTE: When `args` contains a 'synthetic' Block (e.g. generated by
-            concatenation of recorded data) the recording protocol cannot be
-            accessed anymore. Any use of the SynapticPathway object must assume
-            that ALL segments in any RecordingEpisode in the Schedule are recorded
-            using the same protocol - specific to that episode.
-            
-        pathwayType: SynapticPathwayType
-            The role of the pathway in a synaptic plasticity experiment
-                        (Test, Control, Other)
-
-        name: str
-            Name of the pathway; default is the tring representation of pathwayType
-            
-        index: int
-            The index of the Pathway ( >= 0); default is 0; this index should be 
-            unique among pathways in an experiment or schedule
-            
-        responseSignal: GeneralIndexType
-            The index of the analog signal(s) in data, containing the synaptic response.
-            Default is None.
-            
-            NOTE: This is also used when 'data'is constructed from *args. Therefore, it
-            should typically resolve to a subset of signals distinct from those indicated 
-            by the 'analogCommandSignal' and 'digitalCommandSignal' parameters (see next)
-            
-
-        analogCommandSignal: GeneralIndexType
-            Index of the analog signal(s) containing the clamping command, or None.
-            NOTE: Also used to construct the data from *args.
-
-        digitalCommandSignal: GeneralIndexType
-            Index of the analog signal(s) containing the digital command, or None (default)
-            NOTE: Also used to construct the data from *args.
-            
-        schedule: a Schedule, or a sequence (tuple, list) of RecordingEpisodes; 
-                optional, default is None.
-            
-        segments: GeneralIndexType¹
-            The index of the segments in the source data in *args.
-            
-            Used only when 'data' is constructed by concatenating the neo.Blocks in *args
-
-        Var-keyword parameters (kwargs):
-        --------------------------------
-        These are passed directly to the superclass constructor (BaseScipyenData).
-            
-        Notes:
-        -----
-        ¹see core.utilities.GeneralIndexType
-        
-    """
-        super().__init__(**kwargs)
-        
-        # if not isinstance(data, neo.Block):
-        #     if len(args):
-        #         data = concatenate_blocks(*args, segments=segments)
-        
-    @staticmethod
-    def fromBlocks(*blocks, 
-                   source: RecordingSource,
-                   # pathName:str = "pathway", 
-                   pathwayType:SynapticPathwayType = SynapticPathwayType.Test, 
-                   episodes:typing.Sequence[RecordingEpisode] = list()):
-        """
-        Factory for SynapticPathway.
-        
-        Parameters:
-        ==========
-        *blocks: sequence of neo.Block data (e.g., read from ABF files)
-    
-        source: RecordingSource
-    
-        pathwayType:SynapticPathwayType - the type of the pathway (optional, default is SynapticPathwayType.Test)
-        
-        episodes: sequence of RecordingEpisode objects - default is empty
-        
-        """
-        
-        epiNameSet = set(episodeSpecs.keys())
-        
-        if len(epiNameSet) != len(episodeSpecs):
-            dupl_ = [k for k in episodeSpecs.keys() if k not in epiNameSet]
-            raise ValueError(f"Duplicate episode names were specified: {dupl_}")
-        
-        nBlocks = sum(len(bl) for bl in episodeSpecs.values())
-        
-        segments = list()
-        
-        episodes = list()
-        episodeBlocks = list() # temporary store of episode blocks
-                            # will be concatenated to generate final data for the
-                            # pathway
-                            
-        # NOTE: 2023-05-20 11:06:02
-        # Because we want to concatenate all segments in a single neo.Block for
-        # this pathway (associated with the 'data' field) we store references
-        # to the start frame & end frame in the episode
-        beginFrame = 0
-        
-        for episodeName, blocks, in episodeSpecs.items():
-            bb = sorted(blocks, key = lambda x: x.rec_datetime)
-            
-            for k, b in enumerate(bb):
-                try:
-                    _ = normalized_index(b.segments, segments) 
-                except:
-                    raise ValueError(f"Invaid segment index {segments} for block {k} ({b.name}) in episode {episodeName}")
-            
-            datetime_start = bb[0].rec_datetime
-            datetime_end = bb[-1].rec_datetime
-            
-            # TODO/FIXME: 2023-05-21 23:41:45
-            # copy segments directly with data subset, here
-            # fullBlockList.extend(bb)
-            
-            # episodeBlock = concatenate_blocks(*bb, segments=segments,
-            #                                   analogsignals=analogsignals,
-            #                                   irregularlysampledsignals=irregularlysampledsignals,
-            #                                   imagesequences=imagesequences,
-            #                                   spiketrains=spiketrains,
-            #                                   epochs=epochs,event=events)
-
-            
-
-            episodes.append(Episode(episodeName, 
-                              begin=datetime_start,
-                              end=datetime_end,
-                              beginFrame=beginFrame,
-                              endFrame=beginFrame + sum(len(b.segments) for b in bb)-1))
-            
-            # episodeBlocks.append(episodeBlock)
-            
-            beginFrame += len(episodeBlock.segments)
-            
-        data = concatenate_blocks(*episodeBlocks) # no data subset selection here
-        
-        schedule = Schedule(episodes)
-        
-        return SynapticPathway(data=data, name=pathName,
-                               pathwayType=pathwayType,
-                               responseSignal=responseSignal,
-                               analogCommandSignal=analogCommandSignal,
-                               digitalCommandSignal=digitalCommandSignal,
-                               schedule=schedule)
+    # @with_doc(concatenate_blocks, use_header = True)
+    # def __init__(self, 
+    #              pathwayType:SynapticPathwayType = SynapticPathwayType.Test,
+    #              source: typing.optional[RecordingSource] = None,
+    #              schedule: typing.optional[Schedule] = None,
+    #              **kwargs):
+    #              # name:typing.Optional[str]=None, 
+    #              # index:int = 0,
+    #              # schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
+    #     """SynapticPathway constructor """
+    #     super().__init__(**kwargs)
         
 @dataclass
 class LocationMeasure:
