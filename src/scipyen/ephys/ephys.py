@@ -1230,7 +1230,7 @@ class RecordingEpisode(Episode):
 class RecordingSchedule(Schedule):
     @property
     def pathways(self):
-        return = unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
+        return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
         
         
     def addEpisode(self, episode: RecordingEpisode):
