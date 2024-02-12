@@ -1471,7 +1471,8 @@ class LTPOnline(QtCore.QObject):
     
 
     def __init__(self, *args,
-                 episode: typing.Union[str, tuple] = "baseline",
+                 episodeName: str = "baseline",
+                 # episodeName: typing.Union[str, RecordingEpisode] = "baseline",
                  useEmbeddedProtocol:bool=True,
                  trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.CurrentClamp,
@@ -1487,50 +1488,6 @@ class LTPOnline(QtCore.QObject):
                  simulate = None,
                  out: typing.Optional[io.TextIOBase] = None):
         """
-        Var-positional parameters:
-        --------------------------
-    
-        One or more ephys.RecordingSource specifying the logical association
-        between physical indices of input and output channels used to record 
-        data form a particular source (cell, field) in this experiment.
-    
-        Named parameters:
-        ------------------
-    
-        episode: str, or tuple, default is 'baseline' (case-sensitive!)
-            LTPOnline begins with this episode (by default this is a baseline 
-                episode, recording synaptic responses before any conditioning)
-    
-            When a str: this is the name of the initial episode (by default, 'baseline')
-    
-            When a tuple, 
-    
-            ALL sources undergo the same episode at the same time; i.e., applying
-            conditioning to one source while recording baseline (or chase) from 
-            another source is not allowed. FIXME/TODO remove this constraint
-    
-        trackingClampMode: expected clamping mode; one of ephys.ClampMode.VoltageClamp
-            or ephys.ClampMode.CurrentClamp, or their respective int values (2, 4)
-
-            NOTE: even if recording field potentials (I=0 "clamping mode") the units
-            of the DAC and ADC should pair up as for current clamp (i.e., DAC in mV
-            and ADC in pA) because I=0 is actually current clamp without actual clamping
-            (i.e. no current injected into the cell whatsoever)
-
-            Also NOTE this is irrespective of electrode mode: patch clamp can
-            record in either clamp modes; on the other hand, sharp (intracellular)
-            or field recording electrodes are useless in voltage clamp...
-
-        conditioningMode: as above;
-            for patch-clamp recordings one may choose to trigger postsynaptic
-                activity by current injection (current clamp) or 'emulated' in
-                voltage-clamp with AP-like waveforms, dynamic clamp and such...
-                (if the cell can be voltage-clamped with some degree of accuracy)
-
-                therefore, any of voltage- or current-clamp modes are valid
-        
-        responseBaselineDuration: time Quantity (default is 5 * pq.ms)
-            Duration of baseline before the response - used in Voltage clamp
         
         """
         
@@ -1539,7 +1496,7 @@ class LTPOnline(QtCore.QObject):
         self._running_ = False
         self._sources_ = None # preallocate
         
-        self._currentEpisodeName_ = episode if isinstance(episode, str) and len(episode.strip()) else "baseline"
+        self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
         
         self._parse_sources_(*args)
         self._setup_data_()

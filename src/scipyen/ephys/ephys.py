@@ -1234,11 +1234,18 @@ class RecordingSchedule(Schedule):
         
         
     def addEpisode(self, episode: RecordingEpisode):
-        if episode in self.episodes:
-            return
+        if not isinstance(episode, RecordingEpisode):
+            raise TypeError(f"Expecting a RecordingEpisode; instead, got {type(episode).__name__}")
+        super().addEpisode(episode)
+        
+    def addEpisodes(self, episodes:typing.Sequence[RecordingEpisode]):
+        if len(episodes):
+            if not all(isinstance(e, RecordingEpisode) for e in episodes):
+                raise TypeError("Expecting a sequence of Recording Episode objects")
+            
+            super().addEpisodes(episodes)
         
         
-    
 class SynapticPathwayType(TypeEnum):
     """
     Synaptic pathway type.
