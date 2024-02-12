@@ -1412,30 +1412,25 @@ class SynapticPathway(BaseScipyenData):
         #         data = concatenate_blocks(*args, segments=segments)
         
     @staticmethod
-    def fromBlocks(pathName:str, 
-                   pathwayType:SynapticPathwayType=SynapticPathwayType.Test, 
-                   *episodeSpecs:typing.Sequence[RecordingEpisode]):
+    def fromBlocks(*blocks, 
+                   source: RecordingSource,
+                   # pathName:str = "pathway", 
+                   pathwayType:SynapticPathwayType = SynapticPathwayType.Test, 
+                   episodes:typing.Sequence[RecordingEpisode] = list()):
         """
         Factory for SynapticPathway.
         
         Parameters:
         ==========
-        pathName:str - name of the pathway
+        *blocks: sequence of neo.Block data (e.g., read from ABF files)
+    
+        source: RecordingSource
+    
         pathwayType:SynapticPathwayType - the type of the pathway (optional, default is SynapticPathwayType.Test)
         
-        *episodeSpecs: sequence of RecordingEpisode objects
-            see help RecordingEpisode
+        episodes: sequence of RecordingEpisode objects - default is empty
         
         """
-        
-        
-        
-        # NOTE: 2023-05-19 17:08:53
-        # an episode spec is a mapping of str ↦ sequence of neo Blocks
-        # 
-        # The blocks in the sequence are ordered here by their rec_datetime
-        # WARNING/TODO: check argument types
-        #
         
         epiNameSet = set(episodeSpecs.keys())
         
@@ -1504,8 +1499,6 @@ class SynapticPathway(BaseScipyenData):
                                digitalCommandSignal=digitalCommandSignal,
                                schedule=schedule)
         
-# class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locations", "name", "channel"))):
-
 @dataclass
 class LocationMeasure:
     """Functor to calculate a signal measure at a location using a suitable function or functor.
