@@ -236,6 +236,7 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
+
 class __BaseSynStim__(typing.NamedTuple):
     name: str = "stim"
     channel: typing.Union[int, str] = 0
@@ -988,41 +989,12 @@ class RecordingEpisode(Episode):
     Fields (constructor parameters):
     ================================
         
-    • protocol:ElectrophysiologyProtocol - mandatory
+    • protocol: ElectrophysiologyProtocol
         Currently, only pyabfbridge.ABFProtocol objects are supported. The ABFProtocol
         is a subclass of ElectrophysiologyProtocol defined in this module.
 
-
-    The other fields indicate optional indices into the data segments and signals
-    of the source data.
-
     • episodeType: RecordingEpisodeType
         
-    • adcChannels : int or str, or sequence of int or str - respectively, the index 
-        (indices) or the name(s) of the ADC channel (corresponding to analog signals
-        in each sweep), recording the pathway-specific synaptic response
-
-        NOTE: During an experiment, the recording may switch between episodes with
-        different clamping modes, or electrode modes (see below). This results in
-        episodes with different response and command signals. Therefore we attach
-        this information here, instead of the SynapticPathway instance to which this
-        episode belongs to.`
-
-    • dacChannels : int or str, or sequence of int or str - index or name of the 
-        DAC channel (optonalliy, corresponding to analog signals in the data containing
-        record copies of the DAC voltage- or current-clamp command signal (or None).
-        When available, these signals are typically recorded - when available - by 
-        feeding the secondary output of the amplifier into an ADC input in the 
-        acquisition (DAQ) board.
-
-    • digChannels: int or str, or sequence of int or str - index od the digital output
-        channel(s) used for synaptic stimulation; these are necessary in order to 
-        distinguish the digital channel used for synaptic stimulation, from other 
-        digital channels used, e.g. to trigger auxiliary devices (such as image
-        acquistion devices). These outputs can also be "recorded" by feeding a branch
-        of the digital output into an ADC input of the DAQ board; in such cases, the
-        resulting analogsignals have ther own name, and those names can be used here.
-
     • electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.WholeCellPatch)
 
         NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
@@ -1083,15 +1055,16 @@ class RecordingEpisode(Episode):
     
 """
     # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
-    def __init__(self, episodeType:RecordingEpisodeType = RecordingEpisodeType.Tracking,
-                 name:typing.Optional[str] = None,
-                 protocol:typing.Optional[ElectrophysiologyProtocol]=None, 
-                 sources:typing.Optional[typing.Sequence[RecordingSource]] = None,
-                 segments:typing.Optional[GeneralIndexType] = None,
-                 electrodeMode:ElectrodeMode = ElectrodeMode.WholeCellPatch,
-                 pathways:typing.Optional[typing.Sequence[SynapticPathway]] = None,
-                 xtalk:typing.Optional[dict[int, tuple[int,int]]] = None ,
-                 triggers:typing.Optional[TriggerEvent] = None,
+    def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
+                 name: typing.Optional[str] = None,
+                 protocol: typing.Optional[ElectrophysiologyProtocol]=None, 
+                 sources: typing.Optional[typing.Sequence[RecordingSource]] = None,
+                 segments: typing.Optional[GeneralIndexType] = None,
+                 electrodeMode: typing.Optional[ElectrodeMode] = None,
+                 clampMode: typing.Optional[ClampMode] = None,
+                 pathways: typing.Optional[typing.Sequence[SynapticPathway]] = None,
+                 xtalk: typing.Optional[dict[int, tuple[int,int]]] = None ,
+                 triggers: typing.Optional[TriggerEvent] = None,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1138,27 +1111,23 @@ class RecordingEpisode(Episode):
         """
         if not isinstance(name, str):
             name = ""
+            
         super().__init__(name, **kwargs)
         
         self._type_ = episodeType
 
         self.protocol = protocol
         
-        # self.adcChannels = adcChannels
-        # self.dacChannels = dacChannels
-        # self.digChannels = digChannels
-        
         if not isinstance(electrodeMode, ElectrodeMode):
             electrodeMode = ElectrodeMode.Field
         
         self.electrodeMode = electrodeMode
-#         
-        # NOTE: 2023-10-15 23:21:06
-        # clamp mode inferred from the protocol
-#         if not isinstance(clampMode, ClampMode):
-#             clampMode = ClampMode.NoClamp
-#             
-#         self.clampMode = clampMode
+
+        if not isinstance(clampMode, ClampMode):
+            # remember to set this up from the protocol, if present
+            clampMode = ClampMode.NoClamp
+            
+        self.clampMode = clampMode
         
         if isinstance(pathways, (tuple, list)):
             if len(pathways):
@@ -1167,8 +1136,6 @@ class RecordingEpisode(Episode):
             self.pathways = pathways
         else:
             self.pathways = []
-        
-        # if isinstance(xtalk, (tuple, list)):
         
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
@@ -1219,49 +1186,6 @@ class RecordingEpisode(Episode):
         
         self._data_ = None
         
-        if len(args) == 0:
-            return
-        
-    def _parse_args_(self, *args):
-        if len(args) == 0:
-            return
-        
-        # NOTE: 2023-12-27 12:39:58
-        # Prerequisite #1: that all neo blocks must have the same number of 
-        # segments (sweeps)
-        #
-        # However, this is only useful for LTP experiments with interleaved pathways
-        # so better not to enforce it
-        #
-        # if all(isinstance(a, neo.Block) for a in args):
-        #     if len(args) > 1:
-        #         assert all(len(args[0].segments) == len(a.segments) for a in args [1:]), "All blocks must contain the same number of segments"
-        
-        # NOTE: 2023-12-27 12:44:26
-        # when several pathways are recorded, we need a mapping that tells which
-        # segments in each block belongs to which pathway
-        #
-        # We search for such mapping in the following places:
-        # 1) self._pathways_ # to decide how to structure this
-        # 2) the annotations in each block
-        # 3) the annotations in each segment of each block
-        #
-        # (1) in the first case we need to decide what / how to implement
-        #   to be used as a mechanism to annotate post-hoc
-        #
-        # (2) second case requires annotating the block - typically, at 
-        #   recording time ⟹ this can be done when the experiment is run from
-        #   within Scipyen; otherwise we need a mechanism to annotate post-hoc
-        #   → fall-back on case (1)
-        #
-        # (3) third case, like case (2) requires annotating each segment
-        #   Like case (2) thish would be done at the recording time, hence when
-        #   the experiment is run from within Scipyen; otherwise, we need a 
-        #   mechanism to annotate post-hoc.
-        #   → fall-back on case (1)
-        
-        
-        
     def _repr_pretty_(self, p, cycle):
         supertxt = super().__repr__() + " with :"
     
@@ -1271,11 +1195,9 @@ class RecordingEpisode(Episode):
             p.text(supertxt)
             p.breakable()
             attr_repr = [" "]
-            attr_repr += [f"{a}: {getattr(self,a).__repr__()}" for a in ("protocol",
-                                                                         "adcChannels", 
-                                                                         "dacChannels",
-                                                                         "digChannels",
+            attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("protocol",
                                                                          "electrodeMode",
+                                                                         "clampMode",
                                                                         )]
             
             with p.group(4 ,"(",")"):
@@ -1304,6 +1226,19 @@ class RecordingEpisode(Episode):
                 
             p.breakable()
 
+@with_doc(Schedule, use_header=True, header_str = "Inherits from:")
+class RecordingSchedule(Schedule):
+    @property
+    def pathways(self):
+        return = unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
+        
+        
+    def addEpisode(self, episode: RecordingEpisode):
+        if episode in self.episodes:
+            return
+        
+        
+    
 class SynapticPathwayType(TypeEnum):
     """
     Synaptic pathway type.
@@ -1357,7 +1292,7 @@ class SynapticPathway(BaseScipyenData):
     Also specifies the "type" of the SynapticPathway - specifies the role of
     the SynapticPathway in an experiment.
 
-    SynapticPayhway objects  has a pathwayType attribute which specifies
+    SynapticPayhway objects have a pathwayType attribute which specifies
     the pathway's role in a synaptic plasticity experiment.
     
     """
@@ -1366,7 +1301,7 @@ class SynapticPathway(BaseScipyenData):
         )
     
     _data_attributes_ = (
-        ("pathwayType", SynapticPathwayType, SynapticPathwayType.Test),
+        ("pathwayType", SynapticPathwayType, SynapticPathwayType.Null),
         ("responseSignal", (str, int, tuple, list), 0),
         ("analogCommandSignal", (str, int, tuple, list), 1),
         ("digitalCommandSignal", (int, tuple, list), 2),

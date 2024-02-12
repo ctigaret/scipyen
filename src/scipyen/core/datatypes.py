@@ -50,7 +50,8 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core import quantities as scq
 from core import xmlutils
 from core import strutils
-from core.prog import safeWrapper, is_hashable, is_type_or_subclass, ImmutableDescriptor
+from core.prog import (safeWrapper, is_hashable, is_type_or_subclass, 
+                       ImmutableDescriptor, scipywarn)
 from core.datazone import DataZone
 from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 
@@ -1077,7 +1078,7 @@ class Episode:
 class Schedule:
     name:str = ""
     _:KW_ONLY
-    episodes:typing.Sequence[Episode] = field(default_factory = lambda : [Episode()])
+    episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
     
     @singledispatchmethod
     def episode(self, ndx):

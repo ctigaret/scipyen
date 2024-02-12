@@ -104,7 +104,7 @@ import iolib.pictio as pio
 import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
                          RecordingSource, RecordingEpisode, RecordingEpisodeType,
-                         SynapticStimulus, AuxiliaryInput, AuxiliaryOutput,
+                         SynapticStimulus, SynapticPathway, AuxiliaryInput, AuxiliaryOutput,
                          synstim, auxinput, auxoutput, 
                          amplitudeMeasure, chordSlopeMeasure, durationMeasure)
 import ephys.membrane as membrane
@@ -1537,10 +1537,11 @@ class LTPOnline(QtCore.QObject):
         super().__init__(parent=parent)
         
         self._running_ = False
+        self._sources_ = None # preallocate
         
         self._currentEpisodeName_ = episode if isinstance(episode, str) and len(episode.strip()) else "baseline"
         
-        self._parse_args_(*args)
+        self._parse_sources_(*args)
         self._setup_data_()
         self._results_ = dict() 
         
@@ -1784,147 +1785,164 @@ class LTPOnline(QtCore.QObject):
     #     return {"stimulus": syn, "responses": dict()}
         
             
-    def _parse_args_(self, *args):
-        # print(f"{self.__class__.__name__}._parse_args_: args = {args}")
+    def _parse_sources_(self, *args):
+        # print(f"{self.__class__.__name__}._parse_sources_: args = {args}")
         if len(args) == 0:
-            self._sources_ = None
+            raise ValueError("I must have at least one RecordingSource defined")
+            # self._sources_ = None
             # TODO: 2024-01-04 22:19:44 
             # write code to infer RecordingSource from first ABF file (in _LTPOnlineFileProcessor_)
-            raise ValueError("I must have at least one RecordingSource defined")
-        else:
-            if not all(isinstance(a, RecordingSource) for a in args):
-                raise TypeError(f"Expecting one or more RecordingSource objects")
-            
-            dupsrc = duplicates(args, indices=True)
-            
-            if len(dupsrc):
-                raise ValueError(f"Duplicate sources detected in 'args': {dupsrc}")
-        
-            # parse sources from args; make sure there are identical names
-            dupNames = duplicates([a.name for a in args], indices=True)
+            # NOTE: 2024-02-12 08:46:34
+            # this is difficult due to ambiguities when two ADCs are used, e.g.,
+            # when recording secondary amplifier output as well (useful to infer
+            # the command signal waveforms when the protocol is not accessible)
 
-            if len(dupNames):
-                warnings.warn("The sources do not have unique names; names will be adapted.")
-                snames = list()
-                self._sources_ = list()
-                for src in args:
-                    if src.name not in snames:
-                        snames.append(src.name)
-                        sources.append(src)
-                        
-                    else:
-                        # adapt name to avoid duplicates; since an ephys.RecordingSource is 
-                        # an immutable named tuple, we use its _replace method to create
-                        # a copy with a new name
-                        new_name = utilities.counter_suffix(src.name, snames)
-                        snames.append(new_name)
-                        sources.append(src._replace(name=new_name))
-                        
-            else:
-                self._sources_ = args
-                
-            #### BEGIN Checks
-            #
-            # NOTE: 2024-01-04 22:20:55
-            # check consistency of synaptic stimuli in sources
+        if not all(isinstance(a, RecordingSource) for a in args):
+            raise TypeError(f"Expecting one or more RecordingSource objects")
+        
+        dupsrc = duplicates(args, indices=True)
+        
+        if len(dupsrc):
+            raise ValueError(f"Duplicate sources detected in 'args': {dupsrc}")
+    
+        # parse sources from args; make sure there are identical names
+        dupNames = duplicates([a.name for a in args], indices=True)
+
+        if len(dupNames):
+            warnings.warn("The sources do not have unique names; names will be adapted.")
+            snames = list()
+            _sources = list()
+            for src in args:
+                if src.name not in snames:
+                    snames.append(src.name)
+                    _sources.append(src)
+                    
+                else:
+                    # adapt name to avoid duplicates; since an ephys.RecordingSource is 
+                    # an immutable named tuple, we use its _replace method to create
+                    # a copy with a new name
+                    new_name = utilities.counter_suffix(src.name, snames)
+                    snames.append(new_name)
+                    _sources.append(src._replace(name=new_name))
+                    
+            # now use these as args
+            args = _sources
+                    
+        #### BEGIN Checks
+        #
+        # NOTE: 2024-01-04 22:20:55
+        # check consistency of synaptic stimuli in sources
+        
+        # make sure sources specify distinct signal layouts for synaptic
+        # simulations; in particular sources must specifiy:
+        # • unique ADC ↦ DAC pairs
+        # • unique synaptic stimulus configurations
+        # • unique auxiliary ADCs (when used) — these are useful to infer 
+        #   trigger protocols from input signals recorded via auxiliary inputs
+        #   — specified using AuxiliaryInput objects:
+        #   
+        
+        # DACs used to emulate TTLs for synaptic stimuli
+        syndacs = set(itertools.chain.from_iterable(s.syn_dac for s in args))
+        
+        # DACs used to emulate TTLs for other purposes
+        ttldacs = set(itertools.chain.from_iterable(s.out_dac_triggers for s in args))
+        
+        # DACs used to emit waveforms other than clamping
+        # these should REALLY be distinct from ttldacs
+        cmddacs = set(itertools.chain.from_iterable(s.other_outputs for s in args))
+        
+        # DIGs used for synaptic stimulation
+        syndigs = set(itertools.chain.from_iterable(s.syn_dig for s in args))
+        
+        # DIGs used to trigger anything other than synapses
+        digs = set(itertools.chain.from_iterable(s.out_dig_triggers for s in args))
+        
+        
+        # 1. all sources must have a primary ADC
+        if any(s.adc is None for s in args):
+            raise ValueError("All source must specify a primary ADC input")
+        
+        adcs, snames  = list(zip(*[(s.adc, s.name) for s in args]))
+        
+        # 2. primary ADCs cannot be shared among sources
+        dupadcs     = duplicates(adcs)  # sources must have distinct main ADCs
+        if len(dupadcs):
+            raise ValueError(f"Sharing of primary ADCs ({dupadcs}) among sources is forbidden")
+        
+        # 3. source names should be unique
+        dupnames = duplicates(snames)
+        if len(dupnames):
+            raise ValueError(f"Sharing of names ({dupnames}) among sources is forbidden")
             
-            # make sure sources specify distinct signal layouts for synaptic
-            # simulations; in particular sources must specifiy:
-            # • unique ADC ↦ DAC pairs
-            # • unique synaptic stimulus configurations
-            # • unique auxiliary ADCs (when used) — these are useful to infer 
-            #   trigger protocols from input signals recorded via auxiliary inputs
-            #   — specified using AuxiliaryInput objects:
-            #   
+        # 4. for clamped sources only - by definition these define a primary DAC
+        #   needed for clamping and to provide waveforms for optionally for 
+        #   membrane test (recommended) and possibly other electrical 
+        #   manipulations of the clamped cell (e.g., to elicit postsynaptic spikes).
+        #
+        #   See detailed checks below (4.1, 4.2, etc)
+        #
+        # In the SAME experiment, a DAC cannot be used, simultaneously, for:
+        # • clamping command waveforms
+        # • TTL emulation (± 5 V !)
+        # 
+        
+        clamped_sources = [s for s in args if s.clamped]
+        if len(clamped_sources):
+            # these DACs MUST be unique
+            dacs = [s.dac for s in clamped_sources]
             
-            # DACs used to emulate TTLs for synaptic stimuli
-            syndacs = set(itertools.chain.from_iterable(s.syn_dac for s in self._sources_))
+            # 4.1 primary DACs must be unique
+            dupdacs = duplicates(dacs)
+            if len(dupdacs):
+                raise ValueError(f"Sharing of primary DACs ({dupdacs}) among sources is forbidden")
             
-            # DACs used to emulate TTLs for other purposes
-            ttldacs = set(itertools.chain.from_iterable(s.out_dac_triggers for s in self._sources_))
-            
-            # DACs used to emit waveforms other than clamping
-            # these should REALLY be distinct from ttldacs
-            cmddacs = set(itertools.chain.from_iterable(s.other_outputs for s in self._sources_))
-            
-            # DIGs used for synaptic stimulation
-            syndigs = set(itertools.chain.from_iterable(s.syn_dig for s in self._sources_))
-            
-            # DIGs used to trigger anything other than synapses
-            digs = set(itertools.chain.from_iterable(s.out_dig_triggers for s in self._sources_))
-            
-            
-            # 1. all sources must have a primary ADC
-            if any(s.adc is None for s in self._sources_):
-                raise ValueError("All source must specify a primary ADC input")
-            
-            adcs, snames  = list(zip(*[(s.adc, s.name) for s in self._sources_]))
-            
-            # 2. primary ADCs cannot be shared among sources
-            dupadcs     = duplicates(adcs)  # sources must have distinct main ADCs
-            if len(dupadcs):
-                raise ValueError(f"Sharing of primary ADCs ({dupadcs}) among sources is forbidden")
-            
-            # 3. source names should be unique
-            dupnames = duplicates(snames)
-            if len(dupnames):
-                raise ValueError(f"Sharing of names ({dupnames}) among sources is forbidden")
-                
-            # 4. for clamped sources only - by definition these define a primary DAC
-            #   needed for clamping and to provide waveforms for optionally for 
-            #   membrane test (recommended) and possibly other electrical 
-            #   manipulations of the clamped cell (e.g., to elicit postsynaptic spikes).
-            #
-            #   See detailed checks below (4.1, 4.2, etc)
-            #
-            # In the SAME experiment, a DAC cannot be used, simultaneously, for:
-            # • clamping command waveforms
-            # • TTL emulation (± 5 V !)
-            # 
-            
-            clamped_sources = [s for s in self._sources_ if s.clamped]
-            if len(clamped_sources):
-                # these DACs MUST be unique
-                dacs = [s.dac for s in clamped_sources]
-                
-                # 4.1 primary DACs must be unique
-                dupdacs = duplicates(dacs)
-                if len(dupdacs):
-                    raise ValueError(f"Sharing of primary DACs ({dupdacs}) among sources is forbidden")
-                
-                # 4.2 primary DACs CANNOT be used for synaptic stimulation
-                ovlap = syndacs & set(dacs)
-                if len(ovlap):
-                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and synaptic stimulation")
-            
-                # 4.3 primary DACs CANNOT be used to emulate TTLs for 3ʳᵈ party devices in the same experiment
-                ovlap = ttldacs & set(dacs)
-                if len(ovlap):
-                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and TTL emulation for 3ʳᵈ party devices")
-                
-                # 4.4 primary DACs CANNOT be used to send command signal waveforms
-                # to other than the source (cell or membrane patch)
-                ovlap = cmddacs & set(dacs)
-                if len(ovlap):
-                    raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and controlling 3ʳᵈ party devices")
-                
-            # 5. check that DIG channels do not overlap with those used for syn stim
-            ovlap = digs & syndigs
+            # 4.2 primary DACs CANNOT be used for synaptic stimulation
+            ovlap = syndacs & set(dacs)
             if len(ovlap):
-                raise ValueError(f"The following DIGs {ovlap} seem to be used both for synaptic stimulation and triggering 3ʳᵈ party devices")
+                raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and synaptic stimulation")
+        
+            # 4.3 primary DACs CANNOT be used to emulate TTLs for 3ʳᵈ party devices in the same experiment
+            ovlap = ttldacs & set(dacs)
+            if len(ovlap):
+                raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and TTL emulation for 3ʳᵈ party devices")
             
-            # 6. in each RecordingSource, the SynapticStimulus objects must have unique names 
-            # (but OK to share across sources)
+            # 4.4 primary DACs CANNOT be used to send command signal waveforms
+            # to other than the source (cell or membrane patch)
+            ovlap = cmddacs & set(dacs)
+            if len(ovlap):
+                raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and controlling 3ʳᵈ party devices")
             
-            for k, s in enumerate(self._sources_):
-                if isinstance(s.syn, typing.Sequence):
-                    assert len(set(s_.name for s_ in s.syn)) == len(s.syn), f"{k}ᵗʰ source ({s.name}) has duplicate names for SynapticStimulus"
+        # 5. check that DIG channels do not overlap with those used for syn stim
+        ovlap = digs & syndigs
+        if len(ovlap):
+            raise ValueError(f"The following DIGs {ovlap} seem to be used both for synaptic stimulation and triggering 3ʳᵈ party devices")
+        
+        # 6. in each RecordingSource, the SynapticStimulus objects must have unique names 
+        # (but OK to share across sources)
+        
+        for k, s in enumerate(args):
+            if isinstance(s.syn, typing.Sequence):
+                assert len(set(s_.name for s_ in s.syn)) == len(s.syn), f"{k}ᵗʰ source ({s.name}) has duplicate names for SynapticStimulus"
+        
+        #
+        #### END   Checks
+        
+        # NOTE: 2024-02-12 08:49:45 
+        # ### BEGIN create SynapticPathway objects from each recording source
+        # Some of their fields will have the default (generic) values, to be
+        # modified during the processing.
+        
+        pathways = dict()
+        
+        for source in args:
+            pathways[source.name] = SynapticPathway()
             
-            #
-            #### END   Checks
+        
+        # ### END create SynapticPathway objects from each recording source
             
-        # return True
-                
+        self._sources_ = args
+        
     def _setup_data_(self):
         if not hasattr(self, "_data_") or not isinstance(self._data_, dict):
             self._data_ = dict((src.name, dict((("source",          src),
@@ -1997,7 +2015,7 @@ class LTPOnline(QtCore.QObject):
         
     def reset(self, *args):
         if len(args):
-            self._parse_args_(args)
+            self._parse_sources_(args)
         # self._monitorProtocol_ = None
         # self._conditioningProtocol_ = None
         
