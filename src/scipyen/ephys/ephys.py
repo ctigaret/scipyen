@@ -1307,48 +1307,9 @@ class SynapticPathway():
     
     """
     pathwayType: SynapticPathwayType = SynapticPathwayType.Null
-    source: typing.Optional[RecordingSource] = None
+    stimulus: typing.Optional[SynapticStimulus] = None
     schedule: typing.Optional[RecordingSchedule] = None
-    # from core import pyabfbridge as pab
-#     _data_children_ = (
-#         ("data", neo.Block(name="Data")),
-#         )
-#     
-#     _data_attributes_ = (
-#         ("pathwayType", SynapticPathwayType, SynapticPathwayType.Null),
-#         ("source", RecordingSource)
-#         # ("responseSignal", (str, int, tuple, list), 0),
-#         # ("analogCommandSignal", (str, int, tuple, list), 1),
-#         # ("digitalCommandSignal", (int, tuple, list), 2),
-#         ("schedule", Schedule, Schedule()), # one or more RecordingEpisode objects
-#         )
-#     
-#     _descriptor_attributes_ = _data_children_ + _data_attributes_ + BaseScipyenData._descriptor_attributes_
-    
-    # def __init__(self, *args, data:typing.Optional[neo.Block] = None, 
-    #              pathwayType:SynapticPathwayType = SynapticPathwayType.Test, 
-    #              name:typing.Optional[str]=None, 
-    #              index:int = 0,
-    #              segments:GeneralIndexType=0,
-    #              responseSignal:typing.Optional[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]]=None, 
-    #              analogCommandSignal:typing.Union[typing.Union[str, int, typing.Sequence[int], typing.Sequence[str]]] = None, 
-    #              digitalCommandSignal:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
-    #              schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
-    #              **kwargs):
-    
-    # NOTE: 2024-01-16 18:58:10
-    # below, segments is not needed - contained in Schedule's Episodes
-    # @with_doc(concatenate_blocks, use_header = True)
-    # def __init__(self, 
-    #              pathwayType:SynapticPathwayType = SynapticPathwayType.Test,
-    #              source: typing.optional[RecordingSource] = None,
-    #              schedule: typing.optional[Schedule] = None,
-    #              **kwargs):
-    #              # name:typing.Optional[str]=None, 
-    #              # index:int = 0,
-    #              # schedule:typing.Optional[typing.Union[Schedule, typing.Sequence[RecordingEpisode]]] = None, 
-    #     """SynapticPathway constructor """
-    #     super().__init__(**kwargs)
+    measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
         
 @dataclass
 class LocationMeasure:
