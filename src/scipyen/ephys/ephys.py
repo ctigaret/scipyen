@@ -1062,7 +1062,6 @@ class RecordingEpisode(Episode):
                  electrodeMode: typing.Sequence[ElectrodeMode] = list(),
                  clampMode: typing.Sequence[ClampMode] = list(),
                  segments: typing.Optional[GeneralIndexType] = None,
-                 # clampMode: typing.Optional[ClampMode] = None,
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[dict[int, tuple[int,int]]] = None ,
                  triggers: typing.Sequence[TriggerEvent] = list(),
@@ -1202,7 +1201,8 @@ class RecordingEpisode(Episode):
                                                                          "clampMode",
                                                                         )]
             
-            with p.group(4 ,"(",")"):
+            # with p.group(4 ,"(",")"):
+            with p.group(4 ,"",""):
                 for t in attr_repr:
                     p.text(t)
                     p.breakable()
@@ -1214,7 +1214,8 @@ class RecordingEpisode(Episode):
             p.breakable()
             
             if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
-                with p.group(4, "(",")"):
+                # with p.group(4, "(",")"):
+                with p.group(4, "",""):
                     for pth in self.pathways:
                         p.text(pth.name)
                         p.breakable()

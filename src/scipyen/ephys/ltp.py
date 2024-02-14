@@ -104,6 +104,7 @@ import iolib.pictio as pio
 import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
                          RecordingSource, RecordingEpisode, RecordingEpisodeType,
+                         RecordingSchedule,
                          SynapticStimulus, SynapticPathway, AuxiliaryInput, AuxiliaryOutput,
                          synstim, auxinput, auxoutput, 
                          amplitudeMeasure, chordSlopeMeasure, durationMeasure)
@@ -1499,15 +1500,21 @@ class LTPOnline(QtCore.QObject):
         
         self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
         
-        self._parse_sources_(*args)
-        self._setup_data_()
+        self._currentEpisode_ = RecordingEpisode(name=self._currentEpisodeName_)
+        self._schedule_ = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
+        
+        self._schedule_.addEpisode(self._currentEpisode_)
+        
+        self._sources_ = self._check_sources_(*args)
+        # self._setup_data_()
         self._results_ = dict() 
         
         self._runData_ = DataBag(sources = self._sources_,
-                                   data = self._data_,
-                                   newEpisode = True,
-                                   episodeName = None, # default is "baseline"
-                                   episodes = dict(), # map episode name to data
+                                 schedule = self._schedule_,
+                                   # data = self._data_,
+                                   # newEpisode = True,
+                                   # episodeName = None, # default is "baseline"
+                                   # episodes = dict(), # map episode name to data
                                    abfRunTimesMinutes = list(),
                                    abfRunDeltaTimesMinutes = list(),
                                    baselineDurations = baselineDurations,
@@ -1743,8 +1750,8 @@ class LTPOnline(QtCore.QObject):
     #     return {"stimulus": syn, "responses": dict()}
         
             
-    def _parse_sources_(self, *args):
-        # print(f"{self.__class__.__name__}._parse_sources_: args = {args}")
+    def _check_sources_(self, *args):
+        # print(f"{self.__class__.__name__}._check_sources_: args = {args}")
         if len(args) == 0:
             raise ValueError("I must have at least one RecordingSource defined")
             # self._sources_ = None
@@ -1891,32 +1898,32 @@ class LTPOnline(QtCore.QObject):
         # Some of their fields will have the default (generic) values, to be
         # modified during the processing.
         
-        pathways = dict()
-        
-        for source in args:
-            pathways[source.name] = SynapticPathway()
+#         pathways = dict()
+#         
+#         for source in args:
+#             pathways[source.name] = SynapticPathway()
             
         
         # ### END create SynapticPathway objects from each recording source
             
-        self._sources_ = args
+        return args
         
-    def _setup_data_(self):
-        if not hasattr(self, "_data_") or not isinstance(self._data_, dict):
-            self._data_ = dict((src.name, dict((("source",          src),
-                                                (self._currentEpisodeName_,        dict(src.syn_blocks))))) for src in self._sources_)
-            
-        else:
-            # for each source add new episode to data (named after the current episode name)
-            for src in self._sources_:
-                if self._currentEpisodeName_ not in self._data_[src.name].keys():
-                    self._data_[src.name][self._currentEpisodeName_] = dict(src.syn_blocks)
-            
-        # self._data_ = dict((src.name, dict((("source",          src),
-        #                                     ("baseline",        dict(src.syn_blocks)),
-        #                                     ("conditioning",    dict(src.syn_blocks)),
-        #                                     ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
-        
+#     def _setup_data_(self):
+#         if not hasattr(self, "_data_") or not isinstance(self._data_, dict):
+#             self._data_ = dict((src.name, dict((("source",          src),
+#                                                 (self._currentEpisodeName_,        dict(src.syn_blocks))))) for src in self._sources_)
+#             
+#         else:
+#             # for each source add new episode to data (named after the current episode name)
+#             for src in self._sources_:
+#                 if self._currentEpisodeName_ not in self._data_[src.name].keys():
+#                     self._data_[src.name][self._currentEpisodeName_] = dict(src.syn_blocks)
+#             
+#         # self._data_ = dict((src.name, dict((("source",          src),
+#         #                                     ("baseline",        dict(src.syn_blocks)),
+#         #                                     ("conditioning",    dict(src.syn_blocks)),
+#         #                                     ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
+#         
         
     
     @pyqtSlot()
@@ -1973,7 +1980,7 @@ class LTPOnline(QtCore.QObject):
         
     def reset(self, *args):
         if len(args):
-            self._parse_sources_(args)
+            self._check_sources_(args)
         # self._monitorProtocol_ = None
         # self._conditioningProtocol_ = None
         
