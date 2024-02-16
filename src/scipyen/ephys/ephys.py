@@ -666,10 +666,26 @@ class RecordingSource(__BaseSource__):
         return tuple()
     
     @property
-    def syn_paths(self) -> typing.Union[SynapticStimulus, typing.Tuple[SynapticStimulus]]:
-        """Alias to the 'syn' field"""
-        return self.syn
+    def pathways(self):
+        """Factory for SynapticPathway objects based on the `syn` field.
+        The SynapticPathway fields `pathwayType`, `schedule` and `measurement` 
+        will have their default values.
+        
+        Depending on the `syn` field, returns a SynapticPathway, a tuple of 
+        SynapticPathway objects, or None.
     
+        """
+        if isinstance(self.syn, SynapticStimulus):
+            return SynapticPathway(stimulus = self.syn, name = self.syn.name,
+                                   adc = self.adc, dac = self.dac)
+            
+        if isinstance(self.syn, (tuple, list)):
+            if len(self.syn) == 1:
+                return SynapticPathway(stimulus = self.syn[0], name = self.syn[0].name,
+                                       adc = self.adc, dac = self.dac)
+            elif len(self.syn) > 1:
+                return tuple(SynapticPathway(stimulus = s, name = s.name, adc = self.adc, dac = self.dac) for s in self.syn)
+        
     @property
     def in_daq_cmd(self) -> tuple:
         """Tuple of ADCs for recording DAQ-issued command waveforms other than TTLs.
@@ -904,8 +920,6 @@ class RecordingEpisodeType(TypeEnum):
     
     Conditioning    = 4 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
-                        
-
 
 class ElectrophysiologyProtocol(ABC):
     """Abstract base class for electrophysiology data acquisition protocols
@@ -1303,14 +1317,17 @@ class SynapticPathway:
     Also specifies the "type" of the SynapticPathway - specifies the role of
     the SynapticPathway in an experiment.
 
-    SynapticPayhway objects have a pathwayType attribute which specifies
+    SynapticPathway objects have a pathwayType attribute which specifies
     the pathway's role in a synaptic plasticity experiment.
     
     """
     pathwayType: SynapticPathwayType = SynapticPathwayType.Null
     stimulus: typing.Optional[SynapticStimulus] = None
+    adc: typing.Optional[int] = None
+    dac: typing.Optional[int] = None
     schedule: typing.Optional[RecordingSchedule] = None
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
+    name: str = "pathway"
         
 @dataclass
 class LocationMeasure:

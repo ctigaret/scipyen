@@ -670,45 +670,44 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 
             self.print(self._runData_.sources)
             
-            
-            
-            
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
             # 
             # upon first run, self._runData_.protocol is None
             if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
                 self._runData_.currentProtocol = protocol
-                episode = RecordingEpisode(name=self._runData_.episodeName, beginFrame=self._runData_.sweeps)
+                episode = RecordingEpisode(name=self._runData_.episodeName, 
+                                           beginFrame = 0,
+                                           # beginFrame=self._runData_.sweeps,
+                                           begin=abfRun.rec_datetime)
                 self._runData_.schedule.addEpisode(episode)
                 self._runData_.currentEpisode = episode
                 
-                
-                self.print(f"initial protocol = {protocol.name}")
+                self.print(f"initial protocol: {protocol.name}")
                 
                 # self.processProtocol(protocol)
                 
                 
             elif protocol != self._runData_.currentProtocol:
-                # a different protocol - here, newEpisode should have been "True"
-                # if not, then automatically set a new episode and "invent" a name 
-                # for it
+                # a different protocol emdash — WARNING: signals a new episode:
                 self.print(f"new protocol: {protocol.name}")
-                # WARNING: a new protocol signals a new episode:
                 
-                # 1. finish off current episode
+                # 1. finish off current episode with the previously loaded ABF file
+                # NOTE: 2024-02-16 08:28:43
+                # self._runData_.sweeps hasn't been incremented yet
+                self._runData_.currentEpisode.end = self._runData_.abfRunTimesMinutes[-1]
                 self._runData_.currentEpisode.endFrame = self._runData_.sweeps
-                self._runData_.currentEpisode.end = datetime.datetime.now()
-                if len(self._runData_.episodes) and self._runData_.episodeName == self._runData_.currentEpisode.name:
-                    episodeName = utilities.counter_suffix(self._runData_.episodeName, [e.name for e in self._runData_.schedule])
+                episodeNames = [e.name for e in self._runData_.schedule.episodes]
+                if self._runData_.episodeName in episodeNames:
+                    episodeName = utilities.counter_suffix(self._runData_.episodeName, episodeNames)
+                else:
+                    episodeName = self._runData_.episodeName
+                  
+                # see NOTE: 2024-02-16 08:28:43
                 episode = RecordingEpisode(name=episodeName, beginFrame = self._runData_.sweeps+1)
+                
                 self._runData_.schedule.addEpisode(episode)
                 
-                # if not self._runData_.newEpisode:
-                #     self._runData_.newEpisode = True
-                #     episodeName = self._runData_.episodeName
-                #     newEpisodeName = utilities.counter_suffix(episodeName, self._runData_.episodes)
-                    
             else: # same protocol → add data to currrent episode
                 # TODO
                 pass
