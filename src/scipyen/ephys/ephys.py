@@ -676,15 +676,18 @@ class RecordingSource(__BaseSource__):
     
         """
         if isinstance(self.syn, SynapticStimulus):
-            return SynapticPathway(stimulus = self.syn, name = self.syn.name,
-                                   adc = self.adc, dac = self.dac)
+            return SynapticPathway(stimulus = self.syn, adc = self.adc, dac = self.dac,
+                                   name = " ".join([self.name, self.syn.name]),
+                                   )
             
         if isinstance(self.syn, (tuple, list)):
             if len(self.syn) == 1:
-                return SynapticPathway(stimulus = self.syn[0], name = self.syn[0].name,
-                                       adc = self.adc, dac = self.dac)
+                return SynapticPathway(stimulus = self.syn[0], adc = self.adc, dac = self.dac,
+                                       name = " ".join([self.name, self.syn[0].name]),
+                                       )
             elif len(self.syn) > 1:
-                return tuple(SynapticPathway(stimulus = s, name = s.name, adc = self.adc, dac = self.dac) for s in self.syn)
+                return tuple(SynapticPathway(stimulus = s, adc = self.adc, dac = self.dac,
+                                             name = " ".join([self.name, s.name])) for s in self.syn)
         
     @property
     def in_daq_cmd(self) -> tuple:
@@ -1010,13 +1013,14 @@ class RecordingEpisode(Episode):
     • episodeType: RecordingEpisodeType
         
     • electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.WholeCellPatch)
+        or sequence of 
 
         NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
         using the same electrode during an experiment (i.e. either Field, *Patch, or
         or Sharp).
 
         This attribute allows for episodes with distinct electrode 'mode' for the
-        same pathway.
+        same pathway or recording source¹.
 
     • pathways: optional, a list of SynapticPathways or None (default); can also be
         an empty list (same as if it was None).
@@ -1052,11 +1056,7 @@ class RecordingEpisode(Episode):
         The order of the pathway indices in the values is the order in which each 
         pathway was stimulated during the paired-pulse.
 
-        
-        
         WARNING: the pathways attribute must be a list of SynapticPathways.
-
-
     ---
 
     ¹Exceptions are possible:
@@ -1249,7 +1249,6 @@ class RecordingSchedule(Schedule):
     def pathways(self):
         return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
         
-        
     def addEpisode(self, episode: RecordingEpisode):
         if not isinstance(episode, RecordingEpisode):
             raise TypeError(f"Expecting a RecordingEpisode; instead, got {type(episode).__name__}")
@@ -1325,6 +1324,8 @@ class SynapticPathway:
     stimulus: typing.Optional[SynapticStimulus] = None
     adc: typing.Optional[int] = None
     dac: typing.Optional[int] = None
+    electrodeMode
+    clampMode
     schedule: typing.Optional[RecordingSchedule] = None
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
     name: str = "pathway"

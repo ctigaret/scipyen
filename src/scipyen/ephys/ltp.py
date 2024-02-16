@@ -676,12 +676,17 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # upon first run, self._runData_.protocol is None
             if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
                 self._runData_.currentProtocol = protocol
+                
                 episode = RecordingEpisode(name=self._runData_.episodeName, 
                                            beginFrame = 0,
                                            # beginFrame=self._runData_.sweeps,
-                                           begin=abfRun.rec_datetime)
+                                           begin=abfRun.rec_datetime,
+                                           protocol = protocol)
                 self._runData_.schedule.addEpisode(episode)
                 self._runData_.currentEpisode = episode
+                
+                for pathway in self._runData_.pathways:
+                    pathway.pathwayType = ephys.SynapticPathwayType.
                 
                 self.print(f"initial protocol: {protocol.name}")
                 
@@ -1516,11 +1521,21 @@ class LTPOnline(QtCore.QObject):
         # self._schedule_.addEpisode(self._currentEpisode_)
         
         self._sources_ = self._check_sources_(*args)
+        
+        # NOTE: 2024-02-16 10:56:58
+        # having enforced sources with unique names and physical ADC indexes
+        # above, the synaptic pathways generated below should be unique
+        # More importantly, the SynapticPathway originated from the same source
+        # CAN share ADC indexes; however, the ADC indexes across sources MUST be
+        # distinct
+        self._pathways_ = list(itertools.chain.from_iterable([s.pathways for s in self._sources_]))
+        
         # self._setup_data_()
         self._results_ = dict() 
         
         self._runData_ = DataBag(sources = self._sources_,
                                  schedule = self._schedule_,
+                                 pathways = self._pathways_,
                                  episodeName = self._currentEpisodeName_,
                                  sweeps = 0,
                                  currentProtocol = None,
@@ -1847,7 +1862,7 @@ class LTPOnline(QtCore.QObject):
         # 3. source names should be unique
         dupnames = duplicates(snames)
         if len(dupnames):
-            raise ValueError(f"Sharing of names ({dupnames}) among sources is forbidden")
+            raise ValueError(f"RecordingSource objects must have distinct names; instead got the following duplicates ({dupnames})")
             
         # 4. for clamped sources only - by definition these define a primary DAC
         #   needed for clamping and to provide waveforms for optionally for 
@@ -1902,39 +1917,8 @@ class LTPOnline(QtCore.QObject):
         #
         #### END   Checks
         
-        # NOTE: 2024-02-12 08:49:45 
-        # ### BEGIN create SynapticPathway objects from each recording source
-        # Some of their fields will have the default (generic) values, to be
-        # modified during the processing.
-        
-#         pathways = dict()
-#         
-#         for source in args:
-#             pathways[source.name] = SynapticPathway()
-            
-        
-        # ### END create SynapticPathway objects from each recording source
-            
         return args
         
-#     def _setup_data_(self):
-#         if not hasattr(self, "_data_") or not isinstance(self._data_, dict):
-#             self._data_ = dict((src.name, dict((("source",          src),
-#                                                 (self._currentEpisodeName_,        dict(src.syn_blocks))))) for src in self._sources_)
-#             
-#         else:
-#             # for each source add new episode to data (named after the current episode name)
-#             for src in self._sources_:
-#                 if self._currentEpisodeName_ not in self._data_[src.name].keys():
-#                     self._data_[src.name][self._currentEpisodeName_] = dict(src.syn_blocks)
-#             
-#         # self._data_ = dict((src.name, dict((("source",          src),
-#         #                                     ("baseline",        dict(src.syn_blocks)),
-#         #                                     ("conditioning",    dict(src.syn_blocks)),
-#         #                                     ("chase",           dict(src.syn_blocks))))) for src in self._sources_)
-#         
-        
-    
     @pyqtSlot()
     def doWork(self):
         self.start()
