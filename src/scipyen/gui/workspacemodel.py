@@ -1090,9 +1090,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         if hasattr(result, "success") and result.success:
             self._updateModel_(self.shell.user_ns)
-        # else:
-        #     self.lastExecutionResult = None
-            
 
     def _updateModel_(self, ns: dict):
         """Determines what workspace variables have been removed/added/modified.
@@ -1976,12 +1973,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         internal variable monitor which triggers Ui updates already.
 
         """
-        # try:
-        #     self.internalVariableChanged.disconnect(self._slot_internalVariableChanged_)
-        # except:
-        #     traceback.print_exc()
-        # self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
-        
         # currently displayed variables in the viewer widget
         displayed_var_names = set(self.getDisplayedVariableNames())
         

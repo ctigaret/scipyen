@@ -1950,6 +1950,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         return {key: value}
     
     def set(self, obj, value):
+        # print(f"{self.__class__.__name__}.set")
         try:
             old_value = obj._trait_values[self.name]
             

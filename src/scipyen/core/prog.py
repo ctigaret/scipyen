@@ -810,7 +810,7 @@ def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
     
     return "".join(func)
 
-def scipywarn(message, category=None, stacklevel=1, source=None):
+def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
     from warnings import (filters, defaultaction)
     if isinstance(message, Warning):
         category = message.__class__
@@ -912,7 +912,7 @@ def scipywarn(message, category=None, stacklevel=1, source=None):
     # ### END
     
     # Print message and context
-    msg = WarningMessage(message, category, filename, lineno, source)
+    msg = WarningMessage(message, category, filename, lineno, file=out, source=source)
     _myshowarning(msg)
     
 def _myshowarning(msg:WarningMessage):#, category, filename, lineno, file=None, line=None):

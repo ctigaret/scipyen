@@ -414,22 +414,16 @@ NOTE: The function was designed to complement the %who, %who_ls and %whos
 
 def assignin(variable, varname, ws=None):
     """Assign variable as varname in workspace ws"""
-    
+    user_ws = user_workspace()
     if ws is None:
-        ws = user_workspace()
+        ws = user_ws
         
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         
-        #frame_records = inspect.getouterframes(inspect.currentframe())
-        ##print(frame_records)
-        #for (n,f) in enumerate(frame_records):
-            #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
-                #ws = f[0].f_globals["mainWindow"].workspace
-                ##ws = f[0].f_globals
-                #break
-        
     ws[varname] = variable
+    if ws is user_ws:
+        ws["mainWindow"].workspaceModel.update()
     
 assign = assignin # syntactic sugar
 

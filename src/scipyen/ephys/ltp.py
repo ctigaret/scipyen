@@ -2,6 +2,7 @@
 
 #### BEGIN core python modules
 import os, sys, traceback, inspect, numbers, warnings, pathlib, time, io
+import datetime
 import functools, itertools
 import collections, enum
 import typing, types
@@ -12,6 +13,7 @@ from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 #### END core python modules
 
 #### BEGIN 3rd party modules
+from traitlets import Bunch
 import numpy as np
 import pandas as pd
 import quantities as pq
@@ -20,6 +22,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import neo
 from scipy import optimize, cluster#, where
+import colorama
 
 from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
@@ -79,7 +82,8 @@ from core.utilities import (safeWrapper,
                             normalized_index,
                             unique,
                             duplicates,
-                            GeneralIndexType)
+                            GeneralIndexType,
+                            counter_suffix)
 
 #### END pict.core modules
 
@@ -317,9 +321,13 @@ class _LTPFilesSimulator_(QtCore.QThread):
     """
     Used for testing LTPOnline on already recorded files
     """
+    
+    simulationDone = pyqtSignal(name = "simulationDone")
+    
     supplyFile = pyqtSignal(pathlib.Path, name = "supplyFile")
     
     defaultTimeout = 10000 # ms
+    
     
     def __init__(self, parent, simulation:dict = None,
                  out: typing.Optional[io.TextIOBase] = None):
@@ -332,6 +340,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
         self._simulationFiles_ = []
         self._simulationTimeOut_ = self.defaultTimeout
         self._stdout_ = out
+        self._paused_ = False
         
         files = None
         
@@ -344,9 +353,9 @@ class _LTPFilesSimulator_(QtCore.QThread):
                 files = None
             
         if files is None:
-            print(f"Looking for ABF files in current directory ({os.getcwd()}) ...")
+            print(f"{self.__class__.__name__}:\n Looking for ABF files in directory: ({os.getcwd()}) ...")
             files = subprocess.run(["ls"], capture_output=True).stdout.decode().split("\n")
-            print(f"Found {len(files)} ABF files")
+            # print(f" Found {len(files)} ABF files")
         
         if isinstance(files, list) and len(files) > 0 and all(isinstance(v, (str, pathlib.Path)) for v in files):
             simFilesPaths = list(filter(lambda x: x.is_file() and x.suffix == ".abf", [pathlib.Path(v) for v in files]))
@@ -354,12 +363,12 @@ class _LTPFilesSimulator_(QtCore.QThread):
             if len(simFilesPaths):
                 # NOTE: 2024-01-08 17:45:21
                 # bound to introduce some delay, but needs must, for simulation purposes
-                print("Sorting ABF data based on recording time ...")
+                print(f" Sorting {len(simFilesPaths)} ABF data based on recording time ...")
                 self._simulationFiles_ = sorted(simFilesPaths, key = lambda x: pio.loadAxonFile(x).rec_datetime)
-                print("... done.")
+                print(" ... done.")
                 
         if len(self._simulationFiles_) == 0:
-            print(f"No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
+            print(f" No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
                
     def print(self, msg):
         if isinstance(self._stdout_, io.TextIOBase):
@@ -370,27 +379,42 @@ class _LTPFilesSimulator_(QtCore.QThread):
     def run(self):
         self._simulationCounter_ = 0
         for k,f in enumerate(self._simulationFiles_):
-            self.print(f"{self.__class__.__name__}.run: reading file {k}: {f}")
+            self.print(f"\n****\n{self.__class__.__name__}.run: simulation counter {self._simulationCounter_}\n reading file {k}: {colorama.Fore.RED}{colorama.Style.BRIGHT}{f}{colorama.Style.RESET_ALL}")
             self.simulateFile()
-            QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             if self.isInterruptionRequested():
+                self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
                 break
+            QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
+            
+        # if not self._paused_:
+        if k < (len(self._simulationFiles_) - 1):
+            self._paused_ = True
+        else:
+            self.simulationDone.emit()
             
     def resume(self):
         """Resumes simulation"""
         if self._simulationCounter_ < len(self._simulationFiles_):
+            self._paused_ = False
             for k in range(self._simulationCounter_, len(self._simulationFiles_)):
                 f = self._simulationFiles_[k]
-                self.print(f"{self.__class__.__name__}.run: reading file {k}: {f}")
+                self.print(f"\n****\n{self.__class__.__name__}.run: simulation counter {self._simulationCounter_}\n reading file {k}: {colorama.Fore.RED}{colorama.Style.BRIGHT}{f}{colorama.Style.RESET_ALL} for simulation counter {self._simulationCounter_}")
                 self.simulateFile()
-                QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
                 if self.isInterruptionRequested():
+                    self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
                     break
+                QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
+                
+            if k < (len(self._simulationFiles_)-1):
+                self._paused_ = True
+                
+            else:
+                self.simulationDone.emit()
                 
     @pyqtSlot()
     def simulateFile(self):
         if self._simulationCounter_ >= len(self._simulationFiles_):
-            self.stop()
+            self.simulationDone.emit()
             return
         
         self._simulatedFile_ = self._simulationFiles_[self._simulationCounter_]
@@ -620,7 +644,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     #
     def __init__(self, parent:QtCore.QObject, 
                  abfBuffer:collections.deque,
-                 # abfRunData:dict,
+                 abfRunData:dict,
                  # presynapticTriggers: dict,
                  # landmarks:dict,
                  # data:dict, 
@@ -645,7 +669,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     def processAbfFile(self, abfFile:pathlib.Path):
         """Reads and ABF protocol from the ABF file and analyses the data
         """
-        msg = f"{self.__class__.__name__}.processAbfFile received {abfFile}"
+        msg = f"{self.__class__.__name__}.processAbfFile received {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}"
         self.print(msg)
             
         try:
@@ -668,7 +692,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # and set an appropriate interval between successive trials !
             assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
-            self.print(self._runData_.sources)
+            # self.print(self._runData_.sources)
             
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
@@ -677,6 +701,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
                 self._runData_.currentProtocol = protocol
                 
+                
                 episode = RecordingEpisode(name=self._runData_.episodeName, 
                                            protocol = self._runData_.currentProtocol,
                                            sources = self._runData_.sources,
@@ -684,20 +709,19 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                            beginFrame = 0,
                                            # beginFrame=self._runData_.sweeps,
                                            begin=abfRun.rec_datetime)
-                self._runData_.schedule.addEpisode(episode)
+                
+                # self._runData_.schedule.addEpisode(episode)
                 self._runData_.currentEpisode = episode
                 
-                # for pathway in self._runData_.pathways:
-                #     pathway.pathwayType = ephys.SynapticPathwayType.
+                self.processProtocol(protocol, *self._runData_.pathways)
                 
-                self.print(f"initial protocol: {protocol.name}")
+                self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
                 
-                # self.processProtocol(protocol)
                 
                 
             elif protocol != self._runData_.currentProtocol:
                 # a different protocol emdash — WARNING: signals a new episode:
-                self.print(f"new protocol: {protocol.name}")
+                self.print(f"{colorama.Fore.CYAN}{colorama.Style.BRIGHT}new protocol{colorama.Style.RESET_ALL}: {protocol.name}")
                 
                 # 1. finish off current episode with the previously loaded ABF file
                 # NOTE: 2024-02-16 08:28:43
@@ -706,7 +730,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.currentEpisode.endFrame = self._runData_.sweeps
                 episodeNames = [e.name for e in self._runData_.schedule.episodes]
                 if self._runData_.episodeName in episodeNames:
-                    episodeName = utilities.counter_suffix(self._runData_.episodeName, episodeNames)
+                    episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
                     self._runData_.episodeName = episodeName
                 # else:
                 #     episodeName = self._runData_.episodeName
@@ -726,9 +750,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
             else: # same protocol → add data to currrent episode
                 # TODO
-                pass
+                self._runData_.currentEpisode.endFrame += 1
+                self._runData_.currentEpisode.end = datetime.datetime.now()
+                
             
             self._runData_.sweeps += 1
+            
+            self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
 
             # NOTE: 2023-09-29 14:12:56
             # we need:
@@ -1069,36 +1097,189 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             traceback.print_exc()
         
 
-    def processProtocol(self, protocol:pab.ABFProtocol):
+    def processProtocol(self, protocol:pab.ABFProtocol, *pathways):
         self.print(f"{self.__class__.__name__}.processProtocol {protocol.name}")
-        for source in self._runData_.sources:
-            pass
-        clampMode = protocol.clampMode(self._adcChannel_, self._dacChannel_)
-        adc = protocol.inputConfiguration(self._adcChannel_)
-        dac = protocol.outputConfiguration(self._dacChannel_)
-        
-        
-        pass
+        for pathway in pathways:
+            self.processPathway(pathway, protocol)
+
+    def processPathway(self, pathway:SynapticPathway, protocol:pab.ABFProtocol):
+        adc = protocol.inputConfiguration(pathway.adc)
+        dac = protocol.outputConfiguration(pathway.dac)
+        pathway.clampMode = protocol.clampMode(adc, dac)
+        synStimEpochs = list()
+        mbTestEpochs = list()
+        # pathway.electrodeMode = ElectrodeMode.Field if pathway.clampMode == 
+        if isinstance(pathway.stimulus, SynapticStimulus) and pathway.stimulus.dig:
+            # TODO: 2024-02-16 22:54:29
+            # simplify this gymnastics, given that the DIg channel should already
+            # be specified in the pathway.
+            
+            # Guess which DAC output has digital outputs enabled.
+            #
+            # In Clampex, there can be only one!¹
+            #
+            # Ths is necessary because one may have confgured dig outputs in a DAC
+            # different from the one used for command waveform.
+            #
+            # HOWEVER, this is only possble when alternate digital outputs are 
+            # enabled in the protocol - and, hence, this dac must have the same epochs
+            # defined as the DAC used for clamping.
+            #
+            # ¹) For this reason, additional triggers can only be sent out by emulating
+            #    TTL waveforms in the analog command epochs on additional DAC outputs.
+            #
+            digOutDacs = list(filter(lambda x: x.digitalOutputEnabled, (protocol.outputConfiguration(k) for k in range(protocol.nDACChannels))))
     
-    def storeProtocol(self, protocol:pab.ABFProtocol):
-        if protocol.nSweeps == 2:
-            assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
-            assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
+            if len(digOutDacs) == 0:
+                raise ValueError("The protocol indicates there are no DAC channels with digital output enabled")
             
-        if self._runData_.protocol is None:
-            self._runData_.newEpisode = True
+            digOutDACIndex = digOutDacs[0].number
             
-        self._runData_.protocol = protocol
+            if digOutDACIndex != dac:
+                if not protocol.alternateDigitalOutputStateEnabled:
+                    raise ValueError(f"Digital outputs are enabled on DAC {digOutDACIndex} and command waveforms are sent via DAC {dac}, but alternative digital outputs are disabled in the protocol")
+            
+                assert protocol.nSweeps % 2 == 0, "For alternate DIG pattern the protocol is expected to have an even number of sweeps"
+    
+
+            # DAC where dig out is enabled;
+            # when alt dig out is enabled, this stores the main dig pattern
+            # (the dig pattern sent out on even sweeps 0, 2, 4, etc)
+            # whereas the "main" dac retrieved above stores the alternate digital pattern
+            # (the dig pattern set out on odd sweeps, 1,3, 5, etc)
+            
+            digdac = protocol.outputConfiguration(digOutDACIndex)
+            
+            if len(digdac.epochs) == 0:
+                raise ValueError("DAC with digital outputs has no epochs!")
+            
+            digEpochsTable = digdac.epochsTable(0)
+            dacEpochsTable = dac.epochsTable(0)
+            
+            digEpochsTable_reduced = digEpochsTable.loc[[i for i in digEpochsTable.index if not i.startswith("Digital Pattern")], :]
+            dacEpochsTable_reduced = dacEpochsTable.loc[[i for i in dacEpochsTable.index if not i.startswith("Digital Pattern")], :]
+            
+            digEpochsTableAlt = None
+            digEpochsTableAlt_reduced = None
+            
+            if digOutDACIndex != dac:
+                # a this point, this implies protocol.alternateDigitalOutputStateEnabled == True
+                #
+                # What we check here:
+                # when alternate digital output is enabled, AND the dig dac is dfferent 
+                # from the main dac, the epochs defned in each of the dacs MUST be the same
+                # EXCEPT for the reported (stored) digital patterns
+                # 
+                # The idea is that the main experimental epochs are defined in the dacChannel,
+                # but the digital outputs may be defined in the "alternative" DAC channel,
+                # with the condition that the same epochs are defined there
+                # 
+                # NOTE: In general this is a SOFT requirement (one can imagine 
+                # doing completely different things in the "alternate" digital output)
+                #
+                # However, for a synaptic plasticity experiment, sending stimuli at
+                # different times on the alternate pathway is an unnecessary complication
+                # hence, HERE, this is is a HARD requirement (for now...)
+                #
+                digEpochsTableAlt = digdac.epochsTable(1)
+                digEpochsTableAlt_reduced = digEpochsTableAlt.loc[[i for i in digEpochsTableAlt.index if not i.startswith("Digital Pattern")], :]
+                assert(np.all(digEpochsTable_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels"
+                assert(np.all(digEpochsTableAlt_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels with alternate digital outputs"
+            
+            
+            # Locate the presynaptic triggers epoch
+            # first try and find epochs with digital trains
+            # there should be only one such epoch, sending at least one TTL pulse per train
+            #
+            synStimEpochs = list(filter(lambda x: len(x.trainDigitalOutputChannels("all"))>0, digdac.epochs))
+            
+            # ideally there is only one such epoch
+            if len(synStimEpochs) > 1:
+                scipywarn(f"There are {len(synStimEpochs)} in the protocol; will use the first one", out = self._stdout_)
+                synStimEpochs = [synStimEpochs[0]]
+                # return False
+            
+            elif len(synStimEpochs) == 0:
+                # Try prestim triggers defined as digital pulses instead of trains.
+                #
+                # Here we can expect to have more than one such epochs, together 
+                #   emulating a train of TTL pulses (with one pulse per epoch).
+                #
+                # There should be no intervening epochs here...
+                #
+                # Obviously, this is a contrived scenario that might work for the 
+                # synaptic monitoring episodes of the experiment (when one might use
+                # single,  paired-pulse, or even a few pulses - although I am not 
+                # sure there is good case for the latter) but is not so usable during 
+                # conditioning episodes, especially those using high frequency trains
+                # (one would run out of epochs pretty fast...); nevertheless, I can 
+                # imagine case where low frequency triggers could be generated
+                # using pulses instead of trains for conditioning as well (e.g.
+                # low frequency stimulations)
+                #
+                synStimEpochs = list(filter(lambda x: len(x.pulseDigitalOutputChannels("all"))>0, digdac.epochs))
+            
+                if len(synStimEpochs) == 0:
+                    raise ValueError("There are no epochs sending digital triggers")
+                
+            # store these for later
+            stimDIG = unique(synStimEpochs[0].usedDigitalOutputChannels("all"))
+            assert pathway.stimulus.channel in stimDIG
         
-        if self._runData_.currentProtocolIsConditioning:
-            self._runData_.newEpisode
-            self._runData_.conditioningProtocols.append(protocol)
+#         mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
+#                                             and not any(x.hasDigitalOutput(d) for d in stimDIG) \
+#                                             and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
+#                                 dac.epochs))
+        
+        mbTestEpochs = list(filter(lambda x: x not in synStimEpochs and x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
+                                            and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
+                                dac.epochs))
+        
+        if len(mbTestEpochs) == 0:
+            # NOTE: 2024-02-16 22:59:25
+            # allow for absence of membrane test epochs
+            # if self._clampMode_ == ephys.ClampMode.VoltageClamp:
+            #     raise ValueError("No membrane test epoch appears to have been defined")
+            membraneTestEpoch = None
+            
         else:
-            self._runData_.monitoringProtocols.append(protocol)
+            membraneTestEpoch = mbTestEpochs[0]
         
-        if self._runData_.newEpisode:
-            self.processTrackingProtocol(protocol)
+        if membraneTestEpoch is None:
+            mbTestAmplitude = None
+            mbTestStart = None
+            mbTestDuration = None
+            signalBaselineStart = 0 * pq.s
+            signalBaselineDuration = dac.epochRelativeStartTime(synStimEpochs[0], 0)
+            responseBaselineStart = signalBaselineStart
+            responseBaselineDuration = signalBaselineDuration
+        else:
+            mbTestAmplitude = membraneTestEpoch.firstLevel
         
+            mbTestStart = dac.epochRelativeStartTime(membraneTestEpoch, 0)
+            mbTestDuration = membraneTestEpoch.firstDuration
+            
+    # TODO: 2024-02-16 23:03:34
+    # carry on with code from processTrackingProtocol @ NOTE: 2024-02-16 23:04:22
+        
+#     def storeProtocol(self, protocol:pab.ABFProtocol):
+#         if protocol.nSweeps == 2:
+#             assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
+#             assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
+#             
+#         if self._runData_.protocol is None:
+#             self._runData_.newEpisode = True
+#             
+#         self._runData_.protocol = protocol
+#         
+#         if self._runData_.currentProtocolIsConditioning:
+#             self._runData_.newEpisode
+#             self._runData_.conditioningProtocols.append(protocol)
+#         else:
+#             self._runData_.monitoringProtocols.append(protocol)
+#         
+#         if self._runData_.newEpisode:
+#             self.processTrackingProtocol(protocol)
 
     def processTrackingProtocol(self, protocol:pab.ABFProtocol):
         """Infers the timings of the landmarks from protocol.
@@ -1281,7 +1462,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self._mbTestStart_ = dac.epochRelativeStartTime(self._membraneTestEpoch_, 0)
             self._mbTestDuration_ = self._membraneTestEpoch_.firstDuration
         
-        
+            # NOTE: 2024-02-16 23:04:22
             # Figure out the global signal baseline and the baseline for synaptic 
             # responses, based on the relative timings of the membrane test and trigger
             #   epochs
@@ -1521,13 +1702,15 @@ class LTPOnline(QtCore.QObject):
         
         super().__init__(parent=parent)
         
+        self._stdout_ = out
+        
         self._running_ = False
         self._sources_ = None # preallocate
         
         self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
         
         # self._currentEpisode_ = RecordingEpisode(name=self._currentEpisodeName_)
-        self._schedule_ = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
+        # self._schedule_ = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
         
         # self._schedule_.addEpisode(self._currentEpisode_)
         
@@ -1541,11 +1724,15 @@ class LTPOnline(QtCore.QObject):
         # distinct
         self._pathways_ = list(itertools.chain.from_iterable([s.pathways for s in self._sources_]))
         
-        # self._setup_data_()
-        self._results_ = dict() 
+        for pathway in self._pathways_:
+            pathway.schedule = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
         
+        # self._setup_data_()
+        # self._results_ = dict() 
+        
+        # self._runData_ = Bunch(sources = self._sources_,
         self._runData_ = DataBag(sources = self._sources_,
-                                 schedule = self._schedule_,
+                                 # schedule = self._schedule_,
                                  pathways = self._pathways_,
                                  episodeName = self._currentEpisodeName_,
                                  currentProtocol = None,
@@ -1663,7 +1850,7 @@ class LTPOnline(QtCore.QObject):
                                                              self._abfRunBuffer_,
                                                              self._runData_,
                                                              self._viewers_,
-                                                             out)
+                                                             self._stdout_)
         
         self._simulation_ = None
         
@@ -1688,16 +1875,17 @@ class LTPOnline(QtCore.QObject):
             self._simulator_params_ = dict(files=None, timeout = int(simulate))
         
         if self._doSimulation_:
-            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, out)
+            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
+            self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
                                         simulator = self._simulatorThread_,
-                                        out = out)
+                                        out = self._stdout_)
             
         else:
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
-                                        out = out)
+                                        out = self._stdout_)
         
         self._abfSupplierThread_.abfRunReady.connect(self._abfProcessorThread_.processAbfFile,
                                                      QtCore.Qt.QueuedConnection)
@@ -1742,48 +1930,6 @@ class LTPOnline(QtCore.QObject):
         
         if hasattr(super(object, self), "__del__"):
             super().__del__()
-            
-    def _make_episode_dict(self, source: RecordingSource, name:str, 
-                           locationMeasures:typing.List[LocationMeasure],
-                           protocol: pab.ABFProtocol) -> dict:
-        ret = dict()
-        
-        # → logical ADC index = index of signal containing recorded responses,
-        # in the Block's segments `analogsignals` attributes ⇒ this is the signal
-        # where measurements are made
-        ret["input"] = protocol.logicalADCIndex(src.adc) 
-        
-        # → logical DAC index = (normally) the index of the "active" DAC channel;
-        # this is the one that sends commands to the recorded cell (in voltage/current clamp)
-        # ATTENTION: This is not enecssarily the `activeDACChannel` property of 
-        # the protocol. In particular, src.dac is None for field recording (i.e..
-        # no command signal for clamping is being used); however, the active 
-        # DAC channel still points to the DAC where digital outputs are enabled 
-        # (in Clampex) and where epochs for triggering DIG outputs are defined.
-        # ret["output"] = protocol.logicalDACIndex(src.dac) if isinstance(src.dac, int) else protocol.logicalDACIndex(protocol.activeDACChannel)
-        ret["output"] = src.dac if isinstance(src.dac, int) else protocol.activeDACChannel # physical index of DAC used for command signal and/or DIG outputs
-        
-        # physDAC = src.dac if isinstance(src.dac, int) else protocol.logicalDACIndex
-        
-        ret["clamping"] = protocol.getClampMode(src.adc, ret["output"])
-        
-        if ret["clamping"] == ClampMode.VoltageClamp:
-            ret["membrane_test"] = {"Rs": None, "Rin": None, "DC": None} # TODO: IrregularlySampledSignal
-            
-        elif ret["clamping"] == ClampMode.CurrentClamp:
-            ret["membrane_test"] = {"Rm": None, "tau": None, "Cm": None} # TODO: IrregularlySampledSignal
-            
-        ret["measures"] = dict()
-        ret["measures"]["membrane_test"] = None # to be setup in _LTPOnlineFileProcessor_.processAbfFile
-        ret["measures"]["pathways"] = dict() # to be setup in _LTPOnlineFileProcessor_.processAbfFile
-        
-        # for syn in src.syn:
-        #     ret["measures"]["pathways"][syn.name] = self._make_pathway_dict(syn, clamping)
-            # ret["pathways"][syn.name] = syn
-        
-    # def _make_pathway_measures(self, syn:SynapticStimulus, clamping:ClampMode):
-    #     return {"stimulus": syn, "responses": dict()}
-        
             
     def _check_sources_(self, *args):
         # print(f"{self.__class__.__name__}._check_sources_: args = {args}")
@@ -1930,13 +2076,28 @@ class LTPOnline(QtCore.QObject):
         
         return args
         
+    def print(self, msg):
+        if isinstance(self._stdout_, io.TextIOBase):
+            print(msg, file = self._stdout_)
+        else:
+            print(msg)
+               
     @pyqtSlot()
-    def doWork(self):
+    def slot_doWork(self):
         self.start()
-
+        
+    @pyqtSlot()
+    def _slot_simulationDone(self):
+        self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
+        self.stop()
+        
     @property
-    def data(self) -> dict:
-        return self._data_
+    def running(self):
+        return self._running_
+
+    # @property
+    # def data(self) -> dict:
+    #     return self._data_
     
     def pause(self):
         """Pause the simulation.
@@ -1976,9 +2137,12 @@ class LTPOnline(QtCore.QObject):
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
             
-        self.resultsReady.emit((self._data_, self._results_))
+        self.resultsReady.emit(self._runData_)
         
         self._running_ = False
+        
+        if self._doSimulation_:
+            wf.assignin(self._runData_, "rundata")
         
         
         
