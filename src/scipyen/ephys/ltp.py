@@ -620,21 +620,17 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     #
     def __init__(self, parent:QtCore.QObject, 
                  abfBuffer:collections.deque,
-                 abfRunParams:dict,
-                 presynapticTriggers: dict,
-                 landmarks:dict,
-                 data:dict, 
-                 resultsAnalysis:dict,
+                 # abfRunData:dict,
+                 # presynapticTriggers: dict,
+                 # landmarks:dict,
+                 # data:dict, 
+                 # resultsAnalysis:dict,
                  viewers:dict,
                  out: typing.Optional[io.TextIOBase] = None):
         QtCore.QThread.__init__(self, parent)
         
         self._abfRunBuffer_ = abfBuffer
-        self._runData_ = abfRunParams
-        self._presynaptic_triggers_ = presynapticTriggers
-        self._landmarks_ = landmarks
-        self._data_ = data
-        self._results_ = resultsAnalysis
+        self._runData_ = abfRunData
         self._viewers_ = viewers
         self._stdout_ = out
         
@@ -675,17 +671,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self.print(self._runData_.sources)
             
             
+            
+            
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
             # 
             # upon first run, self._runData_.protocol is None
             if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
                 self._runData_.currentProtocol = protocol
-                self._runData_.newEpisode = False
-                # set up new episode
-                # since Clampex only runs on Windows, we simply split the string up:
-                #
-                episodeName = protocol.name
+                episode = RecordingEpisode(name=self._runData_.episodeName, beginFrame=self._runData_.sweeps)
+                self._runData_.schedule.addEpisode(episode)
+                self._runData_.currentEpisode = episode
+                
                 
                 self.print(f"initial protocol = {protocol.name}")
                 
@@ -697,12 +694,26 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # if not, then automatically set a new episode and "invent" a name 
                 # for it
                 self.print(f"new protocol: {protocol.name}")
-                if not self._runData_.newEpisode:
-                    self._runData_.newEpisode = True
-                    episodeName = self._runData_.episodeName
-                    newEpisodeName = utilities.counter_suffix(episodeName, self._runData_.episodes)
+                # WARNING: a new protocol signals a new episode:
+                
+                # 1. finish off current episode
+                self._runData_.currentEpisode.endFrame = self._runData_.sweeps
+                self._runData_.currentEpisode.end = datetime.datetime.now()
+                if len(self._runData_.episodes) and self._runData_.episodeName == self._runData_.currentEpisode.name:
+                    episodeName = utilities.counter_suffix(self._runData_.episodeName, [e.name for e in self._runData_.schedule])
+                episode = RecordingEpisode(name=episodeName, beginFrame = self._runData_.sweeps+1)
+                self._runData_.schedule.addEpisode(episode)
+                
+                # if not self._runData_.newEpisode:
+                #     self._runData_.newEpisode = True
+                #     episodeName = self._runData_.episodeName
+                #     newEpisodeName = utilities.counter_suffix(episodeName, self._runData_.episodes)
                     
+            else: # same protocol → add data to currrent episode
+                # TODO
+                pass
             
+            self._runData_.sweeps += 1
 
             # NOTE: 2023-09-29 14:12:56
             # we need:
@@ -1500,10 +1511,10 @@ class LTPOnline(QtCore.QObject):
         
         self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
         
-        self._currentEpisode_ = RecordingEpisode(name=self._currentEpisodeName_)
+        # self._currentEpisode_ = RecordingEpisode(name=self._currentEpisodeName_)
         self._schedule_ = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
         
-        self._schedule_.addEpisode(self._currentEpisode_)
+        # self._schedule_.addEpisode(self._currentEpisode_)
         
         self._sources_ = self._check_sources_(*args)
         # self._setup_data_()
@@ -1511,9 +1522,12 @@ class LTPOnline(QtCore.QObject):
         
         self._runData_ = DataBag(sources = self._sources_,
                                  schedule = self._schedule_,
+                                 episodeName = self._currentEpisodeName_,
+                                 sweeps = 0,
+                                 currentProtocol = None,
+                                 currentEpisode = None,
                                    # data = self._data_,
                                    # newEpisode = True,
-                                   # episodeName = None, # default is "baseline"
                                    # episodes = dict(), # map episode name to data
                                    abfRunTimesMinutes = list(),
                                    abfRunDeltaTimesMinutes = list(),
@@ -1525,7 +1539,7 @@ class LTPOnline(QtCore.QObject):
                                    signalBaselineStart = signalBaselineStart,
                                    signalBaselineDuration = signalBaselineDuration,
                                    currentProtocolIsConditioning = False,
-                                   currentProtocol = None,
+                                   # currentProtocol = None,
                                    useEmbeddedProtocol = useEmbeddedProtocol)
         
         
@@ -1623,10 +1637,6 @@ class LTPOnline(QtCore.QObject):
         self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self, 
                                                              self._abfRunBuffer_,
                                                              self._runData_,
-                                                             self._presynaptic_triggers_, 
-                                                             self._landmarks_,
-                                                             self._data_, 
-                                                             self._results_, 
                                                              self._viewers_,
                                                              out)
         

@@ -1298,7 +1298,7 @@ class SynapticPathwayType(TypeEnum):
     
 # @with_doc(BaseScipyenData, use_header=True)
 @dataclass
-class SynapticPathway():
+class SynapticPathway:
     """Logical association of a SynapticStimulus with a Schedule.
     Also specifies the "type" of the SynapticPathway - specifies the role of
     the SynapticPathway in an experiment.
