@@ -1073,8 +1073,8 @@ class RecordingEpisode(Episode):
                  name: typing.Optional[str] = None,
                  protocol: typing.Optional[ElectrophysiologyProtocol]=None, 
                  sources: typing.Sequence[RecordingSource] = list(),
-                 electrodeMode: typing.Sequence[ElectrodeMode] = list(),
-                 clampMode: typing.Sequence[ClampMode] = list(),
+                 # electrodeMode: typing.Sequence[ElectrodeMode] = list(),
+                 # clampMode: typing.Sequence[ClampMode] = list(),
                  segments: typing.Optional[GeneralIndexType] = None,
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[dict[int, tuple[int,int]]] = None ,
@@ -1132,17 +1132,16 @@ class RecordingEpisode(Episode):
 
         self.protocol = protocol
         
-        
-        if not isinstance(electrodeMode, ElectrodeMode):
-            electrodeMode = ElectrodeMode.Field
-        
-        self.electrodeMode = electrodeMode
-
-        if not isinstance(clampMode, ClampMode):
-            # remember to set this up from the protocol, if present
-            clampMode = ClampMode.NoClamp
-            
-        self.clampMode = clampMode
+#         if not isinstance(electrodeMode, ElectrodeMode):
+#             electrodeMode = ElectrodeMode.Field
+#         
+#         self.electrodeMode = electrodeMode
+# 
+#         if not isinstance(clampMode, ClampMode):
+#             # remember to set this up from the protocol, if present
+#             clampMode = ClampMode.NoClamp
+#             
+#         self.clampMode = clampMode
         
         if isinstance(pathways, (tuple, list)):
             if len(pathways):
@@ -1324,8 +1323,8 @@ class SynapticPathway:
     stimulus: typing.Optional[SynapticStimulus] = None
     adc: typing.Optional[int] = None
     dac: typing.Optional[int] = None
-    electrodeMode
-    clampMode
+    electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
+    clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
     schedule: typing.Optional[RecordingSchedule] = None
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
     name: str = "pathway"

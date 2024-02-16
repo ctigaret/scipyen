@@ -678,6 +678,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.currentProtocol = protocol
                 
                 episode = RecordingEpisode(name=self._runData_.episodeName, 
+                                           sources = self._runData_.sources,
                                            beginFrame = 0,
                                            # beginFrame=self._runData_.sweeps,
                                            begin=abfRun.rec_datetime,
@@ -685,8 +686,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.schedule.addEpisode(episode)
                 self._runData_.currentEpisode = episode
                 
-                for pathway in self._runData_.pathways:
-                    pathway.pathwayType = ephys.SynapticPathwayType.
+                # for pathway in self._runData_.pathways:
+                #     pathway.pathwayType = ephys.SynapticPathwayType.
                 
                 self.print(f"initial protocol: {protocol.name}")
                 
