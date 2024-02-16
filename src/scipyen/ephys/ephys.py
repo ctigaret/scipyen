@@ -905,9 +905,9 @@ class ElectrodeMode(TypeEnum):
    
 class RecordingEpisodeType(TypeEnum):
     """Once can define valid type combinations as follows:
-    Drug | Tracking     (= 3)   ⇒ Tracking episode recorded in the presence of 
+    Tracking | Drug     (= 3)   ⇒ Tracking episode recorded in the presence of 
                                     drug(s)
-    Drug | Conditioning (= 5)   ⇒ Conditioning in the presence of drug(s)
+    Conditioning | Drug (= 5)   ⇒ Conditioning in the presence of drug(s)
     
     A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
     an episode of "drug washout".
@@ -917,12 +917,13 @@ class RecordingEpisodeType(TypeEnum):
     """
     Drug            = 1 # a recording episode in the presence of a drug or mixture
                         # of drugs
-                        
-    Tracking        = 2 # used for tracking synaptic responses
-                        # can be associated with any SynapticPathwayType
     
+    Tracking        = 2 # used for tracking the electrophysiological behaviour of
+                        # a source (e.g., synaptic responses, somatic spiking, etc);
+                        
     Conditioning    = 4 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
+                        
 
 class ElectrophysiologyProtocol(ABC):
     """Abstract base class for electrophysiology data acquisition protocols
@@ -1025,11 +1026,15 @@ class RecordingEpisode(Episode):
     • pathways: optional, a list of SynapticPathways or None (default); can also be
         an empty list (same as if it was None).
 
-        Indicates the SynapticPathways to which this episode applies. Typically,
-        an episode applied to a single pathway. However, there are situations where
+        Indicates the SynapticPathways where this episode applies. Typically,
+        an episode involves a single pathway. However, there are situations where
         an episode involving more pathways is meaningful, e.g., where additional
         pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
         test, or during conditioning in order to test for 'associativity')
+    
+        The electrode and clamping modes are defined in the synaptic pathways.
+    
+    • sources: optional, a list of recording sources
         
     • xtalk: optional, a mapping of int (sweep indices) or tuples (start:int,step:int)
         to pairs (2-tuples) of valid int indices into the 'pathways' attribute.
@@ -1073,8 +1078,6 @@ class RecordingEpisode(Episode):
                  name: typing.Optional[str] = None,
                  protocol: typing.Optional[ElectrophysiologyProtocol]=None, 
                  sources: typing.Sequence[RecordingSource] = list(),
-                 # electrodeMode: typing.Sequence[ElectrodeMode] = list(),
-                 # clampMode: typing.Sequence[ClampMode] = list(),
                  segments: typing.Optional[GeneralIndexType] = None,
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[dict[int, tuple[int,int]]] = None ,
@@ -1132,17 +1135,6 @@ class RecordingEpisode(Episode):
 
         self.protocol = protocol
         
-#         if not isinstance(electrodeMode, ElectrodeMode):
-#             electrodeMode = ElectrodeMode.Field
-#         
-#         self.electrodeMode = electrodeMode
-# 
-#         if not isinstance(clampMode, ClampMode):
-#             # remember to set this up from the protocol, if present
-#             clampMode = ClampMode.NoClamp
-#             
-#         self.clampMode = clampMode
-        
         if isinstance(pathways, (tuple, list)):
             if len(pathways):
                 if not all(isinstance(v, SynapticPathway) for v in pathways):
@@ -1153,8 +1145,8 @@ class RecordingEpisode(Episode):
         
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
-        # between synapses actiated by seemingly distinct axonal pathways
-        # (in other words, the "inverse" of pathway separation)
+        # between synapses activated by ideally distinct axonal pathways 
+        # (encapsulated by SynapticStimulus objects) in the same RecordingSource
         #
         # Testing the degree of pathway separation is based on short-term plasticity
         # at the synapses under study: the "facilitation" or "depletion" of the synaptic
@@ -1166,7 +1158,8 @@ class RecordingEpisode(Episode):
         # the two axonal pathways activate completely separated groups of synapses
         # on the postsynaptic cell.
         #
-        # sweep index:intᵃ or tuple of two int ↦ ordered sequence of pathway int indices, 
+        # sweep index:intᵃ or tuple of int ↦ ordered sequence of pathway 
+        # indexes (int), 
         #   e.g., for two pathways, using int keys:
         #       0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
         #       1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0

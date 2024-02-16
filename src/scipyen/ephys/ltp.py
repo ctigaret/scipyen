@@ -678,11 +678,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.currentProtocol = protocol
                 
                 episode = RecordingEpisode(name=self._runData_.episodeName, 
+                                           protocol = self._runData_.currentProtocol,
                                            sources = self._runData_.sources,
+                                           pathways = self._runData_.pathways,
                                            beginFrame = 0,
                                            # beginFrame=self._runData_.sweeps,
-                                           begin=abfRun.rec_datetime,
-                                           protocol = protocol)
+                                           begin=abfRun.rec_datetime)
                 self._runData_.schedule.addEpisode(episode)
                 self._runData_.currentEpisode = episode
                 
@@ -706,12 +707,21 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 episodeNames = [e.name for e in self._runData_.schedule.episodes]
                 if self._runData_.episodeName in episodeNames:
                     episodeName = utilities.counter_suffix(self._runData_.episodeName, episodeNames)
-                else:
-                    episodeName = self._runData_.episodeName
+                    self._runData_.episodeName = episodeName
+                # else:
+                #     episodeName = self._runData_.episodeName
                   
+                self._runData_.currentProtocol = protocol
                 # see NOTE: 2024-02-16 08:28:43
                 episode = RecordingEpisode(name=episodeName, beginFrame = self._runData_.sweeps+1)
                 
+                episode = RecordingEpisode(name=self._runData_.episodeName,
+                                           protocol = self._runData_.currentProtocol,
+                                           sources = self._runData_.sources,
+                                           pathways = self._runData_.pathways,
+                                           beginFrame = self._runData_.sweeps+1,
+                                           # beginFrame=self._runData_.sweeps,
+                                           begin=abfRun.rec_datetime)
                 self._runData_.schedule.addEpisode(episode)
                 
             else: # same protocol → add data to currrent episode
@@ -1538,9 +1548,9 @@ class LTPOnline(QtCore.QObject):
                                  schedule = self._schedule_,
                                  pathways = self._pathways_,
                                  episodeName = self._currentEpisodeName_,
-                                 sweeps = 0,
                                  currentProtocol = None,
                                  currentEpisode = None,
+                                 sweeps = 0,
                                    # data = self._data_,
                                    # newEpisode = True,
                                    # episodes = dict(), # map episode name to data
