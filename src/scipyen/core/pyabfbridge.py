@@ -502,6 +502,10 @@ ABF = pyabf.ABF
 # This is 8 for DigiData 1550 series, and 4 for DigiData 1440 series
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
 
+class ABFInputConfiguration: pass
+
+class ABFOutputConfiguration: pass
+
 class ABFAcquisitionMode(datatypes.TypeEnum):
     """Corresponds to nOperationMode in ABF._protocolSection and annotations"""
     variable_length_event = 1
@@ -1590,10 +1594,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([e.usedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
-    def getClampMode(self, adcIndex:typing.Union[int, str] = 0,
-                  dacIndex:typing.Optional[typing.Union[int, str]] = None,
-                  physicalADC:bool=True,
-                  physicalDAC:bool=True) -> ClampMode:
+    def getClampMode(self, 
+                     adc:typing.Union[int, str, ABFInputConfiguration] = 0,
+                     dac:typing.Optional[typing.Union[int, str, ABFOutputConfiguration]] = None,
+                     physicalADC:bool=True,
+                     physicalDAC:bool=True) -> ClampMode:
         """Infers the clamping mode used in the experiemnt run with this protocol.
         
         The inferrence is based on the physical units of the input - output signal
@@ -1627,7 +1632,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             the adcIndex, respectively dacIndex are physical or logical indexes.
             Ignored when those indexes are given as strings (channel names).
         """
-        adc = self.getADC(adcIndex, physical=physicalADC) # get first (primary) input by default
+        if not isinstance(adc, ABFInputConfiguration):
+            adc = self.getADC(adc, physical=physicalADC) # get first (primary) input by default
         # adc = self.inputConfiguration(adcIndex, physical=physicalADC) # get first (primary) input by default
 
         if adc is None:
@@ -1636,7 +1642,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         recordsCurrent = scq.check_electrical_current_units(adc.units)
         recordsPotential = scq.check_electrical_potential_units(adc.units)
 
-        dac = self.getDAC(dacIndex, physicalDAC) # get active DAC by default
+        if not isinstance(dac, ABFOutputConfiguration):
+            dac = self.getDAC(dac, physicalDAC) # get active DAC by default
 
         commandIsCurrent = scq.check_electrical_current_units(dac.units)
 

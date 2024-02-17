@@ -699,6 +699,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # 
             # upon first run, self._runData_.protocol is None
             if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
+                self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
+               
                 self._runData_.currentProtocol = protocol
                 
                 
@@ -713,11 +715,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # self._runData_.schedule.addEpisode(episode)
                 self._runData_.currentEpisode = episode
                 
-                self.processProtocol(protocol, *self._runData_.pathways)
-                
-                self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-                
-                
+                self.processProtocol(protocol)
                 
             elif protocol != self._runData_.currentProtocol:
                 # a different protocol emdash — WARNING: signals a new episode:
@@ -1097,22 +1095,70 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             traceback.print_exc()
         
 
-    def processProtocol(self, protocol:pab.ABFProtocol, *pathways):
+    def processProtocol(self, protocol:pab.ABFProtocol):
         self.print(f"{self.__class__.__name__}.processProtocol {protocol.name}")
-        for pathway in pathways:
+        sourceDACs = [s.dac for s in self._runData_.sources]
+        for pathway in self._runData_.pathways:
             self.processPathway(pathway, protocol)
 
     def processPathway(self, pathway:SynapticPathway, protocol:pab.ABFProtocol):
+        # adc is a ABFInputConfiguration
         adc = protocol.inputConfiguration(pathway.adc)
+        
+        # dac is a ABFOutputConfiguration
         dac = protocol.outputConfiguration(pathway.dac)
-        pathway.clampMode = protocol.clampMode(adc, dac)
+        
+        pathway.clampMode = protocol.getClampMode(adc, dac)
         synStimEpochs = list()
         mbTestEpochs = list()
         # pathway.electrodeMode = ElectrodeMode.Field if pathway.clampMode == 
-        if isinstance(pathway.stimulus, SynapticStimulus) and pathway.stimulus.dig:
+        if isinstance(pathway.stimulus, SynapticStimulus):
+            
+            # Get the index of channel emitting digital command (TTL) train or pulse;
+            # this can be either:
+            # • a DIG channel → 
+            #   ∘ the train or pulse are set in an ABFEpoch configured for the 
+            #       DAC with index `pathway.dac` 
+            #   ∘ `pathway.stimulus.channel` is the index of the DIG out in the 
+            #       bit word of the ABFEpoch
+            #   ∘ when `pathway` shares the `dac` with another pathway, the two
+            #       distinct TTL commands are sent as "alternative" digital outputs
+            #       ⟹ 
+            #           ⋆ "alternateDigitalOutputStateEnabled" is True for this `dac`
+            #           ⋆ the protocol must define a even number of sweeps
+            #       
+            # • a DAC channel (TTL emulation) →
+            #   ∘ the TTL command is set in an ABFEpoch conigured for the DAC 
+            #       with index `pathway.stimulus.channel`
+            #
+            # We use the `pathway.stimulus.dig` boolean flag to distinguish the 
+            # two possibilities.
+            
+            # below, digDAC is a ABFOutputConfiguration; digNdx is the index of
+            # the true digital output channel, or None
+            if pathway.stimulus.dig:    
+                # protocol uses a true digital command
+                digDAC = protocol.outputConfiguration(pathway.dac) 
+                digNdx = pathway.stimulus.channel
+                
+                # since it is difficult to test here if this pathway shares the 
+                # dac with another one, we interrogate of the dac uses 
+                # alternative digital outputs
+                
+            else: 
+                # protocol emulates a digital command in a DAC
+                digDAC = protocol.outputConfiguration(pathway.stimulus.channel) 
+                digNdx = None
+                
+            # NOTE: 2024-02-17 09:27:41
+            # find out which DAC defines an epoch for the digital train or pulse;
+            # ideally, this is the dac specified in the pathway
+            
+            
+            
             # TODO: 2024-02-16 22:54:29
-            # simplify this gymnastics, given that the DIg channel should already
-            # be specified in the pathway.
+            # simplify this gymnastics, given that the DIG channel is already
+            # specified in the pathway.
             
             # Guess which DAC output has digital outputs enabled.
             #
@@ -1153,8 +1199,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if len(digdac.epochs) == 0:
                 raise ValueError("DAC with digital outputs has no epochs!")
             
-            digEpochsTable = digdac.epochsTable(0)
-            dacEpochsTable = dac.epochsTable(0)
+            digEpochsTable = digdac.getEpochsTable(0)
+            dacEpochsTable = dac.getEpochsTable(0)
             
             digEpochsTable_reduced = digEpochsTable.loc[[i for i in digEpochsTable.index if not i.startswith("Digital Pattern")], :]
             dacEpochsTable_reduced = dacEpochsTable.loc[[i for i in dacEpochsTable.index if not i.startswith("Digital Pattern")], :]
@@ -1181,7 +1227,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # different times on the alternate pathway is an unnecessary complication
                 # hence, HERE, this is is a HARD requirement (for now...)
                 #
-                digEpochsTableAlt = digdac.epochsTable(1)
+                digEpochsTableAlt = digdac.getEpochsTable(1)
                 digEpochsTableAlt_reduced = digEpochsTableAlt.loc[[i for i in digEpochsTableAlt.index if not i.startswith("Digital Pattern")], :]
                 assert(np.all(digEpochsTable_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels"
                 assert(np.all(digEpochsTableAlt_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels with alternate digital outputs"
@@ -1191,7 +1237,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # first try and find epochs with digital trains
             # there should be only one such epoch, sending at least one TTL pulse per train
             #
-            synStimEpochs = list(filter(lambda x: len(x.trainDigitalOutputChannels("all"))>0, digdac.epochs))
+            synStimEpochs = list(filter(lambda x: len(x.getTrainDigitalOutputChannels("all"))>0, digdac.epochs))
             
             # ideally there is only one such epoch
             if len(synStimEpochs) > 1:
@@ -1217,13 +1263,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # using pulses instead of trains for conditioning as well (e.g.
                 # low frequency stimulations)
                 #
-                synStimEpochs = list(filter(lambda x: len(x.pulseDigitalOutputChannels("all"))>0, digdac.epochs))
+                synStimEpochs = list(filter(lambda x: len(x.getPulseDigitalOutputChannels("all"))>0, digdac.epochs))
             
                 if len(synStimEpochs) == 0:
                     raise ValueError("There are no epochs sending digital triggers")
                 
             # store these for later
-            stimDIG = unique(synStimEpochs[0].usedDigitalOutputChannels("all"))
+            stimDIG = unique(synStimEpochs[0].getUsedDigitalOutputChannels("all"))
             assert pathway.stimulus.channel in stimDIG
         
 #         mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
@@ -1250,13 +1296,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             mbTestStart = None
             mbTestDuration = None
             signalBaselineStart = 0 * pq.s
-            signalBaselineDuration = dac.epochRelativeStartTime(synStimEpochs[0], 0)
+            signalBaselineDuration = dac.getEpochRelativeStartTime(synStimEpochs[0], 0)
             responseBaselineStart = signalBaselineStart
             responseBaselineDuration = signalBaselineDuration
         else:
             mbTestAmplitude = membraneTestEpoch.firstLevel
         
-            mbTestStart = dac.epochRelativeStartTime(membraneTestEpoch, 0)
+            mbTestStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
             mbTestDuration = membraneTestEpoch.firstDuration
             
     # TODO: 2024-02-16 23:03:34
@@ -1340,8 +1386,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         if len(digdac.epochs) == 0:
             raise ValueError("DAC with digital outputs has no epochs!")
         
-        digEpochsTable = digdac.epochsTable(0)
-        dacEpochsTable = dac.epochsTable(0)
+        digEpochsTable = digdac.getEpochsTable(0)
+        dacEpochsTable = dac.getEpochsTable(0)
         
         digEpochsTable_reduced = digEpochsTable.loc[[i for i in digEpochsTable.index if not i.startswith("Digital Pattern")], :]
         dacEpochsTable_reduced = dacEpochsTable.loc[[i for i in dacEpochsTable.index if not i.startswith("Digital Pattern")], :]
@@ -1368,7 +1414,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # different times on the alternate pathway is an unnecessary complication
             # hence, HERE, this is is a HARD requirement (for now...)
             #
-            digEpochsTableAlt = digdac.epochsTable(1)
+            digEpochsTableAlt = digdac.getEpochsTable(1)
             digEpochsTableAlt_reduced = digEpochsTableAlt.loc[[i for i in digEpochsTableAlt.index if not i.startswith("Digital Pattern")], :]
             assert(np.all(digEpochsTable_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels"
             assert(np.all(digEpochsTableAlt_reduced == dacEpochsTable_reduced)), "Epochs table mismatch between DAC channels with alternate digital outputs"
@@ -1379,7 +1425,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # there should be only one such epoch, sending at least one TTL pulse per train
         #
         
-        synStimEpochs = list(filter(lambda x: len(x.trainDigitalOutputChannels("all"))>0, 
+        synStimEpochs = list(filter(lambda x: len(x.getTrainDigitalOutputChannels("all"))>0, 
                                     digdac.epochs))
         
         # synStimEpochs = list(filter(lambda x: any(x.hasDigitalTrain(d) for d in stimDIG), 
@@ -1409,7 +1455,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # using pulses instead of trains for conditioning as well (e.g.
             # low frequency stimulations)
             #
-            synStimEpochs = list(filter(lambda x: len(x.pulseDigitalOutputChannels("all"))>0, 
+            synStimEpochs = list(filter(lambda x: len(x.getPulseDigitalOutputChannels("all"))>0, 
                                         digdac.epochs))
         
             # synStimEpochs = list(filter(lambda x: any(x.hasDigitalPulse(d) for d in stimDIG), 
@@ -1418,7 +1464,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 raise ValueError("There are no epoch sending digital triggers")
             
         # store these for later
-        stimDIG = unique(synStimEpochs[0].usedDigitalOutputChannels("all"))
+        stimDIG = unique(synStimEpochs[0].getUsedDigitalOutputChannels("all"))
             
         # We need:
         # start of membrane test
@@ -1453,13 +1499,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self._mbTestStart_ = None
             self._mbTestDuration_ = None
             self._signalBaselineStart_ = 0 * pq.s
-            self._signalBaselineDuration_ = dac.epochRelativeStartTime(synStimEpochs[0], 0)
+            self._signalBaselineDuration_ = dac.getEpochRelativeStartTime(synStimEpochs[0], 0)
             self._responseBaselineStart_ = self._signalBaselineStart_
             self._responseBaselineDuration_ = self._signalBaselineDuration_
         else:
             self._mbTestAmplitude_ = self._membraneTestEpoch_.firstLevel
         
-            self._mbTestStart_ = dac.epochRelativeStartTime(self._membraneTestEpoch_, 0)
+            self._mbTestStart_ = dac.getEpochRelativeStartTime(self._membraneTestEpoch_, 0)
             self._mbTestDuration_ = self._membraneTestEpoch_.firstDuration
         
             # NOTE: 2024-02-16 23:04:22
@@ -1476,7 +1522,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #
             # 1) parse the protocol for epochs
             #
-            if dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) + self._membraneTestEpoch_.firstDuration < digdac.epochRelativeStartTime(synStimEpochs[0], 0):
+            if dac.getEpochRelativeStartTime(self._membraneTestEpoch_, 0) + self._membraneTestEpoch_.firstDuration < digdac.getEpochRelativeStartTime(synStimEpochs[0], 0):
                 # membrane test is delivered completely sometime BEFORE triggers
                 #
                 
@@ -1485,22 +1531,22 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # after the holding time; odd, but allowed...)
                         
                     self._signalBaselineStart_ = 0 * pq.s
-                    self._signalBaselineDuration_ = dac.epochRelativeStartTime(self._membraneTestEpoch_, 0)
+                    self._signalBaselineDuration_ = dac.getEpochRelativeStartTime(self._membraneTestEpoch_, 0)
                     
                 else:
                     # are there any epochs definded BEFORE mb test?
-                    initialEpochs = list(filter(lambda x: dac.epochRelativeStartTime(x, 0) + x.firstDuration <=  dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) \
+                    initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  dac.getEpochRelativeStartTime(self._membraneTestEpoch_, 0) \
                                                         and x.firstDuration > 0 and x.deltaDuration == 0, 
                                                     dac.epochs))
                     
                     if len(initialEpochs):
                         baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
                         if len(baselineEpochs):
-                            self._signalBaselineStart_ = dac.epochRelativeStartTime(baselineEpochs[0], 0)
+                            self._signalBaselineStart_ = dac.getEpochRelativeStartTime(baselineEpochs[0], 0)
                             self._signalBaselineDuration_ = baselineEpochs[0].firstDuration
                         else:
                             self._signalBaselineStart_ = 0 * pq.s
-                            self._signalBaselineDuration_ = dac.epochRelativeStartTime(initialEpochs[0], 0)
+                            self._signalBaselineDuration_ = dac.getEpochRelativeStartTime(initialEpochs[0], 0)
                             
                     else:
                         # no epochs before the membrane test (odd, but can be allowed...)
@@ -1523,20 +1569,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 #
                 
                 responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._responseBaselineDuration_ \
-                                                            and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
-                                                            and dac.epochRelativeStartTime(x, 0) + x.firstDuration <= digdac.epochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
+                                                            and dac.getEpochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
+                                                            and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= digdac.getEpochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
                                                     dac.epochs))
                 
                 if len(responseBaselineEpochs):
                     # take the last one
-                    self._responseBaselineStart_ = dac.epochRelativeStartTime(responseBaselineEpochs[-1], 0)
+                    self._responseBaselineStart_ = dac.getEpochRelativeStartTime(responseBaselineEpochs[-1], 0)
                 
                 else:
-                    self._responseBaselineStart_ = digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
+                    self._responseBaselineStart_ = digdac.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
                     
                 
                     
-            elif dac.epochRelativeStartTime(self._membraneTestEpoch_, 0) > digdac.epochRelativeStartTime(synStimEpochs[-1], 0) + synStimEpochs[-1].firstDuration:
+            elif dac.getEpochRelativeStartTime(self._membraneTestEpoch_, 0) > digdac.getEpochRelativeStartTime(synStimEpochs[-1], 0) + synStimEpochs[-1].firstDuration:
                 # membrane test delivered somwehere towards the end of the sweep, 
                 # surely AFTER the triggers (and hopefully when the synaptic responses
                 # have decayed...)
@@ -1544,7 +1590,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # in this case, best is to use the first epoch before the synStimEpochs (if any)
                 # or the dac holding
                 #
-                initialEpochs = list(filter(lambda x: dac.epochRelativeStartTime(x, 0) + x.firstDuration <=  digdac.epochRelativeStartTime(synStimEpochs[0], 0) \
+                initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  digdac.getEpochRelativeStartTime(synStimEpochs[0], 0) \
                                                     and x.firstDuration > 0 and x.deltaDuration == 0, 
                                                 dac.epochs))
                 
@@ -1552,35 +1598,35 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # there are epochs before synStimEpochs - are any of these baseline-like?
                     baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
                     if len(baselineEpochs):
-                        self._signalBaselineStart_ = dac.epochRelativeStartTime(baselineEpochs[0], 0)
+                        self._signalBaselineStart_ = dac.getEpochRelativeStartTime(baselineEpochs[0], 0)
                         self._signalBaselineDuration_ = baselineEpochs[0].firstDuration
                     else:
                         self._signalBaselineStart_ = 0 * pq.s
-                        self._signalBaselineDuration_ = dac.epochRelativeStartTime(initialEpochs[0], 0)
+                        self._signalBaselineDuration_ = dac.getEpochRelativeStartTime(initialEpochs[0], 0)
                         
                 else:
                     # no epochs before the membrane test (odd, but can be allowed...)
-                    self._signalBaselineStart_ = max(digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
+                    self._signalBaselineStart_ = max(digdac.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
                     self._signalBaselineDuration_ = max(dac.holdingTime, synStimEpochs[0].firstDuration)
             
                 # Now, determine the response baseline for this scenario.
                 responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._responseBaselineDuration_ \
-                                                            and dac.epochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
-                                                            and dac.epochRelativeStartTime(x, 0) + x.firstDuration <= digdac.epochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
+                                                            and dac.getEpochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
+                                                            and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= digdac.getEpochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
                                                     dac.epochs))
                 
                 if len(responseBaselineEpochs):
                     # take the last one
-                    self._responseBaselineStart_ = dac.epochRelativeStartTime(responseBaselineEpochs[-1], 0)
+                    self._responseBaselineStart_ = dac.getEpochRelativeStartTime(responseBaselineEpochs[-1], 0)
                 
                 else:
-                    self._responseBaselineStart_ = digdac.epochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
+                    self._responseBaselineStart_ = digdac.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._responseBaselineDuration_
         #
         # 2) create trigger events
         #
         for path in range(protocol.nSweeps):
             pndx = f"path{path}"
-            pathEpochs = sorted(synStimEpochs, key = lambda x: dac.epochRelativeStartTime(x, path))
+            pathEpochs = sorted(synStimEpochs, key = lambda x: dac.getEpochRelativeStartTime(x, path))
             trig = dac.triggerEvents(pathEpochs[0], path) # will add sweep start time here
             if len(pathEpochs) > 1:
                 for e in pathEpochs[1:]:
@@ -1636,9 +1682,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # the adc signal (searching for the first capacitance transient)
             # also, NOTE that we only need Rbase, Rs, and Rin for the pathway 0
             #
-            self._landmarks_["Rs"] = [dac.epochRelativeStartTime(self._membraneTestEpoch_), 
+            self._landmarks_["Rs"] = [dac.getEpochRelativeStartTime(self._membraneTestEpoch_), 
                                       self._responseBaselineDuration_]
-            self._landmarks_["Rin"] = [dac.epochRelativeStartTime(self._membraneTestEpoch_) + self._membraneTestEpoch_.firstDuration - 2 * self._responseBaselineDuration_,
+            self._landmarks_["Rin"] = [dac.getEpochRelativeStartTime(self._membraneTestEpoch_) + self._membraneTestEpoch_.firstDuration - 2 * self._responseBaselineDuration_,
                                        self._responseBaselineDuration_]
             self._landmarks_["PSCBase"] = [self._responseBaselineStart_, self._responseBaselineDuration_]
             self._landmarks_["PSC0Peak"] = [self._presynaptic_triggers_["path0"].times[0] - protocol.sweepTime(0) + 15 * pq.ms,
@@ -1653,7 +1699,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # steadystate duration - default is 50 ms
             self._landmarks_["Base"] = [self._signalBaselineStart_,self._signalBaselineDuration_]
             if self._membraneTestEpoch_ is not None:
-                self._landmarks_["VmTest"] = [dac.epochRelativeStartTime(self._membraneTestEpoch_),
+                self._landmarks_["VmTest"] = [dac.getEpochRelativeStartTime(self._membraneTestEpoch_),
                                             self._membraneTestEpoch_.firstDuration]
             
 class LTPOnline(QtCore.QObject):
@@ -1932,6 +1978,18 @@ class LTPOnline(QtCore.QObject):
             super().__del__()
             
     def _check_sources_(self, *args):
+        """Verifies consistency of recording sources:
+        Requirements are either hard (•) or soft (∘); unmet soft requirements
+        will cause adjustments to be made to the sources; unmed hard requirements
+        will raise exceptions
+        Distinct sources require:
+        • distinct ADC
+        • distinct DAC
+        • distinct SynapticStimulus configurations
+        ∘ distinct name
+        ∘ when several sources have SynapticStimulus configured, these SynapticStimulus
+            must have distinct names across all the sources
+        """
         # print(f"{self.__class__.__name__}._check_sources_: args = {args}")
         if len(args) == 0:
             raise ValueError("I must have at least one RecordingSource defined")
