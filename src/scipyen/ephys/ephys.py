@@ -676,17 +676,17 @@ class RecordingSource(__BaseSource__):
     
         """
         if isinstance(self.syn, SynapticStimulus):
-            return SynapticPathway(stimulus = self.syn, adc = self.adc, dac = self.dac,
+            return SynapticPathway(source = self, stimulus = self.syn,
                                    name = " ".join([self.name, self.syn.name]),
                                    )
             
         if isinstance(self.syn, (tuple, list)):
             if len(self.syn) == 1:
-                return SynapticPathway(stimulus = self.syn[0], adc = self.adc, dac = self.dac,
+                return SynapticPathway(source=self, stimulus = self.syn[0],
                                        name = " ".join([self.name, self.syn[0].name]),
                                        )
             elif len(self.syn) > 1:
-                return tuple(SynapticPathway(stimulus = s, adc = self.adc, dac = self.dac,
+                return tuple(SynapticPathway(source=self, stimulus = s,
                                              name = " ".join([self.name, s.name])) for s in self.syn)
         
     @property
@@ -1313,9 +1313,8 @@ class SynapticPathway:
     
     """
     pathwayType: SynapticPathwayType = SynapticPathwayType.Null
-    stimulus: typing.Optional[SynapticStimulus] = None
-    adc: typing.Optional[int] = None
-    dac: typing.Optional[int] = None
+    source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    stimulus: SynapticStimulus = field(default_factory = lambda: SynapticStimulus())
     electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
     clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
     schedule: typing.Optional[RecordingSchedule] = None

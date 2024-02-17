@@ -4,6 +4,7 @@
 import os, sys, traceback, inspect, numbers, warnings, pathlib, time, io
 import datetime
 import functools, itertools
+from functools import (singledispatch, singledispatchmethod)
 import collections, enum
 import typing, types
 import dataclasses
@@ -106,7 +107,7 @@ import iolib.pictio as pio
 #### END pict.iolib modules
 
 import ephys.ephys as ephys
-from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, 
+from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, ElectrophysiologyProtocol,
                          RecordingSource, RecordingEpisode, RecordingEpisodeType,
                          RecordingSchedule,
                          SynapticStimulus, SynapticPathway, AuxiliaryInput, AuxiliaryOutput,
@@ -384,7 +385,8 @@ class _LTPFilesSimulator_(QtCore.QThread):
             if self.isInterruptionRequested():
                 self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
                 break
-            QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
+            if k < (len(self._simulationFiles_)-1):
+                QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             
         # if not self._paused_:
         if k < (len(self._simulationFiles_) - 1):
@@ -680,9 +682,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             deltaMinutes = (abfRun.rec_datetime - self._runData_.abfRunTimesMinutes[0]).seconds/60
             self._runData_.abfRunDeltaTimesMinutes.append(deltaMinutes)
             
-            # NOTE: 2023-12-29 14:59:01
-            # get the ADC channels from the signals in abfRun
-            
             protocol = pab.ABFProtocol(abfRun)
 
             # check that the number of sweeps actually stored in the ABF file/neo.Block
@@ -703,7 +702,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                
                 self._runData_.currentProtocol = protocol
                 
-                
+                # TODO: 2024-02-17 22:58:32 see ### TODO: 2024-02-17 22:56:15 ###
                 episode = RecordingEpisode(name=self._runData_.episodeName, 
                                            protocol = self._runData_.currentProtocol,
                                            sources = self._runData_.sources,
@@ -734,8 +733,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 #     episodeName = self._runData_.episodeName
                   
                 self._runData_.currentProtocol = protocol
-                # see NOTE: 2024-02-16 08:28:43
-                episode = RecordingEpisode(name=episodeName, beginFrame = self._runData_.sweeps+1)
                 
                 episode = RecordingEpisode(name=self._runData_.episodeName,
                                            protocol = self._runData_.currentProtocol,
@@ -744,6 +741,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                            beginFrame = self._runData_.sweeps+1,
                                            # beginFrame=self._runData_.sweeps,
                                            begin=abfRun.rec_datetime)
+                
                 self._runData_.schedule.addEpisode(episode)
                 
             else: # same protocol → add data to currrent episode
@@ -754,7 +752,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             self._runData_.sweeps += 1
             
-            self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
+            # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
 
             # NOTE: 2023-09-29 14:12:56
             # we need:
@@ -1093,22 +1091,213 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
         except:
             traceback.print_exc()
+    
+    @singledispatchmethod
+    def processProtocol(self, protocol):
+        # TODO: 2024-02-17 15:44:56
+        # support for CEDProtocol (class not yet written)
+        # generic ephys protocol support (in the distant future, when using NI DAQ devices)
+        if not isinstance(protocol, ElectrophysiologyProtocol):
+            raise TypeError(f"Expecting an ElectrophysiologyProtocol; instead, got a {type(protocol).__name__}")
         
-
-    def processProtocol(self, protocol:pab.ABFProtocol):
+        raise NotImplementedError(f"{type(protocol).__name__} protocols are not yet supported")
+        
+    @processProtocol.register(pab.ABFProtocol)
+    def _(self, protocol:pab.ABFProtocol):
         self.print(f"{self.__class__.__name__}.processProtocol {protocol.name}")
-        sourceDACs = [s.dac for s in self._runData_.sources]
-        for pathway in self._runData_.pathways:
-            self.processPathway(pathway, protocol)
+        # sourceDACs = [s.dac for s in self._runData_.sources]
+        # group pathways by their sources
+        # 
+        # NOTE: 2024-02-17 13:46:53
+        # this uses quite a few function calls; might be cheaper/faster to use 
+        # @ NOTE: 2024-02-17 13:47:29, as sources ARE supplied by _runData_
+        # sources = unique([p.source for p in self._runData_.pathways])
+        # pathways = [[p for p in self._runData_.pathways if p.source == s] for s in sources]
+        
+        
+        # NOTE: 2024-02-17 14:14:17
+        # Clampex supports stimulation of up to TWO distinct synaptic pathways
+        # (i.e. via axonal inputs) for one recording source (cell or field),
+        # using the 'alternative digital outputs' mechanism. 
+        # The run should have an even number of sweeps — ideally, just two,
+        # and a trial MAY consist of several runs (thus, the ABF file will 
+        # store the sweep-by-sweep AVERAGE signals, here resulting in a neo.Block
+        # with the same number of sweeps per run).
+        #
+        # (this is clearly less flexible than CED's Signal software)
+        #
+        # Of course, one can configure an odd number of sweeps (e.g., 3) per
+        # run, but in this case, the last sweep will be a supplementary record
+        # of the "main" pathway (i.e., the first of the two stimulated pathways)
+        # whereas the second pathway would end up with fewer stimulations...
+        #
+        # NOTE: 2024-02-17 13:51:25
+        # if there are more than one pathway associated with this source, 
+        # the following SOFT requirements should be met:
+        #
+        # 1 alternative digital outputs enabled, to allow temporal (sweep-wise)
+        #   separation of pathway responses: responses in both pathways are 
+        #   recorded through the same electrode; therefore, stimulating them 
+        #   in alternate sweeps is the only practical solution to distinguish
+        #   them)
+        #
+        #   NOTE: this applies to tracking (or monitoring) protocols; in contrast,
+        #   conditioning protocols, by definition, affect only a single pathway 
+        #   (otherwise there would be no justification for recording from a 
+        #   second pathway).
+        #
+        #   Technically, conditioning may also affect supplemetary pathways (e.g.
+        #   a "weak" associative or cooperative pathway) but these are not 
+        #   typically being monitored for plasticity; if they were, this would
+        #   would not be possible with a single Clampex protocol.
+        #
+        #   To develop this idea: in Clampex, one would have to configure
+        #   distinct protocols to record any one of, say, three pathways; 
+        #   these protocols would then be interleaved in a sequence, such that
+        #   the three pathways would be recorded separately in the same order,
+        #   over and over again; furthermore, this would preclude any "auto-averaging" 
+        #   (i.e., each of these protocols would consist of one run per trial, 
+        #   ideally with one sweep per run, dedicated entirely to the pathway concerned)
+        #   and the protocol should have alternateDigitalOutputStateEnabled False.
+        #
+        #   ### TODO: 2024-02-17 22:56:15
+        #   To accommodate this, we must avoid setting up a new episode when the 
+        #   ABF protocol has changed (see processAbfFile(…)); instead a new episode
+        #   must be initiated manually through the LTPOnline API; also augment
+        #   the API to configure averaging !
+        #   ###
+        #
+        #
+        # 2 protocol should have an even number of sweeps per run ⇒ even number
+        #   of sweeps per trial recorded in the ABF file ⟹
+        #   ⋆ main path (path 0) on even-numbered sweeps (0, 2, etc)
+        #   ⋆ alternate path (path 1) on odd-numbered sweeps (1, 3, etc)
+        #
+        #   NOTE: an odd number of sweeps implies that the last sweep carries 
+        #   data for the main path (path 0)
+        #
+        #   e.g. for three sweeps per run, sweeeps 0 and 2 carry path 0, whereas
+        #   sweep 1 carries path 1
+        #
+        # 3 alternative waveforms DISABLED to allow the membrane test to be
+        #   be performed (via DAC command signal) in every sweep; if this WAS
+        #   enabled, then analog commands would be send via the DAC channel 
+        #   where the alternative digital stimulation pattern is defined;
+        #   since this DAC is NOT connected to the recording electrode for this
+        #   source, any analog commands emitted by this DAC would end up elsewhere
+        #
+        #   (REMEMBER: One DAC channel per electrode ≡ 1 DAC channel per recording source)
+        #
+        #       — this is a direct consequence of the uninspired way in 
+        #       which Clampex configures digital outputs in their protocol 
+        #       editor GUI: in reality the DIG outputs are NEVER sent through 
+        #       a DAC so they should have created a separate dialog outside 
+        #       the WAVEFORM tabs
+        #
+        # The above prerequisites also have the consequencess below, regarding 
+        #   the use of "supplementary" DACs (with higher index):
+        # • if a supplementary DAC also defines epochs wih DIG enabled, these
+        #   will be included in the alternative DIG pattern (inluding any
+        #   additional DIG output channels) — this is NOT what you may intend.
+        #
+        #   the only possible advantage I can see is triggering a 3ʳᵈ party 
+        #   device e.g. photoactivation/uncaging; the DISadvantage is that ALL
+        #   extra DIG outputs will be subject to the same pattern...
+        #
+        # • if a supplementary DAC defines epochs for analog command waveforms,
+        #   this DAC should have an index higher than all DACs used to deliver 
+        #   amplifier commands (i.e., ≥ 2); this DAC can only be used to send 
+        #   TTL-emulating waveforms to 3ʳᵈ party devices
+        #
+        #   In such cases, alternative waveforms should be ENABLED, waveform
+        #   output in the "alternative" DAC should be DISABLED, and waveform
+        #   output in the supplementary (higher index) DAC should be ENABLED. 
+        #   This situation will result in:
+        #   ∘ a membrane test (for the clamped recorded source) being 
+        #   applied ONLY during the "main" pathway stimulation (which is fine,
+        #   since one may argue that the "alternative" pathway records from
+        #   the same source or cell anyway, so applying a membrane test there
+        #   is redundant)
+        #   ∘ create room for configuring emulated TTLs in the supplementary
+        #       DAC (with higher index) to trigger a 3ʳᵈ party device ONLY
+        #       during the "alternative" pathway stimulation
+        
+        # for src in sources:
+        # NOTE: 2024-02-17 13:47:29
+        # sources are supplied by _runData_, so save a few function calls
+        
+        for src in self._runData_.sources:
+            # TODO: 2024-02-17 23:13:20 FIXME
+            # below pathways are identified by the DIG channel used to stimulate;
+            # must adapt code to identify paths where stimulus is delivered via
+            # a DAC through emulated TTLs !!!
+            # NOTE: 2024-02-17 22:36:56 REMEMBER !:
+            # in a tracking protocol, distinct pathway in the same recording 
+            # source have the same clamp mode!
+            pathways = [p for p in self._runData_.pathways if p.source == src]
+            
+            if len(pathways) == 0:
+                continue
+            
+            # if len(pathways) > 2:
+            #     raise RuntimeError(f"ABF Protocols do not support monitoring more than two pathways for the same source")
+            
+            # NOTE: 2024-02-17 16:37:26
+            # this should be configured in the protocol, in any case
+            # as noted above, a DIG output MAY be also used to trigger 3ʳᵈ party device
+            mainDIGOut = protocol.digitalOutputs(alternate=False)
+            
+            # as noted above, additional DIG outputs MAY be used to trigger 3ʳᵈ party device
+            # furthermore, this is an empty set when the protocol does not enable
+            # alternate digital outputs
+            altDIGOut = protocol.digitalOutputs(alternate=True)
+            
+            
+            
+            if len(pathways) > 1:
+                if len(pathways) == 2 and protocol.alternateDigitalOutputStateEnabled:
+                    # protocol handles two pathways
+                    
+                    # figure out which is the "main" and which is the "alternate" pathway
+                    # True is the main, False is the alternate; most typical would be
+                    # [True, False] here
+                    pathsLayout = [p.stimulus.channel in mainDIGOut and p.stimulus.channel not in altDIGOut for p in pathways]
+                    
+                    # map sweep index in the protocol to pathway data; first element
+                    # is main path (path 0), second is the alternate path (path 1);
+                    # (adapts automatically to requirement 2∘)
+                    pathwaySegments = [range(0, protocol.nSweeps, 2), range(1, protocol.nSweeps, 2)]
+                    
+                else:
+                    # protocol handles just one pathway of however many
+                    pathsLayout = [p.stimulus.channel in mainDIGOut for p in pathways]
+                    pathwaySegments = [range(protocol.nSweeps) if pathsLayout[k] else None for k in range(len(pathways))]
+                    
+                        
+            else: 
+                # unique pathway is also the main pathway
+                pathsLayout = [True] 
+                # all sweeps in the trial record from the same (unique, main) path
+                pathwaySegments = [range(protocol.nSweeps)]
+                
+            adc = protocol.getADC(src.adc)
+            dac = protocol.getDAC(src.dac)
+            
+            for pathway in pathways:
+                pathway.clampMode = protocol.getClampMode(adc, dac)
+                
+                self.processPathway(pathway, protocol)
 
     def processPathway(self, pathway:SynapticPathway, protocol:pab.ABFProtocol):
+        return # for now...
         # adc is a ABFInputConfiguration
-        adc = protocol.inputConfiguration(pathway.adc)
+        # adc = protocol.inputConfiguration(pathway.source.adc)
         
         # dac is a ABFOutputConfiguration
-        dac = protocol.outputConfiguration(pathway.dac)
+#         dac = protocol.outputConfiguration(pathway.source.dac)
+#         
+#         pathway.clampMode = protocol.getClampMode(adc, dac)
         
-        pathway.clampMode = protocol.getClampMode(adc, dac)
         synStimEpochs = list()
         mbTestEpochs = list()
         # pathway.electrodeMode = ElectrodeMode.Field if pathway.clampMode == 
@@ -1138,7 +1327,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # the true digital output channel, or None
             if pathway.stimulus.dig:    
                 # protocol uses a true digital command
-                digDAC = protocol.outputConfiguration(pathway.dac) 
+                digDAC = protocol.outputConfiguration(pathway.source.dac) 
                 digNdx = pathway.stimulus.channel
                 
                 # since it is difficult to test here if this pathway shares the 
@@ -2123,7 +2312,7 @@ class LTPOnline(QtCore.QObject):
             raise ValueError(f"The following DIGs {ovlap} seem to be used both for synaptic stimulation and triggering 3ʳᵈ party devices")
         
         # 6. in each RecordingSource, the SynapticStimulus objects must have unique names 
-        # (but OK to share across sources)
+        # and channels, but OK to share across sources
         
         for k, s in enumerate(args):
             if isinstance(s.syn, typing.Sequence):

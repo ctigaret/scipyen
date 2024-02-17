@@ -1592,7 +1592,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         """
         
-        return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([e.usedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
+        return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
     def getClampMode(self, 
                      adc:typing.Union[int, str, ABFInputConfiguration] = 0,
@@ -2146,7 +2146,7 @@ class ABFOutputConfiguration:
         
         self._init_epochs_(obj)
         
-        # self._digitalOutputs_ = set(itertools.chain.from_iterable([e.usedDigitalOutputChannels() for e in self.epochs]))
+        # self._digitalOutputs_ = set(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels() for e in self.epochs]))
         
     def _init_epochs_(self, obj):
         if isinstance(obj, pyabf.ABF):
@@ -3495,7 +3495,7 @@ class ABFOutputConfiguration:
     # @property
     def getDigitalOutputs(self, alternate:typing.Optional[bool]=None,
                        trains:typing.Optional[bool]=None) -> set:
-        return set(itertools.chain.from_iterable([e.usedDigitalOutputChannels(alternate, trains) for e in self.epochs]))
+        return set(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate, trains) for e in self.epochs]))
         
         # return self._digitalOutputs_
     
