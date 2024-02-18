@@ -703,16 +703,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.currentProtocol = protocol
                 
                 # TODO: 2024-02-17 22:58:32 see ### TODO: 2024-02-17 22:56:15 ###
-                episode = RecordingEpisode(name=self._runData_.episodeName, 
-                                           protocol = self._runData_.currentProtocol,
-                                           sources = self._runData_.sources,
-                                           pathways = self._runData_.pathways,
-                                           beginFrame = 0,
-                                           # beginFrame=self._runData_.sweeps,
-                                           begin=abfRun.rec_datetime)
+                # episode = RecordingEpisode(name=self._runData_.episodeName, 
+                #                            protocol = self._runData_.currentProtocol,
+                #                            sources = self._runData_.sources,
+                #                            pathways = self._runData_.pathways,
+                #                            beginFrame = 0,
+                #                            # beginFrame=self._runData_.sweeps,
+                #                            begin=abfRun.rec_datetime)
                 
                 # self._runData_.schedule.addEpisode(episode)
-                self._runData_.currentEpisode = episode
+                # self._runData_.currentEpisode = episode
                 
                 self.processProtocol(protocol)
                 
@@ -723,12 +723,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # 1. finish off current episode with the previously loaded ABF file
                 # NOTE: 2024-02-16 08:28:43
                 # self._runData_.sweeps hasn't been incremented yet
-                self._runData_.currentEpisode.end = self._runData_.abfRunTimesMinutes[-1]
-                self._runData_.currentEpisode.endFrame = self._runData_.sweeps
-                episodeNames = [e.name for e in self._runData_.schedule.episodes]
-                if self._runData_.episodeName in episodeNames:
-                    episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
-                    self._runData_.episodeName = episodeName
+                # self._runData_.currentEpisode.end = self._runData_.abfRunTimesMinutes[-1]
+                # self._runData_.currentEpisode.endFrame = self._runData_.sweeps
+                # episodeNames = [e.name for e in self._runData_.schedule.episodes]
+                # if self._runData_.episodeName in episodeNames:
+                #     episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
+                #     self._runData_.episodeName = episodeName
                 # else:
                 #     episodeName = self._runData_.episodeName
                   
@@ -1227,10 +1227,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # sources are supplied by _runData_, so save a few function calls
         
         for src in self._runData_.sources:
-            # TODO: 2024-02-17 23:13:20 FIXME
+            # TODO: 2024-02-17 23:13:20
             # below pathways are identified by the DIG channel used to stimulate;
             # must adapt code to identify paths where stimulus is delivered via
             # a DAC through emulated TTLs !!!
+            # But for now, see NOTE: 2024-02-18 08:58:24
+            
             # NOTE: 2024-02-17 22:36:56 REMEMBER !:
             # in a tracking protocol, distinct pathway in the same recording 
             # source have the same clamp mode!
@@ -1239,8 +1241,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if len(pathways) == 0:
                 continue
             
-            # if len(pathways) > 2:
-            #     raise RuntimeError(f"ABF Protocols do not support monitoring more than two pathways for the same source")
+            # NOTE: 2024-02-18 08:58:24
+            # For now, we only support synaptic stimuli sent out through DIG 
+            # channels.
+            
+            if not all(p.stimulus.dig for p in pathways):
+                raise ValueError("All synaptic stimulations must use DIG channels")
             
             # NOTE: 2024-02-17 16:37:26
             # this should be configured in the protocol, in any case
@@ -1249,12 +1255,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             # as noted above, additional DIG outputs MAY be used to trigger 3ʳᵈ party device
             # furthermore, this is an empty set when the protocol does not enable
-            # alternate digital outputs
+            # alternate digital outputs; 
+            #
+            # this is an empty set when alternateDigitalOutputStateEnabled is False
             altDIGOut = protocol.digitalOutputs(alternate=True)
             
-            
-            
             if len(pathways) > 1:
+                if len(pathways) > 2 and protocol.nSweeps > 1:
+                    raise RuntimeError(f"In experiments with more than two pathways, the ABF protocol must record one sweep at a time")
+                
                 if len(pathways) == 2 and protocol.alternateDigitalOutputStateEnabled:
                     # protocol handles two pathways
                     
@@ -1283,10 +1292,17 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             adc = protocol.getADC(src.adc)
             dac = protocol.getDAC(src.dac)
             
+            clampMode = protocol.getClampMode(adc, dac)
+            
             for pathway in pathways:
-                pathway.clampMode = protocol.getClampMode(adc, dac)
+                pathway.clampMode = clampMode
                 
-                self.processPathway(pathway, protocol)
+            # now, find out relevant epochs and triggers
+            
+#             for pathway, segmentRange in zip(pathways, pathwaySegments):
+#                 pathway.clampMode = clampMode
+#                 
+#                 self.processPathway(pathway, protocol, segmentRange)
 
     def processPathway(self, pathway:SynapticPathway, protocol:pab.ABFProtocol):
         return # for now...
@@ -1942,7 +1958,7 @@ class LTPOnline(QtCore.QObject):
         self._running_ = False
         self._sources_ = None # preallocate
         
-        self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
+        # self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
         
         # self._currentEpisode_ = RecordingEpisode(name=self._currentEpisodeName_)
         # self._schedule_ = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
@@ -1950,7 +1966,6 @@ class LTPOnline(QtCore.QObject):
         # self._schedule_.addEpisode(self._currentEpisode_)
         
         self._sources_ = self._check_sources_(*args)
-        
         # NOTE: 2024-02-16 10:56:58
         # having enforced sources with unique names and physical ADC indexes
         # above, the synaptic pathways generated below should be unique
@@ -1959,19 +1974,24 @@ class LTPOnline(QtCore.QObject):
         # distinct
         self._pathways_ = list(itertools.chain.from_iterable([s.pathways for s in self._sources_]))
         
+        episode = RecordingEpisode(name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
+                                    # protocol = self._runData_.currentProtocol,
+                                    sources = self._sources_,
+                                    pathways = self._pathways_,
+                                    beginFrame = 0)
+                                    # beginFrame=self._runData_.sweeps,
+                                    # begin=abfRun.rec_datetime)
+        
+        
         for pathway in self._pathways_:
             pathway.schedule = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
+            pathway.schedule.addEpisode(episode)
         
-        # self._setup_data_()
-        # self._results_ = dict() 
-        
-        # self._runData_ = Bunch(sources = self._sources_,
         self._runData_ = DataBag(sources = self._sources_,
-                                 # schedule = self._schedule_,
                                  pathways = self._pathways_,
-                                 episodeName = self._currentEpisodeName_,
+                                 # episodeName = self._currentEpisodeName_,
                                  currentProtocol = None,
-                                 currentEpisode = None,
+                                 currentEpisode = episode,
                                  sweeps = 0,
                                    # data = self._data_,
                                    # newEpisode = True,
@@ -2339,8 +2359,23 @@ class LTPOnline(QtCore.QObject):
         self.stop()
         
     @property
-    def running(self):
+    def running(self) -> bool:
         return self._running_
+    
+    @property
+    def episode(self) -> str:
+        return self._runData_.currentEpisode
+    
+    @episode.setter
+    def episode(self, val:str):
+        if not isinstance(val, str) or len(val.strip()) == 0:
+            return
+        
+        names = unique(list(itertools.chain.from_iterable([[e.name for e in p.schedule.episodes] for p in pathways])))
+
+        episodeName = counter_suffix(val, names)
+        
+        
 
     # @property
     # def data(self) -> dict:
