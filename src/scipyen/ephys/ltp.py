@@ -682,81 +682,85 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             deltaMinutes = (abfRun.rec_datetime - self._runData_.abfRunTimesMinutes[0]).seconds/60
             self._runData_.abfRunDeltaTimesMinutes.append(deltaMinutes)
             
-            protocol = pab.ABFProtocol(abfRun)
-            if protocol.operationMode != pab.ABFAcquisitionMode.episodic_stimulation:
-                raise ValueError(f"Files must be recorded in episodic mode")
+            if isinstance(self._runData_.locationMeasures, (list, tuple)) and all(isinstance(l, LocationMeasure) for l in self._runData_.locationMaeasures):
+                # TODO: 2024-02-18 23:28:45 URGENTLY
+                # use location emasures to measure on pathways' ADC
+                pass
+            else:
+                protocol = pab.ABFProtocol(abfRun)
+                if protocol.operationMode != pab.ABFAcquisitionMode.episodic_stimulation:
+                    raise ValueError(f"Files must be recorded in episodic mode")
 
-            # check that the number of sweeps actually stored in the ABF file/neo.Block
-            # equals that advertised by the protocol
-            # NOTE: mismatches can happen when trials are acquired very fast (i.e.
-            # back to back) - in this case check the sequencing key in Clampex
-            # and set an appropriate interval between successive trials !
-            assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
+                # check that the number of sweeps actually stored in the ABF file/neo.Block
+                # equals that advertised by the protocol
+                # NOTE: mismatches can happen when trials are acquired very fast (i.e.
+                # back to back) - in this case check the sequencing key in Clampex
+                # and set an appropriate interval between successive trials !
+                assert(protocol.nSweeps) == len(abfRun.segments), f"In {abfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(abfRun.segments)}); check the sequencing key?"
 
-            # self.print(self._runData_.sources)
-            
-            # check that the protocol in the ABF file is the same as the current one
-            # else create a new episode automatically
-            # 
-            # upon first run, self._runData_.protocol is None
-            if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
-                self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-               
-                self._runData_.currentProtocol = protocol
+                # self.print(self._runData_.sources)
                 
-                # TODO: 2024-02-17 22:58:32 see ### TODO: 2024-02-17 22:56:15 ###
-                # episode = RecordingEpisode(name=self._runData_.episodeName, 
-                #                            protocol = self._runData_.currentProtocol,
-                #                            sources = self._runData_.sources,
-                #                            pathways = self._runData_.pathways,
-                #                            beginFrame = 0,
-                #                            # beginFrame=self._runData_.sweeps,
-                #                            begin=abfRun.rec_datetime)
+                # check that the protocol in the ABF file is the same as the current one
+                # else create a new episode automatically
+                # 
+                # upon first run, self._runData_.protocol is None
+                if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
+                    self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
                 
-                # self._runData_.schedule.addEpisode(episode)
-                # self._runData_.currentEpisode = episode
-                
-                self.processProtocol(protocol)
-                
-            elif protocol != self._runData_.currentProtocol:
-                # a different protocol emdash — WARNING: signals a new episode:
-                self.print(f"{colorama.Fore.CYAN}{colorama.Style.BRIGHT}new protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-                
-                # 1. finish off current episode with the previously loaded ABF file
-                # NOTE: 2024-02-16 08:28:43
-                # self._runData_.sweeps hasn't been incremented yet
-                # self._runData_.currentEpisode.end = self._runData_.abfRunTimesMinutes[-1]
-                # self._runData_.currentEpisode.endFrame = self._runData_.sweeps
-                # episodeNames = [e.name for e in self._runData_.schedule.episodes]
-                # if self._runData_.episodeName in episodeNames:
-                #     episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
-                #     self._runData_.episodeName = episodeName
-                # else:
-                #     episodeName = self._runData_.episodeName
-                  
-                self._runData_.currentProtocol = protocol
-                
-#                 episode = RecordingEpisode(name=self._runData_.episodeName,
-#                                            protocol = self._runData_.currentProtocol,
-#                                            sources = self._runData_.sources,
-#                                            pathways = self._runData_.pathways,
-#                                            beginFrame = self._runData_.sweeps+1,
-#                                            # beginFrame=self._runData_.sweeps,
-#                                            begin=abfRun.rec_datetime)
-#                 
-#                 self._runData_.schedule.addEpisode(episode)
-                
-            else: # same protocol → add data to currrent episode
-                self.print(f"{colorama.Fore.BLUE}{colorama.Style.BRIGHT}current protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-                # TODO 2024-02-18 12:01:00 FIXME:
-                # ony adjust for pathways where the protocol has recorded from !
-                # ⇒ get an index of these pathways in processProtocol, store in _runData_
-                pathways = [self._runData_.pathways[k] for k in self._runData_.recordedPathways]
-                for pathway in pathways:
-                    pathway.schedule.episodes[-1].endFrame += 1
-                    pathway.schedule.episodes[-1].end = datetime.datetime.now()
-                
-            
+                    self._runData_.currentProtocol = protocol
+                    
+                    # TODO: 2024-02-17 22:58:32 see ### TODO: 2024-02-17 22:56:15 ###
+                    # episode = RecordingEpisode(name=self._runData_.episodeName, 
+                    #                            protocol = self._runData_.currentProtocol,
+                    #                            sources = self._runData_.sources,
+                    #                            pathways = self._runData_.pathways,
+                    #                            beginFrame = 0,
+                    #                            # beginFrame=self._runData_.sweeps,
+                    #                            begin=abfRun.rec_datetime)
+                    
+                    # self._runData_.schedule.addEpisode(episode)
+                    # self._runData_.currentEpisode = episode
+                    
+                    self.processProtocol(protocol)
+                    
+                elif protocol != self._runData_.currentProtocol:
+                    # a different protocol emdash — WARNING: signals a new episode:
+                    self.print(f"{colorama.Fore.CYAN}{colorama.Style.BRIGHT}new protocol{colorama.Style.RESET_ALL}: {protocol.name}")
+                    
+                    # 1. finish off current episode with the previously loaded ABF file
+                    # NOTE: 2024-02-16 08:28:43
+                    # self._runData_.sweeps hasn't been incremented yet
+                    # self._runData_.currentEpisode.end = self._runData_.abfRunTimesMinutes[-1]
+                    # self._runData_.currentEpisode.endFrame = self._runData_.sweeps
+                    # episodeNames = [e.name for e in self._runData_.schedule.episodes]
+                    # if self._runData_.episodeName in episodeNames:
+                    #     episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
+                    #     self._runData_.episodeName = episodeName
+                    # else:
+                    #     episodeName = self._runData_.episodeName
+                    
+                    self._runData_.currentProtocol = protocol
+                    
+    #                 episode = RecordingEpisode(name=self._runData_.episodeName,
+    #                                            protocol = self._runData_.currentProtocol,
+    #                                            sources = self._runData_.sources,
+    #                                            pathways = self._runData_.pathways,
+    #                                            beginFrame = self._runData_.sweeps+1,
+    #                                            # beginFrame=self._runData_.sweeps,
+    #                                            begin=abfRun.rec_datetime)
+    #                 
+    #                 self._runData_.schedule.addEpisode(episode)
+                    
+                else: # same protocol → add data to currrent episode
+                    self.print(f"{colorama.Fore.BLUE}{colorama.Style.BRIGHT}current protocol{colorama.Style.RESET_ALL}: {protocol.name}")
+                    # TODO 2024-02-18 12:01:00 FIXME:
+                    # ony adjust for pathways where the protocol has recorded from !
+                    # ⇒ get an index of these pathways in processProtocol, store in _runData_
+                    pathways = [self._runData_.pathways[k] for k in self._runData_.recordedPathways]
+                    for pathway in pathways:
+                        pathway.schedule.episodes[-1].endFrame += 1
+                        pathway.schedule.episodes[-1].end = datetime.datetime.now()
+                    
             self._runData_.sweeps += 1
             
             # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
@@ -1114,10 +1118,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         self.print(f"{self.__class__.__name__}.processProtocol {protocol.name}")
         
         # NOTE: 2024-02-18 15:58:07
-        # this sets up a pathways "layout", where a recording source is mapped to:
-        #   index of SynapticPathway (in the sequence of source-specific pathways)
-        #   segment index in the corresponding ABF file
-        #   collection of LocationMeasure objects
+        # this sets up a pathways "layout", a dict:
+        #   recording source ↦ dict:
+        #       pathway index (in the sequence of source-specific pathways) ↦ dict:
+        #           "sweep" ↦ sweep index (segment index)
+        #           "measures" ↦ collection of LocationMeasure objects
         #   
         
         # sourceDACs = [s.dac for s in self._runData_.sources]
@@ -1353,7 +1358,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #   recording from TWO pathways per run — hence you'd need TWO sweeps 
             #
             # bottom line: the protocol should provide at least as many sweeps 
-            #   as the maximum number of patwhays stimulated by it
+            #   as the maximum number of patwhays stimulated by it 
             
             assert protocol.nSweeps >= nPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nPathways} pathways"
             
@@ -1363,7 +1368,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             for k, p in mainDigPathways:
                 adc = protocol.getADC(p.source.adc)
                 dac = protocol.getDAC(p.source.dac)
+                activeDAC = protocol.activeDACChannel
+                
                 clampMode = protocol.getClampMode(adc, dac)
+                
+                # locate sweeps and epochs where the pathway's digital stimulus is emitted
+                sweepsForDig = protocol.getDigitalChannelUsage(p.stimulus.channel, activeDAC)
+                
+                # TODO 2024-02-18 23:23:55 finish this up
+                
                 
                 
                 
@@ -1401,10 +1414,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #             adc = protocol.getADC(src.adc)
 #             dac = protocol.getDAC(src.dac)
             
-            clampMode = protocol.getClampMode(adc, dac)
-            
-            for pathway in pathways:
-                pathway.clampMode = clampMode
+#             clampMode = protocol.getClampMode(adc, dac)
+#             
+#             for pathway in pathways:
+#                 pathway.clampMode = clampMode
                 
             # now, find out relevant epochs and triggers
             
@@ -2040,6 +2053,7 @@ class LTPOnline(QtCore.QObject):
     
 
     def __init__(self, *args,
+                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
                  episodeName: str = "baseline",
                  # episodeName: typing.Union[str, RecordingEpisode] = "baseline",
                  useEmbeddedProtocol:bool=True,
@@ -2066,6 +2080,7 @@ class LTPOnline(QtCore.QObject):
         
         self._running_ = False
         self._sources_ = None # preallocate
+        self._locationMeasures_ = locationMeasures
         
         # self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
         
@@ -2102,6 +2117,7 @@ class LTPOnline(QtCore.QObject):
         # source still needed to group pathways by sources !!! (saves a few iterations)
         self._runData_ = DataBag(sources = self._sources_,
                                  pathways = self._pathways_,
+                                 locationMeasures = self._locationMeasures_,
                                  recordedPathways = dict(),
                                  # episodeName = self._currentEpisodeName_,
                                  currentProtocol = None,

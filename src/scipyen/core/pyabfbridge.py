@@ -1843,6 +1843,16 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """Calls self.getDAC(…)"""
         return self.getDAC(index, physical)
     
+    def getDigitalChannelUsage(self, digChannel:int, dac:ABFOutputConfiguration, 
+                               epochIndexes:bool=False, train:typing.Optional[bool] = None) -> tuple:
+        """Looks up the sweeps and epochs where a digital channel emits a TTL pulse or train
+        See ABFOutputConfiguration.getEpochsForDigitalChannel documentation for 
+        details.
+        
+        """
+        return tuple(filter(lambda x: len(x[1]), ((k, dac.getEpochsForDigitalChannel(digChannel, k, indexes = epochIndexes, train=train)) for k in range(self.nSweeps))))
+        
+    
 class ABFInputConfiguration:
     """Deliberately thin class with basic info about an ADC input in Clampex.
         More information may be added for convenience later; until then, just
@@ -2833,7 +2843,8 @@ class ABFOutputConfiguration:
         units = epoch.firstDuration.units
         return np.sum([self.getEpochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units
     
-    def getEpochActualRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
+    def getEpochActualRelativeStartTime(self, epoch:typing.Union[ABFEpoch, str, int], 
+                                        sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to sweep start.
         Takes into account the holding time (1/64 sweep samples, in Clampex),
         resulting in timings that match the times in the recorded neo.AnalogSignals.
@@ -2851,7 +2862,8 @@ class ABFOutputConfiguration:
         units = epoch.firstDuration.units
         return np.sum([self.getEpochActualDuration(e_, sweep).rescale(units) for e_ in self.epochs[:epoch.epochNumber]]) * units + self.holdingTime
         
-    def getEpochRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], 
+                                     sweep:int=0) -> int:
         """Number of samples from the start of the sweep to the start of epoch.
         WARNING: Like self.getEpochRelativeStartTime, does NOT take into account 
         the holding time; you may want to use self.epochActualRelativeStartsSamples
@@ -2867,7 +2879,8 @@ class ABFOutputConfiguration:
             
         return np.sum([self.getEpochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]])
     
-    def getEpochActualRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochActualRelativeStartSamples(self, epoch:typing.Union[ABFEpoch, str, int],
+                                           sweep:int=0) -> int:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -2877,7 +2890,8 @@ class ABFOutputConfiguration:
             
         return np.sum([self.getEpochActualDurationSamples(e_, sweep) for e_ in self.epochs[:epoch.epochNumber]]) + self.holdingSampleCount
         
-    def getEpochStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
+    def getEpochStartTime(self, epoch:typing.Union[ABFEpoch, str, int], 
+                          sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to the start of recording.
         WARNING: Does NOT take into account the holding time (1/64 of sweep samples),
         therefore the respoonse to the epoch's waveform, as recorded in the ADC 
@@ -2888,13 +2902,15 @@ class ABFOutputConfiguration:
         # units = epoch.firstDuration.units
         return self.getEpochRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
     
-    def getEpochActualStartTime(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> pq.Quantity:
+    def getEpochActualStartTime(self, epoch:typing.Union[ABFEpoch, str, int], 
+                                sweep:int = 0) -> pq.Quantity:
         """Starting time of the epoch, relative to the start of recording.
         Takes into account the sweep holding time.
         """
         return self.getEpochActualRelativeStartTime(epoch, sweep) + self.protocol.sweepInterval * sweep
         
-    def getEpochStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], 
+                             sweep:int=0) -> int:
         """Number of samples from start fo recording to the epoch.
         WARNING: Like self.epochStartSamples, does NOT take into account 
         the holding time; you may want to use self.epochActualStartSamples.
@@ -2902,13 +2918,15 @@ class ABFOutputConfiguration:
         """
         return self.getEpochRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
-    def getEpochActualStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochActualStartSamples(self, epoch:typing.Union[ABFEpoch, str, int], 
+                                   sweep:int=0) -> int:
         """Number of samples from start fo recording to the epoch.
         Takes into account the sweep holding time.
         """
         return self.getEpochActualRelativeStartSamples(epoch, sweep) + self.protocol.sweepSampleCount * sweep
     
-    def getEpochActualDuration(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> pq.Quantity:
+    def getEpochActualDuration(self, epoch:typing.Union[ABFEpoch, str, int], 
+                               sweep:int=0) -> pq.Quantity:
         """Actual epoch duration (in ms) for the given sweep.
         Takes into account first duration and delta duration"""
         if isinstance(epoch, (int, str)):
@@ -2920,7 +2938,8 @@ class ABFOutputConfiguration:
             
         return epoch.firstDuration + sweep * epoch.deltaDuration
         
-    def getEpochActualDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int=0) -> int:
+    def getEpochActualDurationSamples(self, epoch:typing.Union[ABFEpoch, str, int], 
+                                      sweep:int=0) -> int:
         """Actual epoch duration (in samples) for the given sweep.
         Takes into account first duration and delta duration"""
         return scq.nSamples(self.getEpochActualDuration(epoch, sweep), self.samplingRate)
@@ -3331,6 +3350,95 @@ class ABFOutputConfiguration:
             
         return digOFF * pq.V
         
+    def getEpochsForDigitalChannel(self, digChannel: int, sweep: int = 0, 
+                                   indexes: bool=False, train: typing.Optional[bool] = None) -> list:
+        """Returns the index of the epoch where the digChannel is used (set to 1 or '*')
+        Parameters:
+        -----------
+        digChannel: int in the semi-open interval [0 ⋯ 8)
+        sweep: int — index of the sweep (necessary to determine in which digital 
+            pattern — main or alternate — the digChannel is sought
+        indexes:bool, default is False
+            When True, the method returns a list of epoch indexes in this DAC epochs table
+            When False (the default), return a list of epochs
+        train:bool or None
+            When a bool, restricts the look up to where digChannel emits a TTL train
+            (True) or pulse (False).
+    
+            Default is None
+    
+        Returns:
+        --------
+        A list of epochs (or their indexes in the epochs table if `indexes` is True)
+        where digChannel is set (i.e., non-zero).
+    
+        The list may be empty is none of the epochs define a digital pattern for 
+        the given sweep.
+    
+        NOTE: In Clampex, the digital pattern defined in an epoch normally applies
+        to ALL sweeps.
+     
+        The only exception are the protocols where alternate digital pattern
+        is enabled. In such protocols, the active DAC channel is the one where
+        the "main" digital pattern is defined in the protocol editor, and this
+        "main" pattern is applied to the sweeps with even index (0, 2, 4, etc).
+        The "alternative" digital pattern is defined in any other DAC in the protocol
+        editor, and is applied to the sweeps with odd index (1, 3, 5, etc)
+    
+        NOTE: In reality, this apparent association between a digital pattern 
+        and a DAC is not born out by the hardware; however, digital patterns can 
+        only be configured inside an epoch for analog command waveform output
+        defined for a particular DAC. This may give the false impression that
+        a digital pattern is emitted through the DAC where such epochs were defined,
+        in the protocol editor.
+    
+        Things get more complicated when distinct digital patterns need to be 
+        emitted in consecutive sweeps. Currently, Clampex supports only the definition
+        of only two digital patterns in the same protocol, as explained in the NOTE above.
+    
+        For more complex experimental configuration (e.g. using three distinct 
+        digital patterns in consecutive sweeps) the only approach in Clampex 
+        appears to be the use of distinct ABF protocols via  "Sequencing keys".
+        These protocols would have to generate just one sweep per run, with the 
+        disadvantage that recording averages would have to be done offline
+        (or at least Outside Clampex).
+        
+    
+        """
+        isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+        
+        ret = list()
+        
+        for k, epoch in enumerate(self.epochs):
+            # see self.getEpochDigitalPattern for code logic
+            digPattern = list()
+            if self.alternateDigitalOutputStateEnabled and self.logicalIndex < 2:
+                if self.digitalOutputEnabled:
+                    if self.physicalIndex == self.protocol.activeDACChannel:
+                        if digChannel in range(4):
+                            digPattern = list(reversed(epoch.getDigitalPattern(isAlternateDigital)[0]))
+                        elif digChannel in range(4,8):
+                            digPattern = list(reversed(epoch.getDigitalPattern(isAlternateDigital)[1]))
+                            digChannel -= 4
+                        else:
+                            raise ValueError(f"Expecting a digital channel index (`digChannel`) in the interval [0 ⋯ 8); instead, got {digChannel}")
+            else:
+                if self.digitalOutputEnabled:
+                    if digChannel in range(4):
+                        digPattern = list(reversed(epoch.getDigitalPattern()[0]))
+                    elif digChannel in range(4,8):
+                        digPattern = list(reversed(epoch.getDigitalPattern()[1]))
+                        digChannel -= 4
+                    else:
+                        raise ValueError(f"Expecting a digital channel index (`digChannel`) in the interval [0 ⋯ 8); instead, got {digChannel}")
+                    
+            if digChannel < len(digPattern) and (digPattern[digChannel] != 0 if train is None else digPattern[digChannel] == '*' if train is True else digPattern[digChannel] == 1):
+                if indexes:
+                    ret.append(k)
+                else:
+                    ret.append(epoch)
+                
+        return ret
     
     def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], 
                                sweep:int=0) ->tuple:
@@ -3388,7 +3496,8 @@ class ABFOutputConfiguration:
                 # ONLY the main digital pattern of the epoch, and ONLY if 
                 # the sweep has an even number
                 #
-                if self.logicalIndex == self.protocol.activeDACChannel:
+                # if self.logicalIndex == self.protocol.activeDACChannel:
+                if self.physicalIndex == self.protocol.activeDACChannel:
                     if isAlternateDigital:
                         # this DAC has dig output enabled, hence during
                         # an experiment it will output NOTHING if either 
