@@ -514,6 +514,10 @@ class ABFAcquisitionMode(datatypes.TypeEnum):
     high_speed_oscilloscope = 4 # Not supported by neo, but supported by pyabf!
     episodic_stimulation = 5
     
+class ABFAveragingMode(datatypes.TypeEnum):
+    """Corresponds to nAverageAlgorithm in ABF._protocolSection"""
+    cumulative = 0
+    most_recent = 1
     
 class ABFDACWaveformSource(datatypes.TypeEnum):
     none     = 0
@@ -1006,10 +1010,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             self._acquisitionMode_ = ABFAcquisitionMode.type(obj.nOperationMode)
             self._nSweeps_ = obj._protocolSection.lEpisodesPerRun
+            self._nRuns_   = obj._protocolSection.lRunsPerTrial
+            self._nTrials_ = obj._protocolSection.lNumberOfTrials
             self._nTotalDataPoints_ = obj._dataSection._entryCount
             self._nDataPointsPerSweep_ = obj.sweepPointCount
             self._samplingRate_ = float(obj.dataRate) * pq.Hz
             self._sweepInterval_ = obj._protocolSection.fEpisodeStartToStart * pq.s
+            self._averaging_ = ABFAveragingMode(obj._protocolSection.nAverageAlgorithm) # 0 = Cumulative; 1 = Most recent
+            self._averageWeighting_ =  obj._protocolSection.fAverageWeighting
             
             self._protocolFile_ = obj.protocolPath # store this for future reference
             
@@ -1060,10 +1068,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             self._acquisitionMode_ = ABFAcquisitionMode.type(obj.annotations["protocol"]["nOperationMode"]), 
             self._nSweeps_ = obj.annotations["protocol"]["lEpisodesPerRun"]
+            self._nRuns_   = obj.annotations["protocol"]["lRunsPerTrial"]
+            self._nTrials_ = obj.annotations["protocol"]["lNumberOfTrials"]
             self._nTotalDataPoints_ = obj.annotations["sections"]["DataSection"]["llNumEntries"]
             self._nDataPointsPerSweep_ = int(self._nTotalDataPoints_/self._nSweeps_/self._nADCChannels_)
             self._samplingRate_ = float(obj.annotations["sampling_rate"]) * pq.Hz
             self._sweepInterval_ = obj.annotations["protocol"]["fEpisodeStartToStart"] * pq.s
+            self._averaging_ = ABFAveragingMode(obj.annotations["protocol"]["nAverageAlgorithm"]) # 0 = Cumulative; 1 = Most recent
+            self._averageWeighting_ =  obj.annotations["protocol"]["fAverageWeighting"] 
             
             self._protocolFile_ = obj.annotations["sProtocolPath"].decode()
 
@@ -1192,11 +1204,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def adcNames(self):
-        return [i.name for i in self.inputs]
+        return tuple(i.name for i in self.inputs)
     
     @property
     def adcUnits(self):
-        return [i.units for i in self.inputs]
+        return tuple(i.units for i in self.inputs)
     
     @property
     def adcLogical2PhysicalIndexMap(self):
@@ -1208,11 +1220,27 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def dacNames(self):
-        return [o.name for o in self.outputs]
+        return tuple(o.name for o in self.outputs)
             
     @property
     def dacUnits(self):
-        return [o.units for o in self.outputs]
+        return tuple(o.units for o in self.outputs)
+    
+    @property
+    def physicalDACIndexes(self):
+        return tuple(o.physicalIndex for o in self.outputs)
+            
+    @property
+    def logicalDACIndexes(self):
+        return tuple(o.logicalIndex for o in self.outputs)
+            
+    @property
+    def physicalADCIndexes(self):
+        return tuple(i.physicalIndex for i in self.inputs)
+            
+    @property
+    def logicalADCIndexes(self):
+        return tuple(i.logicalIndex for i in self.inputs)
             
     @property
     def dacLogical2PhysicalIndexMap(self):
@@ -1224,6 +1252,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def acquisitionMode(self) -> ABFAcquisitionMode:
+        """Alias to operationMode"""
+        return self._acquisitionMode_
+    
+    @property
+    def operationMode(self) -> ABFAcquisitionMode:
+        """    
+        variable_length_event = 1
+        fixed_length_event = 2
+        gap_free = 3
+        high_speed_oscilloscope = 4 # Not supported by neo, but supported by pyabf!
+        episodic_stimulation = 5
+        """
         return self._acquisitionMode_
     
     @property
@@ -1511,7 +1551,32 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
     @property
     def nSweeps(self) -> int:
+        """Number of sweeps per run or per trial average"""
         return self._nSweeps_
+    
+    @property
+    def nRuns(self) -> int:
+        """Number of runs per trial.
+        All runs have the same number of sweeps (self.nSweeps)
+        A trial with more than one run will save sweep-by-sweep average in the ABF
+        file. This average is equivalent of a single run with self.nSweeps sweeps.
+        """
+        return self._nRuns_
+    
+    @property
+    def nTrials(self) -> int:
+        """This is always 1?"""
+        return self._nTrials_
+    
+    @property
+    def averaging(self) -> ABFAveragingMode:
+        """Averaging mode - irrelevant when self.nRuns == 1"""
+        return self._averaging_
+    
+    @property
+    def averageWeighting(self) -> float:
+        """Sweep eighting when averaging - irrelevant when self.nRuns == 1"""
+        return self._averageWeighting_
     
     @property
     def nSamples(self) -> int:
@@ -1672,14 +1737,19 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return self._inputs_
     
     def getADC(self, adcChannel:typing.Union[int, str] = 0, 
-               physical:bool=False) -> ABFInputConfiguration:
+               physical:bool=True) -> ABFInputConfiguration:
         """Access the input configuration of an ADC channel with a given index or name.
         
         Parameters:
         -----------
-        index: int or str, or None. Optional, default is None
+        adcChannel: int or str, or None. Optional, default is None
             When an int, it represents the index (physical or logical) of the ADC.
             When a str, it represents the name of the ADC.
+        
+        physical: bool; flag to indicate if `adcChannel`, when an int, represents
+            the physical channel index.
+            
+            Default is True.
         
         Returns:
         --------
@@ -1692,8 +1762,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             adcChannel = self.adcNames.index(adcChannel)
             
-            if physical:
-                adcChannel = self.adcLogical2PhysicalIndexMap[adcChannel]
+            # if physical:
+            #     adcChannel = self.adcLogical2PhysicalIndexMap[adcChannel]
 
         inputconfs = list(filter(lambda x: x.getChannelIndex(physical) == adcChannel, self._inputs_))
         
@@ -1703,12 +1773,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
             chtype = "physical" if physical else "logical"
             raise ValueError(f"Invalid {chtype} ADC channel specified {adcChannel}")
 
-    def getInput(self, adcChannel:int = 0, physical:bool=False) -> ABFInputConfiguration:
+    def getInput(self, adcChannel:int = 0, physical:bool=True) -> ABFInputConfiguration:
         """Calls self.getADC(…)"""
         return self.getADC(adcChannel, physical=physical)
     
     def inputConfiguration(self, adcChannel:typing.Union[int, str] = 0, 
-                           physical:bool=False) -> ABFInputConfiguration:
+                           physical:bool=True) -> ABFInputConfiguration:
         """Calls self.getADC(…)"""
         return self.getADC(adcChannel, physical=physical)
         
@@ -1722,15 +1792,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """List of output configurations (DAC channels); alias to self.DACs"""
         return self.DACs
     
-    def getDAC(self, index:typing.Optional[typing.Union[int, str]] = None, 
-                            physical:bool=False) -> ABFOutputConfiguration:
+    def getDAC(self, dacChannel:typing.Optional[typing.Union[int, str]] = None, 
+                            physical:bool=True) -> ABFOutputConfiguration:
         """Access the output configuration of a DAC channel with a given index or name.
         
         Parameters:
         -----------
-        index: int or str, or None. Optional, default is None
+        dacChannel: int or str, or None. Optional, default is None
             When an int, it represents the index (physical or logical) of the DAC.
             When a str, it represents the name of the DAC.
+        
+        physical: bool; flag to indicate if `dacChannel`, when an int, represents
+            the physical channel index.
+            
+            Default is True.
         
         Returns:
         --------
@@ -1738,25 +1813,23 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         """
         # if not isinstance(index, int):
-        if index is None:
-            index = self.activeDACChannelIndex
+        if dacChannel is None:
+            dacChannel = self.activeDACChannelIndex
             
-        elif isinstance(index, str):
-            if index not in self.dacNames:
-                raise ValueError(f"Invalid DAC channel name {index}")
+        elif isinstance(dacChannel, str):
+            if dacChannel not in self.dacNames:
+                raise ValueError(f"Invalid DAC channel name {dacChannel}")
             
-            index = self.dacNames.index(index)
+            dacChannel = self.dacNames.index(dacChannel)
             
-            if physical:
-                index = self.dacLogical2PhysicalIndexMap[index]
-
-        outputConfs = list(filter(lambda x: x.logicalIndex == index if physical else x.physicalIndex == index, self._outputs_))
+        # outputConfs = list(filter(lambda x: x.logicalIndex == index if physical else x.physicalIndex == index, self._outputs_))
+        outputConfs = list(filter(lambda x: x.getChannelIndex(physical) == dacChannel, self._outputs_))
 
         if len(outputConfs):
             return outputConfs[0]
         else:
             chtype = "physical" if physical else "logical"
-            raise ValueError(f"Invalid {chtype} DAC channel specified {index}")
+            raise ValueError(f"Invalid {chtype} DAC channel specified {dacChannel}")
             
     def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:

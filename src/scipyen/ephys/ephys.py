@@ -921,6 +921,8 @@ class RecordingEpisodeType(TypeEnum):
     Tracking        = 2 # used for tracking the electrophysiological behaviour of
                         # a source (e.g., synaptic responses, somatic spiking, etc);
                         
+    Monitoring      = Tracking
+                        
     Conditioning    = 4 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
                         
@@ -975,9 +977,9 @@ class RecordingEpisode(Episode):
     """
     Specification of an eletrophysiology recording episode.
         
-    An "episode" is a series of sweeps recorded during a specific set of
-    experimental conditions -- possibly, a subset of a larger experiment where
-    several conditions were applied in sequence.
+    An "episode" is a contiguous series of sweeps recorded during a specific set 
+    of experimental conditions or protocol -- typically, a subset of a larger 
+    experiment where several distinct sets of conditions are applied in sequence.
 
     All sweeps in the episode must have been recorded using the same recording
     protocol (an ElectrophysiologyProtocol object).
@@ -1013,18 +1015,8 @@ class RecordingEpisode(Episode):
 
     • episodeType: RecordingEpisodeType
         
-    • electrodeMode: ephys.ElectrodeMode (default is ElectrodeMode.WholeCellPatch)
-        or sequence of 
-
-        NOTE: With exceptions¹, the responses in a synaptic pathway are recorded
-        using the same electrode during an experiment (i.e. either Field, *Patch, or
-        or Sharp).
-
-        This attribute allows for episodes with distinct electrode 'mode' for the
-        same pathway or recording source¹.
-
-    • pathways: optional, a list of SynapticPathways or None (default); can also be
-        an empty list (same as if it was None).
+    • pathways: optional, a list of SynapticPathways or None (default); can also
+        be an empty list (same as if it was None).
 
         Indicates the SynapticPathways where this episode applies. Typically,
         an episode involves a single pathway. However, there are situations where
@@ -1032,10 +1024,8 @@ class RecordingEpisode(Episode):
         pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
         test, or during conditioning in order to test for 'associativity')
     
-        The electrode and clamping modes are defined in the synaptic pathways.
+        The pathways define their own clamping modes and recording source.
     
-    • sources: optional, a list of recording sources
-        
     • xtalk: optional, a mapping of int (sweep indices) or tuples (start:int,step:int)
         to pairs (2-tuples) of valid int indices into the 'pathways' attribute.
         
@@ -1077,47 +1067,38 @@ class RecordingEpisode(Episode):
     def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name: typing.Optional[str] = None,
                  protocol: typing.Optional[ElectrophysiologyProtocol]=None, 
-                 sources: typing.Sequence[RecordingSource] = list(),
-                 segments: typing.Optional[GeneralIndexType] = None,
+                 # sources: typing.Sequence[RecordingSource] = list(), ## → defined in pathways
+                 # segments: typing.Optional[GeneralIndexType] = None, ## → defined in superclass beginFrame endFrame
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[dict[int, tuple[int,int]]] = None ,
-                 triggers: typing.Sequence[TriggerEvent] = list(),
+                 # triggers: typing.Sequence[TriggerEvent] = list(),
                  **kwargs):
         """Constructor for RecordingEpisode.
 
-        Var-positional parameters (args):
-        --------------------------------
-        neo.Block, a sequence of neo.Blocks, a neo.Segment, or a sequence of neo.Segments,
-            or: a str, or a sequence of str (symbol(s) in the workspace, bound to neo.Blocks)
-
-            When a str, if it contains the '*' character then the str is interpreted as 
-            a global search string (a 'glob'). See neoutils.concatenate_blocks(…) for 
-            details.
-
-            NOTE: args represent the source data to which this episode applies to, but
-        is NOT stored in the RecordingEpisode instance. The only use of the data is to
-        assign values to the 'begin', 'end', 'beginFrame', 'endFrame' attributes of the 
-        episode.
-
         Named parameters:
         ------------------
-        protocol: the electrophysiology experimental protocol
-            WARNING: Currently, (2023-10-15 21:15:01) only pyabfbridge.ABFProtocol
-                objects are supported
+        episodeType: type of the episode (see RecordingEpisodeType);
+                default is Tracking or Monitoring (an alias to Tracking).
 
-            Optional; default is None; When None, the protocol will be read from
-        the first 
+        name:str - the name of this episode (optional, default is None)
+            When None, it is up to the user of this object to give an appropriate
+            name
+        protocol: the electrophysiology recording protocol object, or None
+            WARNING: As of 2024-02-18 11:09:55 Scipyen only supports 
+            pyabfbridge.ABFProtocol objects are supported.
 
-        name:str - the name of this episode
+            Optional; default is None.
 
-        episodeType: type of the episode (see RecordingEpisodeType)
+        pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
+            Optional; default is None.
 
-        NOT IMPLEMENTED: These are the attributes of the instance (see the class documentation), PLUS
-        the parameters 'segments', 'glob', 'sortby' and 'ascending' with the same types
-        and semantincs as for the function neoutils.concatenate_blocks(…).
+        xtalk: dict of segment index (int) ↦ tuple of int (indexes of pathways)
+            or None.
 
-        NOTE: Data is NOT concatenated here, but these two parameters are used for 
-                temporarily ordering the source neo.Block objects in args.
+            Indicates the order of the stimulated pathways in a cross-talk contingency,
+            were each pathway is stimulated in turn, in a paired-pulse stimulation
+
+            Optional, default is None
 
         Var-keyword parameters (kwargs)
         -------------------------------
@@ -1191,7 +1172,7 @@ class RecordingEpisode(Episode):
         else:
             raise ValueError(f"Invalid xtalk specification ({xtalk})")
         
-        self._data_ = None
+        # self._data_ = None
         
     def _repr_pretty_(self, p, cycle):
         supertxt = super().__repr__() + " with :"

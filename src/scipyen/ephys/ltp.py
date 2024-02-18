@@ -683,6 +683,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self._runData_.abfRunDeltaTimesMinutes.append(deltaMinutes)
             
             protocol = pab.ABFProtocol(abfRun)
+            if protocol.operationMode != pab.ABFAcquisitionMode.episodic_stimulation:
+                raise ValueError(f"Files must be recorded in episodic mode")
 
             # check that the number of sweeps actually stored in the ABF file/neo.Block
             # equals that advertised by the protocol
@@ -734,20 +736,25 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                   
                 self._runData_.currentProtocol = protocol
                 
-                episode = RecordingEpisode(name=self._runData_.episodeName,
-                                           protocol = self._runData_.currentProtocol,
-                                           sources = self._runData_.sources,
-                                           pathways = self._runData_.pathways,
-                                           beginFrame = self._runData_.sweeps+1,
-                                           # beginFrame=self._runData_.sweeps,
-                                           begin=abfRun.rec_datetime)
-                
-                self._runData_.schedule.addEpisode(episode)
+#                 episode = RecordingEpisode(name=self._runData_.episodeName,
+#                                            protocol = self._runData_.currentProtocol,
+#                                            sources = self._runData_.sources,
+#                                            pathways = self._runData_.pathways,
+#                                            beginFrame = self._runData_.sweeps+1,
+#                                            # beginFrame=self._runData_.sweeps,
+#                                            begin=abfRun.rec_datetime)
+#                 
+#                 self._runData_.schedule.addEpisode(episode)
                 
             else: # same protocol → add data to currrent episode
-                # TODO
-                self._runData_.currentEpisode.endFrame += 1
-                self._runData_.currentEpisode.end = datetime.datetime.now()
+                self.print(f"{colorama.Fore.BLUE}{colorama.Style.BRIGHT}current protocol{colorama.Style.RESET_ALL}: {protocol.name}")
+                # TODO 2024-02-18 12:01:00 FIXME:
+                # ony adjust for pathways where the protocol has recorded from !
+                # ⇒ get an index of these pathways in processProtocol, store in _runData_
+                pathways = [self._runData_.pathways[k] for k in self._runData_.recordedPathways]
+                for pathway in pathways:
+                    pathway.schedule.episodes[-1].endFrame += 1
+                    pathway.schedule.episodes[-1].end = datetime.datetime.now()
                 
             
             self._runData_.sweeps += 1
@@ -1105,6 +1112,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     @processProtocol.register(pab.ABFProtocol)
     def _(self, protocol:pab.ABFProtocol):
         self.print(f"{self.__class__.__name__}.processProtocol {protocol.name}")
+        
+        # NOTE: 2024-02-18 15:58:07
+        # this sets up a pathways "layout", where a recording source is mapped to:
+        #   index of SynapticPathway (in the sequence of source-specific pathways)
+        #   segment index in the corresponding ABF file
+        #   collection of LocationMeasure objects
+        #   
+        
         # sourceDACs = [s.dac for s in self._runData_.sources]
         # group pathways by their sources
         # 
@@ -1236,18 +1251,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # NOTE: 2024-02-17 22:36:56 REMEMBER !:
             # in a tracking protocol, distinct pathway in the same recording 
             # source have the same clamp mode!
+            #
+            # these are pathways defined for this particular source
             pathways = [p for p in self._runData_.pathways if p.source == src]
             
             if len(pathways) == 0:
                 continue
             
-            # NOTE: 2024-02-18 08:58:24
-            # For now, we only support synaptic stimuli sent out through DIG 
-            # channels.
-            
-            if not all(p.stimulus.dig for p in pathways):
-                raise ValueError("All synaptic stimulations must use DIG channels")
-            
+            # figure out which of the pathways use a DIG or a DAC channel for TTLs;
+            # of these figure out which are ACTUALLY used in the protocol
             # NOTE: 2024-02-17 16:37:26
             # this should be configured in the protocol, in any case
             # as noted above, a DIG output MAY be also used to trigger 3ʳᵈ party device
@@ -1260,37 +1272,134 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # this is an empty set when alternateDigitalOutputStateEnabled is False
             altDIGOut = protocol.digitalOutputs(alternate=True)
             
-            if len(pathways) > 1:
-                if len(pathways) > 2 and protocol.nSweeps > 1:
-                    raise RuntimeError(f"In experiments with more than two pathways, the ABF protocol must record one sweep at a time")
-                
-                if len(pathways) == 2 and protocol.alternateDigitalOutputStateEnabled:
-                    # protocol handles two pathways
-                    
-                    # figure out which is the "main" and which is the "alternate" pathway
-                    # True is the main, False is the alternate; most typical would be
-                    # [True, False] here
-                    pathsLayout = [p.stimulus.channel in mainDIGOut and p.stimulus.channel not in altDIGOut for p in pathways]
-                    
-                    # map sweep index in the protocol to pathway data; first element
-                    # is main path (path 0), second is the alternate path (path 1);
-                    # (adapts automatically to requirement 2∘)
-                    pathwaySegments = [range(0, protocol.nSweeps, 2), range(1, protocol.nSweeps, 2)]
-                    
-                else:
-                    # protocol handles just one pathway of however many
-                    pathsLayout = [p.stimulus.channel in mainDIGOut for p in pathways]
-                    pathwaySegments = [range(protocol.nSweeps) if pathsLayout[k] else None for k in range(len(pathways))]
-                    
+            protocolDACNdx = protocol.physicalDACIndexes
+            
+            mainDigPathways = list()
+            altDigPathways  = list()
+            dacPathways     = list()
+            
+            for k, p in enumerate(pathways):
+                if p.stimulus.dig:
+                    if p.stimulus.channel in mainDIGOut:
+                        mainDigPathways.append((k, p))
+                    elif p.stimulus.channel in altDIGOut:
+                        altDigPathways.append((k, p))
                         
-            else: 
-                # unique pathway is also the main pathway
-                pathsLayout = [True] 
-                # all sweeps in the trial record from the same (unique, main) path
-                pathwaySegments = [range(protocol.nSweeps)]
+                elif p.stimulus.channel in protocolDACNdx:
+                    dacPathways.append((k, p))
+                    
+            nPathways = len(mainDigPathways) + len(altDigPathways) + len(dacPathways)
+            
+            if nPathways == 0:
+                # no pathways recorded in this protocol (how likely that is ?!?)
+                continue
+            
+            # If you have just one amplifier, you can record from as many sources as 
+            #   there are channels in the amplifier, for example:
+            #   • just one source for AxoPatch
+            #   • maximum two sources for MultiClamp
+            # 
+            # More amplifiers can allow simultaneous recording from more sources,
+            # provided that the ADC/DACs are appropriately configured and here is
+            # no overlap with any TTL-emulating DACs.
+            #
+            # When the source records from more than one pathway (i.e. more than one pathway for the SAME source)
+            # there should be a temporal separation of sweeps per pathway which can be achieved in 
+            # two ways:
+            #
+            # 1) the alternate stimulation approach → allows up to TWO pathways per source
+            #   1.1) uses temporal separation through alternate sweeps in the same run
+            #   1.2) can be used for up to two pathways:
+            #       1.2.a) either two "digital" pathways ⇒ protocol has:
+            #           • alternateDigitalOutputStateEnabled ≡ True
+            #           • "main" digital pattern set
+            #           • "alternate" digital pattern set
+            #           • alternateDACOutputStateEnabled — irrelevant
+            #       1.2.b) one "digital" and one "dac" pathway ⇒ protocol has:
+            #           • alternateDigitalOutputStateEnabled ≡ True
+            #           • "main" digital pattern set
+            #           • "alternate" digital pattern NOT set
+            #           • alternateDACOutputStateEnabled ≡ True
+            #       1.2.c) two "dac" pathways
+            #           • alternateDigitalOutputStateEnabled — irrelevant
+            #           • "main" digital pattern — irrelevant
+            #           • "alternate" digital pattern — irrelevant
+            #           • alternateDACOutputStateEnabled ≡ True
+            #   1.3) the protocol should have an even number sweeps per run,
+            #       ideally only two (higher sweep index just repeat the 
+            #       measurements unnecessarily and confound the issue of 
+            #       averaged results - to keep it simple, we expect such protocol
+            #       to produce only two sweeps)
+            #           
+            # 2) single-sweep approach → use ONE pathway per protocol, and configure
+            #   as many protocols as there are pathways.
+            #   2.1) averaging will be turned off in Clampex ⟹ ABF files contain
+            #       immediate data, which may be averaged offline (TODO: pass arguments to the LTPOnline)
+            
+            
+            # ⇒ expect the protocol to have
+            # as many sweeps as pathways in this source
+            
+            # Can there be a contigency where this does not hold?
+            #
+            # say you record from a patched cell through one electrode (→ one source)
+            # and simultaneously also record field responses in the same slice — obviously, 
+            # using a second electrode → a second source, with its own ADC/DAC pair;
+            #
+            # each source defines its own pair of pathways: technically, they might be stimulating
+            # the same pair of distinct axonal bundles, via digital channels or DAC channels for TTL emulation
+            #
+            # if you used the alternative stimulation approach, you would then be 
+            #   recording from TWO pathways per run — hence you'd need TWO sweeps 
+            #
+            # bottom line: the protocol should provide at least as many sweeps 
+            #   as the maximum number of patwhays stimulated by it
+            
+            assert protocol.nSweeps >= nPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nPathways} pathways"
+            
+            # in a multi-pathway protocol, the "main" digital pathways are always
+            # delivered on the even-numbered sweeps: 0, 2, etc.
+            #
+            for k, p in mainDigPathways:
+                adc = protocol.getADC(p.source.adc)
+                dac = protocol.getDAC(p.source.dac)
+                clampMode = protocol.getClampMode(adc, dac)
                 
-            adc = protocol.getADC(src.adc)
-            dac = protocol.getDAC(src.dac)
+                
+                
+#             if len(pathways) > 1:
+#                 if len(pathways) > 2 and protocol.nSweeps > 1:
+#                     raise RuntimeError(f"In experiments with more than two pathways, the ABF protocol must record one sweep at a time")
+#                 
+#                 if len(pathways) == 2:
+#                     # special case
+#                     # and protocol.alternateDigitalOutputStateEnabled:
+#                     # protocol handles two pathways
+#                     
+#                     # figure out which is the "main" and which is the "alternate" pathway
+#                     # True is the main, False is the alternate; most typical would be
+#                     # [True, False] here
+#                     pathsLayout = [p.stimulus.channel in mainDIGOut and p.stimulus.channel not in altDIGOut for p in pathways]
+#                     
+#                     # map sweep index in the protocol to pathway data; first element
+#                     # is main path (path 0), second is the alternate path (path 1);
+#                     # (adapts automatically to requirement 2∘)
+#                     pathwaySegments = [range(0, protocol.nSweeps, 2), range(1, protocol.nSweeps, 2)]
+#                     
+#                 else:
+#                     # protocol handles just one pathway of however many
+#                     pathsLayout = [p.stimulus.channel in mainDIGOut for p in pathways]
+#                     pathwaySegments = [range(protocol.nSweeps) if pathsLayout[k] else None for k in range(len(pathways))]
+#                     
+#                         
+#             else: 
+#                 # unique pathway is also the main pathway
+#                 pathsLayout = [True] 
+#                 # all sweeps in the trial record from the same (unique, main) path
+#                 pathwaySegments = [range(protocol.nSweeps)]
+#                 
+#             adc = protocol.getADC(src.adc)
+#             dac = protocol.getDAC(src.dac)
             
             clampMode = protocol.getClampMode(adc, dac)
             
@@ -1974,24 +2083,29 @@ class LTPOnline(QtCore.QObject):
         # distinct
         self._pathways_ = list(itertools.chain.from_iterable([s.pathways for s in self._sources_]))
         
-        episode = RecordingEpisode(name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
-                                    # protocol = self._runData_.currentProtocol,
-                                    sources = self._sources_,
-                                    pathways = self._pathways_,
-                                    beginFrame = 0)
-                                    # beginFrame=self._runData_.sweeps,
-                                    # begin=abfRun.rec_datetime)
+        # episode = RecordingEpisode(name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
+        #                             # protocol = self._runData_.currentProtocol,
+        #                             sources = self._sources_,
+        #                             pathways = self._pathways_,
+        #                             beginFrame = 0)
+        #                             # beginFrame=self._runData_.sweeps,
+        #                             # begin=abfRun.rec_datetime)
         
-        
+        # add first episode in all pathways
         for pathway in self._pathways_:
             pathway.schedule = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
-            pathway.schedule.addEpisode(episode)
+            pathway.schedule.addEpisode(RecordingEpisode(name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
+                                    pathways = [pathway],
+                                    beginFrame = 0))
         
+        # self._runData_ = DataBag(pathways = self._pathways_,
+        # source still needed to group pathways by sources !!! (saves a few iterations)
         self._runData_ = DataBag(sources = self._sources_,
                                  pathways = self._pathways_,
+                                 recordedPathways = dict(),
                                  # episodeName = self._currentEpisodeName_,
                                  currentProtocol = None,
-                                 currentEpisode = episode,
+                                 # currentEpisode = episode,
                                  sweeps = 0,
                                    # data = self._data_,
                                    # newEpisode = True,
@@ -2006,7 +2120,6 @@ class LTPOnline(QtCore.QObject):
                                    signalBaselineStart = signalBaselineStart,
                                    signalBaselineDuration = signalBaselineDuration,
                                    currentProtocolIsConditioning = False,
-                                   # currentProtocol = None,
                                    useEmbeddedProtocol = useEmbeddedProtocol)
         
         
@@ -2363,24 +2476,101 @@ class LTPOnline(QtCore.QObject):
         return self._running_
     
     @property
-    def episode(self) -> str:
-        return self._runData_.currentEpisode
+    def currentEpisodes(self) -> dict:
+        """List of the most recent episodes across pathways"""
+        return [p.schedule.episodes[-1] for p in self._runData_.pathways]
+        # return dict((s, dict((p.name, p.schedule.episodes[-1]) for p in self._runData_.pathways if p.source == s)) for s in self._runData_.sources)
     
-    @episode.setter
-    def episode(self, val:str):
+    def newEpisode(self, val:str, etype: typing.Union[RecordingEpisodeType, str, int] = RecordingEpisodeType.Tracking,
+                   pathway:typing.Optional[typing.Union[SynapticPathway, int, str, typing.Sequence[SynapticPathway], typing.Sequence[int], typing.Sequence[str]]] = None):
+        if len(self._runData_.pathways) == 0:
+            scipywarn("No pathways are defined", out = self._stdout_)
+            return
+        
         if not isinstance(val, str) or len(val.strip()) == 0:
             return
         
-        names = unique(list(itertools.chain.from_iterable([[e.name for e in p.schedule.episodes] for p in pathways])))
-
-        episodeName = counter_suffix(val, names)
+        if isinstance(pathway, (list, tuple)):
+            if all(isinstance(p, int) for p in pathway):
+                invalid = [(k, p) for k, p in enumerate(pathway) if p < 0 or p >= len(self._runData_.pathways)]
+                if len(invalid):
+                    raise ValueError(f"The following elements in the sequence of path indexes are invalid for {len(self._runData_.pathways)} pathways: {' '.join([f'element {k}: path {l}' for k,l in invalid])}")
+                
+                pathway = [self._runData_.pathways[k] for k in pathway]
+                
+            elif all (isinstance(p, str) for p in pathway):
+                pnames = [p.name for p in self._runData_.pathways]
+                
+                invalid = [(k,p) for k, p in enumerate(pathway) if p not in pnames]
+                
+                if len(invalid):
+                    raise ValueError(f"The following path names do not exist: {' '.join([f'element {k}: path {l}' for k,l in invalid])}")
+                
+                pathway = [self._runData_pathways[pnames.index(p)] for p in pathway]
+                
+            elif not all(isinstance(p, SynapticPathway) for p in pathway):
+                raise TypeError("'pathway' expected to be a sequence of SynapticPathway, or int indexes, or str names")
+        
+        elif isinstance(pathway, int):
+            if pathway < 0 or pathway >= len(self._runData_.pathways):
+                raise ValueError(f"Invalid pathway index {pathway} for {len(self._runData_.pathways)} pathway(s)")
+            
+            pathway = self._runData_.pathways[pathway]
+            
+        elif isinstance(pathway, str):
+            pnames = [p.name for p in self._runData_.pathways]
+            if pathway not in pnames:
+                raise ValueError(f"Pathway {pathway} not found")
+            
+            pathway = self._runData_.pathways[pnames.index(pathway)]
+            
+        elif not isinstance(pathway, SynapticPathway):
+            raise TypeError(f"'pathway' expected to be a SynapticPathway, int index or str name, or a sequence of these; instead, got {type(pathway).__name__}")
+        
+        # from here onwards, `pathway` is either a SynapticPathway, or a list of SynapticPathway objects
+        
+        if isinstance(etype, int):
+            if etype not in RecordingEpisodeType.values():
+                raise ValueError(f"Invalid episode type {etype}")
+            etype = RecordingEpisodeType(etype) # will raise ValueError if etype is invalid
+            
+        elif isinstance(etype, str):
+            if etype.capitalize() not in RecordingEpisodeType.names():
+                raise ValueError(f"Invalid episode type {etype}")
+            etype = RecordingEpisodeType.type(etype)
+            
+        elif not isinstance(etype, RecordingEpisodeType):
+            raise TypeError(f"'etype' expected to be a RecordingEpisodeType, a str or an int; instead, got {type(etype).__name__}")
         
         
-
-    # @property
-    # def data(self) -> dict:
-    #     return self._data_
-    
+        if isinstance(pathway, SynapticPathway):
+            if pathway not in self._runData_.pathways:
+                scipywarn(f"Pathway {pathway.name} not found", out=self._stdout_)
+                return
+            
+            names = unique(e.name for e in pathway.schedule.episodes)
+            episodeName = counter_suffix(val, names)
+            lastFrame = max(e.endFrame for e in pathway.schedule.episodes)
+            
+            pathway.schedule.addEpisode(RecordingEpisode(etype, 
+                                                         name = episodeName, 
+                                                         pathways = [pathway],
+                                                         beginFrame  = lastFrame + 1,
+                                                         endFrame = lastFrame + 1))
+            
+        else:
+            names = unique(list(itertools.chain.from_iterable([[e.name for e in p.schedule.episodes] for p in pathway])))
+            episodeName = counter_suffix(val, names)
+            
+            for p in pathway:
+                lastFrame = max(e.endFrame for e in p.schedule.episodes)
+                p.schedule.addEpisode(RecordingEpisode(etype,
+                                                       name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
+                                                       pathways = [p], 
+                                                       beginFrame = lastFrame+1,
+                                                       endFrame = lastFrame + 1))
+            
+        
     def pause(self):
         """Pause the simulation.
         Does nothing when LTPOnline is running in normal mode (i.e. is waiting for
