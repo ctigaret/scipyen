@@ -1245,11 +1245,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #       DAC (with higher index) to trigger a 3ʳᵈ party device ONLY
         #       during the "alternative" pathway stimulation
         
-        # this channel 
-        activeDAC = protocol.activeDACChannel
+        # this channel is the one whhere DIG outputs are configured; it MAY BE
+        # distiinct from the source.dac !!!
+        # activeDAC = protocol.activeDACChannel
+        activeDAC = protocol.getDAC()
         
         # these are the protocol's DACs where digital output is emitted during the recording
-        digOutDacs = list(filter(lambda x: x.digitalOutputEnabled, (protocol.outputConfiguration(k) for k in range(protocol.nDACChannels))))
+        # the active DAC is one of these by definition
+        digOutDacs = tuple(filter(lambda x: x.digitalOutputEnabled, (protocol.getDAC(k) for k in range(protocol.nDACChannels))))
         
         # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
         # if len(digOutDacs) == 0:
@@ -1270,12 +1273,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # source have the same clamp mode!
             #
             # these are pathways defined for this particular source
-            pathways = [p for p in self._runData_.pathways if p.source == src]
+            # pathways = [p for p in self._runData_.pathways if p.source == src]
+            
+            pathways = src.pathways
             
             # no pathways defined in this source - surely an error in the 
             # arguments to the LTPOnline call but can never say for sure
+            # therefore move on to the next source
             if len(pathways) == 0:
                 continue
+            
+            adc = protocol.getADC(p.source.adc)
+            dac = protocol.getDAC(p.source.dac)
+            
+            clampMode = protocol.getClampMode(adc, activeDAC)
             
             # figure out which of the pathways use a DIG or a DAC channel for TTLs;
             # of these figure out which are ACTUALLY used in the protocol
@@ -1294,8 +1305,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # also, will be empty if len(digOutDacs ) == 0
             altDIGOut = protocol.digitalOutputs(alternate=True)
             
-            protocolDACNdx = protocol.physicalDACIndexes
-            
             mainDigPathways = list() # empty if len(digOutDacs ) == 0
             altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
             dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
@@ -1310,13 +1319,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     elif p.stimulus.channel in altDIGOut:
                         altDigPathways.append((k, p))
                         
-                elif p.stimulus.channel in protocolDACNdx:
+                elif p.stimulus.channel in protocol.physicalDACIndexes:
                     dacPathways.append((k, p))
                     
             # total number of pathways recorded in this protocol; it should be ≤ total number of pathways in _runData_
             # NOTE: 2024-02-19 18:30:22 TODO: consider NOT pre-populating the pathways field in _runData_
             # but rather parse the sources here and populate with pathways as necessary.
             nPathways = len(mainDigPathways) + len(altDigPathways) + len(dacPathways)
+            
+            assert nPathways <= 2, "A Clampex protocol does NOT support recording from more than two pathways"
             
             if nPathways == 0:
                 # no pathways recorded in this protocol (how likely that is ?!?)
@@ -1332,27 +1343,32 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # no overlap with any TTL-emulating DACs.
             #
             # When the source records from more than one pathway (i.e. more than one pathway for the SAME source)
-            # there should be a temporal separation of sweeps per pathway which can be achieved in 
-            # two ways:
+            # there should be a temporal separation of sweeps per pathway, so that
+            # synaptic responses recorded through the SAME ADC can be distinguished.
+            #
+            # This can be achieved in two ways:
             #
             # 1) the alternate stimulation approach → allows up to TWO pathways per source
+            # (one can use this approach for a single pathway, but then it will 
+            #  result in wasteful "empty" sweeps: the non-existent "alternate" pathway 
+            #   does not generate any responses, yet it will be recorded)
             #   1.1) uses temporal separation through alternate sweeps in the same run
+            #
             #   1.2) can be used for up to two pathways:
             #       1.2.a) either two "digital" pathways ⇒ protocol has:
             #           • alternateDigitalOutputStateEnabled ≡ True
             #           • "main" digital pattern set
             #           • "alternate" digital pattern set
             #           • alternateDACOutputStateEnabled — irrelevant
+            #
             #       1.2.b) one "digital" and one "dac" pathway ⇒ protocol has:
             #           • alternateDigitalOutputStateEnabled ≡ True
             #           • "main" digital pattern set
             #           • "alternate" digital pattern NOT set
             #           • alternateDACOutputStateEnabled ≡ True
-            #       1.2.c) two "dac" pathways
-            #           • alternateDigitalOutputStateEnabled — irrelevant
-            #           • "main" digital pattern — irrelevant
-            #           • "alternate" digital pattern — irrelevant
-            #           • alternateDACOutputStateEnabled ≡ True
+            #
+            #       1.2.c) two "dac" pathways - impossible in Clampex
+            #
             #   1.3) the protocol should have an even number sweeps per run,
             #       ideally only two (higher sweep index just repeat the 
             #       measurements unnecessarily and confound the issue of 
@@ -1361,19 +1377,65 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #           
             # 2) single-sweep approach → use ONE pathway per protocol, and configure
             #   as many protocols as there are pathways.
+            #
             #   2.1) averaging will be turned off in Clampex ⟹ ABF files contain
             #       immediate data, which may be averaged offline (TODO: pass arguments to the LTPOnline)
+            #       and data should be grouped by pathway, post-hoc
             
-            adc = protocol.getADC(p.source.adc)
-            dac = protocol.getDAC(p.source.dac)
+            # see above: a protocol DOES NOT support monitoring more than
+            # two pathwys
+            # if there are two pathwys, then they should be stimulated
+            # alternatively, and the protocol should (ideally) have an even number 
+            # of sweeps per run; since it does NOT really make sense to have
+            # more than TWO sweeps (because we just repeat the protocol 𝒏
+            # times, for 𝒏 files) we actually ENFORCE THIS precondition:
             
-            clampMode = protocol.getClampMode(adc, activeDAC)
             
+            if nPathways == 2:
+                assert len(mainDigPathways) == 1, "There must be at least one digitally triggered pathway in the protocol"
+                assert len(altDigPathways) == 1 or len(dacPathways) == 1, "There can be only one other pathway, triggered either digtially, or via DAC-emulated TTLs"
+                if len(altDigPathways) == 1:
+                    # two alternative digitally stimulated pathways — the most
+                    # common case
+                    assert protocol.alternateDigitalOutputStateEnabled, "For two digitally-stimulated pathways the alternative digital output state must be enabled in the protocol"
+                elif len(dacPathways) == 1:
+                    # one digital and one DAC pathway 
+                    assert protocol.alternateDigitalOutputStateEnabled and protocol.alternateDACOutputStateEnabled, "For a digitally stimulated pathway and one triggered by emulated TTLs the protocol must have both alternative digital outputs and alternative DAC outputs enabled"
+                    # furthermore, the stimulation DAC for this pathway must have a higher index than
+                    # the active DAC channel, and furthermore, the active DAC channel must also be
+                    # the same as the source's DAC channel (the one sending analog commands)
+                    assert activeDAC == dac, "Active DAC channel must be the same as used for analog command"
+                    assert dacPathways[0][1].stimulus.channel > activeDAC.physicalIndex, "The pathway triggerd by DAC-emulated TTLs must use a higher DAC index than that of the primary pathway"
+            
+            # figure out the epochs that define synaptic stimulations
+            
+            # figure out the membrane test epochs for voltage clamp, set up LocationMeasures for this
+            # we use the source's DAC channel - which may also be the activeDAC
+            # although this is not necessary.
+            # furthermore, these epochs should exist in eitgher voltage-or current clamp
+            # if they do not, we just imply do not provide corresponding measurmements
+            #
+            # also, these are COMMON for all the pathways in the source
             mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
-                                                and not any(x.hasDigitalOutput(d) for d in stimDIG) \
+                                                and not x.hasDigitalOutput(mainDigPathways[0][1].stimulus.channel) \
                                                 and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
                                     dac.epochs))
             
+            
+            if len(mbTestEpochs) == 0:
+                if clampMode in (ClampMode.VoltageClamp, ClampMode.CurrentClamp):
+                    scipywarn("No membrane test epoch appears to have been defined", out = self._stdout_)
+                membraneTestEpoch = None
+                
+            else:
+                membraneTestEpoch = mbTestEpochs[0]
+                testAmplitude = membraneTestEpoch.firstLevel
+                testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
+                testDuration = membraneTestEpoch.firstDuration
+                
+                # figure out where this epoch occurs:
+                # if testStart + testDuration < dac TODO 2024-02-19 22:59:46
+                
             # ⇒ expect the protocol to have
             # as many sweeps as pathways in this source
             
@@ -1404,21 +1466,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # NOTE: for the moment, I do not expect to have more than one such epoch
                 # WARNING we require a membrane test epoch in voltage clamp;
                 # in current clamp this is not mandatory as we may be using field recordings
-                if len(mbTestEpochs) == 0:
-                    if self._clampMode_ == ephys.ClampMode.VoltageClamp:
-                        raise ValueError("No membrane test epoch appears to have been defined")
-                    self._membraneTestEpoch_ = None
-                    
-                else:
-                    self._membraneTestEpoch_ = mbTestEpochs[0]
-                
-                # if clampMode == ClampMode.VoltageClamp:
-                    
-                
                 # locate sweeps and epochs where the pathway's digital stimulus is emitted
                 # we need the active DAC here (which is the one where DIG output is enabled)
                 # 
-                # the sweep returned here is also the sweep where we carry out measurements
+                # the sweep(s) returned here is also the sweep where we carry out measurements
                 sweepsEpochsForDig = protocol.getDigitalChannelUsage(p.stimulus.channel, activeDAC)
                 
                 if len(sweepsEpochsForDig) == 0:
@@ -1696,25 +1747,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     # TODO: 2024-02-16 23:03:34
     # carry on with code from processTrackingProtocol @ NOTE: 2024-02-16 23:04:22
         
-#     def storeProtocol(self, protocol:pab.ABFProtocol):
-#         if protocol.nSweeps == 2:
-#             assert(dac.alternateDigitalOutputStateEnabled), "Alternate Digital Output should have been enabled"
-#             assert(not dac.alternateDACOutputStateEnabled), "Alternate Waveform should have been disabled"
-#             
-#         if self._runData_.protocol is None:
-#             self._runData_.newEpisode = True
-#             
-#         self._runData_.protocol = protocol
-#         
-#         if self._runData_.currentProtocolIsConditioning:
-#             self._runData_.newEpisode
-#             self._runData_.conditioningProtocols.append(protocol)
-#         else:
-#             self._runData_.monitoringProtocols.append(protocol)
-#         
-#         if self._runData_.newEpisode:
-#             self.processTrackingProtocol(protocol)
-
     def processTrackingProtocol(self, protocol:pab.ABFProtocol):
         """Infers the timings of the landmarks from protocol.
         Called only when self._monitorProtocol_ is None (i.e., at first run)
