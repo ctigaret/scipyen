@@ -1733,8 +1733,8 @@ Returns the signal and the command, possibly with units modified as expected for
 
 def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal], 
                        **kwargs) -> tuple:
-    """Detects or checks the timing and amplitude of the command signal for a membrane test (boxcar).
-Returns a tuple (start, stop, test_amplitude)"""
+    """Detects or checks the timing and amplitude of a membrane test waveform (boxcar).
+    Returns a tuple (start, stop, test_amplitude)"""
     up_first = kwargs.pop("up_first", True)
     boxduration = kwargs.pop("boxduration", None) # tuple min , max
     
@@ -4085,9 +4085,9 @@ def _(c0: typing.Union[DataCursor, SignalCursor], c1: typing.Union[DataCursor, S
 def membraneTestVClampMeasure(base: typing.Union[DataCursor, SignalCursor],
                               Rs: typing.Union[DataCursor, SignalCursor],
                               Rin: typing.Union[DataCursor, SignalCursor],
-                              name:str = "membrane_test_vc",
+                              name:str = "DC Rs Rin",
                               channel: int = 0,
-                              relative:bool=False) -> LocationMeasure:
+                              relative:bool=True) -> LocationMeasure:
     """LocationMeasure factory for membrane test in voltage-clamp.
     Calculates DC, Rs and Rin based on three cursors (baseline, Rs and Rin).
 
@@ -4106,6 +4106,37 @@ def membraneTestVClampMeasure(base: typing.Union[DataCursor, SignalCursor],
         return (_dc, _rs, _rin)
     
     return LocationMeasure(_func_, (base, Rs, Rin), name, channel, relative)
+    
+def membraneTestVClampRs(base: typing.Union[DataCursor, SignalCursor],
+                   Rs: typing.Union[DataCursor, SignalCursor],
+                   name:str = "Rs",
+                   channel: int = 0,
+                   relative: bool = True) -> LocationMeasure:
+    
+    def _func_(s, c1, c2, testVmDelta:pq.Quantity, channel:int = 0, relative:bool = True):
+        _dc  = cursor_average(s, c1)
+        _rs  = (testVmDelta / ((cursor_max(s, c2) if testVmDelta > 0 else cursor_min(s, c2)) - _dc)).rescale(pq.megaohm)
+        # _rin = (testVmDelta / (cursor_average(s, c3) - _dc)).rescale(pq.megaohm)
+
+        return _rs
+        
+    return LocationMeasure(_func_, (base, Rs), name, channel, relative)
+    
+
+def membraneTestVClampRin(base: typing.Union[DataCursor, SignalCursor],
+                   Rin: typing.Union[DataCursor, SignalCursor],
+                   name:str = "Rs",
+                   channel: int = 0,
+                   relative: bool = True) -> LocationMeasure:
+    
+    def _func_(s, c1, c2, testVmDelta:pq.Quantity, channel:int = 0, relative:bool = True):
+        _dc  = cursor_average(s, c1)
+        # _rs  = (testVmDelta / ((cursor_max(s, c2) if testVmDelta > 0 else cursor_min(s, c2)) - _dc)).rescale(pq.megaohm)
+        _rin = (testVmDelta / (cursor_average(s, c3) - _dc)).rescale(pq.megaohm)
+
+        return _rin
+        
+    return LocationMeasure(_func_, (base, Rin), name, channel, relative)
     
 
 def signal_measures_in_segment(s: neo.Segment, 

@@ -1699,7 +1699,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """
         if not isinstance(adc, ABFInputConfiguration):
             adc = self.getADC(adc, physical=physicalADC) # get first (primary) input by default
-        # adc = self.inputConfiguration(adcIndex, physical=physicalADC) # get first (primary) input by default
 
         if adc is None:
             raise ValueError(f"{'Physical' if physicalADC else 'Logical'} ADC index {adcIndex} is invalid for this protocol")
@@ -1843,13 +1842,26 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """Calls self.getDAC(…)"""
         return self.getDAC(index, physical)
     
-    def getDigitalChannelUsage(self, digChannel:int, dac:ABFOutputConfiguration, 
-                               epochIndexes:bool=False, train:typing.Optional[bool] = None) -> tuple:
+    def getDigitalChannelUsage(self, digChannel:int, dac:typing.Union[ABFOutputConfiguration, str, int], 
+                               epochIndexes:bool=False, train:typing.Optional[bool] = None,
+                               physical:bool=True) -> tuple:
         """Looks up the sweeps and epochs where a digital channel emits a TTL pulse or train
         See ABFOutputConfiguration.getEpochsForDigitalChannel documentation for 
         details.
         
+        Returns a tuple of (sweep index ↔ epochs list) pairs
+        
         """
+        if not isinstance(digChannel, int):
+            raise TypeError(f"`digChannel` expected an int; instead got {type(digChannel).__name__} ")
+        if digChannel < 0 or digChannel >= self.nDigitalChannels:
+            raise ValueError(f"Invalid `digChannel` ({digChannel}); expecting a value in {range(self.nDigitalChannels)}")
+        
+        if isinstance(dac, (int, str)):
+            dac = self.getDAC(dac, physical=physical)
+        elif not isinstance(dac, ABFOutputConfiguration):
+            raise TypeError(f"`dac` expected an ABFOutputConfiguration, a str (DAC name) or int (DAC index); instead, got {type(dac).__name__}")
+        
         return tuple(filter(lambda x: len(x[1]), ((k, dac.getEpochsForDigitalChannel(digChannel, k, indexes = epochIndexes, train=train)) for k in range(self.nSweeps))))
         
     

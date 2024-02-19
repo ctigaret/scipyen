@@ -685,6 +685,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if isinstance(self._runData_.locationMeasures, (list, tuple)) and all(isinstance(l, LocationMeasure) for l in self._runData_.locationMaeasures):
                 # TODO: 2024-02-18 23:28:45 URGENTLY
                 # use location emasures to measure on pathways' ADC
+                scipywarn(f"Using custom location measures is not yet supported", out = self._stdout_)
                 pass
             else:
                 protocol = pab.ABFProtocol(abfRun)
@@ -1119,11 +1120,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         # NOTE: 2024-02-18 15:58:07
         # this sets up a pathways "layout", a dict:
-        #   recording source ↦ dict:
-        #       pathway index (in the sequence of source-specific pathways) ↦ dict:
-        #           "sweep" ↦ sweep index (segment index)
-        #           "measures" ↦ collection of LocationMeasure objects
+        #   recording source ↦ dict: int ↦ dict, where
+        #                           int:  pathway index (in the sequence of source-specific pathways)
+        #                           dict: int:sweep ↦ sequence of measures
         #   
+        
+        pathwaysLayout = dict() # ← the function needs to return this
+        
         
         # sourceDACs = [s.dac for s in self._runData_.sources]
         # group pathways by their sources
@@ -1242,11 +1245,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #       DAC (with higher index) to trigger a 3ʳᵈ party device ONLY
         #       during the "alternative" pathway stimulation
         
-        # for src in sources:
-        # NOTE: 2024-02-17 13:47:29
-        # sources are supplied by _runData_, so save a few function calls
+        # this channel 
+        activeDAC = protocol.activeDACChannel
+        
+        # these are the protocol's DACs where digital output is emitted during the recording
+        digOutDacs = list(filter(lambda x: x.digitalOutputEnabled, (protocol.outputConfiguration(k) for k in range(protocol.nDACChannels))))
+        
+        # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
+        # if len(digOutDacs) == 0:
+        #     raise ValueError("The protocol indicates there are no DAC channels with digital output enabled")
+        
+        # digOutDACIndex = digOutDacs[0].number
         
         for src in self._runData_.sources:
+            pathwaysLayout[src] = dict()
             # TODO: 2024-02-17 23:13:20
             # below pathways are identified by the DIG channel used to stimulate;
             # must adapt code to identify paths where stimulus is delivered via
@@ -1260,6 +1272,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # these are pathways defined for this particular source
             pathways = [p for p in self._runData_.pathways if p.source == src]
             
+            # no pathways defined in this source - surely an error in the 
+            # arguments to the LTPOnline call but can never say for sure
             if len(pathways) == 0:
                 continue
             
@@ -1268,31 +1282,40 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # NOTE: 2024-02-17 16:37:26
             # this should be configured in the protocol, in any case
             # as noted above, a DIG output MAY be also used to trigger 3ʳᵈ party device
+            #
+            # will be empty if len(digOutDacs ) == 0
             mainDIGOut = protocol.digitalOutputs(alternate=False)
             
             # as noted above, additional DIG outputs MAY be used to trigger 3ʳᵈ party device
             # furthermore, this is an empty set when the protocol does not enable
             # alternate digital outputs; 
             #
-            # this is an empty set when alternateDigitalOutputStateEnabled is False
+            # this is an empty set when alternateDigitalOutputStateEnabled is False;
+            # also, will be empty if len(digOutDacs ) == 0
             altDIGOut = protocol.digitalOutputs(alternate=True)
             
             protocolDACNdx = protocol.physicalDACIndexes
             
-            mainDigPathways = list()
-            altDigPathways  = list()
-            dacPathways     = list()
+            mainDigPathways = list() # empty if len(digOutDacs ) == 0
+            altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
+            dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
             
             for k, p in enumerate(pathways):
                 if p.stimulus.dig:
+                    assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
+                    
                     if p.stimulus.channel in mainDIGOut:
                         mainDigPathways.append((k, p))
+                        
                     elif p.stimulus.channel in altDIGOut:
                         altDigPathways.append((k, p))
                         
                 elif p.stimulus.channel in protocolDACNdx:
                     dacPathways.append((k, p))
                     
+            # total number of pathways recorded in this protocol; it should be ≤ total number of pathways in _runData_
+            # NOTE: 2024-02-19 18:30:22 TODO: consider NOT pre-populating the pathways field in _runData_
+            # but rather parse the sources here and populate with pathways as necessary.
             nPathways = len(mainDigPathways) + len(altDigPathways) + len(dacPathways)
             
             if nPathways == 0:
@@ -1341,6 +1364,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #   2.1) averaging will be turned off in Clampex ⟹ ABF files contain
             #       immediate data, which may be averaged offline (TODO: pass arguments to the LTPOnline)
             
+            adc = protocol.getADC(p.source.adc)
+            dac = protocol.getDAC(p.source.dac)
+            
+            clampMode = protocol.getClampMode(adc, activeDAC)
+            
+            mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
+                                                and not any(x.hasDigitalOutput(d) for d in stimDIG) \
+                                                and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
+                                    dac.epochs))
             
             # ⇒ expect the protocol to have
             # as many sweeps as pathways in this source
@@ -1360,20 +1392,49 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # bottom line: the protocol should provide at least as many sweeps 
             #   as the maximum number of patwhays stimulated by it 
             
-            assert protocol.nSweeps >= nPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nPathways} pathways"
+            # assert protocol.nSweeps >= nPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nPathways} pathways"
             
             # in a multi-pathway protocol, the "main" digital pathways are always
             # delivered on the even-numbered sweeps: 0, 2, etc.
             #
             for k, p in mainDigPathways:
-                adc = protocol.getADC(p.source.adc)
-                dac = protocol.getDAC(p.source.dac)
-                activeDAC = protocol.activeDACChannel
+                pathwayMeasures = list() # to store location measures here
                 
-                clampMode = protocol.getClampMode(adc, dac)
+                
+                # NOTE: for the moment, I do not expect to have more than one such epoch
+                # WARNING we require a membrane test epoch in voltage clamp;
+                # in current clamp this is not mandatory as we may be using field recordings
+                if len(mbTestEpochs) == 0:
+                    if self._clampMode_ == ephys.ClampMode.VoltageClamp:
+                        raise ValueError("No membrane test epoch appears to have been defined")
+                    self._membraneTestEpoch_ = None
+                    
+                else:
+                    self._membraneTestEpoch_ = mbTestEpochs[0]
+                
+                # if clampMode == ClampMode.VoltageClamp:
+                    
                 
                 # locate sweeps and epochs where the pathway's digital stimulus is emitted
-                sweepsForDig = protocol.getDigitalChannelUsage(p.stimulus.channel, activeDAC)
+                # we need the active DAC here (which is the one where DIG output is enabled)
+                # 
+                # the sweep returned here is also the sweep where we carry out measurements
+                sweepsEpochsForDig = protocol.getDigitalChannelUsage(p.stimulus.channel, activeDAC)
+                
+                if len(sweepsEpochsForDig) == 0:
+                    raise RuntimeError(f"The specified DIG channel {p.stimulus.channel} appears to be disabled in all sweeps")
+                
+                if len(sweepsEpochsForDig) > 1:
+                    # TODO: Check for crosstalk
+                    pass
+                    # raise RuntimeError(f"The specified DIG channel {p.stimulus.channel} appears to be active in more than one sweep ({k[0] for k in sweepsEpochsForDig})")
+                
+                digStimEpochs = sweepsEpochsForDig[0][1]
+                # if len(digStimEpochs) > 1
+                
+                pathwaysLayout[src][k][sweepsEpochsForDig[0][0]] = pathwayMeasures
+                
+                    
                 
                 # TODO 2024-02-18 23:23:55 finish this up
                 
