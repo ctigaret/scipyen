@@ -106,8 +106,9 @@ from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker)
 import iolib.pictio as pio
 #### END pict.iolib modules
 
+from ephys.ephys_protocol import ElectrophysiologyProtocol
 import ephys.ephys as ephys
-from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure, ElectrophysiologyProtocol,
+from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure,
                          RecordingSource, RecordingEpisode, RecordingEpisodeType,
                          RecordingSchedule,
                          SynapticStimulus, SynapticPathway, AuxiliaryInput, AuxiliaryOutput,
@@ -1419,11 +1420,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                 and not any(x.hasDigitalOutput(d) for d in (syn_stim_digs)) \
                                                 and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
                                     dac.epochs))
-#             mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
-#                                                 and not x.hasDigitalOutput(mainDigPathways[0][1].stimulus.channel) \
-#                                                 and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
-#                                     dac.epochs))
-#             
             
             if len(mbTestEpochs) == 0:
                 if clampMode in (ClampMode.VoltageClamp, ClampMode.CurrentClamp):
@@ -1485,15 +1481,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # for synaptic stimulation
                 # since I now strive to support DAC-emulated TTL as well, I
                 # prefer the name `digStimEpochs`
-                _synTrainStimEpochs = list(filter(lambda x: len(x.getTrainDigitalOutputChannels("all"))>0, 
+                synTrainStimEpochs = list(filter(lambda x: len(x.getTrainDigitalOutputChannels("all"))>0, 
                                     activeDAC.epochs))
-                _synPulseStimEpochs = list(filter(lambda x: len(x.getPulseDigitalOutputChannels("all"))>0, 
+                synPulseStimEpochs = list(filter(lambda x: len(x.getPulseDigitalOutputChannels("all"))>0, 
                                     activeDAC.epochs))
                 
-                _synStimEpochs = _synTrainStimEpochs + _synPulseStimEpochs
+                synStimEpochs = synTrainStimEpochs + synPulseStimEpochs
                 
-                assert all((e in _synStimEpochs) for e in sweepsEpochsForDig[0][1]), f"Epochs inconsistencies for pathway {k}"
-                # assert all(i==j for i, j in zip(sweepsEpochsForDig[0][1], _synStimEpochs)) f"Epochs inconsistencies for pathway {k}"
+                assert all((e in synStimEpochs) for e in sweepsEpochsForDig[0][1]), f"Epochs inconsistencies for pathway {k}"
+                # assert all(i==j for i, j in zip(sweepsEpochsForDig[0][1], synStimEpochs)) f"Epochs inconsistencies for pathway {k}"
                 
                 if len(sweepsEpochsForDig) == 0:
                     raise RuntimeError(f"The specified DIG channel {p.stimulus.channel} appears to be disabled in all sweeps")
@@ -1515,6 +1511,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 stimDIG = unique(digStimEpoch.getUsedDigitalOutputChannels("all"))
                 
+                # now, figure out start & duration for signal baseline and for synaptic response bseline(s)
+                # we compute: 
+                # signalBaselineStart, signalBaselineDuration, responseBaselineStart, responseBaselineDuration
                 if isinstance(membraneTestEpoch, pab.ABFEpoch):
                     if testStart + testDuration < dac.getEpochRelativeStartTime(digStimEpoch, 0):
                         if testStart == 0:
@@ -1542,7 +1541,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                 
                         
                         responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._runData_.responseBaselineDuration \
-                                                                    and dac.getEpochRelativeStartTime(x, 0) > self._mbTestStart_ + self._mbTestDuration_ \
+                                                                    and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
                                                                     and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
                                                             dac.epochs))
                         
@@ -1551,9 +1550,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             responseBaselineStart = dac.getEpochRelativeStartTime(responseBaselineEpochs[-1], 0)
                         
                         else:
-                            responseBaselineStart = activeDAC.getEpochRelativeStartTime(_synStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
+                            responseBaselineStart = activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
                             
-                    elif testStart > activeDAC.getEpochRelativeStartTime(_synStimEpochs[-1], 0) + _synStimEpochs[-1].firstDuration:
+                    elif testStart > activeDAC.getEpochRelativeStartTime(synStimEpochs[-1], 0) + synStimEpochs[-1].firstDuration:
                         # mb test delivered somweherte towards th eend of the sweep
                         # in any case LATER than the triggers (and hopefully AFTER synaptic responses
                         # have decayed to baseline)
@@ -1562,7 +1561,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         # or the dac holding
                         #
                             
-                        initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  activeDAC.getEpochRelativeStartTime(_synStimEpochs[0], 0) \
+                        initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) \
                                                             and x.firstDuration > 0 and x.deltaDuration == 0, 
                                                         dac.epochs))
                 
@@ -1578,21 +1577,32 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                 
                         else:
                             # no epochs before the membrane test (odd, but can be allowed...)
-                            signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(_synStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
-                            signalBaselineDuration = max(dac.holdingTime, _synStimEpochs[0].firstDuration)
+                            signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
+                            signalBaselineDuration = max(dac.holdingTime, synStimEpochs[0].firstDuration)
                     
                         # Now, determine the response baseline for this scenario.
                         responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._runData_.responseBaselineDuration \
                                                                     and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-                                                                    and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(_synStimEpochs[0], 0) - self._runData_.responseBaselineDuration,
+                                                                    and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - self._runData_.responseBaselineDuration,
                                                             dac.epochs))
                         
                         if len(responseBaselineEpochs):
                             # take the last one
-                            self._responseBaselineStart_ = dac.getEpochRelativeStartTime(responseBaselineEpochs[-1], 0)
+                            responseBaselineStart = dac.getEpochRelativeStartTime(responseBaselineEpochs[-1], 0)
                         
                         else:
-                            self._responseBaselineStart_ = digdac.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
+                            responseBaselineStart = activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
+                            
+                    else:
+                        raise RuntimeError(f"Cannnot determine respone baseline")
+                    
+                else:
+                    # no membrane test epoch configured (e.g. field recording)
+                    
+                    signalBaselineStart = self._runData_.signalBaselineStart
+                    signalBaselineDuration = self._runData_.signalBaselineDuration
+                    responseBaselineStart = dac.synStimEpochs[0].
+                    responseBaselineDuration = self._runData_.responseBaselineDuration
                     
                 
                 pathwaysLayout[src][k][sweepsEpochsForDig[0][0]] = pathwayMeasures
@@ -2264,10 +2274,10 @@ class LTPOnline(QtCore.QObject):
                  useEmbeddedProtocol:bool=True,
                  trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.CurrentClamp,
-                 baselineDurations:pq.Quantity = 5 * pq.ms,
+                 baselineDuration:pq.Quantity = 5 * pq.ms,
                  steadyStateIClampMbTestDuration = 0.05 * pq.s,
                  useSlopeInIClamp:bool = True,
-                 signalBaselineStart:typing.Optional[pq.Quantity] = None,
+                 signalBaselineStart:typing.Optional[pq.Quantity] = 0 * pq.s,
                  signalBaselineDuration:typing.Optional[pq.Quantity] = None,
                  emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
@@ -2285,7 +2295,7 @@ class LTPOnline(QtCore.QObject):
         
         self._running_ = False
         self._sources_ = None # preallocate
-        self._locationMeasures_ = locationMeasures
+        # self._locationMeasures_ = locationMeasures
         
         # self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
         
@@ -2322,26 +2332,26 @@ class LTPOnline(QtCore.QObject):
         # source still needed to group pathways by sources !!! (saves a few iterations)
         self._runData_ = DataBag(sources = self._sources_,
                                  pathways = self._pathways_,
-                                 locationMeasures = self._locationMeasures_,
                                  recordedPathways = dict(),
                                  # episodeName = self._currentEpisodeName_,
                                  currentProtocol = None,
                                  # currentEpisode = episode,
                                  sweeps = 0,
-                                   # data = self._data_,
-                                   # newEpisode = True,
-                                   # episodes = dict(), # map episode name to data
-                                   abfRunTimesMinutes = list(),
-                                   abfRunDeltaTimesMinutes = list(),
-                                   baselineDurations = baselineDurations,
-                                   steadyStateIClampMbTestDuration = steadyStateIClampMbTestDuration,
-                                   trackingClampMode = trackingClampMode,
-                                   conditioningClampMode = conditioningClampMode,
-                                   useSlopeInIClamp = useSlopeInIClamp,
-                                   signalBaselineStart = signalBaselineStart,
-                                   signalBaselineDuration = signalBaselineDuration,
-                                   currentProtocolIsConditioning = False,
-                                   useEmbeddedProtocol = useEmbeddedProtocol)
+                                 # data = self._data_,
+                                 # newEpisode = True,
+                                 # episodes = dict(), # map episode name to data
+                                 abfRunTimesMinutes = list(),
+                                 abfRunDeltaTimesMinutes = list(),
+                                 # steadyStateIClampMbTestDuration = steadyStateIClampMbTestDuration,
+                                 # trackingClampMode = trackingClampMode,
+                                 # conditioningClampMode = conditioningClampMode,
+                                 signalBaselineStart = signalBaselineStart,
+                                 signalBaselineDuration = signalBaselineDuration,
+                                 useSlopeInIClamp = useSlopeInIClamp,
+                                 responseBaselineDuration = baselineDuration,
+                                 locationMeasures = self.locationMeasures,
+                                 # currentProtocolIsConditioning = False,
+                                 useEmbeddedProtocol = useEmbeddedProtocol)
         
         
         # TODO: 2024-01-08 00:04:55 FIXME

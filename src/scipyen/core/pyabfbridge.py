@@ -487,7 +487,7 @@ from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
 # from iolib import pictio as pio # NOTE: not here, so we can import this from
 # pictiio (pio); instead we import pio where it is needed i.e. in getABF()
-from ephys.ephys import (ClampMode, ElectrophysiologyProtocol)
+from ephys.ephys_protocol import ElectrophysiologyProtocol
 
 from pyabf.abf1.headerV1 import HeaderV1
 from pyabf.abf2.headerV2 import HeaderV2
@@ -1663,7 +1663,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                      adc:typing.Union[int, str, ABFInputConfiguration] = 0,
                      dac:typing.Optional[typing.Union[int, str, ABFOutputConfiguration]] = None,
                      physicalADC:bool=True,
-                     physicalDAC:bool=True) -> ClampMode:
+                     physicalDAC:bool=True) -> object:
         """Infers the clamping mode used in the experiemnt run with this protocol.
         
         The inferrence is based on the physical units of the input - output signal
@@ -1696,7 +1696,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
         physicalADC, physicalDAC: bool (default is True for both) indicate if 
             the adcIndex, respectively dacIndex are physical or logical indexes.
             Ignored when those indexes are given as strings (channel names).
+        
+        Returns:
+        
+        an ephys.ephys.ClampMode
+        
         """
+        from ephys.ephys import ClampMode
         if not isinstance(adc, ABFInputConfiguration):
             adc = self.getADC(adc, physical=physicalADC) # get first (primary) input by default
 
