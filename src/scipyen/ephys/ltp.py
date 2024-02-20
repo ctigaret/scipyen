@@ -1253,6 +1253,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # digOutDACIndex = digOutDacs[0].number
         
         for src in self._runData_.sources:
+            # this below maps pathway index to dict sweep index ↦ synaptic pathway
             pathwaysLayout[src] = dict()
             # TODO: 2024-02-17 23:13:20
             # below pathways are identified by the DIG channel used to stimulate;
@@ -1471,7 +1472,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # locate sweeps and epochs where the pathway's digital stimulus is emitted
                 # we need the active DAC here (which is the one where DIG output is enabled)
                 # 
-                # the sweep(s) returned here is also the sweep where we carry out measurements
+                # the sweep(s) returned here is (are) also the sweep(s) where we carry out measurements
                 sweepsEpochsForDig = protocol.getDigitalChannelUsage(p.stimulus.channel, activeDAC)
                 
                 # NOTE: 2024-02-20 08:41:09
@@ -1594,16 +1595,24 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             responseBaselineStart = activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
                             
                     else:
-                        raise RuntimeError(f"Cannnot determine respone baseline")
+                        raise RuntimeError(f"Cannnot determine response baseline")
+                    
+                    # TODO: 2024-02-20 16:24:00
+                    # generate location measures for membrane test
                     
                 else:
                     # no membrane test epoch configured (e.g. field recording)
-                    
+                    # ⇒ response baseline same as signal baseline
+                    #
                     signalBaselineStart = self._runData_.signalBaselineStart
-                    signalBaselineDuration = self._runData_.signalBaselineDuration
-                    responseBaselineStart = dac.synStimEpochs[0].
-                    responseBaselineDuration = self._runData_.responseBaselineDuration
+                    signalBaselineDuration = dac.getEpochRelativeStartTime(synStimEpochs[0],0)
+                    responseBaselineStart = self._runData_.signalBaselineStart
+                    responseBaselineDuration = signalBaselineDuration
                     
+                # FIXME 2024-02-20 16:22:05 in the above:
+                # 1) what to do with paired pulses?
+                # 2) generate location measures for the membrane test (if any)
+                # 3) figure out contigency for crosstalk
                 
                 pathwaysLayout[src][k][sweepsEpochsForDig[0][0]] = pathwayMeasures
                 
