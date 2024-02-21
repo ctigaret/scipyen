@@ -386,8 +386,9 @@ class _LTPFilesSimulator_(QtCore.QThread):
             if self.isInterruptionRequested():
                 self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
                 break
-            if k < (len(self._simulationFiles_)-1):
-                QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
+            QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
+            # if k < (len(self._simulationFiles_)-1):
+            #     QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             
         # if not self._paused_:
         if k < (len(self._simulationFiles_) - 1):
@@ -661,7 +662,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         self._viewers_ = viewers
         self._stdout_ = out
         
-    def print(self, msg):
+    def print(self, msg:object):
         if isinstance(self._stdout_, io.TextIOBase):
             print(msg, file=self._stdout_)
         else:
@@ -690,8 +691,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 pass
             else:
                 protocol = pab.ABFProtocol(abfRun)
-                if protocol.operationMode != pab.ABFAcquisitionMode.episodic_stimulation:
-                    raise ValueError(f"Files must be recorded in episodic mode")
+                opMode = protocol.acquisitionMode # why does this return a tuple ?!?
+                if isinstance(opMode, (tuple, list)):
+                    opMode = opMode[0]
+                assert opMode == pab.ABFAcquisitionMode.episodic_stimulation, f"Files must be recorded in episodic mode"
 
                 # check that the number of sweeps actually stored in the ABF file/neo.Block
                 # equals that advertised by the protocol
@@ -1107,7 +1110,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
     @processProtocol.register(pab.ABFProtocol)
     def _(self, protocol:pab.ABFProtocol):
-        self.print(f"{self.__class__.__name__}.processProtocol {protocol.name}")
+        self.print(f"{self.__class__.__name__}.processProtocol ({protocol.name})")
         
         # NOTE: 2024-02-18 15:58:07
         # this sets up a pathways "layout", a dict:
@@ -1241,16 +1244,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # activeDAC = protocol.activeDACChannel
         activeDAC = protocol.getDAC() # this is the `digdac` in processTrackingProtocol
         
-        
         # these are the protocol's DACs where digital output is emitted during the recording
         # the active DAC is one of these by definition
         digOutDacs = tuple(filter(lambda x: x.digitalOutputEnabled, (protocol.getDAC(k) for k in range(protocol.nDACChannels))))
+        
+        self.print(f"   activeDAC: {activeDAC.name}, digOutDacs: {[d.name for d in digOutDacs]}")
+        
         # will be empty if len(digOutDacs ) == 0
         mainDIGOut = protocol.digitalOutputs(alternate=False)
         
         # this is an empty set when alternateDigitalOutputStateEnabled is False;
         # also, will be empty if len(digOutDacs ) == 0
         altDIGOut = protocol.digitalOutputs(alternate=True)
+        
+        self.print(f"   mainDIGOut: {mainDIGOut}, altDIGOut: {altDIGOut}")
         
         crosstalk = False # to be determined below
         
@@ -1262,6 +1269,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         for src in self._runData_.sources:
             # this below maps pathway index to dict sweep index ↦ synaptic pathway
+            self.print(f"   -----------------")
+            self.print(f"   processing source {src.name}")
             pathwaysLayout[src] = dict()
             # TODO: 2024-02-17 23:13:20
             # below pathways are identified by the DIG channel used to stimulate;
@@ -1286,6 +1295,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             adc = protocol.getADC(src.adc)
             dac = protocol.getDAC(src.dac)
+            
+            self.print(f"   source adc: {adc.name}, dac: {dac.name}")
             
             if dac != activeDAC:
                 if not protocol.alternateDigitalOutputStateEnabled:
@@ -1397,6 +1408,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if nPathways == 2:
                 assert len(mainDigPathways) == 1, "There must be at least one digitally triggered pathway in the protocol"
                 syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
+                
                 assert len(altDigPathways) == 1 or len(dacPathways) == 1, "There can be only one other pathway, triggered either digtially, or via DAC-emulated TTLs"
                 if len(altDigPathways) == 1:
                     # two alternative digitally stimulated pathways — the most
@@ -1413,14 +1425,17 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     assert dacPathways[0][1].stimulus.channel > activeDAC.physicalIndex, "The pathway triggerd by DAC-emulated TTLs must use a higher DAC index than that of the primary pathway"
                     
                     
-            elif nPathways == 1: # alternative pathways do not exist here
+            # elif nPathways == 1: # alternative pathways do not exist here
+            else: # alternative pathways do not exist here; nPathways ≡ 1 
                 if len(mainDigPathways):
                     syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
                     
                 elif len(dacPathways):
                     syn_stim_dacs.append(dacPathways[0][1].stimulus.channel)
                     
-                    
+            
+            self.print(f"   digital channels for synaptic stimulation: {syn_stim_digs}")
+            self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {syn_stim_dacs}")
             
             # figure out the epochs that define synaptic stimulations
             
@@ -1449,6 +1464,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 testAmplitude = membraneTestEpoch.firstLevel
                 testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
                 testDuration = membraneTestEpoch.firstDuration
+                
+                self.print(f"   membraneTestEpoch: {membraneTestEpoch.letter} ({membraneTestEpoch.number}) with:")
+                self.print(f"       amplitude: {testAmplitude}")
+                self.print(f"       start: {testStart}")
+                self.print(f"       duration: {testDuration}")
+                self.print(f"       -----")
                 
             # NOTE: 2024-02-20 23:42:12
             # figure out where this epoch occurs:
@@ -1479,6 +1500,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # delivered on the even-numbered sweeps: 0, 2, etc.
             #
             for k, p in mainDigPathways:
+                self.print(f"   processing pathway {k} ({p.name})")
                 pathwayMeasures = list() # to store location measures here
                 
                 
@@ -1510,6 +1532,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                     activeDAC.epochs))
                 
                 synStimEpochs = synTrainStimEpochs + synPulseStimEpochs
+                
+                
+                ee = ", ".join([f"{e.letter} ({e.number})" for e in synStimEpochs])
+                self.print(f"       synaptic stimulation epochs: {ee}")
+                
+                self.print(f"       DIG channel {p.stimulus.channel} active in sweeps {[sed[0] for sed in sweepsEpochsForDig]}")
+                
                 
                 assert all((e in synStimEpochs) for e in sweepsEpochsForDig[0][1]), f"Epochs inconsistencies for pathway {k}"
                 # assert all(i==j for i, j in zip(sweepsEpochsForDig[0][1], synStimEpochs)) f"Epochs inconsistencies for pathway {k}"
@@ -2416,7 +2445,7 @@ class LTPOnline(QtCore.QObject):
                                  signalBaselineDuration = signalBaselineDuration,
                                  useSlopeInIClamp = useSlopeInIClamp,
                                  responseBaselineDuration = baselineDuration,
-                                 locationMeasures = self.locationMeasures,
+                                 locationMeasures = locationMeasures,
                                  # currentProtocolIsConditioning = False,
                                  useEmbeddedProtocol = useEmbeddedProtocol)
         

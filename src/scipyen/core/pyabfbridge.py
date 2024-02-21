@@ -1016,7 +1016,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._digUseLastEpochHolding_ = bool(obj._protocolSection.nDigitalInterEpisode)
             # ### END   digital outputs information
             
-            self._acquisitionMode_ = ABFAcquisitionMode.type(obj.nOperationMode)
+            self._acquisitionMode_ = ABFAcquisitionMode.namevalue(obj.nOperationMode)
             self._nSweeps_ = obj._protocolSection.lEpisodesPerRun
             self._nRuns_   = obj._protocolSection.lRunsPerTrial
             self._nTrials_ = obj._protocolSection.lNumberOfTrials
@@ -1783,6 +1783,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if len(inputconfs):
             return inputconfs[0]
         else:
+            ndx = adcChannel if physical else self.adcLogical2PhysicalIndexMap[adcChannel]
+            if ndx in range(self.nADCChannels):
+                return self.inputs[ndx]
             chtype = "physical" if physical else "logical"
             raise ValueError(f"Invalid {chtype} ADC channel specified {adcChannel}")
 
