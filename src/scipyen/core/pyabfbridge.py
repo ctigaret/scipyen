@@ -578,10 +578,18 @@ class ABFEpoch:
         
     @property
     def letter(self) -> str:
+        """Epoch's letter in the epochs index.
+        E.g., 'A', 'B', etc"""
         return getEpochLetter(self.number)
     
     @property
     def number(self) -> int:
+        """Alias to self.index"""
+        return self._epochNumber_
+    
+    @property
+    def index(self) -> int:
+        """Index of thsi epochs in the Epochs table"""
         return self._epochNumber_
     
     @number.setter

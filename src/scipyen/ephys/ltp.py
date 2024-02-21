@@ -1245,6 +1245,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # these are the protocol's DACs where digital output is emitted during the recording
         # the active DAC is one of these by definition
         digOutDacs = tuple(filter(lambda x: x.digitalOutputEnabled, (protocol.getDAC(k) for k in range(protocol.nDACChannels))))
+        # will be empty if len(digOutDacs ) == 0
+        mainDIGOut = protocol.digitalOutputs(alternate=False)
+        
+        # this is an empty set when alternateDigitalOutputStateEnabled is False;
+        # also, will be empty if len(digOutDacs ) == 0
+        altDIGOut = protocol.digitalOutputs(alternate=True)
+        
+        crosstalk = False # to be determined below
         
         # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
         # if len(digOutDacs) == 0:
@@ -1276,8 +1284,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if len(pathways) == 0:
                 continue
             
-            adc = protocol.getADC(p.source.adc)
-            dac = protocol.getDAC(p.source.dac)
+            adc = protocol.getADC(src.adc)
+            dac = protocol.getDAC(src.dac)
             
             if dac != activeDAC:
                 if not protocol.alternateDigitalOutputStateEnabled:
@@ -1291,16 +1299,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # this should be configured in the protocol, in any case
             # as noted above, a DIG output MAY be also used to trigger 3ʳᵈ party device
             #
-            # will be empty if len(digOutDacs ) == 0
-            mainDIGOut = protocol.digitalOutputs(alternate=False)
             
             # as noted above, additional DIG outputs MAY be used to trigger 3ʳᵈ party device
             # furthermore, this is an empty set when the protocol does not enable
             # alternate digital outputs; 
             #
-            # this is an empty set when alternateDigitalOutputStateEnabled is False;
-            # also, will be empty if len(digOutDacs ) == 0
-            altDIGOut = protocol.digitalOutputs(alternate=True)
             
             mainDigPathways = list() # empty if len(digOutDacs ) == 0
             altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
@@ -1308,7 +1311,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             for k, p in enumerate(pathways):
                 if p.stimulus.dig:
-                    assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
+                    # assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
+                    assert dac in digOutDacs, f"The DAC channel ({dac.physicalIndex}) for pathway {k} does not appear to have DIG outputs enabled"
                     
                     if p.stimulus.channel in mainDIGOut:
                         mainDigPathways.append((k, p))
@@ -1407,6 +1411,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # the same as the source's DAC channel (the one sending analog commands)
                     assert activeDAC == dac, "Active DAC channel must be the same as used for analog command"
                     assert dacPathways[0][1].stimulus.channel > activeDAC.physicalIndex, "The pathway triggerd by DAC-emulated TTLs must use a higher DAC index than that of the primary pathway"
+                    
+                    
+            elif nPathways == 1: # alternative pathways do not exist here
+                if len(mainDigPathways):
+                    syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
+                    
+                elif len(dacPathways):
+                    syn_stim_dacs.append(dacPathways[0][1].stimulus.channel)
+                    
+                    
             
             # figure out the epochs that define synaptic stimulations
             
@@ -1436,8 +1450,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
                 testDuration = membraneTestEpoch.firstDuration
                 
-                # figure out where this epoch occurs:
-                # if testStart + testDuration < dac TODO 2024-02-19 22:59:46
+            # NOTE: 2024-02-20 23:42:12
+            # figure out where this epoch occurs:
+            # if testStart + testDuration < dac TODO 2024-02-19 22:59:46
+            # → done per each pathway, below
                 
             # ⇒ expect the protocol to have
             # as many sweeps as pathways in this source
@@ -1473,7 +1489,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # we need the active DAC here (which is the one where DIG output is enabled)
                 # 
                 # the sweep(s) returned here is (are) also the sweep(s) where we carry out measurements
+                # NOTE: 2024-02-20 23:45:58
+                # if there are more than one sweeps, this is likely a crosstalk protocol
+                # to be confirmed by the number of stimuli on each path way and
+                # the order of pathways in the protocol
                 sweepsEpochsForDig = protocol.getDigitalChannelUsage(p.stimulus.channel, activeDAC)
+                
                 
                 # NOTE: 2024-02-20 08:41:09
                 # this is to check the sweepsEpochsForDig approach against the
@@ -1484,6 +1505,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # prefer the name `digStimEpochs`
                 synTrainStimEpochs = list(filter(lambda x: len(x.getTrainDigitalOutputChannels("all"))>0, 
                                     activeDAC.epochs))
+                
                 synPulseStimEpochs = list(filter(lambda x: len(x.getPulseDigitalOutputChannels("all"))>0, 
                                     activeDAC.epochs))
                 
@@ -1500,23 +1522,32 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     pass
                     # raise RuntimeError(f"The specified DIG channel {p.stimulus.channel} appears to be active in more than one sweep ({k[0] for k in sweepsEpochsForDig})")
                 
-                digStimEpochs = sweepsEpochsForDig[0][1] # a list
+                
+                responseBaselineDuration = self._runData_.responseBaselineDuration
+                
+                digStimEpochs = sweepsEpochsForDig[0][1] # a list with epochs that emit on the SAME digital channel
                 
                 if len(digStimEpochs) == 0:
                     raise RuntimeError(f"No digital stimulation epochs found in the protocol, for pathway {k} in source {src}")
                 
-                if len(digStimEpochs) > 1:
-                    scipywarn(f"For pathway {k} in source {src} there are {len(digStimEpochs)} in the protocol; will use the first one")
+                # if len(digStimEpochs) > 1:
+                    # below, this is contentious: what if the user decided to 
+                    # use more than one epoch to emulate a digital TTL train?
+                    # so better use them all
+                    # scipywarn(f"For pathway {k} in source {src} there are {len(digStimEpochs)} in the protocol; will use the first one")
                     
-                digStimEpoch = digStimEpochs[0]
+                firstDigStimEpoch = digStimEpochs[0]
                 
-                stimDIG = unique(digStimEpoch.getUsedDigitalOutputChannels("all"))
+                # collection of unique digital channels used for stimulation on THIS pathway
+                stimDIG = unique(list(itertools.chain.from_iterable(e.getUsedDigitalOutputChannels("all") for e in digStimEpochs)))
                 
-                # now, figure out start & duration for signal baseline and for synaptic response bseline(s)
+                # now, figure out start & duration for signal baseline and for synaptic response baseline(s)
                 # we compute: 
                 # signalBaselineStart, signalBaselineDuration, responseBaselineStart, responseBaselineDuration
                 if isinstance(membraneTestEpoch, pab.ABFEpoch):
-                    if testStart + testDuration < dac.getEpochRelativeStartTime(digStimEpoch, 0):
+                    if testStart + testDuration < dac.getEpochRelativeStartTime(firstDigStimEpoch, 0):
+                        # membrane test occurs BEFORE digital simulation epochs,
+                        # possibly with intervening epochs (for response baselines)
                         if testStart == 0:
                             signalBaselineStart = 0*pq.s
                             signalBaselineDuration = testStart
@@ -1540,34 +1571,50 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                 signalBaselineStart = max(testStart -2 * dac.holdingTime, 0*pq.s)
                                 signalBaselineDuration = max(dac.holdingTime, testDuration)
                                 
+                        # any epochs intervening between membrane test and digStimEpochs
+                        # and between consecutive digStimEpochs - 
+                        # (do we really care ?!? just use line below:)
+                        # howeverm keep the code just in case the user did provide baseline epochs intervening
+                        # between mb test and first stim and between consecutive stims
+                        #
+                        digStimStarts = [activeDAC.getEpochRelativeStartTime(e)  - responseBaselineDuration for e in digStimEpochs]
                         
-                        responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._runData_.responseBaselineDuration \
+                        ff = lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration
+                        responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
                                                                     and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-                                                                    and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - self._responseBaselineDuration_,
+                                                                    and any([ff(x) <= digStimStarts[0]] + [ff(x) > digStimStarts[k-1] and ff(x) <= digStimStarts[k] for k in range(1, len(digStimStarts))]),
                                                             dac.epochs))
+                        # if len(digStimEpochs) > 1:
+                        # else:
+                        #     responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
+                        #                                                 and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
+                        #                                                 and any(dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0)) - responseBaselineDuration,
+                        #                                         dac.epochs))
                         
                         if len(responseBaselineEpochs):
-                            # take the last one
-                            responseBaselineStart = dac.getEpochRelativeStartTime(responseBaselineEpochs[-1], 0)
+                            responseBaselineStarts = [dac.getEpochRelativeStartTime(e, 0) for e in responseBaselineEpochs]
                         
                         else:
-                            responseBaselineStart = activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
+                            # CAUTION 2024-02-21 00:49:16
+                            # what if the responses are closer in time than responseBaselineDuration ?!?
+                            responseBaselineStarts = digStimStarts
+                            # responseBaselineStarts = activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * responseBaselineDuration
                             
-                    elif testStart > activeDAC.getEpochRelativeStartTime(synStimEpochs[-1], 0) + synStimEpochs[-1].firstDuration:
-                        # mb test delivered somweherte towards th eend of the sweep
-                        # in any case LATER than the triggers (and hopefully AFTER synaptic responses
-                        # have decayed to baseline)
+                    elif testStart > activeDAC.getEpochRelativeStartTime(digStimEpochs[-1], 0) + digStimEpochs[-1].firstDuration:
+                        # mb test delivered AFTGER the last digital simulation epoch 
+                        # ideally, somwehere towards the end of the sweep, 
+                        # hopefully AFTER synaptic responses have decayed to baseline
                         #
-                        # in this case, best is to use the first epoch before the synStimEpochs (if any)
-                        # or the dac holding
+                        # in this case, best is to use the first epoch before the
+                        # digStimEpochs (if any), or the dac holding, as signal baseline (DC)
                         #
                             
-                        initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) \
+                        initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) \
                                                             and x.firstDuration > 0 and x.deltaDuration == 0, 
                                                         dac.epochs))
                 
                         if len(initialEpochs):
-                            # there are epochs before synStimEpochs - are any of these baseline-like?
+                            # there are epochs before digStimEpochs - are any of these baseline-like?
                             baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
                             if len(baselineEpochs):
                                 signalBaselineStart = dac.getEpochRelativeStartTime(baselineEpochs[0], 0)
@@ -1578,21 +1625,31 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                 
                         else:
                             # no epochs before the membrane test (odd, but can be allowed...)
-                            signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
-                            signalBaselineDuration = max(dac.holdingTime, synStimEpochs[0].firstDuration)
+                            signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
+                            signalBaselineDuration = max(dac.holdingTime, digStimEpochs[0].firstDuration)
                     
                         # Now, determine the response baseline for this scenario.
-                        responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= self._runData_.responseBaselineDuration \
+                        digStimStarts = [activeDAC.getEpochRelativeStartTime(e)  - responseBaselineDuration for e in digStimEpochs]
+                        
+                        ff = lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration
+
+                        responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
                                                                     and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-                                                                    and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - self._runData_.responseBaselineDuration,
+                                                                    and any([ff(x) <= digStimStarts[0]] + [ff(x) > digStimStarts[k-1] and ff(x) <= digStimStarts[k] for k in range(1, len(digStimStarts))]),
                                                             dac.epochs))
+
+                        # responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
+                        #                                             and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
+                        #                                             and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - responseBaselineDuration,
+                        #                                     dac.epochs))
                         
                         if len(responseBaselineEpochs):
                             # take the last one
-                            responseBaselineStart = dac.getEpochRelativeStartTime(responseBaselineEpochs[-1], 0)
+                            responseBaselineStarts = [dac.getEpochRelativeStartTime(e, 0) for e in responseBaselineEpochs]
                         
                         else:
-                            responseBaselineStart = activeDAC.getEpochRelativeStartTime(synStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
+                            responseBaselineStarts = digStimStarts
+                            # responseBaselineStart = activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
                             
                     else:
                         raise RuntimeError(f"Cannnot determine response baseline")
@@ -1606,15 +1663,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     #
                     signalBaselineStart = self._runData_.signalBaselineStart
                     signalBaselineDuration = dac.getEpochRelativeStartTime(synStimEpochs[0],0)
-                    responseBaselineStart = self._runData_.signalBaselineStart
-                    responseBaselineDuration = signalBaselineDuration
+                    responseBaselineStarts = [self._runData_.signalBaselineStart]
+                    # responseBaselineDuration = signalBaselineDuration
                     
                 # FIXME 2024-02-20 16:22:05 in the above:
                 # 1) what to do with paired pulses?
                 # 2) generate location measures for the membrane test (if any)
                 # 3) figure out contigency for crosstalk
                 
-                pathwaysLayout[src][k][sweepsEpochsForDig[0][0]] = pathwayMeasures
+                # commented out for now
+                # pathwaysLayout[src][k][sweepsEpochsForDig[0][0]] = pathwayMeasures
                 
                     
                 
