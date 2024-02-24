@@ -416,7 +416,6 @@ class DataZone(DataObject):
                              .format(len(labels), self.size))
         self._labels = np.array(labels)
 
-# class Interval(collections.namedtuple("Interval", ("t0", "t1", "name", "extent"))):
 @dataclass
 class Interval:
     """Encapsulates an interval of a signal in a Cartesian axis system.

@@ -60,7 +60,7 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter, with_doc)
+from core.prog import (safeWrapper, AttributeAdapter, with_doc, printStyled)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -4711,7 +4711,3 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
 #     return RecordingSource(name, 0, 0, synStims)
 #     
 
-def printStyled(s:str, color:str='yellow', bright:bool=True):
-    c = getattr(colorama.Fore, color.upper())
-    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
-    return f"{pre}{s}{colorama.Style.RESET_ALL}"

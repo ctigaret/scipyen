@@ -1,38 +1,342 @@
-import io
+"""CoolLED pE 1&2 device
+Device connected to PC via USB ↦ port:
+    On Windows PC ↦ COM3
+        might need the CoolLED pE device?
+    
+    On Linux PC (laptop) ↦ /dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00 → /dev/ttyACM0
+        To use the device:
+            the user needs to have read/write permissions to the device file
+            (see below)
+        for VirtualBox Windows client:
+            • forward THE DEVICE ABOVE to COM3
+            • launch the VirtulBox client machine (user needs read/write access 
+                to the device file on the host machine, see below)
+            
+Upon trying to launch the virtual box Windows client you an error dialog a 
+message as below:
+
+**************************************************
+Failed to start the virtual machine Windows10.
+
+Cannot open host device '/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00' 
+for read/write access. Check the permissions of that device ('/bin/ls -l 
+/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00'): Most probably you need 
+to be member of the device group. Make sure that you logout/login after changing 
+the group settings of the current user (VERR_ACCESS_DENIED).
+
+Result Code:NS_ERROR_FAILURE (0X80004005) Component:ConsoleWrap 
+Interface:IConsole {6ac83d89-6ee7-4e33-8ae6-b257b2e81be8}
+**************************************************
+
+This is because, as a user in the host (Linux) world you do not have read/write
+access to the serial device file, and you need a few more steps:
+configure 
+• find out who has read/write permissions on the serial device:
+    ∘ find out the original device file, display permissions to that file:
+    
+user@Host:~> ls -l /dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00 
+lrwxrwxrwx 1 root root 13 Feb 24 15:51 /dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00 -> ../../ttyACM0
+
+    ∘ we see it is a symbolic link to the serial device file /dev/ttyACM0
+        therefore, find permissions to that as well:
+
+user@Host:~> ls -l /dev/ttyACM0 
+
+crw-rw---- 1 root dialout 166, 0 Feb 24 15:51 /dev/ttyACM0
+
+    ∘ in this example the user running Virtualbox needs to be a member of the 
+        'dialout' group ⇒ ask the sysadmin to configure the user as a member of 
+        that group; the user needs to log out and log in again
+        
+        WARNING: Some distribution might require a system reboot after this change
+
+NOTE: Each Linux distribution may assign different group names (e.g. 'devices'
+instead of 'dialout', etc). This being a serial device, the choice of 'dialout'
+as a group may be justified as these devices usually are communication devices
+(for example, modems).
+
+        
+"""
+
+import io, sys, os, typing
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import serial
 import serial.tools.list_ports as port_list
 
+from core.prog import (scipywarn, printStyled)
+from core.datatypes import TypeEnum
+
 TriggerLabels = ["Off","RisingEdges","FallingEdges","BothEdges","FollowPulse"]
 TriggerCmd = ['Z', '+', '-', '*', 'X'] # char
 
+class TriggerType(TypeEnum):
+    OFF = 0
+    RisingEdges = 1
+    FallingEdges = 2
+    BothEdges = 3
+    FollowPulse = 4
+    
+    @classmethod
+    def getCommandString(cls, t):
+        if isinstance(t, (str, int)):
+            t = cls.type(t)
+        elif t not in cls:
+            raise TypeError(f"Expecting a {cls.__name__} object; instead, got a {type(t).__name__}")
+        
+        return TriggerCmd[t.value]
+    
+    @classmethod
+    def fromCommandString(cls, s:str):
+        if not isinstance(s, str) :
+            raise TypeError(f"Expecting a string; instead, got a {type(s).__name__}")
+        
+        if len(s) != 1 or s.upper() not in TriggerCmd:
+            raise ValueError(f"Expecting a str in {TriggerCmd} (case-insenstive); instead, got {s}")
+        
+        s = s.upper()
+        
+        if s in ("Z", "X"):
+            return cls.OFF if s == "Z" else cls.FollowPulse
+        
+        else:
+            return cls.RisingEdges if s == "+" else cls.FallingEdges if s == "-" else cls.BothEdges
+        
+            
+    @property
+    def command(self):
+        return TriggerCmd[self.value]
 
-@dataclass
 class CoolLEDpE12():
-    port:str = "COM3"
-    baudrate:int = 9600
-    xonxoff: int = 0
-    parity:str = serial.PARITY_NONE
-    stopbits:int = 1
-    verbose:int = 1
-    timeout:float = 0.5
-    inter_byte_timeput: float = 0.0
+    def __init__(self, port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
+                 baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1, 
+                 timeout:float = 0.5, xonxoff:int = 0, verbose:int = 1, 
+                 inter_byte_timeout:float = 0.0):
+        """
+        Default parameter values are:
 
+            port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00"
+            baudrate:int = 9600
+            xonxoff: int = 0
+            parity:str = serial.PARITY_NONE
+            stopbits:int = 1
+            verbose:int = 1
+            timeout:float = 0.5
+            inter_byte_timeout: float = 0.0
+        """
+        
+        if parity not in serial.PARITY_NAMES:
+            raise ValueError(f"Invalid bit parity {parity}, expecting a str, one of {serial.PARITY_NAMES}")
+        
+        self._lam_labels_ = list() # of str
+        self._xlam_labels_ = list() # of str
+        self._greeting_msg_ = list()
+        self._trigger_mode_ = TriggerType.OFF
+        self._current_channel_ = 0
+        
+        self.__serial_port__ = serial.Serial(port, timeout = timeout)
+        self.__serial_port__.baudrate = baudrate
+        self.__serial_port__.xonxoff = xonxoff
+        self.__serial_port__.parity = parity
+        self.__serial_port__.stopbits = stopbits
+        self.__serial_port__.verbose = verbose
+        # self.__serial_port__.timeoutk = timeout
+        self.__serial_port__.inter_byte_timeout = inter_byte_timeout
+        
+        self.__portio__ = io.TextIOWrapper(io.BufferedRWPair(self.__serial_port__, self.__serial_port__))
+        
+        if not self.__serial_port__.is_open:
+            self.openPort()
+            
+        self._greeting_msg_ = self.readPort(collapse=False)
+        self._readChannelLabels_()
+        # print(f"{self.__class__.__name__} greeting: {self._greeting_msg_}")
+            
+        
+    
+    def __enter__(self):
+        if not self.__serial_port__.is_open:
+            self.__serial_port__.open()
+        return self
+    
+    def __exit__(self, *args):
+        if self.__serial_port__.is_open:
+            self.__serial_port__.close()
+            
+    def readPort(self, collapse:bool = True) -> str | list:
+        if not self.__serial_port__.is_open:
+            return ""
+        
+        msg = self.__portio__.readlines()
+        
+        if collapse:
+            for s in msg:
+                s.strip("\n")
+                
+            if len(msg) == 1:
+                msg = msg[0].strip("\n")
+            else:
+                msg = "\n".join(msg)
+        
+        return msg
+    
+    def sendCommand(self, cmd: str, verbose:bool=True, collapse:bool=True):
+        if not self.__serial_port__.is_open:
+            scipywarn("The underlying serial port is closed; call method openPort() then call this method again.")
+            # printStyled("The underlying serial port is closed; call method openPort() then call this method again.", "red")
+            return
+        
+        if not cmd.endswith("\n"):
+            cmd += "\n"
+            
+        self.__portio__.write(cmd)
+        self.__portio__.flush()
+        
+        if verbose:
+            print(f"sending {cmd}")
+            
+        msg = self.readPort(collapse=collapse)
+        
+        if verbose:
+            print(f"received:\n{msg}")
+            
+        return msg
+    
     def readChannels(self):
-        with serial.Serial(self.port, self.timeout=1) as port:
-            port.baudrate = self.baudrate
-            port.xonxoff = self.xonxoff
-            port.parity = self.parity
-            port.stopbits = self.stopbits
-            port.verbose = self.verbose
-            port.timeoutk = self.timeout
-            port.inter_byte_timeout = self.inter_byte_timeout
+        msg = self.sendCommand("LAMS", verbose=False, collapse=False)
+        print(msg)
+        
+    def _readLAMLabels_(self):
+        msg = list(filter(lambda x: x not in self._greeting_msg_, self.sendCommand("LAMS", verbose=False, collapse=False)))
+        
+        self._lam_labels_ = sorted([s[4] for s in msg if len(s) >= 4 and s.startswith("LAM:")])
+        
+    def _readXLAMLabels_(self):
+        msg = list(filter(lambda x: x not in self._greeting_msg_, self.sendCommand("LAMS", verbose=False, collapse=False)))
+        self._xlam_labels_ = sorted([s[5] for s in msg if len(s) >=6 and s.startswith("XLAM:")])
+        
+    def _readChannelLabels_(self):
+        msg = list(filter(lambda x: x not in self._greeting_msg_, self.sendCommand("LAMS", verbose=False, collapse=False)))
+        self._lam_labels_ = sorted([s[4] for s in msg if len(s) >= 4 and s.startswith("LAM:")])
+        self._xlam_labels_ = sorted([s[5] for s in msg if len(s) >=6 and s.startswith("XLAM:")])
+        
+        
+    def openPort(self):
+        if not self.__serial_port__.is_open:
+            self.__serial_port__.open()
+            
+    def closePort(self):
+        if self.__serial_port__.is_open:
+            self.__portio__.flush()
+            self.__serial_port__.close()
 
-            if not port.is_open:
-                port.open()
+    def __del__(self):
+        self.closePort()
+        
+    def _actionChannelLight_(self, channel:typing.Optional[typing.Union[int, str]] = None, 
+                             on:bool=True, exclusive:bool=True):
+        pfx = f"SQ{self._trigger_mode_.command}\n"
+        action = "N" if on else "F"
+        oppact = "F" if on else "N"
+        print(f"action: {action}, oppact: {oppact}")
+        
+        if isinstance(channel, int):
+            if channel < 0 or channel > 3:
+                raise ValueError(f"Invalid channel index {channel}; the device has only four (0 ⋯ 3) channels")
+            channel = self._lam_labels_[channel]
+            
+        elif isinstance(channel, str):
+            if channel not in self._lam_labels_:
+                raise ValueError(f"Invalid channel {channel}; was expecting one of {self._lam_labels_}")
+            
+        elif channel is not None:
+            raise TypeError(f"Invalid channel specification; expecting an int (0 ⋯ 3) a str, one of {self._lam_labels_}, or None; instead, got {type(channel).__name__}")
+        
+        if channel is not None:
+            msg = f"{pfx}"
+            for lam in self._lam_labels_:
+                print(f"switching {lam} {'off' if action == 'F' else 'on'}")
+                msg += f"C{lam}{action}\n"
+                # action = "N" if channel == lam else "F"
+            msg += "\n"
+            
+        else:
+            if exclusive:
+                msg = f"{pfx}"
+                for lam in self._lam_labels_:
+                    act = action if channel == lam else oppact
+                    msg += f"C{lam}{act}\n"
+                msg += "\n"
+            else:
+                msg = f"{pfx}C{channel}{action}\n"
+        
+        return self.sendCommand(msg, verbose=False, collapse=False)
+        
+        
+    def channelON(self, channel:typing.Optional[typing.Union[int, str]] = None, 
+                  exclusive:bool=True, intensity: int = 0):
+        self._actionChannelLight_(channel, on=True, exclusive=exclusive)
 
+    def lightsOff(self):
+        if self.triggerMode in (TriggerType.OFF, TriggerType.FollowPulse):
+            msg = f"SQX\nC{self._lam_labels_[self._current_channel_]}AZ"
+    @property
+    def portOpen(self) -> bool:
+        return self.__serial_port__.is_open
+    
+    @property
+    def timeout(self)-> int:
+        return self.__serial_port__.timeout
+    
+    @timeout.setter
+    def timeout(self, val:float):
+        self.__serial_port__.timeout = val
+        
+    @property
+    def baudrate(self)-> int:
+        return self.__serial_port__.baudrate
+    
+    @baudrate.setter
+    def baudrate(self, val:float):
+        self.__serial_port__.baudrate = val
+        
+    @property
+    def parity(self) -> int:
+        return self.__serial_port__.parity
+    
+    @parity.setter
+    def parity(self, val:str):
+        if parity not in serial.PARITY_NAMES:
+            raise ValueError(f"Invalid parity {val}; expecting a str, one of {serial.PARITY_NAMES}")
+        
+        self.__serial_port__.parity = val
+        
+    @property
+    def lamLabels(self):
+        return self._lam_labels_
+    
+    @property
+    def triggerMode(self) -> TriggerType:
+        """The trigger type.
+        This property can be set using an int (0 ⋯ 4), a string in 
+        ["Off","RisingEdges","FallingEdges","BothEdges","FollowPulse"] (case-sensitive)
+        or a string in ['Z', '+', '-', '*', 'X'] (case-insensitive).
+        
+        The latter collection represents the command strings (in upper case) 
+        sent to the device.
+        """
+        return self._trigger_mode_
+    
+    @triggerMode.setter
+    def triggerMode(self, val:typing.Optional[typing.Union[TriggerType, int, str]] = None):
+        if isinstance(val, (int, str)):
+            if isinstance(val,str) and val.upper() in TriggerCmd:
+                val = TriggerType.fromCommandString(val)
+            else:
+                val = TriggerType.type(val)
+        elif not isinstance(val, TriggerType):
+            raise TypeError(f"Expecting an int, str or TriggerType; instead, got {type(val).__name__}")
+        
+        self._trigger_mode_ = val
+    
+    
 
-
-
-
-def readChannels()

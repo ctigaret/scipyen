@@ -2,7 +2,7 @@
 Requires PySerial installed in scipyenv
 
 """
-import io
+import io, os, sys
 import serial
 import serial.tools.list_ports as port_list
 
@@ -12,7 +12,15 @@ intensity  = 100
 
 # this is the COM port mapped to the USB connection of CoolLED pE 1 & 2 on
 # Bruker PC !!!
-with serial.Serial("COM3", timeout=1) as com3:
+
+if sys.platform == "win32":
+    port_name = "COM3"
+else:
+    # NOTE: 2024-02-24 19:03:38
+    # it works !!!
+    port_name = "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00"
+    
+with serial.Serial(port_name, timeout=1) as com3:
     # A-HA! need to append \n to the messages in comio!
     try:
         comio = io.TextIOWrapper(io.BufferedRWPair(com3, com3))
@@ -23,6 +31,7 @@ with serial.Serial("COM3", timeout=1) as com3:
         com3.verbose = 1
         com3.timeout = 0.5
         com3.inter_byte_timeout = 0.0 # DelayBetweenCharsMs ?
+        
         if not com3.is_open:
             com3.open()
 
@@ -53,6 +62,15 @@ with serial.Serial("COM3", timeout=1) as com3:
 
         # switch illumination ON:
 
+        print(f"send 'SQX↴CAF↴AZ")
+        comio.write("SQX\nCAF\nAZ")
+        comio.flush()
+        msg = comio.readlines()
+        for s in msg:
+            s = s.strip('\n')
+
+        msg = '\n'.join(msg)
+        print(f"received:\n{msg}")
 
         # set itensity on channel A
         print(f"send 'CAI{intensity}'")

@@ -30,6 +30,8 @@ import numpy as np
 import neo, vigra
 import quantities as pq
 
+import colorama
+
 
 # try:
 #     import mypy
@@ -515,7 +517,7 @@ class Timer(object):
     def running(self):
         return self._start is not None
     
-    def __enter__(self):
+    def __enter__(self, *args):
         # for use as context manager
         self.start()
         return self
@@ -809,6 +811,11 @@ def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
     func.append(")")
     
     return "".join(func)
+
+def printStyled(s:str, color:str='yellow', bright:bool=True):
+    c = getattr(colorama.Fore, color.upper())
+    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+    return f"{pre}{s}{colorama.Style.RESET_ALL}"
 
 def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
     from warnings import (filters, defaultaction)
