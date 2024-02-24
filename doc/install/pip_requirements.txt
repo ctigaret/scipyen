@@ -164,6 +164,7 @@ pyneuroml       # optional
 pyparsing
 #pyqt5-tools ; sys_platform == 'win32'
 pyqtgraph
+pyserial
 pytest
 python-magic
 pytz
@@ -197,6 +198,7 @@ sympy
 tables ; python_version >= '3.9.7'
 tabulate
 tenacity
+termcolor
 terminado
 testpath
 thinc

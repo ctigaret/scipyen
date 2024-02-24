@@ -11,6 +11,9 @@ imreg-dft       # ✓ (pip install imgreg-dft)
 nixio           # ✓ (pip install nixio)
 python-magic    # ✓ (pip install python-magic)
 pyqtdarktheme
+colorama
+termcolor
+pyserial
 #### OPTIONAL packages
 researchpy      # ✓ (pip install researchpy)
 modelspec       # ✓ (pip install modelspec)

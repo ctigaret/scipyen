@@ -1110,7 +1110,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
     @processProtocol.register(pab.ABFProtocol)
     def _(self, protocol:pab.ABFProtocol):
-        self.print(f"{self.__class__.__name__}.processProtocol ({protocol.name})")
+        self.print(f"{self.__class__.__name__}.processProtocol ({printStyled(protocol.name)})")
         
         # NOTE: 2024-02-18 15:58:07
         # this sets up a pathways "layout", a dict:
@@ -1248,7 +1248,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # the active DAC is one of these by definition
         digOutDacs = tuple(filter(lambda x: x.digitalOutputEnabled, (protocol.getDAC(k) for k in range(protocol.nDACChannels))))
         
-        self.print(f"   activeDAC: {activeDAC.name}, digOutDacs: {[d.name for d in digOutDacs]}")
+        self.print(f"   activeDAC: {printStyled(activeDAC.name)}, digOutDacs: {printStyled([d.name for d in digOutDacs])}")
         
         # will be empty if len(digOutDacs ) == 0
         mainDIGOut = protocol.digitalOutputs(alternate=False)
@@ -1257,7 +1257,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # also, will be empty if len(digOutDacs ) == 0
         altDIGOut = protocol.digitalOutputs(alternate=True)
         
-        self.print(f"   mainDIGOut: {mainDIGOut}, altDIGOut: {altDIGOut}")
+        self.print(f"   mainDIGOut: {printStyled(mainDIGOut)}, altDIGOut: {printStyled(altDIGOut)}")
         
         crosstalk = False # to be determined below
         
@@ -1270,7 +1270,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         for src in self._runData_.sources:
             # this below maps pathway index to dict sweep index ↦ synaptic pathway
             self.print(f"   -----------------")
-            self.print(f"   processing source {src.name}")
+            self.print(f"   processing source {printStyled(src.name)}")
             pathwaysLayout[src] = dict()
             # TODO: 2024-02-17 23:13:20
             # below pathways are identified by the DIG channel used to stimulate;
@@ -1296,13 +1296,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             adc = protocol.getADC(src.adc)
             dac = protocol.getDAC(src.dac)
             
-            self.print(f"   source adc: {adc.name}, dac: {dac.name}")
+            self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
             
             if dac != activeDAC:
                 if not protocol.alternateDigitalOutputStateEnabled:
                     raise ValueError(f"Alternative digital outputs must be enabled in the protocol when digital outputs are configured on DAC index {activeDAC.physicalIndex} and command waveforms are sent through DAC index {src.dac}")
                    
             clampMode = protocol.getClampMode(adc, activeDAC)
+            
+            self.print(f"   data recorded in {printStyled(clampMode.name, 'yellow')}")
             
             # figure out which of the pathways use a DIG or a DAC channel for TTLs;
             # of these figure out which are ACTUALLY used in the protocol
@@ -1319,6 +1321,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             mainDigPathways = list() # empty if len(digOutDacs ) == 0
             altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
             dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
+            pathwaysToStore = dict() # the above, to store in _runData_.recordedPathways between runs
             
             for k, p in enumerate(pathways):
                 if p.stimulus.dig:
@@ -1434,8 +1437,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     syn_stim_dacs.append(dacPathways[0][1].stimulus.channel)
                     
             
-            self.print(f"   digital channels for synaptic stimulation: {syn_stim_digs}")
-            self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {syn_stim_dacs}")
+            self.print(f"   digital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow')}")
+            self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow')}")
             
             # figure out the epochs that define synaptic stimulations
             
@@ -1465,10 +1468,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
                 testDuration = membraneTestEpoch.firstDuration
                 
-                self.print(f"   membraneTestEpoch: {membraneTestEpoch.letter} ({membraneTestEpoch.number}) with:")
-                self.print(f"       amplitude: {testAmplitude}")
-                self.print(f"       start: {testStart}")
-                self.print(f"       duration: {testDuration}")
+                self.print(f"   membraneTestEpoch: {printStyled(membraneTestEpoch.letter)} ({printStyled(membraneTestEpoch.number)}) with:")
+                self.print(f"       amplitude: {printStyled(testAmplitude)}")
+                self.print(f"       start: {printStyled(testStart)}")
+                self.print(f"       duration: {printStyled(testDuration)}")
                 self.print(f"       -----")
                 
             # NOTE: 2024-02-20 23:42:12
@@ -1476,8 +1479,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # if testStart + testDuration < dac TODO 2024-02-19 22:59:46
             # → done per each pathway, below
                 
-            # ⇒ expect the protocol to have
-            # as many sweeps as pathways in this source
+            # ⇒ expect the protocol to have as many sweeps as pathways in this source
             
             # Can there be a contigency where this does not hold?
             #
@@ -1500,8 +1502,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # delivered on the even-numbered sweeps: 0, 2, etc.
             #
             for k, p in mainDigPathways:
-                self.print(f"   processing pathway {k} ({p.name})")
-                pathwayMeasures = list() # to store location measures here
+                self.print(f"   processing pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
+                # to store location measures for this pathway:
+                # str (name) ↦ dict("measure" ↦ LocationMeasure, "args" ↦ tuple of extra arguments passed to LocationMeasure)
+                pathwayMeasures = dict() 
                 
                 
                 # NOTE: for the moment, I do not expect to have more than one such epoch
@@ -1535,9 +1539,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 
                 ee = ", ".join([f"{e.letter} ({e.number})" for e in synStimEpochs])
-                self.print(f"       synaptic stimulation epochs: {ee}")
+                self.print(f"       synaptic stimulation epochs: {printStyled(ee)}")
                 
-                self.print(f"       DIG channel {p.stimulus.channel} active in sweeps {[sed[0] for sed in sweepsEpochsForDig]}")
+                self.print(f"       DIG channel {printStyled(p.stimulus.channel)} active in sweeps {printStyled([sed[0] for sed in sweepsEpochsForDig])}")
                 
                 
                 assert all((e in synStimEpochs) for e in sweepsEpochsForDig[0][1]), f"Epochs inconsistencies for pathway {k}"
@@ -1603,7 +1607,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         # any epochs intervening between membrane test and digStimEpochs
                         # and between consecutive digStimEpochs - 
                         # (do we really care ?!? just use line below:)
-                        # howeverm keep the code just in case the user did provide baseline epochs intervening
+                        # however, keep the code just in case the user did provide baseline epochs intervening
                         # between mb test and first stim and between consecutive stims
                         #
                         digStimStarts = [activeDAC.getEpochRelativeStartTime(e)  - responseBaselineDuration for e in digStimEpochs]
@@ -1685,6 +1689,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                     # TODO: 2024-02-20 16:24:00
                     # generate location measures for membrane test
+                    
+                    if clampMode == ClampMode.VoltageClamp:
+                        dataCursorDC  = DataCursor(signalBaselineStart + signalBaselineDuration/2, signalBaselineDuration)
+                        dataCursorRs  = DataCursor(testStart - 0.0025*pq.s, 0.005*pq.s)
+                        # last 10 ms before end of test, window of 5 ms
+                        dataCursorRin = DataCursor(testStart + testDuration - 0.01 * pq.s, 0.005*pq.s)
+                        mbTestLocationMeasure = ephys.membraneTestVClampMeasure(dataCursorDC, dataCursorRs, dataCursorRin)
+                        pathwayMeasures["VClampMembraneTest"] = {"measure":mbTestLocationMeasure,
+                                                                 "args": (testAmplitude)}
+                        
+                    elif clampMode == ClampMode.CurrentClamp:
+                        pass
                     
                 else:
                     # no membrane test epoch configured (e.g. field recording)
@@ -2426,6 +2442,15 @@ class LTPOnline(QtCore.QObject):
         
         # self._runData_ = DataBag(pathways = self._pathways_,
         # source still needed to group pathways by sources !!! (saves a few iterations)
+        #
+        # below:
+        # 'pathways' are the pathways as parsed from the sources
+        # 'recordedPathways' are the pathays ACTUALLY found in the protocol(s)
+        #   taken from the ABF files, hence updated with each abf run; 
+        #   this is a dict: (TODO?)
+        #   
+        
+        
         self._runData_ = DataBag(sources = self._sources_,
                                  pathways = self._pathways_,
                                  recordedPathways = dict(),
@@ -4685,3 +4710,8 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
 #     
 #     return RecordingSource(name, 0, 0, synStims)
 #     
+
+def printStyled(s:str, color:str='yellow', bright:bool=True):
+    c = getattr(colorama.Fore, color.upper())
+    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+    return f"{pre}{s}{colorama.Style.RESET_ALL}"

@@ -1268,11 +1268,14 @@ class LocationMeasure:
 
     In turn, a `location` is an object with one of the following types ('locator' types):
     • SignalCursor
+    • DataCursor (abstraction of SignalCursor; stores only the cursor's coordinates, NOT type;
+                    depending on the axis it applied to it MAY represent a vertical or horizontal
+                    signal cursor; this class is useful when no SignalViewer axes are present yet)
     • neo.Epoch
     • DataZone
     • Interval
 
-    or a sequence (tuple, list) of such (SignalCursor, neo.Epoch, DataZone or Interval)
+    or a sequence (tuple, list) of such (SignalCursor, DataCursor, neo.Epoch, DataZone or Interval)
         
     The LocationMeasure object is callable, taking as first argument a signal-like 
         object, which will be passed at the functor or function encapsulated by
