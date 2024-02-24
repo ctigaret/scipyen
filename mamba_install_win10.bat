@@ -1,5 +1,5 @@
 echo This script requires mambaforge installed from https://github.com/conda-forge/miniforge#mambaforge
-echo run this from a mamba prompt launched as administrator
+echo run this from a mamba (Microforge) prompt launched as administrator
 @echo off
 rem  setlocal enabledelayedexpansion enableextensions
 set mypath=%0
