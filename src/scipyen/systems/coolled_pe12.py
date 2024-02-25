@@ -110,6 +110,7 @@ class TriggerType(TypeEnum):
         return TriggerCmd[self.value]
 
 class CoolLEDpE12():
+    """Looks like the device cannot emit on more than one LAM at any time"""
     def __init__(self, port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1, 
                  timeout:float = 0.5, xonxoff:int = 0, verbose:int = 1, 
@@ -137,7 +138,7 @@ class CoolLEDpE12():
         self._trigger_mode_ = TriggerType.Off
         self._current_channel_ = 0
         self._channel_states_ = dict()
-        self._state_ = dict()
+        # self._state_ = dict()
         
         try:
             self.__serial_port__ = serial.Serial(port, timeout = timeout)
@@ -146,7 +147,7 @@ class CoolLEDpE12():
             self.__serial_port__.parity = parity
             self.__serial_port__.stopbits = stopbits
             self.__serial_port__.verbose = verbose
-            # self.__serial_port__.timeoutk = timeout
+            # self.__serial_port__.timeout = timeout
             self.__serial_port__.inter_byte_timeout = inter_byte_timeout
             
             self.__portio__ = io.TextIOWrapper(io.BufferedRWPair(self.__serial_port__, self.__serial_port__))
@@ -246,57 +247,20 @@ class CoolLEDpE12():
     def __del__(self):
         self.closePort()
         
-    def _actionChannelLight_(self, channel:typing.Optional[typing.Union[int, str]] = None, 
-                             on:bool=True, exclusive:bool=True):
-        pfx = "SQX"
-        action = "N" if on else "F"
-        oppact = "F" if on else "N"
-        print(f"{self.__class__.__name__}._actionChannelLight_: action = {action}, oppact = {oppact}")
-        
-        
-        if isinstance(channel, int):
-            if channel < 0 or channel > 3:
-                raise ValueError(f"Invalid channel index {channel}; the device has only four (0 ⋯ 3) channels")
-            channel = self._lam_labels_[channel]
-            
-        elif isinstance(channel, str):
-            if channel not in self._lam_labels_:
-                raise ValueError(f"Invalid channel {channel}; was expecting one of {self._lam_labels_}")
-            
-        elif channel is not None:
-            raise TypeError(f"Invalid channel specification; expecting an int (0 ⋯ 3) a str, one of {self._lam_labels_}, or None; instead, got {type(channel).__name__}")
-        
-        if channel is not None:
-            msg = f"{pfx}"
-            for lam in self._lam_labels_:
-                print(f"switching {lam} {'off' if action == 'F' else 'on'}")
-                msg += f"C{lam}{action}\r"
-                # action = "N" if channel == lam else "F"
-            msg += "\r"
-            
-        else:
-            if exclusive:
-                msg = f"{pfx}"
-                for lam in self._lam_labels_:
-                    act = action if channel == lam else oppact
-                    msg += f"C{lam}{act}\r"
-                msg += "\r"
-            else:
-                msg = f"{pfx}C{channel}{action}\r"
-        
-        return self.sendCommand(msg, verbose=False, collapse=False)
-        
-        
     def channelON(self, channel:typing.Optional[typing.Union[int, str]] = None, 
-                  exclusive:bool=True, intensity: int = 0):
-        
+                  exclusive:bool=True):
         self.lights(channel, True)
-        # self._actionChannelLight_(channel, on=True, exclusive=exclusive)
         
     def channelOFF(self, channel:typing.Optional[typing.Union[int,str]] = None,
-                  exclusive:bool=True, intensity: int = 0):
+                  exclusive:bool=True):
                    
         self.lights(channel, False)
+        
+    def channel(self, channel:typing.Optional[typing.Union[int, str]] = None, 
+                on:bool=True, intensity:int = 0):
+        self.lights(channel, on)
+        if on == True:
+            self.intensity(channel, intensity)
         
     def readChannelStates(self):
         self.__portio__.flush()
@@ -311,8 +275,11 @@ class CoolLEDpE12():
         self.readChannelStates()
         return self._channel_states_
     
-    def getChannelState(self, channel:typing.Optional[typing.Union[int,str]] = None) -> dict:
-        self.readChannelStates()
+    def getChannelState(self, channel:typing.Optional[typing.Union[int,str]] = None,
+                        refresh:bool=False) -> dict:
+        if refresh:
+            self.readChannelStates()
+            
         if channel is None:
             return self._channel_states_
         
@@ -332,32 +299,55 @@ class CoolLEDpE12():
         else:
             raise TypeError(f"Invalid LAM channel specification; expecting an int, a str or None; instead, got {type(channel).__name__}")
     
-    @property
-    def state(self) -> int:
-        if self.triggerMode == TriggerType.Off:
-            self.__portio__.flush()
-            channelStates = sorted(list(filter(lambda x: x.startswith("C"), self.sendCommand("C?", verbose=False, collapse=False))))
-            
-            # state = any(c[5] == "N" for c in channelStates)
-            self._state_ = any(c[5] == "N" for c in channelStates)
-            
-        # else:
-        #     state = self._state_
+    def _parseLAMStates(self, s:typing.Union[str, typing.Sequence[str]]):
+        # parse `ret` to find out the state of the channels
+        # print(f"{self.__class__.__name__}._parseLAMStates: s = {s}")
+        if isinstance(s, str) and s.startswith("C"):
+            chStates = {s[1]: {"on": s.strip("\n")[-1]=="N", "intensity":int(s[2:5])}}
+        else:
+            chStates = dict(sorted(list(map(lambda x: (x[1], {"on": x.strip("\n")[-1]=="N", "intensity":int(x[2:5])}), filter(lambda x: x.startswith("C"), s))), key = lambda x: x[0]))        
+           
+        # update the states
+        for lam, state in chStates.items():
+            if lam in self._channel_states_:
+                self._channel_states_[lam] = state
         
-        return self._state_
-            
-    @state.setter
-    def state(self, val:bool):
-        self._state_ = val == True
+        # print(self._channel_states_) # for testing
         
-    def lights(self, channel:typing.Union[int,str], on:bool):
+    def lights(self, channel:typing.Union[int,str], on:typing.Union[bool, str],
+               exclusive:bool = False, setCurrent:bool=True, refreshStates:bool=False):
         # action = "N" if on else "F"
         # oppact = "F" if on else "N"
         # print(f"action: {action}, oppact: {oppact}")
         
-        self.currentChannel = channel
-        
-        channelState = self.getChannelState()
+        if setCurrent:
+            self.currentChannel = channel
+            targetLam = self.currentLAM
+            if refreshStates:
+                self.getChannelState(channel, refresh=True)
+            
+        else:
+            if isinstance(channel, int):
+                if channel not in range(4):
+                    raise ValueError(f"Invalid channel index {channel}; expected an int between 0 and 3 inclusive")
+
+                targetLam = self._lam_labels_[channel]
+                
+            elif isinstance(channel, str):
+                c = channel.upper()
+                if c not in self._lam_labels_:
+                    raise ValueError(f"Invalid LAM channel {channel}; expected a str in {self._lam_labels_}")
+                targetLam = c
+                
+            else:
+                raise TypeError(f"Invalid LAM channel specification; expecting an int or str, instead got {type(channel).__name__}")
+                
+                
+        if isinstance(on, str):
+            on = on.upper() == "ON"
+            
+        else:
+            on = on==True
         
         if on:
             trigCmd = "Z" if self.triggerMode in (TriggerType.Off, TriggerType.FollowPulse) else self.triggerMode.command
@@ -365,31 +355,120 @@ class CoolLEDpE12():
             msg = f"SQ{trigCmd}\r"
             
             if self.triggerMode == TriggerType.Off:
-                for k, lam in enumerate(self._lam_labels_):
-                    msg += f"C{lam}"
-                    if k == self.currentChannel:
-                        msg += "N"
-                    else:
-                        msg += "F"
-                        
-                    msg += "\r"
+                if exclusive:
+                    # switch light on for the specified channel
+                    # and off for the others
+                    for k, lam in enumerate(self._lam_labels_):
+                        msg += f"C{lam}"
+                        if lam == targetLam:
+                            msg += "N"
+                        else:
+                            msg += "F"
+                            
+                        msg += "\r"
+                else:
+                    # switch light on for the specified channel,
+                    # leave other channels alone
+                    msg += f"C{targetLam}N\r"
                     
             elif self.triggerMode == TriggerType.FollowPulse:
-                msg += f"\rA{self.currentLAM}#"
+                msg += f"\rA{targetLam}#"
                 
             else:
+                # send an initialization command dependent on the trigger mode
+                # (+, -, *), respectively, for RisingEdges, FallingEdges, BothEdges,
+                # then wait for specific trigger via TTL or subsequent command 
+                # sent to the port ?
+                # 
+                #
+                # then why triggerMessage precedes the SQ-triggerMode command?
                 msg += f"{self.triggerMessage}SQ{self.triggerMode.command}"
                 
-        else:
+        else: # on is False ⇒ shut light off on the current channel
             if self.triggerMode in (TriggerType.Off, TriggerType.FollowPulse):
-                msg = f"SQX\rC{self.currentLAM}F\rAZ"
+                # SQX is for FollowPulse
+                # the shuts down channel ('F')
+                # what does AZ stand for ?!?
+                msg = f"SQX\rC{targetLam}F\rAZ"
             else:
+                # is this a noop?
                 msg = "SQXAZ"
-            
-        self.sendCommand(msg, verbose=True, collapse=False)
-        self.readChannelStates()
+          
+        # send the command and store the returned message from the port
+        ret = self.sendCommand(msg, verbose=False, collapse=False)
+        
+        self._parseLAMStates(ret)
+        
+             
+    def setChannelIntensity(self, channel:typing.Optional[typing.Union[int, str]]=None, 
+                            val:int=0, setCurrent:bool=True):
+        if val not in range(101):
+            raise ValueError(f"Invalid intensity; must be between 0 and 100 inclusive; instead, got {val}")
+        
+        if setCurrent:
+            if isinstance(channel, (str, int)):
+                self.currentChannel = channel
+                msg = f"C{self.currentLAM}I{val:03}"
+            else:
+                msg = "\r".join([f"C{lam}I{val:03}" for lam in self._lam_labels_])
+        else:
+            if isinstance(channel, int):
+                if channel not in range(4):
+                    raise ValueError(f"Invalid channel index {channel}; expected an int between 0 and 3 inclusive")
+                msg = f"C{self._lam_labels_[channel]}I{val:03}"
+                
+            elif isinstance(channel, str):
+                c = channel.upper()
+                if c not in self._lam_labels_:
+                    raise ValueError(f"Invalid LAM channel {channel}; expected a str in {self._lam_labels_}")
+                msg = f"C{c}I{val:03}"
+                
+            else:
+                raise TypeError(f"Invalid LAM channel specification; expecting an int or str, instead got {type(channel).__name__}")
+                
                     
-           
+        ret = self.sendCommand(msg, verbose=False, collapse=False)
+        self._parseLAMStates(ret)
+        
+    def intensity(self, channel:typing.Optional[typing.Union[int, str]]=None, 
+                            val:typing.Optional[int]=None, refresh:bool=False,
+                            setCurrent:bool=True,
+                            ):
+        if val is None:
+            return self.getChannelIntensity(channel, refresh, setCurrent)
+        else:
+            self.setChannelIntensity(channel, val, setCurrent)
+            
+        
+    def getChannelIntensity(self, channel:typing.Optional[typing.Union[int, str]] = None,
+                     refresh:bool=False, setCurrent:bool=True) -> int:
+        
+        if refresh:
+            self.readChannelStates()
+            
+        if setCurrent:
+            if isinstance(channel, (int, str)):
+                self.currentChannel = channel
+                return self._channel_states_[self.currentLAM]["intensity"]
+        
+        if channel is None:
+            return dict((lam, self._channel_states_[lam]["intensity"]) for lam in self._channel_states_)
+
+        if isinstance(channel, int):
+            if channel not in range(4):
+                raise ValueError(f"Invalid channel index {channel}; expecting an int betwen 0 and 3 inclusive")
+            return self._channel_states_[self._lam_labels_[channel]]["intensity"]
+        elif isinstance(channel, str):
+            c = channel.upper()
+            if c not in self._lam_labels_:
+                raise ValueError(f"Invalid LAM channel {channel}; expecting a string in {self._lam_labels_}")
+            
+            return self._channel_states_[c]["intensity"]
+        
+        else:
+            raise TypeError(f"Invalid LAM channel specification; expecting an int or str, instead got {type(channel).__name__}")
+                
+        
     @property
     def triggerMessage(self) -> str:
         return f"SQX\rSQ{self.triggerSequence}\r"
