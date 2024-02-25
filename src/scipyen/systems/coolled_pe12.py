@@ -136,25 +136,31 @@ class CoolLEDpE12():
         self._trigger_sequence_ = ""
         self._trigger_mode_ = TriggerType.Off
         self._current_channel_ = 0
+        self._channel_states_ = dict()
+        self._state_ = dict()
         
-        self.__serial_port__ = serial.Serial(port, timeout = timeout)
-        self.__serial_port__.baudrate = baudrate
-        self.__serial_port__.xonxoff = xonxoff
-        self.__serial_port__.parity = parity
-        self.__serial_port__.stopbits = stopbits
-        self.__serial_port__.verbose = verbose
-        # self.__serial_port__.timeoutk = timeout
-        self.__serial_port__.inter_byte_timeout = inter_byte_timeout
-        
-        self.__portio__ = io.TextIOWrapper(io.BufferedRWPair(self.__serial_port__, self.__serial_port__))
-        
-        if not self.__serial_port__.is_open:
-            self.openPort()
+        try:
+            self.__serial_port__ = serial.Serial(port, timeout = timeout)
+            self.__serial_port__.baudrate = baudrate
+            self.__serial_port__.xonxoff = xonxoff
+            self.__serial_port__.parity = parity
+            self.__serial_port__.stopbits = stopbits
+            self.__serial_port__.verbose = verbose
+            # self.__serial_port__.timeoutk = timeout
+            self.__serial_port__.inter_byte_timeout = inter_byte_timeout
             
-        self._greeting_msg_ = self.readPort(collapse=False)
-        self._readChannelLabels_()
-        # print(f"{self.__class__.__name__} greeting: {self._greeting_msg_}")
+            self.__portio__ = io.TextIOWrapper(io.BufferedRWPair(self.__serial_port__, self.__serial_port__))
             
+            if not self.__serial_port__.is_open:
+                self.openPort()
+                
+            self._greeting_msg_ = self.readPort(collapse=False)
+            self._initChannels_()
+            # print(f"{self.__class__.__name__} greeting: {self._greeting_msg_}")
+                
+        except:
+            print("Device could not be found; make sure it is turned on and plugged in an USB port")
+            raise
         
     
     def __enter__(self):
@@ -220,18 +226,20 @@ class CoolLEDpE12():
         msg = list(filter(lambda x: x not in self._greeting_msg_, self.sendCommand("LAMS", verbose=False, collapse=False)))
         self._xlam_labels_ = sorted([s[5] for s in msg if len(s) >=6 and s.startswith("XLAM:")])
         
-    def _readChannelLabels_(self):
+    def _initChannels_(self):
+        """Reads the channel labels, sets up a default trigger sequence and initializes channel states"""
         msg = list(filter(lambda x: x not in self._greeting_msg_, self.sendCommand("LAMS", verbose=False, collapse=False)))
         self._lam_labels_ = sorted([s[4] for s in msg if len(s) >= 4 and s.startswith("LAM:")])
         self._xlam_labels_ = sorted([s[5] for s in msg if len(s) >=6 and s.startswith("XLAM:")])
-        
+        self._trigger_sequence_ = "".join(self._lam_labels_) + "0"# for now!
+        self.readChannelStates()
         
     def openPort(self):
         if not self.__serial_port__.is_open:
             self.__serial_port__.open()
             
     def closePort(self):
-        if self.__serial_port__.is_open:
+        if hasattr(self, "__serial_port__") and self.__serial_port__.is_open:
             self.__portio__.flush()
             self.__serial_port__.close()
 
@@ -281,33 +289,105 @@ class CoolLEDpE12():
         
     def channelON(self, channel:typing.Optional[typing.Union[int, str]] = None, 
                   exclusive:bool=True, intensity: int = 0):
-        self._actionChannelLight_(channel, on=True, exclusive=exclusive)
-
-    def lights(self):
-        trigCmd = "Z" if self.triggerMode in (TriggerType.Off, TriggerType.FollowPulse) else self.triggerMode.command
         
-        msg = f"SQ{trigCmd}\r"
+        self.lights(channel, True)
+        # self._actionChannelLight_(channel, on=True, exclusive=exclusive)
+        
+    def channelOFF(self, channel:typing.Optional[typing.Union[int,str]] = None,
+                  exclusive:bool=True, intensity: int = 0):
+                   
+        self.lights(channel, False)
+        
+    def readChannelStates(self):
+        self.__portio__.flush()
+        self._channel_states_ = dict(sorted(list(map(lambda x: (x[1], {"on": x.strip("\n")[-1]=="N", "intensity":int(x[2:5])}), filter(lambda x: x.startswith("C"), self.sendCommand("C?", verbose=False, collapse=False)))), key = lambda x: x[0]))        
+        
+    @property
+    def channelStates(self) -> dict:
+        """Read-only property.
+        A channel state can be changed only by commands to switch it ON/OFF or
+        alter its intensity
+        """
+        self.readChannelStates()
+        return self._channel_states_
+    
+    def getChannelState(self, channel:typing.Optional[typing.Union[int,str]] = None) -> dict:
+        self.readChannelStates()
+        if channel is None:
+            return self._channel_states_
+        
+        if isinstance(channel, int):
+            nchannels = len(self._lam_labels_)
+            if channel not in range(nchannels):
+                raise ValueError(f"Invalid channel index specified ({channel}); expecting an int the semi-open interval [0 ⋯ {nchannels})")
+
+            channel = self._lam_labels_[channel]
+        
+        if isinstance(channel, str): 
+            if channel not in self._lam_labels_ or channel not in self._channel_states_:
+                raise ValueError(f"Invalid channel specified {channel}; expecting a string in {self._lam_labels_}")
+            
+            return self._channel_states_[channel]
+        
+        else:
+            raise TypeError(f"Invalid LAM channel specification; expecting an int, a str or None; instead, got {type(channel).__name__}")
+    
+    @property
+    def state(self) -> int:
+        if self.triggerMode == TriggerType.Off:
+            self.__portio__.flush()
+            channelStates = sorted(list(filter(lambda x: x.startswith("C"), self.sendCommand("C?", verbose=False, collapse=False))))
+            
+            # state = any(c[5] == "N" for c in channelStates)
+            self._state_ = any(c[5] == "N" for c in channelStates)
+            
+        # else:
+        #     state = self._state_
+        
+        return self._state_
+            
+    @state.setter
+    def state(self, val:bool):
+        self._state_ = val == True
+        
+    def lights(self, channel:typing.Union[int,str], on:bool):
         # action = "N" if on else "F"
         # oppact = "F" if on else "N"
         # print(f"action: {action}, oppact: {oppact}")
         
-        if self.triggerMode == TriggerType.Off:
-            for k, lam in enumerate(self._lam_labels_):
-                msg += f"C{lam}"
-                if k == self.currentChannel:
-                    msg += "N"
-                else:
-                    msg += "F"
+        self.currentChannel = channel
+        
+        channelState = self.getChannelState()
+        
+        if on:
+            trigCmd = "Z" if self.triggerMode in (TriggerType.Off, TriggerType.FollowPulse) else self.triggerMode.command
+            
+            msg = f"SQ{trigCmd}\r"
+            
+            if self.triggerMode == TriggerType.Off:
+                for k, lam in enumerate(self._lam_labels_):
+                    msg += f"C{lam}"
+                    if k == self.currentChannel:
+                        msg += "N"
+                    else:
+                        msg += "F"
+                        
+                    msg += "\r"
                     
-                msg += "\r"
+            elif self.triggerMode == TriggerType.FollowPulse:
+                msg += f"\rA{self.currentLAM}#"
                 
-        elif self.triggerMode == TriggerType.FollowPulse:
-            msg += f"\rA{self.currentLAM}#"
-            
+            else:
+                msg += f"{self.triggerMessage}SQ{self.triggerMode.command}"
+                
         else:
-            msg += f"{self.triggerMessage}SQ{self.triggerMode.command}"
+            if self.triggerMode in (TriggerType.Off, TriggerType.FollowPulse):
+                msg = f"SQX\rC{self.currentLAM}F\rAZ"
+            else:
+                msg = "SQXAZ"
             
-        self.sendCommand(msg)
+        self.sendCommand(msg, verbose=True, collapse=False)
+        self.readChannelStates()
                     
            
     @property
