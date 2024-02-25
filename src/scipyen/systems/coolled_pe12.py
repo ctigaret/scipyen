@@ -69,8 +69,11 @@ from core.datatypes import TypeEnum
 TriggerLabels = ["Off","RisingEdges","FallingEdges","BothEdges","FollowPulse"]
 TriggerCmd = ['Z', '+', '-', '*', 'X'] # char
 
+carriage_return = "\r"
+line_feed = "\n"
+
 class TriggerType(TypeEnum):
-    OFF = 0
+    Off = 0
     RisingEdges = 1
     FallingEdges = 2
     BothEdges = 3
@@ -96,7 +99,7 @@ class TriggerType(TypeEnum):
         s = s.upper()
         
         if s in ("Z", "X"):
-            return cls.OFF if s == "Z" else cls.FollowPulse
+            return cls.Off if s == "Z" else cls.FollowPulse
         
         else:
             return cls.RisingEdges if s == "+" else cls.FallingEdges if s == "-" else cls.BothEdges
@@ -130,7 +133,8 @@ class CoolLEDpE12():
         self._lam_labels_ = list() # of str
         self._xlam_labels_ = list() # of str
         self._greeting_msg_ = list()
-        self._trigger_mode_ = TriggerType.OFF
+        self._trigger_sequence_ = ""
+        self._trigger_mode_ = TriggerType.Off
         self._current_channel_ = 0
         
         self.__serial_port__ = serial.Serial(port, timeout = timeout)
@@ -192,7 +196,8 @@ class CoolLEDpE12():
         self.__portio__.flush()
         
         if verbose:
-            print(f"sending {cmd}")
+            c_ = cmd.replace("\r", "↵")
+            print(f"sending {c_}")
             
         msg = self.readPort(collapse=collapse)
         
@@ -209,6 +214,7 @@ class CoolLEDpE12():
         msg = list(filter(lambda x: x not in self._greeting_msg_, self.sendCommand("LAMS", verbose=False, collapse=False)))
         
         self._lam_labels_ = sorted([s[4] for s in msg if len(s) >= 4 and s.startswith("LAM:")])
+        self._trigger_sequence_ = "".join(self._lam_labels_) + "0" # for now !
         
     def _readXLAMLabels_(self):
         msg = list(filter(lambda x: x not in self._greeting_msg_, self.sendCommand("LAMS", verbose=False, collapse=False)))
@@ -234,10 +240,11 @@ class CoolLEDpE12():
         
     def _actionChannelLight_(self, channel:typing.Optional[typing.Union[int, str]] = None, 
                              on:bool=True, exclusive:bool=True):
-        pfx = f"SQ{self._trigger_mode_.command}\n"
+        pfx = "SQX"
         action = "N" if on else "F"
         oppact = "F" if on else "N"
-        print(f"action: {action}, oppact: {oppact}")
+        print(f"{self.__class__.__name__}._actionChannelLight_: action = {action}, oppact = {oppact}")
+        
         
         if isinstance(channel, int):
             if channel < 0 or channel > 3:
@@ -255,19 +262,19 @@ class CoolLEDpE12():
             msg = f"{pfx}"
             for lam in self._lam_labels_:
                 print(f"switching {lam} {'off' if action == 'F' else 'on'}")
-                msg += f"C{lam}{action}\n"
+                msg += f"C{lam}{action}\r"
                 # action = "N" if channel == lam else "F"
-            msg += "\n"
+            msg += "\r"
             
         else:
             if exclusive:
                 msg = f"{pfx}"
                 for lam in self._lam_labels_:
                     act = action if channel == lam else oppact
-                    msg += f"C{lam}{act}\n"
-                msg += "\n"
+                    msg += f"C{lam}{act}\r"
+                msg += "\r"
             else:
-                msg = f"{pfx}C{channel}{action}\n"
+                msg = f"{pfx}C{channel}{action}\r"
         
         return self.sendCommand(msg, verbose=False, collapse=False)
         
@@ -276,9 +283,51 @@ class CoolLEDpE12():
                   exclusive:bool=True, intensity: int = 0):
         self._actionChannelLight_(channel, on=True, exclusive=exclusive)
 
-    def lightsOff(self):
-        if self.triggerMode in (TriggerType.OFF, TriggerType.FollowPulse):
-            msg = f"SQX\nC{self._lam_labels_[self._current_channel_]}AZ"
+    def lights(self):
+        trigCmd = "Z" if self.triggerMode in (TriggerType.Off, TriggerType.FollowPulse) else self.triggerMode.command
+        
+        msg = f"SQ{trigCmd}\r"
+        # action = "N" if on else "F"
+        # oppact = "F" if on else "N"
+        # print(f"action: {action}, oppact: {oppact}")
+        
+        if self.triggerMode == TriggerType.Off:
+            for k, lam in enumerate(self._lam_labels_):
+                msg += f"C{lam}"
+                if k == self.currentChannel:
+                    msg += "N"
+                else:
+                    msg += "F"
+                    
+                msg += "\r"
+                
+        elif self.triggerMode == TriggerType.FollowPulse:
+            msg += f"\rA{self.currentLAM}#"
+            
+        else:
+            msg += f"{self.triggerMessage}SQ{self.triggerMode.command}"
+            
+        self.sendCommand(msg)
+                    
+           
+    @property
+    def triggerMessage(self) -> str:
+        return f"SQX\rSQ{self.triggerSequence}\r"
+            
+    @property
+    def triggerSequence(self) -> str:
+        return self._trigger_sequence_
+    
+    @triggerSequence.setter
+    def triggerSequence(self, val:str):
+        if not isinstance(val, str) or len(val.strip()) == 0:
+            scipywarn(f"Invalid trigger sequence {val}")
+            return
+        
+        self._trigger_sequence_ = val
+        
+        
+            
     @property
     def portOpen(self) -> bool:
         return self.__serial_port__.is_open
@@ -337,6 +386,44 @@ class CoolLEDpE12():
             raise TypeError(f"Expecting an int, str or TriggerType; instead, got {type(val).__name__}")
         
         self._trigger_mode_ = val
+        
+    @property
+    def currentChannel(self)->int:
+        """The index of the LAM where commands are currently sent.
+        The setter accepts an int or a str.
+        See also currentLAM.
+        """
+        return self._current_channel_
+    
+    @currentChannel.setter
+    def currentChannel(self, val:typing.Union[int, str]):
+        if isinstance(val, int):
+            if val < 0 or val > 3:
+                raise ValueError(f"Expecting an int in range 0 ⋯ 3 ; instead, got {val}")
+            
+            self._current_channel_ = val
+            
+        elif isinstance(val, str):
+            if val not in self._lam_labels_:
+                raise ValueError(f"Expecting a string in {self._lam_labels_}; nstead, got {val}")
+            
+            self._current_channel_ = self._lam_labels_.index(val)
+        else:
+            raise TypeError(f"Expecting an int; instead gotr a {type(val).__name__}")
+        
+    @property
+    def currentLAM(self)-> str:
+        """<Label of the current LAM channel.
+        The setter accepts an int or a str.
+        See also currentChannel.
+        """
+        return self._lam_labels_[self._current_channel_]
+    
+    @currentLAM.setter
+    def currentLAM(self, val:typing.Union[int,str]):
+        self.currentChannel = val
+    
+        
     
     
 
