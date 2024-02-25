@@ -110,7 +110,12 @@ class TriggerType(TypeEnum):
         return TriggerCmd[self.value]
 
 class CoolLEDpE12():
-    """Looks like the device cannot emit on more than one LAM at any time"""
+    """Looks like the device cannot emit on more than one LAM at any time.
+    Also, for reponsive modulation of intensity through a waveform, the
+    timeout should be set to something small e.g. 0.001 or even 0.0001 (s).
+    NOTE: For very small timeouts getChannelState() should be called manually,
+    in order to make sure all serial port replies are captured (some may be 'lost')
+    """
     def __init__(self, port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1, 
                  timeout:float = 0.5, xonxoff:int = 0, verbose:int = 1, 
@@ -258,9 +263,14 @@ class CoolLEDpE12():
         
     def channel(self, channel:typing.Optional[typing.Union[int, str]] = None, 
                 on:bool=True, intensity:int = 0):
+        self.intensity(channel, intensity)
         self.lights(channel, on)
-        if on == True:
-            self.intensity(channel, intensity)
+        
+        # NOTE: 2024-02-25 22:31:10
+        # if the below is done here we'd get a flash, depending on the intensity 
+        # stored in the device's memory
+        # if on == True:
+        #     self.intensity(channel, intensity)
         
     def readChannelStates(self):
         self.__portio__.flush()
@@ -401,7 +411,45 @@ class CoolLEDpE12():
         
              
     def setChannelIntensity(self, channel:typing.Optional[typing.Union[int, str]]=None, 
-                            val:int=0, setCurrent:bool=True):
+                            val:typing.Union[int, np.ndarray]=0, setCurrent:bool=True):
+        if isinstance(val, np.ndarray):
+            if val.ndim != 1:
+                raise ValueError(f"Expecting a vector; insrtead got an array with {val.ndim} dimensions")
+            
+            v = sigp.normalise_waveform(val) * 100
+            
+            vv = [int(x) for x in v]
+            
+            if channel is None:
+                channel = self.currentLAM
+                
+            elif isinstance(channel, int):
+                if channel not in range(len(self._lam_labels_))
+                    raise ValueError(f"Invalid channel index {channel}; expected an int between 0 and 3 inclusive")
+                channel = self._lam_labels_[channel]
+                
+            elif isinstance(channel, str):
+                if channel not in self._lam_labels_:
+                    raise ValueError(f"Invalid LAM channel {channel}; expected a str in {self._lam_labels_}")
+                
+            else:
+                raise TypeError(f"Invalid LAM channel {channel}")
+            oldTimeout = self.timeout
+            self.timeout = 0.01
+            chState = self.getChannelState(channel)["on"]
+            self.timeout = oldTimeout
+            if not chState:
+                self.channelON(0, True)
+                
+            
+            for x in vv:
+                msg = f"C{channel}I{val:03}"
+                self.sendCommand(msg, verbose=False, collapse=False)
+            
+            
+            
+                    
+            
         if val not in range(101):
             raise ValueError(f"Invalid intensity; must be between 0 and 100 inclusive; instead, got {val}")
         
@@ -431,7 +479,7 @@ class CoolLEDpE12():
         self._parseLAMStates(ret)
         
     def intensity(self, channel:typing.Optional[typing.Union[int, str]]=None, 
-                            val:typing.Optional[int]=None, refresh:bool=False,
+                            val:typing.Optional[typing.Union[int, np.ndarray]]=None, refresh:bool=False,
                             setCurrent:bool=True,
                             ):
         if val is None:
