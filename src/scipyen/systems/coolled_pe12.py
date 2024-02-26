@@ -62,7 +62,9 @@ import io, sys, os, typing
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import serial
 import serial.tools.list_ports as port_list
+import numpy as np
 
+import core.signalprocessing as sigp
 from core.prog import (scipywarn, printStyled)
 from core.datatypes import TypeEnum
 
@@ -111,6 +113,13 @@ class TriggerType(TypeEnum):
 
 class CoolLEDpE12():
     """Looks like the device cannot emit on more than one LAM at any time.
+    ***
+    NOTE: 2024-02-26 08:31:57
+    Actually the statement above is False: using the pE console one can switch to
+    simultaneous mode by pressing the buttons for λ1 and λ4 at the same time !
+    Need to find out what is the port command sequence for that.
+    ***
+
     Also, for reponsive modulation of intensity through a waveform, the
     timeout should be set to something small e.g. 0.001 or even 0.0001 (s).
     NOTE: For very small timeouts getChannelState() should be called manually,
@@ -262,13 +271,14 @@ class CoolLEDpE12():
         self.lights(channel, False)
         
     def channel(self, channel:typing.Optional[typing.Union[int, str]] = None, 
-                on:bool=True, intensity:int = 0):
-        self.intensity(channel, intensity)
+                on:bool=True, intensity:typing.Optional[int] = None):
+        if isinstance(intensity, int) and intensity in range(101):
+            self.intensity(channel, intensity)
         self.lights(channel, on)
         
         # NOTE: 2024-02-25 22:31:10
-        # if the below is done here we'd get a flash, depending on the intensity 
-        # stored in the device's memory
+        # if the below is executed here we'd get a flash, depending on the intensity
+        # stored in the device's memory ⇒ call this BEFORE self.light(…)
         # if on == True:
         #     self.intensity(channel, intensity)
         
@@ -424,7 +434,7 @@ class CoolLEDpE12():
                 channel = self.currentLAM
                 
             elif isinstance(channel, int):
-                if channel not in range(len(self._lam_labels_))
+                if channel not in range(len(self._lam_labels_)):
                     raise ValueError(f"Invalid channel index {channel}; expected an int between 0 and 3 inclusive")
                 channel = self._lam_labels_[channel]
                 
@@ -519,7 +529,8 @@ class CoolLEDpE12():
         
     @property
     def triggerMessage(self) -> str:
-        return f"SQX\rSQ{self.triggerSequence}\r"
+        msg = "\r".join([f"SQ{x}" for x in self.triggerSequence])
+        return f"SQX\r{msg}"
             
     @property
     def triggerSequence(self) -> str:
@@ -573,9 +584,10 @@ class CoolLEDpE12():
     @property
     def triggerMode(self) -> TriggerType:
         """The trigger type.
-        This property can be set using an int (0 ⋯ 4), a string in 
-        ["Off","RisingEdges","FallingEdges","BothEdges","FollowPulse"] (case-sensitive)
-        or a string in ['Z', '+', '-', '*', 'X'] (case-insensitive).
+        This property can be set usin:
+        • an int (0 ⋯ 4),
+        • a string (case-sensitive) in ["Off","RisingEdges","FallingEdges","BothEdges","FollowPulse"]
+        • a string in ['Z', '+', '-', '*', 'X'] (case-insensitive).
         
         The latter collection represents the command strings (in upper case) 
         sent to the device.
@@ -585,8 +597,11 @@ class CoolLEDpE12():
     @triggerMode.setter
     def triggerMode(self, val:typing.Optional[typing.Union[TriggerType, int, str]] = None):
         if isinstance(val, (int, str)):
-            if isinstance(val,str) and val.upper() in TriggerCmd:
-                val = TriggerType.fromCommandString(val)
+            if isinstance(val,str):
+                if val.upper() in TriggerCmd:
+                    val = TriggerType.fromCommandString(val)
+                else:
+                    val = TriggerType.type(val)
             else:
                 val = TriggerType.type(val)
         elif not isinstance(val, TriggerType):
@@ -631,6 +646,10 @@ class CoolLEDpE12():
         self.currentChannel = val
     
         
-    
+def device(port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00",
+                 baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1,
+                 timeout:float = 0.5, xonxoff:int = 0, verbose:int = 1,
+                 inter_byte_timeout:float = 0.0):
+    return CoolLEDpE12(port, baudrate, parity, stopbits, timeout, xonxoff, verbose, inter_byte_timeout)
     
 
