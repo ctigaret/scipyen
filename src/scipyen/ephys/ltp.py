@@ -728,6 +728,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                     self.processProtocol(protocol)
                     
+                    
                 elif protocol != self._runData_.currentProtocol:
                     # a different protocol emdash — WARNING: signals a new episode:
                     self.print(f"{colorama.Fore.CYAN}{colorama.Style.BRIGHT}new protocol{colorama.Style.RESET_ALL}: {protocol.name}")
@@ -1698,9 +1699,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         mbTestLocationMeasure = ephys.membraneTestVClampMeasure(dataCursorDC, dataCursorRs, dataCursorRin)
                         pathwayMeasures["VClampMembraneTest"] = {"measure":mbTestLocationMeasure,
                                                                  "args": (testAmplitude)}
-                        
+                        self.print(f"payhwayMeasures: {printStyled(pathwayMeasures)}")
                     elif clampMode == ClampMode.CurrentClamp:
-                        pass
+                        pass #TODO 2024-02-27 16:18:25
                     
                 else:
                     # no membrane test epoch configured (e.g. field recording)
@@ -1710,6 +1711,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     signalBaselineDuration = dac.getEpochRelativeStartTime(synStimEpochs[0],0)
                     responseBaselineStarts = [self._runData_.signalBaselineStart]
                     # responseBaselineDuration = signalBaselineDuration
+                
+                # NOTE: 2024-02-27 16:24:08
+                # now, record the patwhay entry
+                recorded_pathway_entry = f"{src.name}_{p.name}"
+                if recorded_pathway_entry not in self._runData_.recordedPathways:
+                    self._runData_.recordedPathways[recorded_pathway_entry] = p
+                    
+                # NOTE: 2024-02-27 16:25:58
+                # now, determine the measurements
+                # we need access to the ABF run data here
                     
                 # FIXME 2024-02-20 16:22:05 in the above:
                 # 1) what to do with paired pulses?
@@ -2447,7 +2458,8 @@ class LTPOnline(QtCore.QObject):
         # 'pathways' are the pathways as parsed from the sources
         # 'recordedPathways' are the pathays ACTUALLY found in the protocol(s)
         #   taken from the ABF files, hence updated with each abf run; 
-        #   this is a dict: (TODO?)
+        #   this is a dict: (TODO?) source_name+pathway_name ↦ pathway
+        #                                                      
         #   
         
         
