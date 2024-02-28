@@ -43,7 +43,7 @@ function show_help ()
     echo -e "-h | -? | --help \tShow this help message and quit\n"
     echo -e "\nFor details, execute install.sh --about\n"
     echo -e "\n"
-    echo -e "When run with the virtual Pythob environment already activated,\n"
+    echo -e "When run with the virtual Python environment already activated,\n"
     echo -e "the script will use the current virtual environment to perform \n"
     echo -e "(re)installations. WARNING: Make sure you activate the appropriate\n"
     echo -e "Python environment for this !\n"
@@ -398,7 +398,11 @@ function dovigra ()
         echo -e "Creating vigra build tree outside the source tree\n"
         mkdir -p vigra-build && cd vigra-build
         
-        $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+        $cmake_binary -DPYTHON_INCLUDE_DIR=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
+                      -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
+                      -DPYTHON_EXECUTABLE:FILEPATH=`which python` \
+                      -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+#         $cmake_binary -DPYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") -DPYTHON_EXECUTABLE:FILEPATH=`which python` -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
         
         make && make install
         
@@ -973,7 +977,7 @@ echo -e "Will install in ${install_dir}"
 # echo "python micro": $micro
 
 if ! [ -v VIRTUAL_ENV ] ; then
-    virtual_env={$install_dir}/${virtual_env_pfx}.$pyver
+    virtual_env=${install_dir}/${virtual_env_pfx}.$pyver
     python_exec="python${major}.${minor}"
 else
     virtual_env=$VIRTUAL_ENV
