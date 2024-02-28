@@ -679,17 +679,23 @@ class RecordingSource(__BaseSource__):
         """
         if isinstance(self.syn, SynapticStimulus):
             return SynapticPathway(source = self, stimulus = self.syn,
-                                   name = " ".join([self.name, self.syn.name]),
+                                   name = self.syn.name,
+                                   # name = "_".join([self.name, self.syn.name]),
+                                   # name = " ".join([self.name, self.syn.name]),
                                    )
             
         if isinstance(self.syn, (tuple, list)):
             if len(self.syn) == 1:
                 return SynapticPathway(source=self, stimulus = self.syn[0],
-                                       name = " ".join([self.name, self.syn[0].name]),
+                                       name = self.syn[0].name,
+                                       # name = "_".join([self.name, self.syn[0].name]),
+                                       # name = " ".join([self.name, self.syn[0].name]),
                                        )
             elif len(self.syn) > 1:
                 return tuple(SynapticPathway(source=self, stimulus = s,
-                                             name = " ".join([self.name, s.name])) for s in self.syn)
+                                             name = s.name) for s in self.syn)
+                                             # name = "_".join([self.name, s.name])) for s in self.syn)
+                                             # name = " ".join([self.name, s.name])) for s in self.syn)
         
     @property
     def in_daq_cmd(self) -> tuple:
