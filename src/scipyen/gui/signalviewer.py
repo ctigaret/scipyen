@@ -118,6 +118,12 @@ from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanva
                                                 NavigationToolbar2QT as NavigationToolbar)
 
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
+    
 import vigra
 
 
@@ -2106,6 +2112,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         sig_ndx_names = list(map(lambda x: (x[0],x[1]) if isinstance(x[1], str) and len(x[1].strip()) else (x[0],f"Analog signal {x[0]}") , ((k,getattr(s, "name", f"Analog signal {k}")) for k,s in enumerate(signals))))
         
+        # print(f"{self.__class__.__name__}._gen_signal_ndx_name_map_: sig_ndx_names = {sig_ndx_names}")
+        
         # NOTE: 2023-01-17 11:57:46
         # map signal name suffixed with optional index in brackets, to
         # a tuple (index, signal name)
@@ -2195,23 +2203,29 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                 irregular:typing.Optional[list] = None):
         """ Populates the GUI signal combo boxes based on the signals
         """
-        # print(f"{len(analog) if isinstance(analog, (tuple, list)) else analog} analogs")
-        if not isinstance(analog, (tuple, list)) or len(analog) == 0:
+        # print(f"{self.__class__.__name__}._setup_signal_choosers_: {len(analog) if isinstance(analog, (tuple, list, NeoObjectList)) else analog} analogs")
+        
+        if not isinstance(analog, (tuple, list, NeoObjectList)) or len(analog) == 0:
             self._frame_analog_map_.clear()
             
         else:
             self._frame_analog_map_ = self._gen_signal_ndx_name_map_(analog)
             
+        # print(f"{self.__class__.__name__}._setup_signal_choosers_: _frame_analog_map_ = {self._frame_analog_map_}")
+            
         self._populate_signal_chooser_(self._frame_analog_map_, self.analogSignalComboBox)
             
-        # print(f"{len(irregular) if isinstance(irregular, (tuple, list)) else irregular} irregulars")
-        if irregular is None or (isinstance(irregular, (tuple, list)) and len(irregular) == 0):
+        # print(f"{self.__class__.__name__}._setup_signal_choosers_: {len(irregular) if isinstance(irregular, (tuple, list, NeoObjectList)) else irregular} irregulars")
+        
+        if irregular is None or (isinstance(irregular, (tuple, list, NeoObjectList)) and len(irregular) == 0):
             self._frame_irregs_map_.clear()
             
         else:
             self._frame_irregs_map_ = self._gen_signal_ndx_name_map_(irregular)
             
         self._populate_signal_chooser_(self._frame_irregs_map_, self.irregularSignalComboBox)
+        
+        # print(f"{self.__class__.__name__}._setup_signal_choosers_: _frame_irregs_map_ = {self._frame_irregs_map_}")
 
     # ### END private methods
     
@@ -8875,6 +8889,8 @@ signals in the signal collection.
         selected_signal_ndx = list()
         selected_signal_axis_names = list()
         
+        # print(f"{self.__class__.__name__}._signals_select_: guiSelection = {guiSelection}")
+        
         if len(guiSelection):
             selected_signal_axis_names = guiSelection
             selected_signal_ndx, selected_signal_names = zip(*list(mapping[k] for k in selected_signal_axis_names if k in mapping ))
@@ -8914,7 +8930,7 @@ signals in the signal collection.
         One channel - one axis is the golden rule here.
         
         """
-        # print(f"{len(self.signalAxes)} signal axes, {len(analog)} analog, and {len(irregs)} irregs")
+        # print(f"{self.__class__.__name__}._plot_signals_: {len(self.signalAxes)} signal axes, {len(analog)} analog, and {len(irregs)} irregs")
         if len(analog) + len(irregs) == 0:
             return None, None
         
@@ -8961,7 +8977,7 @@ signals in the signal collection.
                 plotItem = self.signalAxes[ax_ndx]
                 if k in selected_analog_ndx:
                     plot_name_ndx = selected_analog_ndx.index(k)
-                    # print(f"plotItemNames = {plotItemNames}")
+                    # print(f"{self.__class__.__name__}._plot_signals_: plotItemNames = {plotItemNames}")
                     plotItemName = plotItemNames[plot_name_ndx]
                     # NOTE: 2023-01-04 22:14:55
                     # avoid plotting if frame hasn't changed - just change plotItem's visibility

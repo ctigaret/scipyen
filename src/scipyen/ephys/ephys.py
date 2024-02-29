@@ -2411,7 +2411,7 @@ def cursor_reduce(func:types.FunctionType,
         t0, t1 = cursor
         
     else:
-        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursors} instead")
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
     
     if not isinstance(t0, pq.Quantity):
         t0 *= signal.times.units

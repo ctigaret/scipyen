@@ -755,8 +755,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # TODO 2024-02-18 12:01:00 FIXME:
                     # ony adjust for pathways where the protocol has recorded from !
                     # ⇒ get an index of these pathways in processProtocol, store in _runData_
-                    # pathways = [self._runData_.pathways[k] for k in self._runData_.recordedPathways]
-                    recPaths = [v["pathway"] for v in self._runData_.recordedPathways.values()]
+                    # pathways = [self._runData_.pathways[k] for k in self._runData_.pathwayMeasures]
+                    recPaths = [v["pathway"] for v in self._runData_.pathwayMeasures.values()]
                     pathways = [p for p in self._runData_.pathways if p in recPaths]
                     for pathway in pathways:
                         pathway.schedule.episodes[-1].endFrame += 1
@@ -1327,7 +1327,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             mainDigPathways = list() # empty if len(digOutDacs ) == 0
             altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
             dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
-            pathwaysToStore = dict() # the above, to store in _runData_.recordedPathways between runs
+            pathwaysToStore = dict() # the above, to store in _runData_.pathwayMeasures between runs
             
             for k, p in enumerate(pathways):
                 if p.stimulus.dig:
@@ -1516,8 +1516,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 
                 recorded_pathway_entry = f"{src.name}_{p.name}"
-                if recorded_pathway_entry not in self._runData_.recordedPathways:
-                    self._runData_.recordedPathways[recorded_pathway_entry] = {"pathway":p, "measures": pMeasures}
+                if recorded_pathway_entry not in self._runData_.pathwayMeasures:
+                    self._runData_.pathwayMeasures[recorded_pathway_entry] = {"pathway":p, "measures": pMeasures}
                 
                 
             for k, p in altDigPathways:
@@ -1529,295 +1529,17 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 
                 recorded_pathway_entry = f"{src.name}_{p.name}"
-                if recorded_pathway_entry not in self._runData_.recordedPathways:
-                    self._runData_.recordedPathways[recorded_pathway_entry] = {"pathway":p, "measures": pMeasures}
+                if recorded_pathway_entry not in self._runData_.pathwayMeasures:
+                    self._runData_.pathwayMeasures[recorded_pathway_entry] = {"pathway":p, "measures": pMeasures}
                 
                 
-#                 # to store location measures for this pathway:
-#                 # str (name) ↦ dict("measure" ↦ LocationMeasure, "args" ↦ tuple of extra arguments passed to LocationMeasure)
-#                 pathwayMeasures = dict() 
-#                 
-#                 
-#                 # NOTE: for the moment, I do not expect to have more than one such epoch
-#                 # WARNING we require a membrane test epoch in voltage clamp;
-#                 # in current clamp this is not mandatory as we may be using field recordings
-#                 # locate sweeps and epochs where the pathway's digital stimulus is emitted
-#                 # we need the active DAC here (which is the one where DIG output is enabled)
-#                 # 
-#                 # the sweep(s) returned here is (are) also the sweep(s) where we carry out measurements
-#                 # NOTE: 2024-02-20 23:45:58
-#                 # if there are more than one sweeps, this is likely a crosstalk protocol
-#                 # to be confirmed by the number of stimuli on each path way and
-#                 # the order of pathways in the protocol
-#                 sweepsEpochsForDig = protocol.getDigitalChannelUsage(p.stimulus.channel, activeDAC)
-#                 
-#                 
-#                 # NOTE: 2024-02-20 08:41:09
-#                 # this is to check the sweepsEpochsForDig approach against the
-#                 # approach in processTrackingProtocol; consider removing:
-#                 # synStimEpochs below only takes digital TTL-emitting epochs
-#                 # for synaptic stimulation
-#                 # since I now strive to support DAC-emulated TTL as well, I
-#                 # prefer the name `digStimEpochs`
-#                 synTrainStimEpochs = list(filter(lambda x: len(x.getTrainDigitalOutputChannels("all"))>0, 
-#                                     activeDAC.epochs))
-#                 
-#                 synPulseStimEpochs = list(filter(lambda x: len(x.getPulseDigitalOutputChannels("all"))>0, 
-#                                     activeDAC.epochs))
-#                 
-#                 synStimEpochs = synTrainStimEpochs + synPulseStimEpochs
-#                 
-#                 
-#                 ee = ", ".join([f"{e.letter} ({e.number})" for e in synStimEpochs])
-#                 self.print(f"       synaptic stimulation epochs: {printStyled(ee)}")
-#                 
-#                 self.print(f"       DIG channel {printStyled(p.stimulus.channel)} active in sweeps {printStyled([sed[0] for sed in sweepsEpochsForDig])}")
-#                 
-#                 
-#                 assert all((e in synStimEpochs) for e in sweepsEpochsForDig[0][1]), f"Epochs inconsistencies for pathway {k}"
-#                 # assert all(i==j for i, j in zip(sweepsEpochsForDig[0][1], synStimEpochs)) f"Epochs inconsistencies for pathway {k}"
-#                 
-#                 if len(sweepsEpochsForDig) == 0:
-#                     raise RuntimeError(f"The specified DIG channel {p.stimulus.channel} appears to be disabled in all sweeps")
-#                 
-#                 if len(sweepsEpochsForDig) > 1:
-#                     # TODO: Check for crosstalk
-#                     pass
-#                     # raise RuntimeError(f"The specified DIG channel {p.stimulus.channel} appears to be active in more than one sweep ({k[0] for k in sweepsEpochsForDig})")
-#                 
-#                 
-#                 responseBaselineDuration = self._runData_.responseBaselineDuration
-#                 
-#                 digStimEpochs = sweepsEpochsForDig[0][1] # a list with epochs that emit on the SAME digital channel
-#                 
-#                 if len(digStimEpochs) == 0:
-#                     raise RuntimeError(f"No digital stimulation epochs found in the protocol, for pathway {k} in source {src}")
-#                 
-#                 # if len(digStimEpochs) > 1:
-#                     # below, this is contentious: what if the user decided to 
-#                     # use more than one epoch to emulate a digital TTL train?
-#                     # so better use them all
-#                     # scipywarn(f"For pathway {k} in source {src} there are {len(digStimEpochs)} in the protocol; will use the first one")
-#                     
-#                 firstDigStimEpoch = digStimEpochs[0]
-#                 
-#                 # collection of unique digital channels used for stimulation on THIS pathway
-#                 stimDIG = unique(list(itertools.chain.from_iterable(e.getUsedDigitalOutputChannels("all") for e in digStimEpochs)))
-#                 
-#                 # now, figure out start & duration for signal baseline and for synaptic response baseline(s)
-#                 # we compute: 
-#                 # signalBaselineStart, signalBaselineDuration, responseBaselineStart, responseBaselineDuration
-#                 if isinstance(membraneTestEpoch, pab.ABFEpoch):
-#                     if testStart + testDuration < dac.getEpochRelativeStartTime(firstDigStimEpoch, 0):
-#                         # membrane test occurs BEFORE digital simulation epochs,
-#                         # possibly with intervening epochs (for response baselines)
-#                         if testStart == 0:
-#                             signalBaselineStart = 0*pq.s
-#                             signalBaselineDuration = testStart
-#                             
-#                         else:
-#                             # need to fnd out these, as the epochs table may start at a higher epoch index
-#                             initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  dac.getEpochRelativeStartTime(membraneTestEpoch, 0) \
-#                                                                 and x.firstDuration > 0 and x.deltaDuration == 0, 
-#                                                             dac.epochs))
-#                             if len(initialEpochs):
-#                                 # baseline epochs are initial epochs where no analog command is sent out
-#                                 # (e.g. they are not set)
-#                                 baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
-#                                 if len(baselineEpochs):
-#                                     signalBaselineStart = dac.getEpochRelativeStartTime(baselineEpochs[0], 0)
-#                                     signalBaselineDuration = baselineEpochs[0].firstDuration
-#                                 else:
-#                                     signalBaselineStart = 0*pq.s
-#                                     signalBaselineDuration = dac.getEpochRelativeStartTime(initialEpochs[0], 0)
-#                             else:
-#                                 signalBaselineStart = max(testStart -2 * dac.holdingTime, 0*pq.s)
-#                                 signalBaselineDuration = max(dac.holdingTime, testDuration)
-#                                 
-#                         # any epochs intervening between membrane test and digStimEpochs
-#                         # and between consecutive digStimEpochs - 
-#                         # (do we really care ?!? just use line below:)
-#                         # however, keep the code just in case the user did provide baseline epochs intervening
-#                         # between mb test and first stim and between consecutive stims
-#                         #
-#                         digStimStarts = [activeDAC.getEpochRelativeStartTime(e)  - responseBaselineDuration for e in digStimEpochs]
-#                         
-#                         ff = lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration
-#                         responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
-#                                                                     and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-#                                                                     and any([ff(x) <= digStimStarts[0]] + [ff(x) > digStimStarts[k-1] and ff(x) <= digStimStarts[k] for k in range(1, len(digStimStarts))]),
-#                                                             dac.epochs))
-#                         # if len(digStimEpochs) > 1:
-#                         # else:
-#                         #     responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
-#                         #                                                 and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-#                         #                                                 and any(dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0)) - responseBaselineDuration,
-#                         #                                         dac.epochs))
-#                         
-#                         if len(responseBaselineEpochs):
-#                             responseBaselineStarts = [dac.getEpochRelativeStartTime(e, 0) for e in responseBaselineEpochs]
-#                         
-#                         else:
-#                             # CAUTION 2024-02-21 00:49:16
-#                             # what if the responses are closer in time than responseBaselineDuration ?!?
-#                             responseBaselineStarts = digStimStarts
-#                             # responseBaselineStarts = activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * responseBaselineDuration
-#                             
-#                     elif testStart > activeDAC.getEpochRelativeStartTime(digStimEpochs[-1], 0) + digStimEpochs[-1].firstDuration:
-#                         # mb test delivered AFTGER the last digital simulation epoch 
-#                         # ideally, somwehere towards the end of the sweep, 
-#                         # hopefully AFTER synaptic responses have decayed to baseline
-#                         #
-#                         # in this case, best is to use the first epoch before the
-#                         # digStimEpochs (if any), or the dac holding, as signal baseline (DC)
-#                         #
-#                             
-#                         initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) \
-#                                                             and x.firstDuration > 0 and x.deltaDuration == 0, 
-#                                                         dac.epochs))
-#                 
-#                         if len(initialEpochs):
-#                             # there are epochs before digStimEpochs - are any of these baseline-like?
-#                             baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
-#                             if len(baselineEpochs):
-#                                 signalBaselineStart = dac.getEpochRelativeStartTime(baselineEpochs[0], 0)
-#                                 signalBaselineDuration = baselineEpochs[0].firstDuration
-#                             else:
-#                                 signalBaselineStart = 0 * pq.s
-#                                 signalBaselineDuration = dac.getEpochRelativeStartTime(initialEpochs[0], 0)
-#                                 
-#                         else:
-#                             # no epochs before the membrane test (odd, but can be allowed...)
-#                             signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
-#                             signalBaselineDuration = max(dac.holdingTime, digStimEpochs[0].firstDuration)
-#                     
-#                         # Now, determine the response baseline for this scenario.
-#                         digStimStarts = [activeDAC.getEpochRelativeStartTime(e)  - responseBaselineDuration for e in digStimEpochs]
-#                         
-#                         ff = lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration
-# 
-#                         responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
-#                                                                     and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-#                                                                     and any([ff(x) <= digStimStarts[0]] + [ff(x) > digStimStarts[k-1] and ff(x) <= digStimStarts[k] for k in range(1, len(digStimStarts))]),
-#                                                             dac.epochs))
-# 
-#                         # responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
-#                         #                                             and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-#                         #                                             and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - responseBaselineDuration,
-#                         #                                     dac.epochs))
-#                         
-#                         if len(responseBaselineEpochs):
-#                             # take the last one
-#                             responseBaselineStarts = [dac.getEpochRelativeStartTime(e, 0) for e in responseBaselineEpochs]
-#                         
-#                         else:
-#                             responseBaselineStarts = digStimStarts
-#                             # responseBaselineStart = activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * self._runData_.responseBaselineDuration
-#                             
-#                     else:
-#                         raise RuntimeError(f"Cannnot determine response baseline")
-#                     
-#                     # TODO: 2024-02-20 16:24:00
-#                     # generate location measures for membrane test
-#                     
-#                     if clampMode == ClampMode.VoltageClamp:
-#                         dataCursorDC  = DataCursor(signalBaselineStart + signalBaselineDuration/2, signalBaselineDuration)
-#                         dataCursorRs  = DataCursor(testStart - 0.0025*pq.s, 0.005*pq.s)
-#                         # last 10 ms before end of test, window of 5 ms
-#                         dataCursorRin = DataCursor(testStart + testDuration - 0.01 * pq.s, 0.005*pq.s)
-#                         mbTestLocationMeasure = ephys.membraneTestVClampMeasure(dataCursorDC, dataCursorRs, dataCursorRin)
-#                         pathwayMeasures["VClampMembraneTest"] = {"measure":mbTestLocationMeasure,
-#                                                                  "args": (testAmplitude)}
-#                         self.print(f"pathwayMeasures: {printStyled(pathwayMeasures)}")
-#                     elif clampMode == ClampMode.CurrentClamp:
-#                         pass #TODO 2024-02-27 16:18:25
-#                     
-#                 else:
-#                     # no membrane test epoch configured (e.g. field recording)
-#                     # ⇒ response baseline same as signal baseline
-#                     #
-#                     signalBaselineStart = self._runData_.signalBaselineStart
-#                     signalBaselineDuration = dac.getEpochRelativeStartTime(synStimEpochs[0],0)
-#                     responseBaselineStarts = [self._runData_.signalBaselineStart]
-#                     # responseBaselineDuration = signalBaselineDuration
-#                 
-#                 # NOTE: 2024-02-27 16:24:08
-#                 # now, record the patwhay entry
-#                 recorded_pathway_entry = f"{src.name}_{p.name}"
-#                 if recorded_pathway_entry not in self._runData_.recordedPathways:
-#                     self._runData_.recordedPathways[recorded_pathway_entry] = {"pathway":p, "measures": pathwayMeasures}
-                    
-                # NOTE: 2024-02-27 16:25:58
-                # now, determine the measurements
-                # we need access to the ABF run data here
-                    
-                # FIXME 2024-02-20 16:22:05 in the above:
-                # 1) what to do with paired pulses?
-                # 2) generate location measures for the membrane test (if any)
-                # 3) figure out contigency for crosstalk
-                
-                # commented out for now
-                # pathwaysLayout[src][k][sweepsEpochsForDig[0][0]] = pathwayMeasures
-                
-                    
-                
-                # TODO 2024-02-18 23:23:55 finish this up
-                
-                
-                
-                
-#             if len(pathways) > 1:
-#                 if len(pathways) > 2 and protocol.nSweeps > 1:
-#                     raise RuntimeError(f"In experiments with more than two pathways, the ABF protocol must record one sweep at a time")
-#                 
-#                 if len(pathways) == 2:
-#                     # special case
-#                     # and protocol.alternateDigitalOutputStateEnabled:
-#                     # protocol handles two pathways
-#                     
-#                     # figure out which is the "main" and which is the "alternate" pathway
-#                     # True is the main, False is the alternate; most typical would be
-#                     # [True, False] here
-#                     pathsLayout = [p.stimulus.channel in mainDIGOut and p.stimulus.channel not in altDIGOut for p in pathways]
-#                     
-#                     # map sweep index in the protocol to pathway data; first element
-#                     # is main path (path 0), second is the alternate path (path 1);
-#                     # (adapts automatically to requirement 2∘)
-#                     pathwaySegments = [range(0, protocol.nSweeps, 2), range(1, protocol.nSweeps, 2)]
-#                     
-#                 else:
-#                     # protocol handles just one pathway of however many
-#                     pathsLayout = [p.stimulus.channel in mainDIGOut for p in pathways]
-#                     pathwaySegments = [range(protocol.nSweeps) if pathsLayout[k] else None for k in range(len(pathways))]
-#                     
-#                         
-#             else: 
-#                 # unique pathway is also the main pathway
-#                 pathsLayout = [True] 
-#                 # all sweeps in the trial record from the same (unique, main) path
-#                 pathwaySegments = [range(protocol.nSweeps)]
-#                 
-#             adc = protocol.getADC(src.adc)
-#             dac = protocol.getDAC(src.dac)
-            
-#             clampMode = protocol.getClampMode(adc, dac)
-#             
-#             for pathway in pathways:
-#                 pathway.clampMode = clampMode
-                
-            # now, find out relevant epochs and triggers
-            
-#             for pathway, segmentRange in zip(pathways, pathwaySegments):
-#                 pathway.clampMode = clampMode
-#                 
-#                 self.setMeasuresForPathway(pathway, protocol, segmentRange)
-
     def setMeasuresForPathway(self, p:SynapticPathway, protocol:pab.ABFProtocol, clampMode,
                        adc, dac, activeDAC, membraneTestEpoch,
                        testStart, testDuration, testAmplitude):
         # to store location measures for this pathway:
         # str (name) ↦ dict("measure" ↦ LocationMeasure, "args" ↦ tuple of extra arguments passed to LocationMeasure)
-        pathwayMeasures = dict() 
+        pMeasures = dict() 
+        # NOTE: 
         
         
         # NOTE: for the moment, I do not expect to have more than one such epoch
@@ -2009,11 +1731,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 dataCursorRs  = DataCursor(testStart - 0.0025*pq.s, 0.005*pq.s)
                 # last 10 ms before end of test, window of 5 ms
                 dataCursorRin = DataCursor(testStart + testDuration - 0.01 * pq.s, 0.005*pq.s)
-                mbTestLocationMeasure = ephys.membraneTestVClampMeasure(dataCursorDC, dataCursorRs, dataCursorRin)
-                pathwayMeasures["VClampMembraneTest"] = {"measure":mbTestLocationMeasure,
-                                                            "args": (testAmplitude),
-                                                            "sweeps": pathSweeps}
-                self.print(f"       pathwayMeasures: {printStyled(pathwayMeasures)}")
+                # mbTestLocationMeasure = ephys.membraneTestVClampMeasure(dataCursorDC, dataCursorRs, dataCursorRin)
+                pMeasures["VClampMembraneTest"] = {"measure": ephys.membraneTestVClampMeasure,
+                                                         "locations": (dataCursorDC, dataCursorRs, dataCursorRin),
+                                                         "args": (testAmplitude,),
+                                                         "sweeps": pathSweeps}
+                self.print(f"       pMeasures: {printStyled(pMeasures)}")
             elif clampMode == ClampMode.CurrentClamp:
                 pass #TODO 2024-02-27 16:18:25
             
@@ -2026,13 +1749,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             responseBaselineStarts = [self._runData_.signalBaselineStart]
             # responseBaselineDuration = signalBaselineDuration
             
-        return pathwayMeasures
+        return pMeasures
         
         # NOTE: 2024-02-27 16:24:08
         # now, record the patwhay entry
         # recorded_pathway_entry = f"{src.name}_{p.name}"
-        # if recorded_pathway_entry not in self._runData_.recordedPathways:
-        #     self._runData_.recordedPathways[recorded_pathway_entry] = {"pathway":p, "measures": pathwayMeasures}
+        # if recorded_pathway_entry not in self._runData_.pathwayMeasures:
+        #     self._runData_.pathwayMeasures[recorded_pathway_entry] = {"pathway":p, "measures": pathwayMeasures}
         # return # for now...
         
     def processTrackingProtocol(self, protocol:pab.ABFProtocol):
@@ -2436,7 +2159,6 @@ class LTPOnline(QtCore.QObject):
     def __init__(self, *args,
                  locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
                  episodeName: str = "baseline",
-                 # episodeName: typing.Union[str, RecordingEpisode] = "baseline",
                  useEmbeddedProtocol:bool=True,
                  trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
                  conditioningClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.CurrentClamp,
@@ -2499,7 +2221,7 @@ class LTPOnline(QtCore.QObject):
         #
         # below:
         # 'pathways' are the pathways as parsed from the sources
-        # 'recordedPathways' are the pathays ACTUALLY found in the protocol(s)
+        # 'pathwayMeasures' are the pathays ACTUALLY found in the protocol(s)
         #   taken from the ABF files, hence updated with each abf run; 
         #   this is a dict: 
         #       source_name+pathway_name ↦ dict
@@ -2512,7 +2234,7 @@ class LTPOnline(QtCore.QObject):
         
         self._runData_ = DataBag(sources = self._sources_,
                                  pathways = self._pathways_,
-                                 recordedPathways = dict(),
+                                 pathwayMeasures = dict(),
                                  # episodeName = self._currentEpisodeName_,
                                  currentProtocol = None,
                                  # currentEpisode = episode,
