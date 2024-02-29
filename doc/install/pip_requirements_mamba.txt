@@ -27,6 +27,7 @@
 #wheel
 
 distlib
+sip
 PyQt-builder ; sys_platform == 'linux'
 # required to build PyQt5 locally using the host's Qt stack
 Pyqt5-sip ; sys_platform == 'linux'
@@ -103,13 +104,13 @@ jeepney
 joblib
 #jsonlib
 jsonschema
-jupyter
-jupyter_cms
-jupyter_qtconsole_colorschemes
-jupyterlab
-jupyterlab-pygments
-jupyterlab-server
-jupyterlab-widgets
+# jupyter
+# jupyter_cms
+# jupyter_qtconsole_colorschemes
+# jupyterlab
+# jupyterlab-pygments
+# jupyterlab-server
+# jupyterlab-widgets
 jupyterthemes
 keyring
 kiwisolver
@@ -168,7 +169,7 @@ pyqtgraph
 pyserial
 pytest
 python-magic
-pythyon-neo
+python-neo
 pytz
 pywin32 ; sys_platform == 'win32'
 PyWavelets
@@ -221,4 +222,5 @@ widgetsnbextension
 winshell ; sys_platform == 'win32'
 xarray
 xyzservices
+yaml
 zipp

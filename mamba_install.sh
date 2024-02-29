@@ -222,64 +222,73 @@ function install_python_packages()
     if [ ! -r ${CONDA_DEFAULT_ENV}/.packagesdone ] ; then
         mamba config --add channels conda-forge
         
-        echo -e "\n---\n Installing PyPI packages"
-        pip install -r ${installscriptdir}/pip_requirements_mamba.txt
 
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y jupyter
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y jupyterthemes
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y numpy
+        echo -e "\n---\nInstalling yaml"
+        mamba install --prefix $CONDA_DEFAULT_ENV -y yaml
+        
+        echo -e "\n---\nInstalling jupyter"
+        mamba install --prefix $CONDA_DEFAULT_ENV -y jupyter jupyterthemes jupyter_cms jupyter_qtconsole_colorschemes
+        echo -e "\n---\nInstalling jupyterlab"
+        mamba install --prefix $CONDA_DEFAULT_ENV -y jupyterlab jupyterlab-pygments jupyterlab-server jupyterlab-widgets
+        echo -e "\n---\nInstalling numpy"
+        mamba install --prefix $CONDA_DEFAULT_ENV -y numpy
 
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y matplotlib
-#         echo Installing scipy
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y scipy
-#         echo Installing sympy
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y sympy
-#         echo Installing h5py
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y h5py
-#         echo Installing pyqtgraph
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y pyqtgraph
-#         echo Installing pywavelets
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y PyWavelets
-#         echo Installing pandas
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y pandas
-#         echo Installing quantities
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y quantities
-#         echo Installing python-neo
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y python-neo
+        echo -e "\n---\nInstalling matplotlib"
+
+        mamba install --prefix $CONDA_DEFAULT_ENV -y matplotlib
+
+        echo -e "\n---\nInstalling scipy"
+        mamba install --prefix $CONDA_DEFAULT_ENV -y scipy
+        echo -e "\n--\nInstalling sympy"
+        mamba install --prefix $CONDA_DEFAULT_ENV -y sympy
+        echo Installing h5py
+        mamba install --prefix $CONDA_DEFAULT_ENV -y h5py
+        echo Installing pyqtgraph
+        mamba install --prefix $CONDA_DEFAULT_ENV -y pyqtgraph
+        echo Installing pywavelets
+        mamba install --prefix $CONDA_DEFAULT_ENV -y PyWavelets
+        echo Installing pandas
+        mamba install --prefix $CONDA_DEFAULT_ENV -y pandas
+        echo Installing quantities
+        mamba install --prefix $CONDA_DEFAULT_ENV -y quantities
+        echo Installing python-neo
+        mamba install --prefix $CONDA_DEFAULT_ENV -y python-neo
         echo -e "\n---\nInstalling vigra"
         mamba install --prefix $CONDA_DEFAULT_ENV -y -c conda-forge vigra
-#         echo Installing cmocean
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y cmocean
-#         echo Installing confuse
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y confuse
-#         echo Installing inflect
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y inflect
-#         echo Installing seaborn
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y seaborn
-#         echo Installing pingouin
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y pingouin
-#         echo Installing qimage2ndarray
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y qimage2ndarray
-#         echo Installing pyxdg
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y pyxdg
-        # REM OPTIONAL PACKAGES FROM CONDA
-        # REM mamba install --prefix $CONDA_DEFAULT_ENV -y qdarkstyle
-#         echo Installing bokeh
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y bokeh
-#         echo Installing scikit-image
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y scikit-image
-#         echo Installing scikit-learn
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y scikit-learn
-#         echo Installing dill
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y dill
-#         echo Installing libNeuroML
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y libNeuroML
-#         echo Installing matlab kernel
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y matlab_kernel
-#         echo Installing octave kernel
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y octave_kernel
-#         echo Installing PyInstaller
-#         mamba install --prefix $CONDA_DEFAULT_ENV -y pyinstaller
+        echo Installing cmocean
+        mamba install --prefix $CONDA_DEFAULT_ENV -y cmocean
+        echo Installing confuse
+        mamba install --prefix $CONDA_DEFAULT_ENV -y confuse
+        echo Installing inflect
+        mamba install --prefix $CONDA_DEFAULT_ENV -y inflect
+        echo Installing seaborn
+        mamba install --prefix $CONDA_DEFAULT_ENV -y seaborn
+        echo Installing pingouin
+        mamba install --prefix $CONDA_DEFAULT_ENV -y pingouin
+        echo Installing qimage2ndarray
+        mamba install --prefix $CONDA_DEFAULT_ENV -y qimage2ndarray
+        echo Installing pyxdg
+        mamba install --prefix $CONDA_DEFAULT_ENV -y pyxdg
+        REM OPTIONAL PACKAGES FROM CONDA
+        REM mamba install --prefix $CONDA_DEFAULT_ENV -y qdarkstyle
+        echo Installing bokeh
+        mamba install --prefix $CONDA_DEFAULT_ENV -y bokeh
+        echo Installing scikit-image
+        mamba install --prefix $CONDA_DEFAULT_ENV -y scikit-image
+        echo Installing scikit-learn
+        mamba install --prefix $CONDA_DEFAULT_ENV -y scikit-learn
+        echo Installing dill
+        mamba install --prefix $CONDA_DEFAULT_ENV -y dill
+        echo Installing libNeuroML
+        mamba install --prefix $CONDA_DEFAULT_ENV -y libNeuroML
+        echo Installing matlab kernel
+        mamba install --prefix $CONDA_DEFAULT_ENV -y matlab_kernel
+        echo Installing octave kernel
+        mamba install --prefix $CONDA_DEFAULT_ENV -y octave_kernel
+        echo Installing PyInstaller
+        mamba install --prefix $CONDA_DEFAULT_ENV -y pyinstaller
+        echo -e "\n---\n Installing additional PyPI packages"
+        pip install -r ${installscriptdir}/pip_requirements_mamba.txt
 
     fi
 }
@@ -383,10 +392,12 @@ shopt -s lastpipe
 # if [[ `id -u` -eq 0 ]] ; then
 cat <<END > ${target_dir}/scipyen 
 #! /bin/sh
-if [ -z \${CONDA_DEFAULT_ENV} ]; then
+# if [ -z \${CONDA_DEFAULT_ENV} ]; then
+source \$HOME/.scipyenrc
+condaact
 conda activate ${CONDA_DEFAULT_ENV}
 # source ${virtual_env}/bin/activate
-fi
+# fi
 git -C $scipyendir rev-parse 2>/dev/null;
 if [[ \$? -eq 0 ]]; then
 branch=\`git -C ${scipyendir} branch --show-current\`
@@ -695,12 +706,14 @@ if [[ ( -n "$CONDA_DEFAULT_ENV" ) && ( -d "$CONDA_DEFAULT_ENV" ) ]] ; then
     
 #     build Pyqt5 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     install_python_packages
-    dopyqt5
-    
-    
     if [[ $? -eq 0 ]] ; then
     echo -e "Python packages installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${CONDA_DEFAULT_ENV}/.packagesdone
+    else
+    echo -e "Could not install all required packages. Bailing out...\n"
+    exit 1
     fi
+    
+#     dopyqt5
     
     # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
 #     dovigra
@@ -754,3 +767,4 @@ echo "Execution time was $days days, $hours hours, $minutes minutes and $seconds
 # :eof
 # rem  endlocal
 
+    
