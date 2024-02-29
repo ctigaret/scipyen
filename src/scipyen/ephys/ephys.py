@@ -1567,6 +1567,13 @@ class LocationMeasure:
         sequences of scalars, the sequences must also be mutable
     
 """
+    # NOTE: 2024-02-29 22:37:54
+    # mandatory signature for func:
+    # func(*args, **kwargs) where:
+    # *args: signal or signals, and any other positional parameters NOT locators
+    # **kwargs: named parameters for func; these MAY be 'relative' and 'channel'
+    #   although these two will by supplied in self.__call__ if not present in kwargs
+    # 
     func: typing.Callable
     locations: typing.Union[typing.Sequence, DataCursor, Interval, SignalCursor, DataZone, neo.Epoch]
     name: str = "measure"
@@ -1576,7 +1583,19 @@ class LocationMeasure:
     # __slots__ = ()
     
     def __call__(self, *args, **kwargs):
-        # *args is a signal or sequence of signals
+        """
+        Var-positional parameters (*args):
+        ----------------------------------
+        Passed to encapsulated function (`func` field); MUST contain a signal or
+        signals PLUS any additional positional parameters EXCEPT locators
+
+        Var-keyword parameters (**kwargs):
+        ---------------------------------
+        Any explicitly named parameters to `func`; NOTE that `channel` and `relative`
+        are passed to the `func` if they are not supplied with kwargs here
+            
+        """
+        # *args is a signal or sequence of signals plus any other positional arguments
         
         if isinstance(self.locations, (list, tuple)):# and not isinstance(self.locations, Interval):
             args = args + tuple(self.locations)
@@ -1588,9 +1607,15 @@ class LocationMeasure:
         
         if not isinstance(relative, bool):
             kwargs["relative"] = self.relative
+        
+        channel = kwargs.get("channel", None)
+        if not isinstance(channel, int):
+            kwargs["channel"] = self.channel
             
         # print(f"{self.__class__.__name__}.call: relative = {self.relative}")
         # print(f"{self.__class__.__name__}.call: func = {self.func}")
+        # print(f"{self.__class__.__name__}.__call__ args = {args}")
+        # print(f"{self.__class__.__name__}.__call__ kwargs = {kwargs}")
         return self.func(*args, **kwargs)
   
 class DataListener(QtCore.QObject):
@@ -4067,12 +4092,17 @@ def membraneTestVClampMeasure(base: typing.Union[DataCursor, SignalCursor],
     Returns a tuple (DC, Rs, Rin) where DC is the baseline current, Rs and Rin 
     are, respectively, the series and input membrane resistance.
     """
-    def _func_(s, c1, c2, c3, testVmDelta:pq.Quantity, channel:int = 0, relative:bool = True):
+    
+    # NOTE: 2024-02-29 22:37:45 see NOTE: 2024-02-29 22:37:54 for mandatory signature
+    def _func_(s, testVmDelta:pq.Quantity, c1, c2, c3, channel:int = 0, relative:bool = True):
+        # print(f"_func_:\ns = {s}\nc1 = {c1}\nc2 = {c2}\nc3 = {c3}\ntestVmDelta = {testVmDelta}")
         _dc  = cursor_average(s, c1)
         _rin = (testVmDelta / (cursor_average(s, c3) - _dc)).rescale(pq.megaohm)
         _rs  = (testVmDelta / ((cursor_max(s, c2) if testVmDelta > 0 else cursor_min(s, c2)) - _dc)).rescale(pq.megaohm)
         
         return (_dc, _rs, _rin)
+    
+    # f = functools.partial(_func_, channel=channel, relative=relative)
     
     return LocationMeasure(_func_, (base, Rs, Rin), name, channel, relative)
     
