@@ -502,9 +502,11 @@ ABF = pyabf.ABF
 # This is 8 for DigiData 1550 series, and 4 for DigiData 1440 series
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
 
-class ABFInputConfiguration: pass
-
-class ABFOutputConfiguration: pass
+# These two will be (properly) redefined further below
+class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
+    pass
+class ABFInputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
+    pass                         # will be (properly) redefined further below
 
 class ABFAcquisitionMode(datatypes.TypeEnum):
     """Corresponds to nOperationMode in ABF._protocolSection and annotations"""
@@ -931,8 +933,6 @@ class ABFEpoch:
                 return any(v != 0 for v in itertools.chain.from_iterable(p+pa))
                 
                     
-        
-    
     def hasDigitalPulse(self, digChannel:int = 0, alternate:bool=False) -> bool:
         """
         Checks if there is a pulse output (1) on the specified digital channel
@@ -2450,18 +2450,6 @@ class ABFOutputConfiguration:
     def protocol(self) -> ABFProtocol:
         return self._protocol_
         
-#     @property
-#     def digitalTrainActiveLogic(self) -> bool:
-#         return self.protocol.digitalTrainActiveLogic
-#     
-#     @property
-#     def digitalHolding(self) -> int:
-#         return self.protocol.digitalHolding
-#     
-#     @property
-#     def digitalUseLastEpochHolding(self) -> bool:
-#         return self.protocol.digitalUseLastEpochHolding
-            
     @property
     def returnToHold(self) -> bool: 
         """True if the command waveform return to last epoch's level.
@@ -3050,7 +3038,7 @@ class ABFOutputConfiguration:
 
         return [t0 + p * epoch.pulsePeriod for p in range(pc)]
     
-    def getEpochPulseTimes(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> list:
+    def getEpochRelativePulseTimes(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0) -> list:
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -3062,7 +3050,8 @@ class ABFOutputConfiguration:
         if pc == 0:
             return list()
         
-        t0 = self.epochStartTime(epoch, sweep)
+        # t0 = self.epochStartTime(epoch, sweep)
+        t0 = self.getEpochRelativeStartTime(epoch, sweep)
 
         return [t0 + p * epoch.pulsePeriod for p in range(pc)]
 

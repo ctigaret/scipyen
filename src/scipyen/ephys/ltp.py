@@ -84,7 +84,8 @@ from core.utilities import (safeWrapper,
                             unique,
                             duplicates,
                             GeneralIndexType,
-                            counter_suffix)
+                            counter_suffix,
+                            NestedFinder)
 
 #### END pict.core modules
 
@@ -1565,11 +1566,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                               path_entry, clampMode,
                               adc, dac, activeDAC, membraneTestEpoch,
                               testStart, testDuration, testAmplitude):
+        # NOTE: 2024-03-01 23:53:33 TODO / FIXME:
+        # instead of returning pMeasures, why not apply measures directly and 
+        # populate the results ?!?
+        
         # to store location measures for this pathway:
         # str (name) ↦ dict("measure" ↦ LocationMeasure, "args" ↦ tuple of extra arguments passed to LocationMeasure)
         pMeasures = dict() 
         
         holdingTime = protocol.holdingTime
+        crossTalk = False
         
         
         # NOTE: for the moment, I do not expect to have more than one such epoch
@@ -1606,7 +1612,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         pathSweeps = [sed[0] for sed in sweepsEpochsForDig]
         
-        assert len(pathSweeps) == 1, f"There should be only a sweep for each pathway; currently, pathway {p.name} has {len(pathSweeps)} sweeps"
+        # assert len(pathSweeps) == 1, f"There should be only a sweep for each pathway; currently, pathway {p.name} has {len(pathSweeps)} sweeps"
         
         self.print(f"       synaptic stimulation epochs: {printStyled(ee)}")
         
@@ -1632,6 +1638,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         if len(digStimEpochs) == 0:
             raise RuntimeError(f"No digital stimulation epochs found in the protocol, for pathway {k} in source {src}")
         
+        # TODO: 2024-03-01 22:40:37 FIXME - sort out the commented below ↴
         # if len(digStimEpochs) > 1:
             # below, this is contentious: what if the user decided to 
             # use more than one epoch to emulate a digital TTL train?
@@ -1643,19 +1650,62 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # collection of unique digital channels used for stimulation on THIS pathway
         stimDIG = unique(list(itertools.chain.from_iterable(e.getUsedDigitalOutputChannels("all") for e in digStimEpochs)))
         
+        if len(stimDIG) == 1:
+            assert stimDIG[0] == p.stimulus.channel, f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} is different from the {stimDIG[0]} used in the epochs {[e.letter for e in digStimEpochs]}"
+            
+        elif len(stimDIG) == 2:
+            assert p.stimulus.channel in stimDIG, f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} does not appear to be used in the epochs {[e.letter for e in digStimEpochs]}"
+            crossTalk = True
+
+        # NOTE: 2024-03-01 22:57:37 TODO consider the below ↴
+#         elif len(stimDIG) == 0:
+#             raise RuntimeError(f"No digital stimlus channels used in the epochs {[e.letter for e in digStimEpochs]}")
+#             
+#         else:
+#             raise RuntimeError(f"Too may digital stimlus channels used ({len(stimDIG)}) in the epochs {[e.letter for e in digStimEpochs]}")
+            
+        
+        # NOTE: 2024-03-01 22:52:10
+        # figure out stimulus pattern on the digStimEpochs in order to 
+        # determine stimulus timings (may be a TTL pulse or a TTL train!)
+        # then infer response(s) baseline(s) and the time stamps for the 
+        # response(s) maximum (maxima) or minimum (minima) in voltage-clamp
+        # or response slope (in current-clamp or voltage follower mode)
+        #
+        # This should be done independently of where they occur relative to any
+        # membrane test epoch(s)
+        
+        # NOTE: 2024-03-01 23:03:01 below, main pattern is on even index sweeps, alternate pattern is on odd index sweeps
+        # NOTE: 2024-03-01 23:04:48 also, a TTL train if present occurs in the first epoch in digStimEpochs
+        # however, several digStimEpochs might be used if using TTL pulses
+        isTTLtrain = firstDigStimEpoch.hasDigitalTrain(p.stimulus.channel, pathSweeps[0] % 2 == 1)
+        
+        if isTTLtrain:
+            # here, NOTE that the epoch starts at the same time on both main and alternate sweep!
+            # same holds for the relatiove pulse times within the train
+            stimTimes = dac.getEpochRelativePulseTimes(firstDigStimEpoch, 0)
+        
+        else:
+            isTTLpulses = all(e.hasDigitalPulse(p.stimulus.channel, pathSweeps[0] % 2 == 1) for e in digStimEpochs)
+            if isTTLpulses:
+                stimTimes = list(itertools.chain.from_iterable([dac.getEpochRelativePulseTimes(e, 0) for e in digStimEpochs]))
+            else:
+                # NOTE: 2024-03-01 23:30:21 should never get here
+                raise RuntimeError(f"Synaptic stimulation Epochs {[e.letter for e in digStimEpochs]} appear to not have either TTL train nor pulses")
+            
         # now, figure out start & duration for signal baseline and for synaptic response baseline(s)
         # we compute: 
-        # signalBaselineStart, signalBaselineDuration, responseBaselineStart, responseBaselineDuration
+        # signalBaselineStart, signalBaselineDuration, responseBaselineStart
         if isinstance(membraneTestEpoch, pab.ABFEpoch):
             if testStart + testDuration < dac.getEpochRelativeStartTime(firstDigStimEpoch, 0):
                 # membrane test occurs BEFORE digital simulation epochs,
                 # possibly with intervening epochs (for response baselines)
                 if testStart == 0:
-                    signalBaselineStart = 0*pq.s
+                    signalBaselineStart = 0 * pq.s
                     signalBaselineDuration = testStart
                     
                 else:
-                    # need to fnd out these, as the epochs table may start at a higher epoch index
+                    # need to find out these, as the epochs table may start at a higher epoch index
                     initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  dac.getEpochRelativeStartTime(membraneTestEpoch, 0) \
                                                         and x.firstDuration > 0 and x.deltaDuration == 0, 
                                                     dac.epochs))
@@ -1670,7 +1720,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             signalBaselineStart = 0*pq.s
                             signalBaselineDuration = dac.getEpochRelativeStartTime(initialEpochs[0], 0)
                     else:
-                        signalBaselineStart = max(testStart -2 * dac.holdingTime, 0*pq.s)
+                        signalBaselineStart = max(testStart - 2 * dac.holdingTime, 0 * pq.s)
                         signalBaselineDuration = max(dac.holdingTime, testDuration)
                         
                 # any epochs intervening between membrane test and digStimEpochs
@@ -1720,7 +1770,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         
                 else:
                     # no epochs before the membrane test (odd, but can be allowed...)
-                    signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * dac.holdingTime, 0*pq.s)
+                    signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * dac.holdingTime, 0 * pq.s)
                     signalBaselineDuration = max(dac.holdingTime, digStimEpochs[0].firstDuration)
             
                 # Now, determine the response baseline for this scenario.
@@ -1743,6 +1793,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
             else:
                 raise RuntimeError(f"Cannnot determine response baseline")
+            
+            
 
             block = self._runData_.results[src.name][path_entry]["pathway_responses"]
             viewer = self._runData_.viewers[src.name][path_entry]["pathway_viewer"]
@@ -1771,28 +1823,33 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # in processProtocol()
             if clampMode == ClampMode.VoltageClamp:
                 dataCursorDC  = DataCursor(t0 + holdingTime + signalBaselineStart + signalBaselineDuration/2, signalBaselineDuration)
-                dataCursorRs  = DataCursor(t0 + holdingTime + testStart - 0.0025*pq.s, 0.005*pq.s)
+                dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 0.005*pq.s)
                 # last 10 ms before end of test, window of 5 ms
                 dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * pq.s, 0.005*pq.s)
                 # mbTestLocationMeasure = ephys.membraneTestVClampMeasure(dataCursorDC, dataCursorRs, dataCursorRin)
                 
-                
-#                 for ks, s in enumerate(pathSweeps):
-#                     
-#                     sig = currentRun.segments[s].analogsignals[adc.logicalIndex]
-#                     seg = neo.Segment(name=f"path_entry sweep {s}", file_origin = currentRun.file_origin,
-#                                       file_datetime=currentRun.file_datetime,
-#                                       rec_datetime = currentRun.rec_datetime,
-#                                       index = seg_ndx + ks)
-#                     seg.analogsignals.append(sig)
-#                     block.segments.append(seg)
-                    
-                # block.segments.extend([currentRun.segments[s] for s in pathSweeps])
-                # viewer.displayFrame(len(block.segments)-1)
+                # NOTE: 2024-03-01 23:34:52 
+                # adjust for real sweep times then:
+                # • for response baselines use 10 ms BEFORE stimulus with window of 3 ms
+                # • for response amplitude use 10 ms AFTER stimulus, with window 3 ms
+                # • cursors should be manually adjusted in the pathway responses windows
+                #
+                dataCursorsEPSCBaselines = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
+                dataCursorsEPSCs = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
                 
                 viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC")
                 viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs")
                 viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin")
+                
+                for kc, c in enumerate(dataCursorsEPSCBaselines):
+                    viewer.addCursor(SignalCursorTypes.vertical, c, label = f"EPSC{kc}Base")
+                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorsEPSCs[kc], label = f"EPSC{kc}")
+                    pMeasures[f"EPSC{kc}"] = {"measure": ephys.amplitudeMeasure,
+                                              "locations": (viewer.signalCursor(f"EPSC{kc}Base"),
+                                                            viewer.signalCursor(f"EPSC{kc}")),
+                                              "args" : [],
+                                              "sweeps": pathSweeps
+                                              }
                 
                 pMeasures["VClampMembraneTest"] = {"measure": ephys.membraneTestVClampMeasure,
                                                    "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
@@ -1800,12 +1857,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                    "sweeps": pathSweeps}
                 # self.print(f"       pMeasures: {printStyled(pMeasures)}")
             elif clampMode == ClampMode.CurrentClamp:
+                scipywarn("Current-clamp measurements not yet implemented")
                 pass #TODO 2024-02-27 16:18:25
             
         else:
             # no membrane test epoch configured (e.g. field recording)
             # ⇒ response baseline same as signal baseline
             #
+            testStart = 0 * pq.s
+            testDuration = 0 * pq.s
             signalBaselineStart = self._runData_.signalBaselineStart
             signalBaselineDuration = dac.getEpochRelativeStartTime(synStimEpochs[0],0)
             responseBaselineStarts = [self._runData_.signalBaselineStart]
@@ -2467,8 +2527,10 @@ class LTPOnline(QtCore.QObject):
             self.stop()
         try:
             if hasattr(self, "_viewers_"):
-                for viewer in self._viewers_.values():
-                    viewer.close()
+                finder = NestedFinder(self._viewers_)
+                viewerWindows = [finder.get(p) for p in finder.find(QtWidgets.QMainWindow, find_by_type=True)]
+                for window in viewerWindows:
+                    window.close()
                     
             if hasattr(self, "_emitterWindow_") and self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
@@ -2671,6 +2733,22 @@ class LTPOnline(QtCore.QObject):
     @property
     def running(self) -> bool:
         return self._running_
+    
+    @property
+    def viewers(self) -> dict:
+        return self._viewers_
+    
+    @property
+    def results(self) -> dict:
+        return self._results_
+    
+    @property
+    def sources(self) -> typing.Sequence:
+        return self._sources_
+    
+    @property
+    def runData(self) -> DataBag:
+        return self._runData_
     
     @property
     def currentEpisodes(self) -> dict:

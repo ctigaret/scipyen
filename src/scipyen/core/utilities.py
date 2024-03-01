@@ -1423,7 +1423,7 @@ class NestedFinder(object):
         else:# elementary indexing with POD scalars, ndarray or tuple of ndarray
             return self._ndx_expr(src, path)
             
-    def _gen_search(self, var, item, parent=None, as_index=False):#, ntabs=0): # ntabs - for debugging only!
+    def _gen_search(self, var, item, parent=None, as_index=False, by_type=False):#, ntabs=0): # ntabs - for debugging only!
         """Generator to search item in a nesting data structure.
         
         Item can be an indexing object, or a value.
@@ -1478,6 +1478,8 @@ class NestedFinder(object):
         if var is None:
             var = self.data
             
+        # print(f"{self.__class__.__name__}._gen_search as_index = {as_index}, by_type = {by_type}")
+            
             
         if isinstance(var, NestedFinder.nesting_types) and id(var) not in self._visited_:
             self._visited_.append(id(var))
@@ -1500,16 +1502,22 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    if self._comparator_(item, v):
-                        self._found_.append(k)
-                        self._paths_.append(list(self._found_))
-                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
-                        yield k
+                    if by_type:
+                        if isinstance(v, item):
+                            self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            yield k
+                    else:
+                        if self._comparator_(item, v):
+                            self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
+                            yield k
                         
                 if isinstance(v, self.supported_collection_types):
                     self._found_.append(k)
                     # print("%ssearch inside %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
-                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    yield from self._gen_search(v, item, k, as_index, by_type)#, ntabs+1) # ntabs for debugging
                     self._found_.pop()
                     
                 # print("%sNOT FOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
@@ -1543,16 +1551,22 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    if self._comparator_(v, item):
-                        #self._found_.append(k)
-                        self._paths_.append(list(self._found_))
-                        # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
-                        yield k
+                    if by_type:
+                        if isinstance(v, item):
+                            self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            yield k
+                    else:
+                        if self._comparator_(v, item):
+                            #self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                            yield k
                         
                 if isinstance(v, self.supported_collection_types):
                     #self._found_.append(k)
                     # print("%ssearch inside %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
-                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    yield from self._gen_search(v, item, k, as_index, by_type)#, ntabs+1) # ntabs for debugging
                     #self._found_.pop()
                         
                 # print("%sNOT FOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
@@ -1586,16 +1600,23 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    if self._comparator_(v, item):
-                        #self._found_.append(k)
-                        self._paths_.append(list(self._found_))
-                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
-                        yield k
+                    if by_type:
+                        if isinstance(v, item):
+                            self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            yield v
+                            
+                    else:
+                        if self._comparator_(v, item):
+                            #self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                            yield k
                         
                 if isinstance(v, self.supported_collection_types):
                     #self._found_.append(k)
                     # print("%ssearch inside %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
-                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    yield from self._gen_search(v, item, k, as_index, by_type)#, ntabs+1) # ntabs for debugging
                     #self._found_.pop()
                     
                 # print("%sNOT FOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
@@ -1923,15 +1944,16 @@ class NestedFinder(object):
                     # print("%sback up one in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
                 
             
-    def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None):
+    def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None,
+             find_by_type:typing.Optional[bool] = False):
         """Search for 'item' in a nesting data structure.
         
         A nesting data structure if a collection (sequence or mapping - a dict)
         that contains other sequnences or dicts nested inside (with arbitrary
         nesting levels).
         
-        Parameters (for Usage, see below):
-        ----------------------------------
+        Parameters (see below for usage details):
+        -----------------------------------------
         
         item: object of the search (optional, default is None)
             When None, the function re-runs the last search. 
@@ -1945,7 +1967,7 @@ class NestedFinder(object):
             When True: 'search by value' mode
             
                 * 'item' is cosidered a value possibly contained deep inside the
-                    nesting data structure
+                    nesting data structure, or a type or tuple of types (see 'find_by_type', below)
                 
                 * the function returns a collection of paths leading to the 
                     values identical to that of 'item' (for primitive data types),
@@ -1975,6 +1997,14 @@ class NestedFinder(object):
                 Otherwise, the function runs a search for 'item', using 
                 'search by value' mode (i.e., as if find_value was passed as 
                 True)
+        
+        find_by_type: bool; default is False
+            When True, 'item' (above) is expected to be a type or tuple of type, 
+            and the search locates nested items of the type(s) specified by the 
+            'item' parameter.
+        
+            WARNING: this search mode is only supported for mappings (dict) and
+            Python sequences (tuple, list, deque)
                 
         Returns:
         -------
@@ -2371,9 +2401,13 @@ class NestedFinder(object):
         if not isinstance(find_value, bool): # force the default here
             find_value = True
             
+        if find_by_type:
+            if not (isinstance(item, type) or (isinstance(item, tuple) and all(isinstance(i, type) for i in item))):
+                raise ValueError(f"When `find_by_type` is True, `item` must be a type or a sequence of types; instead, got {type(item).__name__}")
+            
         self.initialize()
         
-        self._values_ = deque(self._gen_search(self.data, item, None, not find_value))
+        self._values_ = deque(self._gen_search(self.data, item, None, not find_value, find_by_type))
         
         if find_value:
             self._result_ = self._paths_
@@ -2393,7 +2427,7 @@ class NestedFinder(object):
         
         Calls self.find(key_or_indexing_obj, False)
         """
-        return self.find(obj, False)
+        return self.find(obj, find_value=False)
     
     def findindex(self, obj):
         """Calls self.findkey(key_or_indexing_obj).
@@ -2405,7 +2439,7 @@ class NestedFinder(object):
         
         Calls self.find(value, True)
         """
-        return self.find(value, True)
+        return self.find(value, find_value=True)
     
     def path_expression(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
         """Generates a str expression to be valuated on the hierarchical data
