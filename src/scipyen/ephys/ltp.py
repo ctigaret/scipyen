@@ -98,7 +98,7 @@ from gui.itemslistdialog import ItemsListDialog
 import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
-from gui.cursors import SignalCursor
+from gui.cursors import (SignalCursor, DataCursor, SignalCursorTypes)
 from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker)
 #### END pict.gui modules
 
@@ -114,8 +114,8 @@ from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure,
                          SynapticStimulus, SynapticPathway, AuxiliaryInput, AuxiliaryOutput,
                          synstim, auxinput, auxoutput, 
                          amplitudeMeasure, chordSlopeMeasure, durationMeasure)
+
 import ephys.membrane as membrane
-from gui.cursors import DataCursor
 
 
 LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.pkl")
@@ -649,19 +649,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     def __init__(self, parent:QtCore.QObject, emitter,
                  abfBuffer:collections.deque,
                  abfRunData:dict,
-                 # presynapticTriggers: dict,
-                 # landmarks:dict,
-                 # data:dict, 
-                 # resultsAnalysis:dict,
-                 viewers:dict,
                  out: typing.Optional[io.TextIOBase] = None):
         QtCore.QThread.__init__(self, parent)
         
+        self._emitter_ = emitter
         self._abfRunBuffer_ = abfBuffer
         self._runData_ = abfRunData
-        self._viewers_ = viewers
         self._stdout_ = out
-        self._emitter_ = emitter
         
     def print(self, msg:object):
         if isinstance(self._stdout_, io.TextIOBase):
@@ -1294,6 +1288,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             pathways = src.pathways
             
+            if src.name not in self._runData_.results:
+                self._runData_.results[src.name] = dict()
+            
             if src.name not in self._runData_.viewers:
                 self._runData_.viewers[src.name] = dict()
             
@@ -1353,6 +1350,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             nPathways = len(mainDigPathways) + len(altDigPathways) + len(dacPathways)
             
             assert nPathways <= 2, "A Clampex protocol does NOT support recording from more than two pathways"
+            
             self.print(f"   pathways recorded in this protocol: {printStyled(nPathways)}")
             if nPathways == 0:
                 # no pathways recorded in this protocol (how likely that is ?!?)
@@ -1512,17 +1510,25 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # delivered on the even-numbered sweeps: 0, 2, etc.
             #
             for k, p in mainDigPathways:
+                # NOTE: 2024-03-01 13:50:58
+                # k is the pathway index; p is the pathway
                 self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
                 
                 recorded_pathway_entry = f"{src.name}_{p.name}"
                 
-                if recorded_pathway_entry not in  self._runData_.viewers[src.name]:
-                    self._runData_.viewers[src.name][recorded_pathway_entry] = z
-                    {"path_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                    win_title = "recorded_pathway_entry Recording")}
+                if recorded_pathway_entry not in self._runData_.results[src.name]:
+                    self._runData_.results[src.name][recorded_pathway_entry] = \
+                        {"pathway_responses": neo.Block(name=recorded_pathway_entry)}
                 
-                pMeasures = self.setMeasuresForPathway(p, protocol, clampMode, 
-                                                       adc, dac, activeDAC, membraneTestEpoch, 
+                if recorded_pathway_entry not in self._runData_.viewers[src.name]:
+                    self._runData_.viewers[src.name][recorded_pathway_entry] = \
+                    {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                    win_title = f"{src.name} {p.name} Synaptic Responses")}
+                
+                self._runData_.viewers[src.name][recorded_pathway_entry]["pathway_viewer"].show()
+                
+                pMeasures = self.setMeasuresForPathway(src, p, protocol, recorded_pathway_entry,
+                                                       clampMode, adc, dac, activeDAC, membraneTestEpoch, 
                                                        testStart, testDuration, testAmplitude)
                 
                 
@@ -1536,12 +1542,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 recorded_pathway_entry = f"{src.name}_{p.name}"
                 
                 if recorded_pathway_entry not in self._runData_.viewers[src.name]:
-                    self._runData_.viewers[src.name][recorded_pathway_entry] = z
-                    {"path_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                    win_title = "recorded_pathway_entry Recording")}
+                    self._runData_.viewers[src.name][recorded_pathway_entry] = \
+                    {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                    win_title = f"{src.name} {p.name} Synaptic Responses")}
                 
-                pMeasures = self.setMeasuresForPathway(p, protocol, clampMode, 
-                                                       adc, dac, activeDAC, membraneTestEpoch, 
+                if recorded_pathway_entry not in self._runData_.results[src.name]:
+                    self._runData_.results[src.name][recorded_pathway_entry] = \
+                        {"pathway_responses": neo.Block(name=recorded_pathway_entry)}
+                
+                self._runData_.viewers[src.name][recorded_pathway_entry]["pathway_viewer"].show()
+                
+                pMeasures = self.setMeasuresForPathway(src, p, protocol, recorded_pathway_entry,
+                                                       clampMode, adc, dac, activeDAC, membraneTestEpoch, 
                                                        testStart, testDuration, testAmplitude)
                 
                 
@@ -1549,9 +1561,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     self._runData_.pathwayMeasures[recorded_pathway_entry] = {"pathway":p, "measures": pMeasures}
                 
                 
-    def setMeasuresForPathway(self, p:SynapticPathway, protocol:pab.ABFProtocol, clampMode,
-                       adc, dac, activeDAC, membraneTestEpoch,
-                       testStart, testDuration, testAmplitude):
+    def setMeasuresForPathway(self, src:RecordingSource, p:SynapticPathway, protocol:pab.ABFProtocol, 
+                              path_entry, clampMode,
+                              adc, dac, activeDAC, membraneTestEpoch,
+                              testStart, testDuration, testAmplitude):
         # to store location measures for this pathway:
         # str (name) ↦ dict("measure" ↦ LocationMeasure, "args" ↦ tuple of extra arguments passed to LocationMeasure)
         pMeasures = dict() 
@@ -1590,8 +1603,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         
         ee = ", ".join([f"{e.letter} ({e.number})" for e in synStimEpochs])
-        pathSweeps = [sed[0] for sed in sweepsEpochsForDig
-                      ]
+        
+        pathSweeps = [sed[0] for sed in sweepsEpochsForDig]
+        
+        assert len(pathSweeps) == 1, f"There should be only a sweep for each pathway; currently, pathway {p.name} has {len(pathSweeps)} sweeps"
+        
         self.print(f"       synaptic stimulation epochs: {printStyled(ee)}")
         
         self.print(f"       DIG channel {printStyled(p.stimulus.channel)} active in sweeps {printStyled(pathSweeps)}")
@@ -1670,13 +1686,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                             and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
                                                             and any([ff(x) <= digStimStarts[0]] + [ff(x) > digStimStarts[k-1] and ff(x) <= digStimStarts[k] for k in range(1, len(digStimStarts))]),
                                                     dac.epochs))
-                # if len(digStimEpochs) > 1:
-                # else:
-                #     responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
-                #                                                 and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-                #                                                 and any(dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0)) - responseBaselineDuration,
-                #                                         dac.epochs))
-                
                 if len(responseBaselineEpochs):
                     responseBaselineStarts = [dac.getEpochRelativeStartTime(e, 0) for e in responseBaselineEpochs]
                 
@@ -1724,11 +1733,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                             and any([ff(x) <= digStimStarts[0]] + [ff(x) > digStimStarts[k-1] and ff(x) <= digStimStarts[k] for k in range(1, len(digStimStarts))]),
                                                     dac.epochs))
 
-                # responseBaselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0 and x.firstDuration >= responseBaselineDuration \
-                #                                             and dac.getEpochRelativeStartTime(x, 0) > testStart + testDuration \
-                #                                             and dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <= activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - responseBaselineDuration,
-                #                                     dac.epochs))
-                
                 if len(responseBaselineEpochs):
                     # take the last one
                     responseBaselineStarts = [dac.getEpochRelativeStartTime(e, 0) for e in responseBaselineEpochs]
@@ -1739,26 +1743,62 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
             else:
                 raise RuntimeError(f"Cannnot determine response baseline")
-            
 
+            block = self._runData_.results[src.name][path_entry]["pathway_responses"]
+            viewer = self._runData_.viewers[src.name][path_entry]["pathway_viewer"]
+            currentRun = self._runData_.currentAbfRun
+            
+            seg_ndx = len(block.segments)
+            
+            s = pathSweeps[0]
+            
+            sig = currentRun.segments[s].analogsignals[adc.logicalIndex]
+            t0 = sig.t_start
+            seg = neo.Segment(name=f"path_entry sweep {s}", file_origin = currentRun.file_origin,
+                                file_datetime=currentRun.file_datetime,
+                                rec_datetime = currentRun.rec_datetime,
+                                index = seg_ndx)
+            seg.analogsignals.append(sig)
+            block.segments.append(seg)
+            viewer.view(block)
+            viewer.currentFrame  = len(block.segments)-1
+            
             # TODO: 2024-02-29 22:41:16
             # generate LocationMeasure objects based on SignalCursor 
             # this needs each sweep to be plotted separately in two SignalViewers
             #
             # for this ,we need to call this function AFTER all pathways have been parsed 
             # in processProtocol()
-            
             if clampMode == ClampMode.VoltageClamp:
-                dataCursorDC  = DataCursor(holdingTime + signalBaselineStart + signalBaselineDuration/2, signalBaselineDuration)
-                dataCursorRs  = DataCursor(holdingTime + testStart - 0.0025*pq.s, 0.005*pq.s)
+                dataCursorDC  = DataCursor(t0 + holdingTime + signalBaselineStart + signalBaselineDuration/2, signalBaselineDuration)
+                dataCursorRs  = DataCursor(t0 + holdingTime + testStart - 0.0025*pq.s, 0.005*pq.s)
                 # last 10 ms before end of test, window of 5 ms
-                dataCursorRin = DataCursor(holdingTime + testStart + testDuration - 0.01 * pq.s, 0.005*pq.s)
+                dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * pq.s, 0.005*pq.s)
                 # mbTestLocationMeasure = ephys.membraneTestVClampMeasure(dataCursorDC, dataCursorRs, dataCursorRin)
+                
+                
+#                 for ks, s in enumerate(pathSweeps):
+#                     
+#                     sig = currentRun.segments[s].analogsignals[adc.logicalIndex]
+#                     seg = neo.Segment(name=f"path_entry sweep {s}", file_origin = currentRun.file_origin,
+#                                       file_datetime=currentRun.file_datetime,
+#                                       rec_datetime = currentRun.rec_datetime,
+#                                       index = seg_ndx + ks)
+#                     seg.analogsignals.append(sig)
+#                     block.segments.append(seg)
+                    
+                # block.segments.extend([currentRun.segments[s] for s in pathSweeps])
+                # viewer.displayFrame(len(block.segments)-1)
+                
+                viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC")
+                viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs")
+                viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin")
+                
                 pMeasures["VClampMembraneTest"] = {"measure": ephys.membraneTestVClampMeasure,
-                                                         "locations": (dataCursorDC, dataCursorRs, dataCursorRin),
-                                                         "args": (testAmplitude,),
-                                                         "sweeps": pathSweeps}
-                self.print(f"       pMeasures: {printStyled(pMeasures)}")
+                                                   "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
+                                                   "args": (testAmplitude,),
+                                                   "sweeps": pathSweeps}
+                # self.print(f"       pMeasures: {printStyled(pMeasures)}")
             elif clampMode == ClampMode.CurrentClamp:
                 pass #TODO 2024-02-27 16:18:25
             
@@ -1769,7 +1809,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             signalBaselineStart = self._runData_.signalBaselineStart
             signalBaselineDuration = dac.getEpochRelativeStartTime(synStimEpochs[0],0)
             responseBaselineStarts = [self._runData_.signalBaselineStart]
-            # responseBaselineDuration = signalBaselineDuration
             
         return pMeasures
         
@@ -2231,45 +2270,6 @@ class LTPOnline(QtCore.QObject):
                                     pathways = [pathway],
                                     beginFrame = 0))
         
-        # self._runData_ = DataBag(pathways = self._pathways_,
-        # source still needed to group pathways by sources !!! (saves a few iterations)
-        #
-        # below:
-        # 'pathways' are the pathways as parsed from the sources
-        # 'pathwayMeasures' are the pathays ACTUALLY found in the protocol(s)
-        #   taken from the ABF files, hence updated with each abf run; 
-        #   this is a dict: 
-        #       source_name+pathway_name ↦ dict
-        #                           "pathway" ↦ pathway
-        #                           "measures" ↦ location_measures dict:
-        #                                       measure_name ↦ LocationMeasure
-        #                                                      
-        #   
-        
-        
-        self._runData_ = DataBag(sources = self._sources_,
-                                 pathways = self._pathways_,
-                                 pathwayMeasures = dict(),
-                                 # episodeName = self._currentEpisodeName_,
-                                 currentProtocol = None,
-                                 # currentEpisode = episode,
-                                 sweeps = 0,
-                                 # data = self._data_,
-                                 # newEpisode = True,
-                                 # episodes = dict(), # map episode name to data
-                                 currentAbfRun = None,
-                                 abfRunTimesMinutes = list(),
-                                 abfRunDeltaTimesMinutes = list(),
-                                 # steadyStateIClampMbTestDuration = steadyStateIClampMbTestDuration,
-                                 # trackingClampMode = trackingClampMode,
-                                 # conditioningClampMode = conditioningClampMode,
-                                 signalBaselineStart = signalBaselineStart,
-                                 signalBaselineDuration = signalBaselineDuration,
-                                 useSlopeInIClamp = useSlopeInIClamp,
-                                 responseBaselineDuration = baselineDuration,
-                                 locationMeasures = locationMeasures,
-                                 # currentProtocolIsConditioning = False,
-                                 useEmbeddedProtocol = useEmbeddedProtocol)
         
         
         # TODO: 2024-01-08 00:04:55 FIXME
@@ -2324,11 +2324,12 @@ class LTPOnline(QtCore.QObject):
         if emitterWindow is None:
             self._emitterWindow_ = wsp["mainWindow"]
 
-        elif type(emitterWindow).__name__ != 'ScipyenWindow':
-            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
-
         else:
             self._emitterWindow_ = emitterWindow
+            
+        if type(self._emitterWindow_).__name__ != 'ScipyenWindow':
+            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
+
 
         if directory is None:
             self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
@@ -2350,17 +2351,62 @@ class LTPOnline(QtCore.QObject):
 #         synapticViewer1.annotationsDockWidget.hide()
 #         synapticViewer1.cursorsDockWidget.hide()
 #         
-#         resultsViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_, win_title = "Analysis")
-#         resultsViewer.annotationsDockWidget.hide()
-#         resultsViewer.cursorsDockWidget.hide()
+        RsViewer = sv.SignalViewer(parent=self._emitterWindow_, scipyenWindow = self._emitterWindow_, win_title = "Analysis")
+        RsViewer.annotationsDockWidget.hide()
+        RsViewer.cursorsDockWidget.hide()
 #         
 #         self._viewers_ = dict(path0 = synapticViewer0,
 #                               path1 = synapticViewer1,
 #                               results = resultsViewer)
 #         
-        self._viewers_ = dict()
+        self._viewers_ = {"results": dict()}
+        
+        self._results_ = dict()
+        
         #
         # ### END set up emitter window and viewers
+        
+        # self._runData_ = DataBag(pathways = self._pathways_,
+        # source still needed to group pathways by sources !!! (saves a few iterations)
+        #
+        # below:
+        # 'pathways' are the pathways as parsed from the sources
+        # 'pathwayMeasures' are the pathays ACTUALLY found in the protocol(s)
+        #   taken from the ABF files, hence updated with each abf run; 
+        #   this is a dict: 
+        #       source_name+pathway_name ↦ dict
+        #                           "pathway" ↦ pathway
+        #                           "measures" ↦ location_measures dict:
+        #                                       measure_name ↦ LocationMeasure
+        #                                                      
+        #   
+        
+        
+        self._runData_ = DataBag(sources = self._sources_,
+                                 pathways = self._pathways_,
+                                 pathwayMeasures = dict(),
+                                 # episodeName = self._currentEpisodeName_,
+                                 currentProtocol = None,
+                                 # currentEpisode = episode,
+                                 sweeps = 0,
+                                 # data = self._data_,
+                                 # newEpisode = True,
+                                 # episodes = dict(), # map episode name to data
+                                 currentAbfRun = None,
+                                 viewers = self._viewers_,
+                                 results = self._results_,
+                                 abfRunTimesMinutes = list(),
+                                 abfRunDeltaTimesMinutes = list(),
+                                 # steadyStateIClampMbTestDuration = steadyStateIClampMbTestDuration,
+                                 # trackingClampMode = trackingClampMode,
+                                 # conditioningClampMode = conditioningClampMode,
+                                 signalBaselineStart = signalBaselineStart,
+                                 signalBaselineDuration = signalBaselineDuration,
+                                 useSlopeInIClamp = useSlopeInIClamp,
+                                 responseBaselineDuration = baselineDuration,
+                                 locationMeasures = locationMeasures,
+                                 # currentProtocolIsConditioning = False,
+                                 useEmbeddedProtocol = useEmbeddedProtocol)
         
         self._abfRunBuffer_ = collections.deque()
         
@@ -2368,7 +2414,7 @@ class LTPOnline(QtCore.QObject):
                                                              self._emitterWindow_,
                                                              self._abfRunBuffer_,
                                                              self._runData_,
-                                                             self._viewers_,
+                                                             # self._viewers_,
                                                              self._stdout_)
         
         self._simulation_ = None

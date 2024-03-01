@@ -2809,7 +2809,7 @@ anything else       anything else       ❌
                 raise ValueError(f"{cursorType} not supported")
             
         elif not isinstance(cursorType, SignalCursorTypes):
-            raise TypeError(f"Expecting cursorType a str or a gui.cursors.SignalCursorTypes; instead, got {type(cursorType).__name__}")
+            raise TypeError(f"Expecting cursorType a str or a gui.cursors.SignalCursorTypes object; instead, got {type(cursorType).__name__}")
             
         
         if len(args) == 0: # no coordinates given
@@ -2862,23 +2862,35 @@ anything else       anything else       ❌
 
         When no data has been plotted, the cursor is created in the scene.
         
-        Arguments:
+        Parameters:
+        ------------
         cursorType: str, one of "c", "v" or "h" respectively, for 
                     crosshair, vertical or horizontal cursors; default is "c"
                     
-        where: None, float (for vertical or horizontal cursors) or 
-                    two-element sequence of floats for crosshair cursors
-                    when None, the cursor will be placed in the middle of the
-                    selected axis
+        x: None, float (cursor's horizontal coordinate in axis units) or a DataCursor.
+                When None, the cursor will be placed in the middle of the X range
+                of the selected axis.
+                    
+        y: None, float (cursor's vertical coordinate in axis unitss), or a DataCursor.
+                When None, the cursor will be placed in the middle of the Y range
+                of the selected axis
                     
         xwindow: None or float with the horizontal size of the cursor window;
                     this is ignored for horizontal cursors
                     
         ywindow: as xwindow; ignored for vertical cursors
         
+        xBounds, yBounds: limits for the cursor's position, respectively in the 
+            X and Y ranges of the selected axis.
+        
         label: None, or a str; is None, the cursor will be assigned an ID 
                     composed of "c", "v", or "h", followed by the current cursor
                     number of the same type.
+        
+        name: same as label (for backward compatibility in old API)
+        
+        follows_mouse: bool default False. When True, the cursor will follow
+            the mouse position in the axis
                     
         axis: None (default), int, the str "all" or "a" (case-insensitive), or
             a pyqtgraph.PlotItem object.
@@ -2898,11 +2910,31 @@ anything else       anything else       ❌
             
             When "axis" is a pyqtgraph.PlotItem, it must be one of the axes
             that belong to this instance of SignalViewer.
-                
         
-        It is recommended to pass arguments as keyword arguments for predictable
-            behavior.
+        editFirst:bool, default False; When True, the user will be prompted with
+            the CursorEditor dialog to edit the cursor's parameter (e.g., name,
+            coordinates)
         
+        Var-keyword parameters (**kwargs):
+        ----------------------------------
+        
+        show_value: bool. When True, the cursor's coordinate(s) will be shown
+            next to its label; by default, this is set in SignalViewer's "Cursors"
+            menu
+        
+        precison: int; the precision of the displayed coordinate (i.e. number of 
+            digits after the decimal point); by default, this is set in SignalViewer's "Cursors"
+            menu
+        
+        relative: bool, default is True. 
+            When True, the cursor's horizontal coordinate will be adjusted
+            relative to the minimum of the axis X range (ths is necessary for a 
+            given cursor to 'stay' in axis across, e.g., successive segments of 
+            a neo.Block).
+        
+            When False, whenever the axis X domain changes, the cursor may become
+            invisible, or plotted at one of the axis X domain end (dependng on its
+            xBounds).
         
         """
         # NOTE: 2020-02-26 14:23:40
@@ -8663,6 +8695,7 @@ signals in the signal collection.
     
     @_plot_data_.register(tuple)
     @_plot_data_.register(list)
+    @_plot_data_.register(NeoObjectList)
     def _(self, obj, *args, **kwargs):
         if len(obj) == 0:
             return False
