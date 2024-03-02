@@ -173,6 +173,7 @@ class SignalCursor(QtCore.QObject):
                  hoverPen:typing.Optional[QtGui.QPen]=None, 
                  linkedPen:typing.Optional[QtGui.QPen]=None, 
                  movable_label:bool=True, 
+                 label_position:float = 0.5,
                  show_value:bool=False, 
                  precision:int=3, **kwargs):
         """ SignalCursor constructor.
@@ -262,6 +263,7 @@ class SignalCursor(QtCore.QObject):
         # self._parent_widget_ = None
         
         # print(f"{self.__class__.__name__}.__init__ x = {x}, y = {y}, xBounds = {xBounds}, yBounds = {yBounds}")
+        # print(f"{self.__class__.__name__}.__init__ kwargs = {}, y = {y}, xBounds = {xBounds}, yBounds = {yBounds}")
         
         self._host_graphics_item_ = None
         
@@ -281,12 +283,6 @@ class SignalCursor(QtCore.QObject):
         
         self._hl_ = None
         self._vl_ = None
-        
-#         self._x_ = None
-#         self._y_ = None
-#         
-#         self._hWin_ = None
-#         self._vWin_ = None
         
         self._hDataCursor_ = None
         self._vDataCursor_ = None
@@ -346,6 +342,8 @@ class SignalCursor(QtCore.QObject):
         
         self._current_plot_item_ = None # for multi-axes cursors
         self._movable_label_ = movable_label
+        self._label_pos_ = label_position
+        # print(f"{self.__class__.__name__}.__init__: _label_pos_ = {self._label_pos_}")
         self._show_value_ = show_value
         self._value_precision_ = precision if isinstance(precision, int) and precision > 0 else self.default_precision
         
@@ -374,6 +372,8 @@ class SignalCursor(QtCore.QObject):
             
         scene = self.hostScene
         
+        labelOpts = {"movable": self._movable_label_, "position": self._label_pos_}
+        
         if h:
             # set up the horizontal InfiniteLine
             if not isinstance(self._hl_, pg.InfiniteLine):
@@ -388,7 +388,7 @@ class SignalCursor(QtCore.QObject):
                                         movable=not self._follows_mouse_, 
                                         name="%s_h" % name, 
                                         label=label,
-                                        labelOpts = {"movable": self._movable_label_},
+                                        labelOpts = labelOpts,
                                         pen=self._pen_, 
                                         hoverPen = self._hoverPen_)
                 
@@ -440,7 +440,7 @@ class SignalCursor(QtCore.QObject):
                                         movable=not self._follows_mouse_,
                                         name="%s_v" % name, 
                                         label=label,
-                                        labelOpts={"movable": self._movable_label_},
+                                        labelOpts = labelOpts,
                                         pen=self._pen_, 
                                         hoverPen = self._hoverPen_)
                 
@@ -699,7 +699,19 @@ class SignalCursor(QtCore.QObject):
         for l in (self._hl_, self._vl_):
             if isinstance(l, pg.InfiniteLine):
                 if isinstance(getattr(l, "label", None), pg.InfLineLabel):
-                    l.label.setmovable(value==True)
+                    l.label.setMovable(value==True)
+                    # l.label.setmovable(value==True)
+                    
+    def setLabelPosition(self, value:float):
+        """Set label's position along its corresponding line.
+        The position is a float (0 ⋯ 1) representin the fraction from the 
+        start of the line to its end
+        """
+        value = 0. if value < 0 else 1. if value > 1. else value
+        for l in (self._hl_, self._vl_):
+            if isinstance(l, pg.InfiniteLine):
+                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
+                    l.label.setPosition(value==True)
                 
     def setShowValue(self, val:bool, precision:typing.Optional[int]=None):
         if isinstance(precision, int):

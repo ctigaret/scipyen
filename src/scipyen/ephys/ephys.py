@@ -1728,7 +1728,25 @@ Returns the signal and the command, possibly with units modified as expected for
 def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal], 
                        **kwargs) -> tuple:
     """Detects or checks the timing and amplitude of a membrane test waveform (boxcar).
-    Returns a tuple (start, stop, test_amplitude)"""
+    The detection occurs in a command signal (a copy of the DAC command) where the boxcar is defined.
+    Use this an alternative to parsing an ElectrophysiologyProtocol, in order to 
+    infer the parameters of a membrane test epoch.
+
+    Prerequisite: the command signal must have been recorded in the data. This 
+    can be chieved by routing the DAC output directly into an ADC input in the 
+    DAQ device, or by recording an appropriate¹ "secondary" output signal from 
+    the amplifier (if available).
+
+    Returns a tuple (start, stop, test_amplitude).
+
+
+    NOTE:
+    ¹ Some amplifiers provide a secondary output in addition to the main output
+    signal carrying the recorded electrical signal. The secondary output signal
+    may be selected to contain the pipette voltage (in voltage clamp) or
+    pipette current (in current clamp) which can be used as a "proxy" for the 
+    command signal in these clamping modes.
+"""
     up_first = kwargs.pop("up_first", True)
     boxduration = kwargs.pop("boxduration", None) # tuple min , max
     
@@ -2424,9 +2442,11 @@ def cursor_reduce(func:types.FunctionType,
     # if not isinstance(func, types.FunctionType):
     #     raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
     
+    # print(f"cursor_reduce: signal.t_start = {signal.t_start}; signal.t_stop = {signal.t_stop}")
     if isinstance(cursor, SignalCursor):
-        t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
-        t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
+        # print(f"cursor_reduce: cursor.x = {cursor.x}, cursor.xwindow = {cursor.xwindow}")
+        t0 = (float(cursor.x) - float(cursor.xwindow/2.)) * signal.times.units
+        t1 = (float(cursor.x) + float(cursor.xwindow/2.)) * signal.times.units
         
     elif isinstance(cursor, DataCursor):
         t0 = cursor.coord - cursor.span/2
@@ -3939,8 +3959,10 @@ def _(locator, func, signal, channel=None,
       duration=False, locatorIndex:int=None):
     return epoch_reduce(func, signal, locator, 
                         index=locatorIndex, channel=channel)
-@singledispatch
-def amplitudeMeasure() -> LocationMeasure:
+# @singledispatch
+def amplitudeMeasure(*args, name:str = "amplitude",
+                     channel:int = 0, 
+                     relative: bool = True) -> LocationMeasure:
     """LocationMeasure factory for an amplitude of a signal.
 
     The amplitude is measured as the difference between signal averages at a
@@ -3980,31 +4002,25 @@ def amplitudeMeasure() -> LocationMeasure:
     
     
     """
-    raise NotImplementedError
-
-@amplitudeMeasure.register(float)
-def _(refX: typing.Union[float, pq.Quantity], 
-                     refW: typing.Union[float, pq.Quantity],
-                     locX: typing.Union[float, pq.Quantity], 
-                     locW: typing.Union[float, pq.Quantity],
-                     name:str = "amplitude",
-                     channel:int = 0, 
-                     relative: bool = True) -> LocationMeasure:
-    return LocationMeasure(cursors_difference, 
-                           (DataCursor(refX, refW), 
-                            DataCursor(locX, locW)),
-                           name, channel, relative)
-                           
-@amplitudeMeasure.register(DataCursor)
-@amplitudeMeasure.register(SignalCursor)
-def _(ref: typing.Union[DataCursor, SignalCursor], loc: typing.Union[DataCursor, SignalCursor], 
-      name:str = "amplitude", channel:int = 0, relative:bool = True) -> LocationMeasure:
-    return LocationMeasure(cursors_difference, 
-                           (ref,loc),
-                           name, channel, relative)
-                           
-@singledispatch
-def chordSlopeMeasure() -> LocationMeasure:
+    if len(args) == 4:
+        if all(isinstance(v, (float, pq.Quantity)) for v in args):
+            refX, refW, locX, locW = args
+            return LocationMeasure(cursors_difference, 
+                                   (DataCursor(refX, refW), 
+                                    DataCursor(locX, locW)),
+                                   name, channel, relative)
+        else:
+            raise TypeError(f"Expecting four floats or pq.Quantity scalars")
+        
+    elif len(args) == 2:
+        if all(isinstance(v, (DataCursor, SignalCursor)) for v in args):
+            ref, loc = args
+            return LocationMeasure(cursors_difference, 
+                                  (ref,loc),
+                                  name, channel, relative)
+        
+                
+def chordSlopeMeasure(*args, name:str="chord_slope", channel:int = 0, relative:bool=True) -> LocationMeasure:
     """LocationMeasure factory for the slope of a straight line (chord) between two points on the signal.
     The two points can be specified as:
     • two (vertical) SignalCursor or two DataCursor objects
@@ -4034,20 +4050,21 @@ def chordSlopeMeasure() -> LocationMeasure:
     """
     raise NotImplementedError
 
-@chordSlopeMeasure.register(DataCursor)
-@chordSlopeMeasure.register(SignalCursor)
-def _(*args, name:str="chord_slope", channel:int = 0, relative:bool=True) -> LocationMeasure:
-    if len(args) == 1:
-        return LocationMeasure(cursor_chord_slope, args[0], name, channel, relative)
-    
-    elif len(args) == 2:
-        return LocationMeasure(cursors_chord_slope, args, name, channel, relative)
-    
+    if all(isinstance(v, (DataCursor, SignalCursor)) for v in args):
+        if len(args) == 1:
+            return LocationMeasure(cursor_chord_slope, args[0], name, channel, relative)
+        
+        elif len(args) == 2:
+            return LocationMeasure(cursors_chord_slope, args, name, channel, relative)
+        
+        else:
+            raise SyntaxError(f"Expecting at most two cursors; got {len(args)} instead")
     else:
-        raise SyntaxError(f"Expecting at most two cursors; got {len(args)} instead")
+        raise TypeError(f"Expecting DataCursor or SignalCursor objects in args; instead, got {args}")
     
 @singledispatch
-def durationMeasure() -> LocationMeasure:
+def durationMeasure(c0:typing.Union[DataCursor, SignalCursor], c1: typing.Union[DataCursor, SignalCursor], 
+                    name: str = "duration", relative: bool = True) -> LocationMeasure:
     """LocationMeasure factory for the distance between two locations in the signal.
     The locations are specified as two (vertical) SignalCursor or two DataCursor
     objects. Bt default, the distance between them can be reported in signal domain
@@ -4068,12 +4085,6 @@ def durationMeasure() -> LocationMeasure:
                     to be adjusted relative to the limits of the signal's domain;
                     default is True
 """    
-    raise NotImplementedError
-
-@durationMeasure.register(DataCursor)
-@durationMeasure.register(SignalCursor)
-def _(c0: typing.Union[DataCursor, SignalCursor], c1: typing.Union[DataCursor, SignalCursor],
-      name: str = "duration", relative: bool = True) -> LocationMeasure:
     return LocationMeasure(cursors_distance, (c0,c1), name, relative)
 
 def membraneTestVClampMeasure(base: typing.Union[DataCursor, SignalCursor],

@@ -2936,6 +2936,9 @@ anything else       anything else       ❌
             invisible, or plotted at one of the axis X domain end (dependng on its
             xBounds).
         
+        label_position: float, default is 0.5; the initial position of the cursor's
+            label, as a fraction of the cursor's line extent
+        
         """
         # NOTE: 2020-02-26 14:23:40
         # creates the cursor DIRECTLY at the specified coordinates
@@ -3533,6 +3536,7 @@ anything else       anything else       ❌
         """
         # print(f"{self.__class__.__name__}_addCursor_ cursor_type = {cursor_type}, x = {x} ,y = {y}, xwindow = {xwindow}, ywindow = {ywindow},xBounds = {xBounds},yBounds = {yBounds}, axis={axis}, label= {label}, follows_mouse = {follows_mouse}")
         relative = kwargs.pop("relative", True)
+        label_position = kwargs.pop("label_position", 0.5)
         
         #### BEGIN Figure out cursors destination: axis or scene
         # NOTE: it seemingly makes no sense to add a cursors when there are no
@@ -3753,6 +3757,8 @@ anything else       anything else       ❌
                     pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                     precision = min(pi_precisions)
         # print(f"{self.__class__.__name__}._addCursor_ x = {x}, xwindow = {xwindow}, y = {y}, ywindow = {ywindow}")
+        # print(f"{self.__class__.__name__}._addCursor_ kwargs = {kwargs}")
+        
         cursor = SignalCursor(axis, 
                                    x = x, y = y, xwindow=xwindow, ywindow=ywindow,
                                    cursor_type = cursor_type,
@@ -3767,6 +3773,7 @@ anything else       anything else       ❌
                                    xBounds = xBounds,
                                    yBounds = yBounds,
                                    precision = precision,
+                                   label_position = label_position,
                                    **kwargs)
         
         cursorDict[crsId] = cursor
