@@ -8011,6 +8011,22 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             f, n_outputs, arg_types, arg_names, arg_defaults, var_args, kw_args))
 
         return newAction
+    
+    @property
+    def desktopScreen(self) -> QtGui.QScreen:
+        myGeom = self.geometry() # a QtCore.QRect
+        screens = QtGui.QGuiApplication.screens()
+        primaryScreen = QtGui.QGuiApplication.primaryScreen()
+        # NOTE: 2024-03-02 23:05:29
+        # verify this by changing your desktop screens layout
+        if len(screens) > 1:
+            screenGeoms = [s.geometry() for s in screens]
+            xscreen = [myGeom.x() >= s.x() + s.width() for s in screenGeoms]
+            yscreen = [myGeom.y() >= s.y() + s.height() for s in screenGeoms]
+            screenNdx = [k for k in range(len(screens)) if all([not xscreen[k] , not yscreen[k]])][0]
+            return screens[screenNdx]
+        
+        return primaryScreen
 
     def installPluginMenu(self, pname, v):
         '''Installs a GUI menu for the  plugin named pname.

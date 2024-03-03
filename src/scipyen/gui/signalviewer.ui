@@ -26,20 +26,8 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QGridLayout" name="gridLayout">
-    <property name="leftMargin">
-     <number>0</number>
-    </property>
-    <property name="topMargin">
-     <number>0</number>
-    </property>
-    <property name="rightMargin">
-     <number>0</number>
-    </property>
-    <property name="bottomMargin">
-     <number>0</number>
-    </property>
-    <item row="0" column="0">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
      <widget class="QWidget" name="viewerWidgetContainer" native="true">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -49,80 +37,86 @@
       </property>
      </widget>
     </item>
-    <item row="1" column="0">
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <item>
-       <widget class="QCheckBox" name="plotAnalogSignalsCheckBox">
-        <property name="text">
-         <string>Analog:</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QComboBox" name="analogSignalComboBox"/>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="plotIrregularSignalsCheckBox">
-        <property name="text">
-         <string>Irregular</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QComboBox" name="irregularSignalComboBox"/>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="plotSpikeTrainsCheckBox">
-        <property name="text">
-         <string>Spike trains</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="plotEventsCheckBox">
-        <property name="text">
-         <string>Events</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="plotEpochsCheckBox">
-        <property name="text">
-         <string>Epochs</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-     </layout>
+    <item>
+     <widget class="QWidget" name="selectorsWidget" native="true">
+      <layout class="QGridLayout" name="gridLayout">
+       <item row="0" column="0">
+        <layout class="QHBoxLayout" name="selectorsLayout">
+         <item>
+          <widget class="QCheckBox" name="plotAnalogSignalsCheckBox">
+           <property name="text">
+            <string>Analog:</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="analogSignalComboBox"/>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="plotIrregularSignalsCheckBox">
+           <property name="text">
+            <string>Irregular</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="irregularSignalComboBox"/>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="plotSpikeTrainsCheckBox">
+           <property name="text">
+            <string>Spike trains</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="plotEventsCheckBox">
+           <property name="text">
+            <string>Events</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="plotEpochsCheckBox">
+           <property name="text">
+            <string>Epochs</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
     </item>
-    <item row="2" column="0">
+    <item>
      <widget class="SpinBoxSlider" name="_frames_spinBoxSlider_" native="true"/>
     </item>
    </layout>
@@ -133,7 +127,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

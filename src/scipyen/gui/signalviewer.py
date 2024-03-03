@@ -4350,6 +4350,18 @@ anything else       anything else       ❌
         """
         self.slot_removeCursors()
         
+    def hideNavigator(self):
+        self._frames_spinBoxSlider_.setVisible(False)
+        
+    def showNavigator(self):
+        self._frames_spinBoxSlider_.setVisible(True)
+        
+    def hideSelectors(self):
+        self.selectorsWidget.setVisible(False)
+        
+    def showSelectors(self):
+        self.selectorsWidget.setVisible(True)
+        
     @safeWrapper
     def removeActiveCursor(self):
         self.slot_removeSelectedCursor()

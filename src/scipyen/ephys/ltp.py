@@ -657,6 +657,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         self._abfRunBuffer_ = abfBuffer
         self._runData_ = abfRunData
         self._stdout_ = out
+        self._screen_ = self._emitter_.desktopScreen
+        self._screenGeom = self._screen_.geometry()
+        
+        self._winWidth = int(self._screenGeom.width() // 3 * 0.9)
+        self._winHeight = int(self._screenGeom.height() // 3 * 0.9)
+        
         
     def print(self, msg:object):
         if isinstance(self._stdout_, io.TextIOBase):
@@ -1242,7 +1248,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # the active DAC is one of these by definition
         digOutDacs = tuple(filter(lambda x: x.digitalOutputEnabled, (protocol.getDAC(k) for k in range(protocol.nDACChannels))))
         
-        self.print(f"   activeDAC: {printStyled(activeDAC.name)}, digOutDacs: {printStyled([d.name for d in digOutDacs])}")
+        # self.print(f"   activeDAC: {printStyled(activeDAC.name)}, digOutDacs: {printStyled([d.name for d in digOutDacs])}")
         
         # will be empty if len(digOutDacs ) == 0
         mainDIGOut = protocol.digitalOutputs(alternate=False)
@@ -1251,7 +1257,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # also, will be empty if len(digOutDacs ) == 0
         altDIGOut = protocol.digitalOutputs(alternate=True)
         
-        self.print(f"   mainDIGOut: {printStyled(mainDIGOut)}, altDIGOut: {printStyled(altDIGOut)}")
+        # self.print(f"   mainDIGOut: {printStyled(mainDIGOut)}, altDIGOut: {printStyled(altDIGOut)}")
         
         crosstalk = False # to be determined below
         
@@ -1263,8 +1269,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         for src in self._runData_.sources:
             # this below maps pathway index to dict sweep index ↦ synaptic pathway
-            self.print(f"   -----------------")
-            self.print(f"   processing source {printStyled(src.name)}")
+            # self.print(f"   -----------------")
+            # self.print(f"   processing source {printStyled(src.name)}")
 
             # TODO: 2024-02-17 23:13:20
             # below pathways are identified by the DIG channel used to stimulate;
@@ -1296,7 +1302,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             adc = protocol.getADC(src.adc)
             dac = protocol.getDAC(src.dac)
             
-            self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
+            # self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
             
             if dac != activeDAC:
                 if not protocol.alternateDigitalOutputStateEnabled:
@@ -1304,7 +1310,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                    
             clampMode = protocol.getClampMode(adc, activeDAC)
             
-            self.print(f"   data recorded in {printStyled(clampMode.name, 'yellow')}")
+            # self.print(f"   data recorded in {printStyled(clampMode.name, 'yellow')}")
             
             # figure out which of the pathways use a DIG or a DAC channel for TTLs;
             # of these figure out which are ACTUALLY used in the protocol
@@ -1344,7 +1350,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             assert nPathways <= 2, "A Clampex protocol does NOT support recording from more than two pathways"
             
-            self.print(f"   pathways recorded in this protocol: {printStyled(nPathways)}")
+            # self.print(f"   pathways recorded in this protocol: {printStyled(nPathways)}")
+            
             if nPathways == 0:
                 # no pathways recorded in this protocol (how likely that is ?!?)
                 continue
@@ -1410,7 +1417,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             syn_stim_dacs = list()
             
             if nPathways == 2:
-                assert len(mainDigPathways) == 1, "There must be at least one digitally triggered pathway in the protocol"
+                assert len(mainDigPathways) == 1, "There must one digitally triggered pathway in the protocol"
                 syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
                 
                 assert len(altDigPathways) == 1 or len(dacPathways) == 1, "There can be only one other pathway, triggered either digtially, or via DAC-emulated TTLs"
@@ -1419,6 +1426,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # common case
                     assert protocol.alternateDigitalOutputStateEnabled, "For two digitally-stimulated pathways the alternative digital output state must be enabled in the protocol"
                     syn_stim_digs.append(altDigPathways[0][1].stimulus.channel)
+                    
                 elif len(dacPathways) == 1:
                     # one digital and one DAC pathway 
                     assert protocol.alternateDigitalOutputStateEnabled and protocol.alternateDACOutputStateEnabled, "For a digitally stimulated pathway and one triggered by emulated TTLs the protocol must have both alternative digital outputs and alternative DAC outputs enabled"
@@ -1429,7 +1437,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     assert dacPathways[0][1].stimulus.channel > activeDAC.physicalIndex, "The pathway triggerd by DAC-emulated TTLs must use a higher DAC index than that of the primary pathway"
                     
                     
-            # elif nPathways == 1: # alternative pathways do not exist here
             else: # alternative pathways do not exist here; nPathways ≡ 1 
                 if len(mainDigPathways):
                     syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
@@ -1438,8 +1445,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     syn_stim_dacs.append(dacPathways[0][1].stimulus.channel)
                     
             
-            self.print(f"   digital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow')}")
-            self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow')}")
+            # self.print(f"   digital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow')}")
+            # self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow')}")
             
             # figure out the epochs that define synaptic stimulations
             
@@ -1469,11 +1476,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
                 testDuration = membraneTestEpoch.firstDuration
                 
-                self.print(f"   membraneTestEpoch: {printStyled(membraneTestEpoch.letter)} ({printStyled(membraneTestEpoch.number)}) with:")
-                self.print(f"       amplitude: {printStyled(testAmplitude)}")
-                self.print(f"       start: {printStyled(testStart)}")
-                self.print(f"       duration: {printStyled(testDuration)}")
-                self.print(f"       -----")
+                # self.print(f"   membraneTestEpoch: {printStyled(membraneTestEpoch.letter)} ({printStyled(membraneTestEpoch.number)}) with:")
+                # self.print(f"       amplitude: {printStyled(testAmplitude)}")
+                # self.print(f"       start: {printStyled(testStart)}")
+                # self.print(f"       duration: {printStyled(testDuration)}")
+                # self.print(f"       -----")
                 
             # NOTE: 2024-02-20 23:42:12
             # figure out where this epoch occurs:
@@ -1502,25 +1509,32 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # in a multi-pathway protocol, the "main" digital pathways are always
             # delivered on the even-numbered sweeps: 0, 2, etc.
             #
+            
             for k, p in mainDigPathways:
                 # NOTE: 2024-03-01 13:50:58
                 # k is the pathway index; p is the pathway
-                self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
+                # self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
                 
                 if p.name not in self._runData_.viewers[src.name]:
                     self._runData_.viewers[src.name][p.name] = \
                     {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
                                                     win_title = f"{src.name} {p.name} Synaptic Responses")}
                 
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
+                    
+                    # FIXME: 2024-03-02 23:32:46
+                    # assumes only one main Dig pathway
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), self._screenGeom.y(), int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
+                    
                 if p.name not in self._runData_.results[src.name]:
                     self._runData_.results[src.name][p.name] = \
                         {"pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
-                
-                self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
-                
+                    
                 pMeasures = self.setMeasuresForPathway(src, p, protocol, clampMode, 
                                                        adc, dac, activeDAC, membraneTestEpoch, 
-                                                       testStart, testDuration, testAmplitude)
+                                                       testStart, testDuration, testAmplitude,
+                                                       True, False)
                 
                 
                 if p.name not in self._runData_.pathwayMeasures[src.name]:
@@ -1535,15 +1549,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
                                                     win_title = f"{src.name} {p.name} Synaptic Responses")}
                 
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + int(self._winWidth * 1.1), self._screenGeom.y(), int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
+                    
                 if p.name not in self._runData_.results[src.name]:
                     self._runData_.results[src.name][p.name] = \
                         {"pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
                 
-                self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
-                
                 pMeasures = self.setMeasuresForPathway(src, p, protocol, clampMode, 
                                                        adc, dac, activeDAC, membraneTestEpoch, 
-                                                       testStart, testDuration, testAmplitude)
+                                                       testStart, testDuration, testAmplitude,
+                                                       False, True)
                 
                 
                 if p.name not in self._runData_.pathwayMeasures[src.name]:
@@ -1553,7 +1570,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     def setMeasuresForPathway(self, src: RecordingSource, p: SynapticPathway, 
                               protocol:pab.ABFProtocol, clampMode,
                               adc, dac, activeDAC, membraneTestEpoch,
-                              testStart, testDuration, testAmplitude):
+                              testStart, testDuration, testAmplitude, plotTest,
+                              isAlt):
         # NOTE: 2024-03-01 23:53:33 TODO / FIXME:
         # instead of returning pMeasures, why not apply measures directly and 
         # populate the results ?!?
@@ -1607,9 +1625,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         # assert len(pathSweeps) == 1, f"There should be only a sweep for each pathway; currently, pathway {p.name} has {len(pathSweeps)} sweeps"
         
-        self.print(f"       synaptic stimulation epochs: {printStyled(ee)}")
-        
-        self.print(f"       DIG channel {printStyled(p.stimulus.channel)} active in sweeps {printStyled(pathSweeps)}")
+#         self.print(f"       synaptic stimulation epochs: {printStyled(ee)}")
+#         
+#         self.print(f"       DIG channel {printStyled(p.stimulus.channel)} active in sweeps {printStyled(pathSweeps)}")
         
         assert all((e in synStimEpochs) for e in sweepsEpochsForDig[0][1]), f"Epochs inconsistencies for pathway {p.name}"
         # assert all(i==j for i, j in zip(sweepsEpochsForDig[0][1], synStimEpochs)) f"Epochs inconsistencies for pathway {k}"
@@ -1706,6 +1724,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         viewer.currentFrame  = len(block.segments)-1
         
         # 3) generate signal cursors in the signal viewer window, for synaptic response(s)
+        # FIXME: 2024-03-02 23:59:49 TODO
+        # no need to construct new DataCursor with every run!
+        # merge with creation of signal cursors in the viewer window, below at NOTE 2024-03-03 00:00:40
+        #
         # NOTE: 2024-03-01 23:34:52 
         # adjust for real sweep times then:
         if clampMode == ClampMode.VoltageClamp:
@@ -1752,10 +1774,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 measureUnits = sig.units
                 measureName = "amplitude"
                 
+        # NOTE 2024-03-03 00:00:40
+        # create signal cursors if needed, then measure
         for kc, c in enumerate(dataCursorsResponsesBase):
-            viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{labelPfx}{kc}Base", label_position=0.85)
-            viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{labelPfx}{kc}", label_position=0.85)
             measureLabel = f"{labelPfx}{kc}"
+            if viewer.signalCursor(f"{measureLabel}Base") is None:
+                viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{measureLabel}Base", label_position=0.85)
+            if viewer.signalCursor(f"{measureLabel}") is None:
+                viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{measureLabel}", label_position=0.85)
             pMeasures[measureLabel] = {"measure": locationMeasureFunctor,
                                        "locations": (viewer.signalCursor(f"{measureLabel}Base"),
                                                      viewer.signalCursor(f"{measureLabel}")),
@@ -1766,20 +1792,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             locationMeasure = locationMeasureFunctor(*pMeasures[measureLabel]["locations"],
                                                      name = f"{measureLabel} {measureName}")
                                             
-#             locationMeasure = locationMeasureFunctor(pMeasures[measureLabel]["locations"],
-#                                                      name = f"{measureLabel} {measureName}",
-#                                                      channel = 0,
-#                                                      relative=True)
-#                                             
-            measureValue = locationMeasure(sig)[0]
+            measureValue = np.abs(locationMeasure(sig)[0])
             
-            self.print(f"measureValue = {measureValue}")
+            # self.print(f"measureValue = {measureValue}")
             
             # NOTE: 2024-03-02 15:31:58
-            # 'measureTime' below ↴ already determined at the top in this method.
+            # 'measureTime' below ↴ was determined at the top in this method.
             measurement = neo.IrregularlySampledSignal([measureTime], measureValue, 
                                                            units = measureValue.units, time_units = pq.min,
-                                                           name = f"{measureLabel} {measureName}")
+                                                           name = measureLabel)
+                                                           # name = f"{measureLabel} {measureName}")
                                             
             if measureLabel not in self._runData_.results[src.name][p.name]:
                 self._runData_.results[src.name][p.name][measureLabel] = measurement
@@ -1789,7 +1811,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 times = np.vstack([self._runData_.results[src.name][p.name][measureLabel].times.magnitude, measurement.times.magnitude])
                 self._runData_.results[src.name][p.name][measureLabel] = \
                     neo.IrregularlySampledSignal(times, values, units = measureValue.units, time_units = pq.min,
-                                                           name = f"{measureLabel} {measureName}")
+                                                           name = measureLabel)
+                                                           # name = f"{measureLabel} {measureName}")
                 
             if kc > 0:
                 # calculate paired-pulse ratio
@@ -1808,7 +1831,17 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
                                                     win_title = f"{src.name} {p.name} {labelPfx}{0}")
             
-        self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].plot(self._runData_.results[src.name][p.name][measureLabel])
+            self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].hideSelectors()
+            self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].hideNavigator()
+            x = self._screenGeom.x()
+            if isAlt:
+                x += int(self._winWidth * 1.1)
+                
+            y = self._screenGeom.y() + int(self._winHeight * 1.1)
+            
+            self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+            
+        self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].plot(self._runData_.results[src.name][p.name][f"{labelPfx}{0}"])
             
         #  NOTE: 2024-03-02 11:23:55
         # 4) generate signal cursors in the signal viewer window, for 
@@ -1819,7 +1852,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #
         
         if isinstance(membraneTestEpoch, pab.ABFEpoch):
-            self.print(f"testStart = {testStart}; testDuration = {testDuration}")
+            # self.print(f"testStart = {testStart}; testDuration = {testDuration}")
             if testStart + testDuration < dac.getEpochRelativeStartTime(firstDigStimEpoch, 0):
                 # membrane test occurs BEFORE digital simulation epochs,
                 # possibly with intervening epochs (for response baselines)
@@ -1878,23 +1911,27 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 raise RuntimeError("Membrane test appears to overlap with synaptic stimulation epochs")
             
             if clampMode == ClampMode.VoltageClamp:
-                dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 0.005 * sig.times.units)
-                dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 0.005 * sig.times.units)
                 # last 10 ms before end of test, window of 5 ms
-                dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 0.005*sig.times.units)
-                # mbTestLocationMeasure = ephys.membraneTestVClampMeasure(dataCursorDC, dataCursorRs, dataCursorRin)
+                if viewer.signalCursor("DC") is None:
+                    dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 0.005 * sig.times.units)
+                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC", label_position=0.85)
+                    
+                if viewer.signalCursor("Rs") is None:
+                    dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 0.005 * sig.times.units)
+                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs", label_position=0.85)
+                    
+                if viewer.signalCursor("Rin") is None:
+                    dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 0.005*sig.times.units)
+                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin", label_position=0.85)
                 
-                viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC", label_position=0.85)
-                viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs", label_position=0.85)
-                viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin", label_position=0.85)
                 
-                self.print(f"dataCursorDC ={dataCursorDC}")
-                self.print(f"dataCursorRs ={dataCursorRs}")
-                self.print(f"dataCursorRin ={dataCursorRin}")
-                
-                self.print(f"signal Cursor DC: x = {viewer.signalCursor('DC').x} xwindow = {viewer.signalCursor('DC').xwindow}")
-                self.print(f"signal Cursor Rs: x = {viewer.signalCursor('Rs').x} xwindow = {viewer.signalCursor('Rs').xwindow}")
-                self.print(f"signal Cursor Rin: x = {viewer.signalCursor('Rin').x} xwindow = {viewer.signalCursor('Rin').xwindow}")
+#                 self.print(f"dataCursorDC ={dataCursorDC}")
+#                 self.print(f"dataCursorRs ={dataCursorRs}")
+#                 self.print(f"dataCursorRin ={dataCursorRin}")
+#                 
+#                 self.print(f"signal Cursor DC: x = {viewer.signalCursor('DC').x} xwindow = {viewer.signalCursor('DC').xwindow}")
+#                 self.print(f"signal Cursor Rs: x = {viewer.signalCursor('Rs').x} xwindow = {viewer.signalCursor('Rs').xwindow}")
+#                 self.print(f"signal Cursor Rin: x = {viewer.signalCursor('Rin').x} xwindow = {viewer.signalCursor('Rin').xwindow}")
                 
                 pMeasures["MembraneTest"] = {"measure": ephys.membraneTestVClampMeasure,
                                              "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
@@ -1904,6 +1941,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 mbTestMeasure = ephys.membraneTestVClampMeasure(*pMeasures["MembraneTest"]["locations"])
                 # returns (dc, rs, rin)
                 _dc, _rs, _rin = mbTestMeasure(sig, testAmplitude)
+                # self.print(f"_dc = {_dc}, _rs = {_rs}, _rin = {_rin}")
                 
                 # see NOTE: 2024-03-02 15:31:58 about measureTime ↴
                 DC = neo.IrregularlySampledSignal([measureTime],[_dc], 
@@ -1924,56 +1962,73 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if "DC" not in self._runData_.results[src.name][p.name]:
                     self._runData_.results[src.name][p.name]["DC"] = DC
                 else:
-                    values = np.concatenate([self._runData_.results[src.name][p.name]["DC"], DC])
-                    times = np.concatenate([self._runData_.results[src.name][p.name]["DC"].times, DC.times])
+                    values = np.concatenate([self._runData_.results[src.name][p.name]["DC"].magnitude, DC.magnitude])
+                    times = np.concatenate([self._runData_.results[src.name][p.name]["DC"].times.magnitude, DC.times.magnitude])
                     self._runData_.results[src.name][p.name]["DC"] = \
                         neo.IrregularlySampledSignal(times,values, 
                                                          units = DC.units,
                                                          time_units = DC.times.units,
                                                          name = "DC")
-                    
-                if "DC" not in self._runData_.viewers[src.name][p.name]:
-                    self._runData_.viewers[src.name][p.name]["DC"] = \
-                        sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                    win_title = f"{src.name} {p.name} DC")
-                
-                self._runData_.viewers[src.name][p.name]["DC"].plot(self._runData_.results[src.name][p.name]["DC"])
                 
                 if "Rs" not in self._runData_.results[src.name][p.name]:
                     self._runData_.results[src.name][p.name]["Rs"] = Rs
                 else:
-                    values = np.concatenate([self._runData_.results[src.name][p.name]["Rs"], Rs])
-                    times = np.concatenate([self._runData_.results[src.name][p.name]["Rs"].times, Rs.times])
+                    values = np.concatenate([self._runData_.results[src.name][p.name]["Rs"].magnitude, Rs.magnitude])
+                    times = np.concatenate([self._runData_.results[src.name][p.name]["Rs"].times.magnitude, Rs.times.magnitude])
                     self._runData_.results[src.name][p.name]["Rs"] = \
                         neo.IrregularlySampledSignal(times,values, 
                                                          units = Rs.units,
                                                          time_units = Rs.times.units,
                                                          name = "Rs")
-                    
-                if "Rs" not in self._runData_.viewers[src.name][p.name]:
-                    self._runData_.viewers[src.name][p.name]["Rs"] = \
-                        sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                    win_title = f"{src.name} {p.name} Rs")
-                
-                self._runData_.viewers[src.name][p.name]["Rs"].plot(self._runData_.results[src.name][p.name]["Rs"])
-                
                 if "Rin" not in self._runData_.results[src.name][p.name]:
                     self._runData_.results[src.name][p.name]["Rin"] = Rin
                 else:
-                    values = np.concatenate([self._runData_.results[src.name][p.name]["Rin"], Rs])
-                    times = np.concatenate([self._runData_.results[src.name][p.name]["Rin"].times, Rs.times])
+                    values = np.concatenate([self._runData_.results[src.name][p.name]["Rin"].magnitude, Rs.magnitude])
+                    times = np.concatenate([self._runData_.results[src.name][p.name]["Rin"].times.magnitude, Rs.times.magnitude])
                     self._runData_.results[src.name][p.name]["Rin"] = \
                         neo.IrregularlySampledSignal(times,values, 
                                                          units = Rin.units,
                                                          time_units = Rin.times.units,
                                                          name = "Rin")
                     
-                if "Rin" not in self._runData_.viewers[src.name][p.name]:
-                    self._runData_.viewers[src.name][p.name]["Rin"] = \
-                        sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                    win_title = f"{src.name} {p.name} Rin")
-                
-                self._runData_.viewers[src.name][p.name]["Rin"].plot(self._runData_.results[src.name][p.name]["Rin"])
+                if plotTest:    
+                    x = self._screenGeom.x()
+                    y = self._screenGeom.y() + int(self._winHeight * 2.1)
+                    
+                    if "DC" not in self._runData_.viewers[src.name][p.name]:
+                        self._runData_.viewers[src.name][p.name]["DC"] = \
+                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                        win_title = f"{src.name} {p.name} DC")
+                    
+                        self._runData_.viewers[src.name][p.name]["DC"].hideSelectors()
+                        self._runData_.viewers[src.name][p.name]["DC"].hideNavigator()
+                        self._runData_.viewers[src.name][p.name]["DC"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+                        
+                    self._runData_.viewers[src.name][p.name]["DC"].plot(self._runData_.results[src.name][p.name]["DC"])
+                        
+                    if "Rs" not in self._runData_.viewers[src.name][p.name]:
+                        self._runData_.viewers[src.name][p.name]["Rs"] = \
+                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                        win_title = f"{src.name} {p.name} Rs")
+                        
+                        x += self._winWidth
+                        self._runData_.viewers[src.name][p.name]["Rs"].hideSelectors()
+                        self._runData_.viewers[src.name][p.name]["Rs"].hideNavigator()
+                        self._runData_.viewers[src.name][p.name]["Rs"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+                        
+                    self._runData_.viewers[src.name][p.name]["Rs"].plot(self._runData_.results[src.name][p.name]["Rs"])
+                    
+                    if "Rin" not in self._runData_.viewers[src.name][p.name]:
+                        self._runData_.viewers[src.name][p.name]["Rin"] = \
+                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                        win_title = f"{src.name} {p.name} Rin")
+                    
+                        x += self._winWidth
+                        self._runData_.viewers[src.name][p.name]["Rin"].hideSelectors()
+                        self._runData_.viewers[src.name][p.name]["Rin"].hideNavigator()
+                        self._runData_.viewers[src.name][p.name]["Rin"].setGeometry(x, y, self._winWidth, self._winHeight)
+                        
+                    self._runData_.viewers[src.name][p.name]["Rin"].plot(self._runData_.results[src.name][p.name]["Rin"])
                 
                 # self.print(f"       pMeasures: {printStyled(pMeasures)}")
             elif clampMode == ClampMode.CurrentClamp:
