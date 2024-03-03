@@ -791,6 +791,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._yGridOn_ = self.defaultYGrid
         self._cursorsDockWidget_enabled_ = True
         self._annotationsDockWidget_enabled_ = True
+        self._mainToolBarVisible_ = True
+        self._navigatorVisible_ = True
+        self._selectorsVisible_ = True
         
         #### END generic plot options
         
@@ -942,6 +945,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionShow_Y_grid.toggled.connect(self._slot_showYgrid)
         self.actionShow_Y_grid.setEnabled(False)
         
+        self.actionViewMain_Toolbar.toggled.connect(self.slot_toggleMainToolbar)
+        self.actionViewFrame_Navigator.toggled.connect(self.slot_toggleNavigator)
+        self.actionViewSignal_Selectors.toggled.connect(self.slot_toggleSelectors)
+        
         
         # the actual layout of the plot items (pyqtgraph framework)
         # its "layout" is a QtWidgets.QGraphicsGridLayout
@@ -1065,6 +1072,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.actionIgnore_empty_spike_trains.triggered.connect(self._slot_setIgnoreEmptySpikeTrains)
         # self.actionShow_Legends.setEnabled(False)
+        
+        self.mainToolBar.visibilityChanged.connect(self._slot_mainToolbarVisibilityChanged)
+        
+        # NOTE: 2024-03-03 23:02:33
+        # QWidget does NOT have visibilityChanged signal
+        # self.selectorsWidget.visibilityChanged.connect(self._slot_selectorsVisibilityChanged)
+        # self._frames_spinBoxSlider_.visibilityChanged.connect(self._slot_navigatorVisibiltyChanged)
         
     # ### BEGIN properties
     @property
@@ -1276,7 +1290,43 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.linkAllXAxes()
             else:
                 self.unlinkAllXAxes()
-            
+                
+    @property
+    def mainToolBarVisible(self):
+        return self._mainToolBarVisible_
+    
+    @markConfigurable("MainToolbarVisible", "qt")
+    @mainToolBarVisible.setter
+    def mainToolBarVisible(self, value):
+        self._mainToolBarVisible_ = value == True
+        self.mainToolBar.setVisible(self._mainToolBarVisible_)
+        signalBlocker = QtCore.QSignalBlocker(self.actionViewMain_Toolbar)
+        self.actionViewMain_Toolbar.setChecked(self._mainToolBarVisible_)
+        
+    @property
+    def navigatorVisible(self):
+        return self._navigatorVisible_
+    
+    @markConfigurable("NavigatorVisible", "qt")
+    @navigatorVisible.setter
+    def navigatorVisible(self, value):
+        self._navigatorVisible_ = value == True
+        self._frames_spinBoxSlider_.setVisible(self._navigatorVisible_)
+        signalBlocker = QtCore.QSignalBlocker(self.actionViewFrame_Navigator)
+        self.actionViewFrame_Navigator.setChecked(self._navigatorVisible_)
+        
+    @property
+    def selectorsVisible(self):
+        return self._selectorsVisible_
+    
+    @markConfigurable("SelectorsVisible", "qt")
+    @selectorsVisible.setter
+    def selectorsVisible(self, value):
+        self._selectorsVisible_ = value == True
+        self.selectorsWidget.setVisible(self._selectorsVisible_)
+        signalBlocker = QtCore.QSignalBlocker(self.actionViewSignal_Selectors)
+        self.actionViewSignal_Selectors.setChecked(self._selectorsVisible_)
+        
     @property
     def cursorsShowValue(self):
         return self._cursorsShowValue_
@@ -3252,6 +3302,29 @@ anything else       anything else       ❌
     def slot_reportCursorPosition(self, crsId = None):
         self.reportCursors()
         
+    @pyqtSlot(bool)
+    def _slot_mainToolbarVisibilityChanged(self, val):
+        self._mainToolBarVisible_ = val == True
+        signalBlocker = QtCore.QSignalBlocker(self.actionViewMain_Toolbar)
+        self.actionViewMain_Toolbar.setChecked(self._mainToolBarVisible_)
+        
+    # NOTE: 2024-03-03 23:02:33
+    # QWidget does NOT have visibilityChanged signal
+    # @pyqtSlot(bool)
+    # def _slot_selectorsVisibilityChanged(self, val):
+    #     self._selectorsVisible_ = val == True
+    #     signalBlocker = QtCore.QSignalBlocker(self.actionViewSignal_Selectors)
+    #     self.actionViewSignal_Selectors.setChecked(self._selectorsVisible_)
+    
+    # NOTE: 2024-03-03 23:02:33
+    # QWidget does NOT have visibilityChanged signal
+    # @pyqtSlot(bool)
+    # def _slot_navigatorVisibiltyChanged(self, val):
+    #     self._navigatorVisible_ = val == True
+    #     signalBlocker = QtCore.QSignalBlocker(self.actionViewFrame_Navigator)
+    #     self.actionViewFrame_Navigator.setChecked(self._navigatorVisible_)
+        
+        
     @pyqtSlot(int)
     @safeWrapper
     def slot_irregularSignalsComboBoxIndexChanged(self, index):
@@ -4350,17 +4423,35 @@ anything else       anything else       ❌
         """
         self.slot_removeCursors()
         
+    @pyqtSlot()
+    def slot_toggleNavigator(self):
+        self.showNavigator() if self.actionViewMain_Toolbar.isChecked() else self.hideNavigator()
+        
     def hideNavigator(self):
-        self._frames_spinBoxSlider_.setVisible(False)
+        self.navigatorVisible = False
         
     def showNavigator(self):
-        self._frames_spinBoxSlider_.setVisible(True)
+        self.navigatorVisible = True
+        
+    @pyqtSlot()
+    def slot_toggleSelectors(self):
+        self.showSelectors() if self.actionViewMain_Toolbar.isChecked() else self.hideSelectors()
         
     def hideSelectors(self):
-        self.selectorsWidget.setVisible(False)
+        self.selectorsVisible = False
         
     def showSelectors(self):
-        self.selectorsWidget.setVisible(True)
+        self.selectorsVisible = True
+        
+    @pyqtSlot()
+    def slot_toggleMainToolbar(self):
+        self.showMainToolbar() if self.actionViewMain_Toolbar.isChecked() else self.hideMainToolbar()
+        
+    def hideMainToolbar(self):
+        self.mainToolBarVisible = False
+        
+    def showMainToolbar(self):
+        self.mainToolBarVisible = True
         
     @safeWrapper
     def removeActiveCursor(self):

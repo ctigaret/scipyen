@@ -60,7 +60,7 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter, with_doc, printStyled)
+from core.prog import (safeWrapper, AttributeAdapter, with_doc, printStyled, scipywarn)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -430,11 +430,11 @@ class _LTPFilesSimulator_(QtCore.QThread):
         
         
 class _LTPOnlineSupplier_(QtCore.QThread):
-    abfRunReady = pyqtSignal(pathlib.Path, name="abfRunReady")
+    abfTrialReady = pyqtSignal(pathlib.Path, name="abfTrialReady")
     stopTimer = pyqtSignal(name="stopTimer")
     
     def __init__(self, parent: QtCore.QObject,
-                 abfRunBuffer: collections.deque, 
+                 abfTrialBuffer: collections.deque, 
                  emitterWindow: QtCore.QObject,
                  directory: pathlib.Path,
                  simulator: typing.Optional[_LTPFilesSimulator_] = None,
@@ -442,7 +442,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
         """
         """
         QtCore.QThread.__init__(self, parent)
-        self._abfRunBuffer_ = abfRunBuffer
+        self._abfTrialBuffer_ = abfTrialBuffer
         self._filesQueue_ = collections.deque()
         self._pending_ = dict() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
 
@@ -495,7 +495,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
         # self._a_ += 1
 
     def changedFiles(self, val:typing.Union[typing.Sequence[pathlib.Path]]):
-        """Callback needed by DirectoryFileWatcher"""
+        """Callback needed by DirectoryFileWatcher. Does nothing here..."""
         # print(f"{self.__class__.__name__}.changedFiles {[v.name for v in val]}\n")
         # print(f"\t→ latestAbf = {self._latestAbf_}\n")
         # self._a_ += 1
@@ -507,10 +507,6 @@ class _LTPOnlineSupplier_(QtCore.QThread):
         # self._a_ += 1
         if not all(isinstance(v, pathlib.Path) and v.parent == self._watchedDir_ and v.suffix in (".rsv", ".abf") for v in val):
             return
-
-        # if len(val) > 1:
-        #     # CAUTION!
-        #     return
 
         removed = val[0]
 
@@ -543,7 +539,6 @@ class _LTPOnlineSupplier_(QtCore.QThread):
             fp = pathlib.Path(f)
             stat = fp.stat()
             # print(f"\t → {fp.name}: {stat.st_size}, {stat.st_atime_ns, stat.st_mtime_ns, stat.st_ctime_ns}")
-        # self._a_ += 1
         
     def _rsvForABF_(self, abf:pathlib.Path):
         """Returns the rsv file paired with the abf
@@ -611,9 +606,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
                 self._simulator_.requestInterruption()
                 self._simulator_.quit()
                 self._simulator_.wait()
-        # self.stopTimer.emit()
-        # if isinstance(self._simulationTimer_, QtCore.QTimer):
-        #     self._simulationTimer_.stop()
+
         super().quit()
 
     @pyqtSlot(pathlib.Path)
@@ -626,7 +619,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
         """Callback called by FileStatChecker"""
         # print(f"{self.__class__.__name__}.supplyFile to buffer: abfFile {abfFile.name}\n")
         self._abfListener_.reset()
-        self.abfRunReady.emit(abfFile)
+        self.abfTrialReady.emit(abfFile)
         
     @property
     def abfListener(self) -> FileStatChecker:
@@ -643,9 +636,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         Also used in simulation mode.
         
     """
+    # TODO: 2024-03-03 22:09:16
+    # detect triggers and add trigger events to the pathway blocks?
+    # maybe ...
+    
     # NOTE: 2024-02-08 15:05:35
     # for each source in _runData_.sources, determine the relationships between
     # a DAC, input signal (logical ADC) and stimulus channels
+    #
     # CAUTION: all ADC/DAC signals indexes in a source are PHYSICAL indexes
     #
     # also, each paths have "equal" until an induction protocol is supplied,
@@ -653,13 +651,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     #
     def __init__(self, parent:QtCore.QObject, emitter,
                  abfBuffer:collections.deque,
-                 abfRunData:dict,
+                 abfTrialData:dict,
                  out: typing.Optional[io.TextIOBase] = None):
         QtCore.QThread.__init__(self, parent)
         
         self._emitter_ = emitter
-        self._abfRunBuffer_ = abfBuffer
-        self._runData_ = abfRunData
+        self._abfTrialBuffer_ = abfBuffer
+        self._runData_ = abfTrialData
         self._stdout_ = out
         self._screen_ = self._emitter_.desktopScreen
         self._screenGeom = self._screen_.geometry()
@@ -693,13 +691,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
         try:
             # NOTE: 2024-02-08 14:18:32
-            # self._runData_.currentAbfRun should be a neo.Block
-            self._runData_.currentAbfRun = pio.loadAxonFile(str(abfFile))
-            self._runData_.abfRunTimesMinutes.append(self._runData_.currentAbfRun.rec_datetime)
-            deltaMinutes = (self._runData_.currentAbfRun.rec_datetime - self._runData_.abfRunTimesMinutes[0]).seconds/60
-            self._runData_.abfRunDeltaTimesMinutes.append(deltaMinutes)
+            # self._runData_.currentAbfTrial should be a neo.Block
+            self._runData_.currentAbfTrial = pio.loadAxonFile(str(abfFile))
+            self._runData_.abfTrialTimesMinutes.append(self._runData_.currentAbfTrial.rec_datetime)
+            deltaMinutes = (self._runData_.currentAbfTrial.rec_datetime - self._runData_.abfTrialTimesMinutes[0]).seconds/60
+            self._runData_.abfTrialDeltaTimesMinutes.append(deltaMinutes)
             
-            protocol = pab.ABFProtocol(self._runData_.currentAbfRun)
+            protocol = pab.ABFProtocol(self._runData_.currentAbfTrial)
             opMode = protocol.acquisitionMode # why does this return a tuple ?!?
             if isinstance(opMode, (tuple, list)):
                 opMode = opMode[0]
@@ -714,10 +712,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #
             # NOTE: 2024-03-03 09:27:52
             # soften the asssertion below, just skip the file
-            # assert(protocol.nSweeps) == len(self._runData_.currentAbfRun.segments), f"In {self._runData_.currentAbfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfRun.segments)}); check the sequencing key?"
+            # assert(protocol.nSweeps) == len(self._runData_.currentAbfTrial.segments), f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); check the sequencing key?"
             #
-            if len(self._runData_.currentAbfRun.segments) != protocol.nSweeps:
-                scipywarn(f"In {self._runData_.currentAbfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfRun.segments)}); the ABF trial file {abfFile} will be skipped")
+            if len(self._runData_.currentAbfTrial.segments) != protocol.nSweeps:
+                scipywarn(f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); the ABF trial file {abfFile} will be skipped")
                 return
             
             # self.print(self._runData_.sources)
@@ -741,7 +739,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                 scipywarn(f"Using custom location measures is not yet supported", out = self._stdout_)
 #                 pass
 #             else:
-#                 protocol = pab.ABFProtocol(self._runData_.currentAbfRun)
+#                 protocol = pab.ABFProtocol(self._runData_.currentAbfTrial)
 #                 opMode = protocol.acquisitionMode # why does this return a tuple ?!?
 #                 if isinstance(opMode, (tuple, list)):
 #                     opMode = opMode[0]
@@ -752,7 +750,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                 # NOTE: mismatches can happen when trials are acquired very fast (i.e.
 #                 # back to back) - in this case check the sequencing key in Clampex
 #                 # and set an appropriate interval between successive trials !
-#                 assert(protocol.nSweeps) == len(self._runData_.currentAbfRun.segments), f"In {self._runData_.currentAbfRun.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfRun.segments)}); check the sequencing key?"
+#                 assert(protocol.nSweeps) == len(self._runData_.currentAbfTrial.segments), f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); check the sequencing key?"
 # 
 #                 # self.print(self._runData_.sources)
 #                 
@@ -783,7 +781,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #                     # 1. finish off current episode with the previously loaded ABF file
 #                     # NOTE: 2024-02-16 08:28:43
 #                     # self._runData_.sweeps hasn't been incremented yet
-#                     # self._runData_.currentEpisode.end = self._runData_.abfRunTimesMinutes[-1]
+#                     # self._runData_.currentEpisode.end = self._runData_.abfTrialTimesMinutes[-1]
 #                     # self._runData_.currentEpisode.endFrame = self._runData_.sweeps
 #                     # episodeNames = [e.name for e in self._runData_.schedule.episodes]
 #                     # if self._runData_.episodeName in episodeNames:
@@ -1170,12 +1168,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
                 testDuration = membraneTestEpoch.firstDuration
                 
-                # self.print(f"   membraneTestEpoch: {printStyled(membraneTestEpoch.letter)} ({printStyled(membraneTestEpoch.number)}) with:")
-                # self.print(f"       amplitude: {printStyled(testAmplitude)}")
-                # self.print(f"       start: {printStyled(testStart)}")
-                # self.print(f"       duration: {printStyled(testDuration)}")
-                # self.print(f"       -----")
-                
             # assert protocol.nSweeps >= nPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nPathways} pathways"
             
             # in a multi-pathway protocol, the "main" digital pathways are always
@@ -1186,6 +1178,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # NOTE: 2024-03-01 13:50:58
                 # k is the pathway index; p is the pathway
                 # self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
+                p.clampMode = clampMode
                 
                 if p.name not in self._runData_.viewers[src.name]:
                     self._runData_.viewers[src.name][p.name] = \
@@ -1193,6 +1186,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                     win_title = f"{src.name} {p.name} Synaptic Responses")}
                 
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
                     
                     # FIXME: 2024-03-02 23:32:46
@@ -1200,25 +1194,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), self._screenGeom.y(), int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
                     
                 if p.name not in self._runData_.results[src.name]:
-                    p.clampMode = clampMode
                     self._runData_.results[src.name][p.name] = \
                         {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
                          "pathway": p}
                     
-                pMeasures = self.setMeasuresForPathway(src, p, protocol, clampMode, 
-                                                       adc, dac, activeDAC, membraneTestEpoch, 
-                                                       testStart, testDuration, testAmplitude,
-                                                       True, False)
+                self.setMeasuresForPathway(src, p, protocol, 
+                                                    adc, dac, activeDAC, membraneTestEpoch, 
+                                                    testStart, testDuration, testAmplitude,
+                                                    False)
                 
-                # store pathway measures for later rerun (offline, if needed)
-                if "measures" not in self._runData_.results[src.name][p.name]:
-                    self._runData_.results[src.name][p.name]["measures"] = pMeasures
-                # if p.name not in self._runData_.pathwayMeasures[src.name]:
-                #     self._runData_.pathwayMeasures[src.name][p.name] = {"pathway":p, "measures": pMeasures}
-                
+                self.measurePathway(src, p, adc, False)
                 
             for k, p in altDigPathways:
                 # self.print(f"   processing alt (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
+                p.clampMode = clampMode
                 
                 if p.name not in self._runData_.viewers[src.name]:
                     self._runData_.viewers[src.name][p.name] = \
@@ -1226,43 +1215,212 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                     win_title = f"{src.name} {p.name} Synaptic Responses")}
                 
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + int(self._winWidth * 1.1), self._screenGeom.y(), int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
                     
                 if p.name not in self._runData_.results[src.name]:
-                    p.clampMode = clampMode
                     self._runData_.results[src.name][p.name] = \
                         {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
                          "pathway": p}
                 
-                # store pathway measures for later rerun (offline, if needed)
-                pMeasures = self.setMeasuresForPathway(src, p, protocol, clampMode, 
-                                                       adc, dac, activeDAC, membraneTestEpoch, 
-                                                       testStart, testDuration, testAmplitude,
-                                                       False, True)
+                self.setMeasuresForPathway(src, p, protocol, 
+                                                    adc, dac, activeDAC, membraneTestEpoch, 
+                                                    testStart, testDuration, testAmplitude,
+                                                    True)
+                self.measurePathway(src, p, adc, True)
                 
-                if "measures" not in self._runData_.results[src.name][p.name]:
-                    self._runData_.results[src.name][p.name]["measures"] = pMeasures
-                # if p.name not in self._runData_.pathwayMeasures[src.name]:
-                #     self._runData_.pathwayMeasures[src.name][p.name] = {"pathway":p, "measures": pMeasures}
+    def measurePathway(self, src: RecordingSource, p: SynapticPathway,
+                       adc:pab.ABFInputConfiguration, isAlt:bool=False):
+        measureTime = self._runData_.abfTrialDeltaTimesMinutes[-1] # needed below
+        measures = self._runData_.results[src.name][p.name]["measures"]
+        sweep = self._runData_.results[src.name][p.name]["ABFTrialSweep"]
+        currentTrial = self._runData_.currentAbfTrial
+        sig = currentTrial.segments[sweep].analogsignals[adc.logicalIndex]
+        
+        responseMeasures = [(measureLabel, m) for measureLabel, m in measures.items() if measureLabel != "MembraneTest"]
+        
+        mbTestMeasure = measures.get("MembraneTest", None)
+        
+        initResponse = None
+        initResponseLabel = None
+        
+        for kc, (measureLabel, measure) in enumerate(responseMeasures):
+            measureFunctor = measure["measure"]
+            locations = measure["locations"]
+            args = measure["args"]
+            
+            locationMeasure = measureFunctor(*locations, name=measure["name"])
+            
+            measureValues = locationMeasure(sig)
+            
+            measureVal = np.abs(measureValues[0])
+            
+            measurement = neo.IrregularlySampledSignal([measureTime], measureVal, 
+                                                        units = measureVal.units, time_units = pq.min,
+                                                        name = measureLabel)
+            
+            if measureLabel not in self._runData_.results[src.name][p.name]:
+                self._runData_.results[src.name][p.name][measureLabel] = measurement
                 
+            else:
+                values = np.vstack([self._runData_.results[src.name][p.name][measureLabel].magnitude, measurement.magnitude])
+                times = np.vstack([self._runData_.results[src.name][p.name][measureLabel].times.magnitude, measurement.times.magnitude])
+                self._runData_.results[src.name][p.name][measureLabel] = \
+                    neo.IrregularlySampledSignal(times, values, units = measureVal.units, time_units = pq.min,
+                                                        name = measureLabel)
+                                                        # name = f"{measureLabel} {measureName}")
+            if kc == 0:
+                initResponse = self._runData_.results[src.name][p.name][measureLabel]
+                initResponseLabel = measureLabel
+            else:
+                # calculate paired-pulse ratio
+                ratio = self._runData_.results[src.name][p.name][measureLabel] / initResponse
+                ratio.name = f"Paired-pulse ratio {kc+1}ᵗʰ / 1ˢᵗ"
+                self._runData_.results[src.name][p.name][f"PPR {kc} 0"] = ratio
                 
+        if initResponseLabel not in self._runData_.viewers[src.name][p.name]:
+            self._runData_.viewers[src.name][p.name][initResponseLabel] = \
+                sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                    win_title = f"{src.name} {p.name} {initResponseLabel}")
+            
+            self._runData_.viewers[src.name][p.name][initResponseLabel].hideSelectors()
+            self._runData_.viewers[src.name][p.name][initResponseLabel].hideNavigator()
+            self._runData_.viewers[src.name][p.name][initResponseLabel].hideMainToolbar()
+            
+            x = self._screenGeom.x()
+            
+            if isAlt:
+                x += int(self._winWidth * 1.1)
+                
+            y = self._screenGeom.y() + int(self._winHeight * 1.1)
+            
+            self._runData_.viewers[src.name][p.name][initResponseLabel].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+            
+        self._runData_.viewers[src.name][p.name][initResponseLabel].plot(self._runData_.results[src.name][p.name][initResponseLabel])
+                
+        if isinstance(mbTestMeasure, dict):
+            measureFunctor = mbTestMeasure["measure"]
+            locations = mbTestMeasure["locations"]
+            args = mbTestMeasure["args"]
+            
+            locationMeasure = measureFunctor(*locations, name=mbTestMeasure["name"])
+            measureValues = locationMeasure(sig, *args)
+            # print(f"measurePathway: measureValues = {measureValues}")
+            
+            if p.clampMode == ClampMode.VoltageClamp:
+                _dc, _rs, _rin = measureValues
+                # print(f"measurePathway: _dc = {_dc}, _rs = {_rs}, _rin = {_rin}")
+                
+                DC = neo.IrregularlySampledSignal([measureTime],[_dc], 
+                                                    units = _dc.units,
+                                                    time_units = pq.min,
+                                                    name = "DC")
+                
+                Rs = neo.IrregularlySampledSignal([measureTime],[_rs], 
+                                                    units = _rs.units,
+                                                    time_units = pq.min,
+                                                    name = "Rs")
+                
+                Rin = neo.IrregularlySampledSignal([measureTime],[_rin], 
+                                                    units = _rin.units,
+                                                    time_units = pq.min,
+                                                    name = "Rin")
+                
+                if "DC" not in self._runData_.results[src.name][p.name]:
+                    self._runData_.results[src.name][p.name]["DC"] = DC
+                else:
+                    values = np.concatenate([self._runData_.results[src.name][p.name]["DC"].magnitude, DC.magnitude])
+                    times = np.concatenate([self._runData_.results[src.name][p.name]["DC"].times.magnitude, DC.times.magnitude])
+                    self._runData_.results[src.name][p.name]["DC"] = \
+                        neo.IrregularlySampledSignal(times,values, 
+                                                        units = DC.units,
+                                                        time_units = DC.times.units,
+                                                        name = "DC")
+                
+                if "Rs" not in self._runData_.results[src.name][p.name]:
+                    self._runData_.results[src.name][p.name]["Rs"] = Rs
+                else:
+                    values = np.concatenate([self._runData_.results[src.name][p.name]["Rs"].magnitude, Rs.magnitude])
+                    times = np.concatenate([self._runData_.results[src.name][p.name]["Rs"].times.magnitude, Rs.times.magnitude])
+                    self._runData_.results[src.name][p.name]["Rs"] = \
+                        neo.IrregularlySampledSignal(times,values, 
+                                                        units = Rs.units,
+                                                        time_units = Rs.times.units,
+                                                        name = "Rs")
+                    
+                if "Rin" not in self._runData_.results[src.name][p.name]:
+                    self._runData_.results[src.name][p.name]["Rin"] = Rin
+                else:
+                    values = np.concatenate([self._runData_.results[src.name][p.name]["Rin"].magnitude, Rin.magnitude])
+                    times = np.concatenate([self._runData_.results[src.name][p.name]["Rin"].times.magnitude, Rin.times.magnitude])
+                    self._runData_.results[src.name][p.name]["Rin"] = \
+                        neo.IrregularlySampledSignal(times,values, 
+                                                        units = Rin.units,
+                                                        time_units = Rin.times.units,
+                                                        name = "Rin")
+                    
+                if not isAlt:    
+                    x = self._screenGeom.x()
+                    y = self._screenGeom.y() + int(self._winHeight * 2.1)
+                    
+                    if "DC" not in self._runData_.viewers[src.name][p.name]:
+                        self._runData_.viewers[src.name][p.name]["DC"] = \
+                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                        win_title = f"{src.name} {p.name} DC")
+                    
+                        self._runData_.viewers[src.name][p.name]["DC"].hideSelectors()
+                        self._runData_.viewers[src.name][p.name]["DC"].hideNavigator()
+                        self._runData_.viewers[src.name][p.name]["DC"].hideMainToolbar()
+                        self._runData_.viewers[src.name][p.name]["DC"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+                        
+                    self._runData_.viewers[src.name][p.name]["DC"].plot(self._runData_.results[src.name][p.name]["DC"])
+                        
+                    if "Rs" not in self._runData_.viewers[src.name][p.name]:
+                        self._runData_.viewers[src.name][p.name]["Rs"] = \
+                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                        win_title = f"{src.name} {p.name} Rs")
+                        
+                        x += self._winWidth
+                        self._runData_.viewers[src.name][p.name]["Rs"].hideSelectors()
+                        self._runData_.viewers[src.name][p.name]["Rs"].hideNavigator()
+                        self._runData_.viewers[src.name][p.name]["Rs"].hideMainToolbar()
+                        self._runData_.viewers[src.name][p.name]["Rs"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+                        
+                    self._runData_.viewers[src.name][p.name]["Rs"].plot(self._runData_.results[src.name][p.name]["Rs"])
+                    
+                    if "Rin" not in self._runData_.viewers[src.name][p.name]:
+                        self._runData_.viewers[src.name][p.name]["Rin"] = \
+                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                                                        win_title = f"{src.name} {p.name} Rin")
+                    
+                        x += self._winWidth
+                        self._runData_.viewers[src.name][p.name]["Rin"].hideSelectors()
+                        self._runData_.viewers[src.name][p.name]["Rin"].hideNavigator()
+                        self._runData_.viewers[src.name][p.name]["Rin"].hideMainToolbar()
+                        self._runData_.viewers[src.name][p.name]["Rin"].setGeometry(x, y, self._winWidth, self._winHeight)
+                        
+                    self._runData_.viewers[src.name][p.name]["Rin"].plot(self._runData_.results[src.name][p.name]["Rin"])
+                    
+            else: # current clamp
+                #TODO 2024-02-27 16:18:25
+                scipywarn(f"measurePathway {p.name} in trial {currentTrial.name}: Current-clamp measurements not yet implemented")
+
     def setMeasuresForPathway(self, src: RecordingSource, p: SynapticPathway, 
-                              protocol:pab.ABFProtocol, clampMode,
+                              protocol:pab.ABFProtocol,
                               adc, dac, activeDAC, membraneTestEpoch,
-                              testStart, testDuration, testAmplitude, plotTest,
+                              testStart, testDuration, testAmplitude,
                               isAlt):
+        """Sets up measurements for synaptic pathways
+        This should happen only once, and requires that subsequent ABF trials
+        have the same protocol as the first ABFTrial
+        """
         # NOTE: 2024-03-01 23:53:33 TODO / FIXME:
         # instead of returning pMeasures, why not apply measures directly and 
         # populate the results ?!?
         
-        # to store location measures for this pathway:
-        # str (name) ↦ dict("measure" ↦ LocationMeasure, "args" ↦ tuple of extra arguments passed to LocationMeasure)
-        pMeasures = dict() 
-        measureTime = self._runData_.abfRunDeltaTimesMinutes[-1] # needed below
-            
+        clampMode = p.clampMode # determined in processProtocol(…)
         
-        holdingTime = protocol.holdingTime
         crossTalk = False
         
         # 1) figure out
@@ -1282,36 +1440,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # the order of pathways in the protocol
         sweepsEpochsForDig = protocol.getDigitalChannelUsage(p.stimulus.channel, activeDAC)
         
-        
-        # NOTE: 2024-02-20 08:41:09
-        # this is to check the sweepsEpochsForDig approach against the
-        # approach in processTrackingProtocol; consider removing:
-        # synStimEpochs below only takes digital TTL-emitting epochs
-        # for synaptic stimulation
-        # since I now strive to support DAC-emulated TTL as well, I
-        # prefer the name `digStimEpochs`
-        synTrainStimEpochs = list(filter(lambda x: len(x.getTrainDigitalOutputChannels("all"))>0, 
-                            activeDAC.epochs))
-        
-        synPulseStimEpochs = list(filter(lambda x: len(x.getPulseDigitalOutputChannels("all"))>0, 
-                            activeDAC.epochs))
-        
-        synStimEpochs = synTrainStimEpochs + synPulseStimEpochs
-        
-        
-        ee = ", ".join([f"{e.letter} ({e.number})" for e in synStimEpochs])
-        
-        pathSweeps = [sed[0] for sed in sweepsEpochsForDig]
-        
-        # assert len(pathSweeps) == 1, f"There should be only a sweep for each pathway; currently, pathway {p.name} has {len(pathSweeps)} sweeps"
-        
-#         self.print(f"       synaptic stimulation epochs: {printStyled(ee)}")
-#         
-#         self.print(f"       DIG channel {printStyled(p.stimulus.channel)} active in sweeps {printStyled(pathSweeps)}")
-        
-        assert all((e in synStimEpochs) for e in sweepsEpochsForDig[0][1]), f"Epochs inconsistencies for pathway {p.name}"
-        # assert all(i==j for i, j in zip(sweepsEpochsForDig[0][1], synStimEpochs)) f"Epochs inconsistencies for pathway {k}"
-        
         if len(sweepsEpochsForDig) == 0:
             raise RuntimeError(f"The specified DIG channel {p.stimulus.channel} appears to be disabled in all sweeps")
         
@@ -1319,433 +1447,314 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # TODO: Check for crosstalk
             pass
             # raise RuntimeError(f"The specified DIG channel {p.stimulus.channel} appears to be active in more than one sweep ({k[0] for k in sweepsEpochsForDig})")
-        
-        
-        # responseBaselineDuration = self._runData_.responseBaselineDuration
-        
-        digStimEpochs = sweepsEpochsForDig[0][1] # a list with epochs that emit on the SAME digital channel
-        
-        if len(digStimEpochs) == 0:
-            raise RuntimeError(f"No digital stimulation epochs found in the protocol, for pathway {k} in source {src}")
-        
-        # TODO: 2024-03-01 22:40:37 FIXME - sort out the commented below ↴
-        # if len(digStimEpochs) > 1:
-            # below, this is contentious: what if the user decided to 
-            # use more than one epoch to emulate a digital TTL train?
-            # so better use them all
-            # scipywarn(f"For pathway {k} in source {src} there are {len(digStimEpochs)} in the protocol; will use the first one")
-            
-        firstDigStimEpoch = digStimEpochs[0]
-        
-        # collection of unique digital channels used for stimulation on THIS pathway
-        stimDIG = unique(list(itertools.chain.from_iterable(e.getUsedDigitalOutputChannels("all") for e in digStimEpochs)))
-        
-        if len(stimDIG) == 1:
-            assert stimDIG[0] == p.stimulus.channel, f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} is different from the {stimDIG[0]} used in the epochs {[e.letter for e in digStimEpochs]}"
-            
-        elif len(stimDIG) == 2:
-            assert p.stimulus.channel in stimDIG, f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} does not appear to be used in the epochs {[e.letter for e in digStimEpochs]}"
-            crossTalk = True
 
-        # NOTE: 2024-03-01 22:57:37 TODO consider the below ↴
-#         elif len(stimDIG) == 0:
-#             raise RuntimeError(f"No digital stimlus channels used in the epochs {[e.letter for e in digStimEpochs]}")
-#             
-#         else:
-#             raise RuntimeError(f"Too may digital stimlus channels used ({len(stimDIG)}) in the epochs {[e.letter for e in digStimEpochs]}")
-            
         
-        # NOTE: 2024-03-01 22:52:10
-        # figure out stimulus pattern on the digStimEpochs in order to 
-        # determine stimulus timings (may be a TTL pulse or a TTL train!)
-        # then infer response(s) baseline(s) and the time stamps for the 
-        # response(s) maximum (maxima) or minimum (minima) in voltage-clamp
-        # or response slope (in current-clamp or voltage follower mode)
+        # NOTE: 2024-03-03 21:09:09 DO NOT REMOVE - FYI:
+        # ### BEGIN alternative way to collect ABF Epochs defining synaptic stimulation
         #
-        # This should be done independently of where they occur relative to any
-        # membrane test epoch(s)
+        # either as a train of stimuli
+#         
+#         
+#         synTrainStimEpochs = list(filter(lambda x: len(x.getTrainDigitalOutputChannels("all"))>0, 
+#                             activeDAC.epochs))
+#         
+#         # or as a pulse (i.e., one stimulus per epoch)
+#         synPulseStimEpochs = list(filter(lambda x: len(x.getPulseDigitalOutputChannels("all"))>0, 
+#                             activeDAC.epochs))
+#         
+#         # collct the above together
+#         synStimEpochs = synTrainStimEpochs + synPulseStimEpochs
+#         
+#         assert all((e in synStimEpochs) for e in sweepsEpochsForDig[0][1]), f"Epochs inconsistencies for pathway {p.name}"
+#         
+        # ### END   alternative way to collect ABF Epochs defining synaptic stimulation
         
-        # NOTE: 2024-03-01 23:03:01 below, main pattern is on even index sweeps, alternate pattern is on odd index sweeps
-        # NOTE: 2024-03-01 23:04:48 also, a TTL train if present occurs in the first epoch in digStimEpochs
-        # however, several digStimEpochs might be used if using TTL pulses
-        isTTLtrain = firstDigStimEpoch.hasDigitalTrain(p.stimulus.channel, pathSweeps[0] % 2 == 1)
         
-        if isTTLtrain:
-            # here, NOTE that the epoch starts at the same time on both main and alternate sweep!
-            # same holds for the relatiove pulse times within the train
-            stimTimes = dac.getEpochRelativePulseTimes(firstDigStimEpoch, 0)
-        
-        else:
-            isTTLpulses = all(e.hasDigitalPulse(p.stimulus.channel, pathSweeps[0] % 2 == 1) for e in digStimEpochs)
-            if isTTLpulses:
-                stimTimes = list(itertools.chain.from_iterable([dac.getEpochRelativePulseTimes(e, 0) for e in digStimEpochs]))
-            else:
-                # NOTE: 2024-03-01 23:30:21 should never get here
-                raise RuntimeError(f"Synaptic stimulation Epochs {[e.letter for e in digStimEpochs]} appear to not have either TTL train nor pulses")
-            
-        # 2) extract pathway sweeps and plot
-        block = self._runData_.results[src.name][p.name]["pathway_responses"]   # generated in processProtocol
-        viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in processProtocol
-        currentRun = self._runData_.currentAbfRun
-        
-        seg_ndx = len(block.segments)
+        # NOTE: 2024-03-03 21:03:37
+        # ### BEGIN extract pathway sweeps, concatenate to pathway blocks and plot
+        #
+        pathSweeps = [sed[0] for sed in sweepsEpochsForDig]
         
         s = pathSweeps[0]
         
-        sig = currentRun.segments[s].analogsignals[adc.logicalIndex]
+        block = self._runData_.results[src.name][p.name]["pathway_responses"]   # generated in processProtocol
+        viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in processProtocol
+        currentTrial = self._runData_.currentAbfTrial
+        
+        seg_ndx = len(block.segments)
+        
+        if "ABFTrialSweep" not in self._runData_.results[src.name][p.name]:
+            self._runData_.results[src.name][p.name]["ABFTrialSweep"] = s
+        
+        sig = currentTrial.segments[s].analogsignals[adc.logicalIndex]
         t0 = sig.t_start
-        seg = neo.Segment(name=f"{src.name} {p.name} sweep {s}", file_origin = currentRun.file_origin,
-                            file_datetime=currentRun.file_datetime,
-                            rec_datetime = currentRun.rec_datetime,
+        
+        seg = neo.Segment(name=f"{src.name} {p.name}", file_origin = currentTrial.file_origin,
+                            file_datetime=currentTrial.file_datetime,
+                            rec_datetime = currentTrial.rec_datetime,
                             index = seg_ndx)
+        
+        seg.annotations["ABFTrialSweep"] = s
         seg.analogsignals.append(sig)
         block.segments.append(seg)
         viewer.view(block)
         viewer.currentFrame  = len(block.segments)-1
         
-        # 3) generate signal cursors in the signal viewer window, for synaptic response(s)
-        # FIXME: 2024-03-02 23:59:49 TODO
-        # no need to construct new DataCursor with every run!
-        # merge with creation of signal cursors in the viewer window, below at NOTE 2024-03-03 00:00:40
-        #
-        # NOTE: 2024-03-01 23:34:52 
-        # adjust for real sweep times then:
-        if clampMode == ClampMode.VoltageClamp:
-            labelPfx = "EPSC"
+        # ### END  extract pathway sweeps, concatenate to pathway blocks and plot
+        
+        if "measures" not in self._runData_.results[src.name][p.name]:
+            pMeasures = dict() 
+            measureTime = self._runData_.abfTrialDeltaTimesMinutes[-1] # needed below
+                
+            holdingTime = protocol.holdingTime
+            digStimEpochs = sweepsEpochsForDig[0][1] # a list with epochs that emit on the SAME digital channel
             
-            # • for response baselines use 10 ms BEFORE stimulus with window of 3 ms
-            # • for response amplitude use 10 ms AFTER stimulus, with window 3 ms
-            # • cursors should be manually adjusted in the pathway responses windows
+            if len(digStimEpochs) == 0:
+                raise RuntimeError(f"No digital stimulation epochs found in the protocol, for pathway {k} in source {src}")
+            
+            # TODO: 2024-03-01 22:40:37 FIXME - sort out the commented below ↴
+            # if len(digStimEpochs) > 1:
+                # below, this is contentious: what if the user decided to 
+                # use more than one epoch to emulate a digital TTL train?
+                # so better use them all
+                # scipywarn(f"For pathway {k} in source {src} there are {len(digStimEpochs)} in the protocol; will use the first one")
+                
+            # NOTE: 2024-03-03 21:13:38
+            # use first epoch with digital synaptic stimuli to infer which pathway
+            # is stimulated in this Trial ⇒ might be a cross-talk Trial
+            firstDigStimEpoch = digStimEpochs[0]
+            
+            # collection of unique digital channels used for stimulation on THIS pathway
+            stimDIG = unique(list(itertools.chain.from_iterable(e.getUsedDigitalOutputChannels("all") for e in digStimEpochs)))
+            
+            if len(stimDIG) == 1:
+                assert stimDIG[0] == p.stimulus.channel, f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} is different from the {stimDIG[0]} used in the epochs {[e.letter for e in digStimEpochs]}"
+                
+            elif len(stimDIG) == 2:
+                assert p.stimulus.channel in stimDIG, f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} does not appear to be used in the epochs {[e.letter for e in digStimEpochs]}"
+                crossTalk = True
+
+            # NOTE: 2024-03-01 22:57:37 TODO consider the below ↴
+    #         elif len(stimDIG) == 0:
+    #             raise RuntimeError(f"No digital stimlus channels used in the epochs {[e.letter for e in digStimEpochs]}")
+    #             
+    #         else:
+    #             raise RuntimeError(f"Too may digital stimlus channels used ({len(stimDIG)}) in the epochs {[e.letter for e in digStimEpochs]}")
+                
+            
+            # NOTE: 2024-03-01 22:52:10
+            # figure out stimulus pattern on the digStimEpochs in order to 
+            # determine stimulus timings (may be a TTL pulse or a TTL train!)
+            # then infer response(s) baseline(s) and the time stamps for the 
+            # response(s) maximum (maxima) or minimum (minima) in voltage-clamp
+            # or response slope (in current-clamp or voltage follower mode)
             #
-            dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
-            dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
+            # This should be done independently of where they occur relative to any
+            # membrane test epoch(s)
             
-            locationMeasureFunctor = ephys.amplitudeMeasure
-            measureUnits = sig.units
+            # NOTE: 2024-03-01 23:03:01 below, main pattern is on even index sweeps, alternate pattern is on odd index sweeps
+            # NOTE: 2024-03-01 23:04:48 also, a TTL train if present occurs in the first epoch in digStimEpochs
+            # however, several digStimEpochs might be used if using TTL pulses
+            isTTLtrain = firstDigStimEpoch.hasDigitalTrain(p.stimulus.channel, pathSweeps[0] % 2 == 1)
             
-            measureName = "amplitude"
+            if isTTLtrain:
+                # here, NOTE that the epoch starts at the same time on both main and alternate sweep!
+                # same holds for the relatiove pulse times within the train
+                stimTimes = dac.getEpochRelativePulseTimes(firstDigStimEpoch, 0)
             
-        else:
-            labelPfx = "EPSP"
-            
-            # current clamp or no clamp (voltage-follower)
-            # depending on useSlopeInIClamp we use baseline-amplitude or
-            # chord slope
-            
-            if self._runData_.useSlopeInIClamp:
-                # we need TWO data cursors here, approximately placed on 10% and 90% of
-                # the (field) EPSP; since we don't know yet where these positions are,
-                # we take 5 ms and 10 ms AFTER the stimulus - they'd have to be
-                # adjusted on the signal viewer window for the pathway;
-                # cusros windows are 2 ms each
-                dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t + 0.005 * pq.s, 0.002 * pq.s) for t in stimTimes]
-                dataCursorsResponses = [DataCursor(t0 + holdingTime + t + 0.01 * pq.s, 0.002 * pq.s) for t in stimTimes]
-                
-                locationMeasureFunctor = ephys.chordSlopeMeasure
-                measureUnits = sig.units/sig.times.units # (e.g., mV/ms)
-                measureName = "slope"
-                
             else:
-                # do the same as for voltage clamp above.
+                isTTLpulses = all(e.hasDigitalPulse(p.stimulus.channel, pathSweeps[0] % 2 == 1) for e in digStimEpochs)
+                if isTTLpulses:
+                    stimTimes = list(itertools.chain.from_iterable([dac.getEpochRelativePulseTimes(e, 0) for e in digStimEpochs]))
+                else:
+                    # NOTE: 2024-03-01 23:30:21 should never get here
+                    raise RuntimeError(f"Synaptic stimulation Epochs {[e.letter for e in digStimEpochs]} appear to not have either TTL train nor pulses")
+                
+            # 3) generate signal cursors in the signal viewer window, for synaptic response(s)
+            # FIXME: 2024-03-02 23:59:49 TODO
+            # no need to construct new DataCursor with every run!
+            # merge with creation of signal cursors in the viewer window, below at NOTE 2024-03-03 00:00:40
+            #
+            # NOTE: 2024-03-01 23:34:52 
+            # adjust for real sweep times then:
+            if clampMode == ClampMode.VoltageClamp:
+                labelPfx = "EPSC"
+                
+                # • for response baselines use 10 ms BEFORE stimulus with window of 3 ms
+                # • for response amplitude use 10 ms AFTER stimulus, with window 3 ms
+                # • cursors should be manually adjusted in the pathway responses windows
+                #
                 dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
                 dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
                 
                 locationMeasureFunctor = ephys.amplitudeMeasure
                 measureUnits = sig.units
+                
                 measureName = "amplitude"
                 
-        # NOTE 2024-03-03 00:00:40
-        # create signal cursors if needed, then measure
-        for kc, c in enumerate(dataCursorsResponsesBase):
-            measureLabel = f"{labelPfx}{kc}"
-            if viewer.signalCursor(f"{measureLabel}Base") is None:
-                viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{measureLabel}Base", label_position=0.85)
-                
-            if viewer.signalCursor(f"{measureLabel}") is None:
-                viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{measureLabel}", label_position=0.85)
-                
-            pMeasures[measureLabel] = {"measure": locationMeasureFunctor,
-                                       "locations": (viewer.signalCursor(f"{measureLabel}Base"),
-                                                     viewer.signalCursor(f"{measureLabel}")),
-                                       "args" : [],
-                                       "sweeps": pathSweeps
-                                       }
-                                       
-            locationMeasure = locationMeasureFunctor(*pMeasures[measureLabel]["locations"],
-                                                     name = f"{measureLabel} {measureName}")
-                                            
-            measureValue = np.abs(locationMeasure(sig)[0])
-            
-            # self.print(f"measureValue = {measureValue}")
-            
-            # NOTE: 2024-03-02 15:31:58
-            # 'measureTime' below ↴ was determined at the top in this method.
-            measurement = neo.IrregularlySampledSignal([measureTime], measureValue, 
-                                                           units = measureValue.units, time_units = pq.min,
-                                                           name = measureLabel)
-                                                           # name = f"{measureLabel} {measureName}")
-                                            
-            if measureLabel not in self._runData_.results[src.name][p.name]:
-                self._runData_.results[src.name][p.name][measureLabel] = measurement
-                
             else:
-                values = np.vstack([self._runData_.results[src.name][p.name][measureLabel].magnitude, measurement.magnitude])
-                times = np.vstack([self._runData_.results[src.name][p.name][measureLabel].times.magnitude, measurement.times.magnitude])
-                self._runData_.results[src.name][p.name][measureLabel] = \
-                    neo.IrregularlySampledSignal(times, values, units = measureValue.units, time_units = pq.min,
-                                                           name = measureLabel)
-                                                           # name = f"{measureLabel} {measureName}")
+                labelPfx = "EPSP"
                 
-            if kc > 0:
-                # calculate paired-pulse ratio
-                ratio = self._runData_.results[src.name][p.name][measureLabel] / self._runData_.results[src.name][p.name][f"{labelPfx}{0}"]
-                ratio.name = f"Paired-pulse ratio {kc+1}ᵗʰ / 1ˢᵗ"
-                self._runData_.results[src.name][p.name][f"PPR {kc}_0"] = ratio
+                # current clamp or no clamp (voltage-follower)
+                # depending on useSlopeInIClamp we use baseline-amplitude or
+                # chord slope
                 
-        # NOTE: 2024-03-02 16:54:04
-        # for now, we're only plotting the measurement (amplitude or slope) for 
-        # the first response — which is what thiscodre is all about; measurements
-        # for subsequent responses and paired-pulse ratio(s) are store in results
-        # anyway
-        
-        if f"{labelPfx}{0}" not in self._runData_.viewers[src.name][p.name]:
-            self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"] = \
-                sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                    win_title = f"{src.name} {p.name} {labelPfx}{0}")
-            
-            self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].hideSelectors()
-            self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].hideNavigator()
-            
-            x = self._screenGeom.x()
-            
-            if isAlt:
-                x += int(self._winWidth * 1.1)
-                
-            y = self._screenGeom.y() + int(self._winHeight * 1.1)
-            
-            self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
-            
-        self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].plot(self._runData_.results[src.name][p.name][f"{labelPfx}{0}"])
-            
-        #  NOTE: 2024-03-02 11:23:55
-        # 4) generate signal cursors in the signal viewer window, for 
-        # the membrane test (if any)
-        #
-        #  NOTE: 2024-03-02 11:55:36 membraneTestEpoch and testStart are calculated in processProtocol
-        #  because they are the same for both pathways (they are specific to the recording source)
-        #
-        
-        if isinstance(membraneTestEpoch, pab.ABFEpoch):
-            # self.print(f"testStart = {testStart}; testDuration = {testDuration}")
-            if testStart + testDuration < dac.getEpochRelativeStartTime(firstDigStimEpoch, 0):
-                # membrane test occurs BEFORE digital simulation epochs,
-                # possibly with intervening epochs (for response baselines)
-                if testStart == 0:
-                    signalBaselineStart = 0 * pq.s
-                    # signalBaselineDuration = testStart
+                if self._runData_.useSlopeInIClamp:
+                    # we need TWO data cursors here, approximately placed on 10% and 90% of
+                    # the (field) EPSP; since we don't know yet where these positions are,
+                    # we take 5 ms and 10 ms AFTER the stimulus - they'd have to be
+                    # adjusted on the signal viewer window for the pathway;
+                    # cusros windows are 2 ms each
+                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t + 0.005 * pq.s, 0.002 * pq.s) for t in stimTimes]
+                    dataCursorsResponses = [DataCursor(t0 + holdingTime + t + 0.01 * pq.s, 0.002 * pq.s) for t in stimTimes]
+                    
+                    locationMeasureFunctor = ephys.chordSlopeMeasure
+                    measureUnits = sig.units/sig.times.units # (e.g., mV/ms)
+                    measureName = "slope"
                     
                 else:
-                    # need to find out these, as the epochs table may start at a higher epoch index
-                    initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  dac.getEpochRelativeStartTime(membraneTestEpoch, 0) \
+                    # do the same as for voltage clamp above.
+                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
+                    dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
+                    
+                    locationMeasureFunctor = ephys.amplitudeMeasure
+                    measureUnits = sig.units
+                    measureName = "amplitude"
+                    
+            # NOTE 2024-03-03 00:00:40
+            # create signal cursors if needed, then measure
+            for kc, c in enumerate(dataCursorsResponsesBase):
+                measureLabel = f"{labelPfx}{kc}"
+                if viewer.signalCursor(f"{measureLabel}Base") is None:
+                    viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{measureLabel}Base", label_position=0.85)
+                    
+                if viewer.signalCursor(f"{measureLabel}") is None:
+                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{measureLabel}", label_position=0.85)
+                    
+                pMeasures[measureLabel] = {"measure": locationMeasureFunctor,
+                                        "locations": (viewer.signalCursor(f"{measureLabel}Base"),
+                                                        viewer.signalCursor(f"{measureLabel}")),
+                                        "args" : [],
+                                        "sweeps": pathSweeps, # redundant ?!?
+                                        "name": measureName
+                                        }
+                                        
+            #  NOTE: 2024-03-02 11:23:55
+            # 4) generate signal cursors in the signal viewer window, for 
+            # the membrane test (if any)
+            #
+            #  NOTE: 2024-03-02 11:55:36 membraneTestEpoch and testStart are calculated in processProtocol
+            #  because they are the same for both pathways (they are specific to the recording source)
+            #
+            
+            if isinstance(membraneTestEpoch, pab.ABFEpoch):
+                # self.print(f"testStart = {testStart}; testDuration = {testDuration}")
+                if testStart + testDuration < dac.getEpochRelativeStartTime(firstDigStimEpoch, 0):
+                    # membrane test occurs BEFORE digital simulation epochs,
+                    # possibly with intervening epochs (for response baselines)
+                    if testStart == 0:
+                        signalBaselineStart = 0 * pq.s
+                        
+                    else:
+                        # need to find out these, as the epochs table may start at a higher epoch index
+                        initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  dac.getEpochRelativeStartTime(membraneTestEpoch, 0) \
+                                                            and x.firstDuration > 0 and x.deltaDuration == 0, 
+                                                        dac.epochs))
+                        if len(initialEpochs):
+                            # baseline epochs are initial epochs where no analog command is sent out
+                            # (e.g. they are not set)
+                            baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
+                            if len(baselineEpochs):
+                                signalBaselineStart = dac.getEpochRelativeStartTime(baselineEpochs[0], 0)
+                            else:
+                                signalBaselineStart = 0*pq.s
+                        else:
+                            signalBaselineStart = max(testStart - 2 * dac.holdingTime, 0 * pq.s)
+                            
+                elif testStart > activeDAC.getEpochRelativeStartTime(digStimEpochs[-1], 0) + digStimEpochs[-1].firstDuration:
+                    # mb test delivered AFTGER the last digital simulation epoch 
+                    # ideally, somwehere towards the end of the sweep, 
+                    # hopefully AFTER synaptic responses have decayed to baseline
+                    #
+                    # in this case, best is to use the first epoch before the
+                    # digStimEpochs (if any), or the dac holding, as signal baseline (DC)
+                    #
+                        
+                    initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) \
                                                         and x.firstDuration > 0 and x.deltaDuration == 0, 
                                                     dac.epochs))
+            
                     if len(initialEpochs):
-                        # baseline epochs are initial epochs where no analog command is sent out
-                        # (e.g. they are not set)
+                        # there are epochs before digStimEpochs - are any of these baseline-like?
                         baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
                         if len(baselineEpochs):
                             signalBaselineStart = dac.getEpochRelativeStartTime(baselineEpochs[0], 0)
-                            # signalBaselineDuration = baselineEpochs[0].firstDuration
                         else:
-                            signalBaselineStart = 0*pq.s
-                            # signalBaselineDuration = dac.getEpochRelativeStartTime(initialEpochs[0], 0)
+                            signalBaselineStart = 0 * pq.s
+                            
                     else:
-                        signalBaselineStart = max(testStart - 2 * dac.holdingTime, 0 * pq.s)
-                        # signalBaselineDuration = max(dac.holdingTime, testDuration)
-                        
-            elif testStart > activeDAC.getEpochRelativeStartTime(digStimEpochs[-1], 0) + digStimEpochs[-1].firstDuration:
-                # mb test delivered AFTGER the last digital simulation epoch 
-                # ideally, somwehere towards the end of the sweep, 
-                # hopefully AFTER synaptic responses have decayed to baseline
-                #
-                # in this case, best is to use the first epoch before the
-                # digStimEpochs (if any), or the dac holding, as signal baseline (DC)
-                #
-                    
-                initialEpochs = list(filter(lambda x: dac.getEpochRelativeStartTime(x, 0) + x.firstDuration <=  activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) \
-                                                    and x.firstDuration > 0 and x.deltaDuration == 0, 
-                                                dac.epochs))
-        
-                if len(initialEpochs):
-                    # there are epochs before digStimEpochs - are any of these baseline-like?
-                    baselineEpochs = list(filter(lambda x: x.firstLevel == 0 and x.deltaLevel == 0, initialEpochs))
-                    if len(baselineEpochs):
-                        signalBaselineStart = dac.getEpochRelativeStartTime(baselineEpochs[0], 0)
-                        # signalBaselineDuration = baselineEpochs[0].firstDuration
-                    else:
-                        signalBaselineStart = 0 * pq.s
-                        # signalBaselineDuration = dac.getEpochRelativeStartTime(initialEpochs[0], 0)
-                        
+                        # no epochs before the membrane test (odd, but can be allowed...)
+                        signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * dac.holdingTime, 0 * pq.s)
+                
                 else:
-                    # no epochs before the membrane test (odd, but can be allowed...)
-                    signalBaselineStart = max(activeDAC.getEpochRelativeStartTime(digStimEpochs[0], 0) - 2 * dac.holdingTime, 0 * pq.s)
-                    # signalBaselineDuration = max(dac.holdingTime, digStimEpochs[0].firstDuration)
+                    raise RuntimeError("Membrane test appears to overlap with synaptic stimulation epochs")
+                
+                if clampMode == ClampMode.VoltageClamp:
+                    # last 10 ms before end of test, window of 5 ms
+                    if viewer.signalCursor("DC") is None:
+                        dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 0.005 * sig.times.units)
+                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC", label_position=0.85)
+                        
+                    if viewer.signalCursor("Rs") is None:
+                        dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 0.005 * sig.times.units)
+                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs", label_position=0.85)
+                        
+                    if viewer.signalCursor("Rin") is None:
+                        dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 0.005*sig.times.units)
+                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin", label_position=0.85)
+                    
+                    
+                    pMeasures["MembraneTest"] = {"measure": ephys.membraneTestVClampMeasure,
+                                                "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
+                                                "args": (testAmplitude,),
+                                                "sweeps": pathSweeps,
+                                                "name": "MembraneTest"}
+                elif clampMode == ClampMode.CurrentClamp:
+                    #TODO 2024-02-27 16:18:25
+                    scipywarn("setMeasuresForPathway: Current-clamp measurements not yet implemented")
+                
+            # store pathway measures for measurements
+            self._runData_.results[src.name][p.name]["measures"] = pMeasures
             
-            else:
-                raise RuntimeError("Membrane test appears to overlap with synaptic stimulation epochs")
-            
-            if clampMode == ClampMode.VoltageClamp:
-                # last 10 ms before end of test, window of 5 ms
-                if viewer.signalCursor("DC") is None:
-                    dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 0.005 * sig.times.units)
-                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC", label_position=0.85)
-                    
-                if viewer.signalCursor("Rs") is None:
-                    dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 0.005 * sig.times.units)
-                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs", label_position=0.85)
-                    
-                if viewer.signalCursor("Rin") is None:
-                    dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 0.005*sig.times.units)
-                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin", label_position=0.85)
-                
-                
-#                 self.print(f"dataCursorDC ={dataCursorDC}")
-#                 self.print(f"dataCursorRs ={dataCursorRs}")
-#                 self.print(f"dataCursorRin ={dataCursorRin}")
-#                 
-#                 self.print(f"signal Cursor DC: x = {viewer.signalCursor('DC').x} xwindow = {viewer.signalCursor('DC').xwindow}")
-#                 self.print(f"signal Cursor Rs: x = {viewer.signalCursor('Rs').x} xwindow = {viewer.signalCursor('Rs').xwindow}")
-#                 self.print(f"signal Cursor Rin: x = {viewer.signalCursor('Rin').x} xwindow = {viewer.signalCursor('Rin').xwindow}")
-                
-                pMeasures["MembraneTest"] = {"measure": ephys.membraneTestVClampMeasure,
-                                             "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
-                                             "args": (testAmplitude,),
-                                             "sweeps": pathSweeps}
-                
-                mbTestMeasure = ephys.membraneTestVClampMeasure(*pMeasures["MembraneTest"]["locations"])
-                # returns (dc, rs, rin)
-                _dc, _rs, _rin = mbTestMeasure(sig, testAmplitude)
-                # self.print(f"_dc = {_dc}, _rs = {_rs}, _rin = {_rin}")
-                
-                # see NOTE: 2024-03-02 15:31:58 about measureTime ↴
-                DC = neo.IrregularlySampledSignal([measureTime],[_dc], 
-                                                      units = _dc.units,
-                                                      time_units = pq.min,
-                                                      name = "DC")
-                
-                Rs = neo.IrregularlySampledSignal([measureTime],[_rs], 
-                                                      units = _rs.units,
-                                                      time_units = pq.min,
-                                                      name = "Rs")
-                
-                Rin = neo.IrregularlySampledSignal([measureTime],[_rin], 
-                                                      units = _rin.units,
-                                                      time_units = pq.min,
-                                                      name = "Rin")
-                
-                if "DC" not in self._runData_.results[src.name][p.name]:
-                    self._runData_.results[src.name][p.name]["DC"] = DC
-                else:
-                    values = np.concatenate([self._runData_.results[src.name][p.name]["DC"].magnitude, DC.magnitude])
-                    times = np.concatenate([self._runData_.results[src.name][p.name]["DC"].times.magnitude, DC.times.magnitude])
-                    self._runData_.results[src.name][p.name]["DC"] = \
-                        neo.IrregularlySampledSignal(times,values, 
-                                                         units = DC.units,
-                                                         time_units = DC.times.units,
-                                                         name = "DC")
-                
-                if "Rs" not in self._runData_.results[src.name][p.name]:
-                    self._runData_.results[src.name][p.name]["Rs"] = Rs
-                else:
-                    values = np.concatenate([self._runData_.results[src.name][p.name]["Rs"].magnitude, Rs.magnitude])
-                    times = np.concatenate([self._runData_.results[src.name][p.name]["Rs"].times.magnitude, Rs.times.magnitude])
-                    self._runData_.results[src.name][p.name]["Rs"] = \
-                        neo.IrregularlySampledSignal(times,values, 
-                                                         units = Rs.units,
-                                                         time_units = Rs.times.units,
-                                                         name = "Rs")
-                    
-                if "Rin" not in self._runData_.results[src.name][p.name]:
-                    self._runData_.results[src.name][p.name]["Rin"] = Rin
-                else:
-                    values = np.concatenate([self._runData_.results[src.name][p.name]["Rin"].magnitude, Rs.magnitude])
-                    times = np.concatenate([self._runData_.results[src.name][p.name]["Rin"].times.magnitude, Rs.times.magnitude])
-                    self._runData_.results[src.name][p.name]["Rin"] = \
-                        neo.IrregularlySampledSignal(times,values, 
-                                                         units = Rin.units,
-                                                         time_units = Rin.times.units,
-                                                         name = "Rin")
-                    
-                if plotTest:    
-                    x = self._screenGeom.x()
-                    y = self._screenGeom.y() + int(self._winHeight * 2.1)
-                    
-                    if "DC" not in self._runData_.viewers[src.name][p.name]:
-                        self._runData_.viewers[src.name][p.name]["DC"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                        win_title = f"{src.name} {p.name} DC")
-                    
-                        self._runData_.viewers[src.name][p.name]["DC"].hideSelectors()
-                        self._runData_.viewers[src.name][p.name]["DC"].hideNavigator()
-                        self._runData_.viewers[src.name][p.name]["DC"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
-                        
-                    self._runData_.viewers[src.name][p.name]["DC"].plot(self._runData_.results[src.name][p.name]["DC"])
-                        
-                    if "Rs" not in self._runData_.viewers[src.name][p.name]:
-                        self._runData_.viewers[src.name][p.name]["Rs"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                        win_title = f"{src.name} {p.name} Rs")
-                        
-                        x += self._winWidth
-                        self._runData_.viewers[src.name][p.name]["Rs"].hideSelectors()
-                        self._runData_.viewers[src.name][p.name]["Rs"].hideNavigator()
-                        self._runData_.viewers[src.name][p.name]["Rs"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
-                        
-                    self._runData_.viewers[src.name][p.name]["Rs"].plot(self._runData_.results[src.name][p.name]["Rs"])
-                    
-                    if "Rin" not in self._runData_.viewers[src.name][p.name]:
-                        self._runData_.viewers[src.name][p.name]["Rin"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                        win_title = f"{src.name} {p.name} Rin")
-                    
-                        x += self._winWidth
-                        self._runData_.viewers[src.name][p.name]["Rin"].hideSelectors()
-                        self._runData_.viewers[src.name][p.name]["Rin"].hideNavigator()
-                        self._runData_.viewers[src.name][p.name]["Rin"].setGeometry(x, y, self._winWidth, self._winHeight)
-                        
-                    self._runData_.viewers[src.name][p.name]["Rin"].plot(self._runData_.results[src.name][p.name]["Rin"])
-                
-                # self.print(f"       pMeasures: {printStyled(pMeasures)}")
-            elif clampMode == ClampMode.CurrentClamp:
-                #TODO 2024-02-27 16:18:25
-                scipywarn("Current-clamp measurements not yet implemented")
-            
-        return pMeasures
-        
 class LTPOnline(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
     """
     # TODO: update episodes in the pathway's schedule
         
-    # NOTE: these class members are not used - clean up
-#     test_protocol_properties = ("activeDACChannelIndex",
-#                                 "nSweeps",
-#                                 "acquisitionMode",
-#                                 "samplingRate",
-#                                 "alternateDigitalOutputStateEnabled",
-#                                 "alternateDACOutputStateEnabled")
-#     
-#     timings_fields = ("dcStart", "dcStop", 
-#                       "RsStart", "RsStop",
-#                       "RinStop", "RinStop",
-#                       "EPSC0BaseStart", "EPSC0BaseStop",
-#                       "EPSC0PeakStart", "EPSC0PeakStop",
-#                       "EPSC1BaseStart", "EPSC1BaseStop",
-#                       "EPSC1PeakStart", "EPSC1PeakStop",
-#                       )
-    
     resultsReady = pyqtSignal(object, name="resultsReady")
     
+    _instance = None # singleton pattern
+    
+    def __new__(cls, *args,
+                 episodeName: str = "baseline",
+                 useEmbeddedProtocol:bool=True,
+                 useSlopeInIClamp:bool = True,
+                 emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
+                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
+                 autoStart:bool=False, # NOTE: change to True when done coding TODO
+                 parent=None,
+                 simulate = None,
+                 out: typing.Optional[io.TextIOBase] = None,
+                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
+                 ):
+        # implementation of singleton pattern
+        if cls._instance is None:
+            cls._instance = super().__new__(cls, *args, episodeName,
+                 useEmbeddedProtocol, useSlopeInIClamp, emitterWindow,
+                 directory, autoStart, parent, simulate, out,
+                 locationMeasures)
+            
+        return cls._instance
 
     def __init__(self, *args,
                  episodeName: str = "baseline",
@@ -1759,12 +1768,6 @@ class LTPOnline(QtCore.QObject):
                  out: typing.Optional[io.TextIOBase] = None,
                  locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
                  ):
-                 # conditioningClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.CurrentClamp,
-                 # trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
-                 # baselineDuration:pq.Quantity = 5 * pq.ms,
-                 # steadyStateIClampMbTestDuration = 0.05 * pq.s,
-                 # signalBaselineStart:typing.Optional[pq.Quantity] = 0 * pq.s,
-                 # signalBaselineDuration:typing.Optional[pq.Quantity] = None,
         """
         
         """
@@ -1778,73 +1781,10 @@ class LTPOnline(QtCore.QObject):
         self._sources_ = None # preallocate
         self._locationMeasures_ = locationMeasures
         
-        # self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
-        
-        # self._currentEpisode_ = RecordingEpisode(name=self._currentEpisodeName_)
-        # self._schedule_ = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
-        
-        # self._schedule_.addEpisode(self._currentEpisode_)
-        
         self._sources_ = self._check_sources_(*args)
-        # NOTE: 2024-02-16 10:56:58
-        # having enforced sources with unique names and physical ADC indexes
-        # above, the synaptic pathways generated below should be unique
-        # More importantly, the SynapticPathway originated from the same source
-        # CAN share ADC indexes; however, the ADC indexes across sources MUST be
-        # distinct
-#         self._pathways_ = list(itertools.chain.from_iterable([s.pathways for s in self._sources_]))
-#         
-#         
-#         # add first episode in all pathways
-#         for pathway in self._pathways_:
-#             pathway.schedule = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
-#             pathway.schedule.addEpisode(RecordingEpisode(name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
-#                                     pathways = [pathway],
-#                                     beginFrame = 0))
         
-        
-        
-        # TODO: 2024-01-08 00:04:55 FIXME
-        # FINALIZE THIS !!!
-        #
-        
-        # just one Epoch;
-        # • if ABF Epoch, then it needs to be the first one, type Step,
-        #   ∘ first duration > 0, delta duration == 0
-        #   ∘ first level == 0, delta level == 0
-        # • if NOT an ABF epoch then:
-        #   ∘ by default corresponds to the DAC holding time
-        #
-        self._baselineEpoch_ = None
-
-        # just one epoch:
-        # for voltage clamp needs:
-        # • type Step,
-        # • first duration > 0
-        # • delta duration == 0
-        # • first level != 0
-        # • delta level == 0
-        #
-        self._membraneTestEpoch_ = None
-
-        # baseline before 1ˢᵗ synaptic stimulation below
-        #   it must STOP before  1ˢᵗ synaptic stimulation below
-        #   MAY be the same as baseline if membrane test comes AFTER the last
-        #       synaptic response epoch (as is usual in current clamp)
-        #
-        self._synapticBaselineEpoch_ = None
-
-        # list of one or two epochs
-        # 1) the 1ˢᵗ (and possibly, the only) one is the stimulation for the 1ˢᵗ
-        #   synaptic response
-        # 2) the 2ⁿᵈ (if present) is the stimulation for the 2ⁿᵈ synaptic response
-        #
-        self._synapticStimulationEpochs = list()
-
-        #### END   about ABF epochs
-
-        self._signalAxes_ = dict(path0 = None, path1 = None)
-
+        # NOTE: 2024-03-03 22:10:02 TODO (maybe)
+        # curently not used, but reserve for the future...
         self._presynaptic_triggers_ = dict()
 
         # ### BEGIN set up emitter window and viewers
@@ -1883,37 +1823,22 @@ class LTPOnline(QtCore.QObject):
         # ### END set up emitter window and viewers
         
         self._runData_ = DataBag(sources = self._sources_,
-                                 # pathways = dict(),
-                                 # pathwayMeasures = dict(),
                                  currentProtocol = None,
                                  sweeps = 0,
-                                 currentAbfRun = None,
+                                 currentAbfTrial = None,
                                  viewers = self._viewers_,
                                  results = self._results_,
-                                 abfRunTimesMinutes = list(),
-                                 abfRunDeltaTimesMinutes = list(),
+                                 abfTrialTimesMinutes = list(),
+                                 abfTrialDeltaTimesMinutes = list(),
                                  useSlopeInIClamp = useSlopeInIClamp,
                                  useEmbeddedProtocol = useEmbeddedProtocol,
                                  )
-                                 # locationMeasures = locationMeasures,
-                                 # episodeName = self._currentEpisodeName_,
-                                 # currentEpisode = episode,
-                                 # data = self._data_,
-                                 # newEpisode = True,
-                                 # episodes = dict(), # map episode name to data
-                                 # steadyStateIClampMbTestDuration = steadyStateIClampMbTestDuration,
-                                 # trackingClampMode = trackingClampMode,
-                                 # conditioningClampMode = conditioningClampMode,
-                                 # signalBaselineStart = signalBaselineStart,
-                                 # signalBaselineDuration = signalBaselineDuration,
-                                 # responseBaselineDuration = baselineDuration,
-                                 # currentProtocolIsConditioning = False,
         
-        self._abfRunBuffer_ = collections.deque()
+        self._abfTrialBuffer_ = collections.deque()
         
         self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
                                                              self._emitterWindow_,
-                                                             self._abfRunBuffer_,
+                                                             self._abfTrialBuffer_,
                                                              self._runData_,
                                                              # self._viewers_,
                                                              self._stdout_)
@@ -1943,17 +1868,17 @@ class LTPOnline(QtCore.QObject):
         if self._doSimulation_:
             self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
             self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
+            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
                                         simulator = self._simulatorThread_,
                                         out = self._stdout_)
             
         else:
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfRunBuffer_,
+            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
                                         out = self._stdout_)
         
-        self._abfSupplierThread_.abfRunReady.connect(self._abfProcessorThread_.processAbfFile,
+        self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
                                                      QtCore.Qt.QueuedConnection)
         
         if autoStart:
@@ -1998,6 +1923,8 @@ class LTPOnline(QtCore.QObject):
         
         if hasattr(super(object, self), "__del__"):
             super().__del__()
+            
+        self.__class__._instance = None
             
     def _check_sources_(self, *args):
         """Verifies consistency of recording sources:
@@ -2203,11 +2130,19 @@ class LTPOnline(QtCore.QObject):
         """
         try:
             src = self._sources_[srcIndex]
-            src_dict = self._runData_.results[src.name]
-            paths = sorted([p["pathway"] for p in src_dict.values()], key = lambda x: x.name)
-            
-            for k, p in enumerate(paths):
-                p.pathwayType = SynapticPathwayType.Test if k == pathwayIndex else SynapticPathwayType.Control
+            if src.name in self._runData_.results:
+                src_dict = self._runData_.results[src.name]
+                pdicts = [p for p in src_dict.values() if isinstance(p,  dict)]
+                paths = sorted([p["pathway"] for p in pdicts if "pathway" in p], key = lambda x: x.name)
+                
+                for k, p in enumerate(paths):
+                    p.pathwayType = SynapticPathwayType.Test if k == pathwayIndex else SynapticPathwayType.Control
+                    measures = [(l,m) for l, m in self._runData_.results[src.name][p.name]["measures"].items() if l != "MembraneTest"]
+                    if len(measures):
+                        initResponseLabel = measures[0][0]
+                        if isinstance(self._runData_.viewers[src.name][p.name][initResponseLabel], sv.SignalViewer):
+                            self._runData_.viewers[src.name][p.name][initResponseLabel].winTitle += f" {p.pathwayType.name}"
+                        
         except:
             traceback.print_exc()
     
@@ -2220,12 +2155,16 @@ class LTPOnline(QtCore.QObject):
             for p_name, path in src.items():
                 path_responses = path["pathway_responses"]
                 wf.assignin(path_responses, f"{src_name}_{p_name}_synaptic_responses")
-                fields = [k for k in path.keys() if k not in ("pathway_responses", "pathway", "measures")]
+                fields = [k for k in path.keys() if k not in ("pathway_responses", "pathway", "measures", "ABFTrialSweep")]
                 pathway_result = dict((k, path[k]) for k in fields)
-                wf.assignin(pathway_result, f"{src_name}_{p_name}_results_dict")
                 dd = dict((k,v.flatten()) for k,v in pathway_result.items())
                 df = pd.DataFrame(dd, columns = list(dd.keys()), index = range(max(len(v) for v in dd.values())))
-                wf.assignin(df, f"{src_name}_{p_name}_results")
+                if path.pathwayType in (SynapticPathwayType.Test, SynapticPathwayType.Control):
+                    ptype = f"{path.pathwayType.name}_"
+                else:
+                    ptype = ""
+                wf.assignin(pathway_result, f"{src_name}_{p_name}_{ptype}results_dict")
+                wf.assignin(df, f"{src_name}_{p_name}_{ptype}results")
                     
             
     def pause(self):
@@ -2309,9 +2248,6 @@ class LTPOnline(QtCore.QObject):
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
     
-
-        # self._pending_.clear() # pathlib.Path are hashable; hence we use the RSV ↦ ABF
-
         self._latestAbf_ = None # last ABF file to have been created by Clampex
 
         if not self._doSimulation_ or not isinstance(self._simulatorThread_, _LTPFilesSimulator_):

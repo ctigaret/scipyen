@@ -289,12 +289,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._app_menu_ = self.getAppMenu()
         
-        # if hasattr(self._scipyenWindow_, "workspaceModel") and isinstance(self._scipyenWindow_.workspaceModel, WorkspaceModel):
-        #     self.windowTitleChanged.connect(self._scipyenWindow_.workspaceModel._slot_itemGuiObjectTitleChanged)
-        
-        # if self.appWindow is self.scipyenWindow: # both attributes inherited from WorkspaceGuiMixin
-        #     self.appWindow.registerWindow(self)
-
     #def mousePressEvent(self, evt):
         #if sys.platform == "win32":
             #self.activateWindow()

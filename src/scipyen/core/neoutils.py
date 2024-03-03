@@ -7745,12 +7745,18 @@ def plot_neo(obj: neo.core.basesignal.BaseSignal,
     else:
         labels = [f'channel {k}' for k in range(obj.shape[1])]
         
+    args = list()
+        
+    if pfun == plt.plot and len(kwargs) == 0:
+        if isinstance(obj, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+            args = ['o']
+            
     if obj.shape[1] == 1:
         pfun(times, obj, label = labels[0], **kwargs)
         
     else:
         for k in range(obj.shape[1]):
-            pfun(times, obj[:,k], label = labels[k], **kwargs)
+            pfun(times, obj[:,k], label = labels[k], *args, **kwargs)
         
 
     times_units_str = obj.times.units.dimensionality.string
@@ -7761,8 +7767,8 @@ def plot_neo(obj: neo.core.basesignal.BaseSignal,
     ylabel = f"{name} ({obj.units.dimensionality.string})"
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    if isinstance(objname, str) and len(objname.strip()):
-        plt.title(objname)
+    if isinstance(name, str) and len(name.strip()):
+        plt.title(name)
         
     plt.legend()
     
