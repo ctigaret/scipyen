@@ -112,7 +112,8 @@ import ephys.ephys as ephys
 from ephys.ephys import (ClampMode, ElectrodeMode, LocationMeasure,
                          RecordingSource, RecordingEpisode, RecordingEpisodeType,
                          RecordingSchedule,
-                         SynapticStimulus, SynapticPathway, AuxiliaryInput, AuxiliaryOutput,
+                         SynapticStimulus, SynapticPathway, SynapticPathwayType,
+                         AuxiliaryInput, AuxiliaryOutput,
                          synstim, auxinput, auxoutput, 
                          amplitudeMeasure, chordSlopeMeasure, durationMeasure)
 
@@ -827,12 +828,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # sourceDACs = [s.dac for s in self._runData_.sources]
         # group pathways by their sources
         # 
-        # NOTE: 2024-02-17 13:46:53
-        # this uses quite a few function calls; might be cheaper/faster to use 
-        # @ NOTE: 2024-02-17 13:47:29, as sources ARE supplied by _runData_
-        # sources = unique([p.source for p in self._runData_.pathways])
-        # pathways = [[p for p in self._runData_.pathways if p.source == s] for s in sources]
-        
         
         # NOTE: 2024-02-17 14:14:17
         # Clampex supports stimulation of up to TWO distinct synaptic pathways
@@ -990,8 +985,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if src.name not in self._runData_.viewers:
                 self._runData_.viewers[src.name] = dict()
                 
-            if src.name not in self._runData_.pathwayMeasures:
-                self._runData_.pathwayMeasures[src.name] = dict()
+            # if src.name not in self._runData_.pathwayMeasures:
+            #     self._runData_.pathwayMeasures[src.name] = dict()
             
             # no pathways defined in this source - surely an error in the 
             # arguments to the LTPOnline call but can never say for sure
@@ -1208,7 +1203,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     p.clampMode = clampMode
                     self._runData_.results[src.name][p.name] = \
                         {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
-                         "pathway": p)}
+                         "pathway": p}
                     
                 pMeasures = self.setMeasuresForPathway(src, p, protocol, clampMode, 
                                                        adc, dac, activeDAC, membraneTestEpoch, 
@@ -1238,7 +1233,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     p.clampMode = clampMode
                     self._runData_.results[src.name][p.name] = \
                         {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
-                         "pathway": p)}
+                         "pathway": p}
                 
                 # store pathway measures for later rerun (offline, if needed)
                 pMeasures = self.setMeasuresForPathway(src, p, protocol, clampMode, 
@@ -1465,8 +1460,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             measureLabel = f"{labelPfx}{kc}"
             if viewer.signalCursor(f"{measureLabel}Base") is None:
                 viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{measureLabel}Base", label_position=0.85)
+                
             if viewer.signalCursor(f"{measureLabel}") is None:
                 viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{measureLabel}", label_position=0.85)
+                
             pMeasures[measureLabel] = {"measure": locationMeasureFunctor,
                                        "locations": (viewer.signalCursor(f"{measureLabel}Base"),
                                                      viewer.signalCursor(f"{measureLabel}")),
@@ -1518,7 +1515,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].hideSelectors()
             self._runData_.viewers[src.name][p.name][f"{labelPfx}{0}"].hideNavigator()
+            
             x = self._screenGeom.x()
+            
             if isAlt:
                 x += int(self._winWidth * 1.1)
                 
@@ -1665,6 +1664,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                          units = Rs.units,
                                                          time_units = Rs.times.units,
                                                          name = "Rs")
+                    
                 if "Rin" not in self._runData_.results[src.name][p.name]:
                     self._runData_.results[src.name][p.name]["Rin"] = Rin
                 else:
@@ -1883,7 +1883,7 @@ class LTPOnline(QtCore.QObject):
         # ### END set up emitter window and viewers
         
         self._runData_ = DataBag(sources = self._sources_,
-                                 pathways = dict(),
+                                 # pathways = dict(),
                                  # pathwayMeasures = dict(),
                                  currentProtocol = None,
                                  sweeps = 0,
@@ -2193,7 +2193,23 @@ class LTPOnline(QtCore.QObject):
     
     @property
     def pathways(self) -> dict:
-        return dict((src.name, dict((p.name, p) for p in self._results_[src.name].values())) for src in self._sources_)
+        return dict((src.name, dict((k, p["pathway"]) for k, p in self._results_[src.name].items())) for src in self._sources_)
+    
+    def setTestPathway(self, srcIndex:int, pathwayIndex:int):
+        """Flags the pathway at 'pathwayIndex' in the recording source at 'srcIndex' as a Test pathway.
+        The Test pathway is where conditioning is applied.
+        
+        All other pathways in the source are set to "Control"
+        """
+        try:
+            src = self._sources_[srcIndex]
+            src_dict = self._runData_.results[src.name]
+            paths = sorted([p["pathway"] for p in src_dict.values()], key = lambda x: x.name)
+            
+            for k, p in enumerate(paths):
+                p.pathwayType = SynapticPathwayType.Test if k == pathwayIndex else SynapticPathwayType.Control
+        except:
+            traceback.print_exc()
     
     def exportResults(self):
         if self.running:
@@ -2212,103 +2228,6 @@ class LTPOnline(QtCore.QObject):
                 wf.assignin(df, f"{src_name}_{p_name}_results")
                     
             
-    
-    # @property
-    # def currentEpisodes(self) -> dict:
-    #     """List of the most recent episodes across pathways"""
-    #     return [p.schedule.episodes[-1] for p in self._runData_.pathways]
-    #     # return dict((s, dict((p.name, p.schedule.episodes[-1]) for p in self._runData_.pathways if p.source == s)) for s in self._runData_.sources)
-    
-#     def newEpisode(self, val:str, etype: typing.Union[RecordingEpisodeType, str, int] = RecordingEpisodeType.Tracking,
-#                    pathway:typing.Optional[typing.Union[SynapticPathway, int, str, typing.Sequence[SynapticPathway], typing.Sequence[int], typing.Sequence[str]]] = None):
-#         if len(self._runData_.pathways) == 0:
-#             scipywarn("No pathways are defined", out = self._stdout_)
-#             return
-#         
-#         if not isinstance(val, str) or len(val.strip()) == 0:
-#             return
-#         
-#         if isinstance(pathway, (list, tuple)):
-#             if all(isinstance(p, int) for p in pathway):
-#                 invalid = [(k, p) for k, p in enumerate(pathway) if p < 0 or p >= len(self._runData_.pathways)]
-#                 if len(invalid):
-#                     raise ValueError(f"The following elements in the sequence of path indexes are invalid for {len(self._runData_.pathways)} pathways: {' '.join([f'element {k}: path {l}' for k,l in invalid])}")
-#                 
-#                 pathway = [self._runData_.pathways[k] for k in pathway]
-#                 
-#             elif all (isinstance(p, str) for p in pathway):
-#                 pnames = [p.name for p in self._runData_.pathways]
-#                 
-#                 invalid = [(k,p) for k, p in enumerate(pathway) if p not in pnames]
-#                 
-#                 if len(invalid):
-#                     raise ValueError(f"The following path names do not exist: {' '.join([f'element {k}: path {l}' for k,l in invalid])}")
-#                 
-#                 pathway = [self._runData_pathways[pnames.index(p)] for p in pathway]
-#                 
-#             elif not all(isinstance(p, SynapticPathway) for p in pathway):
-#                 raise TypeError("'pathway' expected to be a sequence of SynapticPathway, or int indexes, or str names")
-#         
-#         elif isinstance(pathway, int):
-#             if pathway < 0 or pathway >= len(self._runData_.pathways):
-#                 raise ValueError(f"Invalid pathway index {pathway} for {len(self._runData_.pathways)} pathway(s)")
-#             
-#             pathway = self._runData_.pathways[pathway]
-#             
-#         elif isinstance(pathway, str):
-#             pnames = [p.name for p in self._runData_.pathways]
-#             if pathway not in pnames:
-#                 raise ValueError(f"Pathway {pathway} not found")
-#             
-#             pathway = self._runData_.pathways[pnames.index(pathway)]
-#             
-#         elif not isinstance(pathway, SynapticPathway):
-#             raise TypeError(f"'pathway' expected to be a SynapticPathway, int index or str name, or a sequence of these; instead, got {type(pathway).__name__}")
-#         
-#         # from here onwards, `pathway` is either a SynapticPathway, or a list of SynapticPathway objects
-#         
-#         if isinstance(etype, int):
-#             if etype not in RecordingEpisodeType.values():
-#                 raise ValueError(f"Invalid episode type {etype}")
-#             etype = RecordingEpisodeType(etype) # will raise ValueError if etype is invalid
-#             
-#         elif isinstance(etype, str):
-#             if etype.capitalize() not in RecordingEpisodeType.names():
-#                 raise ValueError(f"Invalid episode type {etype}")
-#             etype = RecordingEpisodeType.type(etype)
-#             
-#         elif not isinstance(etype, RecordingEpisodeType):
-#             raise TypeError(f"'etype' expected to be a RecordingEpisodeType, a str or an int; instead, got {type(etype).__name__}")
-#         
-#         
-#         if isinstance(pathway, SynapticPathway):
-#             if pathway not in self._runData_.pathways:
-#                 scipywarn(f"Pathway {pathway.name} not found", out=self._stdout_)
-#                 return
-#             
-#             names = unique(e.name for e in pathway.schedule.episodes)
-#             episodeName = counter_suffix(val, names)
-#             lastFrame = max(e.endFrame for e in pathway.schedule.episodes)
-#             
-#             pathway.schedule.addEpisode(RecordingEpisode(etype, 
-#                                                          name = episodeName, 
-#                                                          pathways = [pathway],
-#                                                          beginFrame  = lastFrame + 1,
-#                                                          endFrame = lastFrame + 1))
-#             
-#         else:
-#             names = unique(list(itertools.chain.from_iterable([[e.name for e in p.schedule.episodes] for p in pathway])))
-#             episodeName = counter_suffix(val, names)
-#             
-#             for p in pathway:
-#                 lastFrame = max(e.endFrame for e in p.schedule.episodes)
-#                 p.schedule.addEpisode(RecordingEpisode(etype,
-#                                                        name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
-#                                                        pathways = [p], 
-#                                                        beginFrame = lastFrame+1,
-#                                                        endFrame = lastFrame + 1))
-#             
-        
     def pause(self):
         """Pause the simulation.
         Does nothing when LTPOnline is running in normal mode (i.e. is waiting for
