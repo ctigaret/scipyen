@@ -2159,8 +2159,8 @@ class LTPOnline(QtCore.QObject):
                 pathway_result = dict((k, path[k]) for k in fields)
                 dd = dict((k,v.flatten()) for k,v in pathway_result.items())
                 df = pd.DataFrame(dd, columns = list(dd.keys()), index = range(max(len(v) for v in dd.values())))
-                if path.pathwayType in (SynapticPathwayType.Test, SynapticPathwayType.Control):
-                    ptype = f"{path.pathwayType.name}_"
+                if path["pathway"].pathwayType in (SynapticPathwayType.Test, SynapticPathwayType.Control):
+                    ptype = f"{path['pathway'].pathwayType.name}_"
                 else:
                     ptype = ""
                 wf.assignin(pathway_result, f"{src_name}_{p_name}_{ptype}results_dict")
