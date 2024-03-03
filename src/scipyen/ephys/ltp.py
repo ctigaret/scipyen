@@ -637,7 +637,10 @@ class _LTPOnlineSupplier_(QtCore.QThread):
 
 class _LTPOnlineFileProcessor_(QtCore.QThread):
     """Helper class for LTPOnline.
-        Runs analysis on a single Clampex trial in a separate thread.
+        Provides a thread for the analysis of a single Clampex trial. 
+        
+        Also used in simulation mode.
+        
     """
     # NOTE: 2024-02-08 15:05:35
     # for each source in _runData_.sources, determine the relationships between
@@ -1202,17 +1205,21 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), self._screenGeom.y(), int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
                     
                 if p.name not in self._runData_.results[src.name]:
+                    p.clampMode = clampMode
                     self._runData_.results[src.name][p.name] = \
-                        {"pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
+                        {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
+                         "pathway": p)}
                     
                 pMeasures = self.setMeasuresForPathway(src, p, protocol, clampMode, 
                                                        adc, dac, activeDAC, membraneTestEpoch, 
                                                        testStart, testDuration, testAmplitude,
                                                        True, False)
                 
-                
-                if p.name not in self._runData_.pathwayMeasures[src.name]:
-                    self._runData_.pathwayMeasures[src.name][p.name] = {"pathway":p, "measures": pMeasures}
+                # store pathway measures for later rerun (offline, if needed)
+                if "measures" not in self._runData_.results[src.name][p.name]:
+                    self._runData_.results[src.name][p.name]["measures"] = pMeasures
+                # if p.name not in self._runData_.pathwayMeasures[src.name]:
+                #     self._runData_.pathwayMeasures[src.name][p.name] = {"pathway":p, "measures": pMeasures}
                 
                 
             for k, p in altDigPathways:
@@ -1228,17 +1235,21 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + int(self._winWidth * 1.1), self._screenGeom.y(), int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
                     
                 if p.name not in self._runData_.results[src.name]:
+                    p.clampMode = clampMode
                     self._runData_.results[src.name][p.name] = \
-                        {"pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
+                        {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
+                         "pathway": p)}
                 
+                # store pathway measures for later rerun (offline, if needed)
                 pMeasures = self.setMeasuresForPathway(src, p, protocol, clampMode, 
                                                        adc, dac, activeDAC, membraneTestEpoch, 
                                                        testStart, testDuration, testAmplitude,
                                                        False, True)
                 
-                
-                if p.name not in self._runData_.pathwayMeasures[src.name]:
-                    self._runData_.pathwayMeasures[src.name][p.name] = {"pathway":p, "measures": pMeasures}
+                if "measures" not in self._runData_.results[src.name][p.name]:
+                    self._runData_.results[src.name][p.name]["measures"] = pMeasures
+                # if p.name not in self._runData_.pathwayMeasures[src.name]:
+                #     self._runData_.pathwayMeasures[src.name][p.name] = {"pathway":p, "measures": pMeasures}
                 
                 
     def setMeasuresForPathway(self, src: RecordingSource, p: SynapticPathway, 
@@ -1714,6 +1725,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 class LTPOnline(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
     """
+    # TODO: update episodes in the pathway's schedule
         
     # NOTE: these class members are not used - clean up
 #     test_protocol_properties = ("activeDACChannelIndex",
@@ -1736,7 +1748,6 @@ class LTPOnline(QtCore.QObject):
     
 
     def __init__(self, *args,
-                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
                  episodeName: str = "baseline",
                  useEmbeddedProtocol:bool=True,
                  useSlopeInIClamp:bool = True,
@@ -1746,6 +1757,7 @@ class LTPOnline(QtCore.QObject):
                  parent=None,
                  simulate = None,
                  out: typing.Optional[io.TextIOBase] = None,
+                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
                  ):
                  # conditioningClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.CurrentClamp,
                  # trackingClampMode:typing.Union[int, ephys.ClampMode] = ephys.ClampMode.VoltageClamp,
@@ -1756,14 +1768,15 @@ class LTPOnline(QtCore.QObject):
         """
         
         """
-        
+        # NOTE: 2024-03-03 10:31:16
+        # user-defined location measures are NOT used (for now)
         super().__init__(parent=parent)
         
         self._stdout_ = out
         
         self._running_ = False
         self._sources_ = None # preallocate
-        # self._locationMeasures_ = locationMeasures
+        self._locationMeasures_ = locationMeasures
         
         # self._currentEpisodeName_ = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline"
         
@@ -1779,15 +1792,15 @@ class LTPOnline(QtCore.QObject):
         # More importantly, the SynapticPathway originated from the same source
         # CAN share ADC indexes; however, the ADC indexes across sources MUST be
         # distinct
-        self._pathways_ = list(itertools.chain.from_iterable([s.pathways for s in self._sources_]))
-        
-        
-        # add first episode in all pathways
-        for pathway in self._pathways_:
-            pathway.schedule = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
-            pathway.schedule.addEpisode(RecordingEpisode(name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
-                                    pathways = [pathway],
-                                    beginFrame = 0))
+#         self._pathways_ = list(itertools.chain.from_iterable([s.pathways for s in self._sources_]))
+#         
+#         
+#         # add first episode in all pathways
+#         for pathway in self._pathways_:
+#             pathway.schedule = RecordingSchedule(name=" ".join([os.path.basename(os.getcwd()), str(datetime.datetime.now())]))
+#             pathway.schedule.addEpisode(RecordingEpisode(name = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else "baseline", 
+#                                     pathways = [pathway],
+#                                     beginFrame = 0))
         
         
         
@@ -1870,8 +1883,8 @@ class LTPOnline(QtCore.QObject):
         # ### END set up emitter window and viewers
         
         self._runData_ = DataBag(sources = self._sources_,
-                                 pathways = self._pathways_,
-                                 pathwayMeasures = dict(),
+                                 pathways = dict(),
+                                 # pathwayMeasures = dict(),
                                  currentProtocol = None,
                                  sweeps = 0,
                                  currentAbfRun = None,
@@ -1880,9 +1893,9 @@ class LTPOnline(QtCore.QObject):
                                  abfRunTimesMinutes = list(),
                                  abfRunDeltaTimesMinutes = list(),
                                  useSlopeInIClamp = useSlopeInIClamp,
-                                 locationMeasures = locationMeasures,
                                  useEmbeddedProtocol = useEmbeddedProtocol,
                                  )
+                                 # locationMeasures = locationMeasures,
                                  # episodeName = self._currentEpisodeName_,
                                  # currentEpisode = episode,
                                  # data = self._data_,
@@ -2178,6 +2191,10 @@ class LTPOnline(QtCore.QObject):
     def runData(self) -> DataBag:
         return self._runData_
     
+    @property
+    def pathways(self) -> dict:
+        return dict((src.name, dict((p.name, p) for p in self._results_[src.name].values())) for src in self._sources_)
+    
     def exportResults(self):
         if self.running:
             scipywarn("LTPOnline is still running; call its stop() method first.")
@@ -2187,7 +2204,7 @@ class LTPOnline(QtCore.QObject):
             for p_name, path in src.items():
                 path_responses = path["pathway_responses"]
                 wf.assignin(path_responses, f"{src_name}_{p_name}_synaptic_responses")
-                fields = [k for k in path.keys() if k != "pathway_responses"]
+                fields = [k for k in path.keys() if k not in ("pathway_responses", "pathway", "measures")]
                 pathway_result = dict((k, path[k]) for k in fields)
                 wf.assignin(pathway_result, f"{src_name}_{p_name}_results_dict")
                 dd = dict((k,v.flatten()) for k,v in pathway_result.items())
