@@ -124,6 +124,13 @@ class CoolLEDpE12():
     NOTE: For very small timeouts getChannelState() should be called manually,
     in order to make sure all serial port replies are captured (some may be 'lost')
     """
+
+    #NOTE: 2024-03-04 18:43:04 - ↴ to be continued...
+    # SQ  = send query;
+    # SQX sends command; must be followed by \r and LAM label
+    # A? queries trigger mode: sending A? gets trigger mode in response; one of AZ, A+ A- A* AX
+    # C? queries LAM channels status (all channels if you wait long enough)
+
     def __init__(self, port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1, 
                  timeout:float = 1e-4, xonxoff:int = 0, verbose:int = 1,
@@ -285,10 +292,15 @@ class CoolLEDpE12():
         #     self.intensity(channel, intensity)
         
     def readChannelStates(self):
+        # NOTE: 2024-03-04 18:19:59
+        # needs long timeout to read all messages
+        oldtimeout = self.timeout
+        self.timeout = 0.5
         self.__portio__.flush()
         self._channel_states_ = dict(sorted(list(map(lambda x: (x[1], {"on": x.strip("\n")[-1]=="N", "intensity":int(x[2:5])}), filter(lambda x: x.startswith("C"), self.sendCommand("C?", verbose=False, collapse=False)))), key = lambda x: x[0]))        
         self._lam_labels_ = list(self._channel_states_.keys())
-        
+        self.timeout = oldtimeout
+
     def setChannelTriggerMode(self, channel:typing.Optional[typing.Union[int, str]] = None,
                               tm:typing.Optional[TriggerType] = None,
                               setMode:bool=True):
