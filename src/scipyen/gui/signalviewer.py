@@ -1299,8 +1299,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @mainToolBarVisible.setter
     def mainToolBarVisible(self, value):
         self._mainToolBarVisible_ = value == True
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewMain_Toolbar, self.mainToolBar)]
         self.mainToolBar.setVisible(self._mainToolBarVisible_)
-        signalBlocker = QtCore.QSignalBlocker(self.actionViewMain_Toolbar)
         self.actionViewMain_Toolbar.setChecked(self._mainToolBarVisible_)
         
     @property
@@ -1311,8 +1311,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @navigatorVisible.setter
     def navigatorVisible(self, value):
         self._navigatorVisible_ = value == True
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewFrame_Navigator, self._frames_spinBoxSlider_)]
         self._frames_spinBoxSlider_.setVisible(self._navigatorVisible_)
-        signalBlocker = QtCore.QSignalBlocker(self.actionViewFrame_Navigator)
         self.actionViewFrame_Navigator.setChecked(self._navigatorVisible_)
         
     @property
@@ -1323,8 +1323,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @selectorsVisible.setter
     def selectorsVisible(self, value):
         self._selectorsVisible_ = value == True
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewSignal_Selectors, self.selectorsWidget)]
         self.selectorsWidget.setVisible(self._selectorsVisible_)
-        signalBlocker = QtCore.QSignalBlocker(self.actionViewSignal_Selectors)
         self.actionViewSignal_Selectors.setChecked(self._selectorsVisible_)
         
     @property

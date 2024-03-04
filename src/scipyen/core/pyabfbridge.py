@@ -485,6 +485,7 @@ from core import quantities as scq
 from core import datatypes, strutils, utilities
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
+from core.prog import scipywarn
 # from iolib import pictio as pio # NOTE: not here, so we can import this from
 # pictiio (pio); instead we import pio where it is needed i.e. in getABF()
 from ephys.ephys_protocol import ElectrophysiologyProtocol
@@ -1032,7 +1033,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-            assert obj.annotations["lActualEpisodes"] == obj.annotations["protocol"]["lEpisodesPerRun"], f"In {obj.name}: Mismatch between lActualEpisodes ({obj.annotations['lActualEpisodes']}) and lEpisodesPerRun ({obj.annotations['protocol']['lEpisodesPerRun']})"
+            if obj.annotations["lActualEpisodes"] != obj.annotations["protocol"]["lEpisodesPerRun"]:
+                scipywarn(f"In {obj.name}: Mismatch between lActualEpisodes ({obj.annotations['lActualEpisodes']}) and lEpisodesPerRun ({obj.annotations['protocol']['lEpisodesPerRun']})")
             
             # ### BEGIN ADC inputs information
             # NOTE: further info in self._inputs_

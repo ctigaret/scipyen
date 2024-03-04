@@ -105,7 +105,6 @@ class TriggerType(TypeEnum):
         
         else:
             return cls.RisingEdges if s == "+" else cls.FallingEdges if s == "-" else cls.BothEdges
-        
             
     @property
     def command(self):
@@ -127,7 +126,7 @@ class CoolLEDpE12():
     """
     def __init__(self, port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1, 
-                 timeout:float = 0.5, xonxoff:int = 0, verbose:int = 1, 
+                 timeout:float = 1e-4, xonxoff:int = 0, verbose:int = 1,
                  inter_byte_timeout:float = 0.0):
         """
         Default parameter values are:
@@ -155,7 +154,8 @@ class CoolLEDpE12():
         # self._state_ = dict()
         
         try:
-            self.__serial_port__ = serial.Serial(port, timeout = timeout)
+            # self.__serial_port__ = serial.Serial(port, timeout = timeout)
+            self.__serial_port__ = serial.Serial(port, timeout = 0.5) # need large timeout to initialise and read channel labels
             self.__serial_port__.baudrate = baudrate
             self.__serial_port__.xonxoff = xonxoff
             self.__serial_port__.parity = parity
@@ -172,6 +172,8 @@ class CoolLEDpE12():
             self._greeting_msg_ = self.readPort(collapse=False)
             self._initChannels_()
             # print(f"{self.__class__.__name__} greeting: {self._greeting_msg_}")
+
+            self.timeout = timeout # now, set the desired timeout
                 
         except:
             print("Device could not be found; make sure it is turned on and plugged in an USB port")
@@ -285,7 +287,71 @@ class CoolLEDpE12():
     def readChannelStates(self):
         self.__portio__.flush()
         self._channel_states_ = dict(sorted(list(map(lambda x: (x[1], {"on": x.strip("\n")[-1]=="N", "intensity":int(x[2:5])}), filter(lambda x: x.startswith("C"), self.sendCommand("C?", verbose=False, collapse=False)))), key = lambda x: x[0]))        
+        self._lam_labels_ = list(self._channel_states_.keys())
         
+    def setChannelTriggerMode(self, channel:typing.Optional[typing.Union[int, str]] = None,
+                              tm:typing.Optional[TriggerType] = None,
+                              setMode:bool=True):
+
+        self.getChannelState(refresh=True)
+
+        if channel is None:
+            channels = [self.currentChannel]
+
+        elif isinstance(channel,int):
+            if channel < 0 or channel > 3:
+                raise ValueError(f"Expecting an int in range 0 ⋯ 3 ; instead, got {channel}")
+
+            channels = [channel]
+
+        elif isinstance(channel, str):
+            if channel.lower() == "all":
+                channels = range(4)
+            else:
+                if channel not in self._lam_labels_:
+                    raise ValueError(f"Expecting a string in {self._lam_labels_}; instead, got {channel}")
+
+                channels = [self._lam_labels_.index(channel)]
+
+        if tm is None:
+            tm = self.triggerMode
+
+        elif isinstance(tm, int):
+            if tm not in TriggerType.values():
+                raise ValueError(f"Expecting an int in {list(TriggerType.values())}; instead, got {tm}")
+            tm = TriggerType.type(tm)
+
+        elif isinstance(tm, str):
+            if tm not in TriggerType.names():
+                raise ValueError(f"Invalid TriggerType specified {tm}")
+            tm = TriggerType.type(tm)
+
+        else:
+            raise TypeError(f"Expecting a TriggerType int or str; instead, got {type(tm).__name__}")
+
+        if tm != self.triggerMode:
+            self.triggerMode = tm
+
+        trigCmd = f"SQ{tm.command}"
+
+        if len(channels) > 1:
+            channelSeq = carriage_return.join([f"SQ{self._lam_labels_[c]}" for c in channels])
+        else:
+            c = channels[0]
+            lam = self._lam_labels_[c]
+            # channelState = self._channel_states_[lam]["on"]
+            channelSeq = f"SQ{lam}{carriage_return}"
+
+
+            # if channelState:
+            #     if tm in (TriggerType.Off, TriggerType.FollowPulse):
+            #         msg = f"SQ"
+
+        msg = f"SQX{carriage_return}{channelSeq}{trigCmd}"
+
+        self.sendCommand(msg)
+
+
     @property
     def channelStates(self) -> dict:
         """Read-only property.
@@ -456,10 +522,10 @@ class CoolLEDpE12():
                 msg = f"C{channel}I{val:03}"
                 self.sendCommand(msg, verbose=False, collapse=False)
             
-            
-            
-                    
-            
+
+
+
+
         if val not in range(101):
             raise ValueError(f"Invalid intensity; must be between 0 and 100 inclusive; instead, got {val}")
         
@@ -516,6 +582,7 @@ class CoolLEDpE12():
             if channel not in range(4):
                 raise ValueError(f"Invalid channel index {channel}; expecting an int betwen 0 and 3 inclusive")
             return self._channel_states_[self._lam_labels_[channel]]["intensity"]
+
         elif isinstance(channel, str):
             c = channel.upper()
             if c not in self._lam_labels_:
@@ -601,6 +668,8 @@ class CoolLEDpE12():
                 if val.upper() in TriggerCmd:
                     val = TriggerType.fromCommandString(val)
                 else:
+                    if val not in TriggerType.names():
+                        raise ValueError(f"Invalid TriggerType specified {val}")
                     val = TriggerType.type(val)
             else:
                 val = TriggerType.type(val)
@@ -627,7 +696,7 @@ class CoolLEDpE12():
             
         elif isinstance(val, str):
             if val not in self._lam_labels_:
-                raise ValueError(f"Expecting a string in {self._lam_labels_}; nstead, got {val}")
+                raise ValueError(f"Expecting a string in {self._lam_labels_}; instead, got {val}")
             
             self._current_channel_ = self._lam_labels_.index(val)
         else:
@@ -635,7 +704,7 @@ class CoolLEDpE12():
         
     @property
     def currentLAM(self)-> str:
-        """<Label of the current LAM channel.
+        """Label of the current LAM channel.
         The setter accepts an int or a str.
         See also currentChannel.
         """
@@ -648,7 +717,7 @@ class CoolLEDpE12():
         
 def device(port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00",
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1,
-                 timeout:float = 0.5, xonxoff:int = 0, verbose:int = 1,
+                 timeout:float = 1e-4, xonxoff:int = 0, verbose:int = 1,
                  inter_byte_timeout:float = 0.0):
     return CoolLEDpE12(port, baudrate, parity, stopbits, timeout, xonxoff, verbose, inter_byte_timeout)
     
