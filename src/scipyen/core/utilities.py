@@ -918,7 +918,8 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
         if x is y:
             return True
         
-        if all(isinstance(v, type) for v in (x,y)):
+        # if all(isinstance(v, type) for v in (x,y)):
+        if isinstance(x, type) and isinstance(y, type):
             return x==y
         
         if idcheck:
@@ -974,13 +975,19 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
     #             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x_items, y_items)))
                 # FIXME: 2023-06-01 13:37:10
                 # prone to infinite recursion when either dict is among either x.values() or y.values()
-                ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
+                try:
+                    ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
+                except:
+                    ret = False
                 if not ret:
                     return ret
             else:
                 # FIXME: 2023-06-01 13:43:34
                 # prone to infinite recursion when either element is in x or y
-                ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+                try:
+                    ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+                except:
+                    ret = False
             
             if not ret:
                 return ret
@@ -1048,6 +1055,8 @@ class NestedFinder(object):
     Index and Series) are considered "leaf" objects - i.e., no further search is
     performed INSIDE their elements when these elements are of a nesting type as
     described above.
+    
+    FIXME: This is buggy whe searching by type !!!
     
     """
     supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index) # this implicitly includes namedtuple
