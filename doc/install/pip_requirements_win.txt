@@ -15,6 +15,7 @@ python-magic    # ✓ (pip install python-magic)
 pyqtdarktheme
 colorama
 termcolor
+termcolor2
 pyserial
 
 #### OPTIONAL packages
