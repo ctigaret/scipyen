@@ -372,7 +372,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
             simFilesPaths = list(filter(lambda x: x.is_file() and x.suffix == ".abf", [pathlib.Path(v) for v in files]))
             
             if len(simFilesPaths):
-                print(f"... found {(len(simfilePaths))} ABF files")
+                print(f"... found {(len(simFilesPaths))} ABF files")
                 # NOTE: 2024-01-08 17:45:21
                 # bound to introduce some delay, but needs must, for simulation purposes
                 # print(f" Sorting {len(simFilesPaths)} ABF data based on recording time ...")
