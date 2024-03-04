@@ -695,7 +695,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # • ABF trials recorded with other protocols are ignored; this includes
         #   cross-talk trials and the pathway conditioning trial
         
-        # self.print(f"{self.__class__.__name__}.processAbfFile received {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
+        self.print(f"{self.__class__.__name__}.processAbfFile received {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
             
         try:
             # NOTE: 2024-02-08 14:18:32
@@ -2367,20 +2367,28 @@ class LTPOnline(QtCore.QObject):
         # NOTE: 2023-10-07 11:20:22
         # _emitterWindow_ needed here, to set up viewers
         wsp = wf.user_workspace()
-        
 
+        newDir = None
         if directory is None:
-            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
+            newDir = pathlib.Path(self._emitterWindow_.currentDir).absolute()
             
         elif isinstance(directory, str):
-            self._watchedDir_ = pathlib.Path(directory)
+            newDir = pathlib.Path(directory)
 
         elif isinstance(directory, pathlib.Path):
-            self._watchedDir_ = directory
+            newDir = directory
             
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
+        if newDir != self._watchedDir_:
+            if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+                self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+
+        self._watchedDir_ = newDir
+        if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
+
         self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
                                                              self._emitterWindow_,
                                                              self._abfTrialBuffer_,
