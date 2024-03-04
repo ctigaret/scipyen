@@ -1191,8 +1191,10 @@ class NeoContainerTrait(NeoBaseNeoTrait):
 #                 print(f"\n\tdata children container lengths new:\n\t{new_data_child_container_lengths}")
 #                 print(f"\n\tdata children container lengths old:\n\t{self.data_child_containers_lenghts}")
         
-                
-                silent = new_characteristics == self.characteristics
+                if hasattr(self, "characteristics"):
+                    silent = new_characteristics == self.characteristics
+                else:
+                    silent=False
                 # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare characteristics → {silent}")
                 # silent = new_container_child_container_lengths == self.container_child_containers_lenghts and new_data_child_container_lengths == self.data_child_containers_lenghts
                 # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare container lengths → {silent}")
