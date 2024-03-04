@@ -932,7 +932,10 @@ def _myshowarning(msg:WarningMessage):#, category, filename, lineno, file=None, 
             # warnings get lost
             return
     category = msg.category.__name__
-    s =  f"In {msg.filename}, line {msg.lineno}: \n\x1b[0;33m{category}\x1b[0m: {msg.message}\n"
+    if sys.platform == "win32":
+        s =  f"In {msg.filename}, line {msg.lineno}: \n{category} {msg.message}\n"
+    else:
+        s =  f"In {msg.filename}, line {msg.lineno}: \n\x1b[0;33m{category}\x1b[0m: {msg.message}\n"
     # s =  f"{msg.filename}:{msg.lineno}:\n\x1b[0;33;47m{category}\x1b[0m:\n {msg.message}\n"
     try:
         file.write(s)
