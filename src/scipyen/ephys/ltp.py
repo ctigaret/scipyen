@@ -2112,7 +2112,9 @@ class LTPOnline(QtCore.QObject):
         
     @pyqtSlot()
     def _slot_simulationDone(self):
-        self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
+        # self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
+        print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n",
+              sys.stdout)
         self.stop()
         
     @property
@@ -2173,7 +2175,9 @@ class LTPOnline(QtCore.QObject):
                 path_responses = path["pathway_responses"]
                 wf.assignin(path_responses, f"{src_name}_{p_name}_synaptic_responses")
                 fields = [k for k in path.keys() if k not in ("pathway_responses", "pathway", "measures", "ABFTrialSweep")]
-                pathway_result = dict((k, path[k]) for k in fields)
+                runTimesMinutes = np.array(self._runData_.abfTrialDeltaTimesMinutes)
+                pathway_result = {"RunTime (min)": runTimesMinutes}
+                pathway_result.update(dict((k, path[k]) for k in fields))
                 dd = dict((k,v.flatten()) for k,v in pathway_result.items())
                 df = pd.DataFrame(dd, columns = list(dd.keys()), index = range(max(len(v) for v in dd.values())))
                 if path["pathway"].pathwayType in (SynapticPathwayType.Test, SynapticPathwayType.Control):
