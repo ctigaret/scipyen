@@ -353,18 +353,26 @@ class _LTPFilesSimulator_(QtCore.QThread):
             
             files = simulation.get("files", None)
             
+            directory = simulation.get("dir" , None)
+            
+            if not (isinstance(directory, str) and os.path.isdir(directory)) or not (isinstance(directory, pathlib.Path) and directory.is_dir()):
+                directory = os.getcwd()
+                
+            
             if not isinstance(files, (list, tuple)) or len(files) == 0 or not all(isinstance(v, (str, pathlib.Path)) for v in files):
                 files = None
             
         if files is None:
-            print(f"{self.__class__.__name__}:\n Looking for ABF files in directory: ({os.getcwd()}) ...")
-            files = subprocess.run(["ls"], capture_output=True).stdout.decode().split("\n")
+            print(f"{self.__class__.__name__}:\n Looking for ABF files in directory: ({directory}) ...")
+            files = os.listdir(directory)
+            # files = subprocess.run(["ls"], capture_output=True).stdout.decode().split("\n")
             # print(f" Found {len(files)} ABF files")
         
         if isinstance(files, list) and len(files) > 0 and all(isinstance(v, (str, pathlib.Path)) for v in files):
             simFilesPaths = list(filter(lambda x: x.is_file() and x.suffix == ".abf", [pathlib.Path(v) for v in files]))
             
             if len(simFilesPaths):
+                print(f"... found {(len(simfilePaths))} ABF files")
                 # NOTE: 2024-01-08 17:45:21
                 # bound to introduce some delay, but needs must, for simulation purposes
                 # print(f" Sorting {len(simFilesPaths)} ABF data based on recording time ...")
@@ -1854,8 +1862,17 @@ class LTPOnline(QtCore.QObject):
         if isinstance(simulate, dict):
             files = simulate.get("files", None)
             timeout = simulate.get("timeout", 2000) # ms
+            directory = simulate.get("dir", None)
             if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                self._simulator_params_ = dict(files=files, timeout=timeout)
+                self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
+                self._doSimulation_ = True
+                
+            elif isinstance(directory, str) and os.path.isdir(directory):
+                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
+                self._doSimulation_ = True
+                
+            elif isinstance(directory, pathlib.Path) and directory.is_dir():
+                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
                 self._doSimulation_ = True
                 
         elif isinstance(simulate, bool):
