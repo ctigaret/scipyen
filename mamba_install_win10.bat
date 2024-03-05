@@ -81,7 +81,7 @@ call mamba install --prefix %env_name% -y pyinstaller || goto eof
 echo Installing additional PyPI packages
 call pip install -r %pip_reqs% || goto eof
 
-powershell -ExecutionPolicy Bypass -File %mydir%\make_scipyen_batch_scripts.ps1 %mydir%  || goto eof
+powershell -ExecutionPolicy Bypass -File %mydir%\make_scipyen_batch_scripts.ps1 || goto eof
 
 powershell -ExecutionPolicy Bypass -File %mydir%\make_link.ps1 %mydir%  || goto eof
 echo Scipyen can now be launched from the desktop icon
