@@ -612,7 +612,8 @@ class _LTPOnlineSupplier_(QtCore.QThread):
             self._simulator_.start()
         else:
             # starts directory monitor and captures newly created files
-            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
+            if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+                self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
     
     @pyqtSlot()
     def quit(self):
@@ -680,6 +681,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         self._winWidth = int(self._screenGeom.width() // 3 * 0.9)
         self._winHeight = int(self._screenGeom.height() // 3 * 0.9)
+        
+        # maps source
+        self._monitor_protocols_ = dict()
         
         
     def print(self, msg:object):
@@ -767,6 +771,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if protocol.name == self._runData_.currentProtocol.name:
                 if protocol != self._runData_.currentProtocol:
                     scipywarn(f"Protocol {protocol.name} was changed — CAUTION")
+                    self._runData_.currentProtocol = protocol
                 self.processProtocol(protocol)
                 self._runData_.sweeps += 1
 
@@ -1022,9 +1027,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if src.name not in self._runData_.viewers:
                 self._runData_.viewers[src.name] = dict()
                 
-            # if src.name not in self._runData_.pathwayMeasures:
-            #     self._runData_.pathwayMeasures[src.name] = dict()
-            
             # no pathways defined in this source - surely an error in the 
             # arguments to the LTPOnline call but can never say for sure
             # therefore move on to the next source
@@ -1042,6 +1044,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                    
             clampMode = protocol.getClampMode(adc, activeDAC)
             
+            
             # self.print(f"   data recorded in {printStyled(clampMode.name, 'yellow')}")
             
             # figure out which of the pathways use a DIG or a DAC channel for TTLs;
@@ -1058,28 +1061,77 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             mainDigPathways = list() # empty if len(digOutDacs ) == 0
             altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
-            dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
+            # dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
             
-            for k, p in enumerate(pathways):
-                if p.stimulus.dig:
-                    # assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
-                    if dac not in digOutDacs:
-                        scipywarn(f"The DAC channel ({dac.physicalIndex}) for pathway {k} does not appear to have DIG outputs enabled")
-                        continue
+            if len(pathways) == 2:
+                # there are two options here:
+                # a) the same protocol uses alternative stimulation to record from
+                #   both patwhays
+                #   ⇒ the protocol must:
+                #       • have EXACTLY TWO sweeps (theoreticaly it can have more,
+                #           but this complicates things)
+                #       • have alternateDigitalOutputStateEnabled True
+                #
+                #   → in addition, a two-pwathways protocol MAY implement cross-talk
+                #       via TTL traisn on the alternate stimuli
+                #
+                # b) there are distinct protocols which operate on the same ADC/DAC
+                #   pair, BUT use a distinct DIG output channel for each pathway
+                #   ⇒ the protocols must:
+                #       • have EXACTLY ONE sweep each
+                #       • have alternateDigitalOutputStateEnabled False
+                #       • be delivered alternatively ⇒ we need to somehow cache this information
+                #
+                #   → in addition, Cross-talk must also be implemented by distinct
+                #   single pathway protocols, using single TTL pulses (or trains with one pulse each)
+                #   but defined in successive epochs (so that the paired-pulse interval
+                #   can match the one in a paired-pulse on a single pathway)
+                #   e.g. crosstalk_0_1 delivered alternatively with crosstalk_1_0
+                #   
+                if protocol.alternateDigitalOutputStateEnabled:
+                    if protocol.nSweeps != 2:
+                        scipywarn(f"The protocol {protocol.name} with alternate digital output state enabled expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
+                        # TODO: 2024-03-05 23:03:34 decide what to do here
+                        return
                     
-                    if p.stimulus.channel in mainDIGOut:
-                        mainDigPathways.append((k, p))
+                    for k, p in enumerate(pathways):
+                        if p.stimulus.dig:
+                            # assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
+                            if dac not in digOutDacs:
+                                scipywarn(f"The DAC channel ({dac.physicalIndex}) for pathway {k} does not appear to have DIG outputs enabled")
+                                continue
+                            
+                            if p.stimulus.channel in mainDIGOut:
+                                mainDigPathways.append((k, p))
+                                
+                            elif p.stimulus.channel in altDIGOut:
+                                altDigPathways.append((k, p))
+                                
+                        else:
+                            scipywarn(f"The protocol {protocol.name} does not appear to stimluate any patwhays")
+                            return
                         
-                    elif p.stimulus.channel in altDIGOut:
-                        altDigPathways.append((k, p))
+                else:
                         
-                elif p.stimulus.channel in protocol.physicalDACIndexes:
-                    dacPathways.append((k, p))
+                    if protocol.nSweeps != 1:
+                        # FIXME: 2024-03-05 23:06:00
+                        # the condition below applies only to monitoring protocols
+                        #
+                        # one can have an induction (i.e. conditioning) protocol
+                        # with more than one sweep.
+                        
+                        scipywarn(f"The protocol {protocol.name} with alternate digital output state disabled expected to have one sweep; instead, it has {protocol.nSweeps} sweeps")
+                    
+                        
+                # elif p.stimulus.channel in protocol.physicalDACIndexes:
+                #     dacPathways.append((k, p))
                     
             # total number of pathways recorded in this protocol; it should be ≤ total number of pathways in _runData_
             # NOTE: 2024-02-19 18:30:22 TODO: consider NOT pre-populating the pathways field in _runData_
             # but rather parse the sources here and populate with pathways as necessary.
-            nPathways = len(mainDigPathways) + len(altDigPathways) + len(dacPathways)
+            #
+            # FIXME: dacPathways is contentious - To REMOVE
+            nPathways = len(mainDigPathways) + len(altDigPathways)# + len(dacPathways)
             
             if nPathways > 2:
                 scipywarn("A Clampex protocol does NOT support recording from more than two pathways")
@@ -1158,9 +1210,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 
                 syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
                 
-                if len(altDigPathways) + len(dacPathways) != 1:
-                    scipywarn("There can be only one other pathway, triggered either digitally, or via DAC-emulated TTLs")
-                    continue
+                # if len(altDigPathways) + len(dacPathways) != 1:
+                #     scipywarn("There can be only one other pathway, triggered either digitally, or via DAC-emulated TTLs")
+                #     continue
                 if len(altDigPathways) == 1:
                     # two alternative digitally stimulated pathways — the most
                     # common case
@@ -1169,26 +1221,26 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         continue
                     syn_stim_digs.append(altDigPathways[0][1].stimulus.channel)
                     
-                elif len(dacPathways) == 1:
-                    # one digital and one DAC pathway 
-                    assert protocol.alternateDigitalOutputStateEnabled and protocol.alternateDACOutputStateEnabled, "For a digitally stimulated pathway and one triggered by emulated TTLs the protocol must have both alternative digital outputs and alternative DAC outputs enabled"
-                    # furthermore, the stimulation DAC for this pathway must have a higher index than
-                    # the active DAC channel, and furthermore, the active DAC channel must also be
-                    # the same as the source's DAC channel (the one sending analog commands)
-                    if activeDAC != dac:
-                        scipywarn("Active DAC channel must be the same as used for analog command")
-                        continue
-                    if dacPathways[0][1].stimulus.channel <= activeDAC.physicalIndex:
-                        scipywarn("The pathway triggerd by DAC-emulated TTLs must use a higher DAC index than that of the primary pathway")
-                        continue
+                # elif len(dacPathways) == 1:
+                #     # one digital and one DAC pathway 
+                #     assert protocol.alternateDigitalOutputStateEnabled and protocol.alternateDACOutputStateEnabled, "For a digitally stimulated pathway and one triggered by emulated TTLs the protocol must have both alternative digital outputs and alternative DAC outputs enabled"
+                #     # furthermore, the stimulation DAC for this pathway must have a higher index than
+                #     # the active DAC channel, and furthermore, the active DAC channel must also be
+                #     # the same as the source's DAC channel (the one sending analog commands)
+                #     if activeDAC != dac:
+                #         scipywarn("Active DAC channel must be the same as used for analog command")
+                #         continue
+                #     if dacPathways[0][1].stimulus.channel <= activeDAC.physicalIndex:
+                #         scipywarn("The pathway triggerd by DAC-emulated TTLs must use a higher DAC index than that of the primary pathway")
+                #         continue
                     
                     
             else: # alternative pathways do not exist here; nPathways ≡ 1 
                 if len(mainDigPathways):
                     syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
                     
-                elif len(dacPathways):
-                    syn_stim_dacs.append(dacPathways[0][1].stimulus.channel)
+                # elif len(dacPathways):
+                #     syn_stim_dacs.append(dacPathways[0][1].stimulus.channel)
                     
             
             # self.print(f"   digital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow')}")
@@ -1901,6 +1953,7 @@ class LTPOnline(QtCore.QObject):
         
         self._runData_ = DataBag(sources = self._sources_,
                                  currentProtocol = None,
+                                 monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ protocol}
                                  sweeps = 0,
                                  currentAbfTrial = None,
                                  viewers = self._viewers_,
@@ -2388,7 +2441,7 @@ class LTPOnline(QtCore.QObject):
                                 viewer.close()
         
         
-    def reset(self, *args,
+    def _reset_state_(self, *args,
               episodeName: str = "baseline",
                  useEmbeddedProtocol:bool=True,
                  useSlopeInIClamp:bool = True,
@@ -2451,20 +2504,18 @@ class LTPOnline(QtCore.QObject):
         else:
             raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
+        print(f"{self.__class__.__name__}._reset_state_:\n\tnewDir = {newDir};\n\tprev watched dir = {self._watchedDir_}")
+        
         if newDir != self._watchedDir_:
             if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+                print(f"\n\tremoving {self._watchedDir_} from {self._emitterWindow_.__class__.__name__}.dirFileMonitor")
                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
 
         self._watchedDir_ = newDir
         if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            print(f"\n\tadding {self._watchedDir_} to {self._emitterWindow_.__class__.__name__}.dirFileMonitor")
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
 
-        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
-                                                             self._emitterWindow_,
-                                                             self._abfTrialBuffer_,
-                                                             self._runData_,
-                                                             self._stdout_)
-        
         
         self._simulation_ = None
         
@@ -2473,7 +2524,31 @@ class LTPOnline(QtCore.QObject):
         self._doSimulation_ = False
         
         self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
+        
+    def reset(self, *args,
+              episodeName: str = "baseline",
+                 useEmbeddedProtocol:bool=True,
+                 useSlopeInIClamp:bool = True,
+                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
+                 autoStart:bool=False, # NOTE: change to True when done coding TODO
+                 parent=None,
+                 simulate = None,
+                 timeout = None,
+                 out: typing.Optional[io.TextIOBase] = None,
+                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
+                 ):
+        
+        self._reset_state_(*args, episodeName=episodeName, useEmbeddedProtocol=useEmbeddedProtocol, 
+                           useSlopeInIClamp=useSlopeInIClamp, directory=directory, autoStart=autoStart, # NOTE: change to True when done coding TODO
+                           parent=parent, simulate=simulate, timeout=timeout, out=out,
+                           locationMeasures=locationMeasures)
 
+        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
+                                                             self._emitterWindow_,
+                                                             self._abfTrialBuffer_,
+                                                             self._runData_,
+                                                             self._stdout_)
+        
         if isinstance(simulate, dict):
             files = simulate.get("files", None)
             timeout = simulate.get("timeout", 2000) # ms
@@ -2540,7 +2615,21 @@ class LTPOnline(QtCore.QObject):
         self._abfSupplierThread_.start()
         self._abfProcessorThread_.start()
         
+        if self._doSimulation_:
+            print("Starting simulation mode\n\n")
+        else:
+            print(f"Monitoring directory {self._watchedDir_}\n\n")
+        
         self._running_ = True
+        
+    def kill(self):
+        self.stop()
+        # if self._instance.running:
+        #     scipywarn(f"An instance of {self.__class__.__name__} is still running; call the stop() method on that instance first")
+        #     return
+        self._state_()
+        self._instance = None
+        self.__del__()
             
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
