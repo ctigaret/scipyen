@@ -204,6 +204,7 @@ testpath
 thinc
 tiffile
 termcolor
+termcolor2
 tokenizers
 traitlets
 transformers
