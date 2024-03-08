@@ -1017,7 +1017,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._digUseLastEpochHolding_ = bool(obj._protocolSection.nDigitalInterEpisode)
             # ### END   digital outputs information
             
-            self._acquisitionMode_ = ABFAcquisitionMode.namevalue(obj.nOperationMode)
+            # NOTE: 2024-03-08 22:32:29
+            # this below returns a tuple - not what we want
+            # self._acquisitionMode_ = ABFAcquisitionMode.namevalue(obj.nOperationMode)
+            self._acquisitionMode_ = ABFAcquisitionMode(obj.nOperationMode)
             self._nSweeps_ = obj._protocolSection.lEpisodesPerRun
             self._nRuns_   = obj._protocolSection.lRunsPerTrial
             self._nTrials_ = obj._protocolSection.lNumberOfTrials
@@ -1076,7 +1079,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._digUseLastEpochHolding_ = bool(obj.annotations["protocol"]["nDigitalInterEpisode"])
             # ### END   digital outputs information
             
-            self._acquisitionMode_ = ABFAcquisitionMode.type(obj.annotations["protocol"]["nOperationMode"]), 
+            # NOTE: 2024-03-08 22:33:34 see NOTE: 2024-03-08 22:32:29
+            # self._acquisitionMode_ = ABFAcquisitionMode.type(obj.annotations["protocol"]["nOperationMode"])
+            self._acquisitionMode_ = ABFAcquisitionMode(obj.annotations["protocol"]["nOperationMode"])
             self._nSweeps_ = obj.annotations["protocol"]["lEpisodesPerRun"]
             self._nRuns_   = obj.annotations["protocol"]["lRunsPerTrial"]
             self._nTrials_ = obj.annotations["protocol"]["lNumberOfTrials"]
@@ -1164,8 +1169,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
         ret = True
         for p in properties:
             # NOTE: see NOTE: 2023-11-05 21:05:46 and NOTE: 2023-11-05 21:06:10
-            if getattr(self, p[0]) != getattr(other, p[0]):
-                return False
+            myattr = getattr(self, p[0])
+            otherattr = getattr(other, p[0])
+            if isinstance(myattr, np.ndarray) or isinstance(otherattr, np.ndarray):
+                if not np.all(myattr == otherattr):
+                    return False
+            else:
+                # if getattr(self, p[0]) != getattr(other, p[0]):
+                if myattr != otherattr:
+                    return False
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
         # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
@@ -1264,6 +1276,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def acquisitionMode(self) -> ABFAcquisitionMode:
         """Alias to operationMode"""
         return self._acquisitionMode_
+    
+    @property
+    def digitalOutputDACs(self) -> tuple:
+        """Tuple of DAC channels where digital output is enabled"""
+        return tuple(filter(lambda x: x.digitalOutputEnabled, self.DACs))
     
     @property
     def operationMode(self) -> ABFAcquisitionMode:
