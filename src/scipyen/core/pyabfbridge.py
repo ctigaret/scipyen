@@ -614,6 +614,19 @@ class ABFEpoch:
         return self._epochType_
     
     @property
+    def emulatesTTL(self) -> bool:
+        """True when epoch type is ABFEpochType.Pulse and meets conditions below:
+        • First level != 0
+        • Delta level  == 0
+        • Delta duration  == 0
+        • all digital outputs are zero
+        First duration, train rate and pulse duration are all > 0 (enforced by Clampex)
+        """
+        
+        return self.epochType == ABFEpochType.Pulse and self.firstLevel != 0 and \
+            self.deltaLevel == 0 and self.deltaDuration == 0 and not self.hasDigitalOutput("any", "all")
+    
+    @property
     def type(self) -> ABFEpochType:
         return self._epochType_
     
@@ -2484,6 +2497,9 @@ class ABFOutputConfiguration:
     def getEpochsWithDigitalOutput(self) -> typing.List[ABFEpoch]:
         """List of ABF Epochs emitting digital signals (TTLs)"""
         return [e for e in self.epochs if len(e.getUsedDigitalOutputChannels())]
+    
+    def getEpochsWithTTLWaveforms(self) -> typing.List[ABFEpoch]:
+        return [e for e in self.epochs if e.emulatesTTL]
     
     def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                          eventType:TriggerEventType = TriggerEventType.presynaptic,

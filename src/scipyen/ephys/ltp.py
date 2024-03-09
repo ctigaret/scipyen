@@ -3,7 +3,7 @@
 #### BEGIN core python modules
 import os, sys, traceback, inspect, numbers, warnings, pathlib, time, io
 import datetime
-import functools, itertools
+import functools, itertools, more_itertools
 from functools import (singledispatch, singledispatchmethod)
 import collections, enum
 import typing, types
@@ -1011,26 +1011,78 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #     raise ValueError("The protocol indicates there are no DAC channels with digital output enabled")
         
         for src in self._runData_.sources:
-            # this below maps pathway index to dict sweep index ↦ synaptic pathway
             # self.print(f"   -----------------")
             # self.print(f"   processing source {printStyled(src.name)}")
 
-            # TODO: 2024-02-17 23:13:20
-            # below pathways are identified by the DIG channel used to stimulate;
-            # must adapt code to identify paths where stimulus is delivered via
-            # a DAC through emulated TTLs !!!
-            # But for now, see NOTE: 2024-02-18 08:58:24
-            
+            # NOTE: 2024-03-09 13:49:12
+            # Two pathways can be stimulated alternatively, in one of two ways:
+            # ('hard' prerequisites are indicated with '•'; soft preprequisites
+            #   re indicated with '∘')
+            #
+            #   1) use the same monitoring Clampex protocol with two distinct 
+            #       DIG channels to stimulate the pathways
+            #   • alternateDigitalOutputStateEnabled is True
+            #   ∘ alternateDACOutputStateEnabled is irrelevant
+            #   • the "main" and the "alternate" DIG output are enabled on different
+            #       DACs, which MUST be DACs 0 and 1 (using higher order DACs
+            #       is not supported with alternateDigitalOutputStateEnabled and 
+            #       messes up the alternance) - we cannot check this in pyabfbridge
+            #
+            #   2) use the same monitoring Clampex protocol with one DIG output 
+            #       for one pathway and a DAC output for the other
+            #   • alternateDigitalOutputStateEnabled is True
+            #   • alternateDACOutputStateEnabled is True (!)
+            #   • the DIG output must be configerd on one of DAC0 or DAC1 (making
+            #       sure the digital outputs are enabled in Clampex protocol editor)
+            #   • the DAC used to stimulate the other pathway must have index > 1
+            #       (and NOT telegraphed, i.e. allowed to emit 5V ) - it goes without
+            #       saying that this DAC cannot be used to send clamp commands !
+            #
+            #   In either case (1 or 2):
+            #       • there are exactly two pathways (two dig paths or one dig and one dac paths)
+            #       • the protocol generates two sweeps per trial (averaged or not, depending 
+            #           on how many runs per trial) with each sweep recording from a
+            #           distinct pathway.
+            #
+            #   3) use interlaved protocols, one for each pathway (this allows 
+            #   monitoring more than two pathways, when it makes sense):
+            #       • each protocol defines exactly ONE sweep
+            #       • each protocol affects exactly one path
+            #       • protocols use the same ADC/DAC pair hence the same clampMode
+            #       • protocols are applied in succession, i.e.:
+            #           path 0 ↦ protocol 0
+            #           path 1 ↦ protocol 1
+            #           path 2 ↦ protocol 2 etc
+            # ----
+            #
             # NOTE: 2024-02-17 22:36:56 REMEMBER !:
             # in a tracking protocol, distinct pathway in the same recording 
             # source have the same clamp mode!
             
-            pathways = src.pathways
+            pathway = src.pathways
+            
+            if len(pathways) == 0:
+                scipywarn(f"No pathways defined in source {src.name}")
+                continue
             
             adc = protocol.getADC(src.adc)
             dac = protocol.getDAC(src.dac)
             
+            # all pathways in the source by definition have the same clamping mode
             clampMode = protocol.getClampMode(adc, activeDAC)
+            
+            # NOTE: 2024-03-09 13:46:05
+            # detect which pathways are defined in the source as using 
+            # digital outputs (dig_pathways) or DAC outputs (dac_pathways) to 
+            # stimulate synapses
+            pstimtype = more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))
+            dac_pathways, dig_pathways = [list(x) for x in pstimtype]
+            
+            bad_dac_paths = [p for p in dac_pathways if p.stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
+            
+            if len(bad_dac_paths):
+                scipywarn(f"The pathways {[p.name for p in bad_dac_paths]} in source {src.name} appear to incorrectly use a recording DAC for stimulation; check how LTPOnline was invoked")
+                continue
             
             if self._runData_.conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
@@ -1077,14 +1129,103 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if src.name not in self._runData_.monitorProtocols:
                     self._runData_.monitorProtocols[src.name] = dict()
                     
-                # no pathways defined in this source - surely an error in the 
-                # arguments to the LTPOnline call but can never say for sure
-                # therefore move on to the next source
-                if len(pathways) == 0:
-                    continue
-                
                 # self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
                 
+                # NOTE: 2024-03-09 15:11:20
+                # figure out which of the conditions below is met:
+                # (see also NOTE: 2024-03-09 13:49:12)
+                #
+                # condition 1:
+                #   • source must define two dig_pathways and zero dac_pathways
+                #   • protocol has alternate dig outputs enabled
+                #   • protocol records two sweeps 
+                #   • number of pathways stimulated by the protocol is exactly two
+                #
+                # condition 2:
+                #   • source defines one dig_pathway OR one dac_pathway
+                #   • protocol records two sweeps
+                #   • number of pathways stimulated by the protocol is exactly two
+                #
+                # condition 3:
+                #   • source defines any number of pathways
+                #   • there are as many protocols as pathways
+                #   • each protocol stimulates exactly one pathway
+                #   • each protocol generates one sweep, which must NOT be averaged
+                #       by the protocol
+                #   • protocols must be iterated in the same order
+                #   • each protocol is applied once in each iteration
+                
+                # NOTE: 2024-03-09 15:40:48
+                # figure out which of the above pathway are actually used by the
+                # protocol
+                #
+                # start with dac_pathways first 
+                stim_dacs = [protocol.getDAC(p.stimulus.channel) for p in dac_pathways]
+                
+                # reject if any of the recording dac and active DAC are among the dacs for synaptic stimulation
+                if dac.physicalIndex in stim_dacs or activeDAC.physicalIndex in stim_dacs:
+                    scipywarn(f"Neither recording DAC ({dac.physicalIndex}) the active DAC ({activeDAC.physicalIndex}) should be used for synaptic stimulation")
+                    continue
+                
+                actual_stim_dacs = [d for d in stim_dacs if len(d.getEpochsWithTTLWaveforms())]
+                
+                actualDacPathways = [p fpr p in dac_pathway if p.stimulus.channel in actual_stim_dacs]
+                
+                
+                if protocol.alternateDigitalOutputStateEnabled:
+                    # alternative digital state indicates a dual-pathway protocol
+                    # we expect src to advertise two pathways, and the protocol
+                    # to match these two pathways to separate sweeps (i.e. two sweeps)
+                    #
+                    # NOTE: 2024-03-09 13:47:26 
+                    # protocol.alternateDACOutputStateEnabled must also be True
+                    # True if one of the pathways emits stimuli via
+                    # a DAC 
+                    if len(pathways) != 2:
+                        scipywarn(f"The source {src.name} must define two pathways")
+                        return
+                    
+                    if protocol.nSweeps != 2:
+                        scipywarn(f"The protocol {protocol.name} has alternate digital output state enabled and expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
+                        # TODO: 2024-03-05 23:03:34 decide what to do here
+                        return
+                        
+                    # select pathways by their stimulus channel being a main DIG output
+                    pp = more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, enumerate(pathways))
+                    mainDigPathways, altDigPathways = [list(x) for x in pp]
+                    
+#                     mainDigPathways = list() # empty if len(digOutDacs ) == 0
+#                     altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
+#                     
+#                     for k, p in enumerate(pathways):
+#                         if not p.stimulus.dig:
+#                             scipywarn(f"The protocol {protocol.name} does not appear to use digital outputs to stimulate the pathway {k}")
+#                             return
+#                         
+#                         if dac not in digOutDacs:
+#                             scipywarn(f"The DAC channel ({dac.physicalIndex}) for pathway {k} does not appear to have DIG outputs enabled")
+#                             continue
+#                         
+#                         if p.stimulus.channel in mainDIGOut:
+#                             mainDigPathways.append((k, p))
+#                             
+#                         elif p.stimulus.channel in altDIGOut:
+#                             altDigPathways.append((k, p))
+                            
+                    nPathways = len(mainDigPathways) + len(altDigPathways)# + len(dacPathways)
+                    
+                    if nPathways == 0:
+                        # no pathways recorded in this protocol (how likely that is ?!?)
+                        continue
+                    
+                    if nPathways > 2:
+                        scipywarn("A Clampex protocol does NOT support recording from more than two pathways")
+                        continue
+                    # if len(pathways) == 2:
+                        
+                                
+# ### ---------------------------------------------------------------------- ### #
+                                    
                 if dac != activeDAC:
                     if not protocol.alternateDigitalOutputStateEnabled:
                         raise ValueError(f"Alternative digital outputs must be enabled in the protocol when digital outputs are configured on a DAC index ({activeDAC.physicalIndex}) different from the DAC sending command waveforms ({src.dac})")
