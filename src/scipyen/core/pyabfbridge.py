@@ -624,7 +624,7 @@ class ABFEpoch:
         """
         
         return self.epochType == ABFEpochType.Pulse and self.firstLevel != 0 and \
-            self.deltaLevel == 0 and self.deltaDuration == 0 and not self.hasDigitalOutput("any", "all")
+            self.deltaLevel == 0 and self.deltaDuration == 0 and not self.hasDigitalOutput("any", "alt")
     
     @property
     def type(self) -> ABFEpochType:
@@ -926,27 +926,43 @@ class ABFEpoch:
                 else:
                     return False
                 
-            elif isinstance(digChannel, str) and digChannel == "any":
+            elif isinstance(digChannel, str) and digChannel.lower() == "any":
                 return any(v != 0 for v in itertools.chain.from_iterable(p))
             
-        elif isinstance(alternate, str) and alternate == "all":
-            p = self.getDigitalPattern(False)
-            pa = self.getDigitalPattern(True)
-            
-            if isinstance(digChannel, int):
-                if digChannel in range(len(p[0])):
-                    return p[0][-digChannel-1] != 0 or pa[0][-digChannel-1] != 0
+        elif isinstance(alternate, str):
+            if alternate.lower() == "all":
+                p = self.getDigitalPattern(False)
+                pa = self.getDigitalPattern(True)
                 
-                elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
-                    return p[1][-digChannel-1] != 0 or pa[1][-digChannel-1] != 0
-                
-                else:
-                    return False
+                if isinstance(digChannel, int):
+                    if digChannel in range(len(p[0])):
+                        return p[0][-digChannel-1] != 0 or pa[0][-digChannel-1] != 0
                     
-            elif isinstance(digChannel, str) and digChannel == "any":
-                return any(v != 0 for v in itertools.chain.from_iterable(p+pa))
-                
+                    elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+                        return p[1][-digChannel-1] != 0 or pa[1][-digChannel-1] != 0
                     
+                    else:
+                        return False
+                        
+                elif isinstance(digChannel, str) and digChannel.lower() == "any":
+                    return any(v != 0 for v in itertools.chain.from_iterable(p+pa))
+                
+            elif alternate.lower() in ("main", "alt"):
+                alt = alternate.lower() == "alt"
+                p = self.getDigitalPattern(alternate)
+                if isinstance(digChannel, int):
+                    if digChannel in range(len(p[0])):
+                        return p[0][-digChannel-1] != 0
+                    
+                    elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+                        return p[1][-digChannel-1] != 0
+                    
+                    else:
+                        return False
+                        
+                elif isinstance(digChannel, str) and digChannel.lower() == "any":
+                    return any(v != 0 for v in itertools.chain.from_iterable(p))
+                
     def hasDigitalPulse(self, digChannel:int = 0, alternate:bool=False) -> bool:
         """
         Checks if there is a pulse output (1) on the specified digital channel
@@ -988,10 +1004,10 @@ class ABFEpoch:
             return False
 
 # These two will be (properly) redefined further below
-class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
-    pass
-class ABFInputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
-    pass                         # will be (properly) redefined further below
+# class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
+#     pass
+# class ABFInputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
+#     pass                         # will be (properly) redefined further below
 
 class ABFProtocol(ElectrophysiologyProtocol):
     def __init__(self, obj:typing.Union[pyabf.ABF,neo.Block],
@@ -3634,6 +3650,16 @@ class ABFOutputConfiguration:
                 dig_3_0 = dig_7_4 = [0,0,0,0]
                 
         return dig_3_0, dig_7_4
+    
+    @property
+    def emulatesTTL(self)->bool:
+        """True when this ADC emulates TTLs for3rd party devices.
+        This can happen when:
+        • the DAC has analog waveform enabled
+        • the DAC has epochs that emulate TTLs via analog waveforms (see ABFEpoch.emulatesTTL)
+        """
+        return self.analogWaveformEnabled and len(self.getEpochsWithTTLWaveforms())
+    
                 
     @property
     def analogWaveformEnabled(self) -> bool:
@@ -3727,7 +3753,6 @@ class ABFOutputConfiguration:
         and stays the same throughout the lifetime of the object"""
         return self.protocol.nDigitalOutputs
     
-    # @property
     def getDigitalOutputs(self, alternate:typing.Optional[bool]=None,
                        trains:typing.Optional[bool]=None) -> set:
         return set(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate, trains) for e in self.epochs]))

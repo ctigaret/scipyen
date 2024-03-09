@@ -179,7 +179,7 @@ import traceback
 import keyword
 import inspect
 import weakref
-import itertools
+import itertools, more_itertools
 import typing
 import functools
 import operator
