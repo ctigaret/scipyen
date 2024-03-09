@@ -1027,12 +1027,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             pathways = src.pathways
             
+            adc = protocol.getADC(src.adc)
+            dac = protocol.getDAC(src.dac)
+            
+            clampMode = protocol.getClampMode(adc, activeDAC)
+            
             if self._runData_.conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
                     self._runData_.conditioningProtocols[src.name] = dict()
                     
-                adc = protocol.getADC(src.adc)
-                dac = protocol.getDAC(src.dac)
                 # NOTE: 2024-03-08 22:55:02
                 # altDIGOut MUST be empty here
                 if len(altDIGOut):
@@ -1047,7 +1050,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             p.pathwayType = SynapticPathwayType.Test
                             if p.name not in self._runData_.conditioningProtocols[src.name]:
                                 self._runData_.conditioningProtocols[src.name][p.name] = list()
-                            self._runData_.conditioningProtocols[src.name][p.name].append(protocol)
+                                
+                            if protocol.name not in [pr.name for pr in self._runData_.conditioningProtocols[src.name][p.name]]:
+                                self._runData_.conditioningProtocols[src.name][p.name].append(protocol)
                             
                         else:
                             p.pathwayType = SynapticPathwayType.Control
@@ -1061,10 +1066,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                 initResponseLabel = measures[0][0]
                                 if isinstance(self._runData_.viewers[src.name][p.name][initResponseLabel], sv.SignalViewer):
                                     self._runData_.viewers[src.name][p.name][initResponseLabel].winTitle += f" {p.pathwayType.name}"
-                            
-                    
                 
-            else:
+            else: # NOTE: 2024-03-09 07:51:17 tracking mode
                 if src.name not in self._runData_.results:
                     self._runData_.results[src.name] = dict()
                 
@@ -1080,17 +1083,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if len(pathways) == 0:
                     continue
                 
-                adc = protocol.getADC(src.adc)
-                dac = protocol.getDAC(src.dac)
-                
                 # self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
                 
                 if dac != activeDAC:
                     if not protocol.alternateDigitalOutputStateEnabled:
                         raise ValueError(f"Alternative digital outputs must be enabled in the protocol when digital outputs are configured on a DAC index ({activeDAC.physicalIndex}) different from the DAC sending command waveforms ({src.dac})")
                     
-                clampMode = protocol.getClampMode(adc, activeDAC)
-                
                 # self.print(f"   data recorded in {printStyled(clampMode.name, 'yellow')}")
                 
                 # figure out which of the pathways use a DIG or a DAC channel for TTLs;
@@ -1178,15 +1176,15 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # FIXME: dacPathways is contentious - To REMOVE
                 nPathways = len(mainDigPathways) + len(altDigPathways)# + len(dacPathways)
                 
+                if nPathways == 0:
+                    # no pathways recorded in this protocol (how likely that is ?!?)
+                    continue
+                
                 if nPathways > 2:
                     scipywarn("A Clampex protocol does NOT support recording from more than two pathways")
                     continue
                 
                 # self.print(f"   pathways recorded in this protocol: {printStyled(nPathways)}")
-                
-                if nPathways == 0:
-                    # no pathways recorded in this protocol (how likely that is ?!?)
-                    continue
                 
                 # If you have just one amplifier, you can record from as many sources as 
                 #   there are channels in the amplifier, for example:
@@ -1250,7 +1248,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 if nPathways == 2:
                     if len(mainDigPathways) != 1:
-                        scipywarn("There must one digitally triggered pathway in the protocol")
+                        scipywarn("There must be only one digitally triggered pathway in the protocol")
                         continue
 
                     syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
