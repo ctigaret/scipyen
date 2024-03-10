@@ -847,86 +847,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         except:
             traceback.print_exc()
             
-#     @singledispatchmethod
-#     def getPathwayStimulationSequence(self, protocol:ElectrophysiologyProtocol, 
-#                                       pathways:typing.Sequence[SynapticPathway], 
-#                                       byFirstStimulus:bool=True) -> list:
-#         """Returns a tuple (sweep index, tuple(pathway indices)).
-#         For each sweep in the protocol, returns a tuple with the indices of the 
-#         pathways that have been stimulated (in the `pathways` sequence) ordered
-#         by the temporal order of the stimulation in each sweep.
-#         
-#         Parameters:
-#         ----------
-#         protocol:ElectrophysiologyProtocol — currently only ABFProtocol objects
-#             are supported
-#         
-#         pathways: sequence of SynapticPathway object declared by a RecordingSource.
-#             Not all pathways in the list might be stimulated by the protocol in
-#             every sweep.
-#         
-#         byFirstStimulus: bool, default is True — controls how the order of pathway
-#             stimulation is returned, in particular when the pathways are 
-#             stimulated in several interleaved epochs in a given sweep.
-#         
-#             When True, the order of the pathways inside the stimulation sequence
-#             is given by the first occurence of a stimulus in the pathway(s) (i.e.,
-#             according to the timing of the first ABFEpoch that stimulates the 
-#             pathway, regardless of any subsequent epochs that stimulate the 
-#             same pathway later in the sweep).
-#         
-#             When False, the output reflects sequence of pathways in all ABF Epochs
-#             that emit stimulus signals.
-#         
-#             Example 1: given a source declaring two pathways stimulated, 
-#                 respectively via DIG 0 and DIG 1, and a protocol that stimulates 
-#                 these pathways alternatively according to the schematic below 
-#                 (NOTE: protocol has alternateDigitalOutputStateEnabled True),
-#         
-#             sweep 0 (even sweeps):
-#         
-#                 path 0 (DIG 0)  ______|_____|_____
-#                 path 1 (DIG 1)  ________|_|_______
-#             
-#             sweep 1 (odd sweeps):
-#             
-#                 path 0 (DIG 0)  ________|_|_______
-#                 path 1 (DIG 1)  ______|___________
-#         
-#             `byFirstStimulus`:          the function returns:
-#         -------------------------------------------------------------------
-#             True                        ((0, (0, 1)), (1, (1, 0)))
-#             False                       ((0, (0, 1, 1, 0)), (1, (1, 0, 0)))
-# 
-#             I.e., when `byFirstStimulus` is True the pathway stimulations are
-#             returned in the order of their first stimulation (in sweep 0,
-#             pathway 0 is the first pathway that is being stimulated, whereas in 
-#             sweep 1 it is the second pathway — pathway 1 — that is stimulated,
-#             even if both pathways are also stimulated several times later).
-#         
-#             When `byFirstStimulus` is False, the function returns the full 
-#             stimulation sequence of the pathways in the sweep
-#             
-#             
-#             
-#         
-#             
-#         
-#         
-#         
-#         
-#         """
-#         raise NotImplementedError(f"{type(protocol).__name__} objects are not yet supported")
-#         
-#     @getPathwayStimulationSequence.register(pab.ABFProtocol)
-#     def _(protocol:pab.ABFProtocol, pathways:typing.Sequence[SynapticPathway], 
-#                                       byFirstStimulus:bool=True) -> list:
-#         dac = protocol.getDAC()
-#         if byFirstStimulus:
-#             return tuple((s, tuple( x[0] for x in tuple(sorted(tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(protocol.nSweeps))
-#         else:
-#             return tuple([(s, list(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(protocol.nSweeps)])
-                
     @singledispatchmethod
     def processProtocol(self, protocol):
         # TODO: 2024-02-17 15:44:56
@@ -1263,18 +1183,39 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # by DIG outputs OR DAC-emulated TTLs
                 nPathways = len(dac_pathways) + len(dig_pathways)
                 
+                mainDigPathways = list()
+                altDigPathways = list()
+                altDacPathways = list()
+                
                 if nPathways == 0:
                     scipywarn(f"Protocol {protcol.name} does not seem to monitor any of the pathways declares in source {src.name}")
                     continue
                 
                 if nPathways == 1:
                     # protocol stimulates just one pathway - either DIG or DAC-emulated
-                    mainPathways = dig_pathways if len(dig_pathways) else dac_pathways
-                    altPathways = list()
-                    if protocol.nSweeps != 1:
-                        scipywarn(f"Tracking mode: Protocol {protocol.name} used for recording a single pathway must have just one sweep")
-                
+                    mainDigPathways = dig_pathways if len(dig_pathways) else dac_pathways
+                    # altPathways = list()
+                    if protocol.nSweeps == 1:
+                        # this is either a monitoring protocol or a single-sweep
+                        # conditioning protocol
+                        if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
+                            mainDigPathways[0][1].pathwayType = SynapticPathwayType.Test
+                            
+                    else:
+                        if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
+                            mainDigPathways[0][1].pathwayType = SynapticPathwayType.Test
+                        else:
+                            scipywarn(f"Protocol {protocol.name} has invalid number of sweeps ({protocol.nSweeps}) for tracking")
+                    
+                    # pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
+                    
+                    # TODO: 2024-03-10 21:00:49
+                    # see TODO 2024-03-10 20:59:00, below
+                    
                 elif nPathways == 2:
+                    if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
+                        scipywarn(f"Protocol {protocol.name} is invalid for conditioning")
+                        continue
                     # prerequisite for alternate pathway stimulation with either
                     # two DIGs or one DIG and one DAC-emulated TTLs
                     # protocol stimulates two one pathways: DIG + DIG or DIG + DAC-emulated
@@ -1284,40 +1225,63 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         scipywarn(f"Tracking mode: Alternate digital outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
                         continue
                     
-                    # FIXME: 2024-03-09 23:11:37 BUG
-                    # we ned to test this AFTER figuring out whether both pathways are
-                    # stimulated during the same sweep
-                    # the conditon below is needed only when nPathways ==2 and crosstalk is False;
-                    # in crosstalk the protocol can stimulate two pathways yet have a single sweep
-                    # but them must devise a way to keep track such that a protocol for crosstalk in 
-                    # one direction if followed by a protocol with crosstalk in the opposite direction
-                    # if not crosstalk and protocol.nSweeps != 2:
-                    #     scipywarn(f"Tracking mode: The protocol {protocol.name} is expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
-                    #     continue
-                    
-                        
-                    
                     if len(dac_pathways) == 0:
                         # both pathways in the protocol are stimulated via DIG outputs
-                        mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_pathways)]
+                        mainDigPathways, altDigPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_pathways)]
                         
-                        # if protocol.nSweeps == 1:
-                            # make sure both pathways are stimulated in the same sweep, but in succession
-                            # and determine the order of stimulation
+                        pp = [p[1] for p in mainDigPathways + altDigPathways]
+                        
+                        # figure out the order in which pathways are stimulated
+                        pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence(pp)
+                        
+                        if protocol.nSweeps == 1:
+                            pathsOrder = pathStimBySweep[0][1]
+                            if len(pathsOrder) == 0:
+                                scipywarn("No pathways stimulated in this protocol")
+                                continue
                             
-                        # NOTE: 2024-03-09 23:08:29
-                        # Check if both pathways are stimulated in both sweeps.
-                        # If each sweep simulates the SAME pathway ⇒ crosstalk = False
-                        # If each sweep simulates BOTH pathways, and the pathway order
-                        # is reversed in alternate sweeps ⇒ crosstalk = True
-                        
+                            elif len(pathsOrder) == 1:
+                                # NOTE: 2024-03-10 21:01:32 FIXME
+                                # this should never happen as we are in the condition of
+                                # two dig pathways here
+                                self._runData_.crossTalk = False
+                                
+                            elif len(pathsOrder) == 2:
+                                self._runData_.crossTalk = True
+                                
+                            else:
+                                scipywarn(f"Wrong number of paths in sweep: {len(pathsOrder)}")
+                                continue
+                            # TODO 2024-03-10 20:59:00
+                            # set up persistent mapping of pathways for single-sweep 
+                            # protocols - based on the expectation that such protocols
+                            # must arrive interleaved... but allow for recording 
+                            # interruptions...
+                            
+                        elif protocol.nSweeps == 2:
+                            # if both pathways are stimulated in the same sweep -> cross-talk
+                            # else, expect one pathway stimulated in each sweep
+                            # main pathway on sweep 0, alt pathway on sweep 1
+                            if len(pathStimBySweep[0][1]) == 2:
+                                # TODO 2024-03-10 21:18:40 
+                                # set up persistent mapping of cross-talk
+                                # If each sweep simulates BOTH pathways, and the pathway order
+                                # is reversed in alternate sweeps ⇒ crosstalk = True
+                                # NOTE: implement these checks!
+                                self._runData_.crossTalk = True
+                            else:
+                                self._runData_.crossTalk = False
+                            
                     elif len(dac_pathways) == 1:
                         if not protocol.alternateDACOutputStateEnabled:
                             scipywarn(f"Tracking mode: Alternate DAC outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
                             continue
                         
-                        mainPathways = dig_pathways
-                        altPathways = dac_pathways
+                        mainDigPathways = dig_pathways
+                        altDacPathways = dac_pathways
+                        
+                        # TODO: 2024-03-10 21:23:12
+                        # use logic from above to determine if crosstalk and how
                         
                     elif len(dac_pathways) > 1:
                         scipywarn(f"Tracking mode: In protocol {protocol.name}, for source {src.name}: at most one pathway should be declared as simulated via DAC-emulated TTLs")
@@ -1382,11 +1346,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # alternate digital outputs; 
                 #
                 
-                mainDigPathways = list() # empty if len(digOutDacs ) == 0
-                altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
+                # NOTE: 2024-03-10 21:24:21
+                # calculatd above
+                # mainDigPathways = list() # empty if len(digOutDacs ) == 0
+                # altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
                 # dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
                 
-                if len(pathways) == 2:
+                # if len(pathways) == 2:
                     # there are two options here:
                     # a) the same protocol uses alternative stimulation to record from
                     #   both patwhays
@@ -1411,38 +1377,38 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     #   can match the one in a paired-pulse on a single pathway)
                     #   e.g. crosstalk_0_1 delivered alternatively with crosstalk_1_0
                     #   
-                    if protocol.alternateDigitalOutputStateEnabled:
-                        if protocol.nSweeps != 2:
-                            scipywarn(f"The protocol {protocol.name} with alternate digital output state enabled expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
-                            # TODO: 2024-03-05 23:03:34 decide what to do here
-                            return
-                        
-                        for k, p in enumerate(pathways):
-                            if p.stimulus.dig:
-                                # assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
-                                if dac not in digOutDacs:
-                                    scipywarn(f"The DAC channel ({dac.physicalIndex}) for pathway {k} does not appear to have DIG outputs enabled")
-                                    continue
-                                
-                                if p.stimulus.channel in mainDIGOut:
-                                    mainDigPathways.append((k, p))
-                                    
-                                elif p.stimulus.channel in altDIGOut:
-                                    altDigPathways.append((k, p))
-                                    
-                            else:
-                                scipywarn(f"The protocol {protocol.name} does not appear to use digital outputs to stimulate the pathway {k}")
-                                return
-                            
-                    else:
-                        if protocol.nSweeps != 1:
-                            # FIXME: 2024-03-05 23:06:00
-                            # the condition below applies only to monitoring protocols
-                            #
-                            # one can have an induction (i.e. conditioning) protocol
-                            # with more than one sweep.
-                            
-                            scipywarn(f"The protocol {protocol.name} with alternate digital output state disabled expected to have one sweep; instead, it has {protocol.nSweeps} sweeps")
+#                     if protocol.alternateDigitalOutputStateEnabled:
+#                         if protocol.nSweeps != 2:
+#                             scipywarn(f"The protocol {protocol.name} with alternate digital output state enabled expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
+#                             # TODO: 2024-03-05 23:03:34 decide what to do here
+#                             return
+#                         
+#                         for k, p in enumerate(pathways):
+#                             if p.stimulus.dig:
+#                                 # assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
+#                                 if dac not in digOutDacs:
+#                                     scipywarn(f"The DAC channel ({dac.physicalIndex}) for pathway {k} does not appear to have DIG outputs enabled")
+#                                     continue
+#                                 
+#                                 if p.stimulus.channel in mainDIGOut:
+#                                     mainDigPathways.append((k, p))
+#                                     
+#                                 elif p.stimulus.channel in altDIGOut:
+#                                     altDigPathways.append((k, p))
+#                                     
+#                             else:
+#                                 scipywarn(f"The protocol {protocol.name} does not appear to use digital outputs to stimulate the pathway {k}")
+#                                 return
+#                             
+#                     else:
+#                         if protocol.nSweeps != 1:
+#                             # FIXME: 2024-03-05 23:06:00
+#                             # the condition below applies only to monitoring protocols
+#                             #
+#                             # one can have an induction (i.e. conditioning) protocol
+#                             # with more than one sweep.
+#                             
+#                             scipywarn(f"The protocol {protocol.name} with alternate digital output state disabled expected to have one sweep; instead, it has {protocol.nSweeps} sweeps")
                         
                             
                     # elif p.stimulus.channel in protocol.physicalDACIndexes:
@@ -1515,151 +1481,154 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 #       and data should be grouped by pathway, post-hoc
                 
                 # see above: a protocol DOES NOT support monitoring more than
-                # two pathwys
+                # two pathways
                 # if there are two pathwys, then they should be stimulated
                 # alternatively, and the protocol should (ideally) have an even number 
                 # of sweeps per run; since it does NOT really make sense to have
                 # more than TWO sweeps (because we just repeat the protocol 𝒏
                 # times, for 𝒏 files) we actually ENFORCE THIS precondition:
                 
-                syn_stim_digs = list()
-                syn_stim_dacs = list()
+            syn_stim_digs = list()
+            syn_stim_dacs = list()
+            
+            if nPathways == 2:
+                if len(mainDigPathways) != 1:
+                    scipywarn("There must be only one digitally triggered pathway in the protocol")
+                    continue
+
+                syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
                 
-                if nPathways == 2:
-                    if len(mainDigPathways) != 1:
-                        scipywarn("There must be only one digitally triggered pathway in the protocol")
+                # if len(altDigPathways) + len(dacPathways) != 1:
+                #     scipywarn("There can be only one other pathway, triggered either digitally, or via DAC-emulated TTLs")
+                #     continue
+                if len(altDigPathways) == 1:
+                    # two alternative digitally stimulated pathways — the most
+                    # common case
+                    if not protocol.alternateDigitalOutputStateEnabled:
+                        scipywarn( "For two digitally-stimulated pathways the alternative digital output state must be enabled in the protocol")
                         continue
-
+                    syn_stim_digs.append(altDigPathways[0][1].stimulus.channel)
+                    
+                # TODO: 2024-03-10 21:28:46
+                # provide for altDacPathways as well
+                    
+            else: # alternative pathways do not exist here; nPathways ≡ 1 
+                if len(mainDigPathways):
                     syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
-                    
-                    # if len(altDigPathways) + len(dacPathways) != 1:
-                    #     scipywarn("There can be only one other pathway, triggered either digitally, or via DAC-emulated TTLs")
-                    #     continue
-                    if len(altDigPathways) == 1:
-                        # two alternative digitally stimulated pathways — the most
-                        # common case
-                        if not protocol.alternateDigitalOutputStateEnabled:
-                            scipywarn( "For two digitally-stimulated pathways the alternative digital output state must be enabled in the protocol")
-                            continue
-                        syn_stim_digs.append(altDigPathways[0][1].stimulus.channel)
                         
-                else: # alternative pathways do not exist here; nPathways ≡ 1 
-                    if len(mainDigPathways):
-                        syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
-                        
-                # self.print(f"   digital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow')}")
-                # self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow')}")
+            # self.print(f"   digital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow')}")
+            # self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow')}")
+            
+            # figure out the epochs that define synaptic stimulations
+            
+            # figure out the membrane test epochs; set up LocationMeasures for
+            # the membrane test; we use the source's DAC channel - which may also 
+            # be the activeDAC, although this is not necessary.
+            # furthermore, these epochs should exist in eitgher voltage-or current clamp
+            # if they do not, we just imply do not provide corresponding measurmements
+            #
+            # also, these are COMMON for all the pathways in the source
+            mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
+                                                and not any(x.hasDigitalOutput(d) for d in (syn_stim_digs)) \
+                                                and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
+                                    dac.epochs))
+            
+            if len(mbTestEpochs) == 0:
+                if clampMode in (ClampMode.VoltageClamp, ClampMode.CurrentClamp):
+                    scipywarn("No membrane test epoch appears to have been defined", out = self._stdout_)
+                membraneTestEpoch = None
+                testAmplitude = None
+                testStart = None
+                testDuration = None
                 
-                # figure out the epochs that define synaptic stimulations
+            else:
+                membraneTestEpoch = mbTestEpochs[0]
+                testAmplitude = membraneTestEpoch.firstLevel
+                testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
+                testDuration = membraneTestEpoch.firstDuration
                 
-                # figure out the membrane test epochs; set up LocationMeasures for
-                # the membrane test; we use the source's DAC channel - which may also 
-                # be the activeDAC, although this is not necessary.
-                # furthermore, these epochs should exist in eitgher voltage-or current clamp
-                # if they do not, we just imply do not provide corresponding measurmements
-                #
-                # also, these are COMMON for all the pathways in the source
-                mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
-                                                    and not any(x.hasDigitalOutput(d) for d in (syn_stim_digs)) \
-                                                    and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
-                                        dac.epochs))
+            # assert protocol.nSweeps >= nPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nPathways} pathways"
+            
+            # in a multi-pathway protocol, the "main" digital pathways are always
+            # delivered on the even-numbered sweeps: 0, 2, etc.
+            #
+            
+            for k, p in mainDigPathways:
+                # NOTE: 2024-03-01 13:50:58
+                # k is the pathway index; p is the pathway
+                # self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
+                p.clampMode = clampMode
                 
-                if len(mbTestEpochs) == 0:
-                    if clampMode in (ClampMode.VoltageClamp, ClampMode.CurrentClamp):
-                        scipywarn("No membrane test epoch appears to have been defined", out = self._stdout_)
-                    membraneTestEpoch = None
-                    testAmplitude = None
-                    testStart = None
-                    testDuration = None
+                if p.name not in self._runData_.viewers[src.name]:
+                    # FIXME: 2024-03-02 23:32:46
+                    # assumes only one main Dig pathway
+                    self._runData_.viewers[src.name][p.name] = \
+                    {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_,
+                                                    win_title = f"{src.name} {p.name} Synaptic Responses")}
+
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].showNavigator()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
+
+                    if sys.platform == "win32":
+                        y = self._screenGeom.y() + self._titlebar_height_
+                    else:
+                        y = self._screenGeom.y()
+
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
+                                                                                                        self._winWidth, 
+                                                                                                        self._winHeight))
+                    # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
+                    #                                                                                     int(self._winWidth * 1.1), 
+                    #                                                                                     int(self._winHeight * 1.1)))
+
+                if p.name not in self._runData_.results[src.name]:
+                    self._runData_.results[src.name][p.name] = \
+                        {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
+                        "pathway": p}
+
+                self.setMeasuresForPathway(src, p, protocol,
+                                                    adc, dac, activeDAC, membraneTestEpoch,
+                                                    testStart, testDuration, testAmplitude,
+                                                    False)
+
+                self.measurePathway(src, p, adc, False)
+
+            for k, p in altDigPathways:
+                # self.print(f"   processing alt (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
+                p.clampMode = clampMode
+
+                if p.name not in self._runData_.viewers[src.name]:
+                    self._runData_.viewers[src.name][p.name] = \
+                    {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_,
+                                                    win_title = f"{src.name} {p.name} Synaptic Responses")}
+
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].showNavigator()
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
+
+                    if sys.platform == "win32":
+                        y = self._screenGeom.y() + self._titlebar_height_
+                    else:
+                        y = self._screenGeom.y()
+
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + self._winWidth, y, 
+                                                                                                        self._winWidth, 
+                                                                                                        self._winHeight))
+                    # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + int(self._winWidth * 1.1), y, int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
                     
-                else:
-                    membraneTestEpoch = mbTestEpochs[0]
-                    testAmplitude = membraneTestEpoch.firstLevel
-                    testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
-                    testDuration = membraneTestEpoch.firstDuration
-                    
-                # assert protocol.nSweeps >= nPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nPathways} pathways"
+                if p.name not in self._runData_.results[src.name]:
+                    self._runData_.results[src.name][p.name] = \
+                        {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
+                        "pathway": p}
                 
-                # in a multi-pathway protocol, the "main" digital pathways are always
-                # delivered on the even-numbered sweeps: 0, 2, etc.
-                #
-                
-                for k, p in mainDigPathways:
-                    # NOTE: 2024-03-01 13:50:58
-                    # k is the pathway index; p is the pathway
-                    # self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
-                    p.clampMode = clampMode
-                    
-                    if p.name not in self._runData_.viewers[src.name]:
-                        # FIXME: 2024-03-02 23:32:46
-                        # assumes only one main Dig pathway
-                        self._runData_.viewers[src.name][p.name] = \
-                        {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_,
-                                                        win_title = f"{src.name} {p.name} Synaptic Responses")}
-
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].showNavigator()
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
-
-                        if sys.platform == "win32":
-                            y = self._screenGeom.y() + self._titlebar_height_
-                        else:
-                            y = self._screenGeom.y()
-
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
-                                                                                                            self._winWidth, 
-                                                                                                            self._winHeight))
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
-                        #                                                                                     int(self._winWidth * 1.1), 
-                        #                                                                                     int(self._winHeight * 1.1)))
-
-                    if p.name not in self._runData_.results[src.name]:
-                        self._runData_.results[src.name][p.name] = \
-                            {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
-                            "pathway": p}
-
-                    self.setMeasuresForPathway(src, p, protocol,
-                                                        adc, dac, activeDAC, membraneTestEpoch,
-                                                        testStart, testDuration, testAmplitude,
-                                                        False)
-
-                    self.measurePathway(src, p, adc, False)
-
-                for k, p in altDigPathways:
-                    # self.print(f"   processing alt (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
-                    p.clampMode = clampMode
-
-                    if p.name not in self._runData_.viewers[src.name]:
-                        self._runData_.viewers[src.name][p.name] = \
-                        {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_,
-                                                        win_title = f"{src.name} {p.name} Synaptic Responses")}
-
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].showNavigator()
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
-
-                        if sys.platform == "win32":
-                            y = self._screenGeom.y() + self._titlebar_height_
-                        else:
-                            y = self._screenGeom.y()
-
-                        self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + self._winWidth, y, 
-                                                                                                            self._winWidth, 
-                                                                                                            self._winHeight))
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + int(self._winWidth * 1.1), y, int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
-                        
-                    if p.name not in self._runData_.results[src.name]:
-                        self._runData_.results[src.name][p.name] = \
-                            {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
-                            "pathway": p}
-                    
-                    self.setMeasuresForPathway(src, p, protocol, 
-                                                        adc, dac, activeDAC, membraneTestEpoch, 
-                                                        testStart, testDuration, testAmplitude,
-                                                        True)
-                    self.measurePathway(src, p, adc, True)
+                self.setMeasuresForPathway(src, p, protocol, 
+                                                    adc, dac, activeDAC, membraneTestEpoch, 
+                                                    testStart, testDuration, testAmplitude,
+                                                    True)
+                self.measurePathway(src, p, adc, True)
             
                 
     def measurePathway(self, src: RecordingSource, p: SynapticPathway,
