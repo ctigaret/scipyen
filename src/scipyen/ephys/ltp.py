@@ -846,8 +846,87 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 
         except:
             traceback.print_exc()
-
-    
+            
+#     @singledispatchmethod
+#     def getPathwayStimulationSequence(self, protocol:ElectrophysiologyProtocol, 
+#                                       pathways:typing.Sequence[SynapticPathway], 
+#                                       byFirstStimulus:bool=True) -> list:
+#         """Returns a tuple (sweep index, tuple(pathway indices)).
+#         For each sweep in the protocol, returns a tuple with the indices of the 
+#         pathways that have been stimulated (in the `pathways` sequence) ordered
+#         by the temporal order of the stimulation in each sweep.
+#         
+#         Parameters:
+#         ----------
+#         protocol:ElectrophysiologyProtocol — currently only ABFProtocol objects
+#             are supported
+#         
+#         pathways: sequence of SynapticPathway object declared by a RecordingSource.
+#             Not all pathways in the list might be stimulated by the protocol in
+#             every sweep.
+#         
+#         byFirstStimulus: bool, default is True — controls how the order of pathway
+#             stimulation is returned, in particular when the pathways are 
+#             stimulated in several interleaved epochs in a given sweep.
+#         
+#             When True, the order of the pathways inside the stimulation sequence
+#             is given by the first occurence of a stimulus in the pathway(s) (i.e.,
+#             according to the timing of the first ABFEpoch that stimulates the 
+#             pathway, regardless of any subsequent epochs that stimulate the 
+#             same pathway later in the sweep).
+#         
+#             When False, the output reflects sequence of pathways in all ABF Epochs
+#             that emit stimulus signals.
+#         
+#             Example 1: given a source declaring two pathways stimulated, 
+#                 respectively via DIG 0 and DIG 1, and a protocol that stimulates 
+#                 these pathways alternatively according to the schematic below 
+#                 (NOTE: protocol has alternateDigitalOutputStateEnabled True),
+#         
+#             sweep 0 (even sweeps):
+#         
+#                 path 0 (DIG 0)  ______|_____|_____
+#                 path 1 (DIG 1)  ________|_|_______
+#             
+#             sweep 1 (odd sweeps):
+#             
+#                 path 0 (DIG 0)  ________|_|_______
+#                 path 1 (DIG 1)  ______|___________
+#         
+#             `byFirstStimulus`:          the function returns:
+#         -------------------------------------------------------------------
+#             True                        ((0, (0, 1)), (1, (1, 0)))
+#             False                       ((0, (0, 1, 1, 0)), (1, (1, 0, 0)))
+# 
+#             I.e., when `byFirstStimulus` is True the pathway stimulations are
+#             returned in the order of their first stimulation (in sweep 0,
+#             pathway 0 is the first pathway that is being stimulated, whereas in 
+#             sweep 1 it is the second pathway — pathway 1 — that is stimulated,
+#             even if both pathways are also stimulated several times later).
+#         
+#             When `byFirstStimulus` is False, the function returns the full 
+#             stimulation sequence of the pathways in the sweep
+#             
+#             
+#             
+#         
+#             
+#         
+#         
+#         
+#         
+#         """
+#         raise NotImplementedError(f"{type(protocol).__name__} objects are not yet supported")
+#         
+#     @getPathwayStimulationSequence.register(pab.ABFProtocol)
+#     def _(protocol:pab.ABFProtocol, pathways:typing.Sequence[SynapticPathway], 
+#                                       byFirstStimulus:bool=True) -> list:
+#         dac = protocol.getDAC()
+#         if byFirstStimulus:
+#             return tuple((s, tuple( x[0] for x in tuple(sorted(tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(protocol.nSweeps))
+#         else:
+#             return tuple([(s, list(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(protocol.nSweeps)])
+                
     @singledispatchmethod
     def processProtocol(self, protocol):
         # TODO: 2024-02-17 15:44:56
@@ -1064,7 +1143,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             pathway = src.pathways
             
             if len(pathways) == 0:
-                scipywarn(f"No pathways defined in source {src.name}")
+                scipywarn(f"Ignoring source {src.name} which does not declare any pathways")
                 continue
             
             adc = protocol.getADC(src.adc)
@@ -1074,7 +1153,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # in a conditioning protocol, the dac is by definition the active DAC
             if dac != activeDAC:
                 if not protocol.alternateDigitalOutputStateEnabled:
-                    raise ValueError(f"Alternative digital outputs must be enabled in the protocol when digital outputs are configured on a DAC index ({activeDAC.physicalIndex}) different from the DAC sending command waveforms ({src.dac})")
+                    scipywarn(f"In protocol {protocol.name} for source {src.name}: when the recording DAC {dac.physicalIndex} is different from the DAC where digital outputs are enabled ({activeDAC.physicalIndex}) alternative digital outputs should be enabled in the protocol; this AB trial will be skipped.")
+                    return
+                    # raise ValueError(f"Alternative digital outputs must be enabled in the protocol when digital outputs are configured on a DAC index ({activeDAC.physicalIndex}) different from the DAC sending command waveforms ({src.dac})")
                 
             # all pathways in the source by definition have the same clamping mode
             clampMode = protocol.getClampMode(adc, activeDAC)
@@ -1091,7 +1172,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 scipywarn(f"The pathways {[p[1].name for p in bad_dac_paths]} in source {src.name} are incorrectly declared as using a recording DAC for stimulation; check how LTPOnline was invoked")
                 continue
             
-            if self._runData_.conditioning:
+            if self._runData_.episodeType & RecordingEpisodeType.Conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
                     self._runData_.conditioningProtocols[src.name] = dict()
                     
@@ -1139,21 +1220,21 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
                 
                 # NOTE: 2024-03-09 15:11:20
-                # figure out which of the conditions below is met:
+                # figure out which of the cases below is met:
                 # (see also NOTE: 2024-03-09 13:49:12)
                 #
-                # condition 1:
+                # case 1:
                 #   • source must define two dig_pathways and zero dac_pathways
                 #   • protocol has alternate dig outputs enabled
                 #   • protocol records two sweeps 
                 #   • number of pathways stimulated by the protocol is exactly two
                 #
-                # condition 2:
+                # case 2:
                 #   • source defines one dig_pathway OR one dac_pathway
                 #   • protocol records two sweeps
                 #   • number of pathways stimulated by the protocol is exactly two
                 #
-                # condition 3:
+                # case 3:
                 #   • source defines any number of pathways
                 #   • there are as many protocols as pathways
                 #   • each protocol stimulates exactly one pathway
@@ -1174,10 +1255,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 # do the same for dig-stimulated pathways:
                 # the filter is simpler: the declares stimulsu channel for the pathway
-                # is one of the mainDIGOut or altDIGOut DIG channels defined in the protocol:
-                dig_pathways = [p for p in dig_pathways if p[1].simulus.channel in mainDIGOut or altDIGOut]
+                # is one of the main or alt DIG channels defined in the protocol
+                # from here onward dig_pathways are the pathways actually stimulated by the protocol
+                dig_pathways = [p for p in dig_pathways if p[1].stimulus.channel in mainDIGOut or altDIGOut]
                 
-                # this is the number of pathways actually stimulated by the protocol
+                # this is the total number of pathways actually stimulated by the protocol
+                # by DIG outputs OR DAC-emulated TTLs
                 nPathways = len(dac_pathways) + len(dig_pathways)
                 
                 if nPathways == 0:
@@ -1185,6 +1268,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     continue
                 
                 if nPathways == 1:
+                    # protocol stimulates just one pathway - either DIG or DAC-emulated
                     mainPathways = dig_pathways if len(dig_pathways) else dac_pathways
                     altPathways = list()
                     if protocol.nSweeps != 1:
@@ -1193,29 +1277,41 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 elif nPathways == 2:
                     # prerequisite for alternate pathway stimulation with either
                     # two DIGs or one DIG and one DAC-emulated TTLs
+                    # protocol stimulates two one pathways: DIG + DIG or DIG + DAC-emulated
+                    #
+                    # in either case, alternate digital outputs must be enabled
                     if not protocol.alternateDigitalOutputStateEnabled:
                         scipywarn(f"Tracking mode: Alternate digital outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
                         continue
                     
                     # FIXME: 2024-03-09 23:11:37 BUG
+                    # we ned to test this AFTER figuring out whether both pathways are
+                    # stimulated during the same sweep
                     # the conditon below is needed only when nPathways ==2 and crosstalk is False;
                     # in crosstalk the protocol can stimulate two pathways yet have a single sweep
                     # but them must devise a way to keep track such that a protocol for crosstalk in 
                     # one direction if followed by a protocol with crosstalk in the opposite direction
-                    if not crosstalk and protocol.nSweeps != 2:
-                        scipywarn(f"Tracking mode: The protocol {protocol.name} is expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
-                        continue
+                    # if not crosstalk and protocol.nSweeps != 2:
+                    #     scipywarn(f"Tracking mode: The protocol {protocol.name} is expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
+                    #     continue
+                    
+                        
                     
                     if len(dac_pathways) == 0:
+                        # both pathways in the protocol are stimulated via DIG outputs
                         mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_pathways)]
                         
+                        # if protocol.nSweeps == 1:
+                            # make sure both pathways are stimulated in the same sweep, but in succession
+                            # and determine the order of stimulation
+                            
                         # NOTE: 2024-03-09 23:08:29
                         # Check if both pathways are stimulated in both sweeps.
                         # If each sweep simulates the SAME pathway ⇒ crosstalk = False
                         # If each sweep simulates BOTH pathways, and the pathway order
                         # is reversed in alternate sweeps ⇒ crosstalk = True
                         
-                    if len(dac_pathways) == 1:
+                    elif len(dac_pathways) == 1:
                         if not protocol.alternateDACOutputStateEnabled:
                             scipywarn(f"Tracking mode: Alternate DAC outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
                             continue
@@ -2183,7 +2279,9 @@ class LTPOnline(QtCore.QObject):
                                  useSlopeInIClamp = useSlopeInIClamp,
                                  useEmbeddedProtocol = useEmbeddedProtocol,
                                  exportedResults = True,
-                                 conditioning = False
+                                 episodeType = RecordingEpisodeType.Tracking,
+                                 previousEpisodeType = RecordingEpisodeType.Tracking,
+                                 crossTalk = False
                                  )
         
         self._abfTrialBuffer_ = collections.deque()
@@ -2542,21 +2640,28 @@ class LTPOnline(QtCore.QObject):
         and 'coff'. The last two quickly toggle the conditioning mode from the 
         console.
     """
-        return self._runData_.conditioning
+        return self._runData_.episodeType & RecordingEpisodeType.Conditioning
     
     @conditioning.setter
     def conditioning(self, val:typing.Union[bool, str, int]):
-        if isinstance(val, str):
-            self._runData_.conditioning = val.lower() == "on"
-            
-        elif isinstance(val, int):
-            self._runData_.conditioning = val == 1
-            
-        elif isinstance(val, bool):
-            self._runData_.conditioning = val == True
+        if (isinstance(val, str) and val.lower() == "on") or (isinstance(val, int) and val==1) \
+            or (isinstance(val, bool) and val == True):
+            val = RecordingEpisodeType.Conditioning
             
         else:
-            raise TypeError(f"Expecting a bool, str (e.g. 'on', 'off') or an int; instead, got {type(val).__name__}")
+            val = self._runData_.previousEpisodeType if (self._runData_.previousEpisodeType & RecordingEpisodeType.Tracking) else RecordingEpisodeType.Tracking
+            
+        self._runData_.previousEpisodeType = self._runData_.episodeType
+        self._runData_.episodeType = val
+            
+#         elif isinstance(val, int):
+#             self._runData_.conditioning = val == 1
+#             
+#         elif isinstance(val, bool):
+#             self._runData_.conditioning = val == True
+#             
+#         else:
+#             raise TypeError(f"Expecting a bool, str (e.g. 'on', 'off') or an int; instead, got {type(val).__name__}")
     
     @property
     def con(self):
@@ -2773,7 +2878,9 @@ class LTPOnline(QtCore.QObject):
         self._runData_.useEmbeddedProtocol = useEmbeddedProtocol
         self._runData_.monitorProtocols.clear()
         self._runData_.conditioningProtocols.clear()
-        self._runData_.conditioning = False
+        self._runData_.episodeType = RecordingEpisodeType.Tracking
+        self._runData_.previousEpisodeType = RecordingEpisodeType.Tracking
+        self._runData_.crossTalk = False
         
         self._stdout_ = out
         self._locationMeasures_ = locationMeasures

@@ -1051,7 +1051,7 @@ class RecordingEpisode(Episode):
             name
         protocol: the electrophysiology recording protocol object, or None
             WARNING: As of 2024-02-18 11:09:55 Scipyen only supports 
-            pyabfbridge.ABFProtocol objects are supported.
+            pyabfbridge.ABFProtocol objects.
 
             Optional; default is None.
 

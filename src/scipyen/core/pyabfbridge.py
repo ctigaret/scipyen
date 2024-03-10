@@ -1010,6 +1010,9 @@ class ABFEpoch:
 #     pass                         # will be (properly) redefined further below
 
 class ABFProtocol(ElectrophysiologyProtocol):
+    from ephys.ephys import SynapticPathway
+    from ephys.ephys import ClampMode
+    
     def __init__(self, obj:typing.Union[pyabf.ABF,neo.Block],
                  generateOutputConfigs:bool=True,
                  generateInputConfigs:bool=True):
@@ -1707,7 +1710,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         This behaviour can be controlled with the two parameters:
         
-        • alterante (False/True/None) - default is None
+        • alternate (False/True/None) - default is None
         
         • trains (False/True/None) - default is None
         
@@ -1758,7 +1761,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         an ephys.ephys.ClampMode
         
         """
-        from ephys.ephys import ClampMode
+        # from ephys.ephys import ClampMode
         if not isinstance(adc, ABFInputConfiguration):
             adc = self.getADC(adc, physical=physicalADC) # get first (primary) input by default
 
@@ -1776,16 +1779,221 @@ class ABFProtocol(ElectrophysiologyProtocol):
         commandIsPotential = scq.check_electrical_potential_units(dac.units)
 
         if recordsPotential and commandIsCurrent:
-            return ClampMode.CurrentClamp
+            return self.ClampMode.CurrentClamp
         elif recordsCurrent and commandIsPotential:
-            return ClampMode.VoltageClamp
+            return self.ClampMode.VoltageClamp
         else:
-            return ClampMode.NoClamp
+            return self.ClampMode.NoClamp
 
     def getSweepTime(self, sweep:int = 0) -> pq.Quantity:
         if self.sweepInterval == 0*pq.s:
             return sweep * self.sweepDuration
         return sweep * self.sweepInterval
+    
+    def getPathwaysDigitalStimulationSequence(self, pathways:typing.Sequence[SynapticPathway],
+                                        dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
+                                        byFirstStimulus:bool=True):
+        """Returns sweep-specific digital stimulation of pathways.
+        
+        Often, a protocol is used to digitally stimulate more than one synaptic
+        pathway (typically, to test cross-talk, or overlap, between two synaptic
+        pathways based on short-term plasticity phenomena such as paired-pulse
+        facilitation).
+        
+        This function helps identifying such cases, abnd the order in which the 
+        pathways are stimulated, in each sweep.
+        
+        For each sweep in the protocol, returns a tuple with the indices of the 
+        pathways that have been stimulated (in the `pathways` sequence), ordered
+        by the temporal order of the stimulation in each sweep.
+        
+        This works on ABFEpoch epochs, defined in the specified DAC, that emit 
+        digital signals to stimulate the pathways.
+        
+        Parameters:
+        ----------
+        pathways: sequence of SynapticPathway objects
+            Not all pathways in the sequence might be stimulated by the protocol 
+            in every sweep.
+        
+        dac: a DAC channel configuration of this protocol, an int (physical index)
+            or str (name of the DAC channel), or None (default)
+        
+            When None, `dac` is the active DAC channel of the protocol.
+        
+            WARNING: When a protocol uses alternative digital outputs, this DAC 
+            should be the "active" DAC of the protocol; for generality, we allow
+            specifying other DAC here in case the protocol configured digital
+            output a DAC other than the one used for command waveforms.
+        
+        byFirstStimulus: bool, default is True — controls how the order of pathway
+            stimulation is returned, in particular when the pathways are 
+            stimulated in several interleaved epochs in a given sweep.
+        
+            When True, the order of the pathways inside the stimulation sequence
+            is given by the first occurence of a stimulus in the pathway(s) (i.e.,
+            according to the timing of the first ABFEpoch that stimulates the 
+            pathway, regardless of any subsequent epochs that stimulate the 
+            same pathway later in the sweep).
+        
+            NOTE: This is useful to simply determine the sweep-specific order in
+                which parthways are stimulated, regardless of the stimulation pattern.
+        
+            When False, the output reflects sequence of pathways in all ABF Epochs
+            that emit stimulus signals. See examples below
+        
+        Returns:
+        -------
+        A tuple of 2-tuples, eacb containing:
+            sweep index, tuple of indexes in the `pathways` sequence, for the 
+                pathways that have been stimulated in that sweep
+        
+        NOTE: Depending on the value of the `byFirstStimulus` parameter (see above)
+            the tuple of pathway indexes contains:
+        
+            • `byFirstStimulus` True: the stimulated pathway indexes in the order
+                of the occurrence of their FIRST stimulation in the given sweep
+                — this is the default;
+        
+            • `byFirstStimulus` False: the indexes of the stimulated pathways in 
+                the order they occur accross all epochs that trigger their stimulation,
+                in the given sweep.
+        
+        Examples:
+        ---------
+        
+        Example 1: given a source declaring two pathways stimulated, 
+            respectively via DIG 0 and DIG 1, and a protocol that stimulates 
+            these pathways alternatively according to the schematic below 
+            (NOTE: protocol has alternateDigitalOutputStateEnabled True),
+        
+            sweep 0 (even sweeps):
+        
+                path 0 (DIG 0)  ______|_|_________
+                path 1 (DIG 1)  __________________
+            
+            sweep 1 (odd sweeps):
+            
+                path 0 (DIG 0)  __________________
+                path 1 (DIG 1)  ______|_|_________
+        
+            `byFirstStimulus`:          the function returns:
+        -------------------------------------------------------------------
+            True                        ((0, (0,)), (1, (1,)))
+            False                       ((0, (0,)), (1, (1,)))
+        
+            NOTE: In this example there is one epoch triggering a pathway in 
+                all sweeps, but the epochs uses a TTL train instead of a pulse;
+                the value of `byFirstStimulus` is irrelevant;
+                each epoch appear to be triggered once, but in reality it is 
+                stimulated twice per epoch (via a TTL train)
+        
+            ATTENTION: this example reflects the fact that the number of times
+                a pathway index appears in the tuple does NOT necessarily indicate
+                how many times that pathway was actually stimulated — the
+                latter depends on whether the epoch emits a TTL pulse or a TTL
+                train, and, in the case of TTL trains, on the pulse period in the 
+                train, and duration of the epoch.
+        
+        Example 2: the same source as in Example 1, but the protocol stimulates
+            the pathways according to the following scheme:
+        
+            sweep 0 (even sweeps):
+        
+                path 0 (DIG 0)  ______|___________
+                path 1 (DIG 1)  ________|_________
+            
+            sweep 1 (odd sweeps):
+            
+                path 0 (DIG 0)  ________|_________
+                path 1 (DIG 1)  ______|___________
+        
+            `byFirstStimulus`:          the function returns:
+        -------------------------------------------------------------------
+            True                        ((0, (0, 1)), (1, (1, 0)))
+            False                       ((0, (0, 1)), (1, (1, 0)))
+        
+            NOTE: In this example there is one epoch triggering each pathway in 
+                all sweeps, therefore the value of `byFirstStimulus` is irrelevant.
+        
+        Example 3 (contrived): the same source as in Example 1, but the protocol 
+            stimulates the pathways according to the following scheme:
+        
+            sweep 0 (even sweeps):
+        
+                path 0 (DIG 0)  ______|_____|_____
+                path 1 (DIG 1)  ________|_|_______
+            
+            sweep 1 (odd sweeps):
+            
+                path 0 (DIG 0)  ________|_|_______
+                path 1 (DIG 1)  ______|___________
+        
+            `byFirstStimulus`:          the function returns:
+        -------------------------------------------------------------------
+            True                        ((0, (0, 1)), (1, (1, 0)))
+            False                       ((0, (0, 1, 1, 0)), (1, (1, 0, 0)))
+
+            I.e., when `byFirstStimulus` is True the pathway stimulations are
+            returned in the order of their first stimulation (in sweep 0,
+            pathway 0 is the first pathway that is being stimulated, whereas in 
+            sweep 1 it is the second pathway — pathway 1 — that is stimulated,
+            even if both pathways are also stimulated several times later).
+        
+            When `byFirstStimulus` is False, the function returns the full 
+            stimulation sequence of the pathways in the sweep
+        
+        Example 4: Same recording source as above, but the protocol defines a single
+            sweep for the stimulation of a single pathway
+        
+        """
+        # from ephys.ephys import SynapticPathway
+        
+        if dac is None:
+            dac = self.getDAC()
+            
+        elif isinstance(dac, (int, str)):
+            dac = self.getDAC(dac)
+            
+        elif isinstance(dac, ABFOutputConfiguration):
+            assert dac.protocol == self, "The specified DAC channel configuration does not belong to this protocol"
+            
+        else:
+            raise TypeError(f"`dac` expected an ABFOutputConfiguration, and int, or a string (name); instad, ot {type(dac).__name__} ")
+            
+        if len(pathways) == 0:
+            raise ValueError("`pathways` is an empty sequence")
+        
+        if not all(isinstance(v, self.SynapticPathway) for v in pathways):
+            raise TypeError("`pathways` expected to be a sequence of ephys.SynapticPathway objects")
+        
+        pathways = [p for p in pathways if p.stimulus.dig]
+        
+        if len(pathways) == 0:
+            scipywarn("Neither pathway declares stimuus via a digital output channel")
+            return
+        
+        if byFirstStimulus:
+            # NOTE: 2024-03-10 20:11:22
+            # description of the algorithm (one-liner nested comprehensions)
+            # for each sweep:
+            #   for each pathway:
+            #       get the epochs with digital stimulus ON for the pathway's stimulus channel, in current sweep
+            #           → as tuples of pathway index, epochs sequence
+            #           (NOTE: the epochs sequence there may have more than one epoch, or NO epoch if there is no stimulation on that DIG channel in current sweep)
+            #       take out (filter) the entries with no epochs
+            #       sort entries by the start time of the first epoch in the entry (does nothing of no entry left after the filter step)
+            # collect a tuple of tuples: (sweep index, tuple of pathway indices ordered by the time of their first epoch, sorted above)
+            return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
+        else:
+            # NOTE: 2024-03-10 20:14:34
+            # description of the algorithm (one-liner nested comprehensions)
+            # for each sweep:
+            #   get epochs with digital output
+            #   collect out those that use the stimulus digital channel declared in the pathway specifications
+            # collect a tuple of tuples: (sweep index, tuple of pathway indices stimulated in all epochs in the sweep)
+            return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+                
     
     @property
     def inputs(self):
