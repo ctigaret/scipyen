@@ -4445,8 +4445,8 @@ anything else       anything else       ❌
     def showSelectors(self):
         self.selectorsVisible = True
         
-    @pyqtSlot()
-    def slot_toggleMainToolbar(self):
+    @pyqtSlot(bool)
+    def slot_toggleMainToolbar(self, value):
         self.mainToolBarVisible = value
         # self.showMainToolbar() if self.actionViewMain_Toolbar.isChecked() else self.hideMainToolbar()
         
