@@ -4423,9 +4423,10 @@ anything else       anything else       ❌
         """
         self.slot_removeCursors()
         
-    @pyqtSlot()
-    def slot_toggleNavigator(self):
-        self.showNavigator() if self.actionViewMain_Toolbar.isChecked() else self.hideNavigator()
+    @pyqtSlot(bool)
+    def slot_toggleNavigator(self, value):
+        self.navigatorVisible = value
+        # self.showNavigator() if self.actionViewMain_Toolbar.isChecked() else self.hideNavigator()
         
     def hideNavigator(self):
         self.navigatorVisible = False
@@ -4433,9 +4434,10 @@ anything else       anything else       ❌
     def showNavigator(self):
         self.navigatorVisible = True
         
-    @pyqtSlot()
-    def slot_toggleSelectors(self):
-        self.showSelectors() if self.actionViewMain_Toolbar.isChecked() else self.hideSelectors()
+    @pyqtSlot(bool)
+    def slot_toggleSelectors(self, value):
+        self.selectorsVisible = value
+        # self.showSelectors() if self.actionViewMain_Toolbar.isChecked() else self.hideSelectors()
         
     def hideSelectors(self):
         self.selectorsVisible = False
@@ -4445,7 +4447,8 @@ anything else       anything else       ❌
         
     @pyqtSlot()
     def slot_toggleMainToolbar(self):
-        self.showMainToolbar() if self.actionViewMain_Toolbar.isChecked() else self.hideMainToolbar()
+        self.mainToolBarVisible = value
+        # self.showMainToolbar() if self.actionViewMain_Toolbar.isChecked() else self.hideMainToolbar()
         
     def hideMainToolbar(self):
         self.mainToolBarVisible = False
