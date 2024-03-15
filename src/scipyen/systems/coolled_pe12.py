@@ -295,7 +295,7 @@ class CoolLEDpE12():
         # NOTE: 2024-03-04 18:19:59
         # needs long timeout to read all messages
         oldtimeout = self.timeout
-        self.timeout = 0.5
+        self.timeout = 0.01
         self.__portio__.flush()
         self._channel_states_ = dict(sorted(list(map(lambda x: (x[1], {"on": x.strip("\n")[-1]=="N", "intensity":int(x[2:5])}), filter(lambda x: x.startswith("C"), self.sendCommand("C?", verbose=False, collapse=False)))), key = lambda x: x[0]))        
         self._lam_labels_ = list(self._channel_states_.keys())
@@ -374,7 +374,7 @@ class CoolLEDpE12():
         return self._channel_states_
     
     def getChannelState(self, channel:typing.Optional[typing.Union[int,str]] = None,
-                        refresh:bool=False) -> dict:
+                        refresh:bool=True) -> dict:
         if refresh:
             self.readChannelStates()
             
@@ -525,18 +525,15 @@ class CoolLEDpE12():
             oldTimeout = self.timeout
             self.timeout = 0.01
             chState = self.getChannelState(channel)["on"]
-            self.timeout = oldTimeout
             if not chState:
                 self.channelON(0, True)
-                
-            
+
+
             for x in vv:
                 msg = f"C{channel}I{val:03}"
                 self.sendCommand(msg, verbose=False, collapse=False)
-            
 
-
-
+            self.timeout = oldTimeout
 
         if val not in range(101):
             raise ValueError(f"Invalid intensity; must be between 0 and 100 inclusive; instead, got {val}")
