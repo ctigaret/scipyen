@@ -559,7 +559,7 @@ class CoolLEDpE12():
             else:
                 raise TypeError(f"Invalid LAM channel specification; expecting an int or str, instead got {type(channel).__name__}")
                 
-                    
+        print(f"msg {msg}")
         ret = self.sendCommand(msg, verbose=False, collapse=False)
         self._parseLAMStates(ret)
         
