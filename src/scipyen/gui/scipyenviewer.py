@@ -530,6 +530,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         if get_focus:
             self.activateWindow()
+            
             #self.show()
         
     @abstractmethod
