@@ -2119,7 +2119,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             # kwargs["win_title"] = win_title
             if "parent" not in kwargs:
-                kwargs["parent"] = self
+                kwargs["parent"] = self # needed on X11 platform, but not on Wayland,
+                                        # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
+                
             win = winClass(*args, **kwargs)
 
             variables = dict([item for item in self.shell.user_ns.items(
@@ -4360,7 +4362,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #     if win[1] is not self:
         #         win[1].close()
 
-        if sys.platform == "win32":
+        # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
+        if sys.platform == "win32" or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             QtWidgets.QApplication.closeAllWindows()
             
         evt.accept()

@@ -23,6 +23,8 @@ import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
 
+SESSION_TYPE = os.getenv("XDG_SESSION_TYPE")
+
 class DirectoryFileWatcher(QtCore.QObject):
     """Bounces signals/slots to bound methods (callbacks) in an observer
     """
@@ -880,12 +882,17 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         appWindow = kwargs.pop("appWindow", None)
         
+        parent_obj = parent
+        
         
         if isinstance(scipyenWindow, QtWidgets.QMainWindow) and type(scipyenWindow).__name__ == "ScipyenWindow":
             self._scipyenWindow_ = scipyenWindow
             
-        elif isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
-            self._scipyenWindow_   = parent
+        # elif isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
+        #     self._scipyenWindow_   = parent
+            
+        elif isinstance(parent_obj, QtWidgets.QMainWindow) and type(parent_obj).__name__ == "ScipyenWindow":
+            self._scipyenWindow_   = parent_obj
             
         else:
             # NOTE: 2020-12-05 21:24:45 CAUTION FIXME/TODO
@@ -910,8 +917,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self._appWindow_ = appWindow
             
         elif self._appWindow_ is None:
-            if isinstance(parent, QtWidgets.QMainWindow):
-                self._appWindow_ = parent
+            # if isinstance(parent, QtWidgets.QMainWindow):
+            #     self._appWindow_ = parent
+            if isinstance(parent_obj, QtWidgets.QMainWindow):
+                self._appWindow_ = parent_obj
                 
             else:
                 self._appWindow_ = self._scipyenWindow_

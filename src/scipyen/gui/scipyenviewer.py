@@ -188,6 +188,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if sys.platform == "win32" or os.name == "nt" or platform.uname().system == "Windows":
             parent = None
             
+        # NOTE: 2024-04-17 11:53:29
+        # fixes viewer window stacking in PyQt5 when running on Plasma 6 Wayland 
+        # session
+        # >>> NOTE <<< you still get the "qt.qpa.wayland: Wayland does not support QWindow::requestActivate()"
+        # warnings at the system console, though ⌢
+        if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+            parent = None
+            
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, on=False)
