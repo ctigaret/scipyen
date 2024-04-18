@@ -4123,7 +4123,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.displayFrame()
 
     def _editImageBrightness(self):
-        dlg = pgui.ImageBrightnessDialog(self)
+        dlg = ImageBrightnessDialog(self)
+        # dlg = pgui.ImageBrightnessDialog(self)
         dlg.show()
         
     def _editImageGamma(self):
