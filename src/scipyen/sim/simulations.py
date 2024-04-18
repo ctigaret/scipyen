@@ -2,18 +2,31 @@ import typing
 import numpy as np
 import vigra
 
-def g_blob(meanX:float = 64., meanY:float = 64., varX:float = 1.0, varY:float = 1.0, size:int = 128):
-    "Normally distributed points on a grid"
+def g_blob(meanX:float = 64., meanY:float = 64., varX:float = 1.0, varY:float = 1.0, n:int = 128):
+    """Generates random normally distributed x and y coordinates for a set of points on a 2D grid.
+    
+    Parameters:
+    -----------
+    meanX, meanY, varX, varY: the parameters fo the Gaussian distribution, respectively,
+        of the X and Y coordinates
+    
+    n: the number of points 
+    
+    Returns:
+    --------
+    a 2D numpy array of shape `n` × 2, with the generated random X and Y 
+        coordinates, respectively, in columns 0 and 1, for `n` points
+    """
     rng = np.random.default_rng()
     
     mean = (meanX, meanY) 
     
     cov = [[varX, 0.], [0., varY]] 
     
-    return rng.multivariate_normal(mean, cov, size=size)
+    return rng.multivariate_normal(mean, cov, size=n)
 
 def g_blob_image(blob, img:typing.Optional[typing.Union[np.ndarray, vigra.VigraArray]]=None, size:int=128) -> vigra.VigraArray:
-    """"Embeds a g_blob in an image.
+    """Embeds a `g_blob` in an image.
     The image may be passed as the `img` argument, or a `size` by `size` synthetic
     image will be generated.
     """
