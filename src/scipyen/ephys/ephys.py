@@ -941,7 +941,7 @@ class SynapticPathway: pass
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class RecordingEpisode(Episode):
     """
-    Specification of an eletrophysiology recording episode.
+    Specification of an electrophysiology recording episode.
         
     An "episode" is a contiguous series of sweeps recorded during a specific set 
     of experimental conditions or protocol -- typically, a subset of a larger 

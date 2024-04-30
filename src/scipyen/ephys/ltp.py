@@ -1164,8 +1164,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 continue
             
             pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
-            print(f"{self._runData_.currentAbfTrial.name} ({protocol.name}) paths stim by sweep = {pathStimBySweep}")
-                
+            print(f"{self._runData_.currentAbfTrial.name} protocol {colorama.Fore.GREEN}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL} source {colorama.Fore.GREEN}{src.name}{colorama.Style.RESET_ALL}")
+            print(f"\tpaths stim by sweep = {colorama.Fore.GREEN}{pathStimBySweep}{colorama.Style.RESET_ALL}")
+            
             
             if self._runData_.episodeType & RecordingEpisodeType.Conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
@@ -2166,6 +2167,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
 class LTPOnline(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
+        'legacy' code
     """
     # TODO: update episodes in the pathway's schedule
 
@@ -2947,6 +2949,18 @@ class LTPOnline2(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
     """
     # TODO: update episodes in the pathway's schedule
+    # TODO: decide if:
+    # 1) "guestimating" episode type form the first run, OR
+    # 2)  expect the user to manually enter data (i.e. tracking vs xtalk vs 
+    # conditioning vs tracking again)
+    #
+    # What this entails (fields of runData):
+    # option (1):
+    #   • on first run:
+    #       ∘ currentEpisode = None
+    #       ∘ episodeType = Tracking (the default — anything else doesn't make sense here)
+    #       ∘ pathways unknown — WARNING if first run file is a conditioning one
+    #           it will mis-set all the subsequent parameters
         
     resultsReady = pyqtSignal(object, name="resultsReady")
     
@@ -2965,7 +2979,7 @@ class LTPOnline2(QtCore.QObject):
                  out: typing.Optional[io.TextIOBase] = None,
                  locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
                  ):
-        # implementation of singleton pattern
+        # implementation of singleton pattern ?!?
         if cls._instance is None:
             cls._instance = super().__new__(cls, *args, episodeName,
                  useEmbeddedProtocol, useSlopeInIClamp, emitterWindow,
@@ -3043,6 +3057,7 @@ class LTPOnline2(QtCore.QObject):
         
         self._runData_ = DataBag(sources = self._sources_,
                                  currentProtocol = None,
+                                 currentEpisode = None,
                                  monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ list of protocols}
                                  conditioningProtocols = dict(),
                                  sweeps = 0,
@@ -3079,6 +3094,7 @@ class LTPOnline2(QtCore.QObject):
             files = simulate.get("files", None)
             timeout = simulate.get("timeout", 2000) # ms
             directory = simulate.get("dir", None)
+            
             if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
                 self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
                 self._doSimulation_ = True
