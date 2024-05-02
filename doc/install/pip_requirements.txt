@@ -24,6 +24,11 @@
 # also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
 # linguistics
 # packages already listed above
+
+# CHANGELOG
+# 2024-05-02 08:45:19
+# accommodate installaiton of PyQt6
+
 #wheel
 
 distlib
@@ -34,11 +39,15 @@ Jinja2
 MarkupSafe
 Pillow
 PyLEMS
-# required to build PyQt5 locally using the host's Qt stack
+qtpy
+# required to build PyQt5/6 locally using the host's Qt stack
 PyQt-builder ; sys_platform == 'linux'
 # required to build PyQt5 locally using the host's Qt stack
 Pyqt5-sip ; sys_platform == 'linux'
 PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+# required to build PyQt6 locally using the host's Qt stack
+Pyqt6-sip ; sys_platform == 'linux'
+PyQt6 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
 qdarkstyle ; sys_platform == 'win32'
 qasync
 aiohttp

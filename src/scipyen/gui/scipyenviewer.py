@@ -7,8 +7,10 @@ from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
 #from abc import (abstractmethod,)
 
-from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
+from qtpy import (QtCore, QtWidgets, QtGui, QtDBus)
+from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
+# from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
+# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
 
 from core.utilities import safeWrapper
 # from core import workspacefunctions as wfunc
@@ -72,7 +74,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     _configureUI_() -- configures specific GUI widgets and menus
         
          ATTENTION: If the viewer inherits Qt widgets and actions defined in a
-        QtDesigner *.ui file (loaded with PyQt5.uic.loadUiType()) then this function
+        QtDesigner *.ui file (loaded with uic.loadUiType()) then this function
         must call self.setupUi() very early.
     
     If there are viewer type-specific settigns that need to be made persistent
@@ -126,8 +128,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     data types for which there exists a specialized viewer will be displayed, 
     by default, in that specialized viewer, instead of DataViewer.
     """
-    sig_activated           = pyqtSignal(int, name="sig_activated")
-    sig_closeMe             = pyqtSignal()
+    sig_activated           = Signal(int, name="sig_activated")
+    sig_closeMe             = Signal()
     
     # tuple of 2-tuples (python type, priority)
     # if you don;t want this to be registered as a viewer, then make this attribute empty
@@ -189,7 +191,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             parent = None
             
         # NOTE: 2024-04-17 11:53:29
-        # fixes viewer window stacking in PyQt5 when running on Plasma 6 Wayland 
+        # fixes viewer window stacking when running on Plasma 6 Wayland 
         # session
         # >>> NOTE <<< you still get the "qt.qpa.wayland: Wayland does not support QWindow::requestActivate()"
         # warnings at the system console, though ⌢
@@ -241,7 +243,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._global_menu_service_ = None
         
-        if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
+        # if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
+        if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
             # if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
             if sysutils.is_kde_x11():
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
@@ -682,7 +685,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         return super().event(evt)
     
-    @pyqtSlot(QtGui.QWindow.Visibility)
+    @Slot(QtGui.QWindow.Visibility)
     def _slot_visibility_changed(self, val):
         if hasattr(self, "_wm_id_") and self._wm_id_ != int(self.winId()):
             if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
@@ -733,7 +736,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                     dereg_reply = dbusinterface.call("UnregisterWindow", old_v)
                     newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1]))
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
         """Triggeres a refresh of the displayed information.
@@ -914,7 +917,7 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     # signal emitted when the viewer displays a data frame; value:int = the
     # index of the frame in the data
-    frameChanged            = pyqtSignal(int, name="frameChanged")
+    frameChanged            = Signal(int, name="frameChanged")
     
     def __init__(self, data: typing.Optional[object] = None, parent: typing.Optional[QtWidgets.QMainWindow] = None, ID: typing.Optional[int] = None, win_title: typing.Optional[str] = None, doc_title: typing.Optional[str] = None, frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, currentFrame: typing.Optional[int] = None, missingFrameValue:typing.Optional[object]=None, *args, **kwargs):
         """Constructor for ScipyenFrameViewer.
@@ -1251,7 +1254,7 @@ class ScipyenFrameViewer(ScipyenViewer):
                     
             self._linkedViewers_.clear()
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_setFrameNumber(self, value:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         """Drives frame navigation from the GUI.

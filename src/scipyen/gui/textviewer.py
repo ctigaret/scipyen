@@ -6,8 +6,10 @@ import os
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -38,10 +40,10 @@ class TextViewer(ScipyenViewer):
     • only save as
     • no drag'n drop
     """
-    sig_activated = pyqtSignal(int)
-    # closeMe  = pyqtSignal(int)
-    # signal_window_will_close = pyqtSignal()
-    sig_textChanged = pyqtSignal(name = "sig_textChanged")
+    sig_activated = Signal(int)
+    # closeMe  = Signal(int)
+    # signal_window_will_close = Signal()
+    sig_textChanged = Signal(name = "sig_textChanged")
     
     viewer_for_types = {str: 99, QtGui.QTextDocument: 99}
     # view_action_name = "Text"
@@ -240,7 +242,7 @@ class TextViewer(ScipyenViewer):
                 
         return ret
             
-    @pyqtSlot()
+    @Slot()
     def _slot_exportDataToWorkspace(self):
         if self._docViewer_.document().isEmpty():
             return

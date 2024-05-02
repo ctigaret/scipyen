@@ -9,9 +9,12 @@ from core import quantities as scq
 from core import strutils
 import pandas as pd
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType
 
 from gui import quickdialog as qd
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
@@ -66,7 +69,7 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         
         self.resize(-1,-1)
         
-    @pyqtSlot()
+    @Slot()
     def _slot_entryValueChanged(self):
         # NOTE: 2022-11-07 22:40:17
         # the sender is the variable attribute of the quickdialog widget

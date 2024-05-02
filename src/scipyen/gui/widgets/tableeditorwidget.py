@@ -12,9 +12,12 @@ import numpy as np
 import neo
 import vigra
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5.uic import loadUiType as __loadUiType__
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -140,13 +143,13 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.nextSliceToolButton.setEnabled(False)
         self._dataModel_.setModelData(self._data_)
         
-    @pyqtSlot()
+    @Slot()
     def _slot_prevSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
             if self.currentSlice > 0:
                 self.currentSlice = self.currentSlice - 1
         
-    @pyqtSlot()
+    @Slot()
     def _slot_nextSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
             if self.currentSlice <= self._data_.shape[self._slicingAxis_] -1 :
@@ -274,18 +277,18 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.nextSliceToolButton.setEnabled(False)
         self.nextSliceToolButton.clicked.connect(self._slot_nextSlice)
         
-    @pyqtSlot()
+    @Slot()
     def slot_resizeAllColumnsToContents(self):
         #print("TableEditorWidget slot_resizeAllColumnsToContents")
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         
-    @pyqtSlot()
+    @Slot()
     def slot_resizeAllRowsToContents(self):
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_horizontal_header_context_menu_request(self, pos):
         #print("horizontal header context menu at pos %s" % pos)
@@ -309,7 +312,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         cm.exec(self.tableView.mapToGlobal(pos))
         
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_vertical_header_context_menu_request(self, pos):
         if len(self.selectedRowIndexes) == 0:
@@ -330,7 +333,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         cm.exec(self.tableView.mapToGlobal(pos))
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copyColumnName(self):
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
@@ -352,7 +355,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             return 
         QtWidgets.QApplication.instance().clipboard().setText(ret)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copyRowName(self):
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
@@ -436,7 +439,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         return ret
         
             
-    # @pyqtSlot()
+    # @Slot()
     # @safeWrapper
     # def slot_copySelection(self):
     #     # TODO 2023-11-17 15:00:12
@@ -444,7 +447,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     #     withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
         
         
-    @pyqtSlot(QtWidgets.QTableWidgetItem)
+    @Slot(QtWidgets.QTableWidgetItem)
     @safeWrapper
     def slot_tableEdited(self, item):
         # TODO code for xarray.DataArray
@@ -505,7 +508,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             else:
                 raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_resizeSelectedRowsToContents(self):
         if not isinstance(self.selectedRowIndex, int):
@@ -526,7 +529,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
             self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_resizeSelectedColumnsToContents(self):
         if not isinstance(self.selectedColumnIndex, int):
@@ -547,7 +550,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
             self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copySelection(self):
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
@@ -637,7 +640,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             
         QtGui.QGuiApplication.clipboard().setText("".join(selected_text))
     
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_table_context_menu_requested(self, pos):
         #print("table_context_menu at pos %s" % pos)
@@ -662,10 +665,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     WARNING use with caution
     """
-    editCompleted = pyqtSignal([pd.DataFrame], [pd.Series], [np.ndarray], name="editCompleted")
+    editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="editCompleted")
     
-    signal_rowsPopulated = pyqtSignal(int, name="signal_rowsPopulated")
-    signal_columnsPopulated = pyqtSignal(int, name="signal_columnsPopulated")
+    signal_rowsPopulated = Signal(int, name="signal_rowsPopulated")
+    signal_columnsPopulated = Signal(int, name="signal_columnsPopulated")
     
     def __init__(self, data=None, parent=None):
         super(TabularDataModel, self).__init__(parent=parent)

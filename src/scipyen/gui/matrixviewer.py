@@ -6,7 +6,8 @@ Qt5-based viewer window for two dimensional ndarrays
 #### BEGIN 3rd party modules
 import numpy as np
 import vigra
-from PyQt5 import QtCore, QtWidgets, QtGui
+from qtpy import QtCore, QtWidgets, QtGui
+# from PyQt5 import QtCore, QtWidgets, QtGui
 #### END 3rd party modules
 
 #### BEGIN pict.iolib modules

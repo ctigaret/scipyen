@@ -45,8 +45,10 @@ from copy import copy
 from gui.pyqtgraph_patch import pyqtgraph as pg
 import numpy as np
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets, QtXml
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -105,9 +107,9 @@ def genColorTable(cmap, ncolors=256):
 #### END FIXME 2023-07-12 09:24:29 TODO
 
 class GuiWorkerSignals(QtCore.QObject):
-    signal_Finished = pyqtSignal(name="signal_Finished")
-    sig_error = pyqtSignal(tuple, name="sig_error")
-    signal_Result = pyqtSignal(object, name="signal_Result")
+    signal_Finished = Signal(name="signal_Finished")
+    sig_error = Signal(tuple, name="sig_error")
+    signal_Result = Signal(object, name="signal_Result")
     
     
 class GuiWorker(QtCore.QRunnable):
@@ -122,7 +124,7 @@ class GuiWorker(QtCore.QRunnable):
         
         self.result = None
         
-    @pyqtSlot()
+    @Slot()
     def run(self):
         try:
             self.result = self.fn(*self.args, **self.kwargs)
@@ -164,12 +166,12 @@ class ProgressWorkerSignals(QtCore.QObject):
 
     """
     
-    signal_Finished = pyqtSignal()
-    sig_error = pyqtSignal(tuple)
-    signal_Result = pyqtSignal(object)
-    signal_Progress = pyqtSignal(int)
-    signal_setMaximum = pyqtSignal(int)
-    signal_Canceled = pyqtSignal()
+    signal_Finished = Signal()
+    sig_error = Signal(tuple)
+    signal_Result = Signal(object)
+    signal_Progress = Signal(int)
+    signal_setMaximum = Signal(int)
+    signal_Canceled = Signal()
     
 class ProgressWorkerRunnable(QtCore.QRunnable):
     """
@@ -184,7 +186,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
     
         The function is expected to execute a loop computation and its signature
         should contain an optional named parameter "progressSignal" of type 
-        pyqtSignal, to be emitted after each iteration of the loop code.
+        Signal, to be emitted after each iteration of the loop code.
 
     :param args: Arguments to pass to the callback function
     :param kwargs: Keywords to pass to the callback function
@@ -196,7 +198,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
     NOTE: because this inherits from a QRunnable, the operation cannot be aborted
 
     """
-    # canceled = pyqtSignal(name="canceled")
+    # canceled = Signal(name="canceled")
     
     def __init__(self, fn, progressDialog, *args, **kwargs):
         """
@@ -223,7 +225,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
             self.kwargs["progressUI"] = self.pd
             
 
-    @pyqtSlot()
+    @Slot()
     def run(self):
         '''Initialise the runner function with passed args, kwargs.
         This is done by calling something like threadpool.start(worker)
@@ -347,7 +349,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
         else:
             self.pd is None
             
-    @pyqtSlot(int)
+    @Slot(int)
     def progress(self, value):
         # print(f"{self.__class__.__name__}.progress({value})")
         if isinstance(self.pd, QtWidgets.QProgressDialog):
@@ -359,7 +361,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
     def progressDialog(self):
         return self.pd
     
-    @pyqtSlot()
+    @Slot()
     def run(self):
         # print(f"{self.__class__.__name__}.run()")
         # result = self.fn(*self.args, **self.kwargs)
@@ -390,8 +392,8 @@ class ProgressThreadController(QtCore.QObject):
     moved ot another thread)
 
 """
-    sig_start = pyqtSignal(name="sig_start")
-    sig_ready = pyqtSignal(object, name="sig_ready")
+    sig_start = Signal(name="sig_start")
+    sig_ready = Signal(object, name="sig_ready")
     
     # def __init__(self, fn, /, progressDialog=None, *args, **kwargs):
     def __init__(self, progressWorker:ProgressWorkerThreaded, /, *args, **kwargs):
@@ -425,7 +427,7 @@ class ProgressThreadController(QtCore.QObject):
     #     if isinstance(progressDialog, QtWidgets.QProgressDialog):
     #         self.worker.setProgressDialog(progressDialog)
             
-    @pyqtSlot(object)
+    @Slot(object)
     def handleResult(self, result:object):
         # print(f"{self.__class__.__name__}.handleResult({result})")
         self.result = result
@@ -434,12 +436,12 @@ class ProgressThreadController(QtCore.QObject):
         self.sig_ready.emit(self.result)
         self.workerThread.quit()
         
-    @pyqtSlot()
+    @Slot()
     def finished(self):
         # print(f"{self.__class__.__name__}.finished")
         self.workerThread.quit()
         
-    @pyqtSlot()
+    @Slot()
     def abort(self):
         print(f"{self.__class__.__name__}.abort")
         self.sig_ready.emit(None)
@@ -473,7 +475,7 @@ class LoopWorkerThread(QtCore.QThread):
     """Thread for an atomic function call in a loop.
 See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
 """
-    # sig_ready = pyqtSignal(object, name="sig_ready")
+    # sig_ready = Signal(object, name="sig_ready")
     
     def __init__(self, parent, fn:typing.Callable, /, 
                  loopControl:typing.Optional[dict]=None, *args, **kwargs):

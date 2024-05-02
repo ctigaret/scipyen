@@ -5,9 +5,12 @@ from enum import IntEnum
 
 import numpy as np
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-# from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# # from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 from core.utilities import reverse_mapping_lookup
@@ -205,9 +208,9 @@ class PenComboBox(QtWidgets.QComboBox):
     The selected pen stroke/cap/join style is available as the 'value' property
       
     """
-    activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
-    highlighted = pyqtSignal(object, name="highlighted")
-    styleChanged = pyqtSignal(object, name="styleChanged")
+    activated = Signal(object, name="activated") # overloads QComboBox.activated[int] signal
+    highlighted = Signal(object, name="highlighted")
+    styleChanged = Signal(object, name="styleChanged")
     
     def __init__(self, style:typing.Optional[QtCore.Qt.PenStyle]=None,
                  customStyles:typing.Optional[dict]=customDashStyles, # only for custom strokes
@@ -248,7 +251,7 @@ class PenComboBox(QtWidgets.QComboBox):
         self._slotActivated(1)
         self.setMaxVisibleItems(13)
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slotActivated(self, index:int):
         if self.styling == "stroke" and index == 0:
@@ -276,7 +279,7 @@ class PenComboBox(QtWidgets.QComboBox):
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         self.activated[object].emit(self._internalStyle)
 
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slotHighlighted(self, index:int):
         if index == 0:
@@ -538,9 +541,9 @@ class BrushComboBox(QtWidgets.QComboBox):
       
     The selected QBrush is available as the 'qBrush' and 'value' properties.
     """
-    activated = pyqtSignal(object, name="activated") # overloads QComboBox.activated[int] signal
-    highlighted = pyqtSignal(object, name="highlighted")
-    styleChanged = pyqtSignal(object, name="styleChanged")
+    activated = Signal(object, name="activated") # overloads QComboBox.activated[int] signal
+    highlighted = Signal(object, name="highlighted")
+    styleChanged = Signal(object, name="styleChanged")
     
     def __init__(self, style:typing.Optional[BrushStyleType]=None,
                   customStyles:typing.Optional[dict]=None,
@@ -658,7 +661,7 @@ class BrushComboBox(QtWidgets.QComboBox):
             
         painter.end()
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slotActivated(self, index:int):
         if self.count() == 0:
@@ -738,7 +741,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         self.activated[object].emit(self._internalStyle)
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slotHighlighted(self, index:int):
         gradientBrushIndex = [n for n in self._styles.keys()].index("Gradient...")
@@ -748,7 +751,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         self._internalStyle = self.itemData(index, BrushComboDelegate.ItemRoles.BrushRole)
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slotGradientDialogFinished(self, value:int):
         if value == QtGui.QDialog.Accepted:

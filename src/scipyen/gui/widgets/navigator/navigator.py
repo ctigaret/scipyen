@@ -2,11 +2,15 @@ import typing, pathlib, functools, os, itertools
 from urllib.parse import urlparse, urlsplit
 from collections import namedtuple
 from enum import Enum, IntEnum
-import sip # for sip.isdeleted() - not used yet, but beware
+from qtpy import sip as sip
+# import sip # for sip.isdeleted() - not used yet, but beware
 from traitlets.utils.bunch import Bunch
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg, sip)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
-from PyQt5.uic import loadUiType
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, sip)
+from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
+from qtpy.uic import loadUiType
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg, sip)
+# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
+# from PyQt5.uic import loadUiType
 
 from core import desktoputils as dutils
 from core.desktoputils import PlacesModel
@@ -199,7 +203,7 @@ class UrlComboOverLoadResolving(IntEnum):
     RemoveBottom = 1
     
 class UrlComboBox(QtWidgets.QComboBox):
-    urlActivated = pyqtSignal(QtCore.QUrl, name="urlActivated")
+    urlActivated = Signal(QtCore.QUrl, name="urlActivated")
     
     def __init__(self, mode:UrlComboMode, rw:typing.Optional[bool]=False, parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent)
@@ -417,7 +421,7 @@ class UrlComboBox(QtWidgets.QComboBox):
         if len(self.itemList):
             self._urlAdded_ = True
             
-    @pyqtSlot(int)
+    @Slot(int)
     def slot_activated(self, ndx:int):
         item = self.itemMapper.get(ndx, None)
         
@@ -615,14 +619,14 @@ class NavigatorToggleButton(NavigatorButtonBase):
             
             painter.drawRect(x, verticalGap. caretWidth, buttonHeight - 2 * verticalGap)
     
-    @pyqtSlot()
+    @Slot()
     def updateToolTip(self):
         if self.isChecked():
             self.setToolTip("Click for Navigation")
         else:
             self.setToolTip("Click to Edit Location")
     
-    @pyqtSlot()
+    @Slot()
     def updateCursor(self):
         if self.isChecked():
             self.setCursor(QtCore.Qt.ArrowCursor)
@@ -631,11 +635,11 @@ class NavigatorToggleButton(NavigatorButtonBase):
 
 class NavigatorButton(NavigatorButtonBase): 
     # FIXME/TODO 2023-05-07 23:34:55 finalize
-    navigate = pyqtSignal(str, name="navigate")
-    urlsDroppedOnNavButton = pyqtSignal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDroppedOnNavButton")
-    navigatorButtonActivated = pyqtSignal(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers, name = "navigatorButtonActivated")
-    startedTextResolving = pyqtSignal(name = "startedTextResolving")
-    finishedTextResolving = pyqtSignal(name = "finishedTextResolving")
+    navigate = Signal(str, name="navigate")
+    urlsDroppedOnNavButton = Signal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDroppedOnNavButton")
+    navigatorButtonActivated = Signal(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers, name = "navigatorButtonActivated")
+    startedTextResolving = Signal(name = "startedTextResolving")
+    finishedTextResolving = Signal(name = "finishedTextResolving")
     
     # def __init__(self, text:str, leaf:bool=False, parent=None):
     # def __init__(self, path:pathlib.Path, isBranch:bool=False, parentCrumb=None, parent=None):
@@ -1028,13 +1032,13 @@ class NavigatorButton(NavigatorButtonBase):
         
                 self.subDirsMenu.popup(self.mapToGlobal(evt.pos()))
     
-    @pyqtSlot()
+    @Slot()
     def slot_subDirClick(self): # TODO/FIXME NOW - self.path not existent
         action = self.sender()
         ps = os.path.join(self.path.as_posix(), action.text())
         self.navigate.emit(ps)
         
-    @pyqtSlot()
+    @Slot()
     def slot_menuHiding(self):
         self._pressed_ = False
         self.update()
@@ -1051,7 +1055,7 @@ class NavigatorButton(NavigatorButtonBase):
 # We only use the "file://" protocol, so this is not needed
 #
 # class NavigatorProtocolCombo(NavigatorButtonBase): # TODO
-#     sig_activated = pyqtSignal()
+#     sig_activated = Signal()
 #     def __init__(self, protocol:str, parent=None):
 #         super().__init__(parent)
         
@@ -1059,7 +1063,7 @@ class NavigatorButton(NavigatorButtonBase):
 # By design we only use the 'file://' protocol hence this is NOT needed
 #
 # class NavigatorSchemeCombo(NavigatorButtonBase):
-#     sig_activated = pyqtSignal(str, name="sig_activated")
+#     sig_activated = Signal(str, name="sig_activated")
 #     
 #     def __init__(self, scheme:str, parent:typing.Optional[Navigator]=None):
 #         super().__init__(parent)
@@ -1076,11 +1080,11 @@ class NavigatorButton(NavigatorButtonBase):
 #         url.setScheme(scheme)
 #         return True
 #         
-#     @pyqtSlot()
+#     @Slot()
 #     def setSchemeFromMenu(self):
 #         pass # TODO
 #     
-#     @pyqtSlot(str)
+#     @Slot(str)
 #     def setScheme(self, scheme:str):
 #         self.setText(scheme)
 #         
@@ -1111,8 +1115,8 @@ class NavigatorButton(NavigatorButtonBase):
             
         
 class NavigatorPlacesSelector(NavigatorButtonBase): # TODO: 2023-05-07 23:07:25 finalize
-    sig_placeActivated = pyqtSignal(str, name = "sig_activated")
-    tabRequested = pyqtSignal()
+    sig_placeActivated = Signal(str, name = "sig_activated")
+    tabRequested = Signal()
     
     def __init__(self, placesModel:PlacesModel, parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
@@ -1244,12 +1248,12 @@ class NavigatorDropDownButton(NavigatorButtonBase):
                 self.style().drawPrimitive(QtWidgets.QStyle.PE_IndicatorArrowLeft, option, painter, self)
             
 class UrlNavigator(QtCore.QObject):
-    currentUrlAboutToChange     = pyqtSignal(QtCore.QUrl, name = "currentUrlAboutToChange")
-    currentLocationUrlChanged   = pyqtSignal(name = "currentLocationUrlChanged")
-    urlSelectionRequested       = pyqtSignal(QtCore.QUrl, name = "urlSelectionRequested")
-    historyIndexChanged         = pyqtSignal(name = "historyIndexChanged")
-    historyChanged              = pyqtSignal(name = "historyChanged")
-    historySizeChanged          = pyqtSignal(name = "historySizeChanged")
+    currentUrlAboutToChange     = Signal(QtCore.QUrl, name = "currentUrlAboutToChange")
+    currentLocationUrlChanged   = Signal(name = "currentLocationUrlChanged")
+    urlSelectionRequested       = Signal(QtCore.QUrl, name = "urlSelectionRequested")
+    historyIndexChanged         = Signal(name = "historyIndexChanged")
+    historyChanged              = Signal(name = "historyChanged")
+    historySizeChanged          = Signal(name = "historySizeChanged")
     
     def __init__(self, url:QtCore.QUrl = QtCore.QUrl(), parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent)
@@ -1399,7 +1403,7 @@ class UrlNavigator(QtCore.QObject):
         
         
 class NavigatorPathSelectorEventFilter(QtCore.QObject):
-    tabRequested = pyqtSignal(QtCore.QUrl, name="tabRequested")
+    tabRequested = Signal(QtCore.QUrl, name="tabRequested")
     def __init__(self, parent:QtCore.QObject):
         super().__init__(parent)
         
@@ -1422,23 +1426,23 @@ class NavigatorPathSelectorEventFilter(QtCore.QObject):
 
 class Navigator(QtWidgets.QWidget):
     # ### BEGIN signals
-    activated           = pyqtSignal(name = "activated")
-    urlChanged          = pyqtSignal(QtCore.QUrl, name="urlChanged")
-    urlAboutToBeChanged = pyqtSignal(QtCore.QUrl, name = "urlAboutToBeChanged")
-    editableStateChanged = pyqtSignal(bool, name = "editableStateChanged")
-    historyChanged      = pyqtSignal(name = "historyChanged")
-    urlsDropped         = pyqtSignal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDropped")
-    returnPressed       = pyqtSignal(name = "returnPressed")
+    activated           = Signal(name = "activated")
+    urlChanged          = Signal(QtCore.QUrl, name="urlChanged")
+    urlAboutToBeChanged = Signal(QtCore.QUrl, name = "urlAboutToBeChanged")
+    editableStateChanged = Signal(bool, name = "editableStateChanged")
+    historyChanged      = Signal(name = "historyChanged")
+    urlsDropped         = Signal(QtCore.QUrl, QtGui.QDropEvent, name = "urlsDropped")
+    returnPressed       = Signal(name = "returnPressed")
     
     # NOTE: 2023-05-07 22:03:17
     # Scipyen's file system viewer does not support tabs
-    # tabRequested        = pyqtSignal(QtCore.QUrl, name = "tabRequested")
-    # activeTabRequested  = pyqtSignal(QtCore.QUrl, name = "activeTabRequested")
+    # tabRequested        = Signal(QtCore.QUrl, name = "tabRequested")
+    # activeTabRequested  = Signal(QtCore.QUrl, name = "activeTabRequested")
     
     # NOTE: 2023-05-07 22:03:37
     # this should open the url in the system's default application
-    newWindowRequested  = pyqtSignal(QtCore.QUrl, name = "newWindowRequested")
-    urlSelectionRequested = pyqtSignal(QtCore.QUrl, name = "urlSelectionRequested")
+    newWindowRequested  = Signal(QtCore.QUrl, name = "newWindowRequested")
+    urlSelectionRequested = Signal(QtCore.QUrl, name = "urlSelectionRequested")
     # ### END signals
     
     def __init__(self, placesModel:typing.Optional[PlacesModel]=None, url:typing.Optional[QtCore.QUrl]=None, parent:typing.Optional[QtWidgets.QWidget] = None):
@@ -2015,7 +2019,7 @@ class Navigator(QtWidgets.QWidget):
     
     # ### BEGIN KUrlNavigatorPrivate slots
     
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     def openContextMenu(self, p:QtCore.Qpoint):
         """Navigator's context menu
         Allows 
@@ -2093,7 +2097,7 @@ class Navigator(QtWidgets.QWidget):
         if popup is not None:
             popup.deleteLater()
             
-    @pyqtSlot()
+    @Slot()
     def openPathSelectorMenu(self):
         # KUrlNavigatorPrivate
         if len(self._navButtons_) == 0:
@@ -2149,7 +2153,7 @@ class Navigator(QtWidgets.QWidget):
         if popup is not None:
             popup.deleteLater() 
             
-    @pyqtSlot(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers)
+    @Slot(QtCore.QUrl, QtCore.Qt.MouseButton, QtCore.Qt.KeyboardModifiers)
     def slotNavigatorButtonClicked(self, url:QtCore.QUrl, button:QtCore.Qt.MouseButton, modifiers:QtCore.Qt.KeyboardModifiers):
         # KUrlNavigatorPrivate
         if ((button & QtCore.Qt.MiddleButton) and (modifiers & QtCore.Qt.ShiftModifier)) or ((button & QtCore.Qt.LeftButton) and (modifiers & (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier))):
@@ -2169,7 +2173,7 @@ class Navigator(QtWidgets.QWidget):
         elif (button & QtCore.Qt.LeftButton):
             self.setLocationUrl(url)
     
-    @pyqtSlot(bool)
+    @Slot(bool)
     def slotTogleEditableButtonToggled(self, editable:bool):
         # KUrlNavigatorPrivate
         if self._editable_:
@@ -2177,7 +2181,7 @@ class Navigator(QtWidgets.QWidget):
             
         self.switchView(editable)
         
-    @pyqtSlot(str)
+    @Slot(str)
     def slotPathBoxChanged(self, text:str):
         """
         This slot only deals with the situation where a scheme needs changing
@@ -2210,7 +2214,7 @@ class Navigator(QtWidgets.QWidget):
         # else:
             # self._schemes_.hide() # see NOTE: 2023-05-06 22:30:13
         
-    @pyqtSlot(QtCore.QUrl)
+    @Slot(QtCore.QUrl)
     def slotApplyUrl(self, url:QtCore.QUrl):
         # KUrlNavigatorPrivate
         if not url.isEmpty() and len(url.path()) == 0:
@@ -2224,7 +2228,7 @@ class Navigator(QtWidgets.QWidget):
         self.setLocationUrl(url)
         self._pathBox_.setUrl(self.locationUrl())
         
-    @pyqtSlot(str)
+    @Slot(str)
     def slotCheckFilters(self, text:str):
         # KUrlNavigatorPrivate
         # TODO 2023-05-06 22:53:38
@@ -2234,7 +2238,7 @@ class Navigator(QtWidgets.QWidget):
         # for now, just return False (i.e. not wasFiltered)
         return False
     
-    @pyqtSlot()
+    @Slot()
     def slotReturnPressed(self):
         # KUrlNavigatorPrivate
         self.applyUncommittedUrl()
@@ -2247,68 +2251,68 @@ class Navigator(QtWidgets.QWidget):
     # ### END KUrlNavigatorPrivate slots
     
     # ### BEGIN Slots
-    @pyqtSlot(QtCore.QUrl, QtGui.QDropEvent) # CMT
+    @Slot(QtCore.QUrl, QtGui.QDropEvent) # CMT
     def _slot_dropUrls(self, url:QtCore.QUrl, evt:QtGui.QDropEvent):
         button = self.sender()
         if isinstance(button, NavigatorButton):
             self.dropUrls(url, evt, button)
             
-    @pyqtSlot(QtCore.QUrl, QtCore.Qt.KeyboardModifiers)
+    @Slot(QtCore.QUrl, QtCore.Qt.KeyboardModifiers)
     def _slot_navigatorButtonActivated(self, url:QtCore.QUrl, modifiers:QtCore.Qt.KeyboardModifiers):
         # button = self.sender()
         btn = QtWidgets.QApplication.mouseButtons()
         
         self.slotNavigatorButtonClicked(url, btn, modifiers)
         
-    # @pyqtSlot(str)
+    # @Slot(str)
     # def slotProtocolChanged(self, protocol:str):
     #     pass # TODO
     
-    @pyqtSlot()
+    @Slot()
     def _slot_newWindowRequested_(self):
         action = self.sender()
         url = QtCore.QUrl(action.data().toString())
         if url.isValid():
             self.newWindowRequested.emit(url)
     
-    @pyqtSlot(QtCore.QUrl)
+    @Slot(QtCore.QUrl)
     def setLocationUrl(self, url:QtCore.QUrl):
         self._urlNavigator_.setCurrentLocationUrl(url)
         self.updateContent()
         self.requestActivation()
     
-    @pyqtSlot()
+    @Slot()
     def requestActivation(self):
         self.setActive(True)
     
-    @pyqtSlot()
+    @Slot()
     def setFocus(self):
         if self.isUrlEditable():
             self._pathBox_.setFocus()
         else:
             super().setFocus()
     
-#     @pyqtSlot(QtCore.QUrl)
+#     @Slot(QtCore.QUrl)
 #     def setUrl(self, url:QtCore.QUrl):
 #         pass # TODO DEPRECATED
 #     
-#     @pyqtSlot(QtCore.QUrl)
+#     @Slot(QtCore.QUrl)
 #     def saveRootUrl(self, url:QtCore.QUrl):
 #         pass # TODO DEPRECATED
 #     
-#     @pyqtSlot(int, int)
+#     @Slot(int, int)
 #     def savePosition(self, x:int, y:int):
 #         pass # TODO DEPRECATED
     
-    @pyqtSlot()
+    @Slot()
     def _slot_urlNavigatorUrlChanged(self):
         self.urlChanged.emit(self._urlNavigator_.currentLocationUrl)
         
-    @pyqtSlot(QtCore.QUrl)
+    @Slot(QtCore.QUrl)
     def _slot_urlNavigatorUrlAboutToBeChanged(self, url):
         self.urlAboutToBeChanged.emit(url)
     
-    @pyqtSlot(str)
+    @Slot(str)
     def slotSchemeChanged(self, scheme:str):
         # TODO ?!?
         pass
@@ -2399,16 +2403,16 @@ class Navigator(QtWidgets.QWidget):
 #             self.bcnav.setVisible(True)
 #             
 #         
-#     @pyqtSlot(str)
+#     @Slot(str)
 #     def slot_dirChange(self, value):
 #         print(f"{self.__class__.__name__}.slot_dirChange value: {value}" )
 #         
 #         self.path = pathlib.Path(value)
 #         
-#     @pyqtSlot()
+#     @Slot()
 #     def slot_switchToNavigator(self):
 #         self.editMode = False
 #         
-#     @pyqtSlot()
+#     @Slot()
 #     def slot_switchToEditor(self):
 #         self.editMode = True

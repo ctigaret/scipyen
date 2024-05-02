@@ -141,7 +141,7 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::AllDockWidgetFeatures</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>&amp;User Variables</string>
@@ -274,7 +274,7 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::AllDockWidgetFeatures</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>&amp;Command History</string>
@@ -392,7 +392,7 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::AllDockWidgetFeatures</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>File S&amp;ystem</string>
@@ -632,7 +632,7 @@ NOTE: you can click anywhere in the row to select</string>
         <bool>true</bool>
        </property>
        <property name="sizeAdjustPolicy">
-        <enum>QComboBox::AdjustToMinimumContentsLength</enum>
+        <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
        </property>
       </widget>
      </item>

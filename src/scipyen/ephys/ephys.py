@@ -179,8 +179,10 @@ import neo
 import matplotlib as mpl
 # import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
-from PyQt5 import (QtGui, QtCore, QtWidgets)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+from qtpy import (QtGui, QtCore, QtWidgets)
+from qtpy.QtCore import (Signal, Slot, )
+# from PyQt5 import (QtGui, QtCore, QtWidgets)
+# from PyQt5.QtCore import (Signal, Slot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -1635,15 +1637,15 @@ class DataListener(QtCore.QObject):
         self.scipyenWindow.enableDirectoryWatch(False)
 
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesRemoved(self, removedItems):
         print(f"{self.__class__.__name__}.slot_filesRemoved {removedItems}")
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesChanged(self, changedItems):
         print(f"{self.__class__.__name__}.slot_filesChanged {changedItems}")
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesNew(self, newItems):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
         

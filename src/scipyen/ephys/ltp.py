@@ -25,9 +25,12 @@ import neo
 from scipy import optimize, cluster#, where
 import colorama
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.uic import loadUiType as __loadUiType__ 
+from qtpy import QtCore, QtGui, QtWidgets, QtXml
+from qtpy.QtCore import Signal, Slot
+from qtpy.uic import loadUiType as __loadUiType__ 
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+# from PyQt5.QtCore import Signal, Slot
+# from PyQt5.uic import loadUiType as __loadUiType__ 
 
 #### END 3rd party modules
 
@@ -126,10 +129,12 @@ optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
     
-
-__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
-                                                   from_imports=True, 
-                                                   import_from="gui") #  so that resources can be imported too
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
+                                                    from_imports=True, 
+                                                    import_from="gui") #  so that resources can be imported too
+else:
+    __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__) #  so that resources can be imported too
 
 # def conditioningSource(adc:typing.Union[int, str] = 0, dac:typing.Optional[int] = None, path:int=0, 
 #               pathname:typing.Optional[str]=None,
@@ -326,9 +331,9 @@ class _LTPFilesSimulator_(QtCore.QThread):
     Used for testing LTPOnline on already recorded files
     """
     
-    simulationDone = pyqtSignal(name = "simulationDone")
+    simulationDone = Signal(name = "simulationDone")
     
-    supplyFile = pyqtSignal(pathlib.Path, name = "supplyFile")
+    supplyFile = Signal(pathlib.Path, name = "supplyFile")
     
     defaultTimeout = 10000 # ms
     
@@ -425,7 +430,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
             else:
                 self.simulationDone.emit()
                 
-    @pyqtSlot()
+    @Slot()
     def simulateFile(self):
         if self._simulationCounter_ >= len(self._simulationFiles_):
             self.simulationDone.emit()
@@ -438,8 +443,8 @@ class _LTPFilesSimulator_(QtCore.QThread):
         
         
 class _LTPOnlineSupplier_(QtCore.QThread):
-    abfTrialReady = pyqtSignal(pathlib.Path, name="abfTrialReady")
-    stopTimer = pyqtSignal(name="stopTimer")
+    abfTrialReady = Signal(pathlib.Path, name="abfTrialReady")
+    stopTimer = Signal(name="stopTimer")
     
     def __init__(self, parent: QtCore.QObject,
                  abfTrialBuffer: collections.deque, 
@@ -615,7 +620,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
             if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
     
-    @pyqtSlot()
+    @Slot()
     def quit(self):
         if isinstance(self._simulator_, _LTPFilesSimulator_):
             if self._simulator_.isRunning():
@@ -625,7 +630,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
 
         super().quit()
 
-    @pyqtSlot(pathlib.Path)
+    @Slot(pathlib.Path)
     def _simulateFile_(self, value):
         # print(f"{self.__class__.__name__}._simulateFile_: {value}")
         
@@ -695,7 +700,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             print(msg)
         
     @safeWrapper
-    @pyqtSlot(pathlib.Path)
+    @Slot(pathlib.Path)
     def processAbfFile(self, abfFile:pathlib.Path):
         """Reads and ABF protocol from the ABF file and analyses the data
         """
@@ -2171,7 +2176,7 @@ class LTPOnline(QtCore.QObject):
     """
     # TODO: update episodes in the pathway's schedule
 
-    resultsReady = pyqtSignal(object, name="resultsReady")
+    resultsReady = Signal(object, name="resultsReady")
 
     _instance = None # singleton pattern
 
@@ -2560,11 +2565,11 @@ class LTPOnline(QtCore.QObject):
 
 
 
-    @pyqtSlot()
+    @Slot()
     def slot_doWork(self):
         self.start()
 
-    @pyqtSlot()
+    @Slot()
     def _slot_simulationDone(self):
         # self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
         print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
@@ -2962,7 +2967,7 @@ class LTPOnline2(QtCore.QObject):
     #       ∘ pathways unknown — WARNING if first run file is a conditioning one
     #           it will mis-set all the subsequent parameters
         
-    resultsReady = pyqtSignal(object, name="resultsReady")
+    resultsReady = Signal(object, name="resultsReady")
     
     _instance = None # singleton pattern
     
@@ -3358,11 +3363,11 @@ class LTPOnline2(QtCore.QObject):
 
 
                
-    @pyqtSlot()
+    @Slot()
     def slot_doWork(self):
         self.start()
         
-    @pyqtSlot()
+    @Slot()
     def _slot_simulationDone(self):
         # self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
         print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")

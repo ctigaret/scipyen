@@ -13,9 +13,13 @@ import math
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-# from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from qtpy.uic import loadUiType as __loadUiType__
+
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# # from PyQt5.uic import loadUiType as __loadUiType__
 
 from pyqtgraph import (DataTreeWidget, TableWidget, )
 #from pyqtgraph.widgets.TableWidget import _defersort
@@ -93,13 +97,13 @@ class DataViewer(ScipyenViewer):
     2019: Uses InteractiveTreeWidget which inherits from pyqtgraph DataTreeWidget 
     and in turn inherits from QTreeWidget.
     """
-    sig_activated = pyqtSignal(int)
-    closeMe  = pyqtSignal(int)
-    signal_window_will_close = pyqtSignal()
+    sig_activated = Signal(int)
+    closeMe  = Signal(int)
+    signal_window_will_close = Signal()
     
     # NOTE: 2022-11-20 22:09:07
     # reserved for future developmet of editing capabilities TODO
-    sig_dataChanged = pyqtSignal(name = "sig_dataChanged")
+    sig_dataChanged = Signal(name = "sig_dataChanged")
     
     # TODO: 2019-11-01 22:44:34
     # implement viewing of other data structures (e.g., viewing their __dict__
@@ -278,7 +282,7 @@ class DataViewer(ScipyenViewer):
             for k in range(self.treeWidget.topLevelItemCount()):
                 self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
         self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
@@ -303,7 +307,7 @@ class DataViewer(ScipyenViewer):
         #     self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
             #self._collapseRecursive_(self.treeWidget.topLevelItem(k), collapseCurrent=False)
 
-    @pyqtSlot(QtWidgets.QTreeWidgetItem, int)
+    @Slot(QtWidgets.QTreeWidgetItem, int)
     @safeWrapper
     def slot_itemDoubleClicked(self, item, column):
         from core.utilities import get_nested_value
@@ -356,7 +360,7 @@ class DataViewer(ScipyenViewer):
             
             self._populate_tree_widget_()
             
-    @pyqtSlot()
+    @Slot()
     def slot_goBack(self):
         self._cache_index_ = self._cache_index_ - 1
         
@@ -371,12 +375,12 @@ class DataViewer(ScipyenViewer):
             
         self._populate_tree_widget_()
         
-    @pyqtSlot()
+    @Slot()
     def slot_goFirst(self):
         self._cache_index_ = 0
         self._populate_tree_widget_()
         
-    @pyqtSlot()
+    @Slot()
     def slot_goNext(self):
         self._cache_index_ = self._cache_index_ + 1
         if self._cache_index_ >= len(self._obj_cache_):
@@ -386,7 +390,7 @@ class DataViewer(ScipyenViewer):
         self.goBack.setEnabled(self._cache_index_ >0)
         self._populate_tree_widget_()
         
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_customContextMenuRequested(self, point):
         # FIXME/TODO copy to system clipboard? - what mime type? JSON data?
@@ -473,20 +477,20 @@ class DataViewer(ScipyenViewer):
         elif len(item_paths) == 1:
             self._scipyenWindow_.app.clipboard().setText(item_paths[0])
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_collapseAll(self):
         for k in range(self.treeWidget.topLevelItemCount()):
             self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), current=False)
 
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_expandAll(self):
         for k in range(self.treeWidget.topLevelItemCount()):
             self._collapse_expand_Recursive(self.treeWidget.topLevelItem(k), expand=True, current=False)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copyPaths(self):
         if self._scipyenWindow_ is None:
@@ -495,7 +499,7 @@ class DataViewer(ScipyenViewer):
         item_paths = self.getSelectedPaths()
         self.exportPathsToClipboard(item_paths)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportItemPathToConsole(self):
         if self._scipyenWindow_ is None:
@@ -505,7 +509,7 @@ class DataViewer(ScipyenViewer):
         self.exportPathsToClipboard(item_paths)
         self._scipyenWindow_.console.paste()
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportItemDataToWorkspace(self):
         """Exports data from currently selected items to the workspace.
@@ -551,7 +555,7 @@ class DataViewer(ScipyenViewer):
         
         self._export_data_items_(items, fullPathAsName=fullPathAsName)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editItemData(self):
         # TODO: 2022-10-11 13:45:35
@@ -563,7 +567,7 @@ class DataViewer(ScipyenViewer):
             return
         
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_viewItemDataInNewWindow(self):
         from core.utilities import get_nested_value

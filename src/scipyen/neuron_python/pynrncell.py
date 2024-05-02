@@ -434,7 +434,7 @@ class PyNRNCell(object):
             # NOTE: 2021-02-09 16:10:56
             # Use NEURON's own file selection GUI API here (i.e. written in HOC),
             # albeit acessed from our (python) side, to avoid any crashes from 
-            # PyQt5.
+            # PyQt.
             fc = h.File()
             fc.chooser("", "Choose SWC file", "*.swc", "Open", "Cancel", os.getcwd())
             

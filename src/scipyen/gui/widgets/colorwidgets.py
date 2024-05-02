@@ -10,14 +10,13 @@ What is new/different from the KWidgetsAddons classes:
     4) option to keep alpha value when a color is dropped or pasted onto the widget
     5) option to have a light chequered pattern for transparent colors
     6) Qt::GlobalColors enum in the Qt's Core module (wrapped as a sip.enumtype
-       in PyQt5) is represented as the 'qtGlobalColors' dictionary in this 
+       in PyQt) is represented as the 'qtGlobalColors' dictionary in this 
        module's namespace.
        
        This allows a reverse lookup of a global color enum key (as a str) based 
        on its int value.
        
-       Useful to retrieve the Qt enum object as a symbol given its int value.
-       For example, given PyQt5.QtCore imported as QtCore:
+       Useful to retrieve the Qt enum object as a symbol given its int value, e.g.:
        reverse_dict(qtGlobalColors)[7] -> 'QtCore.Qt.red'
        
        and 
@@ -42,8 +41,10 @@ from functools import partial
 
 import numpy as np
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets, QtXml
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 from core.utilities import reverse_mapping_lookup
@@ -71,7 +72,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         option to keep alpha value when a color is dropped or pasted onto the widget
         option to have a light chequered pattern for transparent colors
     """
-    changedColor = pyqtSignal(QtGui.QColor, name="changedColor")
+    changedColor = Signal(QtGui.QColor, name="changedColor")
     
     def __init__(self, color:QtGui.QColor, defaultColor:QtGui.QColor,
                  alphaChannelEnabled:bool = True, useDefaultColor=True,
@@ -158,7 +159,7 @@ class ColorPushButton(QtWidgets.QPushButton):
     def alphaChannelEnabled(self, value:bool):
         self._alphaChannelEnabled = value
         
-    @pyqtSlot(QtGui.QColor)
+    @Slot(QtGui.QColor)
     def slot_setColor(self, value):
         if isinstance(value, QtGui.QColor) and value.isValid():
             sigblock = QtCore.QSignalBlocker(self)
@@ -262,7 +263,7 @@ class ColorPushButton(QtWidgets.QPushButton):
             createDrag(self.color, self).exec_()
             self.setDown(False)
             
-    @pyqtSlot()
+    @Slot()
     def _chooseColor(self):
         if self._dialog:
             self._dialog.show()
@@ -277,7 +278,7 @@ class ColorPushButton(QtWidgets.QPushButton):
         self._dialog.accepted.connect(self._colorChosen)
         self._dialog.show()
         
-    @pyqtSlot()
+    @Slot()
     def _colorChosen(self):
         if not self._dialog:
             return
@@ -367,9 +368,9 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
     
         
 class ColorComboBox(QtWidgets.QComboBox):
-    activated = pyqtSignal(QtGui.QColor, name="activated") # overloads QComboBox.activated[int] signal
-    highlighted = pyqtSignal(QtGui.QColor, name="highlighted")
-    colorChanged = pyqtSignal(QtGui.QColor, name="colorChanged")
+    activated = Signal(QtGui.QColor, name="activated") # overloads QComboBox.activated[int] signal
+    highlighted = Signal(QtGui.QColor, name="highlighted")
+    colorChanged = Signal(QtGui.QColor, name="colorChanged")
 
     def __init__(self, color:typing.Optional[typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor, int, str, typing.Sequence[typing.Union[int, float]]]]=None, 
                  palette:typing.Optional[typing.Union[list, tuple, dict, str, ColorPalette]]=standardPalette,
@@ -567,14 +568,14 @@ class ColorComboBox(QtWidgets.QComboBox):
         self.setItemData(0, ttip, QtCore.Qt.ToolTipRole)
         self._customColor = self._internalColor
 
-    @pyqtSlot(QtGui.QColor)
+    @Slot(QtGui.QColor)
     def slot_setColor(self, value:QtGui.QColor):
         if isinstance(value, QtGui.QColor) and value.isValid():
             sigblock = QtCore.QSignalBlocker(self)
             self._setCustomColor(value)
             self.update()
     
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slotActivated(self, index:int):
         if index == 0:
@@ -617,7 +618,7 @@ class ColorComboBox(QtWidgets.QComboBox):
         
         self.activated[QtGui.QColor].emit(self._internalColor.qcolor)
     
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slotHighlighted(self, index:int):
         if index == 0:
@@ -758,7 +759,7 @@ class ColorComboBox(QtWidgets.QComboBox):
 class ColorSelectionWidget(QtWidgets.QWidget):
     """Combines a ColorComboBox and a ColorPushButton in the same widget
     """
-    colorChanged = pyqtSignal(QtGui.QColor, name="colorChanged")
+    colorChanged = Signal(QtGui.QColor, name="colorChanged")
     
     def __init__(self, color:typing.Optional[QtGui.QColor]=None,
                  defaultColor:typing.Optional[QtGui.QColor]=None,
@@ -802,7 +803,7 @@ class ColorSelectionWidget(QtWidgets.QWidget):
         self._colorComboBox.activated.connect(self.slot_setColor)
         self._colorPushButton.changedColor.connect(self.slot_setColor)
         
-    @pyqtSlot(QtGui.QColor)
+    @Slot(QtGui.QColor)
     def slot_setColor(self, color):
         self.color = color
         

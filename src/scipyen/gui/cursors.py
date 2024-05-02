@@ -4,8 +4,10 @@
 import collections, enum, numbers, typing
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
-from PyQt5 import (QtCore, QtGui, QtWidgets,) 
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+from qtpy import (QtCore, QtGui, QtWidgets,) 
+from qtpy.QtCore import (Signal, Slot, )
+# from PyQt5 import (QtCore, QtGui, QtWidgets,) 
+# from PyQt5.QtCore import (Signal, Slot, )
 
 # import pyqtgraph as pg
 # pg.Qt.lib = "PyQt5"
@@ -90,7 +92,7 @@ class SignalCursorTypes(enum.Enum):
             
 
 class CursorLine(pg.InfiniteLine):
-    sig_double_clicked = pyqtSignal()
+    sig_double_clicked = Signal()
     
     def _init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -144,16 +146,16 @@ class SignalCursor(QtCore.QObject):
     # TODO: 2019-02-07 17:31:43
     # 1) implement cursors linking
     
-    sig_cursorSelected = pyqtSignal(str, name="sig_cursorSelected") 
-    sig_cursorDeselected = pyqtSignal(str, name="sig_cursorDeselected") 
-    #sig_cursorMoved = pyqtSignal(str, float, float, name="sig_cursorMoved")
-    sig_editMe = pyqtSignal(str, name="sig_editMe")
-    sig_reportPosition = pyqtSignal(str, name="sig_reportPosition")
-    #sig_reportDynamicPosition = pyqtSignal(str, name="sig_reportDynamicPosition")
-    sig_doubleClicked = pyqtSignal(str, name = "sig_doubleClicked")
-    sig_lineContextMenuRequested = pyqtSignal(str, name = "sig_lineContextMenuRequested")
+    sig_cursorSelected = Signal(str, name="sig_cursorSelected") 
+    sig_cursorDeselected = Signal(str, name="sig_cursorDeselected") 
+    #sig_cursorMoved = Signal(str, float, float, name="sig_cursorMoved")
+    sig_editMe = Signal(str, name="sig_editMe")
+    sig_reportPosition = Signal(str, name="sig_reportPosition")
+    #sig_reportDynamicPosition = Signal(str, name="sig_reportDynamicPosition")
+    sig_doubleClicked = Signal(str, name = "sig_doubleClicked")
+    sig_lineContextMenuRequested = Signal(str, name = "sig_lineContextMenuRequested")
     
-    sig_axisPositionChanged = pyqtSignal(tuple, name="sig_axisPositionChanged")
+    sig_axisPositionChanged = Signal(tuple, name="sig_axisPositionChanged")
 
     default_precision = 3
     
@@ -752,8 +754,8 @@ class SignalCursor(QtCore.QObject):
         self._show_value_ = value == True
         self._update_labels_()
                     
-    @pyqtSlot()
-    @pyqtSlot(object)
+    @Slot()
+    @Slot(object)
     @safeWrapper
     def slot_positionChanged(self, evt=None):
         self.sig_cursorSelected.emit(self._cursorId_)
@@ -769,14 +771,14 @@ class SignalCursor(QtCore.QObject):
         if self._cursor_type_ != SignalCursorTypes.crosshair:
             self.sig_reportPosition.emit(self.ID)
             
-    @pyqtSlot(tuple)
+    @Slot(tuple)
     @safeWrapper
     def slot_linkedPositionChanged(self, pos):
         signalBlockers = [QtCore.QSignalBlocker(c) for c in self._linked_cursors_]
         self.x = pos[0]
         self.y = pos[1]
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_line_selected_(self):
         if not self._follows_mouse_:
@@ -784,7 +786,7 @@ class SignalCursor(QtCore.QObject):
             self.sig_cursorSelected.emit(self.ID)
             
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_setSelected(self, val):
         if not self._follows_mouse_:
@@ -1212,7 +1214,7 @@ class SignalCursor(QtCore.QObject):
                 self._dragging_ = True
                 #print("_interpret_scene_mouse_events_ _dragging_", self._dragging_)
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_selected_in_scene_(self, evt):
         # NOTE: 2019-02-09 23:29:22
@@ -1225,18 +1227,18 @@ class SignalCursor(QtCore.QObject):
             (self.hline is not None and self.hline in items):
             self.sig_cursorSelected.emit(self.ID)
             
-    @pyqtSlot(object, object)
+    @Slot(object, object)
     def slot_line_Clicked(self, obj, evt):
         # print(f"{self.__class__.__name__}.slot_line_Clicked evt {evt}")
         # print(f"host item {self._host_graphics_item_}")
         if evt.button() == QtCore.Qt.MouseButton.RightButton:
             self.sig_lineContextMenuRequested.emit(self.ID)
             
-    @pyqtSlot()
+    @Slot()
     def slot_line_doubleClicked(self):
         self.sig_doubleClicked.emit(self.ID)
             
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_mouse_event_(self, evt):
         """Workaround to synchronize movement of BOTH lines when mouse is dragged in the scene.

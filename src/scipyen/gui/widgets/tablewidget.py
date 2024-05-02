@@ -8,8 +8,10 @@ import math
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 
 from pyqtgraph import (DataTreeWidget, TableWidget, )
 #from pyqtgraph.widgets.TableWidget import _defersort

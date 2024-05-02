@@ -1576,7 +1576,8 @@ def no_sip_autoconversion(klass):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            import sip
+            # import sip
+            from qtpy import sip as sip
             oldValue = sip.enableautoconversion(klass, False)
             ret = func(*args, *kwargs)
             sip.enableautoconversion(klass, oldValue)

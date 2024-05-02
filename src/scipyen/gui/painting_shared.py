@@ -6,11 +6,15 @@ from traitlets import Bunch
 
 import numpy as np
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-# from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# # from PyQt5.uic import loadUiType as __loadUiType__
 
-import sip # for sip.cast
+from qtpy import sip as sip  # for sip.cast
+# import sip # for sip.cast
 
 from core.prog import (safeWrapper, no_sip_autoconversion)
 from core.traitcontainers import DataBag
@@ -56,45 +60,96 @@ FontStyleType = typing.Union[int, QtGui.QFont.Style]
 
 FontWeightType = typing.Union[int, QtGui.QFont.Weight]
 
-standardQtFontStyles = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Style)), key = lambda x: x[1]))
+#### BEGIN
+#
+#
+#
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    standardQtFontStyles = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Style)), key = lambda x: x[1]))
+    standardQtFontWeights = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), key = lambda x: x[1]))
+    
 
-standardQtFontWeights = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), key = lambda x: x[1]))
+    standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10),
+                            key = lambda x: x[1]))
 
+    standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256),
+                            key = lambda x: x[1]))
 
-standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10),
-                           key = lambda x: x[1]))
+    standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32),
+                            key = lambda x: x[1]))
+    
+    standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
 
-standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val <= 256),
-                           key = lambda x: x[1]))
+    standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
 
-standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32),
-                           key = lambda x: x[1]))
+    standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
+                                        key = lambda x: x[1]))
+    validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3),
+                                        key = lambda x: x[1]))
+
+    standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
+                                            key = lambda x: x[1]))
+
+    standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
+                                            key = lambda x: x[1]))
+
+    standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
+                                            key = lambda x: x[1]))
+
+    standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
+                                            key = lambda x: x[1]))
+
+    qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
+                                            key = lambda x: x[1]))
+else:
+    # NOTE: 2024-05-02 11:33:12 
+    # the various Qt namespace enums below are more like regular Python enums in PyQt6 (via qtpy)
+    standardQtFontStyles = Bunch(sorted(((name, val) for name, val in QtGui.QFont.Style._member_map_.items()), 
+                                        key = lambda x: x[1].value)) 
+
+    standardQtFontWeights = Bunch(sorted(((name, val) for name, val in QtGui.QFont.Weight._member_map_.items()), 
+                                        key = lambda x: x[1].value))
+
+    standardQtPenStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenStyle._member_map_.items() if val.value < 10),
+                            key = lambda x: x[1].value))
+
+    standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenJoinStyle._member_map_.items() if val.value <= 256),
+                            key = lambda x: x[1].value))
+
+    standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenCapStyle._member_map_.items() if val.value <= 32),
+                            key = lambda x: x[1].value))
+    
+    standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Preset._member_map_.items() if name != "NumPresets")))
+
+    standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Spread._member_map_.items())))
+
+    standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Type._member_map_.items()),
+                                        key = lambda x: x[1].value))
+    
+    validQtGradientTypes = Bunch(sorted(((name, value) for name, value in QtGui.QGradient.Type._member_map_.items() if value.value < 3),
+                                        key = lambda x: x[1].value))
+
+    standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in QtCore.Qt.BrushStyle._member_map_.items()),
+                                            key = lambda x: x[1].value))
+
+    standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
+                                            key = lambda x: x[1].value))
+
+    standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
+                                            key = lambda x: x[1].value))
+
+    standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
+                                            key = lambda x: x[1].value))
+
+    qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
+                                            key = lambda x: x[1].value))
+
 
 customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
 
-standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
-
-standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
-
-standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
-                                      key = lambda x: x[1]))
-validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3),
-                                      key = lambda x: x[1]))
-
-standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
-                                           key = lambda x: x[1]))
-
-standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
-                                           key = lambda x: x[1]))
-
-standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
-                                           key = lambda x: x[1]))
-
-standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
-                                           key = lambda x: x[1]))
-
-qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
-                                        key = lambda x: x[1]))
+#
+#
+#### END NOTE: 2024-05-02 11:33:12 
 
 def populateMimeData(mimeData:QtCore.QMimeData, color:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]):
     #from core.utilities import reverse_dict
@@ -645,7 +700,7 @@ def y_less_than(p1:QtCore.QPointF, p2:QtCore.QPointF) -> bool:
     return p1.y() < p2.y()
 
 class HoverPoints(QtCore.QObject):
-    pointsChanged = pyqtSignal(QtGui.QPolygonF, name = "pointsChanged")
+    pointsChanged = Signal(QtGui.QPolygonF, name = "pointsChanged")
     
     class PointShape(IntEnum):
         CircleShape=auto()
@@ -784,14 +839,14 @@ class HoverPoints(QtCore.QObject):
     def labels(self, val:typing.Union[str, tuple, list, bool]) -> None:
         self._labels = val
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     def setEnabled(self, value:bool) -> None:
         self.enabled = value
         #if self._enabled != value:
             #self._enabled = enabled
             #self._widget.update()
             
-    @pyqtSlot(bool)
+    @Slot(bool)
     def setDisabled(self, value:bool) -> None:
         self.enabled = not value
         #self.setEnabled(not value)
@@ -1219,7 +1274,7 @@ def printGradientStops(g:typing.Union[QtGui.QGradient, typing.Sequence[typing.Tu
         NOTE: in Qt, QGradientStops is an alias for QVector<QGradientStop>, 
                 whereas QGradientStop is an alias for QPair<qreal, QColor>
                 
-        In Python (PyQt5), these types are "mapped" as follows:
+        In Python, these Qt types are "mapped" as follows:
         
         QVector -> list
         QPair   -> tuple with two elements

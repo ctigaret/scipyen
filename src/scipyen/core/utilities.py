@@ -32,7 +32,8 @@ import pyqtgraph # for their own eq operator
 import matplotlib as mpl
 #import language_tool_python
 
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 # try:
 #     from pyqtgraph import eq # not sure is needed
 # except:
@@ -2706,7 +2707,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #result of sys.getsizeof(obj) for any other python object
         
         #TODO construct handlers for other object types as well including 
-        #PyQt5 objects (maybe)
+        #Qt objects (maybe)
             
     icon = QtGui.QIcon.fromTheme("object")
     

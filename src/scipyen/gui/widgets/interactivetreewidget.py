@@ -7,8 +7,10 @@ import math
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 
 from pyqtgraph import (DataTreeWidget, TableWidget, )
 #from pyqtgraph.widgets.TableWidget import _defersort
@@ -115,7 +117,7 @@ class InteractiveTreeWidget(DataTreeWidget):
         
         return widget
     
-    @pyqtSlot(QtWidgets.QTreeWidgetItem, int)
+    @Slot(QtWidgets.QTreeWidgetItem, int)
     def _slot_setLastActive(self, item, column):
         # print(f"{self.__class__.__name__}<{self.parent().windowTitle()}, {self.parent().parent().windowTitle()}> _slot_setLastActive item {item.data(0,QtCore.Qt.DisplayRole)}")
         self._last_active_item_ = item.data(0,QtCore.Qt.DisplayRole)

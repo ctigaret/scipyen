@@ -47,7 +47,8 @@ import vigra
 import neo
 import confuse # for programmatic read/write of non-gui settings
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+# from qtpy import QtCore, QtGui, QtWidgets
+# from PyQt5 import QtCore, QtGui, QtWidgets
 #### END 3rd party modules
 
 #### BEGIN pict.core modules

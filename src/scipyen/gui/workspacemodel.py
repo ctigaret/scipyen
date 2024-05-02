@@ -49,10 +49,15 @@ from core.prog import (safeWrapper, timefunc, processtimefunc, timeblock)
 from core.datatypes import TypeEnum
 # from jupyter_core.paths import jupyter_runtime_dir
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot
 
-mpl.use("Qt5Agg")
+# NOTE: 2024-05-02 11:02:14
+# shouldn't be needed any more (QT_API in os.environ)
+# also taken care of, in mainwindow
+# mpl.use("Qt5Agg")
 
 
 class WorkspaceVarChange(TypeEnum):
@@ -74,16 +79,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     This may be used by code external to ScipyenWindow (e.g. CaTanalysis etc)
 
     '''
-    modelContentsChanged = pyqtSignal(name="modelContentsChanged")
-    workingDir = pyqtSignal(str, name="workingDir")
-    internalVariableChanged = pyqtSignal(dict, name="internalVariableChanged")
-    varModified = pyqtSignal(object, name="varModified")
-    sig_startAsyncUpdate = pyqtSignal(dict, name="sig_startAsyncUpdate")
+    modelContentsChanged = Signal(name="modelContentsChanged")
+    workingDir = Signal(str, name="workingDir")
+    internalVariableChanged = Signal(dict, name="internalVariableChanged")
+    varModified = Signal(object, name="varModified")
+    sig_startAsyncUpdate = Signal(dict, name="sig_startAsyncUpdate")
     
     #                         ns    dataname ns_name 
-    sig_varAdded = pyqtSignal(dict, str,     str,     name="sig_varAdded")
-    sig_varRemoved = pyqtSignal(dict, str,     str,     name="sig_varRemoved")
-    sig_varModified = pyqtSignal(dict, str,     str,     name="sig_varModified")
+    sig_varAdded = Signal(dict, str,     str,     name="sig_varAdded")
+    sig_varRemoved = Signal(dict, str,     str,     name="sig_varRemoved")
+    sig_varModified = Signal(dict, str,     str,     name="sig_varModified")
 
     def __init__(self, shell, user_ns_hidden=dict(),
                  parent=None,
@@ -787,7 +792,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # print(f"\n{self.__class__.__name__}.internalVariablesListenerCB({change})")
         self.internalVariableChanged.emit(change)
         
-    @pyqtSlot(dict)
+    @Slot(dict)
     def _slot_cacheInternalVariableChange_(self, change):
         name = change.name
         change_type = change.get("change_type", change.type)
@@ -804,7 +809,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             
         # print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
 
-#     @pyqtSlot(dict)
+#     @Slot(dict)
 #     def _slot_internalVariableChanged_(self, change):
 #         """Connected (and triggered by) self.internalVariableChanged Qt signal.
 #         Launches an UI update for each workspace model in a loop, which is
@@ -853,7 +858,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 
         return (name, alteration)
 
-    @pyqtSlot(tuple)
+    @Slot(tuple)
     def _slot_updateModelFromMonitor_(self, value):
         name, alteration = value
         # print(f"\n{self.__class__.__name__}._slot_updateModelFromMonitor_ {name} {alteration.name}")
@@ -1527,7 +1532,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # self.gcf_figs.update(
         #     fig_manager.canvas.figure for fig_manager in Gcf.figs.values())
         
-    @pyqtSlot(str)
+    @Slot(str)
     def _slot_itemGuiObjectTitleChanged(self, val:str):
         """For dynamic update of 1st line of tooltip of items representing a QWidget"""
         obj = self.sender()
@@ -1703,7 +1708,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         return v if v in self.shell.user_ns else None  # <- this is the workspace
 
-    # @pyqtSlot()
+    # @Slot()
     # def slot_updateTable(self):
     #     # print("slot_updateTable")
     #     # QtCore.QTimer.singleShot(0, self.update)
@@ -1745,7 +1750,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #         v_row = self.generateRowContents(dataname, data)
     #         self.updateRow(row, v_row)
 
-    @pyqtSlot(dict, str, str)
+    @Slot(dict, str, str)
     def updateRowForVariable2(self, ns: dict, dataname: str, ns_name:str = "Internal"):
         # CAUTION This is only for internal workspace, but
         # TODO 2020-07-30 22:18:35 merge & factor code for both internal and foreign
@@ -1857,7 +1862,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #     else:
     #         self.removeRow(row)
 
-    @pyqtSlot(dict, str, str)
+    @Slot(dict, str, str)
     def removeRowForVariable2(self, ns: dict, 
                               dataname: str, 
                               ns_name: str = "Internal"):
@@ -1894,7 +1899,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #     v_row = self.generateRowContents(dataname, data)
     #     self.appendRow(v_row)  # append the row to the model
 
-    @pyqtSlot(dict, str, str)
+    @Slot(dict, str, str)
     def addRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
         """CAUTION Only use for data in the internal workspace, not in remote ones.
         """
@@ -2061,7 +2066,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 #             del self.internalVariablesListenerCB
                 
             
-    @pyqtSlot(dict)
+    @Slot(dict)
     def _slot_updateModelAsync_(self, namespace:dict):
         """Triggered by self.sig_startAsyncUpdate signal.
         This signal is emitted by self.update() and self._updateModel_()

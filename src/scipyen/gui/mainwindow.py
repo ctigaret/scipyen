@@ -147,10 +147,15 @@ import core.quantities as cq
 from jupyter_client.session import Message
 from IPython.display import set_matplotlib_formats
 from IPython.core.history import HistoryAccessor
-from PyQt5.uic import loadUiType
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot,
-                          Q_ENUMS, Q_FLAGS, pyqtProperty,)
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+from qtpy.QtCore import (Signal, Slot,
+                          QEnum, Property,)
+from qtpy.uic import loadUiType
+# from PyQt5.uic import loadUiType
+# from PyQt5.QtCore import (Signal, Slot,
+#                           QEnum, Q_FLAGS, Property,)
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from jupyter_core.paths import jupyter_runtime_dir
 import neo
 import vigra
@@ -167,7 +172,8 @@ import atexit
 import re
 import inspect
 import gc
-import sip
+from qtpy import sip as sip
+# import sip
 import io
 import warnings
 import numbers
@@ -226,11 +232,34 @@ import sklearn as sk  # machine learning, also nice plot_* functionality
 import seaborn as sb  # statistical data visualization
 
 # print("mainwindow.py __name__ =", __name__)
+# BEGIN matplotlib modules
+import matplotlib as mpl
+# NOTE: 2024-05-02 10:47:43
+# the  next line is obsolete as os.environ["QT_API"] should take care of it ?
+mpl.use("Qtagg")
+# mpl.use("Qt5Agg") #
+# NOTE: 2021-08-17 12:17:08
+# this is NOT recommended anymore
+# import matplotlib.pylab as plb
+
+# BEGIN configure matplotlib
+mpl.rcParams["savefig.format"] = "svg"
+mpl.rcParams["xtick.direction"] = "in"
+mpl.rcParams["ytick.direction"] = "in"
+mpl.rcParams["svg.fonttype"]="none"
+
+# NOTE: 2017-08-24 22:48:45
+# required to enable interaction with matplotlib plots
+plt.ion()
+
+# END configure matplotlib
+
+# END matplotlib modules
 
 # BEGIN migration to pyqtgraph -- setup global parameters
 # NOTE: 2019-01-24 21:40:45
 # import pyqtgraph as pg # used throughout - based on Qt5
-# pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
+# pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5 # NOTE: 2024-05-02 12:42:42 not anymore
 # # TODO make this peristent  user-modifiable configuration
 # #pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
 # pg.setConfigOptions(background="w", foreground="k", editorCommand="kate")
@@ -240,35 +269,6 @@ from gui.pyqtgraph_patch import pyqtgraph as pg
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
-# BEGIN matplotlib modules
-import matplotlib as mpl
-mpl.use("Qt5Agg")
-# NOTE: 2021-08-17 12:17:08
-# this is NOT recommended anymore
-# import matplotlib.pylab as plb
-
-# BEGIN configure matplotlib
-
-# matplotlib.use("QtAgg")
-# NOTE: 2019-07-29 18:25:30
-# this does NOT seem to affect matplotlibrc therefore
-# we use a customized matplotlibrc file in pict's directory
-# to use Qt5Agg as backend and use SVG as default save format for figures
-# NOTE: 2019-08-07 16:34:23 that doesn't seem to work either, hence we
-# call the matplotlib magic in console, at init, see NOTE: 2019-08-07 16:34:58
-# mpl.rcParams['backend']='Qt5Agg'
-# turn pyplot interactive ON
-mpl.rcParams["savefig.format"] = "svg"
-mpl.rcParams["xtick.direction"] = "in"
-mpl.rcParams["ytick.direction"] = "in"
-
-# NOTE: 2017-08-24 22:48:45
-# required to enable interaction with matplotlib plots
-plt.ion()
-
-# END configure matplotlib
-
-# END matplotlib modules
 
 # END numerics & data visualization
 
@@ -433,12 +433,12 @@ else:
 
 _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 
-_imported_modules__ = u'\n\nFor convenience, the following modules are imported (custom names indicated where appropriate):' +\
-    u'\n\nnumpy --> np\nmatplotlib --> mpl\nmatplotlib.pyplot --> plt\nmatplotlib.pylab --> plb\nmatplotlib.mlab --> mlb\n' +\
-    u'PyQt5.QtCore\nPyQt5.QtGui\ntypes\nsys\nos\n' +\
-    u'IPython.utils.ipstruct --> Struct' +\
-    u'\n\nAnd from the Pict package:\npictio --> pio\nsignalviewer --> sv\ndatatypes \nxmlutils' +\
-    u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
+# _imported_modules__ = u'\n\nFor convenience, the following modules are imported (custom names indicated where appropriate):' +\
+#     u'\n\nnumpy --> np\nmatplotlib --> mpl\nmatplotlib.pyplot --> plt\nmatplotlib.pylab --> plb\nmatplotlib.mlab --> mlb\n' +\
+#     u'QtCore\nQtGui\ntypes\nsys\nos\n' +\
+#     u'IPython.utils.ipstruct --> Struct' +\
+#     u'\n\nAnd from the Pict package:\npictio --> pio\nsignalviewer --> sv\ndatatypes \nxmlutils' +\
+#     u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
 
 
 _info_banner_ = ["\n*** NOTE: ***"]
@@ -463,7 +463,8 @@ _info_banner_.append("quantities -> pq")
 _info_banner_.append("\n")
 _info_banner_.append("The following modules are from PyQt5")
 _info_banner_.append("============================================")
-_info_banner_.append("QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml")
+_info_banner_.append("QtCore, QtGui, QtWidgets, QtXml")
+# _info_banner_.append("QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml")
 _info_banner_.append("\n")
 _info_banner_.append("The following modules belong to pict package")
 _info_banner_.append("============================================")
@@ -494,13 +495,19 @@ _info_banner_.append(
 def console_info():
     print("\n".join(_info_banner_))
 
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    # Form class,        Base class
+    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, "mainwindow.ui"), 
+                                                    from_imports=True, import_from="gui")
 
-# Form class,        Base class
-__UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(
-    __module_path__, "mainwindow.ui"), from_imports=True, import_from="gui")
+    __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"), 
+                                               from_imports=True, import_from="gui")
+else:
+    # Form class,        Base class
+    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, "mainwindow.ui"))
 
-__UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(
-    __module_path__, "scriptmanagerwindow.ui"), from_imports=True, import_from="gui")
+    __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
+
 
 
 class WorkspaceViewer(QtWidgets.QTableView):
@@ -562,15 +569,15 @@ class WorkspaceViewer(QtWidgets.QTableView):
 # class WindowManager(ConfigurableQMainWindowMeta):
 
 class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, WorkspaceGuiMixin):
-    signal_forgetScripts = pyqtSignal(object)
-    signal_executeScript = pyqtSignal(str)
-    signal_importScript = pyqtSignal(str)
-    signal_pasteScript = pyqtSignal(str)
-    signal_editScript = pyqtSignal(str)
-    signal_openScriptFolder = pyqtSignal(str)
-    signal_pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
-    signal_pythonFileAdded = pyqtSignal(str)
-    signal_scriptManagerClosed = pyqtSignal()
+    signal_forgetScripts = Signal(object)
+    signal_executeScript = Signal(str)
+    signal_importScript = Signal(str)
+    signal_pasteScript = Signal(str)
+    signal_editScript = Signal(str)
+    signal_openScriptFolder = Signal(str)
+    signal_pythonFileReceived = Signal(str, QtCore.QPoint)
+    signal_pythonFileAdded = Signal(str)
+    signal_scriptManagerClosed = Signal()
 
     # NOTE recently run scripts is managed by ScipyenWindow instance mainWindow
     # FIXME 2021-09-18 14:16:14 Change this so that it is managed instead by
@@ -682,7 +689,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     def scriptFileNames(self):
         return [self.scriptsTable.item(row, 1).text() for row in range(self.scriptsTable.rowCount())]
 
-    @pyqtSlot("QPoint")
+    @Slot("QPoint")
     @safeWrapper
     def slot_customContextMenuRequested(self, pos):
         items = self.scriptsTable.selectedItems()
@@ -731,14 +738,14 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         cm.popup(self.scriptsTable.mapToGlobal(pos))
 
-    @pyqtSlot(int, int)
+    @Slot(int, int)
     @safeWrapper
     def slot_cellDoubleClick(self, row, col):
         item = self.scriptsTable.item(row, 1)
 
         self.signal_executeScript.emit(item.text())
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addScript(self):
         targetDir = os.getcwd()
@@ -764,7 +771,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
             elif any("text" in s for s in mime_file_type if isinstance(s, str)) and os.path.splitext(fileName)[-1] == ".py":
                 self.signal_pythonFileAdded.emit(fileName)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addScripts(self):
         targetDir = os.getcwd()
@@ -783,7 +790,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
                 if any("python" in s for s in mft):
                     self.signal_pythonFileAdded.emit(fileName)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_forgetScripts(self):
         if len(self.scriptsTable.selectedItems()) == 0:
@@ -798,7 +805,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         self.signal_forgetScripts.emit(items)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_forgetAll(self):
         items = [self.scriptsTable.item(r, 1).text()
@@ -809,7 +816,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         self.signal_forgetScripts.emit(items)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_executeScript(self):
         if len(self.scriptsTable.selectedItems()) != 1:
@@ -821,7 +828,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         self.signal_executeScript.emit(item)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_importAsModule(self):
         if len(self.scriptsTable.selectedItems()) != 1:
@@ -833,7 +840,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         self.signal_importScript.emit(item)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editScript(self):
         if len(self.scriptsTable.selectedItems()) != 1:
@@ -845,7 +852,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         self.signal_editScript.emit(item)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_openScriptFolder(self):
         if len(self.scriptsTable.selectedItems()) != 1:
@@ -857,7 +864,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         self.signal_openScriptFolder.emit(item)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_teleportScript(self):
         if len(self.scriptsTable.selectedItems()) != 1:
@@ -961,14 +968,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     '''
     # NOTE: 2021-08-23 10:36:14 WindowManager inherits from __QMainWindow__ which
     # is QtWidgets.QMainWindow
-    workspaceChanged = pyqtSignal()
-    startPluginLoad = pyqtSignal()
-    sig_refreshRecentFilesMenu = pyqtSignal()
-    sig_windowRemoved = pyqtSignal(tuple, name="sig_windowRemoved")
+    workspaceChanged = Signal()
+    startPluginLoad = Signal()
+    sig_refreshRecentFilesMenu = Signal()
+    sig_windowRemoved = Signal(tuple, name="sig_windowRemoved")
     
-    sig_newItemsInMonitoredDir = pyqtSignal(tuple, name="sig_newItemsInMonitoredDir")
-    sig_itemsRemovedFromMonitoredDir = pyqtSignal(tuple, name="sig_itemsRemovedFromMonitoredDir")
-    sig_itemsChangedInMonitoredDir = pyqtSignal(tuple, name="sig_itemsChangedInMonitoredDir")
+    sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
+    sig_itemsRemovedFromMonitoredDir = Signal(tuple, name="sig_itemsRemovedFromMonitoredDir")
+    sig_itemsChangedInMonitoredDir = Signal(tuple, name="sig_itemsChangedInMonitoredDir")
 
     _instance = None
 
@@ -1256,7 +1263,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         Defines a new slot for plugins functionality.
         Connected to the `triggered` signal of dynamic QActions for plugins.
         '''
-        # from PyQt5.QtCore import pyqtSlot
+        # from PyQt5.QtCore import Slot
 
         # NOTE: 2016-04-17 16:16:52 moved to _installPluginFunction_
         # NOTE:2016-04-17 15:39:03 in python 3 use inspect.getfullargspec(f)
@@ -1264,7 +1271,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # kwa = argSpec.keywords
 
         # NOTE: 2016-04-17 16:18:18 to reflect new code layout
-        @pyqtSlot()
+        @Slot()
         @self._inputPrompter_(n_outputs, arg_types, arg_names, arg_default, var_args, kw_args)
         def sw_f(*arg_types, **kw_args):
             return f(*arg_types, **kw_args)
@@ -1965,7 +1972,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     # END   Properties
     
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_windowActivated(self, obj):
         """Not used, but keep it
@@ -1973,7 +1980,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             self.setCurrentWindow(obj)
 
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_windowVariableDeleted(self, wid):
         # TODO
@@ -2164,8 +2171,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #
         # print(f"{self.__class__.__name__}._adopt_mpl_figure ({fig}, number {fig.number})")
         import matplotlib.cbook as cbook
-        backend_mod = importlib.import_module(
-            cbook._backend_module_name("Qt5Agg"))
+        backend_mod = importlib.import_module(cbook._backend_module_name(mpl.rcParams["backend"]))
+        # backend_mod = importlib.import_module(cbook._backend_module_name("Qt5Agg"))
         
         class backend_mod(mpl.backend_bases._Backend):
             locals().update(vars(backend_mod))
@@ -2249,7 +2256,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             win = self._adopt_mpl_figure(win)
 
         else:
-            if isinstance(getattr(win, "sig_activated", None), QtCore.pyqtBoundSignal):
+            if isinstance(getattr(win, "sig_activated", None), QtCore.SignalInstance):
                 win.sig_activated[int].connect(self.slot_setCurrentViewer)
             else:
                 winEvtFilter = WindowEventFilter(win, parent=self)
@@ -2366,7 +2373,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         return [fig for fig in self.matplotlib_figures if fig in self.viewers[mpl.figure.Figure]]
 
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_setCurrentViewer(self, wId):
         """ Delegates to self.setCurrentWindow 
@@ -2382,7 +2389,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     # BEGIN PyQt slots
 
-    @pyqtSlot()
+    @Slot()
     def _slot_chooseCodeEditor(self):
         d = qd.QuickDialog(self, "Choose code editor")
         editorNameInput = qd.StringInput(
@@ -2392,30 +2399,30 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if d.exec() == QtWidgets.QDialog.Accepted:
             self.scipyenEditor = d.editorNameInput.text()
 
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_setOverrideSystemEditor(self, val):
         self.overrideSystemEditor = val == True
 
-    @pyqtSlot()
+    @Slot()
     def slot_launchExternalRunningIPython(self):
         self._init_ExternalIPython_(new="connection")
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_launchExternalIPython(self):
         self._init_ExternalIPython_()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_launchExternalNeuronIPython(self):
         self._init_ExternalIPython_(new="neuron")
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_launchExternalRunningIPythonNeuron(self):
         self._init_ExternalIPython_(new="neuron_ext")
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_initQtConsole(self):
         self._init_QtConsole_()
@@ -2943,12 +2950,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     #
     #
     # FIXME -- why does it appear to execute only ONE print command?
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _helpOnConsole_(self):
         self.console.execute("console_info()")
 
-    @pyqtSlot()
+    @Slot()
     def slot_refreshView(self):
         if self.activeDockWidget is self.dockWidgetFileSystem:
             # self.slot_updateCwd()
@@ -2965,7 +2972,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     # NOTE: 2016-03-26 17:07:17
     # as a workaround for the problem in NOTE: 2016-03-26 17:01:32
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_updateWorkspaceView(self):
         """
@@ -2976,7 +2983,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._sortWorkspaceViewFirstColumn_()
         self._resizeWorkspaceViewFirstColumn_()
 
-    @pyqtSlot()
+    @Slot()
     def slot_updateWorkspaceModel(self):
         """ pyplot commands may produce or close a figure; we need to reflect this!
         """
@@ -2994,7 +3001,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # timer.timeout.connect(self.workspaceModel.update)
         # timer.start(0)
 
-    @pyqtSlot()
+    @Slot()
     def slot_updateCwd(self):
         if self.cwd != os.getcwd():
             self.cwd = os.getcwd()
@@ -3280,7 +3287,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         return True
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_newViewer(self):
         """Slot for opening a list of viewer types (currently not used)
@@ -3299,7 +3306,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             win = self.newViewer(selected_viewer_type_name)  # , name=win_name)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_newViewerMenuAction(self):
         """Slot for creating new viewer directly from Windows/Create New menu
@@ -3307,7 +3314,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         win = self.newViewer(self.sender().text()
                              )  # inherited: WindowManager.newViewer
 
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_historyContextMenuRequest(self, point):
         cm = QtWidgets.QMenu("Selected history", self)
@@ -3472,7 +3479,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 pio.saveText(cmd+"\n", fn)
                 # with open(fn, mode="wt") as destfile:
 
-    @pyqtSlot(QtCore.QModelIndex)
+    @Slot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemPressed(self, ndx):
         """Triggered by single-click of lmb in workspace viewer.
@@ -3486,7 +3493,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         except:
             pass
 
-    @pyqtSlot(QtCore.QModelIndex)
+    @Slot(QtCore.QModelIndex)
     @safeWrapper
     def slot_variableItemActivated(self, ndx):
         """Called by double-click of left mouse button on item in workspace
@@ -3763,7 +3770,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         clearWs.triggered.connect(self._slot_clearInternalWorkspace)
         clearWs.hovered.connect(self._slot_showActionStatusMessage_)
 
-    @pyqtSlot("QPoint")
+    @Slot("QPoint")
     @safeWrapper
     def slot_workspaceViewContextMenuRequest(self, point):
         """
@@ -3807,7 +3814,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         cm.popup(self.workspaceView.mapToGlobal(point))
 
-    @pyqtSlot(QtCore.QItemSelection, QtCore.QItemSelection)
+    @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
     @safeWrapper
     def slot_selectionChanged(self, selected, deselected):
         """Selection change in the workspace viewer
@@ -3845,7 +3852,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # self.workspaceModel.currentItem = None
             # self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
 
-    @pyqtSlot("QStandardItem*")
+    @Slot("QStandardItem*")
     @safeWrapper
     def slot_variableItemNameChanged(self, item):
         """Called when itemChanged was emitted by workspaceModel.
@@ -3919,7 +3926,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.currentVarItemName = newVarName
                 self.workspaceView.sortByColumn(0, QtCore.Qt.AscendingOrder)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_renameWorkspaceVar(self):
         """ Renames workspace variables through GUI Menu action.
@@ -3973,7 +3980,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
         self.workspaceModel.rebindObjectInNamespace(varName, newVarNameOK)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_saveSelectedVariables(self):
         indexList = self.workspaceView.selectedIndexes()
@@ -4006,7 +4013,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # QtWidgets.QApplication.restoreOverrideCursor()
             self.unsetCursor()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_pickleSelectedVariables(self):
         indexList = self.workspaceView.selectedIndexes()
@@ -4039,7 +4046,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # QtWidgets.QApplication.restoreOverrideCursor()
             self.unsetCursor()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_deleteSelectedWorkspaceObjects(self):
         """Removes objects from the workspace.
@@ -4159,18 +4166,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspaceModel.unbindObjectInNamespace(varName) # single shot
 
 
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_dockWidgetVisibilityChanged(self, val):
         if val is True:
             self.activeDockWidget = self.sender()
 
-    @pyqtSlot(QtWidgets.QDockWidget)
+    @Slot(QtWidgets.QDockWidget)
     @safeWrapper
     def slot_dockWidgetActivated(self, w):
         self.activeDockWidget = w
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copyWorkspaceSelection(self):
         # NOTE: check out keyboard modifier WHEN this slot is called
@@ -4197,7 +4204,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.app.clipboard().setText(", ".join(varnames))
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copyWorkspaceSelectionQuoted(self):
         """
@@ -4222,20 +4229,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.app.clipboard().setText(", ".join(varNames))
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_pasteHistorySelection(self):
         self._copyHistorySelection_()
         # by default this will paste the contents of the Cliboard, not the X11 selection
         self.console.paste()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_pasteWorkspaceSelection(self):
         self.slot_copyWorkspaceSelection()
         self.console.paste()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_pasteQuotedWorkspaceSelection(self):
         """
@@ -4246,7 +4253,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.slot_copyWorkspaceSelectionQuoted()
         self.console.paste()
 
-    @pyqtSlot("QTreeWidgetItem*", int)
+    @Slot("QTreeWidgetItem*", int)
     @safeWrapper
     def slot_historyItemSelected(self, item, col):
         """Triggered by a selcting an item in the Command History list.
@@ -4277,7 +4284,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # print("slot_historyItemSelected selected session", self.selectedSessionID)
 
-    @pyqtSlot("QTreeWidgetItem*", int)
+    @Slot("QTreeWidgetItem*", int)
     @safeWrapper
     def slot_historyItemActivated(self, item, col):
         """Triggered by activating an item in the Command History list.
@@ -4334,7 +4341,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # (some race condition going on?)
         # self.workspaceModel.update() 
 
-    @pyqtSlot()
+    @Slot()
     def slot_Quit(self):
         self.close()
             
@@ -4681,8 +4688,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         tbactions = (self.newViewersAction, self.consolesAction,
                      self.scriptsAction, self.applicationsAction)
-        tw = (w for w in itertools.chain(*(a.associatedWidgets()
-              for a in tbactions)) if w is not self.toolBar)
+        if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+            tw = (w for w in itertools.chain(*(a.associatedWidgets()
+                for a in tbactions)) if w is not self.toolBar)
+        else:
+            tw = (w for w in itertools.chain(*(a.associatedObjects()
+                for a in tbactions)) if w is not self.toolBar)
 
         for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
@@ -4734,26 +4745,23 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                                                "Remove this path from list",
                                                                self.directoryComboBox.lineEdit())
 
-        self.removeRecentDirFromListAction.setToolTip(
-            "Remove this path from history")
+        self.removeRecentDirFromListAction.setToolTip("Remove this path from history")
 
-        self.removeRecentDirFromListAction.triggered.connect(
-            self.slot_removeDirFromHistory)
+        self.removeRecentDirFromListAction.triggered.connect(self.slot_removeDirFromHistory)
 
         self.clearRecentDirListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
                                                           "Clear history of visited paths",
                                                           self.directoryComboBox.lineEdit())
 
-        self.clearRecentDirListAction.setToolTip(
-            "Clear history of visited paths")
+        self.clearRecentDirListAction.setToolTip("Clear history of visited paths")
 
-        self.clearRecentDirListAction.triggered.connect(
-            self.slot_clearRecentDirList)
+        self.clearRecentDirListAction.triggered.connect(self.slot_clearRecentDirList)
 
         self.directoryComboBox.lineEdit().addAction(self.removeRecentDirFromListAction,
                                                     QtWidgets.QLineEdit.TrailingPosition)
 
-        self.directoryComboBox.activated[str].connect(self.slot_chDirString)
+        # self.directoryComboBox.activated[str].connect(self.slot_chDirString)
+        self.directoryComboBox.textActivated[str].connect(self.slot_chDirString)
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
@@ -4761,11 +4769,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                                                 "Remove this filter from history",
                                                                 self.fileSystemFilter.lineEdit())
 
-        self.removeFileFilterFromListAction.setToolTip(
-            "Remove this filter from history")
+        self.removeFileFilterFromListAction.setToolTip("Remove this filter from history")
 
-        self.removeFileFilterFromListAction.triggered.connect(
-            self.slot_removeFileFilterFromHistory)
+        self.removeFileFilterFromListAction.triggered.connect(self.slot_removeFileFilterFromHistory)
 
         self.clearFileFilterListAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("final_activity"),
                                                            "Clear filter list",
@@ -4773,14 +4779,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.clearFileFilterListAction.setToolTip("Clear file filter history")
 
-        self.clearFileFilterListAction.triggered.connect(
-            self.slot_clearFileFilterHistory)
+        self.clearFileFilterListAction.triggered.connect(self.slot_clearFileFilterHistory)
 
         self.fileSystemFilter.lineEdit().addAction(self.removeFileFilterFromListAction,
                                                    QtWidgets.QLineEdit.TrailingPosition)
 
-        self.fileSystemFilter.currentTextChanged[str].connect(
-            self.slot_setFileNameFilter)
+        self.fileSystemFilter.currentTextChanged[str].connect(self.slot_setFileNameFilter)
 
         self.dirHomeBtn.released.connect(self.slot_goToHomeDir)
         self.dirUpBtn.released.connect(self.slot_goToParentDir)
@@ -4846,8 +4850,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.consoleDockWidget = QtWidgets.QDockWidget(
             "Console", self, objectName="consoleDockWidget")
         self.consoleDockWidget.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
-        self.consoleDockWidget.setFeatures(
-            QtWidgets.QDockWidget.AllDockWidgetFeatures)
+        self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
+        # self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.AllDockWidgetFeatures)# NOTE 2024-05-02 12:21:54 deprecated even in Qt 5 !!!
         self.consoleDockWidget.setVisible(False)
         # END console dock
         # END Dock widgets management
@@ -4865,13 +4869,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.setWindowIcon(icon) # this doesn't work? -- next line does
         QtWidgets.QApplication.setWindowIcon(icon)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_keyDeleteStuff(self):
         if self.workspaceView.hasFocus():
             self.slot_deleteSelectedWorkspaceObjects()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_goToHomeDir(self):
         if sys.platform == "win32":
@@ -4879,7 +4883,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.slot_changeDirectory(os.environ['HOME'])
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_goToParentDir(self):
         # print(self.currentDir)
@@ -4889,7 +4893,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_changeDirectory(os.path.dirname(
                 os.path.abspath(self.currentDir)))
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_goToPrevDir(self):
         if len(self.navPrevDir) > 0:
@@ -4897,7 +4901,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             prevDir = self.navPrevDir.popleft()
             self.slot_changeDirectory(prevDir)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_goToNextDir(self):
         if len(self.navNextDir) > 0:
@@ -4905,13 +4909,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             nextDir = self.navNextDir.popleft()
             self.slot_changeDirectory(nextDir)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_systemOpenCurrentFolder(self):
         targetDir = self.fileSystemModel.rootPath()
         self.slot_systemOpenFileOrFolder(targetDir)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_openCurrentDirInSystemTerminal(self):
         dest = str(pathlib.Path(self.currentDir))
@@ -4930,7 +4934,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             warnings.warn(f"Launching a terminal on {sys.platform} is not yet supported")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_systemOpenSelectedFiles(self):
         """Opens selected file(s) or directory/ies in the system application"""
@@ -4979,7 +4983,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # this function. Hence, I use the signal/slot mechanism.
         self.sig_refreshRecentFilesMenu.emit()
 
-    @pyqtSlot()
+    @Slot()
     def _slot_refreshRecentFilesMenu_(self):
         '''Recreates the Recent Files submenu of the File menu; each recent file
         gets a QAction with the 'triggered' slot connected to self.slot_loadRecentFile.
@@ -5071,7 +5075,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.statusbar.clearMessage()
 
-    @pyqtSlot(object, bool, QtCore.QPoint)
+    @Slot(object, bool, QtCore.QPoint)
     @safeWrapper
     def slot_loadDroppedURLs(self, urls, chdirs, pos):
         # print(f"{self.__class__.__name__}.slot_loadDroppedURLs")
@@ -5128,7 +5132,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             #             warnings.warn(
             #                 "ScipyenWindow.slot_loadDroppedURLs: Remote URLs not yet supported", NotImplemented)
 
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_fileSystemContextMenuRequest(self, point):
         """Pops up a context menu for the File System viewer.
@@ -5199,7 +5203,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         cm.popup(self.fileSystemTreeView.mapToGlobal(point), action_0)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addVarNameToFinderHistory(self):
         varTxt = self.varNameFilterFinderComboBox.lineEdit().text()
@@ -5212,7 +5216,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # TODO add to varname history and save/restore from configuration file
     # TODO: find a way to filter displayed variable names -- low pripriy as we don't
     # overpopulate the variable browser yet
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_filterSelectVarNames(self, val):
         """Select variables in workspace viewer, according to name filter.
@@ -5246,7 +5250,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.workspaceView.selectionModel().select(
                     i.index(), QtCore.QItemSelectionModel.Select)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeVarNameFromFinderHistory(self):
         currentNdx = self.varNameFilterFinderComboBox.currentIndex()
@@ -5264,7 +5268,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # TODO: if the above task is successfully completed, then also find
     # out how to filter or select by session number
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_findCommand(self, val):
         """Finds command in the history tree based on glob search.
@@ -5334,7 +5338,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         except:
             self.historyTreeWidget.setSelectionMode(original_selection_mode)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addCommandFindToHistory(self):
         cmdTxt = self.commandFinderComboBox.lineEdit().text()
@@ -5342,7 +5346,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self._commandHistoryFinderList.appendleft(cmdTxt)
             self.lastCommandFind = cmdTxt
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeItemFromCommandFinderHistory(self):
         currentNdx = self.commandFinderComboBox.currentIndex()
@@ -5353,7 +5357,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.commandFinderComboBox.removeItem(currentNdx)
         self.commandFinderComboBox.lineEdit().setClearButtonEnabled(True)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeDirFromHistory(self):
         signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
@@ -5365,14 +5369,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.directoryComboBox.removeItem(currentNdx)
         self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_clearRecentDirList(self):
         signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
         self._clearRecentDirectories_()
         self.directoryComboBox.clear()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeFileFilterFromHistory(self):
         currentNdx = self.fileSystemFilter.currentIndex()
@@ -5386,7 +5390,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.fileSystemFilter.removeItem(currentNdx)
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_clearFileFilterHistory(self):
         signalBlocker = QtCore.QSignalBlocker(self.fileSystemFilter)
@@ -5394,7 +5398,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.fileSystemFilter.clear()
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_setFileNameFilter(self, val):
         if len(val) == 0:
@@ -5413,12 +5417,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             self.lastFileSystemFilter = val
 
-    @pyqtSlot(QtCore.QModelIndex)
+    @Slot(QtCore.QModelIndex)
     @safeWrapper
     def slot_resizeFileTreeViewFirstColumn(self, ndx):
         self._resizeFileColumn_()
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_resizeFileTreeColumnForPath(self, path):
         self._resizeFileColumn_()
@@ -5460,7 +5464,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceView.sortByColumn(sortSection, sortOrder)
         self.workspaceView.setSortingEnabled(True)
 
-    @pyqtSlot(QtCore.QModelIndex)
+    @Slot(QtCore.QModelIndex)
     @safeWrapper
     def slot_fileSystemItemActivated(self, ndx):
         """ 
@@ -5477,7 +5481,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                            self._openSelectedFileItemsThreaded)
             
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_chDirString(self, val):
         if "://" in val:
@@ -5487,7 +5491,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print("ScipyenWindow.slot_chDirString: \nval = %s; \nprotocol = %s; \ntarget = %s" % (val, protocol, target))
         self.slot_changeDirectory(target)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_changeDirectory(self, targetDir=None):
         # print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
@@ -5620,7 +5624,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.app.clipboard().setText(',\n'.join(itemNames))
         self.console.paste()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_importPrairieView(self):
         # from systems.PrairieView import PrairieViewImporter # PrairieView already imported as module
@@ -5638,7 +5642,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         pvimp.finished[int].connect(self._slot_prairieViewImportGuiDone)
         pvimp.open()
 
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slot_prairieViewImportGuiDone(self, value):
         # if value == QtWidgets.QDialog.Accepted:
@@ -5647,7 +5651,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if dlg is not None:
                 self.assignToWorkspace(dlg.scanDataVarName, dlg.scandata)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_importDataFrame(self):
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
@@ -5661,7 +5665,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.loadFiles(fileNames, self._openSelectedFileItemsThreaded,
                        ioReaderFn = pio.importDataFrame)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_openSelectedFileItems(self):
         """Opens files via (triggered from) context menu in File system browser"""
@@ -5757,42 +5761,42 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded ({k}, {item})")
             OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, 
                                     updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
-            if OK and isinstance(progressSignal, QtCore.pyqtBoundSignal):
+            if OK and isinstance(progressSignal, QtCore.SignalInstance):
                 # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded loaded ({k}, {item})")
                 progressSignal.emit(k)
                     
             if isinstance(loopControl, dict) and loopControl.get("break", None) == True:
-                if isinstance(canceledSignal, QtCore.pyqtBoundSignal):
+                if isinstance(canceledSignal, QtCore.SignalInstance):
                     canceledSignal.emit()
                 break
                 
         return OK
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_showFilesFilter(self):
         self.filesFilterFrame.setVisible(True)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_hideFilesFilter(self):
         self.filesFilterFrame.setVisible(False)
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def _slot_runPythonScriptFromManager(self, fileName):
         if os.path.isfile(fileName):
             self._temp_python_filename_ = fileName
             self._slot_runPythonSource()
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def _slot_importPythonScriptFromManager(self, fileName):
         if os.path.isfile(fileName):
             self._temp_python_filename_ = fileName
             self._slot_importPythonModule()
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_systemEditScript(self, fileName):
         if os.path.exists(fileName) and os.path.isfile(fileName):
@@ -5807,7 +5811,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 url = QtCore.QUrl.fromLocalFile(fileName)
                 QtGui.QDesktopServices.openUrl(url)
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_systemOpenFileOrFolder(self, fileName):
         """Opens fileName with the associated system application."""
@@ -5819,7 +5823,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         elif isinstance(fileName, QtCore.QUrl) and fileName.isValid() and fileName.isLocalFile():
             QtGui.QDesktopServices.openUrl(fileName)
 
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_systemOpenUrl(self, urlobj):
         if isinstance(urlobj, QtCore.QUrl) and urlobj.isValid():
@@ -5835,7 +5839,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if url.isValid():
                 QtGui.QDesktopServices.openUrl(url)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_systemOpenParentFolderForSelectedItems(self):
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
@@ -5847,7 +5851,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         for folder in parentFolders:
             self.slot_systemOpenFileOrFolder(folder)
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_systemOpenParentFolder2(self):
         """Opens the parent directory of the current directory, in system app"""
@@ -5857,7 +5861,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # print(f"\t{self.__class__.__name__} OK")
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(f"file://{dest}"))
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_systemOpenParentFolder(self, fileName):
         if isinstance(fileName, str):
@@ -5881,14 +5885,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             u_path = url.adjusted(QtCore.QUrl.RemoveFilename)  # .path()
             QtGui.QDesktopServices.openUrl(u_path)
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def _slot_pastePythonScriptFromManager(self, fileName):
         if os.path.isfile(fileName):
             self._temp_python_filename_ = fileName
             self._slot_python_code_to_console()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_runRecentPythonScript_(self):
         if isinstance(self.sender(), QtWidgets.QAction):
@@ -5916,7 +5920,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     self._slot_runPythonSource()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_pastePythonScript(self, fileName=None):
         if not isinstance(fileName, str) or len(fileName) == 0:
@@ -5955,7 +5959,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         self.recentScripts.appendleft(fileName)
                         self._refreshRecentScriptsMenu_()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_showScriptsManagerWindow(self):
         self._showScriptsManagerWindow()
@@ -5966,7 +5970,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.scriptsManager.showNormal()
         # self._script_manager_autolaunch = True
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_runPythonScript(self, fileName=None):
         if not isinstance(fileName, str) or len(fileName) == 0:
@@ -6011,7 +6015,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         self.recentScripts.appendleft(fileName)
                         self._refreshRecentScriptsMenu_()
 
-    @pyqtSlot(str, QtCore.QPoint)
+    @Slot(str, QtCore.QPoint)
     @safeWrapper
     def slot_handlePythonTextFile(self, path, pos):
         if os.path.isfile(path):
@@ -6055,7 +6059,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # # self._addRecentFile_(fName, fileReader) # done inside loadDiskFile
             # self.workspaceModel.update()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_loadRecentFile(self):
         '''
@@ -6074,7 +6078,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.loadDiskFile(fName, fileReader)
                 # self.workspaceModel.update()
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_rootPathChanged(self, newPath):
         pass
@@ -6228,7 +6232,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return ret
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_saveFile(self):
         """Saves data to file.
@@ -6349,7 +6353,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # use list comprehension to construct filter
     # @_workspaceModifier # NOTE: 2016-05-02 20:46:58 not used anymore here
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def openFile(self):
         '''Slot to which File Open typically connects to.
@@ -6410,7 +6414,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     #
     # 2016-08-11 14:13:24
     # NOTE: see NOTE above loadImageFile(self):
-    # @pyqtSlot()
+    # @Slot()
     # def loadBioFormatsImageFile(self):
         # '''Slot to which an item in the File typically connects to.
 
@@ -6441,7 +6445,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     # self._addRecentFile_(fileName, "bioformats")
                     # self.workspaceModel.update()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_openFiles(self):
         """Opening of several files via (triggered from) the 'File/Open' menu action.
@@ -6482,7 +6486,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             # self.workspaceModel.update()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_openNamedFile_(self):
         """Called by slot_handlePythonTextFile"""
@@ -6493,7 +6497,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.loadFile(self._temp_python_filename_)
             self._temp_python_filename_ = None
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_python_code_to_console(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
@@ -6510,18 +6514,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.recentScripts.appendleft(self._temp_python_filename_)
                     self._refreshRecentScriptsMenu_()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_gui_worker_done_(self):
         QtWidgets.QApplication.setOverrideCursor(self._defaultCursor)
 
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_gui_worker_result_(self, val):
         print("ScipyenWindow._slot_gui_worker_result_", val)
         pass
 
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_forgetScripts_(self, o):
         if isinstance(o, str):
@@ -6534,7 +6538,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self._refreshRecentScriptsMenu_()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_dockConsole(self):
         if self.console is not None:
@@ -6543,7 +6547,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.consoleDockWidget.setVisible(True)
             self._console_docked_ = True
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_undockConsole(self):
         # FIXME 2021-11-26 18:37:40
@@ -6553,7 +6557,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.consoleDockWidget.setVisible(False)
             self._console_docked_ = False
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_importPythonModule(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
@@ -6571,7 +6575,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             self._temp_python_filename_ = None
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_copyToExternalWS(self):
         from core.extipyutils_client import cmd_copy_to_foreign
@@ -6592,7 +6596,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.external_console.execute(
             cmd_foreign_shell_ns_listing(namespace=ns))
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_copyFromExternalWS(self):
         from core.utilities import standard_obj_summary_headers
@@ -6622,12 +6626,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # self.external_console.execute(cmd_copies_from_foreign(*varnames),
                 # where = wsname)
 
-    @pyqtSlot(object)
+    @Slot(object)
     def _slot_int_krn_shell_chnl_msg_recvd(self, msg):
         if msg["msg_type"] == "execute_reply":
             pass
 
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_ext_krn_shell_chnl_msg_recvd(self, msg):
         # TODO 2020-07-13 00:45:57
@@ -6776,21 +6780,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def execute_in_external_console(self, call, where=None):
         self.external_console.execute(call, where=where)
 
-    @pyqtSlot(dict)
+    @Slot(dict)
     @safeWrapper
     def _slot_ext_krn_disconnected(self, cdict):
         # print("mainWindow: _slot_ext_krn_disconnected %s" % cdict)
         signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
         self.workspaceModel.removeForeignNamespace(cdict)
 
-    @pyqtSlot(dict)
+    @Slot(dict)
     @safeWrapper
     def _slot_ext_krn_stop(self, conndict):
         # print("mainWindow: _slot_ext_krn_stop %s" % conndict)
         signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
         self.workspaceModel.removeForeignNamespace(conndict)
 
-    @pyqtSlot(dict)
+    @Slot(dict)
     @safeWrapper
     def _slot_ext_krn_restart(self, conndict):
         # print("mainWindow: _slot_ext_krn_restart %s" % conndict)
@@ -6816,12 +6820,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         sys.modules[moduleName] = module
 
-    @pyqtSlot(str)
+    @Slot(str)
     def _slot_scriptFileAddedInManager(self, fileName):
         self._temp_python_filename_ = fileName
         self._slot_registerPythonSource_()
 
-    @pyqtSlot()
+    @Slot()
     def _slot_clearInternalWorkspace(self):
         varNames = self.workspaceModel.getDisplayedVariableNames()
         prompt = "Remove all variables from the workspace?"
@@ -6863,7 +6867,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.workspaceModel.update()
 
-    @pyqtSlot()
+    @Slot()
     def _slot_cm_AddPythonScriptToManager(self):
         selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
@@ -6876,15 +6880,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         for f in fileNames:
             self._slot_scriptFileAddedInManager(f)
 
-    @pyqtSlot()
+    @Slot()
     def _slot_scriptManagerClosed(self):
         self.scriptManagerAutoLaunch = False
 
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_set_scriptManagerAutoLaunch(self, val):
         self.scriptManagerVisible = val
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_registerPythonSource_(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
@@ -6912,7 +6916,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             self._temp_python_filename_ = None
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_runPythonSource(self):
         if isinstance(self._temp_python_filename_, str) and len(self._temp_python_filename_.strip()) and os.path.isfile(self._temp_python_filename_):
@@ -6969,11 +6973,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         self.statusbar.showMessage("Done!")
 
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_setAutoRemoveViewers(self, value):
         self.autoRemoveViewers = value == True
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def _slot_test_gui_style(self, val: str):
         self._prev_gui_style_name = self._current_GUI_style_name
@@ -6990,7 +6994,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             self._current_GUI_style_name = val
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_set_Application_style(self):
         from .itemslistdialog import ItemsListDialog
@@ -7019,19 +7023,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.guiStyle = self._prev_gui_style_name
 
-    @pyqtSlot(tuple)
+    @Slot(tuple)
     def slot_windowRemoved(self, name_obj):
         self.shell.user_ns.pop(name_obj[0], None)
         self.workspaceModel.update()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_showActionStatusMessage_(self):
         action = self.sender()
         if isinstance(action, QtWidgets.QAction):
             action.showStatusText(self)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_multiExportToCsv(self):
         indexList = self.workspaceView.selectedIndexes()
@@ -7052,7 +7056,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     filename = "".join([v, ".csv"])
                     pio.writeCsv(self.workspace[v], fileName=filename)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportToCsv(self):
         indexList = self.workspaceView.selectedIndexes()
@@ -7091,7 +7095,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(filename.strip()) > 0:
             pio.writeCsv(self.workspace[varname], fileName=filename)
 
-    @pyqtSlot()
+    @Slot()
     def slot_useDataViewer(self):
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
             newWindow = True
@@ -7131,7 +7135,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.console.execute(varname)
 
-    @pyqtSlot()
+    @Slot()
     def slot_showInConsole(self):
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
             newWindow = True
@@ -7161,7 +7165,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.console.execute(varname)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_autoSelectViewer(self):
         newWindow = bool(
@@ -7220,7 +7224,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         else:
             self.console.execute(varname)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_viewSelectedVar(self):
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
@@ -7248,7 +7252,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if not self.viewVar(varname, newWindow=False):
             self.console.execute(varname)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_viewSelectedVariables(self):
         indexList = self.workspaceView.selectedIndexes()
@@ -7262,7 +7266,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if not self.viewVar(varname, True):
                 self.console.execute(varname)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_consoleDisplaySelectedVariables(self):
         indexList = self.workspaceView.selectedIndexes()
@@ -7277,7 +7281,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         for varname in varnames:
             self.console.execute(varname)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_viewNDarray(self):
         """Displays ndarray in a TableEditor
@@ -7317,7 +7321,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # NOTE: to avoid clash with python's raise PyQt uses "raise_()"
                 winDict[winId].raise_()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_viewNDarrayNewWindow(self):
         """Displays ndarray in a new  TableEditor
@@ -7333,7 +7337,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         winDict[winId].view(self.workspace[varname])
         winDict[winId].setTitle(varname)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_viewSelectedVarInNewWindow(self):
         # if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
@@ -7383,8 +7387,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return False
     
-    # @pyqtSlot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
-    @pyqtSlot()
+    # @Slot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
+    @Slot()
     def slot_fileSystemDataChanged(self, *args, **kwargs): # TODO 2023-09-27 22:43:52 revisit this
         # print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
         self._fileSystemChanged_ = True
@@ -7480,13 +7484,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.dirFileMonitor.addPath(self.currentDir)
                 
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def _slot_monitoredFileChanged(self, *args, **kwargs):
         print(f"{self.__class__.__name__}._slot_monitoredFileChanged:\n\targs = {args}\n\t kwargs = {kwargs}\n\n")
         
     
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def _slot_monitoredDirectoryChanged(self, *args, **kwargs):
         """Called when the contents of the monitored directories have changed:
         
@@ -7722,7 +7726,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if worker is not None:
             self.threadpool.start(worker)
 
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_loop_process_result(self, obj, name=""):
         if isinstance(name, str) and len(name.strip()):
@@ -7746,7 +7750,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 if parentMenuOrMenuBar.title() != "Plugins":
                     self._removeMenu_(parentMenuOrMenuBar)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     # do we "unload", "offload", or simply "forget" them?
     def slot_offloadPlugins(self):
@@ -7776,7 +7780,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.plugins.clear()
             scipyen_plugin_loader.loaded_plugins.clear()  # need to clear this, too
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_reloadPlugins(self):
         self.slot_offloadPlugins()
@@ -7784,7 +7788,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     # TODO/FIXME 2016-04-03 00:14:47
     # make forceRecompile a configuration variable !!!
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_loadPlugins(self):
         ''' Asynchronously search and load of Scipyen 'plugins'

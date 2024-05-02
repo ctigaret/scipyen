@@ -97,9 +97,12 @@ import quantities as pq
 
 import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-from PyQt5.QtWidgets import (QWidget, QMainWindow)
-from PyQt5.QtCore import (QSettings, QVariant)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+from qtpy.QtWidgets import (QWidget, QMainWindow)
+from qtpy.QtCore import (QSettings, QVariant)
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+# from PyQt5.QtWidgets import (QWidget, QMainWindow)
+# from PyQt5.QtCore import (QSettings, QVariant)
 
 from IPython.lib.pretty import pprint
 
@@ -627,7 +630,10 @@ def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:t
     # print(f"loadQSettingsKey group: {gname}, key: {key}, value: {ret} ({type(ret).__name__})")
     return ret
 
-def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None, save:bool=True):
+def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, Figure], 
+                   group_name:typing.Optional[str]=None,
+                   prefix:typing.Optional[str]=None, 
+                   save:bool=True):
     """Synchronize user-specifc settings with the Scipyen's Qt configuration file.
     
     The Scipyen's configuration file is in native format, and on Linux it usually
@@ -942,9 +948,6 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
                 value_type = config_setter.get("value_type", None)
                 if not isinstance(value_type, type):
                     value_type = type(default)
-                    
-                # if settername == "autoRemoveViewers":
-                #     print(f"value_type {value_type}")
                     
                 try:
                     if value_type is bool:
@@ -1908,7 +1911,10 @@ def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     # print("saveWindowSettings %s" % win.__class__.__name__)
     return syncQtSettings(qsettings, win, group_name, prefix, True)
     
-def loadWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None):
+def loadWindowSettings(qsettings:QtCore.QSettings,
+                       win:typing.Union[QtWidgets.QMainWindow, Figure],
+                       group_name:typing.Optional[str]=None,
+                       prefix:typing.Optional[str]=None):
     """Loads window settings from the Scipyen's Qt configuration file.
     
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf 

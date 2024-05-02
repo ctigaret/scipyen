@@ -2,9 +2,12 @@
 import os
 from numbers import (Number, Real,)
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType
 
 import numpy as np
 import quantities as pq
@@ -20,12 +23,15 @@ from gui.workspacegui import GuiMessages
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_ProtocolEditorDialog, QDialog = loadUiType(os.path.join(__module_path__, "protocoleditordialog.ui"), from_imports=True, import_from="gui")
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    Ui_ProtocolEditorDialog, QDialog = loadUiType(os.path.join(__module_path__, "protocoleditordialog.ui"), from_imports=True, import_from="gui")
+else:
+    Ui_ProtocolEditorDialog, QDialog = loadUiType(os.path.join(__module_path__, "protocoleditordialog.ui"))
 
 class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
     model_columns = ["Name", "Presynaptic", "Postsynaptic", "Photostimulation", "Imaging delay", "Frames"]
     
-    editCompleted = pyqtSignal(str, name="editCompleted")
+    editCompleted = Signal(str, name="editCompleted")
     
     def __init__(self, protocols=None, parent=None):
         super().__init__(parent)
@@ -269,14 +275,14 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
     #### BEGIN Qt signals:
     # emitted to inform the caller that GUI action(s) to add new protocol have 
     # been enacted
-    sig_requestProtocolAdd = pyqtSignal(int, name="sig_requestProtocolAdd")
-    sig_removeProtocol = pyqtSignal(int, name="sig_removeProtocol")
-    sig_detectTriggers = pyqtSignal(name="sig_detectTriggers")
-    sig_clearProtocols = pyqtSignal(name="sig_clearProtocols")
+    sig_requestProtocolAdd = Signal(int, name="sig_requestProtocolAdd")
+    sig_removeProtocol = Signal(int, name="sig_removeProtocol")
+    sig_detectTriggers = Signal(name="sig_detectTriggers")
+    sig_clearProtocols = Signal(name="sig_clearProtocols")
     #### END Qt signals
     
     #                               row, col, txt
-    sig_protocolEdited = pyqtSignal(int, int, str, name="sig_protocolEdited")
+    sig_protocolEdited = Signal(int, int, str, name="sig_protocolEdited")
     
     def __init__(self, parent=None, title="Protocol Editor"):
         super().__init__(parent)
@@ -335,7 +341,7 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
         
         #self.protocolTableView.itemChanged[QtWidgets.QTableWidgetItem].connect(self._slot_protocolTableEdited)
         
-    @pyqtSlot(QtWidgets.QTableWidgetItem)
+    @Slot(QtWidgets.QTableWidgetItem)
     def _slot_protocolTableEdited(self, item):
         col = item.column()
         row = item.row()
@@ -353,30 +359,30 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
         
         # rows: one for each defined protocol
         
-    @pyqtSlot()
+    @Slot()
     def _slot_addProtocol(self):
         self.sig_requestProtocolAdd.emit()
         
-    @pyqtSlot()
+    @Slot()
     def _slot_protocolAdded(self):
         pass
     
-    @pyqtSlot()
+    @Slot()
     def _slot_loadProtocols(self):
         pass
     
-    @pyqtSlot()
+    @Slot()
     def _slot_removeProtocol(self):
         index = self.protocolTableView.currentRow()
         self.sig_removeProtocol.emit(index)
         
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_protocolRemoved(self, index):
         if index < len(self._dataModel_.modelData):
             pass
             #self.protocolTableView.removeRow(index)
     
-    @pyqtSlot()
+    @Slot()
     def _slot_detectTriggers(self):
         """Emits sig_detectTriggers signal.
         
@@ -390,15 +396,15 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
         """
         self.sig_detectTriggers.emit()
         
-    @pyqtSlot()
+    @Slot()
     def _slot_clearProtocols(self):
         pass
     
-    @pyqtSlot()
+    @Slot()
     def _slot_importProtocols(self):
         pass
     
-    @pyqtSlot()
+    @Slot()
     def _slot_dataChanged(self):
         print("ProtocolEditorDialog data changed")
     

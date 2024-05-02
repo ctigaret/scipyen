@@ -6,8 +6,10 @@ from pprint import pprint
 from traitlets import (config, Bunch)
 #### END Configurable objects with traitlets.config
 import matplotlib as mpl
-from PyQt5 import (QtCore, QtWidgets, QtGui)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty)
+from qtpy import (QtCore, QtWidgets, QtGui)
+from qtpy.QtCore import (Signal, Slot, QEnum, Property)
+# from PyQt5 import (QtCore, QtWidgets, QtGui)
+# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property)
 #from traitlets.config import SingletonConfigurable
 from core.utilities import safeWrapper
 from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)
@@ -49,7 +51,7 @@ class DirectoryFileWatcher(QtCore.QObject):
         self._watchedDir_   = None
 
         if isinstance(emitter, QtCore.QObject):
-            if all(hasattr(emitter, x) and isinstance(inspect.getattr_static(emitter, x), QtCore.pyqtSignal) for x in self.required_sigs):
+            if all(hasattr(emitter, x) and isinstance(inspect.getattr_static(emitter, x), QtCore.Signal) for x in self.required_sigs):
                 self._source_ = emitter
                 self._source_.sig_newItemsInMonitoredDir.connect(self.slot_newFiles, type=QtCore.Qt.QueuedConnection)
                 self._source_.sig_itemsRemovedFromMonitoredDir.connect(self.slot_filesRemoved, type=QtCore.Qt.QueuedConnection)
@@ -107,7 +109,7 @@ class DirectoryFileWatcher(QtCore.QObject):
         else:
             self._observer_ = None
 
-    @pyqtSlot(tuple)
+    @Slot(tuple)
     def slot_filesRemoved(self, value):
         # Check all items in value are files and are in the same parent directory
         if not all(isinstance(v, pathlib.Path) for v in value):
@@ -132,7 +134,7 @@ class DirectoryFileWatcher(QtCore.QObject):
                 self.observer.removedFiles(self._removedFiles_)
 
 
-    @pyqtSlot(tuple)
+    @Slot(tuple)
     def slot_filesChanged(self, value):
         # Check all items in value are files and are in the same parent directory
         if not all(isinstance(v, pathlib.Path) for v in value):
@@ -155,7 +157,7 @@ class DirectoryFileWatcher(QtCore.QObject):
                 self.observer.changedFiles(self._changedFiles_)
 
 
-    @pyqtSlot(tuple)
+    @Slot(tuple)
     def slot_newFiles(self, value):
         """"""
         # Check all items in value are files and are in the same parent directory
@@ -191,7 +193,7 @@ class DirectoryFileWatcher(QtCore.QObject):
                         self._source_.dirFileMonitor.removePath(str(filepath))
         
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def slot_monitoredFileChanged(self, *args, **kwargs):
         # print(f"{self.__class__.__name__}._slot_monitoredFileChanged:\n\targs = {args}\n\t kwargs = {kwargs}\n\n")
         self._observer_.filesChanged(self._source_.dirFileMonitor.files())
@@ -199,7 +201,7 @@ class DirectoryFileWatcher(QtCore.QObject):
     
 
 class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
-    sig_wm_inspect_done = pyqtSignal(name="sig_wm_inspect_done")
+    sig_wm_inspect_done = Signal(name="sig_wm_inspect_done")
     
     def __init__(self, parent=None):
         # NOTE: 2023-01-08 13:19:59
@@ -224,7 +226,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
             self.timer.setInterval(25)
             self.timer.timeout.connect(self.wmctrl.start)
             
-    @pyqtSlot()
+    @Slot()
     def _slot_parseWindowsList(self):
         if not isinstance(self.wmctrl, QtCore.QProcess):
             self.sig_wm_inspect_done.emit()
@@ -569,7 +571,7 @@ class FileIOGui(object):
         return dirName
     
 class FileStatChecker(QtCore.QObject):
-    okToProcess = pyqtSignal(pathlib.Path, name="okToProcess")
+    okToProcess = Signal(pathlib.Path, name="okToProcess")
     
     def __init__(self, filePath:typing.Optional[pathlib.Path] = None, 
                  interval:typing.Optional[int] = None,
@@ -1241,7 +1243,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 if isinstance(configData, dict) and len(configData):
                     for k,v in configData.items():
                         self.set_configurable_attribute(k,v,cfg)
-    @pyqtSlot()
+    @Slot()
     def _slot_breakLoop(self):
         """To be connected to the `canceled` signal of a progress dialog.
         Modifies the loopControl variable to interrupt a worker loop gracefully.
@@ -1280,7 +1282,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # TODO replicate the logic in loadFiles -> mainWindow._saveSelectedObjectsThreaded
         
         
-    @pyqtSlot(object)
+    @Slot(object)
     def workerReady(self, obj):
         # print(f"{self.__class__.__name__}.workerReady: obj = {obj}; self.updateUiWithFileLoad = {self.updateUiWithFileLoad }")
         self.loopControl["break"] = False

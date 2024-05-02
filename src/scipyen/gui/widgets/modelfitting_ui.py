@@ -10,9 +10,12 @@ from gui import guiutils
 import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -50,11 +53,11 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     
     """
-    sig_dataChanged = pyqtSignal(name="sig_dataChanged")
+    sig_dataChanged = Signal(name="sig_dataChanged")
     #                                 index(row), column name
-    sig_parameterChanged = pyqtSignal(str,        str,        name="sig_parameterChanged")
-    sig_badBounds = pyqtSignal(str, name="sig_badBounds")
-    sig_infeasible_x0 = pyqtSignal(str, name="sig_infeasible_x0")
+    sig_parameterChanged = Signal(str,        str,        name="sig_parameterChanged")
+    sig_badBounds = Signal(str, name="sig_badBounds")
+    sig_infeasible_x0 = Signal(str, name="sig_infeasible_x0")
     
     _default_spin_decimals_ = 4
     _default_spin_step_ = 1e-4
@@ -479,7 +482,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
     def spinStep(self, value:float):
         self._spinStep_ = float(value)
     
-    @pyqtSlot(float)
+    @Slot(float)
     def _slot_newValue(self, value):
         widget = self.sender()
         if self.isVertical: # FIXME/TODO/BUG
