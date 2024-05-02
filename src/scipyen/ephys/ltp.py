@@ -355,6 +355,8 @@ class _LTPFilesSimulator_(QtCore.QThread):
         
         if isinstance(simulation, dict):
             self._simulationTimeOut_ = simulation.get("timeout",self.defaultTimeout )
+
+            # print(f"{self.__class__.__name__}._simulationTimeOut_ = {self._simulationTimeOut_}")
             
             files = simulation.get("files", None)
             
@@ -362,7 +364,6 @@ class _LTPFilesSimulator_(QtCore.QThread):
             
             if not (isinstance(directory, str) and os.path.isdir(directory)) or not (isinstance(directory, pathlib.Path) and directory.is_dir()):
                 directory = os.getcwd()
-                
             
             if not isinstance(files, (list, tuple)) or len(files) == 0 or not all(isinstance(v, (str, pathlib.Path)) for v in files):
                 files = None
@@ -714,7 +715,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # • ABF trials recorded with other protocols are ignored; this includes
         #   cross-talk trials and the pathway conditioning trial
         
-        self.print(f"{self.__class__.__name__}.processAbfFile {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
+        self.print(f"{self.__class__.__name__}.processAbfFile {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}\n")
 
         try:
             # NOTE: 2024-02-08 14:18:32
@@ -2170,7 +2171,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # store pathway measures for measurements
             self._runData_.results[src.name][p.name]["measures"] = pMeasures
             
-class LTPOnline(QtCore.QObject):
+class LTPOnline_old(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
         'legacy' code
     """
@@ -2950,7 +2951,7 @@ class LTPOnline(QtCore.QObject):
         self.__del__()
 
 
-class LTPOnline2(QtCore.QObject):
+class LTPOnline(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
     """
     # TODO: update episodes in the pathway's schedule
@@ -3123,7 +3124,9 @@ class LTPOnline2(QtCore.QObject):
             self._simulator_params_ = dict(files=None, timeout = int(simulate))
         
         if self._doSimulation_:
-            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
+            # print(f"Simulator parameters: {self._simulator_params_}")
+            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, 
+                                                         self._stdout_)
             self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
                                         self._emitterWindow_, self._watchedDir_,

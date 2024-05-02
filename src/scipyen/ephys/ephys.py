@@ -945,9 +945,9 @@ class RecordingEpisode(Episode):
     """
     Specification of an electrophysiology recording episode.
         
-    An "episode" is a contiguous series of sweeps recorded during a specific set 
-    of experimental conditions or protocol -- typically, a subset of a larger 
-    experiment where several distinct sets of conditions are applied in sequence.
+    An "episode" is a contiguous series of sweeps recorded under a common set 
+    of experimental conditions -- typically, a subset of a larger 
+    experiment where distinct sets of conditions are applied in sequence.
 
     All sweeps in the episode must have been recorded using the same recording
     protocol (an ElectrophysiologyProtocol object).
