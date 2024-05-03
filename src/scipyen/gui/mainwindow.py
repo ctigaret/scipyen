@@ -1994,36 +1994,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         assert viewer.ID == wid
         
-    #def event(self, evt):
-        #if sys.platform == "win32":
-            #if evt == QtCore.QEvent.WindowDeactivate:
-                #self.setWindowFlags(self._winFlagsCache_);
-                ##self.show();
-                #return True
-
-            #return super().event(evt)
-
-
-        #else:
-            #return super().event(evt)
-
-    #def mousePressEvent(self, evt):
-        #if sys.platform == "win32":
-            #self.activateWindow()
-        #super().mousePressEvent(evt)
-
+    def requestActivate(self):
+        """workaround wayland"""
+        if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+            return
+        super().requestActivate()
+        
     def activateWindow(self):
         # print(f"{self.__class__.__name__}.activateWindow")
         #super().activateWindow()
         if sys.platform== "win32":
             self.windowHandle().raise_()
-            # flags = self.windowFlags();
-            # self.show(); # Restore from systray
-            # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
-            # self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
-            # self.show();
-            #self.raise_()
         else:
+            if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+                return
             super().activateWindow()
 
     @safeWrapper
@@ -2326,6 +2310,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """Sets obj to be the current window and raises it.
         Steals focus.
         """
+        # print(f"{self.__class__.__name__}.raiseWindow ({obj})")
         if not isinstance(obj, (scipyenviewer.ScipyenViewer, mpl.figure.Figure)):
             return
 
@@ -2342,8 +2327,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 obj.show()  # steals focus!
 
         else:
-            obj.activateWindow()
-            obj.raise_()
+            if os.getenv("XDG_SESSION_TYPE").lower() != "wayland":
+                obj.activateWindow()
+                obj.raise_()
             obj.setVisible(True)
 
     def setCurrentWindow(self, obj):

@@ -846,6 +846,7 @@ IFS=$oldifs
 
 function make_launch_script () 
 {
+    # force the use of XCB platform abstraction plugin in Qt
 if [[ `id -u` -eq 0 ]] ; then
     target_dir=/usr/local/bin
 else
@@ -889,6 +890,7 @@ if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
+export QT_QPA_PLATFORM=xcb
 ${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
 END
 shopt -u lastpipe

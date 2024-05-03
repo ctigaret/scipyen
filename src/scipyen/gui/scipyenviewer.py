@@ -313,10 +313,19 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             #self.activateWindow()
         #super().mousePressEvent(evt)
 
+    def requestActivate(self):
+        """workaround wayland"""
+        if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+            return
+        super().requestActivate()
+        
+
     def activateWindow(self):
         if sys.platform== "win32":
             self.windowHandle().raise_()
         else:
+            if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+                return
             super().activateWindow()
         
     def getAppMenu(self):

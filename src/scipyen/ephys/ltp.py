@@ -759,23 +759,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
                 # self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
                 self._runData_.currentProtocol = protocol
-
-            # NOTE: This below ↴ is WRONG: is a protocol parameter has changed
-            # it will be reported as different...
-            # This means a change of protocol mid-experiment will result in skipping
-            # the file.
-            #
-            # You may argue whether allowing a change in protocol is a good idea
-            # — but this is useful when setting things up using "dry" Clampex runs...
-            #
-            # we could try a more granular approach (e.g protocol.is_identical_except_digital(…))
-            # but is simpler to just look at the protocol name;
-            #
-            # However, CAUTION: if a protocol is inadvertently changes yet saved under the same
-            # name this WILL mess things up. So it's up to the user to know that theyre doing
-            #
-            # if protocol == self._runData_.currentProtocol:
-            #
+                
             if protocol.name == self._runData_.currentProtocol.name:
                 if protocol != self._runData_.currentProtocol:
                     scipywarn(f"Protocol {protocol.name} was changed — CAUTION")
@@ -1219,7 +1203,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if src.name not in self._runData_.monitorProtocols:
                     self._runData_.monitorProtocols[src.name] = dict()
                     
-                # self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
+                self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
                 
                 
                 if nProtocolPathways == 1:
@@ -3476,6 +3460,26 @@ class LTPOnline(QtCore.QObject):
     def c(self)->bool:
         """Query conditioning mode"""
         return self.conditioning
+    
+    @property
+    def p(self):
+        self.pause()
+        
+    @property
+    def r(self):
+        self.resume()
+        
+    @property
+    def s(self):
+        self.start()
+        
+    @property
+    def S(self):
+        self.stop()
+        
+    @property
+    def R(self):
+        self.reset(force=True)
     
     def setTestPathway(self, srcIndex:int, pathwayIndex:int):
         """Flags the pathway at 'pathwayIndex' in the recording source at 'srcIndex' as a Test pathway.

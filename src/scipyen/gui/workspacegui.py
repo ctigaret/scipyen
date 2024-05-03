@@ -932,45 +932,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             
         ScipyenConfigurable.__init__(self, *args, **kwargs)
         
-        # self._winFlagsCache_ = None
-        
-        # if sys.platform == "win32":
-        #     if isinstance(self, QtWidgets.QMainWindow):
-        #         self._winFlagsCache_ = self.windowFlags()
-                # flags = self.windowFlags() | QtCore.Qt.MSWindowsOwnDC | QtCore.Qt.BypassWindowManagerHint
-                # self.setWindowFlags(flags);
-                
-                
-#     def event(self, evt):
-#         if not isinstance(self, QtWidgets.QMainWindow):
-#             return False
-#         
-#         if sys.platform == "win32":
-#             if evt == QtCore.QEvent.WindowDeactivate:
-#                 self.setWindowFlags(self._winFlagsCache_);
-#                 self.show();
-#                 return True
-#             
-#             return super(QtWidgets.QMainWindow, self).event(evt)
-#                 
-#                 
-#         else:
-#             return super(QtWidgets.QMainWindow, self).event(evt)
-#  
-#     def activateWindow(self):
-#         if not isinstance(self, QtWidgets.QMainWindow):
-#             return
-#         if sys.platform== "win32":
-#             # flags = self.windowFlags();
-#             # self.show(); # Restore from systray
-#             # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
-#             self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
-#             self.show();
-#             # self.raise_()
-#         else:
-#             super().activateWindow()
-
-        
     @property
     def scipyenWindow(self):
         """Returns a reference to the main Scipyen window.
