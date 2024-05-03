@@ -752,6 +752,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             
             # self.print(self._runData_.sources)
             
+            if self._runData_.currentEpisode is None:
+                self._runData_.currentEpisode = RecordingEpisode(self._runData_.currentEpisodeType)
+                self._runData_.currentEpisode.begin = self._runData_.currentAbfTrial.rec_datetime
+                
+            else:
+                pass
+                
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
             #
@@ -1154,11 +1161,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 continue
             
             pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
-            print(f"{self._runData_.currentAbfTrial.name} protocol {colorama.Fore.GREEN}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL} source {colorama.Fore.GREEN}{src.name}{colorama.Style.RESET_ALL}")
-            print(f"\tpaths stim by sweep = {colorama.Fore.GREEN}{pathStimBySweep}{colorama.Style.RESET_ALL}")
+            self.print(f"{self._runData_.currentAbfTrial.name} protocol {colorama.Fore.GREEN}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL} source {colorama.Fore.GREEN}{src.name}{colorama.Style.RESET_ALL}")
+            self.print(f"\tpaths stim by sweep = {colorama.Fore.GREEN}{pathStimBySweep}{colorama.Style.RESET_ALL}")
             
-            print(f"\tcurrent episode: {self._runData_.currentEpisode}")
-            print(f"\tcurrent episode type: {self._runData_.currentEpisodeType}")
+            self.print(f"\tcurrent episode: {self._runData_.currentEpisode}")
+            self.print(f"\tcurrent episode type: {self._runData_.currentEpisodeType}")
             
             if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
@@ -3061,7 +3068,7 @@ class LTPOnline(QtCore.QObject):
                                  useSlopeInIClamp = useSlopeInIClamp,
                                  useEmbeddedProtocol = useEmbeddedProtocol,
                                  exportedResults = True,
-                                 episodeType = RecordingEpisodeType.Tracking,
+                                 currentEpisodeType = RecordingEpisodeType.Tracking,
                                  previousEpisodeType = None,
                                  crossTalk = False
                                  )
@@ -3439,15 +3446,6 @@ class LTPOnline(QtCore.QObject):
         self._runData_.previousEpisodeType = self._runData_.currentEpisodeType
         self._runData_.currentEpisodeType = val
             
-#         elif isinstance(val, int):
-#             self._runData_.conditioning = val == 1
-#             
-#         elif isinstance(val, bool):
-#             self._runData_.conditioning = val == True
-#             
-#         else:
-#             raise TypeError(f"Expecting a bool, str (e.g. 'on', 'off') or an int; instead, got {type(val).__name__}")
-    
     @property
     def con(self):
         """Switch conditioning mode ON"""
