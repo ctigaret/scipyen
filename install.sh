@@ -890,12 +890,12 @@ if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
-export QT_QPA_PLATFORM=xcb
 ${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
 END
 shopt -u lastpipe
 chmod +x ${target_dir}/scipyen 
 echo -e "Scipyen startup script created in ${target_dir} \n"
+# export QT_QPA_PLATFORM=xcb
 # else
 # ln -s ${scipyensrcdir}/scipyen ${target_dir}/scipyen
 # echo -e "Link to scipyen startup script created in ${target_dir} \n"

@@ -1157,8 +1157,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             print(f"{self._runData_.currentAbfTrial.name} protocol {colorama.Fore.GREEN}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL} source {colorama.Fore.GREEN}{src.name}{colorama.Style.RESET_ALL}")
             print(f"\tpaths stim by sweep = {colorama.Fore.GREEN}{pathStimBySweep}{colorama.Style.RESET_ALL}")
             
+            print(f"\tcurrent episode: {self._runData_.currentEpisode}")
+            print(f"\tcurrent episode type: {self._runData_.currentEpisodeType}")
             
-            if self._runData_.episodeType & RecordingEpisodeType.Conditioning:
+            if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
                     self._runData_.conditioningProtocols[src.name] = dict()
                     
@@ -1213,11 +1215,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     if protocol.nSweeps == 1:
                         # this is either a monitoring protocol or a single-sweep
                         # conditioning protocol
-                        if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
+                        if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning > 0:
                             mainPathways[0][1].pathwayType = SynapticPathwayType.Test
                             
                     else:
-                        if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
+                        if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning > 0:
                             mainPathways[0][1].pathwayType = SynapticPathwayType.Test
                         else:
                             scipywarn(f"Protocol {protocol.name} has invalid number of sweeps ({protocol.nSweeps}) for tracking")
@@ -1228,7 +1230,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # see TODO 2024-03-10 20:59:00, below
                     
                 elif nProtocolPathways == 2:
-                    if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
+                    if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning > 0:
                         scipywarn(f"Protocol {protocol.name} is invalid for conditioning")
                         continue
                     # prerequisite for alternate pathway stimulation with either
@@ -3060,7 +3062,7 @@ class LTPOnline(QtCore.QObject):
                                  useEmbeddedProtocol = useEmbeddedProtocol,
                                  exportedResults = True,
                                  episodeType = RecordingEpisodeType.Tracking,
-                                 previousEpisodeType = RecordingEpisodeType.Tracking,
+                                 previousEpisodeType = None,
                                  crossTalk = False
                                  )
         
@@ -3423,7 +3425,7 @@ class LTPOnline(QtCore.QObject):
         and 'coff'. The last two quickly toggle the conditioning mode from the 
         console.
     """
-        return self._runData_.episodeType & RecordingEpisodeType.Conditioning
+        return self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning
     
     @conditioning.setter
     def conditioning(self, val:typing.Union[bool, str, int]):
@@ -3432,10 +3434,10 @@ class LTPOnline(QtCore.QObject):
             val = RecordingEpisodeType.Conditioning
             
         else:
-            val = self._runData_.previousEpisodeType if (self._runData_.previousEpisodeType & RecordingEpisodeType.Tracking) else RecordingEpisodeType.Tracking
+            val = self._runData_.previousEpisodeType if (isinstance(self._runData_.previousEpisodeType, RecordingEpisodeType) and self._runData_.previousEpisodeType & RecordingEpisodeType.Tracking) else RecordingEpisodeType.Tracking
             
-        self._runData_.previousEpisodeType = self._runData_.episodeType
-        self._runData_.episodeType = val
+        self._runData_.previousEpisodeType = self._runData_.currentEpisodeType
+        self._runData_.currentEpisodeType = val
             
 #         elif isinstance(val, int):
 #             self._runData_.conditioning = val == 1
@@ -3681,7 +3683,7 @@ class LTPOnline(QtCore.QObject):
         self._runData_.useEmbeddedProtocol = useEmbeddedProtocol
         self._runData_.monitorProtocols.clear()
         self._runData_.conditioningProtocols.clear()
-        self._runData_.episodeType = RecordingEpisodeType.Tracking
+        self._runData_.currentEpisodeType = RecordingEpisodeType.Tracking
         self._runData_.previousEpisodeType = RecordingEpisodeType.Tracking
         self._runData_.crossTalk = False
         

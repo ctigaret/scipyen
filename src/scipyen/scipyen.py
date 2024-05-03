@@ -13,6 +13,8 @@ import faulthandler, warnings
 # optional use of Qt6 as PyQt5/6 or PySide2/6
 os.environ["QT_API"] = "pyqt5"
 os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+if sys.platform == "linux":
+    os.environ["QT_QPA_PLATFORM"]="xcb"
 
 if len(sys.argv) > 1:
     if "pyqt6" in sys.argv:
