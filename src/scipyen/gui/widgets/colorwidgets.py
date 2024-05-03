@@ -46,7 +46,7 @@ from qtpy.QtCore import Signal, Slot, QEnum, Property
 # from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
 # from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 
-from core.prog import (safeWrapper, no_sip_autoconversion)
+from core.prog import safeWrapper
 from core.utilities import reverse_mapping_lookup
 from gui.painting_shared import (standardPalette, standardPaletteDict, svgPalette,
                               getPalette, paletteQColor, qcolor,
@@ -300,7 +300,6 @@ class ColorComboDelegate(QtWidgets.QAbstractItemDelegate):
         super().__init__(parent)
         self._tPmap = transparentPixmap
     
-    #@no_sip_autoconversion(QtCore.QVariant)
     def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem, index:QtCore.QModelIndex):
         innerColor = QtGui.QColor(QtCore.Qt.white)
         isSelected = (option.state and QtWidgets.QStyle.State_Selected)

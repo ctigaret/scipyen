@@ -76,7 +76,7 @@ from tornado.queues import Queue
 
 import zmq
 
-from qtpy import sip as sip
+# from qtpy import sip as sip
 # import sip
 
 from pygments import styles as pstyles

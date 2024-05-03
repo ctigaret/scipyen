@@ -79,7 +79,12 @@ else:
 
 #### BEGIN 3rd party modules
 
-from qtpy import sip
+if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
+    from qtpy import sip
+    has_sip = True
+else:
+    has_sip = False
+    
 # import sip
 
 

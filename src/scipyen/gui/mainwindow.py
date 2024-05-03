@@ -172,7 +172,11 @@ import atexit
 import re
 import inspect
 import gc
-from qtpy import sip as sip
+try:
+    from qtpy import sip as sip
+    has_sip = True
+except:
+    has_sip = False
 # import sip
 import io
 import warnings
@@ -2101,7 +2105,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             else:
                 raise ValueError(f"Unexpected viewer class name {wClass}")
 
-        elif not isinstance(winClass, (type, sip.wrappertype)):
+        elif not isinstance(winClass, (type)) and (has_sip and not isinstance(winClass, sip.wrappertype)):
             raise TypeError(f"Expecting a type or sip.wrappertype; got {type(winClass).__name__} instead")
 
         else:

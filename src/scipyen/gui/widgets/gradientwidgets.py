@@ -11,10 +11,7 @@ from qtpy.QtCore import Signal, Slot, QEnum, Property
 # from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
 # from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 
-from qtpy import sip as sip
-# import sip
-
-from core.prog import (safeWrapper, no_sip_autoconversion)
+from core.prog import safeWrapper
 
 from core.utilities import (counter_suffix, reverse_dict, reverse_mapping_lookup)
 
@@ -1422,40 +1419,31 @@ class GradientWidget(QtWidgets.QWidget):
                 
             if gradientType == QtGui.QGradient.LinearGradient:
                 g = g2l(gradient)
-                #gradient = sip.cast(gradient, QtGui.QLinearGradient)
                 
             elif gradientType == QtGui.QGradient.RadialGradient:
                 g = g2r(gradient)
-                #gradient = sip.cast(gradient, QtGui.QRadialGradient)
                 
             elif gradientType == QtGui.QGradient.ConicalGradient:
                 g = g2c(gradient)
-                #gradient = sip.cast(gradient, QtGui.QConicalGradient)
                 
             else:
                 return
             
             gradient = g
             
-        #print("GradientWidget._showGradient gradient:", gradient)
-        #print("\tresolved to:", reverse_mapping_lookup(standardQtGradientTypes, gradient.type()))
-        #stops = gradient.stops()
-        
-        #print(f"GradientWidget._showGradient, points: {points}")
-        
         if isinstance(points, (QtGui.QPolygonF, QtGui.QPolygon)) and len(points)==2:
             hoverStops = QtGui.QPolygonF(points)
         else:
             g = scaleGradient(gradient, self._renderer.rect())
             gline = gradientLine(g, self._renderer.rect()) 
             hoverStops = QtGui.QPolygonF((gline.p1(), gline.p2()))
+
         # NOTE: 2021-06-21 08:33:39
         # renderer doesn't know about the editor, and editor doesn't know about
         # renderer; therefore, the gradient stops must be sent to both
         self._editor.setGradientStops(stops)
         self._renderer.gradientStops = stops
         self._renderer.hoverPoints.points = hoverStops
-        #printPoints(self._renderer.hoverPoints.points)
         self._renderer.update()
         
         if isinstance(gradient, QtGui.QLinearGradient):

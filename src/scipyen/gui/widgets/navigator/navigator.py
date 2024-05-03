@@ -2,10 +2,14 @@ import typing, pathlib, functools, os, itertools
 from urllib.parse import urlparse, urlsplit
 from collections import namedtuple
 from enum import Enum, IntEnum
-from qtpy import sip as sip
+try:
+    from qtpy import sip as sip # for sip.cast
+    has_sip = True
+except:
+    has_sip = False
 # import sip # for sip.isdeleted() - not used yet, but beware
 from traitlets.utils.bunch import Bunch
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, sip)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
 from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
 from qtpy.uic import loadUiType
 # from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg, sip)
@@ -1410,9 +1414,16 @@ class NavigatorPathSelectorEventFilter(QtCore.QObject):
     @safeWrapper
     def eventFilter(self, watched:QtCore.QObject, evt:QtCore.QEvent):
         if evt.type() == QtCore.QEvent.MouseButtonRelease:
-            me = sip.cast(evt, QtGui.QMouseEvent)
+            if has_sip:
+                me = sip.cast(evt, QtGui.QMouseEvent)
+            else:
+                me = evt
+                
             try:
-                menu = sip.cast(watched, QtWidgets.QMenu)
+                if has_sip:
+                    menu = sip.cast(watched, QtWidgets.QMenu)
+                else:
+                    menu = watched
                 action = menu.activeAction()
                 if action is not None:
                     url = QtCore.QUrl(action.data().toString())

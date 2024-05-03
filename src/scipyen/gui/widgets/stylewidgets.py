@@ -12,7 +12,7 @@ from qtpy.QtCore import Signal, Slot, QEnum, Property
 # from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 # # from PyQt5.uic import loadUiType as __loadUiType__
 
-from core.prog import (safeWrapper, no_sip_autoconversion)
+from core.prog import safeWrapper
 from core.utilities import reverse_mapping_lookup
 
 from gui.painting_shared import (make_transparent_bg,
@@ -71,7 +71,6 @@ class PenComboDelegate(QtWidgets.QAbstractItemDelegate):
         if isinstance(value, str) and value.lower() in ("cap", "join", "stroke"):
             self._styling = value
 
-    #@no_sip_autoconversion(QtCore.QVariant)
     def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem,
               index:QtCore.QModelIndex):
         isSelected = (option.state and QtWidgets.QStyle.State_Selected)
@@ -336,7 +335,7 @@ class PenComboBox(QtWidgets.QComboBox):
         self.setItemData(0, name, QtCore.Qt.ToolTipRole)
         self.setItemData(0, self._internalStyle, PenComboDelegate.ItemRoles.PenRole)
     
-    @no_sip_autoconversion(QtCore.QVariant)
+    # @no_sip_autoconversion(QtCore.QVariant)
     def paintEvent(self, ev:QtGui.QPaintEvent):
         painter = QtWidgets.QStylePainter(self) # CAUTION Must call end() before returning
         
@@ -444,7 +443,6 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent)
         
-    #@no_sip_autoconversion(QtCore.QVariant)
     def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem,
               index:QtCore.QModelIndex):
 
