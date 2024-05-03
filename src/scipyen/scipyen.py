@@ -99,10 +99,10 @@ try:
 except:
     pass
 
-if hasattr(QtCore.Qt, "AA_EnableHighDpiScaling"):
-    QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-if hasattr(QtCore.Qt, "AA_UseHighDpiPixmaps"):
-    QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
+# if hasattr(QtCore.Qt, "AA_EnableHighDpiScaling"):
+#     QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+# if hasattr(QtCore.Qt, "AA_UseHighDpiPixmaps"):
+#     QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
 
 
 # NOTE: 2023-09-28 22:12:25 

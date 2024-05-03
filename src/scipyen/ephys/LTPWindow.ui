@@ -91,7 +91,7 @@
                 <string>+</string>
                </property>
                <property name="icon">
-                <iconset resource="../gui/resources/resources.qrc">
+                <iconset>
                  <normaloff>:/images/add.svg</normaloff>:/images/add.svg</iconset>
                </property>
               </widget>
@@ -111,7 +111,7 @@
                 <string>-</string>
                </property>
                <property name="icon">
-                <iconset resource="../gui/resources/resources.qrc">
+                <iconset>
                  <normaloff>:/images/list-remove.svg</normaloff>:/images/list-remove.svg</iconset>
                </property>
               </widget>
@@ -646,8 +646,5 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
- <resources>
-  <include location="../gui/resources/resources.qrc"/>
- </resources>
  <connections/>
 </ui>

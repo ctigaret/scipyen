@@ -1110,8 +1110,6 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
   </action>
  </widget>
- <resources>
-  <include location="../../../../src/for scipyen/resources 23i30b/gui/resources/images.qrc"/>
- </resources>
+ <resources/>
  <connections/>
 </ui>

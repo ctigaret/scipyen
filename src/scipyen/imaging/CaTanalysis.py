@@ -210,6 +210,7 @@ import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer)
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.itemslistdialog import ItemsListDialog
+from gui import resources_rc
 # from gui import resources_rc
 #### END pict.gui modules
 
@@ -237,6 +238,8 @@ import ephys.ephys as ephys
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__,"LSCaTWindow.ui")
+
+# print(f"CaTanalysis.py __ui_path__ {__ui_path__}")
 
 # Form class,        Base class                                                                               package with the resources.qrc file
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):

@@ -411,9 +411,6 @@
   <tabstop>optionsFileChooserToolButton</tabstop>
   <tabstop>optionsImportToolButton</tabstop>
  </tabstops>
- <resources>
-  <include location="../gui/resources/resources.qrc"/>
- </resources>
  <connections>
   <connection>
    <sender>buttonBox</sender>

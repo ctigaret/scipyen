@@ -53,6 +53,7 @@ from gui.protocoleditordialog import ProtocolEditorDialog
 from gui import pictgui as pgui
 from gui.workspacegui import WorkspaceGuiMixin
 import gui.signalviewer as sv
+from gui import resources_rc
 
 from imaging import (imageprocessing as imgp, axisutils, axiscalibration,)
 from imaging.scandata import (ScanData, ScanDataOptions, scanDataOptions,)
