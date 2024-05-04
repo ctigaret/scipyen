@@ -715,7 +715,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # • ABF trials recorded with other protocols are ignored; this includes
         #   cross-talk trials and the pathway conditioning trial
         
-        self.print(f"{self.__class__.__name__}.processAbfFile {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}\n")
+        self.print(f"\n{self.__class__.__name__}.processAbfFile {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
 
         try:
             # NOTE: 2024-02-08 14:18:32
@@ -750,16 +750,21 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self._runData_.abfTrialDeltaTimesMinutes.append(deltaMinutes)
             self._runData_.currentAbfTrial = currentAbfTrial
             
+            # create a new episode here, using _runData_.newEpisodeOnNextRun
+            episode = self.newEpisode(RecordingEpisodeType.Tracking)
+            
             # self.print(self._runData_.sources)
             
-            if self._runData_.currentEpisode is None:
-                self._runData_.currentEpisode = RecordingEpisode(self._runData_.currentEpisodeType)
-                self._runData_.currentEpisode.begin = self._runData_.currentAbfTrial.rec_datetime
+            # if not isinstance(self._runData_.currentEpisode, RecordingEpisode):
+                # self._runData_.currentEpisode = RecordingEpisode(self._runData_.currentEpisodeType)
+                # self._runData_.currentEpisode.begin = self._runData_.currentAbfTrial.rec_datetime
                 
-            else:
-                self.print(f"current episode: {printStyled(self._runData_.currentEpisode, 'red', True)} type: {printStyled(self._runData_.currentEpisode.type.name, 'red', True)}")
-                if self._runData_.currentEpisode.type & self._runData_.currentEpisodeType:
-                    pass
+            if len(self._runData_.episodes) == 0:
+                episode = RecordingEpisode(RecordingEpisodeType.Tracking, name=f"{RecordingEpisodeType.Tracking.name_0}")
+                
+            # self.print(f"current episode: {printStyled(self._runData_.currentEpisode, 'yellow', True)} type: {printStyled(self._runData_.currentEpisode.type.name, 'yellow', True)}")
+            self.print(f"current episode: {printStyled(self._runData_.episodes[-1], 'yellow', True)} type: {printStyled(self._runData_.episodes[-1].type.name, 'yellow', True)}")
+            # self.print(f"\tcurrent episode type decl: {printStyled(self._runData_.currentEpisodeType.name, 'yellow', True)}")
                 
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
@@ -774,11 +779,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     scipywarn(f"Protocol {protocol.name} was changed — CAUTION")
                     self._runData_.currentProtocol = protocol
                 self.processProtocol(protocol)
-                self._runData_.sweeps += 1
                 
             if self._runData_.exportedResults:
                 self._runData_.exportedResults = False
 
+            self._runData_.sweeps += 1
             
             # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
 
@@ -1009,6 +1014,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # if len(digOutDacs) == 0:
         #     raise ValueError("The protocol indicates there are no DAC channels with digital output enabled")
         
+        self.print(f"{self._runData_.currentAbfTrial.name} protocol {printStyled(protocol.name, 'green', True)}")
+        
+        self.print(f"\tcurrent episode: {printStyled(self._runData_.currentEpisode, 'green', True)}, type {printStyled(self._runData_.currentEpisode.type.name, 'green', True)}")
+        self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
+            
         for src in self._runData_.sources:
             # self.print(f"   -----------------")
             # self.print(f"   processing source {printStyled(src.name)}")
@@ -1163,12 +1173,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 continue
             
             pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
-            self.print(f"{self._runData_.currentAbfTrial.name} protocol {printStyled(protocol.name, 'green', True)} source {printStyled(src.name, 'green', True)}")
+            self.print(f"\tsource {printStyled(src.name, 'green', True)}")
             self.print(f"\tpaths stim by sweep = {printStyled(pathStimBySweep, 'green', True)}")
-            
-            self.print(f"\tcurrent episode: {printStyled(self._runData_.currentEpisode, 'green', True)}, type {printStyled(self._runData_.currentEpisode.type.name, 'green', True)}")
-            self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
-            
+
             if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
                     self._runData_.conditioningProtocols[src.name] = dict()
@@ -1214,8 +1221,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if src.name not in self._runData_.monitorProtocols:
                     self._runData_.monitorProtocols[src.name] = dict()
                     
-                self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
-                
+                self.print(f"\tsource adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
                 
                 if nProtocolPathways == 1:
                     # protocol stimulates just one pathway - either DIG or DAC-emulated
@@ -1259,7 +1265,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         
                         # figure out the order in which pathways are stimulated
                         # pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence(pp)
-                        
                         
                         if protocol.nSweeps == 1:
                             pathsOrder = pathStimBySweep[0][1]
@@ -1608,9 +1613,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
                                                                                                             self._winWidth, 
                                                                                                             self._winHeight))
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
-                        #                                                                                     int(self._winWidth * 1.1), 
-                        #                                                                                     int(self._winHeight * 1.1)))
 
                     if p.name not in self._runData_.results[src.name]:
                         self._runData_.results[src.name][p.name] = \
@@ -3069,7 +3071,7 @@ class LTPOnline(QtCore.QObject):
         
         self._runData_ = DataBag(sources = self._sources_,
                                  currentProtocol = None,
-                                 currentEpisode = None,
+                                 # currentEpisode = None,
                                  monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ list of protocols}
                                  conditioningProtocols = dict(),
                                  sweeps = 0,
@@ -3081,9 +3083,11 @@ class LTPOnline(QtCore.QObject):
                                  useSlopeInIClamp = useSlopeInIClamp,
                                  useEmbeddedProtocol = useEmbeddedProtocol,
                                  exportedResults = True,
-                                 currentEpisodeType = RecordingEpisodeType.Tracking,
-                                 previousEpisodeType = None,
-                                 crossTalk = False
+                                 # currentEpisodeType = RecordingEpisodeType.Tracking,
+                                 # previousEpisodeType = None,
+                                 crossTalk = False,
+                                 episodes = list(),
+                                 newEpisodeOnNextRun = tuple(RecordingEpisodeType.Tracking, None) # episode type, episode name
                                  )
         
         self._abfTrialBuffer_ = collections.deque()
@@ -3406,6 +3410,22 @@ class LTPOnline(QtCore.QObject):
     def pathways(self) -> dict:
         return dict((src.name, dict((k, p["pathway"]) for k, p in self._results_[src.name].items())) for src in self._sources_)
     
+    def newEpisode(self, episodeType:typing.Optional[typing.Union[RecordingEpisodeType, int, str]] = None, 
+                   episodeName:typing.Optional[str]=None):
+        if isinstance(episodeType, (str, int)):
+            episodeType = RecordingEpisodeType.type(episodeType)
+        elif episodeType is None:
+            episodeType = RecordingEpisodeType.Tracking
+        elif not isinstance(episodeType, RecordingEpisodeType):
+            scipywarn(f"Expecting a RecordingEpisodeType value, an int or a str")
+            return
+        ename = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else episodeType.name
+        if len(self._runData_.episodes):
+            epNames = [e.name for e in self._runData_.episodes]
+            ename = counter_suffix(ename, epNames)
+        return RecordingEpisode(episodeType, name=ename)
+        
+    
     @property
     def conditioning(self) -> bool:
         """Query the operating state (conditioning mode).
@@ -3454,10 +3474,19 @@ class LTPOnline(QtCore.QObject):
             val = RecordingEpisodeType.Conditioning
             
         else:
-            val = self._runData_.previousEpisodeType if (isinstance(self._runData_.previousEpisodeType, RecordingEpisodeType) and self._runData_.previousEpisodeType & RecordingEpisodeType.Tracking) else RecordingEpisodeType.Tracking
+            val = self._runData_.episodes[-1].type if len(self._runData_.episodes) else RecordingEpisodeType.Tracking
+            # val = self._runData_.previousEpisodeType if (isinstance(self._runData_.previousEpisodeType, RecordingEpisodeType) and self._runData_.previousEpisodeType & RecordingEpisodeType.Tracking) else RecordingEpisodeType.Tracking
             
-        self._runData_.previousEpisodeType = self._runData_.currentEpisodeType
-        self._runData_.currentEpisodeType = val
+        self.print(f"set conditioning to {val.name}")
+        
+        # self._runData_.previousEpisodeType = self._runData_.currentEpisodeType
+        # self._runData_.currentEpisodeType = val
+        # self._runData_.previousEpisode = self._runData_.currentEpisode
+        # self._runData_.previousEpisode.end = self._runData_.currentAbfTrial.rec_datetime
+        # self._runData_.previousEpisode.endFrame = self._runData_.sweeps
+        # self._runData_.episodes.append(self._runData_.previousEpisode)
+        # self._runData_.currentEpisode = RecordingEpisode(val)
+        
             
     @property
     def con(self):
