@@ -757,7 +757,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.currentEpisode.begin = self._runData_.currentAbfTrial.rec_datetime
                 
             else:
-                if self._runData_.currentEpisode & self._runData_.currentEpisodeType:
+                self.print(f"current episode: {printStyled(self._runData_.currentEpisode, 'red', True)} type: {printStyled(self._runData_.currentEpisode.type.name, 'red', True)}")
+                if self._runData_.currentEpisode.type & self._runData_.currentEpisodeType:
                     pass
                 
             # check that the protocol in the ABF file is the same as the current one
@@ -1162,11 +1163,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 continue
             
             pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
-            self.print(f"{self._runData_.currentAbfTrial.name} protocol {colorama.Fore.GREEN}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL} source {colorama.Fore.GREEN}{src.name}{colorama.Style.RESET_ALL}")
-            self.print(f"\tpaths stim by sweep = {colorama.Fore.GREEN}{pathStimBySweep}{colorama.Style.RESET_ALL}")
+            self.print(f"{self._runData_.currentAbfTrial.name} protocol {printStyled(protocol.name, 'green', True)} source {printStyled(src.name, 'green', True)}")
+            self.print(f"\tpaths stim by sweep = {printStyled(pathStimBySweep, 'green', True)}")
             
-            self.print(f"\tcurrent episode: {self._runData_.currentEpisode}")
-            self.print(f"\tcurrent episode type: {self._runData_.currentEpisodeType}")
+            self.print(f"\tcurrent episode: {printStyled(self._runData_.currentEpisode, 'green', True)}, type {printStyled(self._runData_.currentEpisode.type.name, 'green', True)}")
+            self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
             
             if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
@@ -3486,7 +3487,8 @@ class LTPOnline(QtCore.QObject):
         self.start()
         
     @property
-    def S(self):
+    def h(self):
+        """Stops the LTP online app"""
         self.stop()
         
     @property

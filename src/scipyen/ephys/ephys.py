@@ -1183,6 +1183,17 @@ class RecordingEpisode(Episode):
                 p.text("\n")
                 
             p.breakable()
+            
+    @property
+    def type(self) -> RecordingEpisodeType:
+        return self._type_
+    
+    @type.setter
+    def type(self, val:RecordingEpisodeType):
+        if isinstance(val, RecordingEpisodeType):
+            self._type_ = val
+        else:
+            scipywarn(f"Expecting a RecordingEpisodeType, instead got {val}")
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
