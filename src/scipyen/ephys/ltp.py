@@ -757,7 +757,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.currentEpisode.begin = self._runData_.currentAbfTrial.rec_datetime
                 
             else:
-                pass
+                if self._runData_.currentEpisode & self._runData_.currentEpisodeType:
+                    pass
                 
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
@@ -2955,11 +2956,22 @@ class LTPOnline(QtCore.QObject):
     #
     # What this entails (fields of runData):
     # option (1):
-    #   • on first run:
+    #   • on first trial:
     #       ∘ currentEpisode = None
     #       ∘ episodeType = Tracking (the default — anything else doesn't make sense here)
     #       ∘ pathways unknown — WARNING if first run file is a conditioning one
     #           it will mis-set all the subsequent parameters
+    #       ∘ protocol unknown
+    #           ⋄ to be inferred from the ABF trial
+    #           ⋄ set up pathway measures
+    #
+    #   • on subsequent trials:
+    #       ∘ test against protocol from previous trial
+    #       ∘ must find a way to infer whether this is a conditioning trial — difficult
+    #
+    # option (2)
+    #   • start in tracking mode
+    #   • use con/coff to signal conditioning
         
     resultsReady = Signal(object, name="resultsReady")
     

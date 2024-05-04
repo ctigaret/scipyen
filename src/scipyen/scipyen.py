@@ -13,6 +13,11 @@ import faulthandler, warnings
 # optional use of Qt6 as PyQt5/6 or PySide2/6
 os.environ["QT_API"] = "pyqt5"
 os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+
+# NOTE: 2024-05-04 10:14:08
+# forcing xcb platform when running on Wayland, in Linux, because we want to
+# restore window sizes and positions from Scipyen.conf (Wayland does not allow
+# an application 'client' to control window position)
 if sys.platform == "linux":
     os.environ["QT_QPA_PLATFORM"]="xcb"
 
@@ -54,28 +59,6 @@ else:
     if sys.platform == "win32" and sys.version_info.minor >= 9:
         if "CONDA_DEFAULT_ENV" not in os.environ:
             raise OSError("On windows platform, unbundled Scipyen must be run inside a conda environment")
-#         import win32api
-#         vigraimpex_mod = "vigraimpex"
-#         path_to_vigraimpex = win32api.GetModuleFileName(win32api.LoadLibrary(vigraimpex_mod))
-#         os.add_dll_directory(os.path.dirname(path_to_vigraimpex))
-#         lib_environ = os.environ.get("LIB", "")
-#
-#
-#         if len(lib_environ.strip()):
-#             libdirs = lib_environ.split(os.pathsep)
-#             for d in libdirs:
-#                 if len(d.strip()) and  os.path.isdir(d):
-#                     os.add_dll_directory(d)
-
-    # os.environ["QT_API"] = "pyqt5" # NOTE: 2024-05-02 10:22:30 see above
-
-    # try:
-    #     import breeze_resources
-    #     has_breeze_resources_for_win32 = True
-    # except:
-    #     has_breeze_resources_for_win32 = False
-
-
 
 #### END core python modules
 
@@ -205,7 +188,8 @@ if hasattr(QtCore, "QLoggingCategory"):
 # NOTE: on opensuse pyqtgraph expect PyQt4 first, as qtlib; if not found this
 # raises an exception; setting pq.Qt.lib later does not work.
 # therefore is better to set this up early, here.
-os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+# NOTE: done above, see NOTE: 2024-05-02 10:22:39
+# os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
 #os.putenv("PYQTGRAPH_QT_LIB", "PyQt5")
 
 
@@ -234,7 +218,7 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
 
 def main():
     import gui.mainwindow as mainwindow
-    print(f"Using {os.environ['QT_API']}\n")
+    # print(f"Using {os.environ['QT_API']}\n")
     faulthandler.enable()
     
     # NOTE: 2021-08-17 10:02:20
@@ -247,14 +231,6 @@ def main():
     #sip.setdestroyonexit(True)
 
     try:
-        # NOTE: 2024-05-02 09:48:26
-        # is this ever needed?
-        # sip.setdestroyonexit(True) # better leave to default
-        
-        # NOTE: 2021-08-17 10:07:11 is this needed?
-        # QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-        # QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
-        
         # BEGIN 
         # 1. create the pyqt5 app
         app = QtWidgets.QApplication(sys.argv)
@@ -263,6 +239,15 @@ def main():
         if sys.platform == "win32":
             if hasQDarkTheme:
                 qdarktheme.setup_theme("auto")
+                
+        elif sys.platform == "linux":
+            # NOTE: 2024-05-04 10:16:33
+            # reuired on Wayland so that the window manager decorates the windows
+            # with the appropriate icon instead of using the generic Wayland one.
+            # NOTE that this good to have even when forcing the use xcb platform 
+            # (see NOTE: 2024-05-04 10:14:08 above) as it conforms to the desktop
+            # standards
+            app.setDesktopFileName("Scipyen")
 
 
         # NOTE: 2023-01-08 00:48:47
