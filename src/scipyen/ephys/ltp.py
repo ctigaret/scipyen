@@ -402,15 +402,16 @@ class _LTPFilesSimulator_(QtCore.QThread):
             if self.isInterruptionRequested():
                 self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
                 break
+            
             QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             # if k < (len(self._simulationFiles_)-1):
             #     QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             
-        # if not self._paused_:
-        if k < (len(self._simulationFiles_) - 1):
-            self._paused_ = True
-        else:
-            self.simulationDone.emit()
+            # if not self._paused_:
+            if k < (len(self._simulationFiles_) - 1):
+                self._paused_ = True
+            else:
+                self.simulationDone.emit()
             
     def resume(self):
         """Resumes simulation"""
@@ -699,6 +700,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             print(msg, file=self._stdout_)
         else:
             print(msg)
+            
+    def genEpisode(self, episodeType, episodeName):
+        return RecordingEpisode(episodeType, name=episodeName)
+        
         
     @safeWrapper
     @Slot(pathlib.Path)
@@ -718,8 +723,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         self.print(f"\n{self.__class__.__name__}.processAbfFile {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
 
         try:
-            # NOTE: 2024-02-08 14:18:32
-            # self._runData_.currentAbfTrial should be a neo.Block
             currentAbfTrial = pio.loadAxonFile(str(abfFile))
             protocol = pab.ABFProtocol(currentAbfTrial)
             # self.print(f"\twith protocol {colorama.Fore.RED}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL}\n")
@@ -748,10 +751,31 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self._runData_.abfTrialTimesMinutes.append(currentAbfTrial.rec_datetime)
             deltaMinutes = (currentAbfTrial.rec_datetime - self._runData_.abfTrialTimesMinutes[0]).seconds/60
             self._runData_.abfTrialDeltaTimesMinutes.append(deltaMinutes)
+            
+            # NOTE: 2024-02-08 14:18:32
+            # self._runData_.currentAbfTrial should be a neo.Block or None
+            if isinstance(self._runData_.currentAbfTrial, neo.Block):
+                # cache the previous trial
+                self._runData_.prevAbfTrial = self._runData_.currentAbfTrial
             self._runData_.currentAbfTrial = currentAbfTrial
             
+            # new episode requested via _runData_ ⇒
             # create a new episode here, using _runData_.newEpisodeOnNextRun
-            episode = self.newEpisode(RecordingEpisodeType.Tracking)
+            if len(self._runData_.newEpisodeOnNextRun) == 2:
+                if len(self._runData_.episodes):
+                    # finalize the previous episode
+                    self._runData_.episodes[-1].endFrame = self._runData_.sweeps-1
+                    if isinstance(self._runData_.prevAbfTrial, neo.Block):
+                        self._runData_.episodes[-1].end=self._runData_.prevAbfTrial.rec_datetime
+                    else:
+                        self._runData_.episodes[-1].end=self._runData_.currentAbfTrial.rec_datetime
+                    
+                eType, eName = self._runData_.newEpisodeOnNextRun
+                episode = RecordingEpisode(eType, name=eName, protocol=protocol)
+                episode.begin = currentAbfTrial.rec_datetime
+                episode.beginFrame = self._runData_.sweeps
+                self._runData_.episodes.append(episode)
+                self._runData_.newEpisodeOnNextRun = tuple() # invalidate the request
             
             # self.print(self._runData_.sources)
             
@@ -864,6 +888,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     @processProtocol.register(pab.ABFProtocol)
     def _(self, protocol:pab.ABFProtocol):
         # self.print(f"{self.__class__.__name__}.processProtocol ({printStyled(protocol.name)})")
+        
+        if len(self._runData_.episodes) == 0:
+            scipywarn("No episode has been defined")
+            return
+        
+        currentEpisode = self._runData_.episodes[-1]
         
         # NOTE: 2024-02-18 15:58:07
         # this sets up a pathways "layout", a dict:
@@ -1016,8 +1046,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         self.print(f"{self._runData_.currentAbfTrial.name} protocol {printStyled(protocol.name, 'green', True)}")
         
-        self.print(f"\tcurrent episode: {printStyled(self._runData_.currentEpisode, 'green', True)}, type {printStyled(self._runData_.currentEpisode.type.name, 'green', True)}")
-        self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
+        # self.print(f"\tcurrent episode: {printStyled(self._runData_.currentEpisode, 'green', True)}, type {printStyled(self._runData_.currentEpisode.type.name, 'green', True)}")
+        # self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
             
         for src in self._runData_.sources:
             # self.print(f"   -----------------")
@@ -1176,7 +1206,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self.print(f"\tsource {printStyled(src.name, 'green', True)}")
             self.print(f"\tpaths stim by sweep = {printStyled(pathStimBySweep, 'green', True)}")
 
-            if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning:
+            if currentEpisode.type & RecordingEpisodeType.Conditioning:
                 if src.name not in self._runData_.conditioningProtocols:
                     self._runData_.conditioningProtocols[src.name] = dict()
                     
@@ -1245,7 +1275,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # see TODO 2024-03-10 20:59:00, below
                     
                 elif nProtocolPathways == 2:
-                    if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning > 0:
+                    if currentEpisode.type & RecordingEpisodeType.Conditioning > 0:
                         scipywarn(f"Protocol {protocol.name} is invalid for conditioning")
                         continue
                     # prerequisite for alternate pathway stimulation with either
@@ -3070,12 +3100,12 @@ class LTPOnline(QtCore.QObject):
         # ### END set up emitter window and viewers
         
         self._runData_ = DataBag(sources = self._sources_,
+                                 currentAbfTrial = None,
                                  currentProtocol = None,
-                                 # currentEpisode = None,
+                                 prevAbfTrial = None,
                                  monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ list of protocols}
                                  conditioningProtocols = dict(),
                                  sweeps = 0,
-                                 currentAbfTrial = None,
                                  viewers = self._viewers_,
                                  results = self._results_,
                                  abfTrialTimesMinutes = list(),
@@ -3087,7 +3117,8 @@ class LTPOnline(QtCore.QObject):
                                  # previousEpisodeType = None,
                                  crossTalk = False,
                                  episodes = list(),
-                                 newEpisodeOnNextRun = tuple(RecordingEpisodeType.Tracking, None) # episode type, episode name
+                                 newEpisodeOnNextRun = (RecordingEpisodeType.Tracking, None), # episode type, episode name
+                                 drug = None, # or a tuibale mnemonic string
                                  )
         
         self._abfTrialBuffer_ = collections.deque()
@@ -3423,8 +3454,7 @@ class LTPOnline(QtCore.QObject):
         if len(self._runData_.episodes):
             epNames = [e.name for e in self._runData_.episodes]
             ename = counter_suffix(ename, epNames)
-        return RecordingEpisode(episodeType, name=ename)
-        
+        self._runData_.newEpisodeOnNextRun = (episodeType,  ename)
     
     @property
     def conditioning(self) -> bool:
@@ -3465,28 +3495,27 @@ class LTPOnline(QtCore.QObject):
         and 'coff'. The last two quickly toggle the conditioning mode from the 
         console.
     """
-        return self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning
+        if len(self._runData_.episodes):
+            return self._runData_.episodes[-1].type & RecordingEpisodeType.Conditioning
+        return False
     
     @conditioning.setter
     def conditioning(self, val:typing.Union[bool, str, int]):
+        # we ONLY support Conditioning and Tracking as episode types
         if (isinstance(val, str) and val.lower() == "on") or (isinstance(val, int) and val==1) \
             or (isinstance(val, bool) and val == True):
-            val = RecordingEpisodeType.Conditioning
+            val = RecordingEpisodeType.Conditioning if self._runData_.drug is None else RecordingEpisodeType.Conditioning | RecordingEpisodeType.Drug
             
         else:
-            val = self._runData_.episodes[-1].type if len(self._runData_.episodes) else RecordingEpisodeType.Tracking
-            # val = self._runData_.previousEpisodeType if (isinstance(self._runData_.previousEpisodeType, RecordingEpisodeType) and self._runData_.previousEpisodeType & RecordingEpisodeType.Tracking) else RecordingEpisodeType.Tracking
+            val = RecordingEpisodeType.Tracking if self._runData_.drug is None else RecordingEpisodeType.Tracking | RecordingEpisodeType.Drug
             
         self.print(f"set conditioning to {val.name}")
         
-        # self._runData_.previousEpisodeType = self._runData_.currentEpisodeType
-        # self._runData_.currentEpisodeType = val
-        # self._runData_.previousEpisode = self._runData_.currentEpisode
-        # self._runData_.previousEpisode.end = self._runData_.currentAbfTrial.rec_datetime
-        # self._runData_.previousEpisode.endFrame = self._runData_.sweeps
-        # self._runData_.episodes.append(self._runData_.previousEpisode)
-        # self._runData_.currentEpisode = RecordingEpisode(val)
-        
+        # set this in order to flag the _LTPOnlineFileProcessor_ that a new 
+        # recording episode should be created on the next run
+        # we do this to because the user KNOWS that the next run will be 
+        # (tracking or conditioning)
+        self._runData_.newEpisodeOnNextRun = (val, val.name)
             
     @property
     def con(self):
@@ -3502,6 +3531,33 @@ class LTPOnline(QtCore.QObject):
     def c(self)->bool:
         """Query conditioning mode"""
         return self.conditioning
+    
+    @property
+    def drug(self):
+        return self._runData_.drug
+    
+    @drug.setter
+    def drug(self, val:typing.Optional[str]):
+        if isinstance(val, str):
+            if len(val.strip()) == 0:
+                val = None
+                
+        elif val is not None:
+            scipywarn(f"'drug' expected to be a string or None; instead, got {drug}")
+            
+        self._runData_.drug = val
+        
+        if len(self._runData_.episodes):
+            if self._runData_.drug is None:
+                if self.conditioning:
+                    self.newEpisode(RecordingEpisodeType.Conditioning)
+                else:
+                    self.newEpisode(RecordingEpisodeType.Tracking)
+            else:
+                if self.conditioning:
+                    self.newEpisode(RecordingEpisodeType.Conditioning | RecordingEpisodeType.Drug, drug)
+                else:
+                    self.newEpisode(RecordingEpisodeType.Tracking | RecordingEpisodeType.Drug, drug)
     
     @property
     def p(self):
