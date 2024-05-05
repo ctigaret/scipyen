@@ -802,12 +802,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if protocol != self._runData_.currentProtocol:
                     scipywarn(f"Protocol {protocol.name} was changed — CAUTION")
                     self._runData_.currentProtocol = protocol
+                    
                 self.processProtocol(protocol)
                 
             if self._runData_.exportedResults:
                 self._runData_.exportedResults = False
 
             self._runData_.sweeps += 1
+            self._runData_.totalSweeps += 1
             
             # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
 
@@ -3105,7 +3107,8 @@ class LTPOnline(QtCore.QObject):
                                  prevAbfTrial = None,
                                  monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ list of protocols}
                                  conditioningProtocols = dict(),
-                                 sweeps = 0,
+                                 sweeps = 0, # the number of analysed sweeps
+                                 totalSweeps = 0, # the number of recorded sweeps
                                  viewers = self._viewers_,
                                  results = self._results_,
                                  abfTrialTimesMinutes = list(),
@@ -3718,6 +3721,11 @@ class LTPOnline(QtCore.QObject):
         
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+            
+        if len(self._runData_.episodes):
+            if isinstance(self._runData_.currentAbfTrial, neo.Block):
+                self._runData_.episodes[-1].end = self._runData_.currentAbfTrial.rec_datetime
+                self._runData_.episodes[-1].endFrame = self._runData_.sweeps
             
         # self.resultsReady.emit(self._runData_)
         self.resultsReady.emit(self._results_)
