@@ -1142,6 +1142,20 @@ class RecordingEpisode(Episode):
         
         # self._data_ = None
         
+    def __repr__(self):
+        ret = list()
+        ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}, begin={self.begin}, end={self.end}, beginFrame={self.beginFrame}, endFrame={self.endFrame}), with:")
+        if len(self.pathways) == 0:
+            ret.append(f"\tPathways: []")
+        else:
+            ret.append(f"\tPathways:")
+            for p in self.pathways:
+                ret.append(f"\t{p}")
+
+        ret.append(f"\txtalk: {self.xtalk}")
+        
+        return "\n".join(ret)
+        
     def _repr_pretty_(self, p, cycle):
         supertxt = super().__repr__() + " with :"
     
