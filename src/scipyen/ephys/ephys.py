@@ -1151,10 +1151,11 @@ class RecordingEpisode(Episode):
             p.text(supertxt)
             p.breakable()
             attr_repr = [" "]
-            attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("protocol",
-                                                                         "electrodeMode",
-                                                                         "clampMode",
-                                                                        )]
+            attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
+                                                                                "protocol",
+                                                                                "electrodeMode",
+                                                                                "clampMode",
+                                                                                )]
             
             # with p.group(4 ,"(",")"):
             with p.group(4 ,"",""):
