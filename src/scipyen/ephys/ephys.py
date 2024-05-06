@@ -1038,7 +1038,7 @@ class RecordingEpisode(Episode):
                  # sources: typing.Sequence[RecordingSource] = list(), ## → defined in pathways
                  # segments: typing.Optional[GeneralIndexType] = None, ## → defined in superclass beginFrame endFrame
                  pathways: typing.Sequence[SynapticPathway] = list(),
-                 xtalk: typing.Optional[dict[int, tuple[int,int]]] = None ,
+                 xtalk: typing.Optional[tuple] = None ,
                  # triggers: typing.Sequence[TriggerEvent] = list(),
                  **kwargs):
         """Constructor for RecordingEpisode.
@@ -1135,7 +1135,7 @@ class RecordingEpisode(Episode):
             self.xtalk = xtalk
             
         elif xtalk is None:
-            self.xtalk = []
+            self.xtalk = tuple()
             
         else:
             raise ValueError(f"Invalid xtalk specification ({xtalk})")
