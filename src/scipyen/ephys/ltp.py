@@ -802,7 +802,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     scipywarn(f"Protocol {protocol.name} was changed — CAUTION")
                     self._runData_.currentProtocol = protocol
                     
-                self.processProtocol(protocol)
+            self.processProtocol(protocol)
                 
             if self._runData_.exportedResults:
                 self._runData_.exportedResults = False
@@ -1201,6 +1201,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_stim_pathways)]
                     
                 else: # one dac and one dig pathway
+                    if not protocol.alternateDACOutputStateEnabled:
+                        scipywarn(f"Tracking mode: Alternate DAC outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_stim_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
+                        continue
                     mainPathways, altPathways = dig_stim_pathways, dac_stim_pathways
                         
             else: # nProtocolPathways > 2
@@ -1212,12 +1215,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self.print(f"\tsource: {printStyled(src.name, 'green', True)}")
             self.print(f"\t\t{printStyled(nProtocolPathways, 'yellow', True)} pathways")
             
+            # NOTE: 2024-05-06 09:59:39
+            # pathStimBySweep below is a tuple of (sweep index, tuple of pathway indices)
+            # when the second element has more than one pathway index, and these
+            # pathway indices are different, it indicates that there is a cross-talk
+            # test stimulation of these pathways in that specific sweep
             pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
             self.print(f"\t\tindex of pathway stimulation by sweep = {printStyled(pathStimBySweep, 'green', True)}")
-            self.print(f"\t\t{printStyled(len(mainPathways, 'cyan', True))} main pathways: {printStyled(mainPathways, 'cyan', True)}")
-            self.print(f"\t\t{printStyled(len(altPathways, 'cyan', False))} alternate pathways: {printStyled(altPathways, 'cyan', False)}")
+            self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways: {printStyled(mainPathways, 'cyan', True)}")
+            self.print(f"\t\t{printStyled(len(altPathways), 'cyan', False)} alternate pathways: {printStyled(altPathways, 'cyan', False)}")
 
             if currentEpisode.type & RecordingEpisodeType.Tracking: 
+                self.print(f"{printStyled('Tracking...', 'magenta', True)}")
                 # NOTE: 2024-03-09 07:51:17 tracking mode
                 if src.name not in self._runData_.results:
                     self._runData_.results[src.name] = dict()
@@ -1230,27 +1239,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                 self.print(f"\tsource adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
                 
+                self._runData_.crosstalk = pathStimBySweep
+                
                 if nProtocolPathways == 1:
                     # protocol stimulates just one pathway - either DIG or DAC-emulated
                     # one implication of that is that the protocol DOES NOT (CANNOT)
                     # perform cross-talk:
                     self._runData_.crossTalk = False
-                    
-                    mainPathways = dig_stim_pathways if len(dig_stim_pathways) else dac_stim_pathways
 
-                    # the test below is never reached because this branch deals with Tracking mode
-#                     if protocol.nSweeps == 1:
-#                         # this is either a monitoring protocol or a single-sweep
-#                         # conditioning protocol
-#                         if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning > 0:
-#                             mainPathways[0][1].pathwayType = SynapticPathwayType.Test
-#                             
-#                     else:
-#                         if self._runData_.currentEpisodeType & RecordingEpisodeType.Conditioning > 0:
-#                             mainPathways[0][1].pathwayType = SynapticPathwayType.Test
-#                         else:
-#                             scipywarn(f"Protocol {protocol.name} has invalid number of sweeps ({protocol.nSweeps}) for tracking")
-                    
                 elif nProtocolPathways == 2:
                     # prerequisite for alternate pathway stimulation with either
                     # two DIGs or one DIG and one DAC-emulated TTLs
@@ -1261,69 +1257,44 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         scipywarn(f"Tracking mode: Alternate digital outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_stim_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
                         continue
                     
-                    if len(dac_stim_pathways) == 0:
-                        # both pathways in the protocol are stimulated via DIG outputs
-                        mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_stim_pathways)]
+                    if len(dac_stim_pathways) > 1:
+                        scipywarn(f"Tracking mode: In protocol {protocol.name}, for source {src.name}: at most one pathway should be declared as simulated via DAC-emulated TTLs")
+                        continue
                         
-                        pp = [p[1] for p in mainPathways + altPathways]
-                        
-                        # figure out the order in which pathways are stimulated
-                        # pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence(pp)
-                        
-                        if protocol.nSweeps == 1:
-                            pathsOrder = pathStimBySweep[0][1]
-                            if len(pathsOrder) == 0:
-                                scipywarn("No pathways stimulated in this protocol")
-                                continue
-                            
-                            elif len(pathsOrder) == 1:
-                                # NOTE: 2024-03-10 21:01:32 FIXME
-                                # this should never happen as we are in the condition of
-                                # two dig pathways here
-                                self._runData_.crossTalk = False
-                                
-                            elif len(pathsOrder) == 2:
-                                self._runData_.crossTalk = True
-                                
-                            else:
-                                scipywarn(f"Wrong number of paths in sweep: {len(pathsOrder)}")
-                                continue
-                            
-                            # TODO 2024-03-10 20:59:00
-                            # set up persistent mapping of pathways for single-sweep 
-                            # protocols - based on the expectation that such protocols
-                            # must arrive interleaved... but allow for recording 
-                            # interruptions...
-                            
-                            self._runData_.crossTalk = False
-                            
-                        elif protocol.nSweeps == 2:
-                            # if both pathways are stimulated in the same sweep -> cross-talk
-                            # else, expect one pathway stimulated in each sweep
-                            # main pathway on sweep 0, alt pathway on sweep 1
-                            if len(pathStimBySweep[0][1]) == 2:
-                                # TODO 2024-03-10 21:18:40 
-                                # set up persistent mapping of cross-talk
-                                # If each sweep simulates BOTH pathways, and the pathway order
-                                # is reversed in alternate sweeps ⇒ crosstalk = True
-                                # NOTE: implement these checks!
-                                self._runData_.crossTalk = True
-                            else:
-                                self._runData_.crossTalk = False
-                            
-                    elif len(dac_stim_pathways) == 1:
-                        if not protocol.alternateDACOutputStateEnabled:
-                            scipywarn(f"Tracking mode: Alternate DAC outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_stim_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
+                    if protocol.nSweeps == 1:
+                        pathsOrder = pathStimBySweep[0][1]
+                        if len(pathsOrder) == 0:
+                            scipywarn("No pathways stimulated in this protocol")
+                            self._runData_.crossTalk = tuple()
                             continue
                         
-                        mainPathways = dig_stim_pathways
-                        altDacPathways = dac_stim_pathways
+                        elif len(pathsOrder) == 1:
+                            # NOTE: 2024-03-10 21:01:32 FIXME
+                            # this should never happen as we are in the condition of
+                            # two dig pathways here
+                            self._runData_.crossTalk = tuple()
+                            
+                        elif len(pathsOrder) == 2:
+                            self._runData_.crossTalk = pathsOrder
+                            
+                        else:
+                            scipywarn(f"Wrong number of paths in sweep: {len(pathsOrder)}")
+                            self._runData_.crossTalk = tuple()
+                            continue
                         
-                        # TODO: 2024-03-10 21:23:12
-                        # use logic from above to determine if crosstalk and how
-                        
-                    elif len(dac_stim_pathways) > 1:
-                        scipywarn(f"Tracking mode: In protocol {protocol.name}, for source {src.name}: at most one pathway should be declared as simulated via DAC-emulated TTLs")
+                    elif protocol.nSweeps == 2:
+                        # if both pathways are stimulated in the same sweep -> cross-talk
+                        # else, expect one pathway stimulated in each sweep
+                        # main pathway on sweep 0, alt pathway on sweep 1
+                        if len(pathStimBySweep[0][1]) == 2:
+                            # TODO 2024-03-10 21:18:40 
+                            # set up persistent mapping of cross-talk
+                            # If each sweep simulates BOTH pathways, and the pathway order
+                            # is reversed in alternate sweeps ⇒ crosstalk = True
+                            # NOTE: implement these checks!
+                            self._runData_.crossTalk = pathStimBySweep[0][1]
+                        else:
+                            self._runData_.crossTalk = tuple()
                         
                 else: # nProtocolPathways > 2
                     # NOTE: 2024-03-09 22:54:05
@@ -1331,204 +1302,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     scipywarn(f"Tracking mode: Protocol {protocol.name} seems to be stimulating more than two pathways, and is not supported")
                     continue
                 
-                # print(f"{self._runData_.currentAbfTrial.name} ({protocol.name}) paths stim by sweep = {pathStimBySweep}")
+                self.print(f"crosstalk: {printStyled(self._runData_.crossTalk, 'magenta', True)}")
                 
-#                 if protocol.alternateDigitalOutputStateEnabled:
-#                     # alternative digital state indicates a dual-pathway protocol
-#                     # we expect src to advertise two pathways, and the protocol
-#                     # to match these two pathways to separate sweeps (i.e. two sweeps)
-#                     #
-#                     # NOTE: 2024-03-09 13:47:26 
-#                     # protocol.alternateDACOutputStateEnabled must also be True
-#                     # True if one of the pathways emits stimuli via
-#                     # a DAC 
-#                     if len(pathways) != 2:
-#                         scipywarn(f"The source {src.name} must define two pathways")
-#                         return
-#                     
-#                     if protocol.nSweeps != 2:
-#                         scipywarn(f"The protocol {protocol.name} has alternate digital output state enabled and expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
-#                         # TODO: 2024-03-05 23:03:34 decide what to do here
-#                         return
-#                         
-#                     # select pathways by their stimulus channel being a main or
-#                     # and alternative DIG output
-#                     mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_stim_pathways)]
-#                     
-#                     nDIGPathways = len(mainPathways) + len(altPathways)# + len(dacPathways)
-#                     
-#                     if nProtocolPathways == 0:
-#                         # no pathways recorded in this protocol (how likely that is ?!?)
-#                         continue
-#                     
-#                     if nProtocolPathways > 2:
-#                         scipywarn("A Clampex protocol does NOT support recording from more than two pathways")
-#                         continue
-#                     # if len(pathways) == 2:
-                        
-                                
-# ### ---------------------------------------------------------------------- ### #
-                                    
-                # if dac != activeDAC:
-                #     if not protocol.alternateDigitalOutputStateEnabled:
-                #         raise ValueError(f"Alternative digital outputs must be enabled in the protocol when digital outputs are configured on a DAC index ({activeDAC.physicalIndex}) different from the DAC sending command waveforms ({src.dac})")
-                    
-                # self.print(f"   data recorded in {printStyled(clampMode.name, 'yellow')}")
-                
-                # figure out which of the pathways use a DIG or a DAC channel for TTLs;
-                # of these figure out which are ACTUALLY used in the protocol
-                # NOTE: 2024-02-17 16:37:26
-                # this should be configured in the protocol, in any case
-                # as noted above, a DIG output MAY be also used to trigger 3ʳᵈ party device
+                # NOTE: 2024-05-06 09:16:37
+                # Figure out the epochs that define synaptic stimulations
                 #
-                
-                # as noted above, additional DIG outputs MAY be used to trigger 3ʳᵈ party device
-                # furthermore, this is an empty set when the protocol does not enable
-                # alternate digital outputs; 
-                #
-                
-                # NOTE: 2024-03-10 21:24:21
-                # calculatd above
-                # mainPathways = list() # empty if len(digOutDacs ) == 0
-                # altPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
-                # dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
-                
-                # if len(pathways) == 2:
-                    # there are two options here:
-                    # a) the same protocol uses alternative stimulation to record from
-                    #   both patwhays
-                    #   ⇒ the protocol must:
-                    #       • have EXACTLY TWO sweeps (theoreticaly it can have more,
-                    #           but this complicates things)
-                    #       • have alternateDigitalOutputStateEnabled True
-                    #
-                    #   → in addition, a two-pwathways protocol MAY implement cross-talk
-                    #       via TTL train on the alternate stimuli
-                    #
-                    # b) there are distinct protocols which operate on the same ADC/DAC
-                    #   pair, BUT use a distinct DIG output channel for each pathway
-                    #   ⇒ the protocols must:
-                    #       • have EXACTLY ONE sweep each
-                    #       • have alternateDigitalOutputStateEnabled False
-                    #       • be delivered alternatively ⇒ we need to somehow cache this information
-                    #
-                    #   → in addition, Cross-talk must also be implemented by distinct
-                    #   single pathway protocols, using single TTL pulses (or trains with one pulse each)
-                    #   but defined in successive epochs (so that the paired-pulse interval
-                    #   can match the one in a paired-pulse on a single pathway)
-                    #   e.g. crosstalk_0_1 delivered alternatively with crosstalk_1_0
-                    #   
-#                     if protocol.alternateDigitalOutputStateEnabled:
-#                         if protocol.nSweeps != 2:
-#                             scipywarn(f"The protocol {protocol.name} with alternate digital output state enabled expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
-#                             # TODO: 2024-03-05 23:03:34 decide what to do here
-#                             return
-#                         
-#                         for k, p in enumerate(pathways):
-#                             if p.stimulus.dig:
-#                                 # assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
-#                                 if dac not in digOutDacs:
-#                                     scipywarn(f"The DAC channel ({dac.physicalIndex}) for pathway {k} does not appear to have DIG outputs enabled")
-#                                     continue
-#                                 
-#                                 if p.stimulus.channel in mainDIGOut:
-#                                     mainPathways.append((k, p))
-#                                     
-#                                 elif p.stimulus.channel in altDIGOut:
-#                                     altPathways.append((k, p))
-#                                     
-#                             else:
-#                                 scipywarn(f"The protocol {protocol.name} does not appear to use digital outputs to stimulate the pathway {k}")
-#                                 return
-#                             
-#                     else:
-#                         if protocol.nSweeps != 1:
-#                             # FIXME: 2024-03-05 23:06:00
-#                             # the condition below applies only to monitoring protocols
-#                             #
-#                             # one can have an induction (i.e. conditioning) protocol
-#                             # with more than one sweep.
-#                             
-#                             scipywarn(f"The protocol {protocol.name} with alternate digital output state disabled expected to have one sweep; instead, it has {protocol.nSweeps} sweeps")
-                        
-                            
-                    # elif p.stimulus.channel in protocol.physicalDACIndexes:
-                    #     dacPathways.append((k, p))
-                        
-                # total number of pathways recorded in this protocol; it should be ≤ total number of pathways in _runData_
-                # NOTE: 2024-02-19 18:30:22 TODO: consider NOT pre-populating the pathways field in _runData_
-                # but rather parse the sources here and populate with pathways as necessary.
-                #
-                # FIXME: dacPathways is contentious - To REMOVE
-#                 nProtocolPathways = len(mainPathways) + len(altPathways)# + len(dacPathways)
-#                 
-#                 if nProtocolPathways == 0:
-#                     # no pathways recorded in this protocol (how likely that is ?!?)
-#                     continue
-#                 
-#                 if nProtocolPathways > 2:
-#                     scipywarn("A Clampex protocol does NOT support recording from more than two pathways")
-#                     continue
-                
-                # self.print(f"   pathways recorded in this protocol: {printStyled(nProtocolPathways)}")
-                
-                # If you have just one amplifier, you can record from as many sources as 
-                #   there are channels in the amplifier, for example:
-                #   • just one source for AxoPatch
-                #   • maximum two sources for MultiClamp
-                # 
-                # More amplifiers can allow simultaneous recording from more sources,
-                # provided that the ADC/DACs are appropriately configured and here is
-                # no overlap with any TTL-emulating DACs.
-                #
-                # When the source records from more than one pathway (i.e. more than one pathway for the SAME source)
-                # there should be a temporal separation of sweeps per pathway, so that
-                # synaptic responses recorded through the SAME ADC can be distinguished.
-                #
-                # This can be achieved in two ways:
-                #
-                # 1) the alternate stimulation approach → allows up to TWO pathways per source
-                # (one can use this approach for a single pathway, but then it will 
-                #  result in wasteful "empty" sweeps: the non-existent "alternate" pathway 
-                #   does not generate any responses, yet it will be recorded)
-                #   1.1) uses temporal separation through alternate sweeps in the same run
-                #
-                #   1.2) can be used for up to two pathways:
-                #       1.2.a) either two "digital" pathways ⇒ protocol has:
-                #           • alternateDigitalOutputStateEnabled ≡ True
-                #           • "main" digital pattern set
-                #           • "alternate" digital pattern set
-                #           • alternateDACOutputStateEnabled — irrelevant
-                #
-                #       1.2.b) one "digital" and one "dac" pathway ⇒ protocol has:
-                #           • alternateDigitalOutputStateEnabled ≡ True
-                #           • "main" digital pattern set
-                #           • "alternate" digital pattern NOT set
-                #           • alternateDACOutputStateEnabled ≡ True
-                #
-                #       1.2.c) two "dac" pathways - impossible in Clampex
-                #
-                #   1.3) the protocol should have an even number sweeps per run,
-                #       ideally only two (higher sweep index just repeat the 
-                #       measurements unnecessarily and confound the issue of 
-                #       averaged results - to keep it simple, we expect such protocol
-                #       to produce only two sweeps)
-                #           
-                # 2) single-sweep approach → use ONE pathway per protocol, and configure
-                #   as many protocols as there are pathways.
-                #
-                #   2.1) averaging will be turned off in Clampex ⟹ ABF files contain
-                #       immediate data, which may be averaged offline (TODO: pass arguments to the LTPOnline)
-                #       and data should be grouped by pathway, post-hoc
-                
-                # see above: a protocol DOES NOT support monitoring more than
-                # two pathways
-                # if there are two pathwys, then they should be stimulated
-                # alternatively, and the protocol should (ideally) have an even number 
-                # of sweeps per run; since it does NOT really make sense to have
-                # more than TWO sweeps (because we just repeat the protocol 𝒏
-                # times, for 𝒏 files) we actually ENFORCE THIS precondition:
-                
                 syn_stim_digs = list()
                 syn_stim_dacs = list()
                 
@@ -1539,9 +1317,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 
                     syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
                     
-                    # if len(altPathways) + len(dacPathways) != 1:
-                    #     scipywarn("There can be only one other pathway, triggered either digitally, or via DAC-emulated TTLs")
-                    #     continue
                     if len(altPathways) == 1:
                         # two alternative digitally stimulated pathways — the most
                         # common case
@@ -1557,10 +1332,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     if len(mainPathways):
                         syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
                             
-                # self.print(f"   digital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow')}")
-                # self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow')}")
+                self.print(f"\t\tdigital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow', True)}")
+                self.print(f"\t\tDAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow', True)}")
                 
-                # figure out the epochs that define synaptic stimulations
                 
                 # figure out the membrane test epochs; set up LocationMeasures for
                 # the membrane test; we use the source's DAC channel - which may also 
@@ -2410,17 +2184,21 @@ class LTPOnline_old(QtCore.QObject):
                 self._simulatorThread_.quit()
                 self._simulatorThread_.wait()
                 self._simulatorThread_.deleteLater()
+                self._simulatorThread_ = None
 
-            if hasattr(self, "_abfSupplierThread_") and hasattr(self, "_abfProcessorThread_"):
+            if hasattr(self, "_abfSupplierThread_") and isinstance(self._abfSupplierThread_, _LTPOnlineSupplier_):
                 self._abfSupplierThread_.abfListener.stop()
                 self._abfSupplierThread_.quit()
                 self._abfSupplierThread_.wait()
+                self._abfSupplierThread_.deleteLater()
+                self._abfSupplierThread_ = None
 
+            if hasattr(self, "_abfProcessorThread_") and isinstance(self._abfProcessorThread_, _LTPOnlineFileProcessor_):
+                self._abfProcessorThread_.stop()
                 self._abfProcessorThread_.quit()
                 self._abfProcessorThread_.wait()
-
-                self._abfSupplierThread_.deleteLater()
                 self._abfProcessorThread_.deleteLater()
+                self._abfProcessorThread_= None
 
         except:
             traceback.print_exc()
@@ -2879,7 +2657,7 @@ class LTPOnline_old(QtCore.QObject):
         self._simulation_ = None
 
         self._simulatorThread_ = None
-
+        self._abfSupplierThread_ = None
         self._doSimulation_ = False
 
         self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
@@ -3131,7 +2909,7 @@ class LTPOnline(QtCore.QObject):
                                  exportedResults = True,
                                  # currentEpisodeType = RecordingEpisodeType.Tracking,
                                  # previousEpisodeType = None,
-                                 crossTalk = False,
+                                 crossTalk = tuple(),
                                  episodes = list(),
                                  newEpisodeOnNextRun = (RecordingEpisodeType.Tracking, None), # episode type, episode name
                                  drug = None, # or a tuibale mnemonic string
