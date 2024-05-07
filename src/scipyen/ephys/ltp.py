@@ -1127,6 +1127,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # • DAC outputs (dac_stim_pathways)
             # in order to deliver synaptic stimulus
             #
+            
+            # NOTE: 2024-05-07 15:14:55
+            # first, figure out what simulated pathways are defined in the protocol
+            # then refine (i.e. keep only the paths ACTUALLY used in the source,
+            # see NOTE: 2024-03-09 15:40:48 below)
+            #
             dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))]
             
             bad_dac_paths = [p for p in dac_stim_pathways if p[1].stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
@@ -1160,13 +1166,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #   • each protocol is applied once in each iteration
             
             # NOTE: 2024-03-09 15:40:48
-            # figure out which of the above pathways are actually used by the
-            # protocol
-
+            # figure out which of the above pathways (NOTE: 2024-05-07 15:14:55) 
+            # are actually used by the protocol
+            #
             # start with dac-stimulated pathways first → find out which of the 
             # declared ones are actually used by the protocol
             #
             # from here onwards, dac_stim_pathways are those used in the protocol
+            #
             dac_stim_pathways = [p for p in dac_stim_pathways if len(protocol.getDAC(p[1].stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC)]
             self.print(f"\t\tdac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
             
@@ -1274,13 +1281,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if src.name not in self._runData_.viewers:
                     self._runData_.viewers[src.name] = dict()
                     
-                if src.name not in self._runData_.monitorProtocols:
-                    self._runData_.monitorProtocols[src.name] = dict()
+                # if src.name not in self._runData_.monitorProtocols:
+                #     self._runData_.monitorProtocols[src.name] = dict()
                     
                 self.print(f"\t\tadc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
                 
                 
-                self.print(f"\t\tcrosstalk: {printStyled(self._runData_.pathStimsBySweep, 'magenta', True)}")
+                self.print(f"\t\pathStimsBySweep: {printStyled(pathStimsBySweep, 'magenta', True)}")
                 
                 if any(len(x[1]) > 1 for x in pathStimsBySweep):
                     self.print("\t\tcrosstalk protocol.")
