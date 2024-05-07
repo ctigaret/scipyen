@@ -704,8 +704,329 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     def genEpisode(self, episodeType, episodeName):
         return RecordingEpisode(episodeType, name=episodeName)
         
-    def _parseABFProtocolOutputs(self, protocol:pab.ABFProtocol):
-        # NOTE: 2024-02-17 14:14:17
+#     def _parseABFProtocolOutputs(self, protocol:pab.ABFProtocol):
+#         # NOTE: 2024-02-17 14:14:17
+#         # Clampex supports stimulation of up to TWO distinct synaptic pathways
+#         # (i.e. via axonal inputs) for one recording source (cell or field),
+#         # using the 'alternative digital outputs' mechanism. 
+#         # The run should have an even number of sweeps — ideally, just two,
+#         # and a trial MAY consist of several runs (thus, the ABF file will 
+#         # store the sweep-by-sweep AVERAGE signals, here resulting in a neo.Block
+#         # with the same number of sweeps per run).
+#         #
+#         # (this is clearly less flexible than CED's Signal software)
+#         #
+#         # Of course, one can configure an odd number of sweeps (e.g., 3) per
+#         # run, but in this case, the last sweep will be a supplementary record
+#         # of the "main" pathway (i.e., the first of the two stimulated pathways)
+#         # whereas the second pathway would end up with fewer stimulations...
+#         #
+#         # NOTE: 2024-02-17 13:51:25
+#         # if there are more than one pathway associated with this source, 
+#         # the following SOFT requirements should be met:
+#         #
+#         # 1 alternative digital outputs enabled, to allow temporal (sweep-wise)
+#         #   separation of pathway responses: responses in both pathways are 
+#         #   recorded through the same electrode; therefore, stimulating them 
+#         #   in alternate sweeps is the only practical solution to distinguish
+#         #   them)
+#         #
+#         #   NOTE: this applies to tracking (or monitoring) protocols; in contrast,
+#         #   conditioning protocols, by definition, affect only a single pathway 
+#         #   (otherwise there would be no justification for recording from a 
+#         #   second pathway).
+#         #
+#         #   Technically, conditioning may also affect supplemetary pathways (e.g.
+#         #   a "weak" associative or cooperative pathway) but these are not 
+#         #   typically being monitored for plasticity; if they were, this would
+#         #   would not be possible with a single Clampex protocol.
+#         #
+#         #   To develop this idea: in Clampex, one would have to configure
+#         #   distinct protocols to record any one of, say, three pathways; 
+#         #   these protocols would then be interleaved in a sequence, such that
+#         #   the three pathways would be recorded separately in the same order,
+#         #   over and over again; furthermore, this would preclude any "auto-averaging" 
+#         #   (i.e., each of these protocols would consist of one run per trial, 
+#         #   ideally with one sweep per run, dedicated entirely to the pathway concerned)
+#         #   and the protocol should have alternateDigitalOutputStateEnabled False.
+#         #
+#         #   ### TODO: 2024-02-17 22:56:15
+#         #   To accommodate this, we must avoid setting up a new episode when the 
+#         #   ABF protocol has changed (see processAbfFile(…)); instead a new episode
+#         #   must be initiated manually through the LTPOnline API; also augment
+#         #   the API to configure averaging !
+#         #   ###
+#         #
+#         #
+#         # 2 protocol should have an even number of sweeps per run ⇒ even number
+#         #   of sweeps per trial recorded in the ABF file ⟹
+#         #   ⋆ main path (path 0) on even-numbered sweeps (0, 2, etc)
+#         #   ⋆ alternate path (path 1) on odd-numbered sweeps (1, 3, etc)
+#         #
+#         #   NOTE: an odd number of sweeps implies that the last sweep carries 
+#         #   data for the main path (path 0)
+#         #
+#         #   e.g. for three sweeps per run, sweeeps 0 and 2 carry path 0, whereas
+#         #   sweep 1 carries path 1
+#         #
+#         # 3 alternative waveforms DISABLED to allow the membrane test to be
+#         #   be performed (via DAC command signal) in every sweep; if this WAS
+#         #   enabled, then analog commands would be send via the DAC channel 
+#         #   where the alternative digital stimulation pattern is defined;
+#         #   since this DAC is NOT connected to the recording electrode for this
+#         #   source, any analog commands emitted by this DAC would end up elsewhere
+#         #
+#         #   (REMEMBER: One DAC channel per electrode ≡ 1 DAC channel per recording source)
+#         #
+#         #       — this is a direct consequence of the uninspired way in 
+#         #       which Clampex configures digital outputs in their protocol 
+#         #       editor GUI: in reality the DIG outputs are NEVER sent through 
+#         #       a DAC so they should have created a separate dialog outside 
+#         #       the WAVEFORM tabs
+#         #
+#         # The above prerequisites also have the consequencess below, regarding 
+#         #   the use of "supplementary" DACs (with higher index):
+#         # • if a supplementary DAC also defines epochs wih DIG enabled, these
+#         #   will be included in the alternative DIG pattern (inluding any
+#         #   additional DIG output channels) — this is NOT what you may intend.
+#         #
+#         #   the only possible advantage I can see is triggering a 3ʳᵈ party 
+#         #   device e.g. photoactivation/uncaging; the DISadvantage is that ALL
+#         #   extra DIG outputs will be subject to the same pattern...
+#         #
+#         # • if a supplementary DAC defines epochs for analog command waveforms,
+#         #   this DAC should have an index higher than all DACs used to deliver 
+#         #   amplifier commands (i.e., ≥ 2); this DAC can only be used to send 
+#         #   TTL-emulating waveforms to 3ʳᵈ party devices
+#         #
+#         #   In such cases, alternative waveforms should be ENABLED, waveform
+#         #   output in the "alternative" DAC should be DISABLED, and waveform
+#         #   output in the supplementary (higher index) DAC should be ENABLED. 
+#         #   This situation will result in:
+#         #   ∘ a membrane test (for the clamped recorded source) being 
+#         #   applied ONLY during the "main" pathway stimulation (which is fine,
+#         #   since one may argue that the "alternative" pathway records from
+#         #   the same source or cell anyway, so applying a membrane test there
+#         #   is redundant)
+#         #   ∘ create room for configuring emulated TTLs in the supplementary
+#         #       DAC (with higher index) to trigger a 3ʳᵈ party device ONLY
+#         #       during the "alternative" pathway stimulation
+#         
+#         # this channel is the one where DIG outputs are configured; it MAY BE
+#         # distinct from the source.dac !!!
+#         activeDAC = protocol.getDAC() # this is the `digdac` in processTrackingProtocol
+#         
+#         # these are the protocol's DACs where digital output is emitted during the recording
+#         # the active DAC is one of these by definition
+#         # WARNING: do NOT confuse with DACs that emulate TTLs
+#         digOutDacs = protocol.digitalOutputDACs
+# 
+#         # will be an empty set if len(digOutDacs ) == 0
+#         mainDIGOut = protocol.digitalOutputs(alternate=False)
+#         
+#         # this is an empty set when alternateDigitalOutputStateEnabled is False;
+#         # also, will be empty if len(digOutDacs ) == 0
+#         altDIGOut = protocol.digitalOutputs(alternate=True)
+#         
+#         return activeDAC, digOutDacs, mainDIGOut, altDIGOut
+    
+    @safeWrapper
+    @Slot(pathlib.Path)
+    def processAbfFile(self, abfFile:pathlib.Path):
+        """Reads and ABF protocol from the ABF file and analyses the data
+        """
+        # NOTE: 2024-03-03 09:18:08
+        # we rely completely on parsing the ABF protocol, given the ABF trial files
+        # furthermore, we assume:
+        # • the recording starts with a tracking protocol, which must be the same
+        #   for both baseline and chase (i.e. BEFORE and AFTER pathway conditioning)
+        # • we measure synaptic responses and membrane test parameters ONLY in 
+        #   ABF trials recorded using this tracking protocol 
+        # • ABF trials recorded with other protocols are ignored; this includes
+        #   cross-talk trials and the pathway conditioning trial
+        
+        self.print(f"\n{self.__class__.__name__}.processAbfFile {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
+
+        try:
+            currentAbfTrial = pio.loadAxonFile(str(abfFile))
+            protocol = pab.ABFProtocol(currentAbfTrial)
+            # self.print(f"\twith protocol {colorama.Fore.RED}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL}\n")
+            opMode = protocol.acquisitionMode # 
+            if isinstance(opMode, (tuple, list)): # FIXED 2024-03-08 22:32:14, see pyabfbridge.py NOTE: 2024-03-08 22:33:34 and NOTE: 2024-03-08 22:32:29
+                opMode = opMode[0]
+
+            if opMode != pab.ABFAcquisitionMode.episodic_stimulation:
+                scipywarn(f"In {currentAbfTrial.name}: File {abfFile} was not recorded in episodic stimulation mode and will be skipped")
+                return
+
+            # check that the number of sweeps actually stored in the ABF file/neo.Block
+            # equals that advertised by the protocol
+            # NOTE: mismatches can happen when trials are acquired very fast (i.e.
+            # back to back) - in this case check the sequencing key in Clampex
+            # and set an appropriate interval between successive trials !
+            #
+            # NOTE: 2024-03-03 09:27:52
+            # soften the asssertion below, just skip the file
+            # assert(protocol.nSweeps) == len(self._runData_.currentAbfTrial.segments), f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); check the sequencing key?"
+            #
+            if len(currentAbfTrial.segments) != protocol.nSweeps:
+                scipywarn(f"In {currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); the ABF trial file {abfFile} will be skipped")
+                return
+
+            self._runData_.abfTrialTimesMinutes.append(currentAbfTrial.rec_datetime)
+            deltaMinutes = (currentAbfTrial.rec_datetime - self._runData_.abfTrialTimesMinutes[0]).seconds/60
+            self._runData_.abfTrialDeltaTimesMinutes.append(deltaMinutes)
+            
+            # NOTE: 2024-02-08 14:18:32
+            # self._runData_.currentAbfTrial should be a neo.Block or None
+            if isinstance(self._runData_.currentAbfTrial, neo.Block):
+                # cache the previous trial
+                self._runData_.prevAbfTrial = self._runData_.currentAbfTrial
+            self._runData_.currentAbfTrial = currentAbfTrial
+            
+            # new episode requested via _runData_ ⇒
+            # create a new episode here, using _runData_.newEpisodeOnNextRun
+            if len(self._runData_.newEpisodeOnNextRun) == 2:
+                if len(self._runData_.episodes):
+                    # finalize the previous episode
+                    self._runData_.episodes[-1].endFrame = self._runData_.sweeps-1
+                    if isinstance(self._runData_.prevAbfTrial, neo.Block):
+                        self._runData_.episodes[-1].end=self._runData_.prevAbfTrial.rec_datetime
+                    else:
+                        self._runData_.episodes[-1].end=self._runData_.currentAbfTrial.rec_datetime
+                    
+                eType, eName = self._runData_.newEpisodeOnNextRun
+                episode = RecordingEpisode(eType, name=eName, protocol=protocol)
+                episode.begin = currentAbfTrial.rec_datetime
+                episode.beginFrame = self._runData_.sweeps
+                self._runData_.episodes.append(episode)
+                self._runData_.newEpisodeOnNextRun = tuple() # invalidate the request
+            
+            # self.print(self._runData_.sources)
+            
+            # if not isinstance(self._runData_.currentEpisode, RecordingEpisode):
+                # self._runData_.currentEpisode = RecordingEpisode(self._runData_.currentEpisodeType)
+                # self._runData_.currentEpisode.begin = self._runData_.currentAbfTrial.rec_datetime
+                
+            if len(self._runData_.episodes) == 0:
+                episode = RecordingEpisode(RecordingEpisodeType.Tracking, name=f"{RecordingEpisodeType.Tracking.name_0}")
+                self._runData_.episodes.append(episode)
+                
+            else:
+                episode = self._runData_.episodes[-1]
+                epIndex = self._runData_.episodes.index(episode)
+                
+            self.print(f"current episode ({printStyled(epIndex, 'yellow', True)}): {printStyled(self._runData_.episodes[-1], 'yellow', True)}")
+            # self.print(f"\tcurrent episode type decl: {printStyled(self._runData_.currentEpisodeType.name, 'yellow', True)}")
+                
+            # check that the protocol in the ABF file is the same as the current one
+            # else create a new episode automatically
+            #
+            # upon first run, self._runData_.protocol is None
+            if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
+                # self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
+                self._runData_.currentProtocol = protocol
+                
+            if protocol.name == self._runData_.currentProtocol.name:
+                if protocol != self._runData_.currentProtocol:
+                    scipywarn(f"Protocol {protocol.name} was changed — CAUTION")
+                    self._runData_.currentProtocol = protocol
+                    
+            self.processProtocol(protocol)
+                
+            if self._runData_.exportedResults:
+                self._runData_.exportedResults = False
+
+            self._runData_.sweeps += 1
+            self._runData_.totalSweeps += 1
+            
+            # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
+
+            # ### BEGIN don't remove yet
+            #             if isinstance(self._runData_.locationMeasures, (list, tuple)) and all(isinstance(l, LocationMeasure) for l in self._runData_.locationMaeasures):
+            #                 # TODO: 2024-02-18 23:28:45 URGENTLY
+            #                 # use location measures to measure on pathways' ADC
+            #                 scipywarn(f"Using custom location measures is not yet supported", out = self._stdout_)
+            #                 pass
+            #             else:
+            #                 protocol = pab.ABFProtocol(self._runData_.currentAbfTrial)
+            #                 opMode = protocol.acquisitionMode # why does this return a tuple ?!?
+            #                 if isinstance(opMode, (tuple, list)):
+            #                     opMode = opMode[0]
+            #                 assert opMode == pab.ABFAcquisitionMode.episodic_stimulation, f"Files must be recorded in episodic mode"
+            #
+            #                 # check that the number of sweeps actually stored in the ABF file/neo.Block
+            #                 # equals that advertised by the protocol
+            #                 # NOTE: mismatches can happen when trials are acquired very fast (i.e.
+            #                 # back to back) - in this case check the sequencing key in Clampex
+            #                 # and set an appropriate interval between successive trials !
+            #                 assert(protocol.nSweeps) == len(self._runData_.currentAbfTrial.segments), f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); check the sequencing key?"
+            #
+            #                 # self.print(self._runData_.sources)
+            #
+            #                 # check that the protocol in the ABF file is the same as the current one
+            #                 # else create a new episode automatically
+            #                 #
+            #                 # upon first run, self._runData_.protocol is None
+            #                 if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
+            #                     # self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
+            #
+            #                     self._runData_.currentProtocol = protocol
+            #
+            #                     # NOTE: 2024-02-27 19:13:04
+            #                     # this selects the pathways recorded by the protocol
+            #                     # for each source
+            #                     self.processProtocol(protocol)
+            #
+            #
+            #                 elif protocol == self._runData_.currentProtocol:
+            #                     # self.print(f"{colorama.Fore.BLUE}{colorama.Style.BRIGHT}current protocol{colorama.Style.RESET_ALL}: {protocol.name}")
+            #                     # same protocol → add data to currrent episode
+            #                     self.processProtocol(protocol)
+
+            #                 else:
+            #                     # a different protocol — WARNING: signals a new episode
+            #                     # self.print(f"{colorama.Fore.CYAN}{colorama.Style.BRIGHT}new protocol{colorama.Style.RESET_ALL}: {protocol.name}")
+            #                     pass
+            #                     # 1. finish off current episode with the previously loaded ABF file
+            #                     # NOTE: 2024-02-16 08:28:43
+            #                     # self._runData_.sweeps hasn't been incremented yet
+            #                     # self._runData_.currentEpisode.end = self._runData_.abfTrialTimesMinutes[-1]
+            #                     # self._runData_.currentEpisode.endFrame = self._runData_.sweeps
+            #                     # episodeNames = [e.name for e in self._runData_.schedule.episodes]
+            #                     # if self._runData_.episodeName in episodeNames:
+            #                     #     episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
+            #                     #     self._runData_.episodeName = episodeName
+            #                     # else:
+            #                     #     episodeName = self._runData_.episodeName
+            #
+            #                     # self._runData_.currentProtocol = protocol
+            # ### END   don't remove yet
+
+        except:
+            traceback.print_exc()
+            
+    @singledispatchmethod
+    def processProtocol(self, protocol):
+        # TODO: 2024-02-17 15:44:56
+        # support for CEDProtocol (class not yet written)
+        # generic ephys protocol support (in the distant future, when using NI DAQ devices)
+        if not isinstance(protocol, ElectrophysiologyProtocol):
+            raise TypeError(f"Expecting an ElectrophysiologyProtocol; instead, got a {type(protocol).__name__}")
+        
+        raise NotImplementedError(f"{type(protocol).__name__} protocols are not yet supported")
+        
+    @processProtocol.register(pab.ABFProtocol)
+    def _(self, protocol:pab.ABFProtocol):
+        # self.print(f"{self.__class__.__name__}.processProtocol ({printStyled(protocol.name)})")
+        
+        if len(self._runData_.episodes) == 0:
+            scipywarn("No episode has been defined")
+            return
+        
+        currentEpisode = self._runData_.episodes[-1]
+        
+24-02-17 14:14:17
         # Clampex supports stimulation of up to TWO distinct synaptic pathways
         # (i.e. via axonal inputs) for one recording source (cell or field),
         # using the 'alternative digital outputs' mechanism. 
@@ -820,208 +1141,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # the active DAC is one of these by definition
         # WARNING: do NOT confuse with DACs that emulate TTLs
         digOutDacs = protocol.digitalOutputDACs
-
+        
         # will be an empty set if len(digOutDacs ) == 0
         mainDIGOut = protocol.digitalOutputs(alternate=False)
         
         # this is an empty set when alternateDigitalOutputStateEnabled is False;
         # also, will be empty if len(digOutDacs ) == 0
         altDIGOut = protocol.digitalOutputs(alternate=True)
-        
-        return activeDAC, digOutDacs, mainDIGOut, altDIGOut
-    
-    @safeWrapper
-    @Slot(pathlib.Path)
-    def processAbfFile(self, abfFile:pathlib.Path):
-        """Reads and ABF protocol from the ABF file and analyses the data
-        """
-        # NOTE: 2024-03-03 09:18:08
-        # we rely completely on parsing the ABF protocol, given the ABF trial files
-        # furthermore, we assume:
-        # • the recording starts with a tracking protocol, which must be the same
-        #   for both baseline and chase (i.e. BEFORE and AFTER pathway conditioning)
-        # • we measure synaptic responses and membrane test parameters ONLY in 
-        #   ABF trials recorded using this tracking protocol 
-        # • ABF trials recorded with other protocols are ignored; this includes
-        #   cross-talk trials and the pathway conditioning trial
-        
-        self.print(f"\n{self.__class__.__name__}.processAbfFile {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
-
-        try:
-            currentAbfTrial = pio.loadAxonFile(str(abfFile))
-            protocol = pab.ABFProtocol(currentAbfTrial)
-            # self.print(f"\twith protocol {colorama.Fore.RED}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL}\n")
-            opMode = protocol.acquisitionMode # 
-            if isinstance(opMode, (tuple, list)): # FIXED 2024-03-08 22:32:14, see pyabfbridge.py NOTE: 2024-03-08 22:33:34 and NOTE: 2024-03-08 22:32:29
-                opMode = opMode[0]
-
-            if opMode != pab.ABFAcquisitionMode.episodic_stimulation:
-                scipywarn(f"In {currentAbfTrial.name}: File {abfFile} was not recorded in episodic stimulation mode and will be skipped")
-                return
-
-            # check that the number of sweeps actually stored in the ABF file/neo.Block
-            # equals that advertised by the protocol
-            # NOTE: mismatches can happen when trials are acquired very fast (i.e.
-            # back to back) - in this case check the sequencing key in Clampex
-            # and set an appropriate interval between successive trials !
-            #
-            # NOTE: 2024-03-03 09:27:52
-            # soften the asssertion below, just skip the file
-            # assert(protocol.nSweeps) == len(self._runData_.currentAbfTrial.segments), f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); check the sequencing key?"
-            #
-            if len(currentAbfTrial.segments) != protocol.nSweeps:
-                scipywarn(f"In {currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); the ABF trial file {abfFile} will be skipped")
-                return
-
-            self._runData_.abfTrialTimesMinutes.append(currentAbfTrial.rec_datetime)
-            deltaMinutes = (currentAbfTrial.rec_datetime - self._runData_.abfTrialTimesMinutes[0]).seconds/60
-            self._runData_.abfTrialDeltaTimesMinutes.append(deltaMinutes)
-            
-            # NOTE: 2024-02-08 14:18:32
-            # self._runData_.currentAbfTrial should be a neo.Block or None
-            if isinstance(self._runData_.currentAbfTrial, neo.Block):
-                # cache the previous trial
-                self._runData_.prevAbfTrial = self._runData_.currentAbfTrial
-            self._runData_.currentAbfTrial = currentAbfTrial
-            
-            # new episode requested via _runData_ ⇒
-            # create a new episode here, using _runData_.newEpisodeOnNextRun
-            if len(self._runData_.newEpisodeOnNextRun) == 2:
-                if len(self._runData_.episodes):
-                    # finalize the previous episode
-                    self._runData_.episodes[-1].endFrame = self._runData_.sweeps-1
-                    if isinstance(self._runData_.prevAbfTrial, neo.Block):
-                        self._runData_.episodes[-1].end=self._runData_.prevAbfTrial.rec_datetime
-                    else:
-                        self._runData_.episodes[-1].end=self._runData_.currentAbfTrial.rec_datetime
-                    
-                eType, eName = self._runData_.newEpisodeOnNextRun
-                episode = RecordingEpisode(eType, name=eName, protocol=protocol)
-                episode.begin = currentAbfTrial.rec_datetime
-                episode.beginFrame = self._runData_.sweeps
-                self._runData_.episodes.append(episode)
-                self._runData_.newEpisodeOnNextRun = tuple() # invalidate the request
-            
-            # self.print(self._runData_.sources)
-            
-            # if not isinstance(self._runData_.currentEpisode, RecordingEpisode):
-                # self._runData_.currentEpisode = RecordingEpisode(self._runData_.currentEpisodeType)
-                # self._runData_.currentEpisode.begin = self._runData_.currentAbfTrial.rec_datetime
-                
-            if len(self._runData_.episodes) == 0:
-                episode = RecordingEpisode(RecordingEpisodeType.Tracking, name=f"{RecordingEpisodeType.Tracking.name_0}")
-                
-            self.print(f"current episode: {printStyled(self._runData_.episodes[-1], 'yellow', True)}")
-            # self.print(f"\tcurrent episode type decl: {printStyled(self._runData_.currentEpisodeType.name, 'yellow', True)}")
-                
-            # check that the protocol in the ABF file is the same as the current one
-            # else create a new episode automatically
-            #
-            # upon first run, self._runData_.protocol is None
-            if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
-                # self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-                self._runData_.currentProtocol = protocol
-                
-            if protocol.name == self._runData_.currentProtocol.name:
-                if protocol != self._runData_.currentProtocol:
-                    scipywarn(f"Protocol {protocol.name} was changed — CAUTION")
-                    self._runData_.currentProtocol = protocol
-                    
-            self.processProtocol(protocol)
-                
-            if self._runData_.exportedResults:
-                self._runData_.exportedResults = False
-
-            self._runData_.sweeps += 1
-            self._runData_.totalSweeps += 1
-            
-            # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
-
-            # ### BEGIN don't remove yet
-            #             if isinstance(self._runData_.locationMeasures, (list, tuple)) and all(isinstance(l, LocationMeasure) for l in self._runData_.locationMaeasures):
-            #                 # TODO: 2024-02-18 23:28:45 URGENTLY
-            #                 # use location measures to measure on pathways' ADC
-            #                 scipywarn(f"Using custom location measures is not yet supported", out = self._stdout_)
-            #                 pass
-            #             else:
-            #                 protocol = pab.ABFProtocol(self._runData_.currentAbfTrial)
-            #                 opMode = protocol.acquisitionMode # why does this return a tuple ?!?
-            #                 if isinstance(opMode, (tuple, list)):
-            #                     opMode = opMode[0]
-            #                 assert opMode == pab.ABFAcquisitionMode.episodic_stimulation, f"Files must be recorded in episodic mode"
-            #
-            #                 # check that the number of sweeps actually stored in the ABF file/neo.Block
-            #                 # equals that advertised by the protocol
-            #                 # NOTE: mismatches can happen when trials are acquired very fast (i.e.
-            #                 # back to back) - in this case check the sequencing key in Clampex
-            #                 # and set an appropriate interval between successive trials !
-            #                 assert(protocol.nSweeps) == len(self._runData_.currentAbfTrial.segments), f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); check the sequencing key?"
-            #
-            #                 # self.print(self._runData_.sources)
-            #
-            #                 # check that the protocol in the ABF file is the same as the current one
-            #                 # else create a new episode automatically
-            #                 #
-            #                 # upon first run, self._runData_.protocol is None
-            #                 if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
-            #                     # self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #
-            #                     self._runData_.currentProtocol = protocol
-            #
-            #                     # NOTE: 2024-02-27 19:13:04
-            #                     # this selects the pathways recorded by the protocol
-            #                     # for each source
-            #                     self.processProtocol(protocol)
-            #
-            #
-            #                 elif protocol == self._runData_.currentProtocol:
-            #                     # self.print(f"{colorama.Fore.BLUE}{colorama.Style.BRIGHT}current protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #                     # same protocol → add data to currrent episode
-            #                     self.processProtocol(protocol)
-
-            #                 else:
-            #                     # a different protocol — WARNING: signals a new episode
-            #                     # self.print(f"{colorama.Fore.CYAN}{colorama.Style.BRIGHT}new protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #                     pass
-            #                     # 1. finish off current episode with the previously loaded ABF file
-            #                     # NOTE: 2024-02-16 08:28:43
-            #                     # self._runData_.sweeps hasn't been incremented yet
-            #                     # self._runData_.currentEpisode.end = self._runData_.abfTrialTimesMinutes[-1]
-            #                     # self._runData_.currentEpisode.endFrame = self._runData_.sweeps
-            #                     # episodeNames = [e.name for e in self._runData_.schedule.episodes]
-            #                     # if self._runData_.episodeName in episodeNames:
-            #                     #     episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
-            #                     #     self._runData_.episodeName = episodeName
-            #                     # else:
-            #                     #     episodeName = self._runData_.episodeName
-            #
-            #                     # self._runData_.currentProtocol = protocol
-            # ### END   don't remove yet
-
-        except:
-            traceback.print_exc()
-            
-    @singledispatchmethod
-    def processProtocol(self, protocol):
-        # TODO: 2024-02-17 15:44:56
-        # support for CEDProtocol (class not yet written)
-        # generic ephys protocol support (in the distant future, when using NI DAQ devices)
-        if not isinstance(protocol, ElectrophysiologyProtocol):
-            raise TypeError(f"Expecting an ElectrophysiologyProtocol; instead, got a {type(protocol).__name__}")
-        
-        raise NotImplementedError(f"{type(protocol).__name__} protocols are not yet supported")
-        
-    @processProtocol.register(pab.ABFProtocol)
-    def _(self, protocol:pab.ABFProtocol):
-        # self.print(f"{self.__class__.__name__}.processProtocol ({printStyled(protocol.name)})")
-        
-        if len(self._runData_.episodes) == 0:
-            scipywarn("No episode has been defined")
-            return
-        
-        currentEpisode = self._runData_.episodes[-1]
-        
-        activeDAC, digOutDacs, mainDIGOut, altDIGOut = self._parseABFProtocolOutputs(protocol)
+        # activeDAC, digOutDacs, mainDIGOut, altDIGOut = self._parseABFProtocolOutputs(protocol)
 
         # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
         # if len(digOutDacs) == 0:
@@ -1034,6 +1161,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
             
         for src in self._runData_.sources:
+            self.print(f"\tsource: {printStyled(src.name, 'green', True)}")
             # self.print(f"   -----------------")
             # self.print(f"   processing source {printStyled(src.name)}")
 
@@ -1107,6 +1235,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # recording source have the same clamp mode!
             # 
             clampMode = protocol.getClampMode(adc, activeDAC)
+            self.print(f"\t\tadc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}, clampMode: {printStyled(clampMode.name, 'yellow')}")
             
             # NOTE: 2024-03-09 22:56:22 
             # In a conditioning protocol, the dac is by definition the active DAC.
@@ -1134,6 +1263,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # see NOTE: 2024-03-09 15:40:48 below)
             #
             dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))]
+            self.print(f"\t\tdig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
+            self.print(f"\t\tdac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
             
             bad_dac_paths = [p for p in dac_stim_pathways if p[1].stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
             
@@ -1174,22 +1305,22 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #
             # from here onwards, dac_stim_pathways are those used in the protocol
             #
-            dac_stim_pathways = [p for p in dac_stim_pathways if len(protocol.getDAC(p[1].stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC)]
-            self.print(f"\t\tdac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
+            src_dac_stim_pathways = [p for p in dac_stim_pathways if len(protocol.getDAC(p[1].stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC)]
             
             # do the same for dig-stimulated pathways:
             # the filter is simpler: the declares stimulsu channel for the pathway
             # is one of the main or alt DIG channels defined in the protocol
             # from here onward dig_stim_pathways are the pathways actually stimulated by the protocol
-            dig_stim_pathways = [p for p in dig_stim_pathways if p[1].stimulus.channel in mainDIGOut or altDIGOut]
-            self.print(f"\t\tdig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
+            src_dig_stim_pathways = [p for p in dig_stim_pathways if p[1].stimulus.channel in mainDIGOut or altDIGOut]
             
             # This is the total number of pathways actually STIMULATED in the
             # protocol, given the sourcer 'src', via either DIG outputs 
             # (dig_stim_pathways) OR DAC-emulated TTLs (dac_stim_pathways)
             #
-            nStimPathways = len(dac_stim_pathways) + len(dig_stim_pathways)
-            self.print(f"\t\t{printStyled(nStimPathways, 'green', True)} pathways")
+            nSrcStimPathways = len(src_dac_stim_pathways) + len(src_dig_stim_pathways)
+            self.print(f"\t\t{printStyled(nSrcStimPathways, 'green', True)} pathways, with:")
+            self.print(f"\t\tsource dig stim pathways: {printStyled(src_dig_stim_pathways, 'green', True)}")
+            self.print(f"\t\tsource dac stim pathways: {printStyled(src_dac_stim_pathways, 'green', True)}")
             
             # NOTE: 2024-05-07 14:43:35
             # Below, the concepts of "main" and "alternative" pathways are arbitrary
@@ -1223,18 +1354,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #
             altPathways = list()
             
-            if nStimPathways == 0:
+            if nSrcStimPathways == 0:
                 scipywarn(f"Protocol {protcol.name} does not seem to monitor any of the pathways declares in source {src.name}")
                 continue
             
             
-            if nStimPathways == 1:
+            if nSrcStimPathways == 1:
                 # When there is a single pathway simulated in the protocol, this 
                 # is by definition the 'main' pathway.
                 #
                 mainPathways = dig_stim_pathways if len(dig_stim_pathways) else dac_stim_pathways
                 
-            elif nStimPathways == 2:
+            elif nSrcStimPathways == 2:
                 if len(dac_stim_pathways) == 0:
                     # both main and alternative stimulated pathways are stimulated
                     # via DIG channels
@@ -1253,23 +1384,23 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     continue
                     
                         
-            else: # nStimPathways > 2
+            else: # nSrcStimPathways > 2
                 # NOTE: 2024-03-09 22:54:05
                 # I think this is technically impossible in Clampex
                 scipywarn(f"Tracking mode: Protocol {protocol.name} seems to be stimulating more than two pathways; This is not currently supported")
                 continue
             
-            self.print(f"\tsource: {printStyled(src.name, 'green', True)}")
             
+            # self.print(f"\t\tindex of pathway stimulation by sweep = {printStyled(pathStimsBySweep, 'green', True)}")
+            self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways: {printStyled(mainPathways, 'cyan', True)}")
+            self.print(f"\t\t{printStyled(len(altPathways), 'cyan', False)} alternate pathways: {printStyled(altPathways, 'cyan', False)}")
             # NOTE: 2024-05-06 09:59:39
             # pathStimsBySweep below is a tuple of (sweep index, tuple of pathway indices)
             # when the second element has more than one pathway index, and these
             # pathway indices are different, it indicates that there is a cross-talk
             # test stimulation of these pathways in that specific sweep
             pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
-            # self.print(f"\t\tindex of pathway stimulation by sweep = {printStyled(pathStimsBySweep, 'green', True)}")
-            self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways: {printStyled(mainPathways, 'cyan', True)}")
-            self.print(f"\t\t{printStyled(len(altPathways), 'cyan', False)} alternate pathways: {printStyled(altPathways, 'cyan', False)}")
+            self.print(f"\t\tpathStimsBySweep: {printStyled(pathStimsBySweep, 'magenta', True)}")
 
             if currentEpisode.type & RecordingEpisodeType.Tracking: 
                 # NOTE: 2024-03-09 07:51:17 tracking mode
@@ -1283,13 +1414,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                 # if src.name not in self._runData_.monitorProtocols:
                 #     self._runData_.monitorProtocols[src.name] = dict()
-                    
-                self.print(f"\t\tadc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
-                
-                
-                self.print(f"\t\pathStimsBySweep: {printStyled(pathStimsBySweep, 'magenta', True)}")
-                
-                if any(len(x[1]) > 1 for x in pathStimsBySweep):
+
+                if any(len(x[1]) > 1 for x in pathStimsBySweep): # crosstalk?
                     self.print("\t\tcrosstalk protocol.")
                     if len(currentEpisode.xtalk) == 0 or currentEpisode.xtalk != pathStimsBySweep:
                         self.print("\t\tsetting new crosstalk episode")
@@ -1310,9 +1436,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                         self._runData_.pathStimsBySweep = pathStimsBySweep
                         
-                else:
+                else: # single path stimulation per sweep
                     self.print("\t\tnormal tracking protocol")
-                    if len(currentEpisode.xtalk) or self._runData_.pathStimsBySweep != pathStimsBySweep:
+                    if len(currentEpisode.xtalk) > 0 and self._runData_.pathStimsBySweep != pathStimsBySweep:
                         self.print("\t\tnew tracking episode")
                         if isinstance(self._runData_.prevAbfTrial, neo.Block):
                             currentEpisode.end = self._runData_.prevAbfTrial.rec_datetime
@@ -1334,13 +1460,13 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 syn_stim_digs = list()
                 syn_stim_dacs = list()
                 
-                if nStimPathways == 2:
+                if nSrcStimPathways == 2:
                     if len(mainPathways) != 1:
                         if all ((len(x[1]) <= 1 for x in self._runData_.pathStimsBySweep)):
-                            scipywarn(f"In protocol {printStyled(protocol.name, 'red', True)}: There must be only one digitally triggered pathway defined.")
+                            scipywarn(f"In protocol {printStyled(protocol.name, 'red', True)}: There must be only one digitally triggered main pathway defined.")
                             continue
                         
-
+                    # syn_stim_digs.append(mainPathways[0].stimulus.channel)
                     syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
                     
                     if len(altPathways) == 1:
@@ -1355,7 +1481,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # TODO: 2024-03-10 21:28:46
                     # provide for altDacPathways as well
                         
-                else: # alternative pathways do not exist here; nStimPathways ≡ 1 
+                else: # alternative pathways do not exist here; nSrcStimPathways ≡ 1 
                     if len(mainPathways):
                         syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
                             
@@ -1389,7 +1515,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
                     testDuration = membraneTestEpoch.firstDuration
                     
-                # assert protocol.nSweeps >= nStimPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nStimPathways} pathways"
+                # assert protocol.nSweeps >= nSrcStimPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nSrcStimPathways} pathways"
                 
                 # in a multi-pathway protocol, the "main" digital pathways are always
                 # delivered on the even-numbered sweeps: 0, 2, etc.
