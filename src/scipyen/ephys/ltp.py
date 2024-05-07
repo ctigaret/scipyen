@@ -1026,7 +1026,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         currentEpisode = self._runData_.episodes[-1]
         
-24-02-17 14:14:17
+        # NOTE 24-02-17 14:14:17
         # Clampex supports stimulation of up to TWO distinct synaptic pathways
         # (i.e. via axonal inputs) for one recording source (cell or field),
         # using the 'alternative digital outputs' mechanism. 
@@ -1133,29 +1133,31 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #       DAC (with higher index) to trigger a 3ʳᵈ party device ONLY
         #       during the "alternative" pathway stimulation
         
+        self.print(f"{self._runData_.currentAbfTrial.name} processProtocol: {printStyled(protocol.name, 'green', True)}")
+
         # this channel is the one where DIG outputs are configured; it MAY BE
         # distinct from the source.dac !!!
         activeDAC = protocol.getDAC() # this is the `digdac` in processTrackingProtocol
+        self.print(f"\tactiveDAC: {printStyled(activeDAC.name, 'green', True)} (physical index {printStyled(activeDAC.physical, 'green', True)})")
         
         # these are the protocol's DACs where digital output is emitted during the recording
         # the active DAC is one of these by definition
         # WARNING: do NOT confuse with DACs that emulate TTLs
         digOutDacs = protocol.digitalOutputDACs
+        self.print(f"\tDACs with DIG output defined: {printStyled(tuple((d.name + ' (physical index ' + str(d.physical) + ')' for d in digOutDacs)),'green', True)}")
         
         # will be an empty set if len(digOutDacs ) == 0
         mainDIGOut = protocol.digitalOutputs(alternate=False)
+        self.print(f"\tprincipal (main) digital output channels: {printStyled(mainDIGOut, 'green', True)}")
         
         # this is an empty set when alternateDigitalOutputStateEnabled is False;
         # also, will be empty if len(digOutDacs ) == 0
         altDIGOut = protocol.digitalOutputs(alternate=True)
-        # activeDAC, digOutDacs, mainDIGOut, altDIGOut = self._parseABFProtocolOutputs(protocol)
+        self.print(f"\talternative digital output channels: {printStyled(altDIGOut, 'green', True)}")
 
         # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
         # if len(digOutDacs) == 0:
         #     raise ValueError("The protocol indicates there are no DAC channels with digital output enabled")
-        
-        self.print(f"{self._runData_.currentAbfTrial.name} processProtocol:")
-        self.print(f"\tprotocol {printStyled(protocol.name, 'green', True)}")
         
         # self.print(f"\tcurrent episode: {printStyled(self._runData_.currentEpisode, 'green', True)}, type {printStyled(self._runData_.currentEpisode.type.name, 'green', True)}")
         # self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
@@ -1236,6 +1238,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # 
             clampMode = protocol.getClampMode(adc, activeDAC)
             self.print(f"\t\tadc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}, clampMode: {printStyled(clampMode.name, 'yellow')}")
+            self.print(f"\t\tsource dac is the protocol's activeDAC: {printStyled(dac == activeDAC, 'yellow', True)}")
             
             # NOTE: 2024-03-09 22:56:22 
             # In a conditioning protocol, the dac is by definition the active DAC.
@@ -1369,7 +1372,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if len(dac_stim_pathways) == 0:
                     # both main and alternative stimulated pathways are stimulated
                     # via DIG channels
-                    mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in mainDIGOut, dig_stim_pathways)]
+                    mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_stim_pathways)]
+                    # mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in mainDIGOut, dig_stim_pathways)]
                     
                 elif len(dac_stim_pathways) == 1:
                     # one stim pathway (main) is DIG, the other (alternative) is DAC
