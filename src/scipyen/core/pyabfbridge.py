@@ -563,6 +563,10 @@ class ABFEpoch:
         # self._pulseWidth_in_samples_ = 0
         self._dacNum_ = -1
         
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__} Epoch {self.epochNumber} ({self.letter}), type {self.epochType.name}"
+        
+        
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False

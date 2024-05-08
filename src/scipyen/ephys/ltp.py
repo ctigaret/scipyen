@@ -1393,13 +1393,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self.print(f"\t\tpathway stimulation by sweep (pathStimsBySweep): {printStyled(pathStimsBySweep, 'magenta', True)}")
 
             if currentEpisode.type & RecordingEpisodeType.Tracking: 
-                # NOTE: 2024-05-08 12:12:37
-                # By default, measurements are enabled in tracking mode; 
-                # the only excpetion is during cross-talk, so we disable that,
-                # below
-                #
-                # However, we DO output the sweeps, we just don't measure them
-                # measurePathways = True 
                 # NOTE: 2024-03-09 07:51:17 tracking mode
                 self.print(f"\t\t{printStyled('Tracking...', 'magenta', True)}")
                 
@@ -1409,9 +1402,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if src.name not in self._runData_.viewers:
                     self._runData_.viewers[src.name] = dict()
                     
-                # if src.name not in self._runData_.monitorProtocols:
-                #     self._runData_.monitorProtocols[src.name] = dict()
-
                 if any(len(x[1]) > 1 for x in pathStimsBySweep): # crosstalk?
                     self.print("\t\tcrosstalk protocol.")
                     if len(currentEpisode.xtalk) == 0 or currentEpisode.xtalk != pathStimsBySweep:
@@ -1433,10 +1423,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                         self._runData_.pathStimsBySweep = pathStimsBySweep
                         
-                        # NOTE: 2024-05-08 12:08:54
-                        # skip measurements for cross-talk protocols
-                        # measurePathways = False
-                        
                 else: # single path stimulation per sweep
                     self.print("\t\tnormal tracking protocol")
                     if len(currentEpisode.xtalk) > 0 and self._runData_.pathStimsBySweep != pathStimsBySweep:
@@ -1456,11 +1442,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                         # measurePathways = True
                         
-                # FIXME/TODO 2024-05-08 12:37:01
-                # move all the below to setMeasuresForPathway 
-                #
                 # NOTE: 2024-05-06 09:16:37
                 # Figure out the epochs that define synaptic stimulations
+                # we use the 
                 
                 syn_stim_digs = list()
                 syn_stim_dacs = list()
@@ -1497,18 +1481,23 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self.print(f"\t\tdigital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow', True)}")
                 self.print(f"\t\tDAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow', True)}")
                 
-                
-                # figure out the membrane test epochs; set up LocationMeasures for
+                # NOTE: 2024-05-08 14:13:29
+                # Figure out the membrane test epochs in order to set up LocationMeasures for
                 # the membrane test; we use the source's DAC channel - which may also 
                 # be the activeDAC, although this is not necessary.
-                # furthermore, these epochs should exist in eitgher voltage-or current clamp
-                # if they do not, we just imply do not provide corresponding measurmements
                 #
-                # also, these are COMMON for all the pathways in the source
+                # Furthermore, these epochs should exist in eitgher voltage-or current clamp;
+                # if they do not, we just do not provide corresponding measurmements
+                #
+                # The membrane test epochs are COMMON for all the pathways in the source, 
+                # because it is the source that gets manipulated (via the DAC)
+                # ireespective of how many pathways are measured.
+                #
                 mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
                                                     and not any(x.hasDigitalOutput(d) for d in (syn_stim_digs)) \
                                                     and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
                                         dac.epochs))
+                
                 
                 if len(mbTestEpochs) == 0:
                     if clampMode in (ClampMode.VoltageClamp, ClampMode.CurrentClamp):
@@ -1524,12 +1513,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
                     testDuration = membraneTestEpoch.firstDuration
                     
+                self.print(f"\t\tMembrane test epochs {printStyled(mbTestEpochs, 'yellow', True)}")
+                self.print(f"\t\t• amplitude {printStyled(testAmplitude, 'yellow', True)}")
+                self.print(f"\t\t• start {printStyled(testStart, 'yellow', True)}")
+                self.print(f"\t\t• duration {printStyled(testDuration, 'yellow', True)}")
+                
                 # assert protocol.nSweeps >= nSrcStimPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nSrcStimPathways} pathways"
                 
                 # in a multi-pathway protocol, the "main" digital pathways are always
                 # delivered on the even-numbered sweeps: 0, 2, etc.
                 #
-                
                 for k, p in mainPathways:
                     # NOTE: 2024-03-01 13:50:58
                     # k is the pathway index; p is the pathway
@@ -1911,7 +1904,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         viewer.currentFrame  = len(block.segments)-1
         
         # ### END  extract pathway sweeps, concatenate to pathway blocks and plot
-
+        
+        # ### BEGIN setup measures, if needed
+        # FIXME 2024-05-08 15:06:34
+        # crossTalk setting is wrong and not needed, really
         crossTalk = False
 
         if "measures" not in self._runData_.results[src.name][p.name]:
@@ -1939,7 +1935,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # collection of unique digital channels used for stimulation on THIS pathway
             stimDIG = unique(list(itertools.chain.from_iterable(e.getUsedDigitalOutputChannels("all") for e in digStimEpochs)))
 
-
             if len(stimDIG) == 1:
                 if stimDIG[0] != p.stimulus.channel:
                     scipywarn(f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} is different from the {stimDIG[0]} used in the epochs {[e.letter for e in digStimEpochs]}")
@@ -1953,6 +1948,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     crossTalk = False
                 else:
                     crossTalk = True
+                    
+            self.print(f"{self.__class__.__name__}.setMeasuresForPathway source {printStyled(src.name, 'green', True)}, path {printStyled(p.name, 'green', True)} (stim channel {printStyled(p.stimulus.channel, 'green', True)} digital: {printStyled(p.stimulus.dig, 'green', True)}) -> crossTalk {printStyled(crossTalk, 'green', True)} ")
+            
 
             # NOTE: 2024-03-01 22:57:37 TODO consider the below ↴
     #         elif len(stimDIG) == 0:
@@ -2145,6 +2143,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
             # store pathway measures for measurements
             self._runData_.results[src.name][p.name]["measures"] = pMeasures
+            
+        # ### END setup measures
+        
             
 class LTPOnline_old(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
@@ -2707,8 +2708,11 @@ class LTPOnline_old(QtCore.QObject):
         #     self._abfSupplierThread_.abfListener.stop()
 
 
+        self._abfSupplierThread_.abfListener.stop()
         self._abfSupplierThread_.quit()
         self._abfSupplierThread_.wait()
+        
+        self._abfProcessorThread_.stop()
         self._abfProcessorThread_.quit()
         self._abfProcessorThread_.wait()
 
