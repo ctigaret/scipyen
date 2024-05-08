@@ -1796,7 +1796,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     def getPathwaysDigitalStimulationSequence(self, pathways:typing.Sequence[SynapticPathway],
                                         dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                                        byFirstStimulus:bool=True):
+                                        byFirstStimulus:bool=True,
+                                        indices:bool=True):
         """Returns sweep-specific digital stimulation of pathways.
         
         Often, a protocol is used to digitally stimulate more than one synaptic
@@ -1846,11 +1847,19 @@ class ABFProtocol(ElectrophysiologyProtocol):
             When False, the output reflects sequence of pathways in all ABF Epochs
             that emit stimulus signals. See examples below
         
+        indices: bool, default is False; when True, the returned tuple will contain
+            the indexes of the pathways in the sequence of pathways suppkied in 
+            the 'pathways' parameter (see above)
+            When False (default), the return tuple will contin a reference to 
+            the pathway itself
+            
+        
         Returns:
         -------
         A tuple of 2-tuples, eacb containing:
-            sweep index, tuple of indexes in the `pathways` sequence, for the 
-                pathways that have been stimulated in that sweep
+            sweep index, tuple of indexes in the `pathways` sequence (when the 
+                'indices' parameter is True), or tuple of pathways (when 'indices'
+                is False) that have been stimulated in that sweep.
         
         NOTE: Depending on the value of the `byFirstStimulus` parameter (see above)
             the tuple of pathway indexes contains:
@@ -1980,7 +1989,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         if byFirstStimulus:
             # NOTE: 2024-03-10 20:11:22
-            # description of the algorithm (one-liner nested comprehensions)
+            # description of the algorithm in the one-line nested comprehension
+            # below:
             # for each sweep:
             #   for each pathway:
             #       get the epochs with digital stimulus ON for the pathway's stimulus channel, in current sweep
@@ -1989,7 +1999,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
             #       take out (filter) the entries with no epochs
             #       sort entries by the start time of the first epoch in the entry (does nothing of no entry left after the filter step)
             # collect a tuple of tuples: (sweep index, tuple of pathway indices ordered by the time of their first epoch, sorted above)
-            return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
+            if indices:
+                return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
+            return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(p, dac.getEpochsForDigitalChannel(p.stimulus.channel, s)) for p in pathways]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
+            
         else:
             # NOTE: 2024-03-10 20:14:34
             # description of the algorithm (one-liner nested comprehensions)
@@ -1997,7 +2010,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
             #   get epochs with digital output
             #   collect out those that use the stimulus digital channel declared in the pathway specifications
             # collect a tuple of tuples: (sweep index, tuple of pathway indices stimulated in all epochs in the sweep)
-            return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+            if indices:
+                return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+            return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda p: p.stimulus.channel == c, pathways) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
                 
     
     @property

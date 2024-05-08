@@ -960,6 +960,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         currentEpisode = self._runData_.episodes[-1]
         
         # NOTE 24-02-17 14:14:17
+        # ### BEGIN
         # Clampex supports stimulation of up to TWO distinct synaptic pathways
         # (i.e. via axonal inputs) for one recording source (cell or field),
         # using the 'alternative digital outputs' mechanism. 
@@ -1065,21 +1066,26 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #   ∘ create room for configuring emulated TTLs in the supplementary
         #       DAC (with higher index) to trigger a 3ʳᵈ party device ONLY
         #       during the "alternative" pathway stimulation
+        #
+        # ### END
         
         self.print(f"{self._runData_.currentAbfTrial.name} processProtocol: {printStyled(protocol.name, 'green', True)}")
 
-        # this channel is the one where DIG outputs are configured; it MAY BE
-        # distinct from the source.dac !!!
+        # The channel where DIG outputs are configured; it MAY BE distinct from
+        # the DAC channel used by the source for command signals (source.dac) !!!
+        #
         activeDAC = protocol.getDAC() # this is the `digdac` in processTrackingProtocol
         # self.print(f"\tactiveDAC: {printStyled(activeDAC.name, 'green', True)} (physical index {printStyled(activeDAC.physical, 'green', True)})")
         
-        # these are the protocol's DACs where digital output is emitted during the recording
-        # the active DAC is one of these by definition
+        # The the protocol's DAC channels where digital output is emitted during
+        # the recording; the active DAC is one of these by definition
         # WARNING: do NOT confuse with DACs that emulate TTLs
+        #
         digOutDacs = protocol.digitalOutputDACs
-        # self.print(f"\tDACs with DIG output defined: {printStyled(tuple((d.name + ' (physical index ' + str(d.physical) + ')' for d in digOutDacs)),'green', True)}")
+        # self.print(f"\tDACs with DIG output defined (digOutDacs): {printStyled(tuple((d.name + ' (physical index ' + str(d.physical) + ')' for d in digOutDacs)),'green', True)}")
         
         # NOTE: 2024-05-08 09:57:21
+        # ### BEGIN
         # 'mainDIGOut' is the set of digital channel indexes where the principal 
         # ("main") digital pattern is configured; empty set if len(digOutDacs ) == 0
         #
@@ -1094,9 +1100,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # 
         # However this be circumvented when using single run per trial protocols
         # (and alternate them via sequencer loops)
-        #
+        # ### END
         mainDIGOut = protocol.digitalOutputs(alternate=False)
-        # self.print(f"\tdigital output channels for printicpal (main) stimulation pattern: {printStyled(mainDIGOut, 'green', True)}")
+        # self.print(f"\tdigital output channels for printicpal (main) stimulation pattern (mainDIGOut): {printStyled(mainDIGOut, 'green', True)}")
         
         # NOTE: 2024-05-08 09:58:11
         # 'altDIGOut' is the set of digital channel indexes where the "alternative"
@@ -1104,7 +1110,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # is False or when len(digOutDacs ) == 0
         #
         altDIGOut = protocol.digitalOutputs(alternate=True)
-        # self.print(f"\tdigital output channels for alternative pattern: {printStyled(altDIGOut, 'green', True)}")
+        # self.print(f"\tdigital output channels for alternative pattern (altDIGOut): {printStyled(altDIGOut, 'green', True)}")
 
         # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
         # if len(digOutDacs) == 0:
@@ -1114,7 +1120,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
             
         for src in self._runData_.sources:
-            self.print(f"\tsource: {printStyled(src.name, 'green', True)}")
+            self.print(f"\tsource (src): {printStyled(src.name, 'green', True)}")
             # self.print(f"   -----------------")
             # self.print(f"   processing source {printStyled(src.name)}")
 
@@ -1381,11 +1387,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 continue
             
             
-            self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways: {printStyled(mainPathways, 'cyan', True)}")
-            self.print(f"\t\t{printStyled(len(altPathways), 'cyan', False)} alternate pathways: {printStyled(altPathways, 'cyan', False)}")
+            self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways ('mainPathways'): {printStyled(mainPathways, 'cyan', True)}")
+            self.print(f"\t\t{printStyled(len(altPathways), 'cyan', True)} alternate pathways ('altPathways'): {printStyled(altPathways, 'cyan', False)}")
             
             # NOTE: 2024-05-06 09:59:39
-            # pathStimsBySweep below is a tuple of (sweep index, tuple of pathway indices)
+            # pathStimsBySweep below is a tuple of (sweep index, tuple of 
+            # pathway indices in the sequence of unique pathways mainPathways + altPathways);
             # when the second element has more than one pathway index, and these
             # pathway indices are different, it indicates that there is a cross-talk
             # test stimulation of these pathways in that specific sweep
