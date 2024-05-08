@@ -354,7 +354,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         when an independent execution request is made (e.g. during launch of a script
         from Scipyen's script manager).
         Without this, the input line would still show the input text giving the 
-        false impresison that the text had been executed (run)
+        false impression that the text had been executed (run)
         """
         cursor = self._control.textCursor()
         cursor.beginEditBlock()
@@ -370,6 +370,11 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     @Slot()
     def slot_clearConsole(self):
         self.clear()
+        # cursor = self._control.textCursor()
+        # cursor.beginEditBlock()
+        # cursor.insertText('\n')
+        # cursor.endEditBlock()
+        
         
     @safeWrapper
     @Slot()

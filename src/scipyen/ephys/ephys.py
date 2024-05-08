@@ -1288,13 +1288,13 @@ class SynapticPathway:
     
     """
     pathwayType: SynapticPathwayType = SynapticPathwayType.Null
-    source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    name: str = "pathway"
     stimulus: SynapticStimulus = field(default_factory = lambda: SynapticStimulus())
     electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
     clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
     schedule: typing.Optional[RecordingSchedule] = None
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
-    name: str = "pathway"
+    source: RecordingSource = field(default_factory = lambda: RecordingSource())
         
 @dataclass
 class LocationMeasure:

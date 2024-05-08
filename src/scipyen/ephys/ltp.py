@@ -845,7 +845,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # • ABF trials recorded with other protocols are ignored; this includes
         #   cross-talk trials and the pathway conditioning trial
         
-        self.print(f"\n{self.__class__.__name__}.processAbfFile {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
+        self.print(f"\n{self.__class__.__name__}.processAbfFile {printStyled(abfFile, 'yellow', True)}")
 
         try:
             currentAbfTrial = pio.loadAxonFile(str(abfFile))
@@ -902,12 +902,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.episodes.append(episode)
                 self._runData_.newEpisodeOnNextRun = tuple() # invalidate the request
             
-            # self.print(self._runData_.sources)
-            
-            # if not isinstance(self._runData_.currentEpisode, RecordingEpisode):
-                # self._runData_.currentEpisode = RecordingEpisode(self._runData_.currentEpisodeType)
-                # self._runData_.currentEpisode.begin = self._runData_.currentAbfTrial.rec_datetime
-                
             if len(self._runData_.episodes) == 0:
                 episode = RecordingEpisode(RecordingEpisodeType.Tracking, name=f"{RecordingEpisodeType.Tracking.name_0}")
                 self._runData_.episodes.append(episode)
@@ -941,67 +935,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self._runData_.totalSweeps += 1
             
             # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
-
-            # ### BEGIN don't remove yet
-            #             if isinstance(self._runData_.locationMeasures, (list, tuple)) and all(isinstance(l, LocationMeasure) for l in self._runData_.locationMaeasures):
-            #                 # TODO: 2024-02-18 23:28:45 URGENTLY
-            #                 # use location measures to measure on pathways' ADC
-            #                 scipywarn(f"Using custom location measures is not yet supported", out = self._stdout_)
-            #                 pass
-            #             else:
-            #                 protocol = pab.ABFProtocol(self._runData_.currentAbfTrial)
-            #                 opMode = protocol.acquisitionMode # why does this return a tuple ?!?
-            #                 if isinstance(opMode, (tuple, list)):
-            #                     opMode = opMode[0]
-            #                 assert opMode == pab.ABFAcquisitionMode.episodic_stimulation, f"Files must be recorded in episodic mode"
-            #
-            #                 # check that the number of sweeps actually stored in the ABF file/neo.Block
-            #                 # equals that advertised by the protocol
-            #                 # NOTE: mismatches can happen when trials are acquired very fast (i.e.
-            #                 # back to back) - in this case check the sequencing key in Clampex
-            #                 # and set an appropriate interval between successive trials !
-            #                 assert(protocol.nSweeps) == len(self._runData_.currentAbfTrial.segments), f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); check the sequencing key?"
-            #
-            #                 # self.print(self._runData_.sources)
-            #
-            #                 # check that the protocol in the ABF file is the same as the current one
-            #                 # else create a new episode automatically
-            #                 #
-            #                 # upon first run, self._runData_.protocol is None
-            #                 if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
-            #                     # self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #
-            #                     self._runData_.currentProtocol = protocol
-            #
-            #                     # NOTE: 2024-02-27 19:13:04
-            #                     # this selects the pathways recorded by the protocol
-            #                     # for each source
-            #                     self.processProtocol(protocol)
-            #
-            #
-            #                 elif protocol == self._runData_.currentProtocol:
-            #                     # self.print(f"{colorama.Fore.BLUE}{colorama.Style.BRIGHT}current protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #                     # same protocol → add data to currrent episode
-            #                     self.processProtocol(protocol)
-
-            #                 else:
-            #                     # a different protocol — WARNING: signals a new episode
-            #                     # self.print(f"{colorama.Fore.CYAN}{colorama.Style.BRIGHT}new protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #                     pass
-            #                     # 1. finish off current episode with the previously loaded ABF file
-            #                     # NOTE: 2024-02-16 08:28:43
-            #                     # self._runData_.sweeps hasn't been incremented yet
-            #                     # self._runData_.currentEpisode.end = self._runData_.abfTrialTimesMinutes[-1]
-            #                     # self._runData_.currentEpisode.endFrame = self._runData_.sweeps
-            #                     # episodeNames = [e.name for e in self._runData_.schedule.episodes]
-            #                     # if self._runData_.episodeName in episodeNames:
-            #                     #     episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
-            #                     #     self._runData_.episodeName = episodeName
-            #                     # else:
-            #                     #     episodeName = self._runData_.episodeName
-            #
-            #                     # self._runData_.currentProtocol = protocol
-            # ### END   don't remove yet
 
         except:
             traceback.print_exc()
@@ -1138,22 +1071,40 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # this channel is the one where DIG outputs are configured; it MAY BE
         # distinct from the source.dac !!!
         activeDAC = protocol.getDAC() # this is the `digdac` in processTrackingProtocol
-        self.print(f"\tactiveDAC: {printStyled(activeDAC.name, 'green', True)} (physical index {printStyled(activeDAC.physical, 'green', True)})")
+        # self.print(f"\tactiveDAC: {printStyled(activeDAC.name, 'green', True)} (physical index {printStyled(activeDAC.physical, 'green', True)})")
         
         # these are the protocol's DACs where digital output is emitted during the recording
         # the active DAC is one of these by definition
         # WARNING: do NOT confuse with DACs that emulate TTLs
         digOutDacs = protocol.digitalOutputDACs
-        self.print(f"\tDACs with DIG output defined: {printStyled(tuple((d.name + ' (physical index ' + str(d.physical) + ')' for d in digOutDacs)),'green', True)}")
+        # self.print(f"\tDACs with DIG output defined: {printStyled(tuple((d.name + ' (physical index ' + str(d.physical) + ')' for d in digOutDacs)),'green', True)}")
         
-        # will be an empty set if len(digOutDacs ) == 0
+        # NOTE: 2024-05-08 09:57:21
+        # 'mainDIGOut' is the set of digital channel indexes where the principal 
+        # ("main") digital pattern is configured; empty set if len(digOutDacs ) == 0
+        #
+        # See also 'altDIGOut', below.
+        #
+        # WARNING: in a cross-talk protocol, both sets MIGHT contain the same
+        # digital channels indexes — because for cross-talk, two of the pathways 
+        # are stimulated in every sweep, but in different order (and/or combination,
+        # when there are more than two pathways)
+        #
+        # Fortunately (?!) Clampex only allows up to two pathways stimulated alternatively
+        # 
+        # However this be circumvented when using single run per trial protocols
+        # (and alternate them via sequencer loops)
+        #
         mainDIGOut = protocol.digitalOutputs(alternate=False)
-        self.print(f"\tprincipal (main) digital output channels: {printStyled(mainDIGOut, 'green', True)}")
+        # self.print(f"\tdigital output channels for printicpal (main) stimulation pattern: {printStyled(mainDIGOut, 'green', True)}")
         
-        # this is an empty set when alternateDigitalOutputStateEnabled is False;
-        # also, will be empty if len(digOutDacs ) == 0
+        # NOTE: 2024-05-08 09:58:11
+        # 'altDIGOut' is the set of digital channel indexes where the "alternative"
+        # digital pattern is configured; empty set when alternateDigitalOutputStateEnabled
+        # is False or when len(digOutDacs ) == 0
+        #
         altDIGOut = protocol.digitalOutputs(alternate=True)
-        self.print(f"\talternative digital output channels: {printStyled(altDIGOut, 'green', True)}")
+        # self.print(f"\tdigital output channels for alternative pattern: {printStyled(altDIGOut, 'green', True)}")
 
         # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
         # if len(digOutDacs) == 0:
@@ -1237,8 +1188,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # recording source have the same clamp mode!
             # 
             clampMode = protocol.getClampMode(adc, activeDAC)
-            self.print(f"\t\tadc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}, clampMode: {printStyled(clampMode.name, 'yellow')}")
-            self.print(f"\t\tsource dac is the protocol's activeDAC: {printStyled(dac == activeDAC, 'yellow', True)}")
+            # self.print(f"\t\tadc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}, clampMode: {printStyled(clampMode.name, 'yellow')}")
+            # self.print(f"\t\tsource dac is the protocol's activeDAC: {printStyled(dac == activeDAC, 'yellow', True)}")
             
             # NOTE: 2024-03-09 22:56:22 
             # In a conditioning protocol, the dac is by definition the active DAC.
@@ -1266,8 +1217,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # see NOTE: 2024-03-09 15:40:48 below)
             #
             dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))]
-            self.print(f"\t\tdig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
-            self.print(f"\t\tdac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
+            # self.print(f"\t\tdig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
+            # self.print(f"\t\tdac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
             
             bad_dac_paths = [p for p in dac_stim_pathways if p[1].stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
             
@@ -1321,9 +1272,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # (dig_stim_pathways) OR DAC-emulated TTLs (dac_stim_pathways)
             #
             nSrcStimPathways = len(src_dac_stim_pathways) + len(src_dig_stim_pathways)
-            self.print(f"\t\t{printStyled(nSrcStimPathways, 'green', True)} pathways, with:")
-            self.print(f"\t\tsource dig stim pathways: {printStyled(src_dig_stim_pathways, 'green', True)}")
-            self.print(f"\t\tsource dac stim pathways: {printStyled(src_dac_stim_pathways, 'green', True)}")
+            self.print(f"\t\t{printStyled(nSrcStimPathways, 'green', True)} stimulated pathways (nSrcStimPathways)")
+            # self.print(f"\t\tsource dig stim pathways: {printStyled(src_dig_stim_pathways, 'green', True)}")
+            # self.print(f"\t\tsource dac stim pathways: {printStyled(src_dac_stim_pathways, 'green', True)}")
             
             # NOTE: 2024-05-07 14:43:35
             # Below, the concepts of "main" and "alternative" pathways are arbitrary
@@ -1372,8 +1323,43 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 if len(dac_stim_pathways) == 0:
                     # both main and alternative stimulated pathways are stimulated
                     # via DIG channels
-                    mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_stim_pathways)]
+                    
+                    # BUG 2024-05-08 09:54:45 FIXME
+                    # in a xtalk protocol, both main and alt DIG out have the same two channels
+                    # hence the partitioning below WILL NOT work, i.e. mainPathways will be empty !!!
                     # mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in mainDIGOut, dig_stim_pathways)]
+                    #
+                    # NOTE: 2024-05-08 10:11:15
+                    # we therefore take a different approach: the code below is
+                    # rather explicit, yet I'm sure it can be streamlined a bit...
+                    # 
+                    # DIG channel indexes used with the main but NOT the alternative
+                    # pattern; an empty set when mainDIGOut is empty, or when
+                    # mainDIGOut == altDIGOut
+                    # 
+                    mainOnly = mainDIGOut - altDIGOut
+                    
+                    # DIG channel indexes used with the alternative but NOT the 
+                    # main pattern; empty set when altDIGOut is empty, or when
+                    # mainDIGOut == altDIGOut
+                    #
+                    altOnly = altDIGOut - mainDIGOut
+                    
+                    if len(mainDIGOut) > 0:
+                        if len(mainOnly) == 0: # same channels in both mainDIGOut and altDIGOut
+                            mainPathways = dig_stim_pathways
+                        else:
+                            mainPathways = list(x for x in dig_stim_pathways if x[1].stimulus.channel in mainOnly)
+                    else:
+                        mainPathways = list()
+                        
+                    if len(altDIGOut) > 0:
+                        if len(altOnly) == 0:
+                            altPathways = dig_stim_pathways
+                        else:
+                            altPathways = list(x for x in dig_stim_pathways if x[1].stimulus.channel in altOnly)
+                    else:
+                        altPathways = list()
                     
                 elif len(dac_stim_pathways) == 1:
                     # one stim pathway (main) is DIG, the other (alternative) is DAC
@@ -1395,18 +1381,25 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 continue
             
             
-            # self.print(f"\t\tindex of pathway stimulation by sweep = {printStyled(pathStimsBySweep, 'green', True)}")
             self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways: {printStyled(mainPathways, 'cyan', True)}")
             self.print(f"\t\t{printStyled(len(altPathways), 'cyan', False)} alternate pathways: {printStyled(altPathways, 'cyan', False)}")
+            
             # NOTE: 2024-05-06 09:59:39
             # pathStimsBySweep below is a tuple of (sweep index, tuple of pathway indices)
             # when the second element has more than one pathway index, and these
             # pathway indices are different, it indicates that there is a cross-talk
             # test stimulation of these pathways in that specific sweep
-            pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
-            self.print(f"\t\tpathStimsBySweep: {printStyled(pathStimsBySweep, 'magenta', True)}")
+            pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in unique(mainPathways + altPathways)])
+            self.print(f"\t\tpathway stimulation by sweep (pathStimsBySweep): {printStyled(pathStimsBySweep, 'magenta', True)}")
 
             if currentEpisode.type & RecordingEpisodeType.Tracking: 
+                # NOTE: 2024-05-08 12:12:37
+                # By default, measurements are enabled in tracking mode; 
+                # the only excpetion is during cross-talk, so we disable that,
+                # below
+                #
+                # However, we DO output the sweeps, we just don't measure them
+                # measurePathways = True 
                 # NOTE: 2024-03-09 07:51:17 tracking mode
                 self.print(f"\t\t{printStyled('Tracking...', 'magenta', True)}")
                 
@@ -1440,6 +1433,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                         self._runData_.pathStimsBySweep = pathStimsBySweep
                         
+                        # NOTE: 2024-05-08 12:08:54
+                        # skip measurements for cross-talk protocols
+                        # measurePathways = False
+                        
                 else: # single path stimulation per sweep
                     self.print("\t\tnormal tracking protocol")
                     if len(currentEpisode.xtalk) > 0 and self._runData_.pathStimsBySweep != pathStimsBySweep:
@@ -1457,37 +1454,45 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         currentEpisode = newEpisode
                         self._runData_.pathStimsBySweep = pathStimsBySweep
                 
-                
+                        # measurePathways = True
+                        
+                # FIXME/TODO 2024-05-08 12:37:01
+                # move all the below to setMeasuresForPathway 
+                #
                 # NOTE: 2024-05-06 09:16:37
                 # Figure out the epochs that define synaptic stimulations
-                #
+                
                 syn_stim_digs = list()
                 syn_stim_dacs = list()
                 
                 if nSrcStimPathways == 2:
-                    if len(mainPathways) != 1:
-                        if all ((len(x[1]) <= 1 for x in self._runData_.pathStimsBySweep)):
+                    if len(mainPathways) == 1:
+                        syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
+                        
+                        if len(altPathways) == 1:
+                            # two alternative digitally stimulated pathways — the most
+                            # common case
+                            if not protocol.alternateDigitalOutputStateEnabled:
+                                scipywarn( f"In protocol {printStyled(protocol.name, 'red', True)}: For two digitally-stimulated pathways the alternative digital output state must be enabled")
+                                continue
+                            
+                            syn_stim_digs.append(altPathways[0][1].stimulus.channel)
+                        
+                    else: # implies altPathways are the same (albeit in a different order?)
+                        if all ((len(x[1]) <= 1 for x in pathStimsBySweep)):
                             scipywarn(f"In protocol {printStyled(protocol.name, 'red', True)}: There must be only one digitally triggered main pathway defined.")
                             continue
                         
-                    # syn_stim_digs.append(mainPathways[0].stimulus.channel)
-                    syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
+                        syn_stim_digs = list(p[1].stimulus.channel for p in mainPathways)
                     
-                    if len(altPathways) == 1:
-                        # two alternative digitally stimulated pathways — the most
-                        # common case
-                        if not protocol.alternateDigitalOutputStateEnabled:
-                            scipywarn( f"In protocol {printStyled(protocol.name, 'red', True)}: For two digitally-stimulated pathways the alternative digital output state must be enabled")
-                            continue
-                        
-                        syn_stim_digs.append(altPathways[0][1].stimulus.channel)
                         
                     # TODO: 2024-03-10 21:28:46
                     # provide for altDacPathways as well
                         
-                else: # alternative pathways do not exist here; nSrcStimPathways ≡ 1 
+                else: # nSrcStimPathways ≡ 1 ⟹ alternative pathways do not exist here; 
                     if len(mainPathways):
-                        syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
+                        syn_stim_digs = list(p[1].stimulus.channel for p in mainPathways)
+                        # syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
                             
                 self.print(f"\t\tdigital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow', True)}")
                 self.print(f"\t\tDAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow', True)}")
@@ -1599,7 +1604,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                         True)
                     self.measurePathway(src, p, adc, True)
             
-            # if currentEpisode.type & RecordingEpisodeType.Conditioning:
             else: # NOTE: 2024-05-05 14:42:13 conditioning protocol
                 if src.name not in self._runData_.conditioningProtocols:
                     self._runData_.conditioningProtocols[src.name] = dict()

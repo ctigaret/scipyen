@@ -1800,8 +1800,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         pathways based on short-term plasticity phenomena such as paired-pulse
         facilitation).
         
-        This function helps identifying such cases, abnd the order in which the 
-        pathways are stimulated, in each sweep.
+        This function helps identifying such cases, including the order in which 
+        the pathways are stimulated, in each sweep.
         
         For each sweep in the protocol, returns a tuple with the indices of the 
         pathways that have been stimulated (in the `pathways` sequence), ordered
@@ -1967,6 +1967,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if not all(isinstance(v, self.SynapticPathway) for v in pathways):
             raise TypeError("`pathways` expected to be a sequence of ephys.SynapticPathway objects")
         
+        # pathways = utilities.unique([p for p in pathways if p.stimulus.dig])
         pathways = [p for p in pathways if p.stimulus.dig]
         
         if len(pathways) == 0:
