@@ -1847,10 +1847,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             When False, the output reflects sequence of pathways in all ABF Epochs
             that emit stimulus signals. See examples below
         
-        indices: bool, default is False; when True, the returned tuple will contain
+        indices: bool, default is True.
+            When True, the returned tuple will contain
             the indexes of the pathways in the sequence of pathways suppkied in 
             the 'pathways' parameter (see above)
-            When False (default), the return tuple will contin a reference to 
+            When False, the return tuple will contin a reference to 
             the pathway itself
             
         
@@ -2008,11 +2009,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # description of the algorithm (one-liner nested comprehensions)
             # for each sweep:
             #   get epochs with digital output
-            #   collect out those that use the stimulus digital channel declared in the pathway specifications
+            #   collect only those that use the stimulus digital channel declared in the pathway specifications
             # collect a tuple of tuples: (sweep index, tuple of pathway indices stimulated in all epochs in the sweep)
             if indices:
                 return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
-            return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda p: p.stimulus.channel == c, pathways) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+            return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda p: p.stimulus.channel == c, pathways) for c in e.getUsedDigitalOutputChannels(s%2 > 0))])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
                 
     
     @property

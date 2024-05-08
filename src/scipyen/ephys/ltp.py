@@ -1283,6 +1283,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # self.print(f"\t\tsource dac stim pathways: {printStyled(src_dac_stim_pathways, 'green', True)}")
             
             # NOTE: 2024-05-07 14:43:35
+            # ### BEGIN
             # Below, the concepts of "main" and "alternative" pathways are arbitrary
             # and used internally, here, to facilitate distinguishing between pathways
             # stimulated in an interleaved fashion (i.e., each pathway stimulated
@@ -1291,6 +1292,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #
             # This is derived from the way in whcih Clampex allows alternative DIG
             # stimulation via DIG channels.
+            #
+            # Practically, the "main" pathways are those stimulated
             #
             # Inthe typical case where alternative pathways are stimulated using
             # DIG channels, the "main" pathway is the one were the DIG output is
@@ -1311,6 +1314,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # in a given source; stimulation of additional pathways can only occur
             # in interlaved mode — i.e., each pathway is stimulated during a separate
             # sweep)
+            #
+            # ### END
             #
             altPathways = list()
             
@@ -1396,7 +1401,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # when the second element has more than one pathway index, and these
             # pathway indices are different, it indicates that there is a cross-talk
             # test stimulation of these pathways in that specific sweep
-            pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in unique(mainPathways + altPathways)])
+            pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in unique(mainPathways + altPathways)], 
+                                                                              indices=False)
             self.print(f"\t\tpathway stimulation by sweep (pathStimsBySweep): {printStyled(pathStimsBySweep, 'magenta', True)}")
 
             if currentEpisode.type & RecordingEpisodeType.Tracking: 
@@ -1485,8 +1491,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         syn_stim_digs = list(p[1].stimulus.channel for p in mainPathways)
                         # syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
                             
-                self.print(f"\t\tdigital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow', True)}")
-                self.print(f"\t\tDAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow', True)}")
+                self.print(f"\t\tdigital channels for synaptic stimulation (syn_stim_digs): {printStyled(syn_stim_digs, 'yellow', True)}")
+                self.print(f"\t\tDAC channels for synaptic stimulation via emulated TTLs (syn_stim_dacs): {printStyled(syn_stim_dacs, 'yellow', True)}")
                 
                 # NOTE: 2024-05-08 14:13:29
                 # Figure out the membrane test epochs in order to set up LocationMeasures for
@@ -1566,8 +1572,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                         adc, dac, activeDAC, membraneTestEpoch,
                                                         testStart, testDuration, testAmplitude,
                                                         False)
-
-                    self.measurePathway(src, p, adc, False)
+                    
+                    if len(self._runData_.episodes[-1].xtalk) == 0:
+                        self.measurePathway(src, p, adc, False)
 
                 for k, p in altPathways:
                     # self.print(f"   processing alt (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
@@ -1591,8 +1598,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + self._winWidth, y, 
                                                                                                             self._winWidth, 
                                                                                                             self._winHeight))
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + int(self._winWidth * 1.1), y, int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
-                        
                     if p.name not in self._runData_.results[src.name]:
                         self._runData_.results[src.name][p.name] = \
                             {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
@@ -1602,7 +1607,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                         adc, dac, activeDAC, membraneTestEpoch, 
                                                         testStart, testDuration, testAmplitude,
                                                         True)
-                    self.measurePathway(src, p, adc, True)
+                    
+                    if len(self._runData_.episodes[-1].xtalk) == 0:
+                        self.measurePathway(src, p, adc, True)
             
             else: # NOTE: 2024-05-05 14:42:13 conditioning protocol
                 if src.name not in self._runData_.conditioningProtocols:
@@ -1915,7 +1922,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # ### BEGIN setup measures, if needed
         # FIXME 2024-05-08 15:06:34
         # crossTalk setting is wrong and not needed, really
-        crossTalk = False
+        # crossTalk = False
 
         if "measures" not in self._runData_.results[src.name][p.name]:
             pMeasures = dict()
@@ -1947,16 +1954,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     scipywarn(f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} is different from the {stimDIG[0]} used in the epochs {[e.letter for e in digStimEpochs]}")
                     # return
 
-                crossTalk = False
+                # crossTalk = False
                 
             elif len(stimDIG) == 2:
                 if p.stimulus.channel not in stimDIG:
                     scipywarn(f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} does not appear to be used in the epochs {[e.letter for e in digStimEpochs]}")
-                    crossTalk = False
-                else:
-                    crossTalk = True
+                #     crossTalk = False
+                # else:
+                #     crossTalk = True
                     
-            self.print(f"{self.__class__.__name__}.setMeasuresForPathway source {printStyled(src.name, 'green', True)}, path {printStyled(p.name, 'green', True)} (stim channel {printStyled(p.stimulus.channel, 'green', True)} digital: {printStyled(p.stimulus.dig, 'green', True)}) -> crossTalk {printStyled(crossTalk, 'green', True)} ")
+            self.print(f"{self.__class__.__name__}.setMeasuresForPathway source {printStyled(src.name, 'green', True)}, path {printStyled(p.name, 'green', True)} (stim channel {printStyled(p.stimulus.channel, 'green', True)} digital: {printStyled(p.stimulus.dig, 'green', True)})")
             
 
             # NOTE: 2024-03-01 22:57:37 TODO consider the below ↴
