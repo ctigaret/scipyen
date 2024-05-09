@@ -9085,7 +9085,7 @@ signals in the signal collection.
         if len(analog) + len(irregs) == 0:
             return None, None
         
-        assert len(self.signalAxes) == len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
+        assert len(self.signalAxes) >= len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
 
         # NOTE: 2023-01-12 16:45:48
         # by convention, analog signals are plotted in order, BEFORE the 
@@ -9117,6 +9117,7 @@ signals in the signal collection.
         selected_irreg_names = list()
         selected_irreg_ndx = list()
         
+        used_axes_ndx = list()
         #### BEGIN plot regular (analog) signals
         # NOTE: update only those plotItems where a selected signal should be
         # all other plotItems are hidden
@@ -9125,6 +9126,7 @@ signals in the signal collection.
             
             for k, signal in enumerate(analog):
                 ax_ndx = analog_axes[k]
+                used_axes_ndx.append(ax_ndx)
                 plotItem = self.signalAxes[ax_ndx]
                 if k in selected_analog_ndx:
                     plot_name_ndx = selected_analog_ndx.index(k)
@@ -9160,6 +9162,7 @@ signals in the signal collection.
             
             for k, signal in enumerate(irregs):
                 ax_ndx = irregs_axes[k]
+                used_axes_ndx.append(ax_ndx)
                 plotItem = self.signalAxes[ax_ndx]
                 if k in selected_irreg_ndx:
                     plot_name_ndx = selected_irreg_ndx.index(k)
@@ -9171,9 +9174,15 @@ signals in the signal collection.
                     plotItem.setVisible(True)
                 else:
                     plotItem.setVisible(False)
+                    
         else:
             for ax_ndx in irregs_axes.values():
                 self.signalAxes[ax_ndx].setVisible(False)
+                
+        # finally, if anything was plotted, HIDE the extra axes (if any)
+        for k, ax in enumerate(self.signalAxes):
+            if k not in used_axes_ndx:
+                ax.setVisible(False)
 
         #### END plot irregular signals
         

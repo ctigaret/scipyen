@@ -400,7 +400,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
             # self.print(f"\n****\n{self.__class__.__name__}.run: simulation counter {self._simulationCounter_}\n reading file {k}: {colorama.Fore.RED}{colorama.Style.BRIGHT}{f}{colorama.Style.RESET_ALL}")
             self.simulateFile()
             if self.isInterruptionRequested():
-                self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
+                self.print(f"\n{self.__class__.__name__}.run: {printStyled('Interruption requested', 'yellow', False)}\n")
                 break
             
             QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
@@ -422,7 +422,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
                 # self.print(f"\n****\n{self.__class__.__name__}.run: simulation counter {self._simulationCounter_}\n reading file {k}: {colorama.Fore.RED}{colorama.Style.BRIGHT}{f}{colorama.Style.RESET_ALL} for simulation counter {self._simulationCounter_}")
                 self.simulateFile()
                 if self.isInterruptionRequested():
-                    self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
+                    self.print(f"\n{self.__class__.__name__}.run: {printStyled('Interruption requested', 'yellow', False)}\n")
                     break
                 QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
                 
@@ -1120,7 +1120,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
             
         for src in self._runData_.sources:
-            self.print(f"\tsource (src): {printStyled(src.name, 'green', True)}")
+            # self.print(f"\tsource (src): {printStyled(src.name, 'green', True)}")
             # self.print(f"   -----------------")
             # self.print(f"   processing source {printStyled(src.name)}")
 
@@ -1177,6 +1177,19 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # Generate the list of pathways according to the specified source
             #
             pathways = src.pathways 
+            
+            registered_pathways = list()
+            
+            for p in pathways:
+                if p.name not in self._runData_.results[src.name]:
+                    self._runData_.results[src.name][p.name] = {"pathway": p}
+                    
+                else if self._runData_.results[src.name][p.name].source != src:
+                    continue
+                    
+                registered_pathways.append(p)
+                    
+            pathways = registered_pathways
             
             # NOTE: 2024-05-06 00:26:04
             # Now, figure out what these pathways are:
@@ -1278,7 +1291,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # (dig_stim_pathways) OR DAC-emulated TTLs (dac_stim_pathways)
             #
             nSrcStimPathways = len(src_dac_stim_pathways) + len(src_dig_stim_pathways)
-            self.print(f"\t\t{printStyled(nSrcStimPathways, 'green', True)} stimulated pathways (nSrcStimPathways)")
+            # self.print(f"\t\t{printStyled(nSrcStimPathways, 'green', True)} stimulated pathways (nSrcStimPathways)")
             # self.print(f"\t\tsource dig stim pathways: {printStyled(src_dig_stim_pathways, 'green', True)}")
             # self.print(f"\t\tsource dac stim pathways: {printStyled(src_dac_stim_pathways, 'green', True)}")
             
@@ -1392,8 +1405,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 continue
             
             
-            self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways ('mainPathways'): {printStyled(mainPathways, 'cyan', True)}")
-            self.print(f"\t\t{printStyled(len(altPathways), 'cyan', True)} alternate pathways ('altPathways'): {printStyled(altPathways, 'cyan', False)}")
+            # self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways ('mainPathways'): {printStyled(mainPathways, 'cyan', True)}")
+            # self.print(f"\t\t{printStyled(len(altPathways), 'cyan', True)} alternate pathways ('altPathways'): {printStyled(altPathways, 'cyan', False)}")
             
             # NOTE: 2024-05-06 09:59:39
             # pathStimsBySweep below is a tuple of (sweep index, tuple of 
@@ -1403,7 +1416,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # test stimulation of these pathways in that specific sweep
             pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in unique(mainPathways + altPathways)], 
                                                                               indices=False)
-            self.print(f"\t\tpathway stimulation by sweep (pathStimsBySweep): {printStyled(pathStimsBySweep, 'magenta', True)}")
+            # self.print(f"\t\tpathway stimulation by sweep (pathStimsBySweep): {printStyled(pathStimsBySweep, 'magenta', True)}")
 
             if currentEpisode.type & RecordingEpisodeType.Tracking: 
                 # NOTE: 2024-03-09 07:51:17 tracking mode
@@ -1491,8 +1504,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         syn_stim_digs = list(p[1].stimulus.channel for p in mainPathways)
                         # syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
                             
-                self.print(f"\t\tdigital channels for synaptic stimulation (syn_stim_digs): {printStyled(syn_stim_digs, 'yellow', True)}")
-                self.print(f"\t\tDAC channels for synaptic stimulation via emulated TTLs (syn_stim_dacs): {printStyled(syn_stim_dacs, 'yellow', True)}")
+                # self.print(f"\t\tdigital channels for synaptic stimulation (syn_stim_digs): {printStyled(syn_stim_digs, 'yellow', True)}")
+                # self.print(f"\t\tDAC channels for synaptic stimulation via emulated TTLs (syn_stim_dacs): {printStyled(syn_stim_dacs, 'yellow', True)}")
                 
                 # NOTE: 2024-05-08 14:13:29
                 # Figure out the membrane test epochs in order to set up LocationMeasures for
@@ -1526,10 +1539,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
                     testDuration = membraneTestEpoch.firstDuration
                     
-                self.print(f"\t\tMembrane test epochs {printStyled(mbTestEpochs, 'yellow', True)}")
-                self.print(f"\t\t• amplitude {printStyled(testAmplitude, 'yellow', True)}")
-                self.print(f"\t\t• start {printStyled(testStart, 'yellow', True)}")
-                self.print(f"\t\t• duration {printStyled(testDuration, 'yellow', True)}")
+                # self.print(f"\t\tMembrane test epochs {printStyled(mbTestEpochs, 'yellow', True)}")
+                # self.print(f"\t\t• amplitude {printStyled(testAmplitude, 'yellow', True)}")
+                # self.print(f"\t\t• start {printStyled(testStart, 'yellow', True)}")
+                # self.print(f"\t\t• duration {printStyled(testDuration, 'yellow', True)}")
                 
                 # assert protocol.nSweeps >= nSrcStimPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nSrcStimPathways} pathways"
                 
@@ -1563,10 +1576,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                                                                             self._winWidth, 
                                                                                                             self._winHeight))
 
-                    if p.name not in self._runData_.results[src.name]:
-                        self._runData_.results[src.name][p.name] = \
-                            {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
-                            "pathway": p}
+                    if "pathway_responses" not in p.name not in self._runData_.results[src.name][p.name]:
+                        self._runData_.results[src.name][p.name]["pathway_responses"] = \
+                            neo.Block(name=f"{src.name} {p.name}")
 
                     self.setMeasuresForPathway(src, p, protocol,
                                                         adc, dac, activeDAC, membraneTestEpoch,
@@ -1598,10 +1610,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + self._winWidth, y, 
                                                                                                             self._winWidth, 
                                                                                                             self._winHeight))
-                    if p.name not in self._runData_.results[src.name]:
-                        self._runData_.results[src.name][p.name] = \
-                            {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
-                            "pathway": p}
+                    if "pathway_responses" not in p.name not in self._runData_.results[src.name][p.name]:
+                        self._runData_.results[src.name][p.name]["pathway_responses"] = \
+                            neo.Block(name=f"{src.name} {p.name}")
                     
                     self.setMeasuresForPathway(src, p, protocol, 
                                                         adc, dac, activeDAC, membraneTestEpoch, 
@@ -1635,11 +1646,41 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             
                         else:
                             p.pathwayType = SynapticPathwayType.Control
+                    
                             
                     # NOTE: 2024-03-08 23:03:46 
                     # Also update the windows names 
                     if src.name in self._runData_.viewers and src.name in self._runData_.results:
                         if p.name in self._runData_.viewers[src.name] and p.name in self._runData_.results[src.name]:
+                            if "pathway_responses" in self._runData_.results[src.name][p.name]:
+                                # append conditioning sweeps
+                                block = self._runData_.results[src.name][p.name]["pathway_responses"]
+                                viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]
+                                
+                                # the sweeps of the current trial
+                                
+                                if p.pathwayType & SynapticPathwayType.Test:
+                                    segments = [neo.Segment(rec_datetime = s.rec_datetime,
+                                                          index = s.index) for s in self._runData_.currentAbfTrial.segments]
+                                else:
+                                    seg_indexes = range(len(block.segments), len(block.segments) + len(self._runData_.currentAbfTrial.segments))
+                                    segments = [neo.Segment(rec_datetime = s.rec_datetime,
+                                                          index = k) for k,s in zip(seg_indexes, self._runData_.currentAbfTrial.segments) ]
+                                    # old_signals = block.segments[-1].analogsignals
+                                    # populate with dummy signals (so that plotting is refreshed — SignalViewer BUG 2024-05-09 08:56:00 )
+                                    for k, s in enumerate(self._runData_.currentAbfTrial.segments):
+                                        signals = [neo.AnalogSignal(np.full_like(sig, fill_value = 0.0), 
+                                                                    units = sig.units, t_start = sig.t_start,
+                                                                    sampling_rate = sig.sampling_rate,
+                                                                    name = sig.name) for sig in s.analogsignals]
+                                        segments[k].analogsignals += signals
+                                        
+                                block.segments += self._runData_.currentAbfTrial.segments
+                                
+                                viewer.view(block)
+                                viewer.currentFrame  = len(block.segments)-1
+                                self._runData_.sweps += len(segments)
+                                
                             measures = [(l,m) for l, m in self._runData_.results[src.name][p.name]["measures"].items() if l != "MembraneTest"]
                             if len(measures):
                                 initResponseLabel = measures[0][0]
@@ -1963,7 +2004,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # else:
                 #     crossTalk = True
                     
-            self.print(f"{self.__class__.__name__}.setMeasuresForPathway source {printStyled(src.name, 'green', True)}, path {printStyled(p.name, 'green', True)} (stim channel {printStyled(p.stimulus.channel, 'green', True)} digital: {printStyled(p.stimulus.dig, 'green', True)})")
+            # self.print(f"{self.__class__.__name__}.setMeasuresForPathway source {printStyled(src.name, 'green', True)}, path {printStyled(p.name, 'green', True)} (stim channel {printStyled(p.stimulus.channel, 'green', True)} digital: {printStyled(p.stimulus.dig, 'green', True)})")
             
 
             # NOTE: 2024-03-01 22:57:37 TODO consider the below ↴
@@ -2104,7 +2145,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             signalBaselineStart = max(testStart - 2 * dac.holdingTime, 0 * pq.s)
                             
                 elif testStart > activeDAC.getEpochRelativeStartTime(digStimEpochs[-1], 0) + digStimEpochs[-1].firstDuration:
-                    # mb test delivered AFTGER the last digital simulation epoch 
+                    # mb test delivered AFTER the last digital simulation epoch 
                     # ideally, somwehere towards the end of the sweep, 
                     # hopefully AFTER synaptic responses have decayed to baseline
                     #
@@ -2566,8 +2607,7 @@ class LTPOnline_old(QtCore.QObject):
 
     @Slot()
     def _slot_simulationDone(self):
-        # self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
-        print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
+        print(f"\n{self.__class__.__name__}.run: {printStyled('Simulation done!', 'yellow', False)}\n")
         self.stop()
 
     @property
@@ -3386,8 +3426,7 @@ class LTPOnline(QtCore.QObject):
         
     @Slot()
     def _slot_simulationDone(self):
-        # self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
-        print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
+        self.print(f"\n{self.__class__.__name__}.run: {printStyled('Simulation done!', 'yellow', False)}\n")
         self.stop()
         
     @property
@@ -3482,7 +3521,7 @@ class LTPOnline(QtCore.QObject):
         else:
             val = RecordingEpisodeType.Tracking if self._runData_.drug is None else RecordingEpisodeType.Tracking | RecordingEpisodeType.Drug
             
-        self.print(f"next episode set to {val.name}")
+        self.print(f"Next episode set to {printStyled(val.name, 'red', True)}")
         
         # set this in order to flag the _LTPOnlineFileProcessor_ that a new 
         # recording episode should be created on the next run

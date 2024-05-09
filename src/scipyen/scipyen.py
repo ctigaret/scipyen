@@ -34,6 +34,10 @@ if len(sys.argv) > 1:
         os.environ["QT_API"] = "pyside6"
         os.environ["PYQTGRAPH_QT_LIB"] = "PySide6"
         
+    else:
+        os.environ["QT_API"] = "pyqt5"
+        os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
+        
 
 
 #import cProfile
@@ -185,13 +189,6 @@ from core import scipyen_config
 if hasattr(QtCore, "QLoggingCategory"):
     QtCore.QLoggingCategory.setFilterRules("qt.qpa.xcb=false")
 
-# NOTE: on opensuse pyqtgraph expect PyQt4 first, as qtlib; if not found this
-# raises an exception; setting pq.Qt.lib later does not work.
-# therefore is better to set this up early, here.
-# NOTE: done above, see NOTE: 2024-05-02 10:22:39
-# os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
-#os.putenv("PYQTGRAPH_QT_LIB", "PyQt5")
-
 
 class MyProxyStyle(QtWidgets.QProxyStyle):
     """To prevent repeats of valueChanged in QSpinBox controls for frame navigation.
@@ -218,7 +215,7 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
 
 def main():
     import gui.mainwindow as mainwindow
-    # print(f"Using {os.environ['QT_API']}\n")
+    print(f"Using {os.environ['QT_API']} for GUI and {os.environ['PYQTGRAPH_QT_LIB']} for PyQtGraph\n")
     faulthandler.enable()
     
     # NOTE: 2021-08-17 10:02:20
