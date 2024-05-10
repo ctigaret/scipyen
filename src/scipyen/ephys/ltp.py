@@ -682,14 +682,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         self._abfTrialBuffer_ = abfBuffer
         self._runData_ = abfTrialData
         self._stdout_ = out
-#         self._screen_ = self._emitter_.desktopScreen
-#         self._titlebar_height_ = QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)
-#         
-#         self._screenGeom = self._screen_.geometry()
-        # self._winWidth = int(self._screenGeom.width() // 3 * 0.9)
-        # self._winHeight = int(self._screenGeom.height() // 3 * 0.9)
-        # self._winWidth = 500
-        # self._winHeight = 300
         
         # maps source
         self._monitor_protocols_ = dict()
@@ -910,7 +902,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 episode = self._runData_.episodes[-1]
                 epIndex = self._runData_.episodes.index(episode)
                 
-            self.print(f"current episode ({printStyled(epIndex, 'yellow', True)}): {printStyled(self._runData_.episodes[-1].name, 'yellow', True)} ({printStyled(self._runData_.episodes[-1].type, 'yellow', True)})")
+            # self.print(f"current episode ({printStyled(epIndex, 'yellow', True)}): {printStyled(self._runData_.episodes[-1].name, 'yellow', True)} ({printStyled(self._runData_.episodes[-1].type, 'yellow', True)})")
             # self.print(f"\tcurrent episode type decl: {printStyled(self._runData_.currentEpisodeType.name, 'yellow', True)}")
                 
             # check that the protocol in the ABF file is the same as the current one
@@ -1069,7 +1061,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #
         # ### END
         
-        self.print(f"{self._runData_.currentAbfTrial.name} processProtocol: {printStyled(protocol.name, 'green', True)}")
+        # self.print(f"{self._runData_.currentAbfTrial.name} processProtocol: {printStyled(protocol.name, 'green', True)}")
 
         # The channel where DIG outputs are configured; it MAY BE distinct from
         # the DAC channel used by the source for command signals (source.dac) !!!
@@ -1428,9 +1420,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     self._runData_.viewers[src.name] = dict()
                     
                 if any(len(x[1]) > 1 for x in pathStimsBySweep): # crosstalk?
-                    self.print("\t\tcrosstalk protocol.")
+                    # self.print("\t\tcrosstalk protocol.")
                     if len(currentEpisode.xtalk) == 0 or currentEpisode.xtalk != pathStimsBySweep:
-                        self.print("\t\tsetting new crosstalk episode")
+                        # self.print("\t\tsetting new crosstalk episode")
                         if isinstance(self._runData_.prevAbfTrial, neo.Block):
                             currentEpisode.end = self._runData_.prevAbfTrial.rec_datetime
                         else:
@@ -1449,9 +1441,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         self._runData_.pathStimsBySweep = pathStimsBySweep
                         
                 else: # single path stimulation per sweep
-                    self.print("\t\tnormal tracking protocol")
+                    # self.print("\t\tnormal tracking protocol")
                     if len(currentEpisode.xtalk) > 0 and self._runData_.pathStimsBySweep != pathStimsBySweep:
-                        self.print("\t\tnew tracking episode")
+                        # self.print("\t\tnew tracking episode")
                         if isinstance(self._runData_.prevAbfTrial, neo.Block):
                             currentEpisode.end = self._runData_.prevAbfTrial.rec_datetime
                         else:
@@ -1559,64 +1551,25 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
                     p.clampMode = clampMode
                     
-                    # if p.name not in self._runData_.viewers[src.name]:
-                        # FIXME: 2024-03-02 23:32:46
-                        # assumes only one main Dig pathway
-                        # self._runData_.viewers[src.name][p.name] = \
-                        # {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_,
-                        #                                 win_title = f"{src.name} {p.name} Synaptic Responses")}
-                        # 
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].showNavigator()
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
-                        # 
-                        # if sys.platform == "win32":
-                        #     y = self._screenGeom.y() + self._titlebar_height_
-                        # else:
-                        #     y = self._screenGeom.y()
-                        # 
-                        # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
-                        #                                                                                     self._winWidth, 
-                        #                                                                                     self._winHeight))
-
-                    if "pathway_responses" not in p.name not in self._runData_.results[src.name][p.name]:
-                        self._runData_.results[src.name][p.name]["pathway_responses"] = \
-                            neo.Block(name=f"{src.name} {p.name}")
+                    # if "pathway_responses" not in self._runData_.results[src.name][p.name]:
+                    #     self._runData_.results[src.name][p.name]["pathway_responses"] = \
+                    #         neo.Block(name=f"{src.name} {p.name}")
 
                     self.setMeasuresForPathway(src, p, protocol,
-                                                        adc, dac, activeDAC, membraneTestEpoch,
-                                                        testStart, testDuration, testAmplitude,
-                                                        False)
+                                                adc, dac, activeDAC, membraneTestEpoch,
+                                                testStart, testDuration, testAmplitude,
+                                                False)
                     
                     if len(self._runData_.episodes[-1].xtalk) == 0:
                         self.measurePathway(src, p, adc, False)
 
-                for k, p in altPathways:
+                for p in altPathways:
                     # self.print(f"   processing alt (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
                     p.clampMode = clampMode
 
-                    # if p.name not in self._runData_.viewers[src.name]:
-                    #     self._runData_.viewers[src.name][p.name] = \
-                    #     {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_,
-                    #                                     win_title = f"{src.name} {p.name} Synaptic Responses")}
-                    # 
-                    #     self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
-                    #     self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
-                    #     self._runData_.viewers[src.name][p.name]["pathway_viewer"].showNavigator()
-                    #     self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
-                    # 
-                    #     if sys.platform == "win32":
-                    #         y = self._screenGeom.y() + self._titlebar_height_
-                    #     else:
-                    #         y = self._screenGeom.y()
-                    # 
-                    #     self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + self._winWidth, y, 
-                    #                                                                                         self._winWidth, 
-                    #                                                                                         self._winHeight))
-                    if "pathway_responses" not in p.name not in self._runData_.results[src.name][p.name]:
-                        self._runData_.results[src.name][p.name]["pathway_responses"] = \
-                            neo.Block(name=f"{src.name} {p.name}")
+                    # if "pathway_responses" not in p.name not in self._runData_.results[src.name][p.name]:
+                    #     self._runData_.results[src.name][p.name]["pathway_responses"] = \
+                    #         neo.Block(name=f"{src.name} {p.name}")
                     
                     self.setMeasuresForPathway(src, p, protocol, 
                                                         adc, dac, activeDAC, membraneTestEpoch, 
@@ -1638,6 +1591,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # NOTE: 2024-03-08 23:03:41
                 # Figure out which pathway is being conditioned (test pathway)
                 # and which not (control pathway)
+                # Udate the viewers.
                 for p in pathways:
                     if p.stimulus.dig:
                         if p.stimulus.channel in mainDIGOut:
@@ -1647,51 +1601,41 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                 
                             if protocol.name not in [pr.name for pr in self._runData_.conditioningProtocols[src.name][p.name]]:
                                 self._runData_.conditioningProtocols[src.name][p.name].append(protocol)
+                                
+                            segments = [neo.Segment(rec_datetime = s.rec_datetime,
+                                                    index = s.index) for s in self._runData_.currentAbfTrial.segments]
                             
-                        else:
-                            p.pathwayType = SynapticPathwayType.Control
-                    
+                            self._runData_.results[src.name][p.name]["pathway_responses"].segments.extend(segments)
+                            self._runData_.viewers[src.name][p.name]["pathway_viewer"].view(self._runData_.results[src.name][p.name]["pathway_responses"])
+                            self._runData_.viewers[src.name][p.name]["pathway_viewer"].currentFrame = len(self._runData_.results[src.name][p.name]["pathway_responses"].segments)-1
                             
-                    # NOTE: 2024-03-08 23:03:46 
-                    # Also update the windows names 
-                    if src.name in self._runData_.viewers and src.name in self._runData_.results:
-                        if p.name in self._runData_.viewers[src.name] and p.name in self._runData_.results[src.name]:
-                            if "pathway_responses" in self._runData_.results[src.name][p.name]:
-                                # append conditioning sweeps
-                                block = self._runData_.results[src.name][p.name]["pathway_responses"]
-                                viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]
-                                
-                                # the sweeps of the current trial
-                                
-                                if p.pathwayType & SynapticPathwayType.Test:
-                                    segments = [neo.Segment(rec_datetime = s.rec_datetime,
-                                                          index = s.index) for s in self._runData_.currentAbfTrial.segments]
-                                else:
-                                    seg_indexes = range(len(block.segments), len(block.segments) + len(self._runData_.currentAbfTrial.segments))
-                                    segments = [neo.Segment(rec_datetime = s.rec_datetime,
-                                                          index = k) for k,s in zip(seg_indexes, self._runData_.currentAbfTrial.segments) ]
-                                    # old_signals = block.segments[-1].analogsignals
-                                    # populate with dummy signals (so that plotting is refreshed — SignalViewer BUG 2024-05-09 08:56:00 )
-                                    for k, s in enumerate(self._runData_.currentAbfTrial.segments):
-                                        signals = [neo.AnalogSignal(np.full_like(sig, fill_value = 0.0), 
-                                                                    units = sig.units, t_start = sig.t_start,
-                                                                    sampling_rate = sig.sampling_rate,
-                                                                    name = sig.name) for sig in s.analogsignals]
-                                        segments[k].analogsignals += signals
-                                        
-                                block.segments += self._runData_.currentAbfTrial.segments
-                                
-                                viewer.view(block)
-                                viewer.currentFrame  = len(block.segments)-1
-                                self._runData_.sweeps += len(segments)
-                                
                             measures = [(l,m) for l, m in self._runData_.results[src.name][p.name]["measures"].items() if l != "MembraneTest"]
                             if len(measures):
                                 initResponseLabel = measures[0][0]
                                 if isinstance(self._runData_.viewers[src.name][p.name][initResponseLabel], sv.SignalViewer):
                                     self._runData_.viewers[src.name][p.name][initResponseLabel].winTitle += f" {p.pathwayType.name}"
-                
-                
+                                    
+                        else:
+                            p.pathwayType = SynapticPathwayType.Control
+                            block = self._runData_.results[src.name][p.name]["pathway_responses"]
+                    
+                            seg_indexes = range(len(block.segments), len(block.segments) + len(self._runData_.currentAbfTrial.segments))
+                            segments = [neo.Segment(rec_datetime = s.rec_datetime,
+                                                    index = k) for k,s in zip(seg_indexes, self._runData_.currentAbfTrial.segments) ]
+                            # old_signals = block.segments[-1].analogsignals
+                            # populate with dummy signals (so that plotting is refreshed — SignalViewer BUG 2024-05-09 08:56:00 )
+                            for k, s in enumerate(self._runData_.currentAbfTrial.segments):
+                                signals = [neo.AnalogSignal(np.full_like(sig, fill_value = 0.0), 
+                                                            units = sig.units, t_start = sig.t_start,
+                                                            sampling_rate = sig.sampling_rate,
+                                                            name = sig.name) for sig in s.analogsignals]
+                                segments[k].analogsignals += signals
+                                
+                            self._runData_.results[src.name][p.name]["pathway_responses"].segments.extend(segments)
+                            self._runData_.viewers[src.name][p.name]["pathway_viewer"].view(self._runData_.results[src.name][p.name]["pathway_responses"])
+                            self._runData_.viewers[src.name][p.name]["pathway_viewer"].currentFrame = len(self._runData_.results[src.name][p.name]["pathway_responses"].segments)-1
+                            
+                            
     def measurePathway(self, src: RecordingSource, p: SynapticPathway,
                        adc:pab.ABFInputConfiguration, isAlt:bool=False):
         measureTime = self._runData_.abfTrialDeltaTimesMinutes[-1] # needed below
@@ -1743,23 +1687,22 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
         if initResponseLabel not in self._runData_.viewers[src.name][p.name]:
             self._runData_.viewers[src.name][p.name][initResponseLabel] = \
-                sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
                                                     win_title = f"{src.name} {p.name} {initResponseLabel}")
             
             self._runData_.viewers[src.name][p.name][initResponseLabel].hideSelectors()
             self._runData_.viewers[src.name][p.name][initResponseLabel].hideNavigator()
             self._runData_.viewers[src.name][p.name][initResponseLabel].hideMainToolbar()
             
-            x = self._screenGeom.x()
+            x = self._runData_.screenGeometry.x()
             
             if isAlt:
-                x += self._winWidth
-                # x += int(self._winWidth * 1.1)
+                x += self._runData_.resultWindowSize[0]
+                # x += int(self._runData_.resultWindowSize[0] * 1.1)
                 
-            # y = self._screenGeom.y() + int(self._winHeight * 1.1)
-            y = self._screenGeom.y() + self._winHeight
+            y = self._runData_.screenGeometry.y() + self._runData_.resultWindowSize[1]
             
-            self._runData_.viewers[src.name][p.name][initResponseLabel].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+            self._runData_.viewers[src.name][p.name][initResponseLabel].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
             
         self._runData_.viewers[src.name][p.name][initResponseLabel].plot(self._runData_.results[src.name][p.name][initResponseLabel])
                 
@@ -1825,44 +1768,44 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                         name = "Rin")
                     
                 if not isAlt:    
-                    x = self._screenGeom.x()
-                    y = self._screenGeom.y() + int(self._winHeight * 2.1)
+                    x = self._runData_.screenGeometry.x()
+                    y = self._runData_.screenGeometry.y() + int(self._runData_.resultWindowSize[1] * 2.1)
                     
                     if "DC" not in self._runData_.viewers[src.name][p.name]:
                         self._runData_.viewers[src.name][p.name]["DC"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                            sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
                                                         win_title = f"{src.name} {p.name} DC")
                     
                         self._runData_.viewers[src.name][p.name]["DC"].hideSelectors()
                         self._runData_.viewers[src.name][p.name]["DC"].hideNavigator()
                         self._runData_.viewers[src.name][p.name]["DC"].hideMainToolbar()
-                        self._runData_.viewers[src.name][p.name]["DC"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+                        self._runData_.viewers[src.name][p.name]["DC"].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
                         
                     self._runData_.viewers[src.name][p.name]["DC"].plot(self._runData_.results[src.name][p.name]["DC"])
                         
                     if "Rs" not in self._runData_.viewers[src.name][p.name]:
                         self._runData_.viewers[src.name][p.name]["Rs"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                            sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
                                                         win_title = f"{src.name} {p.name} Rs")
                         
-                        x += self._winWidth
+                        x += self._runData_.resultWindowSize[0]
                         self._runData_.viewers[src.name][p.name]["Rs"].hideSelectors()
                         self._runData_.viewers[src.name][p.name]["Rs"].hideNavigator()
                         self._runData_.viewers[src.name][p.name]["Rs"].hideMainToolbar()
-                        self._runData_.viewers[src.name][p.name]["Rs"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+                        self._runData_.viewers[src.name][p.name]["Rs"].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
                         
                     self._runData_.viewers[src.name][p.name]["Rs"].plot(self._runData_.results[src.name][p.name]["Rs"])
                     
                     if "Rin" not in self._runData_.viewers[src.name][p.name]:
                         self._runData_.viewers[src.name][p.name]["Rin"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
+                            sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
                                                         win_title = f"{src.name} {p.name} Rin")
                     
-                        x += self._winWidth
+                        x += self._runData_.resultWindowSize[0]
                         self._runData_.viewers[src.name][p.name]["Rin"].hideSelectors()
                         self._runData_.viewers[src.name][p.name]["Rin"].hideNavigator()
                         self._runData_.viewers[src.name][p.name]["Rin"].hideMainToolbar()
-                        self._runData_.viewers[src.name][p.name]["Rin"].setGeometry(x, y, self._winWidth, self._winHeight)
+                        self._runData_.viewers[src.name][p.name]["Rin"].setGeometry(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1])
                         
                     self._runData_.viewers[src.name][p.name]["Rin"].plot(self._runData_.results[src.name][p.name]["Rin"])
                     
@@ -1939,8 +1882,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         s = pathSweeps[0]
         
-        block = self._runData_.results[src.name][p.name]["pathway_responses"]   # generated in processProtocol
-        viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in processProtocol
+        block = self._runData_.results[src.name][p.name]["pathway_responses"]   # generated in LTPOnline.__init__
+        viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in LTPOnline.__init__
         currentTrial = self._runData_.currentAbfTrial
         
         seg_ndx = len(block.segments)
@@ -1956,6 +1899,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             rec_datetime = currentTrial.rec_datetime,
                             index = seg_ndx)
         
+        seg.annotations["ABFTrial"] = self._runData_.currentAbfTrial.name
         seg.annotations["ABFTrialSweep"] = s
         seg.analogsignals.append(sig)
         block.segments.append(seg)
@@ -2310,14 +2254,16 @@ class LTPOnline(QtCore.QObject):
 
         self._screen_ = self._emitterWindow_.desktopScreen
         self._titlebar_height_ = QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)
-        self._screenGeom_ = self._screen_.geometry()
+        self._screenGeometry_ = self._screen_.geometry()
         if sys.platform == "win32":
-            y = self._screenGeom_.y() + self._titlebar_height_
+            y = self._screenGeometry_.y() + self._titlebar_height_
         else:
-            y = self._screenGeom_.y()
+            y = self._screenGeometry_.y()
         
         self._viewerWinWidth = 500
         self._viewerWinHeight = 300
+        self._resultWinWidth = 400
+        self._resultWinHeight = 300
 
         if directory is None:
             self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
@@ -2335,6 +2281,8 @@ class LTPOnline(QtCore.QObject):
         
         self._results_ = dict()
         
+        self._parentWindow_ = parent if isinstance(parent, QtWidgets.QWidget) else None
+        
         # NOTE: 2024-05-10 13:32:25
         # populate pathways straight away
         for src in self._sources_:
@@ -2348,9 +2296,9 @@ class LTPOnline(QtCore.QObject):
             # source level (i.e., nothing to do with the actual protocol)
             # dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))]
             dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways)]
-            self.print(f"source {printStyled(src.name, 'green', True)}")
-            self.print(f"dig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
-            self.print(f"dac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
+            # self.print(f"source {printStyled(src.name, 'green', True)}")
+            # self.print(f"dig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
+            # self.print(f"dac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
             # bad_dac_paths = [p for p in dac_stim_pathways if p[1].stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
             bad_dac_paths = [p for p in dac_stim_pathways if p.stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
         
@@ -2363,15 +2311,17 @@ class LTPOnline(QtCore.QObject):
             self._viewers_[src.name] = dict()
             
             for k, p in enumerate(pathways):
-                self._results_[src.name][p.name] = {"pathway": p}
-                viewer = sv.SignalViewer(scipyenWindow = self._emitterWindow_,
+                self._results_[src.name][p.name] = {"pathway": p,
+                                                    "pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
+                
+                viewer = sv.SignalViewer(parent=self._parentWindow_, scipyenWindow = self._emitterWindow_,
                                          win_title = f"{src.name} {p.name} Synaptic Responses")
                 viewer.hideSelectors()
                 viewer.hideMainToolbar()
                 viewer.showNavigator()
                 viewer.show()
                 
-                viewer.setGeometry(QtCore.QRect(self._screenGeom_.x() + k * self._viewerWinWidth, y, 
+                viewer.setGeometry(QtCore.QRect(self._screenGeometry_.x() + k * self._viewerWinWidth, y, 
                                                 self._viewerWinWidth, self._viewerWinHeight))
                 
                 self._viewers_[src.name][p.name] = {"pathway_viewer": viewer}
@@ -2403,6 +2353,9 @@ class LTPOnline(QtCore.QObject):
                                  episodes = list(),
                                  newEpisodeOnNextRun = (RecordingEpisodeType.Tracking, None), # episode type, episode name
                                  drug = None, # or a suitable mnemonic string
+                                 screenGeometry = self._screenGeometry_,
+                                 resultWindowSize = (self._resultWinWidth, self._resultWinHeight),
+                                 parentWindow = self._parentWindow_,
                                  )
         
         self._abfTrialBuffer_ = collections.deque()
@@ -2919,6 +2872,8 @@ class LTPOnline(QtCore.QObject):
         try:
             for src_name, src in self._results_.items():
                 for p_name, path in src.items():
+                    if p_name in ("DACPaths", "DIGPaths"):
+                        continue
                     path_responses = path["pathway_responses"]
                     wf.assignin(path_responses, f"{src_name}_{p_name}_synaptic_responses")
                     initialResponse = [(k, v) for k, v in path.items() if k in ("EPSC0", "EPSP0")]

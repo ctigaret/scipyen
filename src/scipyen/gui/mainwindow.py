@@ -4360,8 +4360,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #         win[1].close()
 
         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
-        if sys.platform == "win32" or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
-            QtWidgets.QApplication.closeAllWindows()
+        # if sys.platform == "win32" or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+        #     QtWidgets.QApplication.closeAllWindows()
+        QtWidgets.QApplication.closeAllWindows()
             
         evt.accept()
 
