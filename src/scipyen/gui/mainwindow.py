@@ -116,7 +116,7 @@ from core.prog import (safeWrapper, deprecation, iter_attribute,
                        filter_attribute, filterfalse_attribute,
                        timefunc, timeblock, processtimefunc, 
                        processtimeblock, Timer, scipywarn, warn_with_traceback, 
-                       get_properties)
+                       get_properties, printStyled)
 
 # NOTE: 2024-01-30 22:00:13
 # use our own warning - OK for scipyen console

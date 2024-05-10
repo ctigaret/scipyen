@@ -1080,7 +1080,6 @@ class RecordingEpisode(Episode):
             name = self._type_.name
             
         super().__init__(name, **kwargs)
-        
 
         self.protocol = protocol
         
@@ -1193,7 +1192,11 @@ class RecordingEpisode(Episode):
                 
             if isinstance(self.xtalk, (tuple, list)) and len(self.xtalk):
                 link = " \u2192 "
-                p.text(f"Test for independence: {link.join([pth.name for pth in self.xtalk])}")
+                txt = ["Test for independence:"]
+                for x in self.xtalk:
+                    if len(x[1]) > 1:
+                        txt.append(f"sweep {x[0]}: {x[1][0].name} {link} {x[1][1].name}")
+                p.text("\n".join(txt))
                 p.breakable()
                 p.text("\n")
                 
