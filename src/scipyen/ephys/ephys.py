@@ -1087,9 +1087,9 @@ class RecordingEpisode(Episode):
             if len(pathways):
                 if not all(isinstance(v, SynapticPathway) for v in pathways):
                     raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
-            self.pathways = pathways
+            self._pathways_ = pathways
         else:
-            self.pathways = []
+            self._pathways_ = []
         
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
@@ -1121,15 +1121,15 @@ class RecordingEpisode(Episode):
         # NOTE: no checks are done on the value of the key(s) so expect errors
         #   when trying to match an episode with data having the wrong number of sweeps
         if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
-            if len(self.pathways) == 0:
+            if len(self._pathways_) == 0:
                 raise ValueError("Cannot apply crosstalk when there are no pathways defined")
             
             for k,p in xtalk.items():
                 if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
                     raise TypeError("Cross-talk has invalid key types; expecting int or pairs of int")
                 
-                if any(p_ not in range(len(self.pathways)) for p_ in p):
-                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self.pathways)} pathways")
+                if any(p_ not in range(len(self._pathways_)) for p_ in p):
+                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self._pathways_)} pathways")
                 
             self.xtalk = xtalk
             
@@ -1144,11 +1144,11 @@ class RecordingEpisode(Episode):
     def __repr__(self):
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}, begin={self.begin}, end={self.end}, beginFrame={self.beginFrame}, endFrame={self.endFrame}), with:")
-        if len(self.pathways) == 0:
+        if len(self._pathways_) == 0:
             ret.append(f"\tPathways: []")
         else:
             ret.append(f"\tPathways:")
-            for p in self.pathways:
+            for p in self._pathways_:
                 ret.append(f"\t{p}")
 
         ret.append(f"\txtalk: {self.xtalk}")
@@ -1182,10 +1182,10 @@ class RecordingEpisode(Episode):
             p.text("Pathways:")
             p.breakable()
             
-            if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
+            if isinstance(self._pathways_, (tuple, list)) and len(self._pathways_):
                 # with p.group(4, "(",")"):
                 with p.group(4, "",""):
-                    for pth in self.pathways:
+                    for pth in self._pathways_:
                         p.text(pth.name)
                         p.breakable()
                     p.text("\n")
@@ -1201,6 +1201,27 @@ class RecordingEpisode(Episode):
                 p.text("\n")
                 
             p.breakable()
+            
+    @property
+    def pathways(self) -> list:
+        return self._pathways_
+    
+    @pathways.setter
+    def pathways(self, val):
+        if isinstance(val, (tuple, list)):
+            if all(isinstance(v, SynapticPathway) for v in val):
+                self._pathways_[:] = [v for v in val]
+            elif len(val) == 0:
+                self._pathways_.clear()
+            else:
+                raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
+            
+        elif val is None:
+            self._pathways_.clear()
+        else:
+            raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
+            
+            
             
     @property
     def type(self) -> RecordingEpisodeType:

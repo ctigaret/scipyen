@@ -1391,10 +1391,33 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 continue
             
             
-            # self.print(f"\t\t{printStyled(len(mainPathways), 'cyan', True)} main pathways ('mainPathways'): {printStyled(mainPathways, 'cyan', True)}")
-            # self.print(f"\t\t{printStyled(len(altPathways), 'cyan', True)} alternate pathways ('altPathways'): {printStyled(altPathways, 'cyan', False)}")
+#             self.print(f"\t{printStyled(len(mainPathways), 'cyan', True)} mainPathways:")
+#             for p in mainPathways:
+#                 self.print(f"\t\t{printStyled(p.name, 'cyan', True)} ({printStyled(p.stimulus.channel, 'cyan', True)}, digital: {printStyled(p.stimulus.dig, 'cyan', True)})")
+#                 
+#             self.print(f"\t{printStyled(len(altPathways), 'cyan', True)} altPathways:")
+#             for p in altPathways:
+#                 self.print(f"\t\t{printStyled(p.name, 'cyan', False)} ({printStyled(p.stimulus.channel, 'cyan', False)}, digital: {printStyled(p.stimulus.dig, 'cyan', False)})")
+#             
+#             
+#             allPathways = mainPathways + altPathways
+#             
+#             self.print(f"\tall pathways ({printStyled(len(allPathways), 'red')}):")
+#             for p in allPathways:
+#                 self.print(f"\t\tpath {printStyled(p.name, 'red')} ({printStyled(p.stimulus.channel, 'red')}, digital: {printStyled(p.stimulus.dig, 'red')})")
             
-            currentEpisode.pathways = unique(mainPathways + altPathways)
+            uniquePathways = unique(mainPathways + altPathways, idcheck=True)
+            # self.print(f"\tunique pathways ({printStyled(len(uniquePathways), 'red')}):")
+            # for p in uniquePathways:
+            #     self.print(f"\t\tpath {printStyled(p.name, 'red')} ({printStyled(p.stimulus.channel, 'red')}, digital: {printStyled(p.stimulus.dig, 'red')})")
+            
+            for p in uniquePathways:
+                if p not in currentEpisode.pathways and isinstance(p, SynapticPathway):
+                    currentEpisode.pathways.append(p)
+            
+            # self.print("\tcurrentEpisode pathways:")
+            # for p in currentEpisode.pathways:
+            #     self.print(f"\t\tpath {printStyled(p.name, 'red')} ({printStyled(p.stimulus.channel, 'red')})")
             
             # NOTE: 2024-05-06 09:59:39
             # pathStimsBySweep below is a tuple of (sweep index, tuple of 
@@ -1404,21 +1427,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # test stimulation of these pathways in that specific sweep
             # pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in unique(mainPathways + altPathways)], 
             #                                                                   indices=False)
-            pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p for p in currentEpisode.pathways], 
-                                                                              indices=False)
+            pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence(uniquePathways, indices=False)
+            self.print("\tpathway stimulation by sweep (pathStimsBySweep):")
+            for sweep_path in pathStimsBySweep:
+                self.print(f"\tsweep: {printStyled(sweep_path[0], 'red')}:")
+                for path in sweep_path[1]:
+                    self.print(f"\t\tpath {printStyled(path.name, 'red')} ({printStyled(path.stimulus.channel, 'red')})")
+            
             # self.print(f"\t\tpathway stimulation by sweep (pathStimsBySweep): {printStyled(pathStimsBySweep, 'magenta', True)}")
 
+            if len(self._runData_.currentAbfTrial.segments) != len(pathStimsBySweep):
+                scipywarn(f"Mismatch between number of sweeps in the trial ({printStyled(len(self._runData_.currentAbfTrial.segments), 'yellow')}) and those in pathways by sweep ({printStyled(len(pathStimsBySweep), 'yellow')})")
 
             if currentEpisode.type & RecordingEpisodeType.Tracking: 
                 # NOTE: 2024-03-09 07:51:17 tracking mode
-                # self.print(f"\t\t{printStyled('Tracking...', 'magenta', True)}")
-                
-                # if src.name not in self._runData_.results:
-                #     self._runData_.results[src.name] = dict()
-                
-                if src.name not in self._runData_.viewers:
-                    self._runData_.viewers[src.name] = dict()
-                    
                 if any(len(x[1]) > 1 for x in pathStimsBySweep): # crosstalk?
                     # self.print("\t\tcrosstalk protocol.")
                     if len(currentEpisode.xtalk) == 0 or currentEpisode.xtalk != pathStimsBySweep:
@@ -1434,7 +1456,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                         begin = self._runData_.currentAbfTrial.rec_datetime,
                                                         beginFrame = self._runData_.sweeps +1)
                         xtalkEpisode.xtalk = pathStimsBySweep
-                        
+                        xtalkEpisode.pathways = uniquePathways
                         self._runData_.episodes.append(xtalkEpisode)
                         currentEpisode = xtalkEpisode
                     
@@ -1453,11 +1475,42 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                       name=f"{currentEpisode.type.name}",
                                                       begin = self._runData_.currentAbfTrial.rec_datetime,
                                                       beginFrame = self._runData_.sweeps +1)
+                        newEpisode.pathways = uniquePathways
                         self._runData_.episodes.append(newEpisode)
                         currentEpisode = newEpisode
                         self._runData_.pathStimsBySweep = pathStimsBySweep
-                
-                        # measurePathways = True
+                    
+                # NOTE: 2024-05-11 18:59:54
+                # for xtalk protocol, the same principle applies:
+                # fitst stimulated path in the sweep goes to that sweep
+                for sweep, paths in pathStimsBySweep:
+                    path = paths[0]
+                    assert path == self._runData_.results[src.name][path.name]["pathway"], printStyled("synaptic pathway mismatch between the protocol and pathway by sweep")
+                    block = self._runData_.results[src.name][path.name]["pathway_responses"]
+                    segment = self._runData_.currentAbfTrial.segments[sweep]
+                    sig = segment.analogsignals[adc.logicalIndex]
+                    segname = f"{src.name} {path.name}"
+                    if len(currentEpisode.xtalk):
+                        segname += " Cross-talk"
+                        
+                    seg = neo.Segment(index = len(block.segments), name=segname,
+                                      file_origin = self._runData_.currentAbfTrial.file_origin,
+                                      file_datetime= self._runData_.currentAbfTrial.file_datetime,
+                                      rec_datetime = self._runData_.currentAbfTrial.rec_datetime)
+                    
+                    seg.analogsignals.append(sig)
+                    seg.annotations["ABFTrial"] = self._runData_.currentAbfTrial.name
+                    seg.annotations["ABFTrialSweep"] = sweep
+                    
+                    if len(currentEpisode.xtalk):
+                        seg.annotations["Crosstalk"] = [p.stimulus.channel for p in paths]
+                        
+                    block.segments.append(seg)
+                    
+                    self._runData_.viewers[src.name][path.name]["pathway_viewer"].view(block)
+                    self._runData_.viewers[src.name][path.name]["pathway_viewer"].currentFrame = len(block.segments)-1
+                    
+                    # self._runData_.results[src.name][p.name]["ABFTrialSweep"] = sweep
                         
                 # NOTE: 2024-05-06 09:16:37
                 # Figure out the epochs that define synaptic stimulations
@@ -1465,6 +1518,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 syn_stim_digs = list()
                 syn_stim_dacs = list()
+                
+                # self.print(f"protocol: {printStyled(protocol.name, 'yellow')} {printStyled(len(mainPathways), 'yellow')} mainPathways: {printStyled(mainPathways, 'yellow')}")
+                # self.print(f"protocol: {printStyled(protocol.name, 'yellow')} {printStyled(len(altPathways), 'yellow')} altPathways: {printStyled(altPathways, 'yellow')}")
                 
                 if nSrcStimPathways == 2:
                     if len(mainPathways) == 1:
@@ -1543,6 +1599,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
                 # in a multi-pathway protocol, the "main" digital pathways are always
                 # delivered on the even-numbered sweeps: 0, 2, etc.
+                
+                
+                # TODO/FIXME 2024-05-11 16:49:12 BUG
+                # bring code for sweep selection and addition to pathway results here
+                # from setMeasuresForPathway
+                
                 #
                 # for k, p in mainPathways:
                 for p in mainPathways:
@@ -1635,12 +1697,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             self._runData_.viewers[src.name][p.name]["pathway_viewer"].view(self._runData_.results[src.name][p.name]["pathway_responses"])
                             self._runData_.viewers[src.name][p.name]["pathway_viewer"].currentFrame = len(self._runData_.results[src.name][p.name]["pathway_responses"].segments)-1
                             
+    
+    def dealSweeps(self):
+        currentEpisode = self._runData_.episodes[-1]
+        
                             
     def measurePathway(self, src: RecordingSource, p: SynapticPathway,
                        adc:pab.ABFInputConfiguration, isAlt:bool=False):
         measureTime = self._runData_.abfTrialDeltaTimesMinutes[-1] # needed below
         measures = self._runData_.results[src.name][p.name]["measures"]
-        sweep = self._runData_.results[src.name][p.name]["ABFTrialSweep"]
+        sweep = self._runData_.results[src.name][p.name]["pathway_responses"].segments[-1].annotations["ABFTrialSweep"]
         currentTrial = self._runData_.currentAbfTrial
         sig = currentTrial.segments[sweep].analogsignals[adc.logicalIndex]
         
@@ -1814,10 +1880,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 scipywarn(f"measurePathway {p.name} in trial {currentTrial.name}: Current-clamp measurements not yet implemented")
 
     def setMeasuresForPathway(self, src: RecordingSource, p: SynapticPathway, 
-                              protocol:pab.ABFProtocol,
-                              adc, dac, activeDAC, membraneTestEpoch,
-                              testStart, testDuration, testAmplitude,
-                              isAlt):
+                        protocol:pab.ABFProtocol,
+                        adc, dac, activeDAC, membraneTestEpoch,
+                        testStart, testDuration, testAmplitude,
+                        isAlt):
         """Sets up measurements for synaptic pathways
         This should happen only once, and requires that subsequent ABF trials
         have the same protocol as the first ABFTrial
@@ -1875,9 +1941,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # ### END   alternative way to collect ABF Epochs defining synaptic stimulation
         
         
-        # NOTE: 2024-03-03 21:03:37
-        # ### BEGIN extract pathway sweeps, concatenate to pathway blocks and plot
-        #
         pathSweeps = [sed[0] for sed in sweepsEpochsForDig]
         
         s = pathSweeps[0]
@@ -1886,27 +1949,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in LTPOnline.__init__
         currentTrial = self._runData_.currentAbfTrial
         
-        seg_ndx = len(block.segments)
-        
-        if "ABFTrialSweep" not in self._runData_.results[src.name][p.name]:
-            self._runData_.results[src.name][p.name]["ABFTrialSweep"] = s
-        
         sig = currentTrial.segments[s].analogsignals[adc.logicalIndex]
         t0 = sig.t_start
-        
-        seg = neo.Segment(name=f"{src.name} {p.name}", file_origin = currentTrial.file_origin,
-                            file_datetime=currentTrial.file_datetime,
-                            rec_datetime = currentTrial.rec_datetime,
-                            index = seg_ndx)
-        
-        seg.annotations["ABFTrial"] = self._runData_.currentAbfTrial.name
-        seg.annotations["ABFTrialSweep"] = s
-        seg.analogsignals.append(sig)
-        block.segments.append(seg)
-        viewer.view(block)
-        viewer.currentFrame  = len(block.segments)-1
-        
-        # ### END  extract pathway sweeps, concatenate to pathway blocks and plot
         
         # ### BEGIN setup measures, if needed
         # FIXME 2024-05-08 15:06:34
@@ -2643,6 +2687,17 @@ class LTPOnline(QtCore.QObject):
                         for name, viewer in path_viewers_dict.items():
                             if isinstance(viewer, QtWidgets.QMainWindow):
                                 viewer.show()
+                                
+    def closeViewers(self):
+        if hasattr(self, "_viewers_"):
+            for src in self._sources_:
+                source_viewers = self._viewers_.get(src.name, None)
+                if isinstance(source_viewers, dict) and len(source_viewers):
+                    path_viewers = [v for v in source_viewers.values() if isinstance(v, dict) and len(v)]
+                    for path_viewers_dict in path_viewers:
+                        for name, viewer in path_viewers_dict.items():
+                            if isinstance(viewer, QtWidgets.QMainWindow):
+                                viewer.close()
 
 
                
@@ -3090,6 +3145,12 @@ class LTPOnline(QtCore.QObject):
         
         self._simulation_ = None
         
+        if isinstance(self._simulatorThread_, QtCore.QThread):
+            self._simulatorThread_.requestInterruption()
+            self._simulatorThread_.quit()
+            self._simulatorThread_.wait()
+            self._simulatorThread_.deleteLater()
+        
         self._simulatorThread_ = None
         
         self._doSimulation_ = False
@@ -3196,7 +3257,7 @@ class LTPOnline(QtCore.QObject):
         self._abfProcessorThread_.start()
         
         if self._doSimulation_:
-            print("Starting simulation mode\n\n")
+            print("Starting simulation\n\n")
         else:
             print(f"Monitoring directory {self._watchedDir_}\n\n")
         

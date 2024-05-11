@@ -581,7 +581,8 @@ class ABFEpoch:
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
+        return all(np.all(utilities.safe_identity_check(getattr(self, p[0]), getattr(other, p[0]), idcheck=False)) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
+        # return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
         
     @property
     def letter(self) -> str:
@@ -1164,15 +1165,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        ret = True
-        for p in properties:
-            # NOTE: see NOTE: 2023-11-05 21:05:46 and NOTE: 2023-11-05 21:06:10
-            # if getattr(self, p[0]) != getattr(other, p[0]):
-            if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0])):
-                return False
+        # ret = True
+        # for p in properties:
+        #     # NOTE: see NOTE: 2023-11-05 21:05:46 and NOTE: 2023-11-05 21:06:10
+        #     if not np.all(getattr(self, p[0]) == getattr(other, p[0])):
+        #     # if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False):
+        #         return False
         
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
-        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
 
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!
@@ -1211,17 +1212,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 if not np.all(myattr == otherattr):
                     return False
             else:
-                # if getattr(self, p[0]) != getattr(other, p[0]):
                 if myattr != otherattr:
                     return False
-        # check equality of properties (descriptors); this includes nSweeps and nADCChannels
-        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
         if ret:
             for k in range(self.nDACChannels):
                 if not self.getDAC(k).is_identical_except_digital(other.getDAC(k)):
                     return False
-            # ret = all(self.getDAC(d).is_identical_except_digital(other.getDAC(d)) for d in range(self.nDACChannels))
                     
         if ret:
             for k in range(self.nADCChannels):
@@ -2284,7 +2281,7 @@ class ABFInputConfiguration:
         
         props = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        return np.all(getattr(self, p[0]) == getattr(other, p[0]) for p in props if x[0] != "protocol")
+        return np.all([utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False) for p in props if p[0] != "protocol"])
 
     def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex
@@ -2655,7 +2652,8 @@ class ABFOutputConfiguration:
             if p[0] not in ("protocol", "epochs"):
                 # NOTE: 2023-11-05 21:05:46
                 # no need to compare all; just compare until first distinct one
-                if getattr(self, p[0]) != getattr(other, p[0]):
+                # if getattr(self, p[0]) != getattr(other, p[0]):
+                if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False):
                     return False
         # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] != "protocol")
 
@@ -2707,10 +2705,6 @@ class ABFOutputConfiguration:
             for k in range(len(epochs)):
                 if not epochs[k].is_identical_except_digital(other_epochs[k]):
                     return False
-            # ret = all(self.epochs[k].is_identical_except_digital(other.epochs[k]) for k in range(len(self.epochs)))
-
-        # if ret:
-        #     ret = all(np.all(self.getEpochsTable(s, includeDigitalPattern=False) == other.getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.protocol.nSweeps))
                     
         return ret
     
