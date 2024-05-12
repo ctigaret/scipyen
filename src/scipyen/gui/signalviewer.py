@@ -8597,7 +8597,7 @@ signals in the signal collection.
         raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
     
     @_plot_data_.register(neo.Block)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:neo.Block, *args, **kwargs):
         # NOTE: 2019-11-24 22:31:26
         # select a segment then delegate to _plotSegment_()
         # Segment selection is based on self.frameIndex, or on self.channelIndex
@@ -8683,7 +8683,8 @@ signals in the signal collection.
         self.currentFrameAnnotations = {type(obj).__name__ : obj.annotations}
         
     @_plot_data_.register(neo.core.spiketrainlist.SpikeTrainList)
-    def _(self, obj:neo.core.spiketrainlist.SpikeTrainList, *args, **kwargs):
+    def _(self, obj:neo.core.spiketrainlist.SpikeTrainList,
+          *args, **kwargs):
         self._plotSpikeTrains_(obj)
         self.currentFrameAnnotations = {type(obj).__name__: [st.annotations for st in obj]}
                 
@@ -8696,7 +8697,8 @@ signals in the signal collection.
     @_plot_data_.register(neo.IrregularlySampledSignal)
     @_plot_data_.register(DataSignal)
     @_plot_data_.register(IrregularlySampledDataSignal)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal], 
+          *args, **kwargs):
         if self.frameAxis == 1:
             if self._current_frame_index_ in self.frameIndex:
                 ndx = self.frameIndex[self._current_frame_index_]
@@ -8713,7 +8715,8 @@ signals in the signal collection.
             
     @_plot_data_.register(neo.Epoch)
     @_plot_data_.register(DataZone)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:typing.Union[neo.Epoch, DataZone], 
+          *args, **kwargs):
         """ Plots a single neo.Epoch 
         NOTE: a single Epoch MAY contain several time intervals.
         """
@@ -8734,7 +8737,8 @@ signals in the signal collection.
         
     @_plot_data_.register(neo.Event)
     @_plot_data_.register(DataMark)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:typing.Union[neo.Event, DataMark],
+          *args, **kwargs):
         """Plot stand-alone events"""
         if len(obj) == 0:
             self._events_axis_.clear()
@@ -8745,7 +8749,7 @@ signals in the signal collection.
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
             
     @_plot_data_.register(np.ndarray)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:np.ndarray, *args, **kwargs):
         # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}> dims: {obj.ndim})")
         try:
             if obj.ndim > 3:
@@ -8814,7 +8818,8 @@ signals in the signal collection.
     @_plot_data_.register(tuple)
     @_plot_data_.register(list)
     @_plot_data_.register(NeoObjectList)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:typing.Union[tuple, list, NeoObjectList],
+          *args, **kwargs):
         if len(obj) == 0:
             return False
         

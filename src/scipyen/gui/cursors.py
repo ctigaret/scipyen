@@ -1879,6 +1879,22 @@ class SignalCursor(QtCore.QObject):
     @property
     def isVertical(self):
         return self._vl_ is not None and self._hl_ is None
+    
+    def isVisible(self):
+        return (self._vl_ is not None and self._vl_.isVisible()) or (self._hl_ is not None and self._hl_.isVisible())
+    
+    def setVisible(self, val:bool):
+        if self._vl_ is not None:
+            self._vl_.setVisible(val)
+            
+        if self._hl_ is not None:
+            self._hl_.setVisible(val)
+            
+    def show(self):
+        self.setVisible(True)
+        
+    def hide(self):
+        self.setVisible(False)
             
     
 @safeWrapper
