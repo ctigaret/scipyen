@@ -2296,50 +2296,26 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # store pathway measures for measurements
             self._runData_.results[src.name][p.name]["measures"] = pMeasures
             
-            self.setupMeasurementViewers()
-            
         # ### END setup measures
         
+        self.setupMeasurementViewers()
+            
     def setupMeasurementViewers(self):
         pw = self._runData_.parentWindow
-        if not isinstance(pw, QtCore.QObject):
-            pw = self
-            
         x = self._runData_.screenGeometry.x()
         y = self._runData_.screenGeometry.height() - self._runData_.resultWindowSize[1] * len(self._runData_.results)
             
         for src_name, src_dict in self._runData_.results.items():
-            for path_name, path_dict in src_dict.items(): 
-                measures = self._runData_.results[src_name][path_name]["measures"]
-                responseMeasures = [measureLabel for measureLabel in measures.keys() if measureLabel != "MembraneTest" and "Base" not in measureLabel and measureLabel.endswith("0")]
-                
-                for k, label in enumerate(responseMeasures):
-                    if label not in self._runData_.viewers[src_name][path_name]:
-                        self._runData_.viewers[src_name][path_name][label] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_.
-                                                                                             win_title=f"{src_name} {path_name} {label}")
-                        self._runData_.viewers[src_name][path_name][label].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
-                        self._runData_.viewers[src_name][path_name][label].hideSelectors()
-                        self._runData_.viewers[src_name][path_name][label].hideNavigator()
-                        self._runData_.viewers[src_name][path_name][label].hideMainToolbar()
-                        
-                        x += self._runData_.resultWindowSize[0]
-                        
-                        
-                mbTestMeasure = measures.get("MembraneTest", None)
-                
-                if isinstance(mbTestMeasure, dict) and "locations" in mbTestMeasure and isinstance(mbTestMeasure["locations"], dict):
-                    if self._runData_.commonViewerForSourceMeasures:
-                        self._runData_.viewers[src_name][path_name]["SourceMeasures"] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_.
-                                                                                                win_title=f"{src_name} {path_name} {label}")
-                        
-                        self._runData_.viewers[src_name][path_name]["SourceMeasures"].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
-                        self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideSelectors()
-                        self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideNavigator()
-                        self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideMainToolbar()
-                        
-                    else:
-                        for label in mbTestMeasure["locations"].keys():
-                            self._runData_.viewers[src_name][path_name][label] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_.
+            for path_name, path_dict in src_dict.items():
+                if path_name not in ("DIGPaths", "DACPaths"): 
+                    measures = self._runData_.results[src_name][path_name].get("measures", None)
+                    if measures is None:
+                        continue
+                    responseMeasures = [measureLabel for measureLabel in measures.keys() if measureLabel != "MembraneTest" and "Base" not in measureLabel and measureLabel.endswith("0")]
+                    
+                    for k, label in enumerate(responseMeasures):
+                        if label not in self._runData_.viewers[src_name][path_name]:
+                            self._runData_.viewers[src_name][path_name][label] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_,
                                                                                                 win_title=f"{src_name} {path_name} {label}")
                             self._runData_.viewers[src_name][path_name][label].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
                             self._runData_.viewers[src_name][path_name][label].hideSelectors()
@@ -2348,8 +2324,34 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             
                             x += self._runData_.resultWindowSize[0]
                             
-        
-                y += self._runData_.resultWindowSize[1]
+                            
+                    mbTestMeasure = measures.get("MembraneTest", None)
+                    
+                    if isinstance(mbTestMeasure, dict) and "locations" in mbTestMeasure and isinstance(mbTestMeasure["locations"], (tuple, list)):
+                        if self._runData_.commonViewerForSourceMeasures:
+                            if "SourceMeasures" not in self._runData_.viewers[src_name][path_name]:
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_,
+                                                                                                        win_title=f"{src_name} {path_name} {'Source measures'}")
+                                
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideSelectors()
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideNavigator()
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideMainToolbar()
+                            
+                        else:
+                            for label in mbTestMeasure["locations"].keys():
+                                if label not in self._runData_.viewers[src_name][path_name]:
+                                    self._runData_.viewers[src_name][path_name][label] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_,
+                                                                                                        win_title=f"{src_name} {path_name} {label}")
+                                    self._runData_.viewers[src_name][path_name][label].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                                    self._runData_.viewers[src_name][path_name][label].hideSelectors()
+                                    self._runData_.viewers[src_name][path_name][label].hideNavigator()
+                                    self._runData_.viewers[src_name][path_name][label].hideMainToolbar()
+                                    
+                                    x += self._runData_.resultWindowSize[0]
+                                
+            
+            y += self._runData_.resultWindowSize[1]
         
         
         
@@ -2521,7 +2523,7 @@ class LTPOnline(QtCore.QObject):
                 self._results_[src.name][p.name] = {"pathway": p,
                                                     "pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
                 
-                viewer = sv.SignalViewer(parent=self._parentWindow_ if isinstance(self._parentWindow_, QtCore.QObject) else self, scipyenWindow = self._emitterWindow_,
+                viewer = sv.SignalViewer(parent=self._parentWindow_, scipyenWindow = self._emitterWindow_,
                                          win_title = f"{src.name} {p.name} Synaptic Responses")
                 viewer.sig_signalCursorPositionChanged[SignalCursor].connect(self.slot_signalCursorPositionChanged)
                 viewer.hideSelectors()
