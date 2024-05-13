@@ -23,9 +23,10 @@ from core.quantities import check_time_units
 
 @dataclass
 class DataCursor:
-    """Convenience structure for notional cursors represented by a coordinate and a span"""
+    """Convenience structure for notional 1D cursor represented by a coordinate and a span"""
     coord:typing.Union[float, pq.Quantity]
     span:typing.Union[float, pq.Quantity]
+    name:str = ""
     
 class SignalCursorTypes(enum.Enum):
     """Enumeration of signal cursor types.
@@ -142,7 +143,24 @@ class SignalCursor(QtCore.QObject):
     """SignalCursor object.
     Covers either a SINGLE pyqtgraph.PlotItem (see crosshair.py in pyqtgraph/examples)
     or a pyqtgraph.GraphicsScene (with possibly multiple plot items)
+        
+    WARNING: As of 2024-05-13 16:59:55 this class is NOT seralizable: saving 
+        or pickling will raise an exception.
+        
+        
     """
+    # TODO: 2024-05-13 17:00:45 FIXME:
+    #     Seralization (pickling) could be implemented using special dunder 
+    #       methods (__reduce__ for seralizing and __new__ for reconstructing, 
+    #       and instantiating QObject components on the fly) -  but this may be
+    #       quite expensive in terms of coding time.
+    #
+    # Similarly, serialization via HDF5 is also theoretically possible, but with 
+    # the same caveat as above (i.e. coding time).
+    #
+    # Probably more convenient is to use DataCursor for now
+    
+    
     # TODO: 2019-02-07 17:31:43
     # 1) implement cursors linking
     

@@ -885,7 +885,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # the current protocol hasn't been processed yet, therefore
                     # sweeps from current trial haven't been distributed yet,
                     # across pathways.
-                    self._runData_.episodes[-1].endFrame = self._runData_.sweeps
+                    self._runData_.episodes[-1].endFrame = self._runData_.sweeps - 1 if self._runData_.sweeps > 0 else 0
                     if isinstance(self._runData_.prevAbfTrial, neo.Block):
                         self._runData_.episodes[-1].end=self._runData_.prevAbfTrial.rec_datetime
                     else:
@@ -1444,12 +1444,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             
                         # NOTE: 2024-05-13 08:41:50
                         # current sweep(s) haven't been added yet
-                        currentEpisode.endFrame = self._runData_.sweeps
+                        # counter is 0-based, and frame selection is semi-open
+                        # interval [beginFrame .. endFrame+1)!
+                        currentEpisode.endFrame = self._runData_.sweeps - 1 if self._runData_.sweeps > 0 else 0
                         
                         xtalkEpisode = RecordingEpisode(currentEpisode.type,
                                                         name=f"{currentEpisode.type.name}_XTalk", 
                                                         begin = self._runData_.currentAbfTrial.rec_datetime,
-                                                        beginFrame = self._runData_.sweeps +1)
+                                                        beginFrame = self._runData_.sweeps)
                         xtalkEpisode.xtalk = pathStimsBySweep
                         xtalkEpisode.pathways = uniquePathways
                         self._runData_.episodes.append(xtalkEpisode)
@@ -1466,12 +1468,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         
                         # NOTE: 2024-05-13 08:42:17
                         # see NOTE: 2024-05-13 08:41:50
-                        currentEpisode.endFrame = self._runData_.sweeps
+                        currentEpisode.endFrame = self._runData_.sweeps - 1 if self._runData_.sweeps > 0 else 0
                         
                         newEpisode = RecordingEpisode(currentEpisode.type, 
                                                       name=f"{currentEpisode.type.name}",
                                                       begin = self._runData_.currentAbfTrial.rec_datetime,
-                                                      beginFrame = self._runData_.sweeps +1)
+                                                      beginFrame = self._runData_.sweeps)
                         newEpisode.pathways = uniquePathways
                         
                         self._runData_.episodes.append(newEpisode)
@@ -1773,13 +1775,25 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         initResponse = None
         initResponseLabel = None
+        pathViewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"] 
         
         for kc, (measureLabel, measure) in enumerate(responseMeasures):
             measureFunctor = measure["measure"]
             locations = measure["locations"]
+            # NOTE: 2024-05-13 16:53:01
+            # measure on cursors, not locations, so that adjustments to cursor
+            # positions are reflected in the measurements for the (next) sweep
+            for l in locations:
+                if pathViewer.signalCursor(l.name) is None:
+                    pathViewer.addCursor(SignalCursorTypes.vertical, l, label_position = 0.85)
+                    
+            locationCursors = [pathViewer.signalCursor(l.name) for l in locations]
+            
             args = measure["args"]
             
-            locationMeasure = measureFunctor(*locations, name=measure["name"])
+            # NOTE: 2024-05-13 17:12:19
+            # now, use the signal cursors (NOT data cursors) to perform measurement
+            locationMeasure = measureFunctor(*locationCursors, name=measure["name"])
             
             measureValues = locationMeasure(sig)
             
@@ -1834,7 +1848,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             locations = mbTestMeasure["locations"]
             args = mbTestMeasure["args"]
             
-            locationMeasure = measureFunctor(*locations, name=mbTestMeasure["name"])
+            # NOTE: 2024-05-13 17:14:02
+            # see NOTE: 2024-05-13 16:53:01
+            for l in locations:
+                if pathViewer.signalCursor(l.name) is None:
+                    pathViewer.addCursor(SignalCursorTypes.vertical, l, label_position = 0.85)
+                    
+            locationCursors = [pathViewer.signalCursor(l.name) for l in locations]
+            
+            # self.print(f"locationCursors {locationCursors}")
+            
+            locationMeasure = measureFunctor(*locationCursors, name=mbTestMeasure["name"])
+            
             measureValues = locationMeasure(sig, *args)
             # print(f"measurePathway: measureValues = {measureValues}")
             
@@ -1857,6 +1882,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                     time_units = pq.min,
                                                     name = "Rin")
                 
+                # NOTE: 2024-05-13 17:14:46
+                # create new irregular signals as needed (DC, Rs, Rin), or 
+                # append to the existing ones
+                #
                 if "DC" not in self._runData_.results[src.name][p.name]:
                     self._runData_.results[src.name][p.name]["DC"] = DC
                 else:
@@ -2024,7 +2053,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         s = pathSweeps[0]
         
         block = self._runData_.results[src.name][p.name]["pathway_responses"]   # generated in LTPOnline.__init__
-        viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in LTPOnline.__init__
+        # viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in LTPOnline.__init__
         currentTrial = self._runData_.currentAbfTrial
         
         sig = currentTrial.segments[s].analogsignals[adc.logicalIndex]
@@ -2035,6 +2064,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # crossTalk setting is wrong and not needed, really
         # crossTalk = False
 
+        # NOTE: set up measures for the first run;
+        # since we only measure during tracking protocols, all trials recorded
+        # using this protocol use the same locations.
+        #
+        # The measurements themselves are done using SignalCursor objects in the
+        # pathway response viewer windows (which are NOT serializable), with the
+        # advantage that they can be adjusted by the user (and thus affecting the
+        # measurement in ALL subsequent sweeps, NOT the current one)
+        #
+        # We store these measures with locations based on Datacursor objects, 
+        # which are serializable (i.e. can be saved/pickled), on the implication
+        # than ALL cursors in these measures are vertical cursors.
+        #
+        #
         if "measures" not in self._runData_.results[src.name][p.name]:
             pMeasures = dict()
             measureTime = self._runData_.abfTrialDeltaTimesMinutes[-1] # needed below
@@ -2103,8 +2146,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # • for response amplitude use 10 ms AFTER stimulus, with window 3 ms
                 # • cursors should be manually adjusted in the pathway responses windows
                 #
-                dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
-                dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
+                dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s, name=f"{labelPfx}{kt}Base") for kt, t in enumerate(stimTimes)]
+                dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s, name=f"{labelPfx}{kt}") for kt, t in enumerate(stimTimes)]
                 
                 locationMeasureFunctor = ephys.amplitudeMeasure
                 measureUnits = sig.units
@@ -2124,8 +2167,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # we take 5 ms and 10 ms AFTER the stimulus - they'd have to be
                     # adjusted on the signal viewer window for the pathway;
                     # cusros windows are 2 ms each
-                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t + 0.005 * pq.s, 0.002 * pq.s) for t in stimTimes]
-                    dataCursorsResponses = [DataCursor(t0 + holdingTime + t + 0.01 * pq.s, 0.002 * pq.s) for t in stimTimes]
+                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t + 0.005 * pq.s, 0.002 * pq.s, name=f"{labelPfx}{kt}Base") for kt, t in enumerate(stimTimes)]
+                    dataCursorsResponses = [DataCursor(t0 + holdingTime + t + 0.01 * pq.s, 0.002 * pq.s, name=f"{labelPfx}{kt}") for kt, t in enumerate(stimTimes)]
                     
                     locationMeasureFunctor = ephys.chordSlopeMeasure
                     measureUnits = sig.units/sig.times.units # (e.g., mV/ms)
@@ -2133,8 +2176,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                 else:
                     # do the same as for voltage clamp above.
-                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
-                    dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
+                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s, name=f"{labelPfx}{kt}Base") for kt, t in enumerate(stimTimes)]
+                    dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s, name=f"{labelPfx}{kt}") for kt, t in enumerate(stimTimes)]
                     
                     locationMeasureFunctor = ephys.amplitudeMeasure
                     measureUnits = sig.units
@@ -2144,17 +2187,20 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # create signal cursors if needed, then measure
             for kc, c in enumerate(dataCursorsResponsesBase):
                 measureLabel = f"{labelPfx}{kc}"
-                if viewer.signalCursor(f"{measureLabel}Base") is None:
-                    viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{measureLabel}Base", label_position=0.85)
+                # if viewer.signalCursor(f"{measureLabel}Base") is None:
+                #     viewer.addCursor(SignalCursorTypes.vertical, c, label_position=0.85)
+                    # viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{measureLabel}Base", label_position=0.85)
                     
-                if viewer.signalCursor(f"{measureLabel}") is None:
-                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{measureLabel}", label_position=0.85)
+                # if viewer.signalCursor(f"{measureLabel}") is None:
+                #     viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label_position=0.85)
+                    # viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{measureLabel}", label_position=0.85)
                     
                 pMeasures[measureLabel] = {"measure": locationMeasureFunctor,
-                                           "locations": (viewer.signalCursor(f"{measureLabel}Base"),
-                                                        viewer.signalCursor(f"{measureLabel}")),
+                                           # "locations": (viewer.signalCursor(f"{measureLabel}Base"),
+                                           #              viewer.signalCursor(f"{measureLabel}")),
+                                           "locations": (c,dataCursorsResponses[kc]),
                                            "args" : [],
-                                           "sweeps": pathSweeps, # redundant ?!?
+                                           # "sweeps": pathSweeps, # redundant ?!?
                                            "name": measureName,
                                            }
                                         
@@ -2165,7 +2211,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #  NOTE: 2024-03-02 11:55:36 membraneTestEpoch and testStart are calculated in processProtocol
             #  because they are the same for both pathways (they are specific to the recording source)
             #
-            
             if isinstance(membraneTestEpoch, pab.ABFEpoch):
                 # self.print(f"testStart = {testStart}; testDuration = {testDuration}")
                 if testStart + testDuration < dac.getEpochRelativeStartTime(firstDigStimEpoch, 0):
@@ -2219,24 +2264,47 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     raise RuntimeError("Membrane test appears to overlap with synaptic stimulation epochs")
                 
                 if clampMode == ClampMode.VoltageClamp:
-                    # last 10 ms before end of test, window of 5 ms
-                    if viewer.signalCursor("DC") is None:
-                        dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 0.005 * sig.times.units)
-                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC", label_position=0.85)
-                        
-                    if viewer.signalCursor("Rs") is None:
-                        dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 0.005 * sig.times.units)
-                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs", label_position=0.85)
-                        
-                    if viewer.signalCursor("Rin") is None:
-                        dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 0.005*sig.times.units)
-                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin", label_position=0.85)
+                    # NOTE: 2024-05-13 16:54:41
+                    # set up location measure for the first run; on subsequent
+                    # runs we rely on signal cursor positions in the path viewer,
+                    # possibly adjusted
+                    #
+                    dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 
+                                                0.005 * sig.times.units, 
+                                                name="DC")
+                    
+                    dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 
+                                                0.005 * sig.times.units, 
+                                                name="Rs")
+                    
+                    dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 
+                                                0.005*sig.times.units, 
+                                                name="Rin")
+                    
+#                     if viewer.signalCursor("DC") is None:
+#                         dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 
+#                                                    0.005 * sig.times.units, 
+#                                                    name="DC")
+#                         # viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC", label_position=0.85)
+#                         
+#                     if viewer.signalCursor("Rs") is None:
+#                         dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 
+#                                                    0.005 * sig.times.units, 
+#                                                    name="Rs")
+#                         # viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs", label_position=0.85)
+#                         
+#                     if viewer.signalCursor("Rin") is None:
+#                         dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 
+#                                                    0.005*sig.times.units, 
+#                                                    name="Rin")
+                        # viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin", label_position=0.85)
                     
                     
                     pMeasures["MembraneTest"] = {"measure": ephys.membraneTestVClampMeasure,
-                                                 "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
+                                                 # "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
+                                                 "locations": (dataCursorDC, dataCursorRs, dataCursorRin),
                                                  "args": (testAmplitude,),
-                                                 "sweeps": pathSweeps,
+                                                 # "sweeps": pathSweeps,
                                                  "name": "MembraneTest",
                                                 }
                 elif clampMode == ClampMode.CurrentClamp:
@@ -2417,6 +2485,7 @@ class LTPOnline(QtCore.QObject):
                 
                 viewer = sv.SignalViewer(parent=self._parentWindow_, scipyenWindow = self._emitterWindow_,
                                          win_title = f"{src.name} {p.name} Synaptic Responses")
+                viewer.sig_signalCursorPositionChanged[SignalCursor].connect(self.slot_signalCursorPositionChanged)
                 viewer.hideSelectors()
                 viewer.hideMainToolbar()
                 viewer.showNavigator()
@@ -2757,7 +2826,33 @@ class LTPOnline(QtCore.QObject):
                             if isinstance(viewer, QtWidgets.QMainWindow):
                                 viewer.close()
 
-
+    @Slot(SignalCursor)
+    def slot_signalCursorPositionChanged(self, c:SignalCursor):
+        """Updates the X coordinate of the location measure after a SignalCursors was adjusted by the user"""
+        emitter = self.sender()
+        for src_name, src_dict in self._viewers_.items():
+            for path_name, path_dict in src_dict.items():
+                if emitter == path_dict["pathway_viewer"]:
+                    cmeasure = c.ID
+                    baseMeasure = cmeasure.replace("Base", "")
+                    if baseMeasure in self._results_[src_name][path_name]["measures"]:
+                        locationNdx = 0 if "Base" in cmeasure else 1
+                        dc = self._results_[src_name][path_name]["measures"][baseMeasure]["locations"][locationNdx]
+                        if isinstance(dc, DataCursor):
+                            dc.coord = c.x
+                            dc.span = c.xwindow
+                    
+                    else:
+                        mbTestMeasures = self._results_[src_name][path_name]["measures"].get("MembraneTest", dict())
+                        if len(mbTestMeasures) and "locations" in mbTestMeasures and all(isinstance(v, DataCursor) for v in mbTestMeasures["locations"]):
+                            mbTestLocs = [l.name for l in mbTestMeasures["locations"]]
+                            if baseMeasure in mbTestLocs:
+                                locationNdx = mbTestLocs.index(baseMeasure)
+                                dc = mbTestLocs[locationNdx]
+                                if isinstance(dc, DataCursor):
+                                    dc.coord = c.x
+                                    dc.span = c.xwindow
+                    
                
     @Slot()
     def slot_doWork(self):
@@ -2988,6 +3083,10 @@ class LTPOnline(QtCore.QObject):
                     if p_name in ("DACPaths", "DIGPaths"):
                         continue
                     path_responses = path["pathway_responses"]
+                    if isinstance(path_responses, neo.Block):
+                        path_responses.annotations["measures"] = dict()
+                        path_responses.annotations["measures"].update(self._runData_.results[src_name][p_name]["measures"])
+                        
                     wf.assignin(path_responses, f"{src_name}_{p_name}_synaptic_responses")
                     initialResponse = [(k, v) for k, v in path.items() if k in ("EPSC0", "EPSP0")]
                     if len(initialResponse):

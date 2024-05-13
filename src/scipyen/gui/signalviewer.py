@@ -416,6 +416,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     sig_newEpochInData = Signal(name="sig_newEpochInData")
     sig_axisActivated = Signal(int, name="sig_axisActivated")
     sig_frameDisplayReady = Signal(name="sig_frameDisplayReady")
+    sig_signalCursorPositionChanged = Signal(SignalCursor, name="sig_signalCursorPositionChanged")
     
     closeMe  = Signal(int)
     frameChanged = Signal(int)
@@ -3006,7 +3007,7 @@ anything else       anything else       ❌
         crsID = self._addCursor_(cursor_type = cursorType,
                                 x = x, y = y, xwindow = xwindow, ywindow = ywindow,
                                 xBounds = xBounds, yBounds = yBounds,
-                                axis = axis, label=label,
+                                axis = axis, label=cname,
                                 follows_mouse=follows_mouse,
                                 precision = precision,
                                 editFirst = editFirst,
@@ -3306,6 +3307,9 @@ anything else       anything else       ❌
     @safeWrapper
     def slot_reportCursorPosition(self, crsId = None):
         self.reportCursors()
+        if isinstance(crsId, str) and len(crsId.strip()):
+            c = self.signalCursor(crsId)
+            self.sig_signalCursorPositionChanged.emit(c)
         
     @Slot(bool)
     def _slot_mainToolbarVisibilityChanged(self, val):
@@ -3819,12 +3823,27 @@ anything else       anything else       ❌
         # print(f"{self.__class__.__name__}._addCursor_ crsPrefix = {crsPrefix}")
         
         if label is None:
-            crsId = "%s%s" % (crsPrefix, str(nCursors))
+            if cursor_type in ("vertical", "v", SignalCursorTypes.vertical) and isinstance(x, DataCursor):
+                label = getattr(x, 'name', None)
+                
+            elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal) and isinstance(y, DataCursor):
+                label = getattr(y, "name", None)
+                
+            elif cursor_type in ("crosshair", "c", SignalCursorTypes.crosshair) and all(isinstance(v, DataCursor) for v in (x,y)):
+                labels = list(filter(lambda x: isinstance(x, str) and len(x.strip()), [getattr(v, "name", None) for v in (x,y)]))
+                if len(labels):
+                    label = "_".join(labels)
+                
+            if label is None:
+                crsId = "%s%s" % (crsPrefix, str(nCursors))
+                
+            else:
+                crsId = label
             
         else:
-            currentCursorLabels = cursorDict.keys()
+            currentCursorLabels = list(cursorDict.keys() )
             
-            crsId = label
+            crsId = counter_suffix(label, currentCursorLabels)
             
         if precision is None:
             if isinstance(axis, pg.PlotItem):
