@@ -880,8 +880,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # create a new episode here, using _runData_.newEpisodeOnNextRun
             if len(self._runData_.newEpisodeOnNextRun) == 2:
                 if len(self._runData_.episodes):
+                    #  NOTE: 2024-05-13 08:47:25
                     # finalize the previous episode
-                    self._runData_.episodes[-1].endFrame = self._runData_.sweeps-1
+                    # the current protocol hasn't been processed yet, therefore
+                    # sweeps from current trial haven't been distributed yet,
+                    # across pathways.
+                    self._runData_.episodes[-1].endFrame = self._runData_.sweeps
                     if isinstance(self._runData_.prevAbfTrial, neo.Block):
                         self._runData_.episodes[-1].end=self._runData_.prevAbfTrial.rec_datetime
                     else:
@@ -890,6 +894,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 eType, eName = self._runData_.newEpisodeOnNextRun
                 episode = RecordingEpisode(eType, name=eName, protocol=protocol)
                 episode.begin = currentAbfTrial.rec_datetime
+                # NOTE: 2024-05-13 08:49:42
+                # next episode starts with the next sweep (which hasn't been added yet)!
                 episode.beginFrame = self._runData_.sweeps
                 self._runData_.episodes.append(episode)
                 self._runData_.newEpisodeOnNextRun = tuple() # invalidate the request
@@ -922,11 +928,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 
             if self._runData_.exportedResults:
                 self._runData_.exportedResults = False
-
-            self._runData_.sweeps += 1
-            self._runData_.totalSweeps += 1
-            
-            # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
 
         except:
             traceback.print_exc()
@@ -1441,7 +1442,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         else:
                             currentEpisode.end = self._runData_.currentAbfTrial.rec_datetime
                             
+                        # NOTE: 2024-05-13 08:41:50
+                        # current sweep(s) haven't been added yet
                         currentEpisode.endFrame = self._runData_.sweeps
+                        
                         xtalkEpisode = RecordingEpisode(currentEpisode.type,
                                                         name=f"{currentEpisode.type.name}_XTalk", 
                                                         begin = self._runData_.currentAbfTrial.rec_datetime,
@@ -1451,8 +1455,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         self._runData_.episodes.append(xtalkEpisode)
                         currentEpisode = xtalkEpisode
                     
-                    # self._runData_.pathStimsBySweep = pathStimsBySweep
-                        
                 else: # single path stimulation per sweep
                     # self.print("\t\tnormal tracking protocol")
                     if len(currentEpisode.xtalk) > 0 and self._runData_.pathStimsBySweep != pathStimsBySweep:
@@ -1462,6 +1464,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         else:
                             currentEpisode.end = self._runData_.currentAbfTrial.rec_datetime
                         
+                        # NOTE: 2024-05-13 08:42:17
+                        # see NOTE: 2024-05-13 08:41:50
                         currentEpisode.endFrame = self._runData_.sweeps
                         
                         newEpisode = RecordingEpisode(currentEpisode.type, 
@@ -1646,24 +1650,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                 if isinstance(self._runData_.viewers[src.name][p.name][initResponseLabel], sv.SignalViewer):
                                     self._runData_.viewers[src.name][p.name][initResponseLabel].winTitle += f" {p.pathwayType.name}"
                                     
-#                             block = self._runData_.results[src.name][p.name]["pathway_responses"]
-#                     
-#                             seg_indexes = range(len(block.segments), len(block.segments) + len(self._runData_.currentAbfTrial.segments))
-#                             segments = [neo.Segment(rec_datetime = s.rec_datetime,
-#                                                     index = k) for k,s in zip(seg_indexes, self._runData_.currentAbfTrial.segments) ]
-#                             # old_signals = block.segments[-1].analogsignals
-#                             # populate with dummy signals (so that plotting is refreshed — SignalViewer BUG 2024-05-09 08:56:00 )
-#                             for k, s in enumerate(self._runData_.currentAbfTrial.segments):
-#                                 signals = [neo.AnalogSignal(np.full_like(sig, fill_value = 0.0), 
-#                                                             units = sig.units, t_start = sig.t_start,
-#                                                             sampling_rate = sig.sampling_rate,
-#                                                             name = sig.name) for sig in s.analogsignals]
-#                                 segments[k].analogsignals += signals
-#                                 
-#                             self._runData_.results[src.name][p.name]["pathway_responses"].segments.extend(segments)
-#                             self._runData_.viewers[src.name][p.name]["pathway_viewer"].view(self._runData_.results[src.name][p.name]["pathway_responses"])
-#                             self._runData_.viewers[src.name][p.name]["pathway_viewer"].currentFrame = len(self._runData_.results[src.name][p.name]["pathway_responses"].segments)-1
-                            
                 self.distributeSweeps(src, adc)
     
     def distributeSweeps(self, src:RecordingSource, adc:pab.ABFInputConfiguration):
@@ -1712,9 +1698,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                 self._runData_.viewers[src.name][path.name]["pathway_viewer"].view(block)
                 self._runData_.viewers[src.name][path.name]["pathway_viewer"].currentFrame = len(block.segments)-1
+                
+            # NOTE: 2024-05-13 08:37:09
+            # one sweep added per pathway ⟹ episodes should each have self._runData_.sweeps
+            self._runData_.sweeps += 1 
             
         elif currentEpisode.type & RecordingEpisodeType.Conditioning:
             # self.print(f"{self.__class__.__name__}.distributeSweeps for conditioning episode")
+            # NOTE: 2024-05-13 08:37:33
+            # add ALL conditioning sweeps in the conditioning block to the 
+            # test pathway
             for sweep, paths in self._runData_.pathStimsBySweep:
                 path = paths[0]
                 assert path == self._runData_.results[src.name][path.name]["pathway"], printStyled("synaptic pathway mismatch between the protocol and pathway stimulation by sweep")
@@ -1739,6 +1732,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 self._runData_.viewers[src.name][path.name]["pathway_viewer"].view(block)
                 self._runData_.viewers[src.name][path.name]["pathway_viewer"].currentFrame = len(block.segments)-1
                 
+                # NOTE: 2024-05-13 08:39:24
+                # also add same number of sweeps, but containing dummy signals, 
+                # to the control pathway
                 for p in controlPaths:
                     b = self._runData_.results[src.name][p.name]["pathway_responses"]
                     seg = neo.Segment(index = segment.index)
@@ -1761,7 +1757,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].view(b)
                     self._runData_.viewers[src.name][p.name]["pathway_viewer"].currentFrame = len(b.segments)-1
                 
-        
+            self._runData_.sweeps += len(self._runData_.pathStimsBySweep)
                             
     def measurePathway(self, src: RecordingSource, p: SynapticPathway,
                        adc:pab.ABFInputConfiguration, isAlt:bool=False):
