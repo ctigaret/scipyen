@@ -127,7 +127,8 @@ LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.
 optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
+# __ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
+__ui_path__ = adapt_ui_path(__module_path__,"LTPOnline.ui")
     
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
@@ -3469,6 +3470,18 @@ class LTPOnline(QtCore.QObject):
         self._instance = None
         self.__del__()
             
+
+class TwoPathwaysOnlineLTP(__UI_LTPWindow__):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+    
+    self._configureUi_()
+    
+    def _configureUi_(self):
+        self.setupUi(self)
+        
+
+
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     
