@@ -15,10 +15,10 @@ echo Activating mamba environment %env_name%
 call mamba activate %env_name% || goto eof
 call mamba config --add channels conda-forge || goto eof
 rem  call mamba install --prefix %env_name% -y --file %conda_reqs%
-echo Installing PyQt5 and QtPy
-call mamba install --prefix %env_name% -y PyQt5 || goto eof
-call mamba install --prefix %env_name% -y PyQt5-sip || goto eof
-call mamba install --prefix %env_name% -y QtPy || goto eof
+rem  echo Installing PyQt5 and QtPy
+rem  call mamba install --prefix %env_name% -y PyQt5 || goto eof
+rem  call mamba install --prefix %env_name% -y PyQt5-sip || goto eof
+rem  call mamba install --prefix %env_name% -y QtPy || goto eof
 echo Installing jupyter
 call mamba install --prefix %env_name% -y jupyter || goto eof
 rem  echo Installing jupyter_cms
