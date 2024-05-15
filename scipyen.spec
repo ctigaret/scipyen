@@ -447,6 +447,10 @@ a = Analysis(
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+options = [
+    ('X', 'frozen_modules=off', None, 'OPTION')
+    ]
+
 if sys.platform == "win32":
     exe = EXE(
         pyz,
@@ -464,7 +468,8 @@ if sys.platform == "win32":
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=os.path.join(scipyen_dir, "doc/install/pythonbackend.ico")
+        icon=os.path.join(scipyen_dir, "doc/install/pythonbackend.ico"),
+        options = options
     )
 else:
     exe = EXE(
@@ -483,6 +488,7 @@ else:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
+        options=options
     )
     
 coll = COLLECT(
