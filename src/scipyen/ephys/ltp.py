@@ -3471,11 +3471,11 @@ class LTPOnline(QtCore.QObject):
         self.__del__()
             
 
-class TwoPathwaysOnlineLTP(__UI_LTPWindow__):
+class TwoPathwaysOnlineLTP(__UI_LTPWindow__, __QMainWindow__):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
     
-    self._configureUi_()
+        self._configureUi_()
     
     def _configureUi_(self):
         self.setupUi(self)
