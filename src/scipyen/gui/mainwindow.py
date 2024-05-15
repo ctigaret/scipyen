@@ -149,8 +149,7 @@ from IPython.display import set_matplotlib_formats
 from IPython.core.history import HistoryAccessor
 
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-from qtpy.QtCore import (Signal, Slot,
-                          QEnum, Property,)
+from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
 # from PyQt5.uic import loadUiType
 # from PyQt5.QtCore import (Signal, Slot,

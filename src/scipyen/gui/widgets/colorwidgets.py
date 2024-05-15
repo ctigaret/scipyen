@@ -42,7 +42,8 @@ from functools import partial
 import numpy as np
 
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
-from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
 # from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
 # from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 

@@ -7,7 +7,8 @@ from enum import IntEnum, auto
 from functools import partial
 
 from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
 # from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
 # from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 

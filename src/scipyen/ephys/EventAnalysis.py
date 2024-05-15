@@ -8,7 +8,8 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
                                 needs_local_scope)
 
 from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
 from qtpy.uic import loadUiType as __loadUiType__
 # from  import QtCore, QtGui, QtWidgets
 # from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property

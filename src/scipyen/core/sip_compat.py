@@ -1,5 +1,6 @@
 from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
 
 try:
     from qtpy import sip as sip

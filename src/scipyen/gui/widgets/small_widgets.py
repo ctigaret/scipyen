@@ -4,7 +4,8 @@ import quantities as pq
 import pandas as pd
 from core.utilities import get_least_pwr10
 from qtpy import (QtCore, QtWidgets, QtGui)
-from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
 from qtpy.uic import loadUiType
 # from PyQt5 import (QtCore, QtWidgets, QtGui)
 # from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property

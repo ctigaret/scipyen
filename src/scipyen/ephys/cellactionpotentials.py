@@ -42,7 +42,8 @@ from scipy import optimize, cluster
 
 # NOTE: 2019-07-29 13:09:02 do I really need these 2 lines?
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
 # from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
 # from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 

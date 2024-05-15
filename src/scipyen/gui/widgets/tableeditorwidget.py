@@ -13,7 +13,8 @@ import neo
 import vigra
 
 from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
 from qtpy.uic import loadUiType as __loadUiType__
 # from PyQt5 import QtCore, QtGui, QtWidgets
 # from PyQt5.QtCore import Signal, Slot, QEnum, Property
