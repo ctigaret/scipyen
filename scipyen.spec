@@ -12,6 +12,9 @@ try:
 except:
     hasNeuron = False
 
+# print(f"argv: {sys.argv}")
+# print(f"orig_argv: {sys.orig_argv}")
+
 myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 myfile = pathlib.Path(myfile).absolute()
 scipyen_dir = os.fspath(myfile.parent)
@@ -44,11 +47,15 @@ print(f"scipyen_dir = {scipyen_dir}")
 # TODO: For more customization contemplate calling pyinstaller as above from a
 # bash script
 
+# NOTE: 2024-05-15 09:03:24
+# looks like we do have to define DEFAULT_DISTPATH
+DEFAULT_DISTPATH = "./dist"
 
-if "--distpath" in sys.argv:
-    ndx = sys.argv.index("--distpath")
-    if ndx < (len(sys.argv) - 1):
-        distpath = sys.argv[ndx+1]
+
+if "--distpath" in sys.orig_argv:
+    ndx = sys.orig_argv.index("--distpath")
+    if ndx < (len(sys.orig_argv) - 1):
+        distpath = sys.orig_argv[ndx+1]
 
     else:
         distpath = DEFAULT_DISTPATH
