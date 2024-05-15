@@ -24,9 +24,12 @@ print(f"scipyen_dir = {scipyen_dir}")
 # NOTE: 2023-06-26 17:25:32
 # This is for the developer, NOT the final user:
 # To create a distributable scipyen application, you need to:
+#
 # 1) clone the scipyen git repo locally (e.g. to $HOME/scipyen)- NOTE: this is assumed to be the case from here onwards
+#
 # 2) use the install.sh script to create a local virtual environment with all the 
 #   binaries needed for Scipyen (this includes building PyQt5, VIGRA and - -optionally - NEURON)
+#
 # 3) activate the new environment, then buld the distributable app:
 #   in a bash shell do something like (NOTE: 'user@host:>'is your terminal prompt
 #   and it may look different on your machine, make sure you understand this):
@@ -38,7 +41,13 @@ print(f"scipyen_dir = {scipyen_dir}")
 #   alternatively, you don't have to cd to scipyen_app, so from the $HOME, call:
 #       user@host:> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
 #
+# 4) On Windows:
+# • assuming the following (please adjust pathways to reflect your local machine; avoid spaces in directory and file names):
+#   ∘ scipyen git clone is in e:\scipyen
+#   ∘ python's virtual envronment (created with mambaforge, see below) is in e:\scipyenv
+#   ∘ there exists a scipyen_app directory where the frozen bundle will be created — e.g, e:\scipyen_app
 #
+#  
 # On windows I use mamba (a faster alternative to <ana>conda) to build a virtual environment (e.g. e:\scipyenv) - best is
 # to use a Miniforge terminal running with as administrator.
 # With that environment activated (see mamba documentation for details), call (e.g. from the root of e: drive):
@@ -445,10 +454,10 @@ if sys.platform == "win32":
         [],
         exclude_binaries=True,
         name='scipyen', # name of the final executable
-        debug=False,
+        debug=1,
         bootloader_ignore_signals=False,
         strip=False,
-        upx=True,
+        upx=False,
         console=True,
         disable_windowed_traceback=False,
         argv_emulation=False,
