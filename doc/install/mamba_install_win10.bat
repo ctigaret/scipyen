@@ -88,6 +88,9 @@ call pip install -r %pip_reqs% || goto eof
 powershell -ExecutionPolicy Bypass -File %mydir%\make_link.ps1 %mydir%  || goto eof
 echo Scipyen can now be launched from the desktop icon
 
+powershell -ExecutionPolicy Bypass -File %mydir%\make_scipyen_batch_scripts.ps1 %mydir%  || goto eof
+echo Scipyen (git clone) can now be called from the command prompt by executing the `scipyen` command
+echo Scipyen pyrthon environent can be activates from the command prompt by executing the `scipyact` command
 
 :eof
 rem  endlocal
