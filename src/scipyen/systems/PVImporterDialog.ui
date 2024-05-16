@@ -61,7 +61,8 @@
           <string>...</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open"/>
+          <iconset theme="document-open">
+           <normaloff>.</normaloff>.</iconset>
          </property>
         </widget>
        </item>
@@ -89,7 +90,8 @@
           <string>...</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open"/>
+          <iconset theme="document-open">
+           <normaloff>.</normaloff>.</iconset>
          </property>
         </widget>
        </item>
@@ -116,7 +118,8 @@
           <string>...</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open"/>
+          <iconset theme="document-open">
+           <normaloff>.</normaloff>.</iconset>
          </property>
         </widget>
        </item>
@@ -504,9 +507,7 @@
    </item>
   </layout>
  </widget>
- <resources>
-  <include location="../gui/resources/resources.qrc"/>
- </resources>
+ <resources/>
  <connections>
   <connection>
    <sender>buttonBox</sender>
