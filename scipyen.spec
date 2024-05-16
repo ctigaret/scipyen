@@ -418,10 +418,6 @@ a = Analysis(
     [os.path.join(scipyen_dir, 'src/scipyen/scipyen.py')],
     pathex=[os.path.join(scipyen_dir, 'src/scipyen')], # ← to find the scipyen package
     binaries=binaries,
-    # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
-    #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
-    #           ('/home/cezar/scipyenv.3.11.3/lib64/*', 'lib64'),
-    #           ],
     datas=datas,
     # NOTE: 2023-06-28 11:08:08
     # Example of what is needed for this attribute:
@@ -478,7 +474,7 @@ else:
         [],
         exclude_binaries=True,
         name='scipyen', # name of the final executable
-        debug=False,
+        debug=1,
         bootloader_ignore_signals=False,
         strip=False,
         upx=True,
