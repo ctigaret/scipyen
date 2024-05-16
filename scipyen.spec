@@ -293,7 +293,7 @@ product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
 
-print(f"bundlepath = {bundlepath}")
+# print(f"bundlepath = {bundlepath}")
 if sys.platform == "linux":
     desktoptempdir = tempfile.mkdtemp()
     desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
@@ -367,7 +367,7 @@ datas.extend(yamltoc)
 # I think the next line below ('collect_all') is better than trying to see what
 # can be tweaked in hook-pygments.py / hook-pkg_resources.py
 jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
-print(f"jqc_hiddenimports = {jqc_hiddenimports}")
+# print(f"jqc_hiddenimports = {jqc_hiddenimports}")
 datas.extend(jqc_datas)
 binaries.extend(jqc_binaries)
 hiddenimports.extend(jqc_hiddenimports)
@@ -377,7 +377,7 @@ hiddenimports.extend(jqc_hiddenimports)
 # when starting external IPython console in Scipyen)
 
 jc_datas, jc_binaries, jc_hiddenimports = collect_all("jupyter_client")
-print(f"jc_hiddenimports = {jc_hiddenimports}")
+# print(f"jc_hiddenimports = {jc_hiddenimports}")
 datas.extend(jc_datas)
 binaries.extend(jc_binaries)
 hiddenimports.extend(jc_hiddenimports)
