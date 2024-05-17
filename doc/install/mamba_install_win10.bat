@@ -84,6 +84,7 @@ call mamba install --prefix %env_name% -y pyinstaller || goto eof
 
 echo Installing additional PyPI packages
 call pip install -r %pip_reqs% || goto eof
+call pip install https://github.com/pyinstaller/pyinstaller/archive/develop.zip || goto eof
 
 powershell -ExecutionPolicy Bypass -File %mydir%\make_link.ps1 %mydir%  || goto eof
 echo Scipyen can now be launched from the desktop icon
