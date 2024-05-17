@@ -299,7 +299,8 @@ day = f"{now.day}"
 hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
-product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
+product = f"scipyen{namesfx}_{platform}_{year}{month}{day}_{hr}_{mn}_{sc}"
+# product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
 
