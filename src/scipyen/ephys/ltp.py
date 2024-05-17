@@ -82,6 +82,8 @@ from core.quantities import(arbitrary_unit,
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
                             get_index_for_seq, 
+                            safe_identity_test,
+                            eq,
                             sp_set_loc,
                             normalized_index,
                             unique,
@@ -89,6 +91,7 @@ from core.utilities import (safeWrapper,
                             GeneralIndexType,
                             counter_suffix,
                             NestedFinder)
+
 
 #### END pict.core modules
 
@@ -103,7 +106,8 @@ import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 from gui.cursors import (SignalCursor, DataCursor, SignalCursorTypes)
-from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker)
+from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker, WorkspaceGuiMixin)
+from gui import scipyen_colormaps as colormaps
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -3471,17 +3475,119 @@ class LTPOnline(QtCore.QObject):
         self.__del__()
             
 
-class TwoPathwaysOnlineLTP(__UI_LTPWindow__, __QMainWindow__):
+class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWindow__):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+        
+        self._metadata_ = DataBag()
+        
+        self._metadata_.name = ""
+        self._metadata_.annotations = {"Source": "", "Cell": "", "Field": "",
+                                       "Genotype": "", "Sex": "", "Age": ""}
+        
+        self._metadata_.source = None
+        self._metadata_.workdir = os.getcwd()
+        
+        self._onlineLTP_ = None
+        
+        self._pathSpinBoxBgDefaultColor = QtGui.QColor()
+        self._darkUI = False
     
         self._configureUi_()
     
     def _configureUi_(self):
         self.setupUi(self)
+        self._pathSpinBoxBgDefaultColor = self.path0SpinBox.palette().color(QtGui.QPalette.Active, QtGui.QPalette.Window)
         
-
-
+        self._darkUI = self._pathSpinBoxBgDefaultColor.getHsv()[2] < 128
+        
+        self.ADCIndexSpinBox.valueChanged.connect(self._slot_adc_changed)
+        self.DACIndexSpinBox.valueChanged.connect(self._slot_dac_changed)
+        self.path0SpinBox.valueChanged.connect(self._slot_path_channel_changed)
+        self.path1SpinBox.valueChanged.connect(self._slot_path_channel_changed)
+        self.metaDataWidget.sig_valueChanged.connect(self._slot_metaDataChanged)
+        
+    @Slot()
+    def _slot_metaDataChanged(self):
+        newData = False
+        if self._metadata_.name != self.metaDataWidget.dataName:
+            self._metadata_.name = self.metaDataWidget.dataName
+            newData = True
+            
+        if eq(self._metadata_.annotations["Source"], self.metaDataWidget.sourceID):
+            # avoid pitfalls of pandas NAType
+            self._metadata_.annotations["Source"] = self.metaDataWidget.sourceID
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Cell"], self.metaDataWidget.cell):
+            self._metadata_.annotations["Cell"] = self.metaDataWidget.cell
+            newData = True
+            
+        if not eq (self._metadata_.annotations["Field"], self.metaDataWidget.field):
+            self._metadata_.annotations["Field"] = self.metaDataWidget.field
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Genotype"], self.metaDataWidget.genotype):
+            self._metadata_.annotations["Genotype"] = self.metaDataWidget.genotype
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Sex"], self.metaDataWidget.sex):
+            self._metadata_.annotations["Sex"] = self.metaDataWidget.sex
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Age"], self.metaDataWidget.age):
+            self._metadata_.annotations["Age"] = self.metaDataWidget.age
+            newData = True
+            
+        if newData:
+            self._metadata_.source = twoPathwaysSource()
+            
+    @Slot(int)
+    def _slot_adc_changed(self, val:int):
+        if val < 0 : 
+            val = 0
+            
+        pass
+    
+    @Slot(int)
+    def _slot_dac_changed(self, val:int):
+        if val < 0:
+            val = 0
+            
+        pass
+    
+    @Slot(int)
+    def _slot_path_channel_changed(self, val:int):
+        w = self.sender()
+        w1 = self.path1SpinBox if w == self.path0SpinBox else self.path0SpinBox
+        
+        if val < 0:
+            val = 0
+            
+        p = w.palette()
+        p1 = w1.palette()
+        
+        c = p.color(w.backgroundRole())
+        c1 = p1.color(w1.backgroundRole())
+        
+        warnC = colormaps.qcolor(f"{'#aa0000'  if self._darkUI else '#ff0000'}")
+        
+        if val == w1.value():
+            if c != warnC:
+                if c1 != warnC:
+                    p1.setColor(w1.backgroundRole(), warnC)
+                    w1.setPalette(p1)
+                p.setColor(w.backgroundRole(), warnC)
+                w.setPalette(p)
+                
+        else:
+            if c != self._pathSpinBoxBgDefaultColor:
+                if c1 != self._pathSpinBoxBgDefaultColor:
+                    p1.setColor(w1.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                    w1.setPalette(p1)
+                p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                w.setPalette(p)
+                
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     

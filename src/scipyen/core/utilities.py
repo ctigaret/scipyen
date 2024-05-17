@@ -948,6 +948,9 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
         the data they encapsulate. Passing 'idcheck' False will cause this function
         to compare the data ontent of the objects instead of their ID.
     
+    NOTE: 2024-05-17 14:58:56
+    to save some typing, you can use the alias 'eq'
+    
 """
     try:
         
@@ -1071,6 +1074,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
         print("Call stack:")
         print(call_stack)
         
+eq = safe_identity_test
 
 class NestedFinder(object):
     """Provides searching in nesting (hierarchical) data structures.
