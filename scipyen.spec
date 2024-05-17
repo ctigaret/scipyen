@@ -47,6 +47,16 @@ print(f"scipyen_dir = {scipyen_dir}")
 #   ∘ python's virtual envronment (created with mambaforge, see below) is in e:\scipyenv
 #   ∘ there exists a scipyen_app directory where the frozen bundle will be created — e.g, e:\scipyen_app
 #
+# • as for linux (see above) you must have the scipyen python environment activated
+#   (in windows, just execute the scipyact command)
+#
+# • in windows command prompte, make sure you are in the top directory where you
+#   want to build the frozen application (e.g., e:\scipyen_app, see above)
+#
+#   for example, your prompt should look something like:
+#       (e:\scipyenv) E:\scipyen_app>
+# • run:
+#   pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm e:\scipyen\scipyen.spec
 #  
 # On windows I use mamba (a faster alternative to <ana>conda) to build a virtual environment (e.g. e:\scipyenv) - best is
 # to use a Miniforge terminal running with as administrator.
