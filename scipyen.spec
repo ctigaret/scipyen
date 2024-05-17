@@ -455,7 +455,8 @@ a = Analysis(
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 options = [
-    ('X', 'frozen_modules=off', None, 'OPTION')
+    ('X frozen_modules=off', None, 'OPTION'),
+    ('O', None, 'OPTION')
     ]
 
 if sys.platform == "win32":
