@@ -299,15 +299,17 @@ day = f"{now.day}"
 hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
-product = f"scipyen{namesfx}_{platform}_{year}{month}{day}_{hr}_{mn}_{sc}"
+build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
+product = f"scipyen{namesfx}_{platform}_{build_sfx}"
 # product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
 
 # print(f"bundlepath = {bundlepath}")
 if sys.platform == "linux":
+    # add a system-wide installation script
     desktoptempdir = tempfile.mkdtemp()
-    desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
+    desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{namesfx}.desktop")
     # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
     desktop_icon_file = "pythonbackend.svg"
     exec_file = os.path.join(bundlepath, "scipyen")
@@ -335,13 +337,13 @@ if sys.platform == "linux":
     with open(desktop_file_name, "wt") as desktop_file:
         for line in desktop_file_contents:
             desktop_file.write(f"{line}\n")
-            
+
     dist_install_script = ["#!/bin/bash",
                         "mydir=`dirname $0`",
                         "whereami=`realpath ${mydir}`",
-                        "chown -R root:root ${whereami}",
-                        "ln -s -b ${whereami}/scipyen /usr/local/bin/",
-                        "ln -s -b ${whereami}/Scipyen.desktop /usr/share/applications/"]
+                        # "chown -R root:root ${whereami}",
+                        "sudo ln -s -b ${whereami}/scipyen /usr/local/bin/",
+                        "sudo ln -s -b ${whereami}/Scipyen_app" + f"{namesfx}.desktop /usr/share/applications/"]
 
     install_script_tempdir = tempfile.mkdtemp()
     dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
@@ -520,4 +522,4 @@ if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
     
 # app_location =
 if sys.platform == "linux":
-    print(f"To install system-wide, run {os.path.join(product, '_internal', 'dist_install.sh')} as root.")
+    print(f"To install system-wide, run {os.path.join(product, '_internal', 'dist_install.sh')}.")
