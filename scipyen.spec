@@ -486,7 +486,7 @@ else:
         [],
         exclude_binaries=True,
         name='scipyen_app', # name of the final executable
-        debug=1,
+        debug=False,
         bootloader_ignore_signals=False,
         strip=False,
         upx=True,
