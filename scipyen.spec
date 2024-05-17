@@ -339,7 +339,8 @@ if sys.platform == "linux":
         for line in dist_install_script:
             dist_install.write(f"{line}\n")
             
-    datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
+    datas.append((f"{os.path.join(scipyen_dir, 'src/scipyen/gui/resources/images', desktop_icon_file)}", '.'))
+    # datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
     datas.append((desktop_file_name, '.'))
     datas.append((dist_install_script_name, '.'))
 
@@ -453,8 +454,8 @@ if sys.platform == "win32":
         a.scripts,
         [],
         exclude_binaries=True,
-        name='scipyen', # name of the final executable
-        debug=1,
+        name='scipyen_app', # name of the final executable
+        debug=False,
         bootloader_ignore_signals=False,
         strip=False,
         upx=False,
@@ -473,7 +474,7 @@ else:
         a.scripts,
         [],
         exclude_binaries=True,
-        name='scipyen', # name of the final executable
+        name='scipyen_app', # name of the final executable
         debug=1,
         bootloader_ignore_signals=False,
         strip=False,
@@ -505,3 +506,6 @@ if isinstance(tempdir, str) and os.path.isdir(tempdir):
 if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
     shutil.rmtree(desktoptempdir)
     
+# app_location =
+if sys.platform == "linux":
+    print(f"To install system-wide, run {os.path.join(product, '_internal', 'dist_install.sh')} as root.")
