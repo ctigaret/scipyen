@@ -974,6 +974,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     workspaceChanged = Signal()
     startPluginLoad = Signal()
     sig_refreshRecentFilesMenu = Signal()
+    sig_changedDirectory = Signal(str, name="sig_changedDirectory")
     sig_windowRemoved = Signal(tuple, name="sig_windowRemoved")
     
     sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
@@ -4726,7 +4727,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.fileSystemModel.dataChanged[QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>"].connect(self.slot_fileSystemDataChanged)
 
         self.dirFileMonitor = QtCore.QFileSystemWatcher(parent = self)
-        self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryChanged)
+        self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryContentsChanged)
         # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
         
         self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
@@ -5546,6 +5547,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # self.currentDirLabel.setText(targetDir)
             mpl.rcParams["savefig.directory"] = targetDir
             self.setWindowTitle("Scipyen %s" % targetDir)
+            
+            self.sig_changedDirectory.emit(targetDir)
+            
             # print(f"{self.__class__.__name__}.slot_changeDirectory targetDir = {targetDir}")
             
             # NOTE: 2023-09-27 21:03:16
@@ -7416,11 +7420,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print(f"{self.__class__.__name__}.enableDirectoryMonitor directory = {directory}; will monitor = {on}" )
 
         if not on: # => remove this directory from the monitoring system & return
-            # self._isDirWatching_ = False
-            # self._monitoredDirsCache_.clear()
             watchedDirs = self.dirFileMonitor.directories()
-            # if len(watchedDirs):
-            #     self.dirFileMonitor.removePaths(watchedDirs)
             # NOTE: this is if we decide to watch several directories
             if str(directory) in watchedDirs:
                 self.dirFileMonitor.removePath(str(directory))
@@ -7429,11 +7429,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
             return
             
-        # self._isDirWatching_ = True
-        # if self.currentDir in self.dirFileMonitor.directories():
         if str(directory) in self.dirFileMonitor.directories():
-        # do nothing if directory already watched
-            print(f"{self.__class__.__name__}.enableDirectoryMonitor: The directory {directory} is already being watched")
+            # do nothing if directory already watched
+            scipywarn(f"{self.__class__.__name__}.enableDirectoryMonitor: The directory {printStyled(directory, 'yellow', True)} is already being watched")
         
         else:
             watchedDirs = self.dirFileMonitor.directories()
@@ -7441,10 +7439,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 wDir = pathlib.Path(watchedDirs[0])
                 self.dirFileMonitor.removePath(watchedDirs[0])
                 self._monitoredDirsCache_.pop(wDir, None)
-                
-            # with os.scandir(str(directory)) as dirIt:
-            #     dirItems = dict((entry.name, entry.stat()) for entry in dirIt)
-            # self._monitoredDirsCache_[directory] = dirItems
                 
             
             # NOTE: 2023-09-27 22:10:44
@@ -7454,15 +7448,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
             
             self.dirFileMonitor.addPath(str(directory))
-            # self.dirFileMonitor.addPath(self.currentDir)
 
     def watchCurrentDirectory(self):
         if not self._isDirWatching_:
             return
         
         if self.currentDir in self.dirFileMonitor.directories():
-            # do nothing if diretory already watched
-            print(f"{self.__class__.__name__}.watchCurrentDirectory: The directory {self.currentDir} is already being watched")
+            # do nothing if directory already watched
+            scipywarn(f"{self.__class__.__name__}.watchCurrentDirectory: The directory {printStyled(self.currentDir, 'yellow', True)} is already being watched")
         
         else:
             # remove prev watched directory from the file system watcher
@@ -7481,7 +7474,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     
     @safeWrapper
     @Slot()
-    def _slot_monitoredDirectoryChanged(self, *args, **kwargs):
+    def _slot_monitoredDirectoryContentsChanged(self, *args, **kwargs):
         """Called when the contents of the monitored directories have changed:
         
         • when a new file was created in the directory 
@@ -7500,7 +7493,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         Connected to self.dirFileMonitor.directoryChanged() slot
         
     """
-        #print(f"{self.__class__.__name__}._slot_monitoredDirectoryChanged (from dirFileMonitor) *args {args}, **kwargs {kwargs}")
+        #print(f"{self.__class__.__name__}._slot_monitoredDirectoryContentsChanged (from dirFileMonitor) *args {args}, **kwargs {kwargs}")
         directories = utilities.unique([pathlib.Path(d) for d in self.dirFileMonitor.directories()])
         
         for d in directories:
@@ -7512,7 +7505,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 changedItems = tuple(i[0] for i in self._monitoredDirsCache_[d].items() if i[0] in currentItems and i[0].stat() != i[1])
                 
                 if len(removedItems):
-                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged removedItems = {removedItems}\n"
+                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryContentsChanged removedItems = {removedItems}\n"
                     # self.console.writeText(txt)
                     for i in removedItems:
                         self._monitoredDirsCache_[d].pop(i, None)
@@ -7520,7 +7513,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.sig_itemsRemovedFromMonitoredDir.emit(tuple(i for i in removedItems))
                     
                 if len(newItems):
-                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged newItems = {newItems}\n"
+                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryContentsChanged newItems = {newItems}\n"
                     # self.console.writeText(txt)
                     for i in newItems:
                         self._monitoredDirsCache_[d][i] = i.stat()
@@ -7528,7 +7521,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.sig_newItemsInMonitoredDir.emit(tuple(i for i in newItems))
                     
                 if len(changedItems):
-                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryChanged changedItems = {changedItems}\n"
+                    # txt = f"{self.__class__.__name__}._slot_monitoredDirectoryContentsChanged changedItems = {changedItems}\n"
                     # self.console.writeText(txt)
                     self.sig_itemsChangedInMonitoredDir.emit(changedItems)
                     for i in changedItems:

@@ -36,7 +36,8 @@ from qtpy.uic import loadUiType as __loadUiType__
 
 #### BEGIN pict.core modules
 import core.workspacefunctions as wf
-from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace, assignin)
+from core.workspacefunctions import (user_workspace, validate_varname, 
+                                     get_symbol_in_namespace, assignin)
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.pyabfbridge as pab
@@ -63,7 +64,8 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter, with_doc, printStyled, scipywarn)
+from core.prog import (safeWrapper, AttributeAdapter, with_doc, 
+                       printStyled, scipywarn)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -106,7 +108,8 @@ import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 from gui.cursors import (SignalCursor, DataCursor, SignalCursorTypes)
-from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker, WorkspaceGuiMixin)
+from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker, 
+                              WorkspaceGuiMixin)
 from gui import scipyen_colormaps as colormaps
 #### END pict.gui modules
 
@@ -226,7 +229,6 @@ else:
 
 def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=None,
                       path0:int=0, path1:int=1, name:typing.Optional[str]=None, 
-                      
                       **kwargs):
     """Factory for a RecordingSource in two-pathways synaptic plasticity experiments.
     
@@ -272,7 +274,10 @@ def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=Non
     
     Var-keyword parameters:
     --------------------------
-    These are `auxin` and `auxout`, and by default are set to 'None'.
+    • `auxin` and `auxout`, and by default are set to 'None'.
+    • `path0name` and `path1name`: both strings -- custom names for the two pathways
+        ∘ by default, these are set to 'path0' and 'path1', respectively
+        ∘ when given, they should be different
     
     In a given application, the 'name' field of RecordingSource objects should have unique
     values in order to allow the lookup of these objects according to this field.
@@ -316,8 +321,11 @@ def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=Non
         raise TypeError(f"'name' expected to be  str or None; instead, got {type(name).__name__}")
     
     assert path0 != path1, f"Test and control pathways must correspond to output channels with distinct indexes; instead got test path: {test_path}, control path: {control_path}"
+    
+    p0name = kwargs.get("path0name", 'path0')
+    p1name = kwargs.get("path1name", 'path1')
         
-    syn     = (SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)) 
+    syn     = (SynapticStimulus('path0', p0name), SynapticStimulus('path1', p1name)) 
     auxin   = kwargs.pop("auxin", None)
     auxout  = kwargs.pop("auxout", None)
     
@@ -374,7 +382,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
                 files = None
             
         if files is None:
-            print(f"{self.__class__.__name__}:\n Looking for ABF files in directory: ({directory}) ...")
+            self.print(f"{self.__class__.__name__}:\n Looking for ABF files in directory: ({directory}) ...")
             files = os.listdir(directory)
             # files = subprocess.run(["ls"], capture_output=True).stdout.decode().split("\n")
             # print(f" Found {len(files)} ABF files")
@@ -383,7 +391,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
             simFilesPaths = list(filter(lambda x: x.is_file() and x.suffix == ".abf", [pathlib.Path(v) for v in files]))
             
             if len(simFilesPaths):
-                print(f"... found {(len(simFilesPaths))} ABF files")
+                self.print(f"... found {(len(simFilesPaths))} ABF files")
                 # NOTE: 2024-01-08 17:45:21
                 # bound to introduce some delay, but needs must, for simulation purposes
                 # print(f" Sorting {len(simFilesPaths)} ABF data based on recording time ...")
@@ -391,7 +399,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
                 # print(" ... done.")
                 
         if len(self._simulationFiles_) == 0:
-            print(f" No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
+            self.print(f" No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
                
     def print(self, msg):
         if isinstance(self._stdout_, io.TextIOBase):
@@ -450,6 +458,18 @@ class _LTPFilesSimulator_(QtCore.QThread):
         
         
 class _LTPOnlineSupplier_(QtCore.QThread):
+    """Monitors files output by electrophysiology acquisition software in a directory.
+        
+        New files output to the directory are then fed into _LTPOnlineFileProcessor_
+        
+    
+    WARNING: Currently this only supports ABF file output from Clampex™, and ONLY
+        for Clampex protocols generating auto-averaged data (i.e., it relies on 
+        intermediate, temporary, '*.rsv' files being output into the monitored
+        directory). The ABF file is supplied to the online file procssor once the
+        corresponding *.rsv file has been deleted by Clampex.
+        
+    """
     abfTrialReady = Signal(pathlib.Path, name="abfTrialReady")
     stopTimer = Signal(name="stopTimer")
     
@@ -618,9 +638,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
             print(msg)
                
     def run(self):
-        # print(f"{self.__class__.__name__}.run(): simulator = {self._simulator_}")
         if isinstance(self._simulator_, _LTPFilesSimulator_):
-            # print(f"Starting simulation...")
             self._simulator_.start()
         else:
             # starts directory monitor and captures newly created files
@@ -634,6 +652,9 @@ class _LTPOnlineSupplier_(QtCore.QThread):
                 self._simulator_.requestInterruption()
                 self._simulator_.quit()
                 self._simulator_.wait()
+                
+        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
 
         super().quit()
 
@@ -656,6 +677,11 @@ class _LTPOnlineSupplier_(QtCore.QThread):
     @property
     def watchedDirectory(self) -> pathlib.Path:
         return self._watchedDir_
+    
+    @watchedDirectory.setter
+    def watchedDirectory(self, val:pathlib.Path) -> None:
+        self._dirMonitor_.directory = val
+    
 
 class _LTPOnlineFileProcessor_(QtCore.QThread):
     """Helper class for LTPOnline.
@@ -2629,14 +2655,14 @@ class LTPOnline(QtCore.QObject):
             
             if not autoStart:
                 cdir = self._simulator_params_.get("dir", os.getcwd())
-                print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
+                self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
         
         else:
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
                                         out = self._stdout_)
             if not autoStart:
-                print(f"\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in {self._watchedDir_}.\n", file = sys.stdout)
+                self.print(f"\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in {self._watchedDir_}.\n", file = sys.stdout)
         
         self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
                                                      QtCore.Qt.QueuedConnection)
@@ -2654,7 +2680,8 @@ class LTPOnline(QtCore.QObject):
             
         try:
             self.closeViewers(True)
-            self._viewers_.clear()
+            if hasattr(self, "_viewers_") and hasattr(self._viewers_, "clear"):
+                self._viewers_.clear()
 
             if hasattr(self, "_emitterWindow_") and self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
@@ -2710,6 +2737,7 @@ class LTPOnline(QtCore.QObject):
             # when recording secondary amplifier output as well (useful to infer
             # the command signal waveforms when the protocol is not accessible)
 
+        # print(args)
         if not all(isinstance(a, RecordingSource) for a in args):
             raise TypeError(f"Expecting one or more RecordingSource objects")
         
@@ -2909,6 +2937,36 @@ class LTPOnline(QtCore.QObject):
         self.stop()
         
     @property
+    def directory(self) -> pathlib.Path:
+        return self._watchedDir_
+    
+    @directory.setter
+    def directory(self, val:typing.Union[str, pathlib.Path]) -> None:
+        if self.running:
+            scipywarn("Cannot change directory while this LTPOnline instance is still running")
+            return
+        
+        
+        if isinstance(val, str) and len(val.strip()) and os.path.isdir(val):
+            val = pathlib.Path(val)
+            
+        elif not isinstance(val, pathlib.Path):
+            scipywarn(f"Expecting a string or a pathlib.Path; instead, got {type(val).__name__}")
+            return
+            
+        val = val.absolute()
+        
+        if not val.is_dir():
+            scipywarn(f"{val} is not a valid directory")
+            return
+        
+        self._watchedDir_ = val
+        
+        self._abfSupplierThread_.watchedDirectory = self._watchedDir_
+            
+            
+        
+    @property
     def running(self) -> bool:
         return self._running_
     
@@ -2932,6 +2990,22 @@ class LTPOnline(QtCore.QObject):
     def pathways(self) -> dict:
         return dict((src.name, dict((k, p["pathway"]) for k, p in self._results_[src.name].items())) for src in self._sources_)
     
+    def newSource(self, val:RecordingSource) -> None:
+        """Replaces currently defined recording source(s) with `val`.
+        Does nothing if the instance of LTPOnline is still running
+        CAUTION: Will reset the internal state!
+        """
+        
+        if self.running:
+            scipywarn("This instance of LTPOnline is still running; cannot alter the recording source.")
+            return
+        
+        if not isinstance(val, RecordingSource):
+            raise TypeError(f"Expecting a RecordingSource; instead, got a {type(val).__name__}")
+        
+        
+        self.reset(force=False)
+        
     def newEpisode(self, episodeType:typing.Optional[typing.Union[RecordingEpisodeType, int, str]] = None, 
                    episodeName:typing.Optional[str]=None):
         if isinstance(episodeType, (str, int)):
@@ -3248,7 +3322,7 @@ class LTPOnline(QtCore.QObject):
         if self._doSimulation_:
             wf.assignin(self._runData_, "rundata")
 
-        print("\nNow call the exportResults method of the LTPOnline instance")
+        self.print("\nNow call the exportResults method of the LTPOnline instance")
             
     def closeViewers(self, clear:bool = False):
         if hasattr(self, "_viewers_"):
@@ -3374,77 +3448,83 @@ class LTPOnline(QtCore.QObject):
                  timeout = None,
                  out: typing.Optional[io.TextIOBase] = None,
                  locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
-                 force:bool=False):
+                 force:bool=False) -> bool:
         
         if not self._runData_.exportedResults and not force:
             scipywarn("There are unsaved results; call exportResults() first, or pass 'force=True' to this call")
-            return
+            return False
         
-        self._reset_state_(*args, episodeName=episodeName, useEmbeddedProtocol=useEmbeddedProtocol, 
-                           useSlopeInIClamp=useSlopeInIClamp, directory=directory, autoStart=autoStart, # NOTE: change to True when done coding TODO
-                           parent=parent, simulate=simulate, timeout=timeout, out=out,
-                           locationMeasures=locationMeasures)
+        try:
+            self._reset_state_(*args, episodeName=episodeName, useEmbeddedProtocol=useEmbeddedProtocol, 
+                            useSlopeInIClamp=useSlopeInIClamp, directory=directory, autoStart=autoStart, # NOTE: change to True when done coding TODO
+                            parent=parent, simulate=simulate, timeout=timeout, out=out,
+                            locationMeasures=locationMeasures)
 
-        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
-                                                             self._emitterWindow_,
-                                                             self._abfTrialBuffer_,
-                                                             self._runData_,
-                                                             self._stdout_)
-        
-        if isinstance(simulate, dict):
-            files = simulate.get("files", None)
-            timeout = simulate.get("timeout", 2000) # ms
-            directory = simulate.get("dir", None)
-            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
-                self._doSimulation_ = True
-                
-            elif isinstance(directory, str) and os.path.isdir(directory):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-                
-            elif isinstance(directory, pathlib.Path) and directory.is_dir():
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-                
-        elif isinstance(simulate, bool):
-            self._doSimulation_ = simulate
-            if isinstance(timeout, int):
-                self._simulator_params_ = dict(files=None, timeout = int(timeout))
-                
+            self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
+                                                                self._emitterWindow_,
+                                                                self._abfTrialBuffer_,
+                                                                self._runData_,
+                                                                self._stdout_)
             
-        elif isinstance(simulate, (int, float)):
-            self._doSimulation_ = True
-            self._simulator_params_ = dict(files=None, timeout = int(simulate))
-        
-        if self._doSimulation_:
-            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
-            self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
-                                        self._emitterWindow_, self._watchedDir_,
-                                        simulator = self._simulatorThread_,
-                                        out = self._stdout_)
+            if isinstance(simulate, dict):
+                files = simulate.get("files", None)
+                timeout = simulate.get("timeout", 2000) # ms
+                directory = simulate.get("dir", None)
+                if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
+                    self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
+                    self._doSimulation_ = True
+                    
+                elif isinstance(directory, str) and os.path.isdir(directory):
+                    self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
+                    self._doSimulation_ = True
+                    
+                elif isinstance(directory, pathlib.Path) and directory.is_dir():
+                    self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
+                    self._doSimulation_ = True
+                    
+            elif isinstance(simulate, bool):
+                self._doSimulation_ = simulate
+                if isinstance(timeout, int):
+                    self._simulator_params_ = dict(files=None, timeout = int(timeout))
+                    
+                
+            elif isinstance(simulate, (int, float)):
+                self._doSimulation_ = True
+                self._simulator_params_ = dict(files=None, timeout = int(simulate))
             
-            if not autoStart:
-                cdir = self._simulator_params_.get("dir", os.getcwd())
-                print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
+            if self._doSimulation_:
+                self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
+                self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
+                self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
+                                            self._emitterWindow_, self._watchedDir_,
+                                            simulator = self._simulatorThread_,
+                                            out = self._stdout_)
+                
+                if not autoStart:
+                    cdir = self._simulator_params_.get("dir", os.getcwd())
+                    self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
 
-        else:
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
-                                        self._emitterWindow_, self._watchedDir_,
-                                        out = self._stdout_)
-            if not autoStart:
-                print("\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in the current directory.\n", file = sys.stdout)
+            else:
+                self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
+                                            self._emitterWindow_, self._watchedDir_,
+                                            out = self._stdout_)
+                if not autoStart:
+                    self.print("\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in the current directory.\n", file = sys.stdout)
 
-        self._exported_results_ = True
-        self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
-                                                     QtCore.Qt.QueuedConnection)
-        if autoStart:
-            self._abfSupplierThread_.start()
-            self._abfProcessorThread_.start()
-            self._running_ = True
-        
-        return True
+            self._exported_results_ = True
+            self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
+                                                        QtCore.Qt.QueuedConnection)
+            if autoStart:
+                self._abfSupplierThread_.start()
+                self._abfProcessorThread_.start()
+                self._running_ = True
+            
+            return True
+        except:
+            msgBuf = io.StringIO()
+            traceback.print_exc(file=msgBuf)
+            scipywarn(f"Could not reset\n{msgBuf.getvalue()}")
+            return False
             
     def start(self):
         """Starts the instance of LTPOnline.
@@ -3452,16 +3532,16 @@ class LTPOnline(QtCore.QObject):
         call `start` again.
         """
         if self._running_:
-            print("Already started")
+            self.print("Already started")
             return
 
         self._abfSupplierThread_.start()
         self._abfProcessorThread_.start()
         
         if self._doSimulation_:
-            print("Starting simulation\n\n")
+            self.print("Starting simulation\n\n")
         else:
-            print(f"Monitoring directory {self._watchedDir_}\n\n")
+            self.print(f"Monitoring directory {self._watchedDir_}\n\n")
         
         self._running_ = True
         
@@ -3481,8 +3561,8 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         
         self._metadata_ = DataBag()
         
-        self._metadata_.name = ""
-        self._metadata_.annotations = {"Source": "", "Cell": "", "Field": "",
+        self._metadata_.name = "Cell"
+        self._metadata_.annotations = {"Source": "", "Cell": "Cell", "Field": "",
                                        "Genotype": "", "Sex": "", "Age": ""}
         
         self._metadata_.source = None
@@ -3492,29 +3572,108 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         
         self._pathSpinBoxBgDefaultColor = QtGui.QColor()
         self._darkUI = False
+        
+        self._running_ = False
     
         self._configureUi_()
+        
+        self._generate_recording_source() # assigns to self._metadata_.source
+        
+        self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
+                               emitterWindow = self.scipyenWindow)
+        
+        self.scipyenWindow.sig_changedDirectory.connect(self._slot_changedWorkingDirectory)
     
     def _configureUi_(self):
         self.setupUi(self)
         self._pathSpinBoxBgDefaultColor = self.path0SpinBox.palette().color(QtGui.QPalette.Active, QtGui.QPalette.Window)
         
         self._darkUI = self._pathSpinBoxBgDefaultColor.getHsv()[2] < 128
+        self._errorColor = colormaps.qcolor(f"{'#aa0000' if self._darkUI else '#ff0000'}")
+        self._warningColor = colormaps.qcolor(f"{'#aa5500' if self._darkUI else '#ff5500'}")
+        self._conditioningColor = colormaps.qcolor('#aa0000')
         
         self.ADCIndexSpinBox.valueChanged.connect(self._slot_adc_changed)
         self.DACIndexSpinBox.valueChanged.connect(self._slot_dac_changed)
+        
+        self.path0SpinBox.setValue(0)
         self.path0SpinBox.valueChanged.connect(self._slot_path_channel_changed)
+        self.path1SpinBox.setValue(1)
         self.path1SpinBox.valueChanged.connect(self._slot_path_channel_changed)
+        
+        self.path0NameEdit.undoAvailable = True
+        self.path0NameEdit.redoAvailable = True
+        self.path0NameEdit.editingFinished.connect(self._slot_path_name_changed)
+        
+        self.path1NameEdit.undoAvailable = True
+        self.path1NameEdit.redoAvailable = True
+        self.path1NameEdit.editingFinished.connect(self._slot_path_name_changed)
+        
+        self.metaDataWidget.dataName = ""
+        self.metaDataWidget.cell = self._metadata_.annotations["Cell"]
+        
         self.metaDataWidget.sig_valueChanged.connect(self._slot_metaDataChanged)
+        
+        self.runningLabel = QtWidgets.QLabel("Idle", parent=self)
+        self.statusBar().addPermanentWidget(self.runningLabel)
+        
+        self.startStopPushButton.clicked.connect(self._slot_startStop)
+        
+        self.conditioningPushButton.clicked.connect(self._slot_conditioningOnOff)
+        
+        self.showViewersToolButton.triggered.connect(self._slot_showViewers)
+        
+        self.defaultTrackingLabelBgColor = self.TrackingConditioningLabel.palette().color(self.TrackingConditioningLabel.backgroundRole())
+        # self.defaultTrackingLabelFgColor = self.TrackingConditioningLabel.palette().color(self.TrackingConditioningLabel.backgroundRole())
+        
+    @Slot()
+    def _slot_startStop(self):
+        if self._oltp.running:
+            self._oltp.stop()
+            self.startStopPushButton.setText("Start")
+            self.conditioningPushButton.setEnabled(False)
+            # self.exportResultsPushButton.setEnabled(True)
+        else:
+            self._oltp.start()
+            self.startStopPushButton.setText("Stop")
+            self.conditioningPushButton.setEnabled(True)
+            # self.exportResultsPushButton.setEnabled(True)
+            
+    @Slot(str)
+    def _slot_changedWorkingDirectory(self, val):
+        self._oltp.directory = val
+        
+    @Slot()
+    def _slot_conditioningOnOff(self):
+        if self._oltp.running:
+            if self._oltp.conditioning:
+                self._oltp.coff
+                self.conditioningPushButton.setText("Conditioning ON")
+                self.TrackingConditioningLabel.setPalette(self.defaultTrackingLabelPalette)
+                self.TrackingConditioningLabel.setText("Tracking")
+                color = "#aa0000"
+            else:
+                self._oltp.con
+                self.TrackingConditioningLabel.setText("Conditioning")
+                self.conditioningPushButton.setText("Conditioning OFF")
+                color = self.defaultTrackingLabelBgColor
+
+            p = self.TrackingConditioningLabel.palette()
+            p.setColor(self.defaultTrackingLabelBgColor, self.TrackingConditioningLabel.backgroundRole())
+            self.TrackingConditioningLabel.setPalette(p)
+        
+    @Slot()
+    def _slot_showViewers(self):
+        self._oltp.showViewers()
         
     @Slot()
     def _slot_metaDataChanged(self):
         newData = False
-        if self._metadata_.name != self.metaDataWidget.dataName:
+        if not eq(self._metadata_.name, self.metaDataWidget.dataName):
             self._metadata_.name = self.metaDataWidget.dataName
             newData = True
             
-        if eq(self._metadata_.annotations["Source"], self.metaDataWidget.sourceID):
+        if not eq(self._metadata_.annotations["Source"], self.metaDataWidget.sourceID):
             # avoid pitfalls of pandas NAType
             self._metadata_.annotations["Source"] = self.metaDataWidget.sourceID
             newData = True
@@ -3540,26 +3699,29 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
             newData = True
             
         if newData:
-            self._metadata_.source = twoPathwaysSource()
+            self._generate_recording_source()
             
     @Slot(int)
     def _slot_adc_changed(self, val:int):
         if val < 0 : 
             val = 0
             
-        pass
+        self._generate_recording_source()
     
     @Slot(int)
     def _slot_dac_changed(self, val:int):
         if val < 0:
             val = 0
-            
-        pass
+
+        self._generate_recording_source()
     
     @Slot(int)
     def _slot_path_channel_changed(self, val:int):
         w = self.sender()
         w1 = self.path1SpinBox if w == self.path0SpinBox else self.path0SpinBox
+        
+        # le = [w_ for w_ in w.children() if isinstance(w_, QtWidgets.QLineEdit)]
+        # le1 = [w_ for w_ in w1.children() if isinstance(w_, QtWidgets.QLineEdit)]
         
         if val < 0:
             val = 0
@@ -3570,23 +3732,104 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         c = p.color(w.backgroundRole())
         c1 = p1.color(w1.backgroundRole())
         
-        warnC = colormaps.qcolor(f"{'#aa0000'  if self._darkUI else '#ff0000'}")
-        
         if val == w1.value():
-            if c != warnC:
-                if c1 != warnC:
-                    p1.setColor(w1.backgroundRole(), warnC)
+            if c != self._errorColor:
+                if c1 != self._errorColor:
+                    p1.setColor(w1.backgroundRole(), self._errorColor)
                     w1.setPalette(p1)
-                p.setColor(w.backgroundRole(), warnC)
+                    # p1.setColor(le1[0].backgroundRole(), self._errorColor)
+                    # le1[0].setPalette(p1)
+                p.setColor(w.backgroundRole(), self._errorColor)
                 w.setPalette(p)
+                # le[0].setPalette(p)
                 
         else:
+            self._generate_recording_source()
             if c != self._pathSpinBoxBgDefaultColor:
                 if c1 != self._pathSpinBoxBgDefaultColor:
                     p1.setColor(w1.backgroundRole(), self._pathSpinBoxBgDefaultColor)
                     w1.setPalette(p1)
                 p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
                 w.setPalette(p)
+                
+    @Slot()
+    def _slot_path_name_changed(self):
+        w = self.sender()
+        
+        w1 = self.path1NameEdit if w == self.path0NameEdit else self.path0NameEdit
+        
+        p = w.palette()
+        p1 = w1.palette()
+        
+        c = p.color(w.backgroundRole())
+        c1 = p1.color(w1.backgroundRole())
+        
+        pathName = w.text()
+        otherPathName =  w1.text()
+        
+        if pathName == otherPathName:
+            if c != self._warningColor:
+                if c1 != self._warningColor:
+                    p1.setColor(w1.backgroundRole(), self._warningColor)
+                    w1.setPalette(p1)
+                p.setColor(w.backgroundRole(), self._warningColor)
+                w.setPalette(p)
+                
+        else:
+            self._generate_recording_source()
+            if c != self._pathSpinBoxBgDefaultColor:
+                if c1 != self._pathSpinBoxBgDefaultColor:
+                    p1.setColor(w1.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                    w1.setPalette(p1)
+                p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                w.setPalette(p)
+                
+                    
+    def _generate_recording_source(self) -> RecordingSource:
+        adc = self.ADCIndexSpinBox.value()
+        dac = self.DACIndexSpinBox.value()
+        path0 = self.path0SpinBox.value()
+        path1 = self.path1SpinBox.value()
+        path0Name = self.path0NameEdit.text()
+        path1Name = self.path1NameEdit.text()
+        # srcName = self._metadata_.annotations["Cell"]
+        
+        # print(self._metadata_.annotations["Cell"])
+        # print(self._metadata_.name)
+        
+        print(f"adc = {adc}, dac = {dac}, path0 = {path0} ({path0Name}), path1 = {path1} ({path1Name})")
+        
+        if isinstance(self._metadata_.annotations["Cell"], str) and len(self._metadata_.annotations["Cell"].strip()) > 0:
+            srcName = self._metadata_.annotations["Cell"]
+        else:
+            if isinstance(self._metadata_.name, str) and len(self._metadata_.name.strip()) > 0:
+                srcName = self._metadata_.name
+            else:
+                srcName = None
+        
+        if path0 == path1:
+            scipywarn("Pathways must use distinct DIG channels")
+            self.statusBar().showMessage("Pathways must use distinct DIG channels")
+            return
+            
+        if path0Name == path1Name:
+            scipywarn("Pathways should have distinct names")
+            self.statusBar().showMessage("Pathways should have distinct names")
+            return
+        
+        print(f"srcName = {srcName}")
+
+        if srcName is None:
+            scipywarn("Name or Cell must be non-empty strings")
+            self.statusBar().showMessage("Name or Cell must be non-empty strings")
+            return
+        
+        src = twoPathwaysSource(adc, dac, path0, path1, srcName,
+                                                   path0name = path0Name,
+                                                   path1name = path1Name)
+        print(f"src = {src}")
+        self._metadata_.source = src
+        
                 
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
