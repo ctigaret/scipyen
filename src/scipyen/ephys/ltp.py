@@ -3642,6 +3642,7 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
                 w.setEnabled(True)
             self.startStopPushButton.setText("Start")
             self.conditioningPushButton.setEnabled(False)
+            
         else:
             for w in ww:
                 w.setEnabled(False)
