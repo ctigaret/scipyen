@@ -2881,7 +2881,10 @@ class LTPOnline(QtCore.QObject):
         return args
         
     def print(self, msg):
-        if isinstance(self._stdout_, io.TextIOBase):
+        if isinstance(self._stdout_, io.StringIO):
+            print(msg, file = self._stdout_)
+            
+        elif isinstance(self._stdout_, io.TextIOBase):
             print(msg, file = self._stdout_)
         else:
             print(msg)
