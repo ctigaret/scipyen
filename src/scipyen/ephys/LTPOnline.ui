@@ -238,6 +238,15 @@ and / or main digital output pattern (patch and field recording)</string>
           <property name="enabled">
            <bool>true</bool>
           </property>
+          <property name="toolTip">
+           <string>Export results to workspace</string>
+          </property>
+          <property name="statusTip">
+           <string>Export results to workspace</string>
+          </property>
+          <property name="whatsThis">
+           <string>Export results to workspace</string>
+          </property>
           <property name="text">
            <string>Export results</string>
           </property>
@@ -255,10 +264,11 @@ and / or main digital output pattern (patch and field recording)</string>
            <string>Show all viewers</string>
           </property>
           <property name="text">
-           <string>...</string>
+           <string>Show viewers</string>
           </property>
           <property name="icon">
-           <iconset theme="window-list"/>
+           <iconset theme="window-list">
+            <normaloff>.</normaloff>.</iconset>
           </property>
          </widget>
         </item>

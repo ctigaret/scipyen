@@ -47,7 +47,8 @@ class DirectoryFileWatcher(QtCore.QObject):
     """
     emitter_sigs = ("sig_newItemsInMonitoredDir",
                     "sig_itemsRemovedFromMonitoredDir",
-                    "sig_itemsChangedInMonitoredDir", )
+                    "sig_itemsChangedInMonitoredDir", 
+                    "sig_changedDirectory")
     
     emitter_interface = ("currentDir", "enableDirectoryMonitor", 
                          "monitoredDirectories", "isDirectoryMonitored", )
@@ -73,7 +74,7 @@ class DirectoryFileWatcher(QtCore.QObject):
         if all(hasattr(observer, x) and (inspect.isfunction(inspect.getattr_static(observer, x)) and inspect.ismethod(getattr(observer, x))) for x in self.observer_interface):
             self._observer_ = observer
             
-        print(f"{self.__class__.__name__}.__init__: emitter = {emitter}")
+        # print(f"{self.__class__.__name__}.__init__: emitter = {emitter}")
 
         if not self._check_emitter_(emitter):
             raise TypeError(f"Invalid 'emitter' was provided")
@@ -108,20 +109,20 @@ class DirectoryFileWatcher(QtCore.QObject):
         #     raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
     def _check_emitter_(self, obj:QtCore.QObject) -> bool:
-        print(f"{self.__class__.__name__}._check_emitter_(obj):")
+        # print(f"{self.__class__.__name__}._check_emitter_(obj):")
         ret = isinstance(obj, QtCore.QObject)
-        print(f"\tobj is QObject: {ret}")
+        # print(f"\tobj is QObject: {ret}")
         if ret:
             ret &= all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), QtCore.Signal) for x in self.emitter_sigs)
-            print(f"\tobj has emitter signals: {ret}")
+            # print(f"\tobj has emitter signals: {ret}")
             
         if ret: 
             ret &= all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), (property, types.FunctionType)) for x in self.emitter_interface)
-            print(f"\tobj has emitter interface: {ret}")
+            # print(f"\tobj has emitter interface: {ret}")
             
         if ret:
             ret &= all(hasattr(obj, x) for x in self.emitter_attrs)
-            print(f"\tobj has emitter attrs: {ret}")
+            # print(f"\tobj has emitter attrs: {ret}")
             
         return ret
 
@@ -150,7 +151,7 @@ class DirectoryFileWatcher(QtCore.QObject):
         
         if self._source_.isDirectoryMonitored(dirToWatch):
             # reset the monitored directory cache
-            self._monitoredDirsCache_[dirToWatch].clear()
+            self._source_._monitoredDirsCache_[dirToWatch].clear()
             
         else:
             watchedDirectories = self._source_.monitoredDirectories
@@ -159,6 +160,8 @@ class DirectoryFileWatcher(QtCore.QObject):
             self._source_.enableDirectoryMonitor(dirToWatch)
         
         self._watchedDir_ = dirToWatch
+        
+        # print(f"{self.__class__.__name__}.directory.setter changed to {self._watchedDir_}")
 
 
     @property

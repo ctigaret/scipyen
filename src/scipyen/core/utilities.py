@@ -3197,7 +3197,6 @@ def yyMdd(now=None):
     return "%s%s%s" % (time.strftime("%y", tuple(now)), string.ascii_lowercase[now.tm_mon-1], time.strftime("%d", tuple(now)))
 
 
-
 def make_file_filter_string(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]
 

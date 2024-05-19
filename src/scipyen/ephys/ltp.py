@@ -92,6 +92,7 @@ from core.utilities import (safeWrapper,
                             duplicates,
                             GeneralIndexType,
                             counter_suffix,
+                            yyMdd,
                             NestedFinder)
 
 
@@ -325,7 +326,7 @@ def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=Non
     p0name = kwargs.get("path0name", 'path0')
     p1name = kwargs.get("path1name", 'path1')
         
-    syn     = (SynapticStimulus('path0', p0name), SynapticStimulus('path1', p1name)) 
+    syn     = (SynapticStimulus(p0name, path0), SynapticStimulus(p1name, path1)) 
     auxin   = kwargs.pop("auxin", None)
     auxout  = kwargs.pop("auxout", None)
     
@@ -681,6 +682,7 @@ class _LTPOnlineSupplier_(QtCore.QThread):
     @watchedDirectory.setter
     def watchedDirectory(self, val:pathlib.Path) -> None:
         self._dirMonitor_.directory = val
+        self._watchedDir_ = self._dirMonitor_.directory
     
 
 class _LTPOnlineFileProcessor_(QtCore.QThread):
@@ -690,6 +692,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         Also used in simulation mode.
         
     """
+    sig_xtalk = Signal(bool, name="sig_xtalk")
     # TODO: 2024-03-03 22:09:16
     # detect triggers and add trigger events to the pathway blocks?
     # maybe ...
@@ -957,8 +960,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
             self.processProtocol(protocol)
                 
-            if self._runData_.exportedResults:
-                self._runData_.exportedResults = False
+            if self._runData_.resultsExported:
+                self._runData_.resultsExported = False
 
         except:
             traceback.print_exc()
@@ -1126,7 +1129,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # (and alternate them via sequencer loops)
         # ### END
         mainDIGOut = protocol.digitalOutputs(alternate=False)
-        # self.print(f"\tdigital output channels for printicpal (main) stimulation pattern (mainDIGOut): {printStyled(mainDIGOut, 'green', True)}")
+        # self.print(f"\tdigital output channels for principal (main) stimulation pattern ({printStyled('mainDIGOut', 'green', True)}): {printStyled(mainDIGOut, 'green', True)}")
         
         # NOTE: 2024-05-08 09:58:11
         # 'altDIGOut' is the set of digital channel indexes where the "alternative"
@@ -1134,7 +1137,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # is False or when len(digOutDacs ) == 0
         #
         altDIGOut = protocol.digitalOutputs(alternate=True)
-        # self.print(f"\tdigital output channels for alternative pattern (altDIGOut): {printStyled(altDIGOut, 'green', True)}")
+        # self.print(f"\tdigital output channels for alternative pattern ({printStyled('altDIGOut', 'green', True)}): {printStyled(altDIGOut, 'green', True)}")
 
         # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
         # if len(digOutDacs) == 0:
@@ -1201,6 +1204,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # Generate the list of pathways according to the specified source
             #
             pathways = [pdict["pathway"] for key, pdict in self._runData_.results[src.name].items() if key not in ("DACPaths", "DIGPaths")]
+            
+            # self.print(f"declared pathways for source {printStyled(src.name, 'yellow', True)}: {printStyled(pathways)}")
             
             # NOTE: 2024-05-06 00:26:04
             # Now, figure out what these pathways are:
@@ -1370,11 +1375,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # 
                     mainOnly = mainDIGOut - altDIGOut
                     
+                    # self.print(f"\t\tmainOnly: {printStyled(mainOnly, 'green', True)}")
+                    
                     # DIG channel indexes used with the alternative but NOT the 
                     # main pattern; empty set when altDIGOut is empty, or when
                     # mainDIGOut == altDIGOut
                     #
                     altOnly = altDIGOut - mainDIGOut
+                    # self.print(f"\t\taltOnly: {printStyled(altOnly, 'green', True)}")
                     
                     if len(mainDIGOut) > 0:
                         if len(mainOnly) == 0: # same channels in both mainDIGOut and altDIGOut
@@ -1421,13 +1429,12 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
 #             self.print(f"\t{printStyled(len(altPathways), 'cyan', True)} altPathways:")
 #             for p in altPathways:
 #                 self.print(f"\t\t{printStyled(p.name, 'cyan', False)} ({printStyled(p.stimulus.channel, 'cyan', False)}, digital: {printStyled(p.stimulus.dig, 'cyan', False)})")
-#             
-#             
-#             allPathways = mainPathways + altPathways
-#             
-#             self.print(f"\tall pathways ({printStyled(len(allPathways), 'red')}):")
-#             for p in allPathways:
-#                 self.print(f"\t\tpath {printStyled(p.name, 'red')} ({printStyled(p.stimulus.channel, 'red')}, digital: {printStyled(p.stimulus.dig, 'red')})")
+            
+            
+            # allPathways = mainPathways + altPathways
+            # self.print(f"\tall pathways ({printStyled(len(allPathways), 'red')}):")
+            # for p in allPathways:
+            #     self.print(f"\t\tpath {printStyled(p.name, 'red')} ({printStyled(p.stimulus.channel, 'red')}, digital: {printStyled(p.stimulus.dig, 'red')})")
             
             uniquePathways = unique(mainPathways + altPathways, idcheck=True)
             # self.print(f"\tunique pathways ({printStyled(len(uniquePathways), 'red')}):")
@@ -1487,6 +1494,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         xtalkEpisode.pathways = uniquePathways
                         self._runData_.episodes.append(xtalkEpisode)
                         currentEpisode = xtalkEpisode
+                        self.sig_xtalk.emit(True)
                     
                 else: # single path stimulation per sweep
                     # self.print("\t\tnormal tracking protocol")
@@ -1510,6 +1518,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         self._runData_.episodes.append(newEpisode)
                         
                         currentEpisode = newEpisode
+                        self.sig_xtalk.emit(False)
                         
                 self._runData_.pathStimsBySweep = pathStimsBySweep
                     
@@ -2560,7 +2569,7 @@ class LTPOnline(QtCore.QObject):
                 viewer.hideSelectors()
                 viewer.hideMainToolbar()
                 viewer.showNavigator()
-                viewer.show()
+                # viewer.show()
                 
                 viewer.setGeometry(QtCore.QRect(self._screenGeometry_.x() + k * self._viewerWinWidth, y, 
                                                 self._viewerWinWidth, self._viewerWinHeight))
@@ -2655,14 +2664,14 @@ class LTPOnline(QtCore.QObject):
             
             if not autoStart:
                 cdir = self._simulator_params_.get("dir", os.getcwd())
-                self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n")
+                # self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n")
         
         else:
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
                                         out = self._stdout_)
-            if not autoStart:
-                self.print(f"\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in {self._watchedDir_}.\n")
+            # if not autoStart:
+            #     self.print(f"\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in {self._watchedDir_}.\n")
         
         self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
                                                      QtCore.Qt.QueuedConnection)
@@ -2898,6 +2907,16 @@ class LTPOnline(QtCore.QObject):
                         for name, viewer in path_viewers_dict.items():
                             if isinstance(viewer, QtWidgets.QMainWindow):
                                 viewer.close()
+    def hideViewers(self):
+        if hasattr(self, "_viewers_"):
+            for src in self._sources_:
+                source_viewers = self._viewers_.get(src.name, None)
+                if isinstance(source_viewers, dict) and len(source_viewers):
+                    path_viewers = [v for v in source_viewers.values() if isinstance(v, dict) and len(v)]
+                    for path_viewers_dict in path_viewers:
+                        for name, viewer in path_viewers_dict.items():
+                            if isinstance(viewer, QtWidgets.QMainWindow):
+                                viewer.hide()
 
     @Slot(SignalCursor)
     def slot_signalCursorPositionChanged(self, c:SignalCursor):
@@ -3187,6 +3206,21 @@ class LTPOnline(QtCore.QObject):
                         
         except:
             traceback.print_exc()
+        
+    @property
+    def hasResults(self) -> bool:
+        path_results = itertools.chain.from_iterable([[(p.get("pathway_responses", None), p.get("measures", None), p) for p_name, p in s.items() if p_name not in ("DACPaths", "DIGPaths")]
+                                                     for s in self._results_.values()])
+        
+        ret = any(isinstance(t[0], neo.Block) and len(t[0].segments) for t in path_results)
+        
+        if ret:
+            # TODO: 2024-05-19 12:02:06
+            # also check for analysis results
+            ret &= all(isinstance(t[1], dict) and all(k in t[2] for k in list(t[1].keys()) if k != "MembraneTest") for t in path_results) # measures
+            
+        return ret
+            
     
     def exportResults(self, normalize:typing.Optional[typing.Union[tuple, range]]=None, normalizeIndexes:bool=True):
         if self.running:
@@ -3268,7 +3302,7 @@ class LTPOnline(QtCore.QObject):
                     wf.assignin(pathway_result, f"{src_name}_{p_name}_{ptype}results_dict")
                     wf.assignin(df, f"{src_name}_{p_name}_{ptype}results")
                 
-            self._runData_.exportedResults = True
+            self._runData_.resultsExported = True
         except:
             traceback.print_exc()
             
@@ -3322,7 +3356,7 @@ class LTPOnline(QtCore.QObject):
         if self._doSimulation_:
             wf.assignin(self._runData_, "rundata")
 
-        self.print("\nNow call the exportResults method of the LTPOnline instance")
+        # self.print("\nNow call the exportResults method of the LTPOnline instance")
             
     def closeViewers(self, clear:bool = False):
         if hasattr(self, "_viewers_"):
@@ -3450,7 +3484,7 @@ class LTPOnline(QtCore.QObject):
                  locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
                  force:bool=False) -> bool:
         
-        if not self._runData_.exportedResults and not force:
+        if self.hasResults and not self._runData_.resultsExported and not force:
             scipywarn("There are unsaved results; call exportResults() first, or pass 'force=True' to this call")
             return False
         
@@ -3502,14 +3536,14 @@ class LTPOnline(QtCore.QObject):
                 
                 if not autoStart:
                     cdir = self._simulator_params_.get("dir", os.getcwd())
-                    self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
+                    # self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n")
 
             else:
                 self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
                                             self._emitterWindow_, self._watchedDir_,
                                             out = self._stdout_)
-                if not autoStart:
-                    self.print("\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in the current directory.\n", file = sys.stdout)
+                # if not autoStart:
+                #     self.print("\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in the current directory.\n")
 
             self._exported_results_ = True
             self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
@@ -3518,6 +3552,8 @@ class LTPOnline(QtCore.QObject):
                 self._abfSupplierThread_.start()
                 self._abfProcessorThread_.start()
                 self._running_ = True
+            
+            # self._log_
             
             return True
         except:
@@ -3544,6 +3580,7 @@ class LTPOnline(QtCore.QObject):
             self.print(f"Monitoring directory {self._watchedDir_}\n\n")
         
         self._running_ = True
+        self._runData_.resultsExported = False
         
     def kill(self):
         self.stop()
@@ -3555,14 +3592,15 @@ class LTPOnline(QtCore.QObject):
         self.__del__()
             
 
-class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWindow__):
-    def __init__(self, parent=None):
+# class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWindow__):
+class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
+    def __init__(self, simulate:bool=False, parent=None):
         super().__init__(parent=parent)
         
         self._metadata_ = DataBag()
         
-        self._metadata_.name = "Cell"
-        self._metadata_.annotations = {"Source": "", "Cell": "Cell", "Field": "",
+        self._metadata_.name = f"Recording_{yyMdd()}"
+        self._metadata_.annotations = {"Source": "AnimalID", "Cell": "Cell", "Field": "",
                                        "Genotype": "", "Sex": "", "Age": ""}
         
         self._metadata_.source = None
@@ -3574,18 +3612,37 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         self._darkUI = False
         
         self._running_ = False
+        
+        self._simulation_ = simulate
+        
+        self._winTitle_ = "Synaptic Plasticity - Two pathways"
+        
+        if self._simulation_: self._winTitle_ += " (Simulation)"
+        
+        # self._log_ = io.StringIO() 
     
         self._configureUi_()
         
         self._generate_recording_source() # assigns to self._metadata_.source
         
-        try:
-            self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
-                                emitterWindow = self.scipyenWindow)
-        except:
-            traceback.print_exc()
+        self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
+                            emitterWindow = self.scipyenWindow, simulate= self._simulation_,
+                            parent=self)
+        
+        if isinstance(self._oltp._abfProcessorThread_, _LTPOnlineFileProcessor_):
+            self._oltp._abfProcessorThread_.sig_xtalk.connect(self._slot_xtalk)
+        
+        # self._oltp.hideViewers()
+        
+        # try:
+        #     self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
+        #                         emitterWindow = self.scipyenWindow)
+        # except:
+        #     traceback.print_exc()
                 
         self.scipyenWindow.sig_changedDirectory.connect(self._slot_changedWorkingDirectory)
+        self.loadSettings()
+        # self.show()
     
     def _configureUi_(self):
         self.setupUi(self)
@@ -3612,7 +3669,8 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         self.path1NameEdit.redoAvailable = True
         self.path1NameEdit.editingFinished.connect(self._slot_path_name_changed)
         
-        self.metaDataWidget.dataName = ""
+        self.metaDataWidget.dataName = self._metadata_.name
+        self.metaDataWidget.sourceID = self._metadata_.annotations["Source"]
         self.metaDataWidget.cell = self._metadata_.annotations["Cell"]
         
         self.metaDataWidget.sig_valueChanged.connect(self._slot_metaDataChanged)
@@ -3626,8 +3684,14 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         
         self.showViewersToolButton.triggered.connect(self._slot_showViewers)
         
-        self.defaultTrackingLabelBgColor = self.TrackingConditioningLabel.palette().color(self.TrackingConditioningLabel.backgroundRole())
-        # self.defaultTrackingLabelFgColor = self.TrackingConditioningLabel.palette().color(self.TrackingConditioningLabel.backgroundRole())
+        self.defaultTrackingLabelPalette = self.TrackingConditioningLabel.palette()
+        self.defaultTrackingLabelBgColor = self.defaultTrackingLabelPalette.color(self.TrackingConditioningLabel.backgroundRole())
+        
+        self.exportResultsPushButton.clicked.connect(self._slot_exportResults)
+        
+        self.setWindowTitle(self._winTitle_)
+        
+        
         
     @Slot()
     def _slot_startStop(self):
@@ -3641,17 +3705,35 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
             for w in ww:
                 w.setEnabled(True)
             self.startStopPushButton.setText("Start")
+            self.startStopPushButton.setStatusTip("Start monitoring Clampex output")
+            self.startStopPushButton.setToolTip("Start monitoring Clampex output")
+            self.startStopPushButton.setWhatsThis("Start monitoring Clampex output")
             self.conditioningPushButton.setEnabled(False)
+            self.runningLabel.setText("Idle")
             
         else:
+            if self._oltp.hasResults and not self._oltp._runData_.resultsExported:
+                carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
+                if carryOn:
+                    self._oltp.reset(force=True)
+                else:
+                    return
+                
             for w in ww:
                 w.setEnabled(False)
+                
             self.startStopPushButton.setText("Stop")
+            self.startStopPushButton.setStatusTip("Stop monitoring Clampex output")
+            self.startStopPushButton.setToolTip("Stop monitoring Clampex output")
+            self.startStopPushButton.setWhatsThis("Stop monitoring Clampex output")
             self.conditioningPushButton.setEnabled(True)
             self._oltp.start()
+            self.runningLabel.setText("Running")
             
     @Slot(str)
     def _slot_changedWorkingDirectory(self, val):
+        if self._oltp.running:
+            return
         self._oltp.directory = val
         
     @Slot()
@@ -3660,17 +3742,23 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
             if self._oltp.conditioning:
                 self._oltp.coff
                 self.conditioningPushButton.setText("Conditioning ON")
-                self.TrackingConditioningLabel.setPalette(self.defaultTrackingLabelPalette)
+                self.conditioningPushButton.setToolTip("Activate conditioning mode for subsequent trials")
+                self.conditioningPushButton.setStatusTip("Activate conditioning mode for subsequent trials")
+                self.conditioningPushButton.setWhatsThis("Activate conditioning mode for subsequent trials")
+                # self.TrackingConditioningLabel.setPalette(self.defaultTrackingLabelPalette)
                 self.TrackingConditioningLabel.setText("Tracking")
-                color = "#aa0000"
+                color = self.defaultTrackingLabelBgColor
             else:
                 self._oltp.con
                 self.TrackingConditioningLabel.setText("Conditioning")
                 self.conditioningPushButton.setText("Conditioning OFF")
-                color = self.defaultTrackingLabelBgColor
+                self.conditioningPushButton.setToolTip("Switch back to tracking mode for subsequent trials")
+                self.conditioningPushButton.setStatusTip("Switch back to tracking mode for subsequent trials")
+                self.conditioningPushButton.setWhatsThis("Switch back to tracking mode for subsequent trials")
+                color = colormaps.qcolor("#aa0000")
 
             p = self.TrackingConditioningLabel.palette()
-            p.setColor(self.defaultTrackingLabelBgColor, self.TrackingConditioningLabel.backgroundRole())
+            p.setColor(self.TrackingConditioningLabel.backgroundRole(), color)
             self.TrackingConditioningLabel.setPalette(p)
         
     @Slot()
@@ -3678,8 +3766,12 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         self._oltp.showViewers()
         
     @Slot()
+    def _slot_exportResults(self):
+        self._oltp.exportResults()
+        
+    @Slot()
     def _slot_metaDataChanged(self):
-        print(f"{self.__class__.__name__}._slot_metaDataChanged")
+        # print(f"{self.__class__.__name__}._slot_metaDataChanged")
         if self._oltp.running:
             return
         
@@ -3769,6 +3861,14 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
                 p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
                 w.setPalette(p)
                 
+    @Slot(bool)
+    def _slot_xtalk(self, val:bool):
+        if val is True:
+            self.TrackingConditioningLabel.setText("Tracking (cross-talk)")
+            
+        else:
+            self.TrackingConditioningLabel.setText("Tracking")
+                
     @Slot()
     def _slot_path_name_changed(self):
         w = self.sender()
@@ -3801,6 +3901,23 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
                 p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
                 w.setPalette(p)
                 
+                
+    def closeEvent(self, evt):
+        self._oltp.stop()
+        if self._oltp.hasResults and not self._oltp._runData_.resultsExported:
+            carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
+            if carryOn:
+                self._oltp.reset(force=True)
+            else:
+                return
+        # self._oltp.reset(force=True)
+        self.saveSettings()
+        if self.isTopLevel:
+            if any([v is self for v in self.appWindow.workspace.values()]):
+                self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
+                self.appWindow.removeFromWorkspace(self, by_name=False)
+            
+        
                     
     def _generate_recording_source(self) -> RecordingSource:
         adc = self.ADCIndexSpinBox.value()
@@ -3814,7 +3931,7 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         # print(self._metadata_.annotations["Cell"])
         # print(self._metadata_.name)
         
-        print(f"adc = {adc}, dac = {dac}, path0 = {path0} ({path0Name}), path1 = {path1} ({path1Name})")
+        # print(f"adc = {adc}, dac = {dac}, path0 = {path0} ({path0Name}), path1 = {path1} ({path1Name})")
         
         if isinstance(self._metadata_.annotations["Cell"], str) and len(self._metadata_.annotations["Cell"].strip()) > 0:
             srcName = self._metadata_.annotations["Cell"]
@@ -3834,7 +3951,7 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
             self.statusBar().showMessage("Pathways should have distinct names")
             return
         
-        print(f"srcName = {srcName}")
+        # print(f"srcName = {srcName}")
 
         if srcName is None:
             scipywarn("Name or Cell must be non-empty strings")
@@ -3844,7 +3961,7 @@ class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWin
         src = twoPathwaysSource(adc, dac, path0, path1, srcName,
                                                    path0name = path0Name,
                                                    path1name = path1Name)
-        print(f"src = {src}")
+        # print(f"src = {src}")
         self._metadata_.source = src
         
                 
@@ -5502,3 +5619,13 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
 #     return RecordingSource(name, 0, 0, synStims)
 #     
 
+
+def launch():
+    try:
+        win = mainWindow.newViewer(TwoPathwaysOnlineLTP, parent = mainWindow, win_title="Synaptic Plasticity")
+        win.show()
+    except:
+        traceback.print_exc()
+        
+def init_scipyen_plugin():
+    return {"Applications|SynapticPlasticity - online":launch}

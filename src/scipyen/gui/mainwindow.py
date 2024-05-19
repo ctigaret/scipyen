@@ -978,9 +978,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     workspaceChanged = Signal()
     startPluginLoad = Signal()
     sig_refreshRecentFilesMenu = Signal()
-    sig_changedDirectory = Signal(str, name="sig_changedDirectory")
     sig_windowRemoved = Signal(tuple, name="sig_windowRemoved")
     
+    sig_changedDirectory = Signal(str, name="sig_changedDirectory")
     sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
     sig_itemsRemovedFromMonitoredDir = Signal(tuple, name="sig_itemsRemovedFromMonitoredDir")
     sig_itemsChangedInMonitoredDir = Signal(tuple, name="sig_itemsChangedInMonitoredDir")
@@ -2097,7 +2097,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             raise TypeError(f"Expecting a type or sip.wrappertype; got {type(winClass).__name__} instead")
 
         else:
-            if winClass not in self.viewers:
+            if winClass not in self.viewers or not issubclass(winClass, QtWidgets.QMainWindow):
                 raise ValueError(f"Unexpected viewer class {winClass.__name__}")
 
         if winClass is mpl.figure.Figure:
