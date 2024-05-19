@@ -3619,7 +3619,7 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         
         if self._simulation_: self._winTitle_ += " (Simulation)"
         
-        # self._log_ = io.StringIO() 
+        self._logIO_ = io.StringIO() 
     
         self._configureUi_()
         
