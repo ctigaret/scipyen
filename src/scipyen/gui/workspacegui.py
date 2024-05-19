@@ -52,7 +52,7 @@ class DirectoryFileWatcher(QtCore.QObject):
     emitter_interface = ("currentDir", "enableDirectoryMonitor", 
                          "monitoredDirectories", "isDirectoryMonitored", )
     
-    emitter_attrs = ("_monitoredDirCache_", )
+    emitter_attrs = ("_monitoredDirsCache_", )
 
     observer_interface = ("newFiles",
                           "changedFiles",
@@ -72,6 +72,8 @@ class DirectoryFileWatcher(QtCore.QObject):
         
         if all(hasattr(observer, x) and (inspect.isfunction(inspect.getattr_static(observer, x)) and inspect.ismethod(getattr(observer, x))) for x in self.observer_interface):
             self._observer_ = observer
+            
+        print(f"{self.__class__.__name__}.__init__: emitter = {emitter}")
 
         if not self._check_emitter_(emitter):
             raise TypeError(f"Invalid 'emitter' was provided")
@@ -106,10 +108,22 @@ class DirectoryFileWatcher(QtCore.QObject):
         #     raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
         
     def _check_emitter_(self, obj:QtCore.QObject) -> bool:
-        return isinstance(obj, QtCore.QObject) and \
-            all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), QtCore.Signal) for x in self.emitter_sigs) and \
-                all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), (property, types.FunctionType)) for x in self.emitter_interface) and \
-                    all(hasattr(obj, x) for x in self.emitter_attrs)
+        print(f"{self.__class__.__name__}._check_emitter_(obj):")
+        ret = isinstance(obj, QtCore.QObject)
+        print(f"\tobj is QObject: {ret}")
+        if ret:
+            ret &= all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), QtCore.Signal) for x in self.emitter_sigs)
+            print(f"\tobj has emitter signals: {ret}")
+            
+        if ret: 
+            ret &= all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), (property, types.FunctionType)) for x in self.emitter_interface)
+            print(f"\tobj has emitter interface: {ret}")
+            
+        if ret:
+            ret &= all(hasattr(obj, x) for x in self.emitter_attrs)
+            print(f"\tobj has emitter attrs: {ret}")
+            
+        return ret
 
     @property
     def directory(self) -> typing.Optional[pathlib.Path]:
@@ -121,7 +135,7 @@ class DirectoryFileWatcher(QtCore.QObject):
         #     scipywarn("Cannot monitor directories as we don't have a valid signal emitter")
         #     return
                     
-        if directory is None:
+        if val is None:
             if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
                 dirToWatch = pathlib.Path(self._source_.currentDir).absolute()
 
@@ -136,7 +150,7 @@ class DirectoryFileWatcher(QtCore.QObject):
         
         if self._source_.isDirectoryMonitored(dirToWatch):
             # reset the monitored directory cache
-            self._monitoredDirCache_[dirToWatch].clear()
+            self._monitoredDirsCache_[dirToWatch].clear()
             
         else:
             watchedDirectories = self._source_.monitoredDirectories
@@ -455,6 +469,19 @@ class GuiMessages(object):
             msgbox.setDetailedText(detail)
             
         return msgbox.exec()
+    
+class DirectoryObserver(QtCore.QObject):
+    # NOTE: 2024-05-19 10:58:13 TODO 
+    # finalize this class: move all relevant API from ScipyenWindow here then
+    # make ScipyenWindow inherit this class
+    sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
+    sig_itemsRemovedFromMonitoredDir = Signal(tuple, name="sig_itemsRemovedFromMonitoredDir")
+    sig_itemsChangedInMonitoredDir = Signal(tuple, name="sig_itemsChangedInMonitoredDir")
+
+    def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
+        super().__init__(parent=parent)
+        self._monitoredDirsCache_ = dict()
+    
         
 class FileIOGui(object):
     @safeWrapper

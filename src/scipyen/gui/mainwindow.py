@@ -72,7 +72,7 @@ from imaging import (imageprocessing as imgp, imgsim,)
 from systems import *
 from ephys import (ephys, ltp, membrane, ivramp,)
 from .workspacemodel import WorkspaceModel
-from .workspacegui import (WorkspaceGuiMixin)
+from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
 from .triggerdetectgui import guiDetectTriggers
 from .itemslistdialog import ItemsListDialog
 from .interact import (getInput, getInputs, packInputs, selectWSData)
@@ -966,9 +966,13 @@ class VTH(object):
                 VTH.default_handlers[viewerClass])
 
 
+# class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, DirectoryObserver, WorkspaceGuiMixin):
 class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
+    # TODO:2024-05-19 10:59:43
+    # finalize workspacegui.DirectoryObserver and inherit from it
+    # see NOTE: 2024-05-19 10:58:13 TODO in gui/workspacegui.py
     # NOTE: 2021-08-23 10:36:14 WindowManager inherits from __QMainWindow__ which
     # is QtWidgets.QMainWindow
     workspaceChanged = Signal()
@@ -980,7 +984,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
     sig_itemsRemovedFromMonitoredDir = Signal(tuple, name="sig_itemsRemovedFromMonitoredDir")
     sig_itemsChangedInMonitoredDir = Signal(tuple, name="sig_itemsChangedInMonitoredDir")
-
+    
     _instance = None
 
     # TODO: 2021-11-26 17:23:45 To add:
