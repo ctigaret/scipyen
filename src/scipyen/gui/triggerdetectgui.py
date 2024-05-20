@@ -4,9 +4,13 @@ from numbers import (Number, Real,)
 from itertools import chain
 #from itertools import (accumulate, chain,)
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType
 
 import numpy as np
 import quantities as pq
@@ -39,13 +43,16 @@ from gui.signalviewer import SignalViewer
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"), from_imports=True, import_from="gui")
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"), from_imports=True, import_from="gui")
+else:
+    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "triggerdetect.ui"))
 
 class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     """
     """
     
-    sig_dataChanged = pyqtSignal()
+    sig_dataChanged = Signal()
     
     def __init__(self, ephys_start:typing.Union[Real, pq.Quantity]=0, 
                  ephys_end:typing.Union[Real, pq.Quantity]=1, n_channels:int=0,
@@ -378,9 +385,9 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
                             "Name": self.imagingNameLineEdit.text()})
                 
         
-    @pyqtSlot(int)
-    @pyqtSlot(float)
-    @pyqtSlot(str)
+    @Slot(int)
+    @Slot(float)
+    @Slot(str)
     def slot_paramValueChangedGui(self, value=None):
         self.sig_dataChanged.emit()
         
@@ -453,8 +460,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
                 w.setMaximum(self._n_channels_ - 1)
                 
 class TriggerDetectDialog(qd.QuickDialog):
-    sig_detectTriggers = pyqtSignal(name="sig_detectTriggers")
-    sig_undoDetectTriggers = pyqtSignal(name="sig_undoDetectTriggers")
+    sig_detectTriggers = Signal(name="sig_detectTriggers")
+    sig_undoDetectTriggers = Signal(name="sig_undoDetectTriggers")
     
     def __init__(self, ephysdata=None, title="Detect Trigger Events", clearEvents=False, parent=None, ephysViewer=None, **kwargs):
         super().__init__(parent=parent, title=title) # calls ancestor's setupUi()
@@ -567,7 +574,7 @@ class TriggerDetectDialog(qd.QuickDialog):
         
         super().closeEvent(evt)
         
-    @pyqtSlot()
+    @Slot()
     def accept(self):
         #print("accept owns viewer", self._owns_viewer_)
         super().accept()
@@ -580,7 +587,7 @@ class TriggerDetectDialog(qd.QuickDialog):
                 #self._ephysViewer_.refresh()
                 
         
-    @pyqtSlot()
+    @Slot()
     def reject(self):
         #print("reject owns viewer", self._owns_viewer_)
         super().reject()
@@ -592,7 +599,7 @@ class TriggerDetectDialog(qd.QuickDialog):
             #else:
                 #self._ephysViewer_.refresh()
         
-    @pyqtSlot(int)
+    @Slot(int)
     def done(self, value):
         """PyQt slot called by self.accept() and self.reject() (see QDialog).
         In turn it closes the dialog (equivalent of QWidget.close()).
@@ -615,15 +622,15 @@ class TriggerDetectDialog(qd.QuickDialog):
             
         super().done(value)
         
-    @pyqtSlot()
+    @Slot()
     def _slot_clearEventsChanged(self):
         self._clear_events_flag_ = self.clearEventsCheckBox.selection()
         
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_ephysFrameChanged(self, value):
         self._update_trigger_detect_ranges_(value)
         
-    @pyqtSlot()
+    @Slot()
     def slot_detect(self):
         if self._ephys_ is None:
             return
@@ -636,7 +643,7 @@ class TriggerDetectDialog(qd.QuickDialog):
             else:
                 self._ephysViewer_.plot(self.ephysdata)
                 
-    @pyqtSlot()
+    @Slot()
     def slot_undo(self):
         """Quickly restore the events - no fancy stuff
         """

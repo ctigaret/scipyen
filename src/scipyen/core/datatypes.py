@@ -34,7 +34,8 @@ from copy import (deepcopy, copy,)
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import (QtGui, QtCore, QtWidgets,)
+# from PyQt5 import (QtGui, QtCore, QtWidgets,)
+from qtpy import (QtGui, QtCore, QtWidgets,)
 import numpy as np
 from numpy import ndarray
 import numpy.matlib as mlib
@@ -1066,12 +1067,18 @@ def inspect_members(obj, predicate=None):
                    
 @dataclass
 class Episode:
+    """Generic episode for frame-based data.
+        NOTE: The `beginFrame` and `endFrame` fields are inclusive indices.
+        To use them in indexing a sequence (or frames), add 1 (one) to the 
+        `endFrame` field, e.g.:
+        range(data.beginFrame, data.endFrame +1)
+    """
     name:str = ""
     _:KW_ONLY
     begin:datetime.datetime = datetime.datetime.now()
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
-    endFrame:int = 1
+    endFrame:int = 0
     
             
 @dataclass

@@ -6,12 +6,13 @@ import numpy as np
 from enum import IntEnum, auto
 from functools import partial
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 
-import sip
-
-from core.prog import (safeWrapper, no_sip_autoconversion)
+from core.prog import safeWrapper
 
 from core.utilities import (counter_suffix, reverse_dict, reverse_mapping_lookup)
 
@@ -41,10 +42,10 @@ from gui.painting_shared import (HoverPoints, x_less_than, y_less_than,
 from gui import quickdialog as qd
 
 class ShadeWidget(QtWidgets.QWidget):
-    colorsChanged   = pyqtSignal(QtGui.QPolygonF, name="colorsChanged")
-    pointMovedX     = pyqtSignal(int, float, name="pointMovedX")
-    pointInserted   = pyqtSignal(int, QtCore.QPointF, name="pointInserted")
-    pointRemoved    = pyqtSignal(int, name="pointRemoved")
+    colorsChanged   = Signal(QtGui.QPolygonF, name="colorsChanged")
+    pointMovedX     = Signal(int, float, name="pointMovedX")
+    pointInserted   = Signal(int, QtCore.QPointF, name="pointInserted")
+    pointRemoved    = Signal(int, name="pointRemoved")
     
     class ShadeType(IntEnum):
         RedShade = auto()
@@ -100,13 +101,13 @@ class ShadeWidget(QtWidgets.QWidget):
     def sizeHint(self) -> QtCore.QSize:
         return QtCore.QSize(150,40)
     
-    @pyqtSlot(int, float)
+    @Slot(int, float)
     def slot_syncPointX(self, index, x):
         if index >= 0 and index < len(self.points):
             self.points[index].setX(x)
             self.update()
             
-    @pyqtSlot(int, QtCore.QPointF)
+    @Slot(int, QtCore.QPointF)
     def slot_pointInserted(self, index, p):
         if index >= 0:
             if index == 0:
@@ -125,7 +126,7 @@ class ShadeWidget(QtWidgets.QWidget):
             self._hoverPoints._locks.insert(index, 0) # inserts a NoLock at point index
             self.update()
         
-    @pyqtSlot(int)
+    @Slot(int)
     def slot_pointRemoved(self, index):
         if index >= 0:
             self._hoverPoints._locks.pop(index)
@@ -236,7 +237,7 @@ class ShadeWidget(QtWidgets.QWidget):
                 
         
 class GradientEditor(QtWidgets.QWidget):
-    gradientStopsChanged = pyqtSignal(object, name="gradientStopsChanged")
+    gradientStopsChanged = Signal(object, name="gradientStopsChanged")
     
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  size:typing.Union[int, typing.Tuple[int]]=11) -> None:
@@ -274,7 +275,7 @@ class GradientEditor(QtWidgets.QWidget):
                     shade.pointInserted.connect(s.slot_pointInserted)
                     shade.pointRemoved.connect(s.slot_pointRemoved)
     
-    @pyqtSlot(object)
+    @Slot(object)
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
         pts_red = list() 
         pts_green = list() 
@@ -310,7 +311,7 @@ class GradientEditor(QtWidgets.QWidget):
         
         self._alphaShade.setGradientStops(stops) # this is essential for painting the background of the _alphaShade
         
-    @pyqtSlot(QtGui.QPolygonF)
+    @Slot(QtGui.QPolygonF)
     def pointsUpdated(self, points:QtGui.QPolygonF):
         stops = self._generateStops(self._redShade.points, self._greenShade.points, self._blueShade.points, self._alphaShade.points)
         if stops:
@@ -616,47 +617,47 @@ class GradientRenderer(QtWidgets.QWidget):
         self._stops[:] = val
         #self.update()
     
-    @pyqtSlot(float)
+    @Slot(float)
     def setFocalRadius(self, val:float) -> None:
         self.focalRadius = val
         self.update()
         
-    @pyqtSlot(float)
+    @Slot(float)
     def setCenterRadius(self, val:float) -> None:
         self.centerRadius = val
         self.update()
 
-    @pyqtSlot()
+    @Slot()
     def setAutoCenterRadius(self) -> None:
         self.autoCenterRadius = True
         self.relativeCenterRadius = False
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setRelativeCenterRadius(self) -> None:
         self.autoCenterRadius = False
         self.relativeCenterRadius = True
         self.update()
 
-    @pyqtSlot()
+    @Slot()
     def setAbsoluteCenterRadius(self) -> None:
         self.autoCenterRadius = False
         self.relativeCenterRadius = False
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setAutoFocalRadius(self) -> None:
         self._useAutoFocalRadius = True
         self._useRelativeFocalRadius = False
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setRelativeFocalRadius(self) -> None:
         self._useAutoFocalRadius=False
         self._useRelativeFocalRadius = True
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setAbsoluteFocalRadius(self) -> None:
         self._useAutoFocalRadius = False
         self._useRelativeFocalRadius = False
@@ -683,52 +684,52 @@ class GradientRenderer(QtWidgets.QWidget):
     def hoverPoints(self) -> HoverPoints:
         return self._hoverPoints
     
-    @pyqtSlot()
+    @Slot()
     def setPadSpread(self) -> None:
         self.spread = QtGui.QGradient.PadSpread
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setRepeatSpread(self) -> None:
         self.spread = QtGui.QGradient.RepeatSpread
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setReflectSpread(self) -> None:
         self.spread = QtGui.QGradient.ReflectSpread
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setLogicalCoordinateMode(self) -> None:
         self.coordinateMode = QtGui.QGradient.LogicalMode
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setDeviceCoordinateMode(self) -> None:
         self.coordinateMode = QtGui.QGradient.StretchToDeviceMode
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setObjectCoordinateMode(self) -> None:
         self.coordinateMode = QtGui.QGradient.ObjectMode
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setLinearGradient(self) -> None:
         self.gradientBrushType = QtCore.Qt.LinearGradientPattern
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setRadialGradient(self) -> None:
         self.gradientBrushType = QtCore.Qt.RadialGradientPattern
         self.update()
         
-    @pyqtSlot()
+    @Slot()
     def setConicalGradient(self) -> None:
         self.gradientBrushType = QtCore.Qt.ConicalGradientPattern
         self.update()
         
-    @pyqtSlot(object)
+    @Slot(object)
     def setGradientStops(self, stops:typing.Iterable[typing.Tuple[float, typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor]]]) -> None:
         self.gradientStops = stops
         self.update()
@@ -1244,12 +1245,12 @@ class GradientWidget(QtWidgets.QWidget):
     def defaultGradient(self, val:typing.Optional[QtGui.QGradient]=None) -> None:
         self._setDefaultGradient(val)
         
-    @pyqtSlot()
+    @Slot()
     def setPreset(self) -> None:
         self._changePresetBy(0)
         self._resetTitle()
         
-    @pyqtSlot(int)
+    @Slot(int)
     def slot_presetActivated(self, index):
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
         self._gradientIndex = index
@@ -1258,17 +1259,17 @@ class GradientWidget(QtWidgets.QWidget):
         self._showGradient(namedgrad[1])
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def setPrevPreset(self) -> None:
         self._changePresetBy(-1)
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def setNextPreset(self) -> None:
         self._changePresetBy(1)
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def slot_gradientModified(self) -> None:
         if isinstance(self._title, str) and len(self._title.strip()):
             self.setWindowTitle("%s *" % self._title)
@@ -1419,40 +1420,31 @@ class GradientWidget(QtWidgets.QWidget):
                 
             if gradientType == QtGui.QGradient.LinearGradient:
                 g = g2l(gradient)
-                #gradient = sip.cast(gradient, QtGui.QLinearGradient)
                 
             elif gradientType == QtGui.QGradient.RadialGradient:
                 g = g2r(gradient)
-                #gradient = sip.cast(gradient, QtGui.QRadialGradient)
                 
             elif gradientType == QtGui.QGradient.ConicalGradient:
                 g = g2c(gradient)
-                #gradient = sip.cast(gradient, QtGui.QConicalGradient)
                 
             else:
                 return
             
             gradient = g
             
-        #print("GradientWidget._showGradient gradient:", gradient)
-        #print("\tresolved to:", reverse_mapping_lookup(standardQtGradientTypes, gradient.type()))
-        #stops = gradient.stops()
-        
-        #print(f"GradientWidget._showGradient, points: {points}")
-        
         if isinstance(points, (QtGui.QPolygonF, QtGui.QPolygon)) and len(points)==2:
             hoverStops = QtGui.QPolygonF(points)
         else:
             g = scaleGradient(gradient, self._renderer.rect())
             gline = gradientLine(g, self._renderer.rect()) 
             hoverStops = QtGui.QPolygonF((gline.p1(), gline.p2()))
+
         # NOTE: 2021-06-21 08:33:39
         # renderer doesn't know about the editor, and editor doesn't know about
         # renderer; therefore, the gradient stops must be sent to both
         self._editor.setGradientStops(stops)
         self._renderer.gradientStops = stops
         self._renderer.hoverPoints.points = hoverStops
-        #printPoints(self._renderer.hoverPoints.points)
         self._renderer.update()
         
         if isinstance(gradient, QtGui.QLinearGradient):
@@ -1497,7 +1489,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._rendererGradient = self._renderer.gradient
             
-    @pyqtSlot()
+    @Slot()
     def slot_addGradientToPresets(self):
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
         name = self._presetComboBox.currentText()
@@ -1528,7 +1520,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._showGradient(val) # this one might be shown already
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def slot_removeGradientFromPresets(self):
         self.removeGradient(self._presetComboBox.currentText())
         
@@ -1576,7 +1568,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def slot_restoreGradientFromPresets(self):
         name = self._presetComboBox.currentText()
         if name in self._gradients.keys():
@@ -1584,7 +1576,7 @@ class GradientWidget(QtWidgets.QWidget):
             
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def slot_acceptGradientChange(self):
         name = self._presetComboBox.currentText()
         
@@ -1604,18 +1596,18 @@ class GradientWidget(QtWidgets.QWidget):
         self._showGradient(self._gradients[name])
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def slot_rejectGradientChange(self):
         self.slot_restoreGradientFromPresets()
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def reloadPresets(self):
         self._setupGradients()
         self._changePresetBy(0)
         self._resetTitle()
         
-    @pyqtSlot()
+    @Slot()
     def slot_gradientNameChanged(self):
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
         val = self._presetComboBox.lineEdit().text()
@@ -1789,13 +1781,13 @@ class GradientWidget(QtWidgets.QWidget):
                               #gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=None,
                               #points:typing.)
             
-    @pyqtSlot()
+    @Slot()
     def setAutoCenterRadius(self)-> None:
         self._centerRadiusSpinBox.setEnabled(False)
         self._renderer.setAutoCenterRadius()
         self._useAutoCenterRadius = True
     
-    @pyqtSlot()
+    @Slot()
     def setRelativeCenterRadius(self) -> None:
         self._centerRadiusSpinBox.setEnabled(True)
         val = self._centerRadiusSpinBox.value()
@@ -1815,7 +1807,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._useAutoCenterRadius = False
         self._renderer.setRelativeCenterRadius()
     
-    @pyqtSlot()
+    @Slot()
     def setAbsoluteCenterRadius(self) -> None:
         self._centerRadiusSpinBox.setEnabled(True)
         val = self._centerRadiusSpinBox.value()
@@ -1837,13 +1829,13 @@ class GradientWidget(QtWidgets.QWidget):
         self._useAutoCenterRadius = False
         self._renderer.setAbsoluteCenterRadius()
     
-    @pyqtSlot()
+    @Slot()
     def setAutoFocalRadius(self) -> None:
         self._focalRadiusSpinBox.setEnabled(False)
         self._renderer.setAutoFocalRadius()
         self._useAutoFocalRadius = True
     
-    @pyqtSlot()
+    @Slot()
     def setRelativeFocalRadius(self) -> None:
         self._focalRadiusSpinBox.setEnabled(True)
         val = self._focalRadiusSpinBox.value()
@@ -1862,7 +1854,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._useAutoFocalRadius = False
         self._renderer.setRelativeFocalRadius()
     
-    @pyqtSlot()
+    @Slot()
     def setAbsoluteFocalRadius(self) -> None:
         self._focalRadiusSpinBox.setEnabled(True)
         val = self._focalRadiusSpinBox.value()
@@ -1884,12 +1876,12 @@ class GradientWidget(QtWidgets.QWidget):
         self._useAutoFocalRadius = False
         self._renderer.setAbsoluteFocalRadius()
         
-    @pyqtSlot(float)
+    @Slot(float)
     def setCenterRadius(self, val:float) -> None:
         if not self._autoCenterRadiusButton.isChecked():
             self._renderer.setCenterRadius(val)
         
-    @pyqtSlot(float)
+    @Slot(float)
     def setFocalRadius(self, val:float) -> None:
         if not self._autoFocalRadiusButton.isChecked():
             self._renderer.setFocalRadius(val)

@@ -21,9 +21,13 @@ import numpy as np
 import neo
 import vigra
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType as __loadUiType__
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -77,9 +81,9 @@ class TableEditor(ScipyenViewer):
     # inherit from WorkspaceGuiMixin for messages and data I/O
     # TODO: 2019-09-09 22:40:36
     # implement plotting -- via the plots module
-    sig_activated               = pyqtSignal(int)
-    closeMe                     = pyqtSignal(int)
-    signal_window_will_close    = pyqtSignal()
+    sig_activated               = Signal(int)
+    closeMe                     = Signal(int)
+    signal_window_will_close    = Signal()
     
     # TODO 2019-11-01 22:57:01
     # finish implementing all these
@@ -148,7 +152,7 @@ class TableEditor(ScipyenViewer):
         if hasattr(self, "_use_mpl_action_"):
             self._use_mpl_action_.setChecked(self._use_matplotlib_)
             
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def _slot_use_mpl_toggled_(self, value):
         self._use_matplotlib_ = value
@@ -251,7 +255,7 @@ class TableEditor(ScipyenViewer):
         
         self.tableWidget.setData(self._data_)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportAsCSVFile(self):
         if self._data_ is None:
@@ -278,24 +282,24 @@ class TableEditor(ScipyenViewer):
         if len(filePath) > 0:
             pio.writeCsv(self._data_, filePath)
             
-    @pyqtSlot()
+    @Slot()
     def slot_resizeAllColumnsAndRowsToContents(self):
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
                 
                 
-    @pyqtSlot()
+    @Slot()
     def slot_resizeAllColumnsToContents(self):
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         
-    @pyqtSlot()
+    @Slot()
     def slot_resizeAllRowsToContents(self):
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_plotSelectedColumns(self):
         '''Plot table selection
@@ -314,7 +318,7 @@ class TableEditor(ScipyenViewer):
         
         self._plot_model_data_(modelIndexes, custom=False)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_customPlotSelectedColumns(self):
         if type(self._scipyenWindow_).__name__ != "ScipyenWindow":

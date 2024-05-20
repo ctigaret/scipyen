@@ -1,9 +1,10 @@
 """Various helpers for GUI
 """
-import typing, warnings, math
+import os, typing, warnings, math
 import numpy as np
 from core.utilities import get_least_pwr10
-from PyQt5 import (QtCore, QtWidgets, QtGui)
+from qtpy import (QtCore, QtWidgets, QtGui)
+# from PyQt5 import (QtCore, QtWidgets, QtGui)
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)
 
@@ -168,23 +169,37 @@ def lsqueeze(s:str, w:int):
         part = w - 3
         return "..." + s[part:]
     return s
+
+def get_current_font_metrics():
+    if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        fm = QtWidgets.QApplication.fontMetrics()
+    else:
+        fm = QtGui.QFontMetrics(QtWidgets.QApplication.instance().font())
+        
+    return fm
+                                
+                                
         
 def get_elided_text(s:str, w:int):
-    fm = QtWidgets.QApplication.fontMetrics()
+    fm = get_current_font_metrics()
+    # fm = QtWidgets.QApplication.fontMetrics()
     return fm.elidedText(s, QtCore.Qt.ElideRight, w)
 
 def get_text_width(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
-    fm = QtWidgets.QApplication.fontMetrics()
+    fm = get_current_font_metrics()
+    # fm = QtWidgets.QApplication.fontMetrics()
     sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.width()
 
 def get_text_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
-    fm = QtWidgets.QApplication.fontMetrics()
+    fm = get_current_font_metrics()
+    # fm = QtWidgets.QApplication.fontMetrics()
     sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.height()
 
 def get_text_width_and_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
-    fm = QtWidgets.QApplication.fontMetrics()
+    # fm = QtWidgets.QApplication.fontMetrics()
+    fm = get_current_font_metrics()
     sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.width(), sz.height()
 
@@ -206,7 +221,7 @@ def get_font_style(val:typing.Union[str, FontStyleType]) -> typing.Union[int, Qt
         QtGui.QFont.Style enum value (see Qt documentation for details)
     
     """
-    
+    # print(f"guiutils.get_font_style(val: {val} [type {type(val).__name__}])")
     if isinstance(val, str) and len(val.strip()):
         ret = standardQtFontStyles.get(val, None) # --> int or None if not found
         if ret is None:
@@ -225,7 +240,8 @@ def get_font_style(val:typing.Union[str, FontStyleType]) -> typing.Union[int, Qt
         return val # OK to feed an int to font.setStyle()
         
     elif isinstance(val, QtGui.QFont.Style):
-        return val
+        return QtGui.QFont.Style(val) # issues when casting in PyQt6 via qtpy
+        # return val
     
     else:
         return QtGui.QFont.StyleNormal

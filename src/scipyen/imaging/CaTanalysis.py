@@ -146,10 +146,12 @@ from IPython.core.magic import (Magics, magics_class, line_magic,
 #### BEGIN 3rd party modules
 from traitlets import Bunch
 
-# NOTE: 2019-07-29 13:13:23 TODO load PyQt5 modules via the pict.gui package
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.uic import loadUiType as __loadUiType__ 
+from qtpy import QtCore, QtGui, QtWidgets, QtXml
+from qtpy.QtCore import Signal, Slot
+from qtpy.uic import loadUiType as __loadUiType__ 
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+# from PyQt5.QtCore import Signal, Slot
+# from PyQt5.uic import loadUiType as __loadUiType__ 
 
 import numpy as np
 import pandas as pd
@@ -208,6 +210,7 @@ import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer)
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.itemslistdialog import ItemsListDialog
+from gui import resources_rc
 # from gui import resources_rc
 #### END pict.gui modules
 
@@ -236,9 +239,14 @@ import ephys.ephys as ephys
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__,"LSCaTWindow.ui")
 
+# print(f"CaTanalysis.py __ui_path__ {__ui_path__}")
+
 # Form class,        Base class                                                                               package with the resources.qrc file
-__UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
-# __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LSCaTWindow.ui"), from_imports=True, import_from="gui")
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
+    # __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(os.path.join(__module_path__,"LSCaTWindow.ui"), from_imports=True, import_from="gui")
+else:
+    __UI_LSCaTWindow__, __QMainWindow__ = __loadUiType__(__ui_path__)#, import_from="gui")
 
 def vCursor2ScanlineProjection(v, path, span=None):
     """Maps the x coordinate for a vertical cursor in linescans space (x,y) coordinates on scanline path, in scene space.
@@ -4640,7 +4648,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #### END Threaded execution
             
     @safeWrapper
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_sceneProcessingDone(self, result):
         if self._data_ is None:
             print("slot_sceneProcessingDone no data")
@@ -4658,7 +4666,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.slot_processingDone()
         
     @safeWrapper
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_scansProcessingDone(self, result):
         if self._data_ is None:
             print("slot_scansProcessingDone no data")
@@ -4672,7 +4680,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             win.displayFrame()
         self.slot_processingDone()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_processingDone(self):
         if self._scene_processing_idle_ and self._scans_processing_idle_:
@@ -4685,7 +4693,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.displayFrame()
             self.statusBar().showMessage("Done!")
             
-    @pyqtSlot()
+    @Slot()
     def slot_cancelCurrentProcess(self):
         # TODO
         pass
@@ -4823,7 +4831,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     # BEGIN PyQt slots
     # ###
     
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscat_bleed_ind_ref_changed(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -4838,7 +4846,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.analysisOptions["Channels"]["Bleed_ind_ref"] = value
         
     
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscat_bleed_ref_ind_changed(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -4852,7 +4860,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self._data_.analysisOptions["Channels"]["Bleed_ref_ind"] = value
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_openScanDataPickleFile(self):
         import mimetypes, io
@@ -4891,7 +4899,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._scipyenWindow_.assignToWorkspace(_data_var_name_, data)
         
-    @pyqtSlot()
+    @Slot()
     def slot_loadOptionsFile(self):
         import io
         if self._data_ is None:
@@ -4937,7 +4945,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.statusBar().showMessage("Done!")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_import_data_wide_descriptors(self):
         from core.workspacefunctions import getvarsbytype
@@ -4980,7 +4988,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             self.displayFrame()
             
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slot_prairieViewImportGuiDone(self, value):
         if value:
@@ -4991,7 +4999,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             self.statusBar().showMessage("Import PrairieView done!")
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_importPrairieView(self):
         import mimetypes, io
@@ -5004,12 +5012,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     def _analyzeFrames_(self, frames, progressSignal=None, setMaxSignal=None, **kwargs):
         """Calls to the module-level analyseFrame() for each frame in frames.
         This is meant to be executed in a separate GUI thread, (i.e. it is called 
-        by a ProgressWorkerRunnable) emits progressSignal(int) pyqtSignal
+        by a ProgressWorkerRunnable) emits progressSignal(int) Signal
         
         Parameters:
         ==========
         frames: a sequence of int: indices of the data frames to be analysed
-        progressSignal: a pyqtSignal with one int argument (the frame)
+        progressSignal: a Signal with one int argument (the frame)
             This signal is emitted after the processing of one frame.
         
         """
@@ -5044,7 +5052,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if progressSignal is not None:
                 progressSignal.emit(frame)
 
-    @pyqtSlot()
+    @Slot()
     def slot_analyseFramesDone(self):
         self._epscat_analysis_idle_ = True
         self._update_report_()
@@ -5054,7 +5062,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         self.statusBar().showMessage("Done!")
         
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_concatenateLSDataDone(self, obj):
         self._generic_work_idle_ = True
         
@@ -5097,7 +5105,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
             self.statusBar().showMessage("Done!")
 
-    @pyqtSlot()
+    @Slot()
     def slot_appendLSData(self):
         import io
         from core.workspacefunctions import getvarsbytype
@@ -5144,7 +5152,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.statusBar().showMessage("Done!")
         
-    @pyqtSlot()
+    @Slot()
     def slot_concatenateLSData(self):
         from core.workspacefunctions import getvarsbytype
         
@@ -5177,7 +5185,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.threadpool.start(worker)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_adoptAnalysisOptionsFromScanData(self):
         from core.workspacefunctions import getvarsbytype
@@ -5219,7 +5227,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             self.statusBar().showMessage("Done!")
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_adoptTriggerProtocolsFromScanDataElectrophysiology(self):
         import io
@@ -5269,7 +5277,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             msgbox.exec()
             return
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_adoptTriggerProtocolsFromScanDataImaging(self):
         from core.workspacefunctions import getvarsbytype
@@ -5320,7 +5328,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             msgbox.exec()
             return
 
-    @pyqtSlot()
+    @Slot()
     def slot_adoptAnalysisUnitsFromScanData(self):
         import io
         from core.workspacefunctions import getvarsbytype
@@ -5376,7 +5384,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
 
             
-    @pyqtSlot()
+    @Slot()
     def slot_addReplaceElectrophysiologyWorkspace(self):
         import mimetypes, io
         from core.workspacefunctions import getvarsbytype
@@ -5497,7 +5505,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             msgbox.exec()
             return
         
-    @pyqtSlot()
+    @Slot()
     def slot_reorderEphysSegments(self):
         if self._data_ is None:
             return 
@@ -5651,7 +5659,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
             self.displayFrame()
             
-    @pyqtSlot()
+    @Slot()
     def slot_addReplaceElectrophysiologyFile(self):
         import mimetypes, io
         
@@ -5814,7 +5822,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
             
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_analyseData(self):
         if self._data_ is None or len(self._data_.analysisOptions)==0:
@@ -5843,7 +5851,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.threadpool.start(worker)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_analyseCurrentFrame(self):
         if self._data_ is None or len(self._data_.analysisOptions)==0:
@@ -5862,7 +5870,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.statusBar().showMessage("Done!")
         
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_analyseCurrentLandmarkInCurrentFrame(self):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -5910,7 +5918,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.statusBar().showMessage("Done!")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_analyseCurrentLandmarkInFrames(self):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -5977,7 +5985,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.threadpool.start(worker)
         
-    @pyqtSlot(QtWidgets.QTableWidgetItem)
+    @Slot(QtWidgets.QTableWidgetItem)
     @safeWrapper
     def slot_epscatParameterChanged(self, item):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6014,7 +6022,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             # NOTE: 2018-06-17 21:01:31 DO NOT DELETE
             #self.statusBar().showMessage("Done!")
                 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_indicatorNameChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6025,7 +6033,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["IndicatorCalibration"]["Name"] = value
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_indicatorKdChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6040,7 +6048,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             self._data_.analysisOptions["IndicatorCalibration"]["Kd"] = value
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_indicatorFminChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6055,7 +6063,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             self._data_.analysisOptions["IndicatorCalibration"]["Fmin"] = value
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_indicatorFmaxChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6070,7 +6078,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             self._data_.analysisOptions["IndicatorCalibration"]["Fmax"] = value
             
-    @pyqtSlot(int)
+    @Slot(int)
     def slot_discrimination2DChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6087,7 +6095,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot(int)
+    @Slot(int)
     def slot_useFirstDiscriminationWindowChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6104,7 +6112,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot(bool)
+    @Slot(bool)
     def slot_discriminationWindowChoiceChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6127,7 +6135,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
         
-    @pyqtSlot(float)
+    @Slot(float)
     def slot_minimumR2Changed(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6141,7 +6149,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
             
-    @pyqtSlot(float)
+    @Slot(float)
     def slot_fsDiscriminantChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
             return
@@ -6154,7 +6162,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_setBaseDiscriminationWindow(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6169,7 +6177,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_setPeakDiscriminationWindow(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6184,7 +6192,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscatDarkCurrentBeginChanged(self, value=None):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6198,7 +6206,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["Intervals"]["DarkCurrent"][0] = value * pq.s
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscatDarkCurrentEndChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6209,7 +6217,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["Intervals"]["DarkCurrent"][1] = value * pq.s
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscatF0BeginChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6220,7 +6228,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["Intervals"]["F0"][0] = value * pq.s
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscatF0EndChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6231,7 +6239,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["Intervals"]["F0"][1] = value * pq.s
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscatFitBeginChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6242,7 +6250,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["Intervals"]["Fit"][0] = value * pq.s
     
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscatFitEndChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6253,7 +6261,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["Intervals"]["Fit"][1] = value * pq.s
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscatIntegralBeginChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6264,7 +6272,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["Intervals"]["Integration"][0] = value * pq.s
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_epscatIntegralEndChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6275,7 +6283,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self._data_.analysisOptions["Intervals"]["Integration"][1] = value * pq.s
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_change_analysis_unit_state(self, state):
         if self._data_ is None:
@@ -6289,7 +6297,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     
         self._update_report_()
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_toggleEPSCaTFit(self, value):
         if self._data_ is None:
@@ -6301,7 +6309,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         elif value == QtCore.Qt.Checked:
             self._data_.analysisOptions["Fitting"]["Fit"] = True
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_detectTriggers(self):
         import io
@@ -6362,7 +6370,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
         
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_define_analysis_unit(self):
         if self._data_ is None:
@@ -6392,7 +6400,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.displayFrame()
         
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_remove_analysis_unit(self):
         #print("slot_remove_analysis_unit")
@@ -6424,7 +6432,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_remove_analysis_cursor(self):
         #print("slot_remove_analysis_cursor")
@@ -6456,7 +6464,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_showReportWindow(self):
         self._update_report_()
@@ -6480,7 +6488,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self.reportWindow.activateWindow()
         
-    @pyqtSlot()
+    @Slot()
     def slot_removeCurrentScanDataFrame(self):
         if self._data_ is None:
             return
@@ -6488,7 +6496,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.removeFrame(self.currentFrame)
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     def slot_removeScanDataFrames(self):
         if self._data_ is None:
             return
@@ -6520,7 +6528,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     for k_,_ in enumerate(indices):
                         indices[k_] -= 1
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addProtocol(self):
         if self._data_ is None:
@@ -6576,7 +6584,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeProtocol(self):
         if self._data_ is None:
@@ -6596,7 +6604,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addEPSCaTComponent(self):
         # TODO
@@ -6604,7 +6612,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.statusBar().showMessage("slot_addEPSCaTComponent currentItem row %d, col %d: %s" % (item.row(), item.column(), item.text()))
         #print("slot_addEPSCaTComponent currentItem row %d, col %d: %s" % (item.row(), item.column(), item.text()))
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeEPSCaTComponent(self):
         # TODO
@@ -6612,7 +6620,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.statusBar().showMessage("slot_removeEPSCaTComponent currentItem row %d, col %d: %s" % (item.row(), item.column(), item.text()))
         #print("slot_removeEPSCaTComponent currentItem row %d, col %d: %s" % (item.row(), item.column(), item.text()))
     
-    @pyqtSlot(QtWidgets.QTableWidgetItem)
+    @Slot(QtWidgets.QTableWidgetItem)
     @safeWrapper
     def slot_protocolTableEdited(self, item):
         """Modifies lsdata's TriggerProtocols directly.
@@ -6735,7 +6743,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot(int)
+    @Slot(int)
     #@safeGUIWrapper
     @safeWrapper
     def slot_epscatIndicatorChannelChanged(self, value):
@@ -6753,7 +6761,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
             
             
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_epscatReferenceChannelChanged(self, value):
         if self._data_ is None or len(self._data_.analysisOptions) == 0:
@@ -6763,7 +6771,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_deleteAllAnalysisUnits(self):
         if self._data_ is None:
@@ -6793,7 +6801,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
                 
-    @pyqtSlot()
+    @Slot()
     def slot_removeAllProtocols(self):
         if self._data_ is None:
             return
@@ -6802,7 +6810,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @pyqtSlot(QtWidgets.QAction)
+    @Slot(QtWidgets.QAction)
     def slot_fileToolbarAction(self, action):
         if action  == self.actionToolbarOpenFile:
             self.slot_openScanDataPickleFile()
@@ -6817,7 +6825,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.slot_pickleLSData()
             
         
-    @pyqtSlot(QtWidgets.QAction)
+    @Slot(QtWidgets.QAction)
     def slot_unitsToolbarAction(self, action):
         #print(action)
         if action == self.actionImportUnits:
@@ -6842,7 +6850,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         elif action  == actionSetup_Vertical_Cursors_in_All_Frames:
             self.slot_setupLinescanCursorsInSpecifiedFrames()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_deleteAnalysisUnits(self):
         if self._data_ is None:
@@ -6947,7 +6955,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         """
         name_list: a list of ScanData objects (variables) names in the workspace
         
-        progressSignal: None (default) or PyQt5 pyqtSignal when this function is
+        progressSignal: None (default) or Signal when this function is
         called from a worker (to be run in a different thread)
         """
         import io
@@ -7252,7 +7260,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self.statusBar().showMessage("Done!")
                 
-    @pyqtSlot()
+    @Slot()
     def slot_collate_reports(self):
         """Concatenates all analysis reports (pandas.DataFrames) from workspace.
         These not be all from the same cell/field/unit.
@@ -7403,7 +7411,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             traceback.print_exc()
         
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def slot_reportLSCaTResults(self):
         """Exports analysis result (pandas.DataFrame) to workspace.
         
@@ -7481,7 +7489,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.statusBar().showMessage("Done!")
         
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def slot_collectAnalysisUnits(self):
         from core.workspacefunctions import getvarsbytype
 
@@ -7515,7 +7523,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.threadpool.start(worker)
         
     @safeWrapper
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_collectAnalysisDone(self, obj):
         self._generic_work_idle_ = True
         
@@ -7554,7 +7562,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             self.statusBar().showMessage("Done!")
             
-    @pyqtSlot()
+    @Slot()
     def slot_report_window_closing(self):
         self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Size", self.reportWindow.size())
         self.qsettings.setValue("LSCaTAnalysis/ReportWindow_Position", self.reportWindow.pos())
@@ -7562,7 +7570,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.qsettings.setValue("LSCaTAnalysis/ReportWindow_State", self.reportWindow.saveState())
                 
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def slot_exportCurrentAnalysisUnit(self):
         if self._data_ is None:
             return
@@ -7604,7 +7612,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.statusBar().showMessage("Done!")
         
-    @pyqtSlot()
+    @Slot()
     def slot_exportScanDataOptions(self):
         if self._data_ is None:
             return
@@ -7635,7 +7643,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
             
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def slot_exportAnalysisUnits(self):
         #QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         self.setCursor(QtCore.Qt.WaitCursor)
@@ -7666,7 +7674,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self.unsetCursor()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_processData(self):
         if self._data_ is None:
@@ -7674,7 +7682,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.filterData()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_processScene(self):
         if self._data_ is None:
@@ -7682,7 +7690,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.filterData(scans=False)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_processScans(self):
         if self._data_ is None:
@@ -7691,7 +7699,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.filterData(scene=False)
         
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_gui_spinbox_select_cursor_by_index(self, index):
         """ TODO FIXME Adapt to select/deselect AnalysisUnits
@@ -7768,7 +7776,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
         self._update_analysis_unit_ui_fields_()
             
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_gui_changed_unit_type_string(self, val):
         if self._data_ is None:
@@ -7785,7 +7793,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self._update_report_()
         
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_gui_changed_genotype(self, val):
         if self._data_ is None:
@@ -7804,7 +7812,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self._update_report_()
         
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_gui_changed_sex(self, val):
         if self._data_ is None:
@@ -7820,7 +7828,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self._update_report_()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_gui_edit_analysis_unit_descriptors(self):
         """
@@ -8130,7 +8138,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
             self.displayFrame()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_gui_add_unit(self):
         if self._data_ is None:
@@ -8148,7 +8156,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._add_vertical_cursor_(asUnit=True)
         
         
-    @pyqtSlot()
+    @Slot()
     def slot_removeUnit(self):
         #print("LSCaTWindow.slot_removeUnit")
         if self._data_ is None:
@@ -8197,7 +8205,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
 
-    @pyqtSlot()
+    @Slot()
     def slot_gui_add_vertical_cursor(self):
         self._add_vertical_cursor_()
         
@@ -8283,7 +8291,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_gui_changed_source_ID(self):
         if self._data_ is None:
@@ -8330,7 +8338,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_gui_age_changed(self):
         if self._data_ is None:
@@ -8365,7 +8373,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         except Exception as e:
             traceback.print_exc()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_gui_changed_cell_name(self):
         if self._data_ is None:
@@ -8412,7 +8420,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_gui_changed_field_name(self):
         if self._data_ is None:
@@ -8439,10 +8447,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    #@pyqtSlot(str)
+    #@Slot(str)
     #@safeWrapper
     #def slot_gui_changed_analysis_unit_name(self, newName):
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_gui_changed_analysis_unit_name(self):
         """Rename an analysis unit
@@ -8489,7 +8497,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_gui_changed_cursor_x_pos(self, value):
         if len(self._data_.scansCursors) == 0:
@@ -8513,7 +8521,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_gui_changed_cursor_y_pos(self, value):
         if len(self._data_.scansCursors) == 0:
@@ -8536,7 +8544,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_gui_changed_cursor_xwindow(self, value):
         if len(self._data_.scansCursors) == 0:
@@ -8559,7 +8567,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_gui_changed_cursor_ywindow(self, value):
         if len(self._data_.scansCursors) == 0:
@@ -8582,8 +8590,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displayFrame()
         
-    #@pyqtSlot(object, int)
-    @pyqtSlot(object)
+    #@Slot(object, int)
+    @Slot(object)
     @safeWrapper
     def slot_graphics_object_added_in_window(self, obj):
         """Slot to be connected to image viewer window signals emitted when a 
@@ -8694,7 +8702,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.displayFrame()
         
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_graphics_object_changed_in_window(self, obj):
         """Triggered by direct interaction with a GraphicsObject cursor.
@@ -8839,7 +8847,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     def slot_toggle_opaque_cursor_labels(self):
         if self._data_ is None:
             return
@@ -8856,7 +8864,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 f.setTransparentLabel(not opaque)
             #__internal_set_opaque_label__(o, opaque)
             
-    @pyqtSlot()
+    @Slot()
     #@safeWrapper
     def slot_graphics_objects_deselected(self):
         if self._data_ is None:
@@ -8894,8 +8902,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     
         self._update_analysis_unit_ui_fields_()
         
-    #@pyqtSlot(object, int)
-    @pyqtSlot(object)
+    #@Slot(object, int)
+    @Slot(object)
     #@safeWrapper
     def slot_graphics_object_selected_in_window(self, obj):
         if self._data_ is None:
@@ -8965,8 +8973,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         self._update_analysis_unit_ui_fields_()
             
-    #@pyqtSlot(object, int)
-    @pyqtSlot(object)
+    #@Slot(object, int)
+    @Slot(object)
     #@safeWrapper
     def slot_graphics_object_removed_in_window(self, obj):
         if self._data_ is None:
@@ -9047,8 +9055,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._update_analysis_unit_ui_fields_()
         self.displayFrame()
     
-    @pyqtSlot(int)
-    @pyqtSlot(float)
+    @Slot(int)
+    @Slot(float)
     @safeWrapper
     def slot_filterParamChanged(self, value):
         if self._data_ is None:
@@ -9162,7 +9170,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_previewFilter(self): # TODO
         if self._data_ is None:
@@ -9193,7 +9201,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             pass
             
             
-    @pyqtSlot()
+    @Slot()
     def slot_removeUncagingArtifact(self):
         if self._data_ is None:
             return
@@ -9219,7 +9227,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._display_scans_()
                 
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_pickleLSData(self):
         if self._data_ is None:
@@ -9280,7 +9288,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._data_.modified=False
             self.displayFrame()
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportCopyToWorkspace(self):
         if self._data_ is None:
@@ -9313,7 +9321,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
             self.statusBar().showMessage("Done!")
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_filterPageSelectionChanged(self, value):
         if self._data_ is None:
@@ -9334,7 +9342,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 self.scanFiltersConfigStackedWidget.setCurrentIndex(0)
         self.generateFilters()
                 
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_displayFramesWithProtocol(self, val):
         if self._data_ is None:
@@ -9342,7 +9350,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.displaySelectFrames()
 
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_splineInterpolatorOrderChanged(self, val):
         self.scanline_spline_order = val
@@ -9352,7 +9360,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._display_scanline_profiles_()
             
             
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_showScanlineProfiles(self, val):
         if self._data_ is None:
@@ -9381,12 +9389,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
         self._update_ui_fields_()
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_enterWhatsThisMode(self):
         QtWidgets.QWhatsThis.enterWhatsThisMode()
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slot_frameChangedInChildViewer(self, value):
         """Captures frame index change in the child viewer
@@ -9459,7 +9467,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     frindex = self._data_.framesMap["scans"][self.currentFrame]
                     win.currentFrame = frindex
                     
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_setFrameNumber(self, value):
         """Connected to frameQSlider or framesQSpinBox signals.
@@ -9550,7 +9558,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         except Exception as e:
             traceback.print_exc()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_setupLinescanCursorsInSpecifiedFrames(self):
         if self._data_ is None:
@@ -9568,7 +9576,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_setupLinescanCursorsInCurrentFrame(self):
         if self._data_ is None:
@@ -9579,7 +9587,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified=True
         self.displayFrame()
             
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_scanDisplayChannelChanged(self, value):
         if self._data_ is None:
@@ -9611,7 +9619,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         win.view(data[k])
                         self._displayed_scene_channels_ = [self._data_.scansChannelNames[k]]
                         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_sceneDisplayChannelChanged(self, value):
         """When scene is a sequence of single-band data, send this to the display.
@@ -9642,7 +9650,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         win.view(data[k])
                         self._displayed_scene_channels_ = [self._data_.sceneChannelNames[k]]
                     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_loadWorkspaceScanData(self):
         
@@ -9665,7 +9673,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         self.setData(newdata = lsdata, doc_title = lsdata_varname)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_setDataName(self):
         if self._data_ is None:
@@ -10518,12 +10526,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         for win in self.scansviewers + self.sceneviewers:
             win.displayFrame()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_refreshAllDisplays(self):
         self.displayFrame()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_refreshDataDisplay(self, showFiltered = True):
         """ TODO/FIXME clean up this mess, 
@@ -11980,7 +11988,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         channel: a str, an int, a sequence of str or a sequence of int, or None 
             (default is None, meaning all available raw data channels are processed)
             
-        progressSignal: a callable pyqtSignal emitting an int, or None (default)
+        progressSignal: a callable Signal emitting an int, or None (default)
         
         """
         if not isinstance(self._data_, ScanData):
@@ -12284,7 +12292,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._data_var_name_ = None
             #self._clear_contents_()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_Quit(self):
         print("%s.slot_Quit %s" % (self.__class__.__name__, self.winTitle))

@@ -38,15 +38,20 @@ Useful to have even when vigranumpy is not installed.
 #                                                                      
 #######################################################################
 # NOTE: 2019-10-06 00:43:44
-# Adaptation for use with PyQt5
+# Adaptation for use with PyQt5/6
 # Copyright 209-2021 by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
 #########################################################################
 import os, typing, inspect, math
 import numpy as np
-import PyQt5.QtCore as QtCore
-import PyQt5.QtGui as QtGui
-import PyQt5.QtWidgets as QtWidgets
-from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
+import qtpy.QtCore as QtCore
+import qtpy.QtGui as QtGui
+import qtpy.QtWidgets as QtWidgets
+from qtpy.QtCore import QObject, Signal, Slot
+# import numpy as np
+# import PyQt5.QtCore as QtCore
+# import PyQt5.QtGui as QtGui
+# import PyQt5.QtWidgets as QtWidgets
+# from PyQt5.QtCore import QObject, Signal, Slot
 
 from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
 

@@ -32,7 +32,8 @@ import pyqtgraph # for their own eq operator
 import matplotlib as mpl
 #import language_tool_python
 
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 # try:
 #     from pyqtgraph import eq # not sure is needed
 # except:
@@ -911,9 +912,47 @@ def safe_identity_test2(x, y) -> bool:
     return SafeComparator(comp=eq)(x, y)
 
 # @safeWrapper
-def safe_identity_test(x, y, idcheck=False) -> bool:
+# def safe_identity_test(x, y) -> bool:
+def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
+    """Test that symbols in x and y refer to identical Python objects.
+    
+    Allows for the particular case where a simple comparison using '==', the 
+    operator.eq or the objects' own __eq__ would fail. For example, numpy arrays
+    require the use of np.all(...) to aggregate comparison between elements, but
+    caling np.all() requires the arrays to have the identical shapes, etc.
+    
+    Optionally, the function can bypass the default mechanism that compares the
+    Python "identity" the objects referred by the symbols (see 'idcheck' parameter)
+    such that two objects stored at distinct memory addresses but containing 
+    identical data (e.g., strings, numbers) are viewed as identical for the purpose
+    of the data contents.
+    
+    Parameters:
+    -----------
+    x,y Symbols of Python objects to be tested for identity.
+    
+    idcheck: bool, optional , default is True. Flag to indicate whether to compare
+        the Python "identity" of the two objects (see Python's `id` builtin).
+    
+        In CPython, this is the objects' addresses in memory (a.k.a a "pointer"); 
+        The obejcts referred to by the two symbols 'x' and 'y' are identical if 
+        they have the same memory location.
+    
+        In most situations, simply checking whether the two objects have the same
+        Python "identity" is sufficient - hence this flag is by default True.
+    
+        On some occasions, two objects with distinct `id` can nevertheless contain
+        identical data (numbers, strings) when they are constructed, for example
+        using the same parameters. Although they ARE distinct Python objects from
+        the code's point of view, they are identical from the point of view of the
+        the data they encapsulate. Passing 'idcheck' False will cause this function
+        to compare the data ontent of the objects instead of their ID.
+    
+    NOTE: 2024-05-17 14:58:56
+    to save some typing, you can use the alias 'eq'
+    
+"""
     try:
-        ret = True
         
         if x is y:
             return True
@@ -922,8 +961,10 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
         if isinstance(x, type) and isinstance(y, type):
             return x==y
         
+        ret = True
+        
         if idcheck:
-            ret &= idcheck(x, y)
+            ret &= ideq(x, y)
             if not ret:
                 return ret
         
@@ -965,18 +1006,10 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
                 return ret
             
             if all(isinstance(v, dict) for v in (x,y)):
-                # ret &= list(x.keys()) == list(y.keys())
-                # if not ret:
-                #     return ret
-                
-    #             x_items = list(filter(lambda x_: x_[1] not in (x,y), x.items()))
-    #             y_items = list(filter(lambda x_: x_[1] not in (x,y), y.items()))
-    #             
-    #             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x_items, y_items)))
                 # FIXME: 2023-06-01 13:37:10
                 # prone to infinite recursion when either dict is among either x.values() or y.values()
                 try:
-                    ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
+                    ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1], idcheck=idcheck), zip(x.items(), y.items())))
                 except:
                     ret = False
                 if not ret:
@@ -985,7 +1018,7 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
                 # FIXME: 2023-06-01 13:43:34
                 # prone to infinite recursion when either element is in x or y
                 try:
-                    ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+                    ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1], idcheck=idcheck), zip(x,y)))
                 except:
                     ret = False
             
@@ -1041,6 +1074,7 @@ def safe_identity_test(x, y, idcheck=False) -> bool:
         print("Call stack:")
         print(call_stack)
         
+eq = safe_identity_test
 
 class NestedFinder(object):
     """Provides searching in nesting (hierarchical) data structures.
@@ -2706,7 +2740,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #result of sys.getsizeof(obj) for any other python object
         
         #TODO construct handlers for other object types as well including 
-        #PyQt5 objects (maybe)
+        #Qt objects (maybe)
             
     icon = QtGui.QIcon.fromTheme("object")
     
@@ -3163,7 +3197,6 @@ def yyMdd(now=None):
     return "%s%s%s" % (time.strftime("%y", tuple(now)), string.ascii_lowercase[now.tm_mon-1], time.strftime("%d", tuple(now)))
 
 
-
 def make_file_filter_string(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]
 
@@ -3423,7 +3456,8 @@ def sort_with_none(iterable, none_last = True) -> typing.Sequence:
     
     return sorted(iterable, key=lambda x: x if x is not None else noneph)
 
-def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
+# def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
+def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
     """Returns a sequence of unique elements in the iterable 'seq'.
     Functional version of gen_unique.
     Parameters:
@@ -3441,10 +3475,12 @@ def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
         of (element, index) tuples, where 'index' is the 0-based index of 
         'element' in 'seq'
     
+    idcheck: see documentation for safe_identity_test function in this module
+    
     Returns:
     =======
     A sequence containing unique elements in 'seq'. When 'indices' is True,
-    returns a sequence of (element, index) tuples fo rthe unique elements in
+    returns a sequence of (element, index) tuples for the unique elements in
     'seq'.
     
     NOTE: Does not guarantee the order of the unique elements is the same as 
@@ -3461,9 +3497,10 @@ def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
-    return seq.__class__(gen_unique(seq, key=key, indices=indices))
+    return seq.__class__(gen_unique(seq, key=key, indices=indices, idcheck=idcheck))
+    # return seq.__class__(gen_unique(seq, key=key, indices=indices))
 
-def duplicates(seq, key=None, indices:bool=False) -> typing.Sequence:
+def duplicates(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
     """Returns a sequence of duplicate elements in 'seq'.
     
     Implements:
@@ -3489,6 +3526,7 @@ def duplicates(seq, key=None, indices:bool=False) -> typing.Sequence:
         of (element, index) tuples, where 'index' is the 0-based index of 
         'element' in 'seq'
     
+    idcheck: see documentation for the safe_identity_test in this module
     
     Returns:
     =======
@@ -3506,14 +3544,15 @@ def duplicates(seq, key=None, indices:bool=False) -> typing.Sequence:
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
     if indices:
-        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, indices=indices)))
+        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, indices=indices, idcheck=idcheck)))
         
     else:
-        return seq.__class__(gen_unique(gen_duplicates(seq, key=key), key=key))
+        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, idcheck=idcheck), key=key))
     
     
 
-def gen_unique(seq, key=None, indices:bool=False):
+# def gen_unique(seq, key=None, indices:bool=False):
+def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
     """Iterates through unique elements in the sequence 'seq'.
     
     Parameters:
@@ -3534,6 +3573,8 @@ def gen_unique(seq, key=None, indices:bool=False):
         e.g.
         
         unique(seq, lambda x: x._some_member_property_or_getter_function_)
+    
+    idcheck: see documentation for the safe_identity_test function in this module
     
     Yields:
     =======
@@ -3582,7 +3623,8 @@ def gen_unique(seq, key=None, indices:bool=False):
             # return val not in seenset and not __add_to_seen__(val)
         else:
             if len(seenlist):
-                if any(not safe_identity_test(val, x_) for x_ in seenlist):
+                # if any(not safe_identity_test(val, x_) for x_ in seenlist):
+                if any(not safe_identity_test(val, x_, idcheck=idcheck) for x_ in seenlist):
                     seenlist.append(val)
                     ret = True
             else:
@@ -3604,7 +3646,8 @@ def gen_unique(seq, key=None, indices:bool=False):
                 seenlist.append(x)
                 return True
                 
-            if all(not safe_identity_test(x, x_) for x_ in seenlist):
+            # if all(not safe_identity_test(x, x_) for x_ in seenlist):
+            if all(not safe_identity_test(x, x_, idcheck=idcheck) for x_ in seenlist):
                 seenlist.append(x)
                 return True
                 
@@ -3642,7 +3685,8 @@ def gen_unique(seq, key=None, indices:bool=False):
             else:
                 yield from (x for x in seq if __check_val__(key))
             
-def gen_duplicates(seq, key=None, indices:bool=False):
+# def gen_duplicates(seq, key=None, indices:bool=False):
+def gen_duplicates(seq, key=None, indices:bool=False, idcheck:bool=True):
     """Iterates through the duplicate elements in the sequence 'seq'.
     Parameters:
     -----------
@@ -3663,6 +3707,8 @@ def gen_duplicates(seq, key=None, indices:bool=False):
         
         unique(seq, lambda x: x._some_member_property_or_getter_function_)
     
+    idcheck: see documentation for the safe_identity_test function in this module
+
     Yields:
     =======
     Duplicate elements in 'seq' i.e., all but the first occurence of
@@ -3708,7 +3754,8 @@ def gen_duplicates(seq, key=None, indices:bool=False):
             return False
         else:
             if len(seenlist):
-                if any(not safe_identity_test(val, x_) for x_ in seenlist):
+                # if any(not safe_identity_test(val, x_) for x_ in seenlist):
+                if any(not safe_identity_test(val, x_, idcheck=idcheck) for x_ in seenlist):
                     seenlist.append(val)
                     return True
             else:
@@ -3728,7 +3775,8 @@ def gen_duplicates(seq, key=None, indices:bool=False):
                 seenlist.append(x)
                 return True
                 
-            if all(not safe_identity_test(x, x_) for x_ in seenlist):
+            # if all(not safe_identity_test(x, x_) for x_ in seenlist):
+            if all(not safe_identity_test(x, x_, idcheck=idcheck) for x_ in seenlist):
                 seenlist.append(x)
                 return True
                 

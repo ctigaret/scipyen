@@ -179,8 +179,10 @@ import neo
 import matplotlib as mpl
 # import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
-from PyQt5 import (QtGui, QtCore, QtWidgets)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+from qtpy import (QtGui, QtCore, QtWidgets)
+from qtpy.QtCore import (Signal, Slot, )
+# from PyQt5 import (QtGui, QtCore, QtWidgets)
+# from PyQt5.QtCore import (Signal, Slot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -941,11 +943,11 @@ class SynapticPathway: pass
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class RecordingEpisode(Episode):
     """
-    Specification of an eletrophysiology recording episode.
+    Specification of an electrophysiology recording episode.
         
-    An "episode" is a contiguous series of sweeps recorded during a specific set 
-    of experimental conditions or protocol -- typically, a subset of a larger 
-    experiment where several distinct sets of conditions are applied in sequence.
+    An "episode" is a contiguous series of sweeps recorded under a common set 
+    of experimental conditions -- typically, a subset of a larger 
+    experiment where distinct sets of conditions are applied in sequence.
 
     All sweeps in the episode must have been recorded using the same recording
     protocol (an ElectrophysiologyProtocol object).
@@ -1036,7 +1038,7 @@ class RecordingEpisode(Episode):
                  # sources: typing.Sequence[RecordingSource] = list(), ## → defined in pathways
                  # segments: typing.Optional[GeneralIndexType] = None, ## → defined in superclass beginFrame endFrame
                  pathways: typing.Sequence[SynapticPathway] = list(),
-                 xtalk: typing.Optional[dict[int, tuple[int,int]]] = None ,
+                 xtalk: typing.Optional[tuple] = None ,
                  # triggers: typing.Sequence[TriggerEvent] = list(),
                  **kwargs):
         """Constructor for RecordingEpisode.
@@ -1078,7 +1080,6 @@ class RecordingEpisode(Episode):
             name = self._type_.name
             
         super().__init__(name, **kwargs)
-        
 
         self.protocol = protocol
         
@@ -1086,9 +1087,9 @@ class RecordingEpisode(Episode):
             if len(pathways):
                 if not all(isinstance(v, SynapticPathway) for v in pathways):
                     raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
-            self.pathways = pathways
+            self._pathways_ = pathways
         else:
-            self.pathways = []
+            self._pathways_ = []
         
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
@@ -1120,25 +1121,39 @@ class RecordingEpisode(Episode):
         # NOTE: no checks are done on the value of the key(s) so expect errors
         #   when trying to match an episode with data having the wrong number of sweeps
         if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
-            if len(self.pathways) == 0:
+            if len(self._pathways_) == 0:
                 raise ValueError("Cannot apply crosstalk when there are no pathways defined")
             
             for k,p in xtalk.items():
                 if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
                     raise TypeError("Cross-talk has invalid key types; expecting int or pairs of int")
                 
-                if any(p_ not in range(len(self.pathways)) for p_ in p):
-                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self.pathways)} pathways")
+                if any(p_ not in range(len(self._pathways_)) for p_ in p):
+                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self._pathways_)} pathways")
                 
             self.xtalk = xtalk
             
         elif xtalk is None:
-            self.xtalk = []
+            self.xtalk = tuple()
             
         else:
             raise ValueError(f"Invalid xtalk specification ({xtalk})")
         
         # self._data_ = None
+        
+    def __repr__(self):
+        ret = list()
+        ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}, begin={self.begin}, end={self.end}, beginFrame={self.beginFrame}, endFrame={self.endFrame}), with:")
+        if len(self._pathways_) == 0:
+            ret.append(f"\tPathways: []")
+        else:
+            ret.append(f"\tPathways:")
+            for p in self._pathways_:
+                ret.append(f"\t{p}")
+
+        ret.append(f"\txtalk: {self.xtalk}")
+        
+        return "\n".join(ret)
         
     def _repr_pretty_(self, p, cycle):
         supertxt = super().__repr__() + " with :"
@@ -1149,10 +1164,11 @@ class RecordingEpisode(Episode):
             p.text(supertxt)
             p.breakable()
             attr_repr = [" "]
-            attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("protocol",
-                                                                         "electrodeMode",
-                                                                         "clampMode",
-                                                                        )]
+            attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
+                                                                                "protocol",
+                                                                                "electrodeMode",
+                                                                                "clampMode",
+                                                                                )]
             
             # with p.group(4 ,"(",")"):
             with p.group(4 ,"",""):
@@ -1166,21 +1182,57 @@ class RecordingEpisode(Episode):
             p.text("Pathways:")
             p.breakable()
             
-            if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
+            if isinstance(self._pathways_, (tuple, list)) and len(self._pathways_):
                 # with p.group(4, "(",")"):
                 with p.group(4, "",""):
-                    for pth in self.pathways:
+                    for pth in self._pathways_:
                         p.text(pth.name)
                         p.breakable()
                     p.text("\n")
                 
             if isinstance(self.xtalk, (tuple, list)) and len(self.xtalk):
                 link = " \u2192 "
-                p.text(f"Test for independence: {link.join([pth.name for pth in self.xtalk])}")
+                txt = ["Test for independence:"]
+                for x in self.xtalk:
+                    if len(x[1]) > 1:
+                        txt.append(f"sweep {x[0]}: {x[1][0].name} {link} {x[1][1].name}")
+                p.text("\n".join(txt))
                 p.breakable()
                 p.text("\n")
                 
             p.breakable()
+            
+    @property
+    def pathways(self) -> list:
+        return self._pathways_
+    
+    @pathways.setter
+    def pathways(self, val):
+        if isinstance(val, (tuple, list)):
+            if all(isinstance(v, SynapticPathway) for v in val):
+                self._pathways_[:] = [v for v in val]
+            elif len(val) == 0:
+                self._pathways_.clear()
+            else:
+                raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
+            
+        elif val is None:
+            self._pathways_.clear()
+        else:
+            raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
+            
+            
+            
+    @property
+    def type(self) -> RecordingEpisodeType:
+        return self._type_
+    
+    @type.setter
+    def type(self, val:RecordingEpisodeType):
+        if isinstance(val, RecordingEpisodeType):
+            self._type_ = val
+        else:
+            scipywarn(f"Expecting a RecordingEpisodeType, instead got {val}")
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
@@ -1260,13 +1312,13 @@ class SynapticPathway:
     
     """
     pathwayType: SynapticPathwayType = SynapticPathwayType.Null
-    source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    name: str = "pathway"
     stimulus: SynapticStimulus = field(default_factory = lambda: SynapticStimulus())
     electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
     clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
     schedule: typing.Optional[RecordingSchedule] = None
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
-    name: str = "pathway"
+    source: RecordingSource = field(default_factory = lambda: RecordingSource())
         
 @dataclass
 class LocationMeasure:
@@ -1635,15 +1687,15 @@ class DataListener(QtCore.QObject):
         self.scipyenWindow.enableDirectoryWatch(False)
 
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesRemoved(self, removedItems):
         print(f"{self.__class__.__name__}.slot_filesRemoved {removedItems}")
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesChanged(self, changedItems):
         print(f"{self.__class__.__name__}.slot_filesChanged {changedItems}")
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesNew(self, newItems):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
         

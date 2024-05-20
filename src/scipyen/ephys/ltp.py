@@ -25,15 +25,19 @@ import neo
 from scipy import optimize, cluster#, where
 import colorama
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.uic import loadUiType as __loadUiType__ 
+from qtpy import QtCore, QtGui, QtWidgets, QtXml
+from qtpy.QtCore import Signal, Slot
+from qtpy.uic import loadUiType as __loadUiType__ 
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+# from PyQt5.QtCore import Signal, Slot
+# from PyQt5.uic import loadUiType as __loadUiType__ 
 
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 import core.workspacefunctions as wf
-from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace, assignin)
+from core.workspacefunctions import (user_workspace, validate_varname, 
+                                     get_symbol_in_namespace, assignin)
 import core.signalprocessing as sigp
 import core.curvefitting as crvf
 import core.pyabfbridge as pab
@@ -60,7 +64,8 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter, with_doc, printStyled, scipywarn)
+from core.prog import (safeWrapper, AttributeAdapter, with_doc, 
+                       printStyled, scipywarn)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -79,13 +84,17 @@ from core.quantities import(arbitrary_unit,
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
                             get_index_for_seq, 
+                            safe_identity_test,
+                            eq,
                             sp_set_loc,
                             normalized_index,
                             unique,
                             duplicates,
                             GeneralIndexType,
                             counter_suffix,
+                            yyMdd,
                             NestedFinder)
+
 
 #### END pict.core modules
 
@@ -100,7 +109,9 @@ import gui.quickdialog as quickdialog
 import gui.scipyenviewer as scipyenviewer
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 from gui.cursors import (SignalCursor, DataCursor, SignalCursorTypes)
-from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker)
+from gui.workspacegui import (DirectoryFileWatcher, FileStatChecker, 
+                              WorkspaceGuiMixin)
+from gui import scipyen_colormaps as colormaps
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -124,12 +135,15 @@ LTPOptionsFile = os.path.join(os.path.dirname(__file__), "options", "LTPOptions.
 optionsDir     = os.path.join(os.path.dirname(__file__), "options")
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
+# __ui_path__ = adapt_ui_path(__module_path__,"LTPWindow.ui")
+__ui_path__ = adapt_ui_path(__module_path__,"LTPOnline.ui")
     
-
-__UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
-                                                   from_imports=True, 
-                                                   import_from="gui") #  so that resources can be imported too
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__, 
+                                                    from_imports=True, 
+                                                    import_from="gui") #  so that resources can be imported too
+else:
+    __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__) #  so that resources can be imported too
 
 # def conditioningSource(adc:typing.Union[int, str] = 0, dac:typing.Optional[int] = None, path:int=0, 
 #               pathname:typing.Optional[str]=None,
@@ -216,7 +230,6 @@ __UI_LTPWindow__, __QMainWindow__ = __loadUiType__(__ui_path__,
 
 def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=None,
                       path0:int=0, path1:int=1, name:typing.Optional[str]=None, 
-                      
                       **kwargs):
     """Factory for a RecordingSource in two-pathways synaptic plasticity experiments.
     
@@ -262,7 +275,10 @@ def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=Non
     
     Var-keyword parameters:
     --------------------------
-    These are `auxin` and `auxout`, and by default are set to 'None'.
+    • `auxin` and `auxout`, and by default are set to 'None'.
+    • `path0name` and `path1name`: both strings -- custom names for the two pathways
+        ∘ by default, these are set to 'path0' and 'path1', respectively
+        ∘ when given, they should be different
     
     In a given application, the 'name' field of RecordingSource objects should have unique
     values in order to allow the lookup of these objects according to this field.
@@ -306,8 +322,11 @@ def twoPathwaysSource(adc:typing.Union[int, str]=0, dac:typing.Optional[int]=Non
         raise TypeError(f"'name' expected to be  str or None; instead, got {type(name).__name__}")
     
     assert path0 != path1, f"Test and control pathways must correspond to output channels with distinct indexes; instead got test path: {test_path}, control path: {control_path}"
+    
+    p0name = kwargs.get("path0name", 'path0')
+    p1name = kwargs.get("path1name", 'path1')
         
-    syn     = (SynapticStimulus('path0', path0), SynapticStimulus('path1', path1)) 
+    syn     = (SynapticStimulus(p0name, path0), SynapticStimulus(p1name, path1)) 
     auxin   = kwargs.pop("auxin", None)
     auxout  = kwargs.pop("auxout", None)
     
@@ -326,9 +345,9 @@ class _LTPFilesSimulator_(QtCore.QThread):
     Used for testing LTPOnline on already recorded files
     """
     
-    simulationDone = pyqtSignal(name = "simulationDone")
+    simulationDone = Signal(name = "simulationDone")
     
-    supplyFile = pyqtSignal(pathlib.Path, name = "supplyFile")
+    supplyFile = Signal(pathlib.Path, name = "supplyFile")
     
     defaultTimeout = 10000 # ms
     
@@ -350,6 +369,8 @@ class _LTPFilesSimulator_(QtCore.QThread):
         
         if isinstance(simulation, dict):
             self._simulationTimeOut_ = simulation.get("timeout",self.defaultTimeout )
+
+            # print(f"{self.__class__.__name__}._simulationTimeOut_ = {self._simulationTimeOut_}")
             
             files = simulation.get("files", None)
             
@@ -357,13 +378,12 @@ class _LTPFilesSimulator_(QtCore.QThread):
             
             if not (isinstance(directory, str) and os.path.isdir(directory)) or not (isinstance(directory, pathlib.Path) and directory.is_dir()):
                 directory = os.getcwd()
-                
             
             if not isinstance(files, (list, tuple)) or len(files) == 0 or not all(isinstance(v, (str, pathlib.Path)) for v in files):
                 files = None
             
         if files is None:
-            print(f"{self.__class__.__name__}:\n Looking for ABF files in directory: ({directory}) ...")
+            self.print(f"{self.__class__.__name__}:\n Looking for ABF files in directory: ({directory}) ...")
             files = os.listdir(directory)
             # files = subprocess.run(["ls"], capture_output=True).stdout.decode().split("\n")
             # print(f" Found {len(files)} ABF files")
@@ -372,7 +392,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
             simFilesPaths = list(filter(lambda x: x.is_file() and x.suffix == ".abf", [pathlib.Path(v) for v in files]))
             
             if len(simFilesPaths):
-                print(f"... found {(len(simFilesPaths))} ABF files")
+                self.print(f"... found {(len(simFilesPaths))} ABF files")
                 # NOTE: 2024-01-08 17:45:21
                 # bound to introduce some delay, but needs must, for simulation purposes
                 # print(f" Sorting {len(simFilesPaths)} ABF data based on recording time ...")
@@ -380,7 +400,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
                 # print(" ... done.")
                 
         if len(self._simulationFiles_) == 0:
-            print(f" No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
+            self.print(f" No Axon binary files (ABF) were supplied, and no ABFs were found in current directory ({os.getcwd()})")
                
     def print(self, msg):
         if isinstance(self._stdout_, io.TextIOBase):
@@ -394,17 +414,18 @@ class _LTPFilesSimulator_(QtCore.QThread):
             # self.print(f"\n****\n{self.__class__.__name__}.run: simulation counter {self._simulationCounter_}\n reading file {k}: {colorama.Fore.RED}{colorama.Style.BRIGHT}{f}{colorama.Style.RESET_ALL}")
             self.simulateFile()
             if self.isInterruptionRequested():
-                self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
+                self.print(f"\n{self.__class__.__name__}.run: {printStyled('Interruption requested', 'yellow', False)}\n")
                 break
+            
             QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             # if k < (len(self._simulationFiles_)-1):
             #     QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
             
-        # if not self._paused_:
-        if k < (len(self._simulationFiles_) - 1):
-            self._paused_ = True
-        else:
-            self.simulationDone.emit()
+            # if not self._paused_:
+            if k < (len(self._simulationFiles_) - 1):
+                self._paused_ = True
+            else:
+                self.simulationDone.emit()
             
     def resume(self):
         """Resumes simulation"""
@@ -415,7 +436,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
                 # self.print(f"\n****\n{self.__class__.__name__}.run: simulation counter {self._simulationCounter_}\n reading file {k}: {colorama.Fore.RED}{colorama.Style.BRIGHT}{f}{colorama.Style.RESET_ALL} for simulation counter {self._simulationCounter_}")
                 self.simulateFile()
                 if self.isInterruptionRequested():
-                    self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Interruption requested{colorama.Style.RESET_ALL}\n")
+                    self.print(f"\n{self.__class__.__name__}.run: {printStyled('Interruption requested', 'yellow', False)}\n")
                     break
                 QtCore.QThread.sleep(int(self._simulationTimeOut_/1000)) # seconds!
                 
@@ -425,7 +446,7 @@ class _LTPFilesSimulator_(QtCore.QThread):
             else:
                 self.simulationDone.emit()
                 
-    @pyqtSlot()
+    @Slot()
     def simulateFile(self):
         if self._simulationCounter_ >= len(self._simulationFiles_):
             self.simulationDone.emit()
@@ -438,8 +459,20 @@ class _LTPFilesSimulator_(QtCore.QThread):
         
         
 class _LTPOnlineSupplier_(QtCore.QThread):
-    abfTrialReady = pyqtSignal(pathlib.Path, name="abfTrialReady")
-    stopTimer = pyqtSignal(name="stopTimer")
+    """Monitors files output by electrophysiology acquisition software in a directory.
+        
+        New files output to the directory are then fed into _LTPOnlineFileProcessor_
+        
+    
+    WARNING: Currently this only supports ABF file output from Clampex™, and ONLY
+        for Clampex protocols generating auto-averaged data (i.e., it relies on 
+        intermediate, temporary, '*.rsv' files being output into the monitored
+        directory). The ABF file is supplied to the online file procssor once the
+        corresponding *.rsv file has been deleted by Clampex.
+        
+    """
+    abfTrialReady = Signal(pathlib.Path, name="abfTrialReady")
+    stopTimer = Signal(name="stopTimer")
     
     def __init__(self, parent: QtCore.QObject,
                  abfTrialBuffer: collections.deque, 
@@ -606,26 +639,27 @@ class _LTPOnlineSupplier_(QtCore.QThread):
             print(msg)
                
     def run(self):
-        # print(f"{self.__class__.__name__}.run(): simulator = {self._simulator_}")
         if isinstance(self._simulator_, _LTPFilesSimulator_):
-            # print(f"Starting simulation...")
             self._simulator_.start()
         else:
             # starts directory monitor and captures newly created files
             if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
     
-    @pyqtSlot()
+    @Slot()
     def quit(self):
         if isinstance(self._simulator_, _LTPFilesSimulator_):
             if self._simulator_.isRunning():
                 self._simulator_.requestInterruption()
                 self._simulator_.quit()
                 self._simulator_.wait()
+                
+        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
 
         super().quit()
 
-    @pyqtSlot(pathlib.Path)
+    @Slot(pathlib.Path)
     def _simulateFile_(self, value):
         # print(f"{self.__class__.__name__}._simulateFile_: {value}")
         
@@ -644,6 +678,12 @@ class _LTPOnlineSupplier_(QtCore.QThread):
     @property
     def watchedDirectory(self) -> pathlib.Path:
         return self._watchedDir_
+    
+    @watchedDirectory.setter
+    def watchedDirectory(self, val:pathlib.Path) -> None:
+        self._dirMonitor_.directory = val
+        self._watchedDir_ = self._dirMonitor_.directory
+    
 
 class _LTPOnlineFileProcessor_(QtCore.QThread):
     """Helper class for LTPOnline.
@@ -652,6 +692,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         Also used in simulation mode.
         
     """
+    sig_xtalk = Signal(bool, name="sig_xtalk")
     # TODO: 2024-03-03 22:09:16
     # detect triggers and add trigger events to the pathway blocks?
     # maybe ...
@@ -675,14 +716,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         self._abfTrialBuffer_ = abfBuffer
         self._runData_ = abfTrialData
         self._stdout_ = out
-        self._screen_ = self._emitter_.desktopScreen
-        self._titlebar_height_ = QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)
-        
-        self._screenGeom = self._screen_.geometry()
-        # self._winWidth = int(self._screenGeom.width() // 3 * 0.9)
-        # self._winHeight = int(self._screenGeom.height() // 3 * 0.9)
-        self._winWidth = 500
-        self._winHeight = 300
         
         # maps source
         self._monitor_protocols_ = dict()
@@ -693,9 +726,138 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             print(msg, file=self._stdout_)
         else:
             print(msg)
+            
+    def genEpisode(self, episodeType, episodeName):
+        return RecordingEpisode(episodeType, name=episodeName)
         
+#     def _parseABFProtocolOutputs(self, protocol:pab.ABFProtocol):
+#         # NOTE: 2024-02-17 14:14:17
+#         # Clampex supports stimulation of up to TWO distinct synaptic pathways
+#         # (i.e. via axonal inputs) for one recording source (cell or field),
+#         # using the 'alternative digital outputs' mechanism. 
+#         # The run should have an even number of sweeps — ideally, just two,
+#         # and a trial MAY consist of several runs (thus, the ABF file will 
+#         # store the sweep-by-sweep AVERAGE signals, here resulting in a neo.Block
+#         # with the same number of sweeps per run).
+#         #
+#         # (this is clearly less flexible than CED's Signal software)
+#         #
+#         # Of course, one can configure an odd number of sweeps (e.g., 3) per
+#         # run, but in this case, the last sweep will be a supplementary record
+#         # of the "main" pathway (i.e., the first of the two stimulated pathways)
+#         # whereas the second pathway would end up with fewer stimulations...
+#         #
+#         # NOTE: 2024-02-17 13:51:25
+#         # if there are more than one pathway associated with this source, 
+#         # the following SOFT requirements should be met:
+#         #
+#         # 1 alternative digital outputs enabled, to allow temporal (sweep-wise)
+#         #   separation of pathway responses: responses in both pathways are 
+#         #   recorded through the same electrode; therefore, stimulating them 
+#         #   in alternate sweeps is the only practical solution to distinguish
+#         #   them)
+#         #
+#         #   NOTE: this applies to tracking (or monitoring) protocols; in contrast,
+#         #   conditioning protocols, by definition, affect only a single pathway 
+#         #   (otherwise there would be no justification for recording from a 
+#         #   second pathway).
+#         #
+#         #   Technically, conditioning may also affect supplemetary pathways (e.g.
+#         #   a "weak" associative or cooperative pathway) but these are not 
+#         #   typically being monitored for plasticity; if they were, this would
+#         #   would not be possible with a single Clampex protocol.
+#         #
+#         #   To develop this idea: in Clampex, one would have to configure
+#         #   distinct protocols to record any one of, say, three pathways; 
+#         #   these protocols would then be interleaved in a sequence, such that
+#         #   the three pathways would be recorded separately in the same order,
+#         #   over and over again; furthermore, this would preclude any "auto-averaging" 
+#         #   (i.e., each of these protocols would consist of one run per trial, 
+#         #   ideally with one sweep per run, dedicated entirely to the pathway concerned)
+#         #   and the protocol should have alternateDigitalOutputStateEnabled False.
+#         #
+#         #   ### TODO: 2024-02-17 22:56:15
+#         #   To accommodate this, we must avoid setting up a new episode when the 
+#         #   ABF protocol has changed (see processAbfFile(…)); instead a new episode
+#         #   must be initiated manually through the LTPOnline API; also augment
+#         #   the API to configure averaging !
+#         #   ###
+#         #
+#         #
+#         # 2 protocol should have an even number of sweeps per run ⇒ even number
+#         #   of sweeps per trial recorded in the ABF file ⟹
+#         #   ⋆ main path (path 0) on even-numbered sweeps (0, 2, etc)
+#         #   ⋆ alternate path (path 1) on odd-numbered sweeps (1, 3, etc)
+#         #
+#         #   NOTE: an odd number of sweeps implies that the last sweep carries 
+#         #   data for the main path (path 0)
+#         #
+#         #   e.g. for three sweeps per run, sweeeps 0 and 2 carry path 0, whereas
+#         #   sweep 1 carries path 1
+#         #
+#         # 3 alternative waveforms DISABLED to allow the membrane test to be
+#         #   be performed (via DAC command signal) in every sweep; if this WAS
+#         #   enabled, then analog commands would be send via the DAC channel 
+#         #   where the alternative digital stimulation pattern is defined;
+#         #   since this DAC is NOT connected to the recording electrode for this
+#         #   source, any analog commands emitted by this DAC would end up elsewhere
+#         #
+#         #   (REMEMBER: One DAC channel per electrode ≡ 1 DAC channel per recording source)
+#         #
+#         #       — this is a direct consequence of the uninspired way in 
+#         #       which Clampex configures digital outputs in their protocol 
+#         #       editor GUI: in reality the DIG outputs are NEVER sent through 
+#         #       a DAC so they should have created a separate dialog outside 
+#         #       the WAVEFORM tabs
+#         #
+#         # The above prerequisites also have the consequencess below, regarding 
+#         #   the use of "supplementary" DACs (with higher index):
+#         # • if a supplementary DAC also defines epochs wih DIG enabled, these
+#         #   will be included in the alternative DIG pattern (inluding any
+#         #   additional DIG output channels) — this is NOT what you may intend.
+#         #
+#         #   the only possible advantage I can see is triggering a 3ʳᵈ party 
+#         #   device e.g. photoactivation/uncaging; the DISadvantage is that ALL
+#         #   extra DIG outputs will be subject to the same pattern...
+#         #
+#         # • if a supplementary DAC defines epochs for analog command waveforms,
+#         #   this DAC should have an index higher than all DACs used to deliver 
+#         #   amplifier commands (i.e., ≥ 2); this DAC can only be used to send 
+#         #   TTL-emulating waveforms to 3ʳᵈ party devices
+#         #
+#         #   In such cases, alternative waveforms should be ENABLED, waveform
+#         #   output in the "alternative" DAC should be DISABLED, and waveform
+#         #   output in the supplementary (higher index) DAC should be ENABLED. 
+#         #   This situation will result in:
+#         #   ∘ a membrane test (for the clamped recorded source) being 
+#         #   applied ONLY during the "main" pathway stimulation (which is fine,
+#         #   since one may argue that the "alternative" pathway records from
+#         #   the same source or cell anyway, so applying a membrane test there
+#         #   is redundant)
+#         #   ∘ create room for configuring emulated TTLs in the supplementary
+#         #       DAC (with higher index) to trigger a 3ʳᵈ party device ONLY
+#         #       during the "alternative" pathway stimulation
+#         
+#         # this channel is the one where DIG outputs are configured; it MAY BE
+#         # distinct from the source.dac !!!
+#         activeDAC = protocol.getDAC() # this is the `digdac` in processTrackingProtocol
+#         
+#         # these are the protocol's DACs where digital output is emitted during the recording
+#         # the active DAC is one of these by definition
+#         # WARNING: do NOT confuse with DACs that emulate TTLs
+#         digOutDacs = protocol.digitalOutputDACs
+# 
+#         # will be an empty set if len(digOutDacs ) == 0
+#         mainDIGOut = protocol.digitalOutputs(alternate=False)
+#         
+#         # this is an empty set when alternateDigitalOutputStateEnabled is False;
+#         # also, will be empty if len(digOutDacs ) == 0
+#         altDIGOut = protocol.digitalOutputs(alternate=True)
+#         
+#         return activeDAC, digOutDacs, mainDIGOut, altDIGOut
+    
     @safeWrapper
-    @pyqtSlot(pathlib.Path)
+    @Slot(pathlib.Path)
     def processAbfFile(self, abfFile:pathlib.Path):
         """Reads and ABF protocol from the ABF file and analyses the data
         """
@@ -709,11 +871,9 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # • ABF trials recorded with other protocols are ignored; this includes
         #   cross-talk trials and the pathway conditioning trial
         
-        # self.print(f"{self.__class__.__name__}.processAbfFile received {colorama.Fore.RED}{colorama.Style.BRIGHT}{abfFile}{colorama.Style.RESET_ALL}")
+        self.print(f"\n{self.__class__.__name__}.processAbfFile {printStyled(abfFile, 'yellow', True)}")
 
         try:
-            # NOTE: 2024-02-08 14:18:32
-            # self._runData_.currentAbfTrial should be a neo.Block
             currentAbfTrial = pio.loadAxonFile(str(abfFile))
             protocol = pab.ABFProtocol(currentAbfTrial)
             # self.print(f"\twith protocol {colorama.Fore.RED}{colorama.Style.BRIGHT}{protocol.name}{colorama.Style.RESET_ALL}\n")
@@ -742,10 +902,49 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             self._runData_.abfTrialTimesMinutes.append(currentAbfTrial.rec_datetime)
             deltaMinutes = (currentAbfTrial.rec_datetime - self._runData_.abfTrialTimesMinutes[0]).seconds/60
             self._runData_.abfTrialDeltaTimesMinutes.append(deltaMinutes)
+            
+            # NOTE: 2024-02-08 14:18:32
+            # self._runData_.currentAbfTrial should be a neo.Block or None
+            if isinstance(self._runData_.currentAbfTrial, neo.Block):
+                # cache the previous trial
+                self._runData_.prevAbfTrial = self._runData_.currentAbfTrial
             self._runData_.currentAbfTrial = currentAbfTrial
             
-            # self.print(self._runData_.sources)
+            # new episode requested via _runData_ ⇒
+            # create a new episode here, using _runData_.newEpisodeOnNextRun
+            if len(self._runData_.newEpisodeOnNextRun) == 2:
+                if len(self._runData_.episodes):
+                    #  NOTE: 2024-05-13 08:47:25
+                    # finalize the previous episode
+                    # the current protocol hasn't been processed yet, therefore
+                    # sweeps from current trial haven't been distributed yet,
+                    # across pathways.
+                    self._runData_.episodes[-1].endFrame = self._runData_.sweeps - 1 if self._runData_.sweeps > 0 else 0
+                    if isinstance(self._runData_.prevAbfTrial, neo.Block):
+                        self._runData_.episodes[-1].end=self._runData_.prevAbfTrial.rec_datetime
+                    else:
+                        self._runData_.episodes[-1].end=self._runData_.currentAbfTrial.rec_datetime
+                    
+                eType, eName = self._runData_.newEpisodeOnNextRun
+                episode = RecordingEpisode(eType, name=eName, protocol=protocol)
+                episode.begin = currentAbfTrial.rec_datetime
+                # NOTE: 2024-05-13 08:49:42
+                # next episode starts with the next sweep (which hasn't been added yet)!
+                episode.beginFrame = self._runData_.sweeps
+                self._runData_.episodes.append(episode)
+                self._runData_.newEpisodeOnNextRun = tuple() # invalidate the request
             
+            if len(self._runData_.episodes) == 0:
+                episode = RecordingEpisode(RecordingEpisodeType.Tracking, name=f"{RecordingEpisodeType.Tracking.name_0}")
+                self._runData_.episodes.append(episode)
+                
+            else:
+                episode = self._runData_.episodes[-1]
+                epIndex = self._runData_.episodes.index(episode)
+                
+            # self.print(f"current episode ({printStyled(epIndex, 'yellow', True)}): {printStyled(self._runData_.episodes[-1].name, 'yellow', True)} ({printStyled(self._runData_.episodes[-1].type, 'yellow', True)})")
+            # self.print(f"\tcurrent episode type decl: {printStyled(self._runData_.currentEpisodeType.name, 'yellow', True)}")
+                
             # check that the protocol in the ABF file is the same as the current one
             # else create a new episode automatically
             #
@@ -753,96 +952,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
                 # self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
                 self._runData_.currentProtocol = protocol
-
-            # NOTE: This below ↴ is WRONG: is a protocol parameter has changed
-            # it will be reported as different...
-            # This means a change of protocol mid-experiment will result in skipping
-            # the file.
-            #
-            # You may argue whether allowing a change in protocol is a good idea
-            # — but this is useful when setting things up using "dry" Clampex runs...
-            #
-            # we could try a more granular approach (e.g protocol.is_identical_except_digital(…))
-            # but is simpler to just look at the protocol name;
-            #
-            # However, CAUTION: if a protocol is inadvertently changes yet saved under the same
-            # name this WILL mess things up. So it's up to the user to know that theyre doing
-            #
-            # if protocol == self._runData_.currentProtocol:
-            #
+                
             if protocol.name == self._runData_.currentProtocol.name:
                 if protocol != self._runData_.currentProtocol:
                     scipywarn(f"Protocol {protocol.name} was changed — CAUTION")
                     self._runData_.currentProtocol = protocol
-                self.processProtocol(protocol)
-                self._runData_.sweeps += 1
+                    
+            self.processProtocol(protocol)
                 
-            if self._runData_.exportedResults:
-                self._runData_.exportedResults = False
-
-            
-            # self.print(f"{self.__class__.__name__}.processABFFile @ end: _runData_\n{self._runData_}")
-
-            # ### BEGIN don't remove yet
-            #             if isinstance(self._runData_.locationMeasures, (list, tuple)) and all(isinstance(l, LocationMeasure) for l in self._runData_.locationMaeasures):
-            #                 # TODO: 2024-02-18 23:28:45 URGENTLY
-            #                 # use location measures to measure on pathways' ADC
-            #                 scipywarn(f"Using custom location measures is not yet supported", out = self._stdout_)
-            #                 pass
-            #             else:
-            #                 protocol = pab.ABFProtocol(self._runData_.currentAbfTrial)
-            #                 opMode = protocol.acquisitionMode # why does this return a tuple ?!?
-            #                 if isinstance(opMode, (tuple, list)):
-            #                     opMode = opMode[0]
-            #                 assert opMode == pab.ABFAcquisitionMode.episodic_stimulation, f"Files must be recorded in episodic mode"
-            #
-            #                 # check that the number of sweeps actually stored in the ABF file/neo.Block
-            #                 # equals that advertised by the protocol
-            #                 # NOTE: mismatches can happen when trials are acquired very fast (i.e.
-            #                 # back to back) - in this case check the sequencing key in Clampex
-            #                 # and set an appropriate interval between successive trials !
-            #                 assert(protocol.nSweeps) == len(self._runData_.currentAbfTrial.segments), f"In {self._runData_.currentAbfTrial.name}: Mismatch between number of sweeps in the protocol ({protocol.nSweeps}) and actual sweeps in the file ({len(self._runData_.currentAbfTrial.segments)}); check the sequencing key?"
-            #
-            #                 # self.print(self._runData_.sources)
-            #
-            #                 # check that the protocol in the ABF file is the same as the current one
-            #                 # else create a new episode automatically
-            #                 #
-            #                 # upon first run, self._runData_.protocol is None
-            #                 if not isinstance(self._runData_.currentProtocol, pab.ABFProtocol):
-            #                     # self.print(f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}initial protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #
-            #                     self._runData_.currentProtocol = protocol
-            #
-            #                     # NOTE: 2024-02-27 19:13:04
-            #                     # this selects the pathways recorded by the protocol
-            #                     # for each source
-            #                     self.processProtocol(protocol)
-            #
-            #
-            #                 elif protocol == self._runData_.currentProtocol:
-            #                     # self.print(f"{colorama.Fore.BLUE}{colorama.Style.BRIGHT}current protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #                     # same protocol → add data to currrent episode
-            #                     self.processProtocol(protocol)
-
-            #                 else:
-            #                     # a different protocol — WARNING: signals a new episode
-            #                     # self.print(f"{colorama.Fore.CYAN}{colorama.Style.BRIGHT}new protocol{colorama.Style.RESET_ALL}: {protocol.name}")
-            #                     pass
-            #                     # 1. finish off current episode with the previously loaded ABF file
-            #                     # NOTE: 2024-02-16 08:28:43
-            #                     # self._runData_.sweeps hasn't been incremented yet
-            #                     # self._runData_.currentEpisode.end = self._runData_.abfTrialTimesMinutes[-1]
-            #                     # self._runData_.currentEpisode.endFrame = self._runData_.sweeps
-            #                     # episodeNames = [e.name for e in self._runData_.schedule.episodes]
-            #                     # if self._runData_.episodeName in episodeNames:
-            #                     #     episodeName = counter_suffix(self._runData_.episodeName, episodeNames)
-            #                     #     self._runData_.episodeName = episodeName
-            #                     # else:
-            #                     #     episodeName = self._runData_.episodeName
-            #
-            #                     # self._runData_.currentProtocol = protocol
-            # ### END   don't remove yet
+            if self._runData_.resultsExported:
+                self._runData_.resultsExported = False
 
         except:
             traceback.print_exc()
@@ -861,21 +980,14 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
     def _(self, protocol:pab.ABFProtocol):
         # self.print(f"{self.__class__.__name__}.processProtocol ({printStyled(protocol.name)})")
         
-        # NOTE: 2024-02-18 15:58:07
-        # this sets up a pathways "layout", a dict:
-        #   recording source ↦ dict: int ↦ dict, where
-        #                           int:  pathway index (in the sequence of source-specific pathways)
-        #                           dict: int:sweep ↦ sequence of measures
-        #   
+        if len(self._runData_.episodes) == 0:
+            scipywarn("No episode has been defined")
+            return
         
-        # pathwaysLayout = dict() # ← the function needs to return this
+        currentEpisode = self._runData_.episodes[-1]
         
-        
-        # sourceDACs = [s.dac for s in self._runData_.sources]
-        # group pathways by their sources
-        # 
-        
-        # NOTE: 2024-02-17 14:14:17
+        # NOTE 24-02-17 14:14:17
+        # ### BEGIN
         # Clampex supports stimulation of up to TWO distinct synaptic pathways
         # (i.e. via axonal inputs) for one recording source (cell or field),
         # using the 'alternative digital outputs' mechanism. 
@@ -981,36 +1093,61 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #   ∘ create room for configuring emulated TTLs in the supplementary
         #       DAC (with higher index) to trigger a 3ʳᵈ party device ONLY
         #       during the "alternative" pathway stimulation
+        #
+        # ### END
         
-        # this channel is the one whhere DIG outputs are configured; it MAY BE
-        # dinstict from the source.dac !!!
-        # activeDAC = protocol.activeDACChannel
+        # self.print(f"{self._runData_.currentAbfTrial.name} processProtocol: {printStyled(protocol.name, 'green', True)}")
+
+        # The channel where DIG outputs are configured; it MAY BE distinct from
+        # the DAC channel used by the source for command signals (source.dac) !!!
+        #
         activeDAC = protocol.getDAC() # this is the `digdac` in processTrackingProtocol
+        # self.print(f"\tactiveDAC: {printStyled(activeDAC.name, 'green', True)} (physical index {printStyled(activeDAC.physical, 'green', True)})")
         
-        # these are the protocol's DACs where digital output is emitted during the recording
-        # the active DAC is one of these by definition
+        # The the protocol's DAC channels where digital output is emitted during
+        # the recording; the active DAC is one of these by definition
         # WARNING: do NOT confuse with DACs that emulate TTLs
+        #
         digOutDacs = protocol.digitalOutputDACs
-        # digOutDacs = tuple(filter(lambda x: x.digitalOutputEnabled, (protocol.getDAC(k) for k in range(protocol.nDACChannels))))
+        # self.print(f"\tDACs with DIG output defined (digOutDacs): {printStyled(tuple((d.name + ' (physical index ' + str(d.physical) + ')' for d in digOutDacs)),'green', True)}")
         
-        # self.print(f"   activeDAC: {printStyled(activeDAC.name)}, digOutDacs: {printStyled([d.name for d in digOutDacs])}")
-        
-        # will be empty if len(digOutDacs ) == 0
+        # NOTE: 2024-05-08 09:57:21
+        # ### BEGIN
+        # 'mainDIGOut' is the set of digital channel indexes where the principal 
+        # ("main") digital pattern is configured; empty set if len(digOutDacs ) == 0
+        #
+        # See also 'altDIGOut', below.
+        #
+        # WARNING: in a cross-talk protocol, both sets MIGHT contain the same
+        # digital channels indexes — because for cross-talk, two of the pathways 
+        # are stimulated in every sweep, but in different order (and/or combination,
+        # when there are more than two pathways)
+        #
+        # Fortunately (?!) Clampex only allows up to two pathways stimulated alternatively
+        # 
+        # However this be circumvented when using single run per trial protocols
+        # (and alternate them via sequencer loops)
+        # ### END
         mainDIGOut = protocol.digitalOutputs(alternate=False)
+        # self.print(f"\tdigital output channels for principal (main) stimulation pattern ({printStyled('mainDIGOut', 'green', True)}): {printStyled(mainDIGOut, 'green', True)}")
         
-        # this is an empty set when alternateDigitalOutputStateEnabled is False;
-        # also, will be empty if len(digOutDacs ) == 0
+        # NOTE: 2024-05-08 09:58:11
+        # 'altDIGOut' is the set of digital channel indexes where the "alternative"
+        # digital pattern is configured; empty set when alternateDigitalOutputStateEnabled
+        # is False or when len(digOutDacs ) == 0
+        #
         altDIGOut = protocol.digitalOutputs(alternate=True)
-        
-        # self.print(f"   mainDIGOut: {printStyled(mainDIGOut)}, altDIGOut: {printStyled(altDIGOut)}")
-        
-        crosstalk = False # to be determined below
-        
+        # self.print(f"\tdigital output channels for alternative pattern ({printStyled('altDIGOut', 'green', True)}): {printStyled(altDIGOut, 'green', True)}")
+
         # NOTE: 2024-02-19 18:25:43 Allow this below because one may not have DIG usage
         # if len(digOutDacs) == 0:
         #     raise ValueError("The protocol indicates there are no DAC channels with digital output enabled")
         
+        # self.print(f"\tcurrent episode: {printStyled(self._runData_.currentEpisode, 'green', True)}, type {printStyled(self._runData_.currentEpisode.type.name, 'green', True)}")
+        # self.print(f"\tcurrent episode type decl: {self._runData_.currentEpisodeType.name}")
+            
         for src in self._runData_.sources:
+            # self.print(f"\tsource (src): {printStyled(src.name, 'green', True)}")
             # self.print(f"   -----------------")
             # self.print(f"   processing source {printStyled(src.name)}")
 
@@ -1056,43 +1193,463 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #           path 2 ↦ protocol 2 etc
             # ----
             #
-            # NOTE: 2024-02-17 22:36:56 REMEMBER !:
-            # in a tracking protocol, distinct pathway in the same recording 
-            # source have the same clamp mode!
             
-            pathway = src.pathways
-            
-            if len(pathways) == 0:
-                scipywarn(f"Ignoring source {src.name} which does not declare any pathways")
-                continue
-            
+            # NOTE: 2024-05-06 00:31:02
+            # Wee ned these in order to figure out details of synaptic pathways
+            # (see below);  these are specific to the source
             adc = protocol.getADC(src.adc)
             dac = protocol.getDAC(src.dac)
             
+            # NOTE: 2024-05-06 00:31:59
+            # Generate the list of pathways according to the specified source
+            #
+            pathways = [pdict["pathway"] for key, pdict in self._runData_.results[src.name].items() if key not in ("DACPaths", "DIGPaths")]
+            
+            # self.print(f"declared pathways for source {printStyled(src.name, 'yellow', True)}: {printStyled(pathways)}")
+            
+            # NOTE: 2024-05-06 00:26:04
+            # Now, figure out what these pathways are:
+            # • how are they stimulated (i.e. via TTL output through DIG channels
+            # or emulated via DAC)
+            # • during which sweep are they stimulated (i.e., are they stimulated 
+            # alternatively in interleaved sweeps, or not)
+            #
+            # if len(pathways) == 0:
+            #     scipywarn(f"Ignoring source {src.name} which does not declare any pathways")
+            #     continue
+            
+            # NOTE: 2024-02-17 22:36:56 REMEMBER !:
+            # By definition, in a tracking protocol, all pathways in the same 
+            # recording source have the same clamp mode!
+            # 
+            clampMode = protocol.getClampMode(adc, activeDAC)
+            # self.print(f"\t\tadc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}, clampMode: {printStyled(clampMode.name, 'yellow')}")
+            # self.print(f"\t\tsource dac is the protocol's activeDAC: {printStyled(dac == activeDAC, 'yellow', True)}")
+            
             # NOTE: 2024-03-09 22:56:22 
-            # in a conditioning protocol, the dac is by definition the active DAC
+            # In a conditioning protocol, the dac is by definition the active DAC.
+            # However, in Tracking mode, the dac might be a different one, in 
+            # particular when there are two synaptic pathways stimulated alternatively.
+            # NOTE: this is NOT because the protocol records via two DACs, but because
+            # an alternative patwhay needs a second DAC to configure command waveforms and 
+            # digital outputs separately form the 'main' — active — DAC.
+            #
             if dac != activeDAC:
                 if not protocol.alternateDigitalOutputStateEnabled:
-                    scipywarn(f"In protocol {protocol.name} for source {src.name}: when the recording DAC {dac.physicalIndex} is different from the DAC where digital outputs are enabled ({activeDAC.physicalIndex}) alternative digital outputs should be enabled in the protocol; this AB trial will be skipped.")
+                    scipywarn(f"In protocol {protocol.name} for source {src.name}: when the recording DAC {dac.physicalIndex} is different from the DAC where digital outputs are enabled ({activeDAC.physicalIndex}) alternative digital outputs should be enabled in the protocol; this ABF trial will be skipped.")
                     return
-                    # raise ValueError(f"Alternative digital outputs must be enabled in the protocol when digital outputs are configured on a DAC index ({activeDAC.physicalIndex}) different from the DAC sending command waveforms ({src.dac})")
                 
-            # all pathways in the source by definition have the same clamping mode
-            clampMode = protocol.getClampMode(adc, activeDAC)
-            
             # NOTE: 2024-03-09 13:46:05
-            # detect which pathways are declared by the source as using 
-            # digital outputs (dig_pathways) or DAC outputs (dac_pathways) to 
-            # stimulate synapses
-            dac_pathways, dig_pathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))]
+            # Detect which pathways are declared by the source as using 
+            # • digital outputs (dig_stim_pathways) or 
+            # • DAC outputs (dac_stim_pathways)
+            # in order to deliver synaptic stimulus
+            #
             
-            bad_dac_paths = [p for p in dac_pathways if p[1].stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
+            # NOTE: 2024-05-07 15:14:55
+            # first, figure out what simulated pathways are defined in the protocol
+            # then refine (i.e. keep only the paths ACTUALLY used in the source,
+            # see NOTE: 2024-03-09 15:40:48 below)
+            #
             
-            if len(bad_dac_paths):
-                scipywarn(f"The pathways {[p[1].name for p in bad_dac_paths]} in source {src.name} are incorrectly declared as using a recording DAC for stimulation; check how LTPOnline was invoked")
+            # Pathways declared by the constructor of LTPOnline
+            dac_stim_pathways, dig_stim_pathways = self._runData_.results[src.name]["DACPaths"], self._runData_.results[src.name]["DIGPaths"]
+            
+            # NOTE: 2024-03-09 15:11:20
+            # figure out which of the cases below is met:
+            # (see also NOTE: 2024-03-09 13:49:12)
+            #
+            # case 1:
+            #   • source must define two dig_stim_pathways and zero dac_stim_pathways
+            #   • protocol has alternate dig outputs enabled
+            #   • protocol records two sweeps 
+            #   • number of pathways stimulated by the protocol is exactly two
+            #
+            # case 2:
+            #   • source defines one dig_pathway OR one dac_pathway
+            #   • protocol records two sweeps
+            #   • number of pathways stimulated by the protocol is exactly two
+            #
+            # case 3:
+            #   • source defines any number of pathways
+            #   • there are as many protocols as pathways
+            #   • each protocol stimulates exactly one pathway
+            #   • each protocol generates one sweep, which must NOT be averaged
+            #       by the protocol
+            #   • protocols must be iterated in the same order
+            #   • each protocol is applied once in each iteration
+            
+            # NOTE: 2024-03-09 15:40:48
+            # figure out which of the above pathways (NOTE: 2024-05-07 15:14:55) 
+            # are actually used by the protocol
+            #
+            # start with dac-stimulated pathways first → find out which of the 
+            # declared ones are actually used by the protocol
+            #
+            # from here onwards, dac_stim_pathways are those used in the protocol
+            #
+            # protocol_dac_stim_pathways = [p for p in dac_stim_pathways if len(protocol.getDAC(p[1].stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC)]
+            protocol_dac_stim_pathways = [p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC)]
+            
+            # do the same for dig-stimulated pathways:
+            # the filter is simpler: the declares stimulsu channel for the pathway
+            # is one of the main or alt DIG channels defined in the protocol
+            # from here onward dig_stim_pathways are the pathways actually stimulated by the protocol
+            # protocol_dig_stim_pathways = [p for p in dig_stim_pathways if p[1].stimulus.channel in mainDIGOut or altDIGOut]
+            protocol_dig_stim_pathways = [p for p in dig_stim_pathways if p.stimulus.channel in mainDIGOut or altDIGOut]
+            
+            # This is the total number of pathways actually STIMULATED in the
+            # protocol, given the sourcer 'src', via either DIG outputs 
+            # (dig_stim_pathways) OR DAC-emulated TTLs (dac_stim_pathways)
+            #
+            nSrcStimPathways = len(protocol_dac_stim_pathways) + len(protocol_dig_stim_pathways)
+            # self.print(f"\t\t{printStyled(nSrcStimPathways, 'green', True)} stimulated pathways (nSrcStimPathways)")
+            # self.print(f"\t\tsource dig stim pathways: {printStyled(protocol_dig_stim_pathways, 'green', True)}")
+            # self.print(f"\t\tsource dac stim pathways: {printStyled(protocol_dac_stim_pathways, 'green', True)}")
+            
+            # NOTE: 2024-05-07 14:43:35
+            # ### BEGIN
+            # Below, the concepts of "main" and "alternative" pathways are arbitrary
+            # and used internally, here, to facilitate distinguishing between pathways
+            # stimulated in an interleaved fashion (i.e., each pathway stimulated
+            # during a separate sweep): there is always ONE main pathway, but there
+            # can be 0, 1, or more alternative pathways stimulated in the protocol.
+            #
+            # This is derived from the way in whcih Clampex allows alternative DIG
+            # stimulation via DIG channels.
+            #
+            # Practically, the "main" pathways are those stimulated
+            #
+            # Inthe typical case where alternative pathways are stimulated using
+            # DIG channels, the "main" pathway is the one were the DIG output is
+            # defined in the same UI tab as the DAC used to send command waveforms
+            # to the cell (if any); the "alternative" DIG output pattern is then
+            # defined in the UI tab of the next available DAC channel (although 
+            # this does not imply any relationship between that DAC channel and 
+            # the "alternative" DIG channel used.)
+            #
+            # The "main" stimulated pathway is ALWAYS a DIG stimulated one, unless
+            # unless only DAC TTL-emulation is used.
+            #
+            # In a mixed scenario (DIG AND DAC stimulations) the "main" pathway is 
+            # the one stimulated via DIG channels.
+            #
+            
+            # list of alternative pathways (each sweep can only stimulate one pathway
+            # in a given source; stimulation of additional pathways can only occur
+            # in interlaved mode — i.e., each pathway is stimulated during a separate
+            # sweep)
+            #
+            # ### END
+            #
+            altPathways = list()
+            
+            if nSrcStimPathways == 0:
+                scipywarn(f"Protocol {protcol.name} does not seem to monitor any of the pathways declares in source {src.name}")
                 continue
             
-            if self._runData_.episodeType & RecordingEpisodeType.Conditioning:
+            
+            if nSrcStimPathways == 1:
+                # When there is a single pathway simulated in the protocol, this 
+                # is by definition the 'main' pathway.
+                #
+                mainPathways = protocol_dig_stim_pathways if len(protocol_dig_stim_pathways) else protocol_dac_stim_pathways
+                
+            elif nSrcStimPathways == 2:
+                if len(protocol_dac_stim_pathways) == 0:
+                    # both main and alternative stimulated pathways are stimulated
+                    # via DIG channels
+                    
+                    # BUG 2024-05-08 09:54:45 FIXME
+                    # in a xtalk protocol, both main and alt DIG out have the same two channels
+                    # hence the partitioning below WILL NOT work, i.e. mainPathways will be empty !!!
+                    # mainPathways, altPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in mainDIGOut, dig_stim_pathways)]
+                    #
+                    # NOTE: 2024-05-08 10:11:15
+                    # we therefore take a different approach: the code below is
+                    # rather explicit, yet I'm sure it can be streamlined a bit...
+                    # 
+                    # DIG channel indexes used with the main but NOT the alternative
+                    # pattern; an empty set when mainDIGOut is empty, or when
+                    # mainDIGOut == altDIGOut
+                    # 
+                    mainOnly = mainDIGOut - altDIGOut
+                    
+                    # self.print(f"\t\tmainOnly: {printStyled(mainOnly, 'green', True)}")
+                    
+                    # DIG channel indexes used with the alternative but NOT the 
+                    # main pattern; empty set when altDIGOut is empty, or when
+                    # mainDIGOut == altDIGOut
+                    #
+                    altOnly = altDIGOut - mainDIGOut
+                    # self.print(f"\t\taltOnly: {printStyled(altOnly, 'green', True)}")
+                    
+                    if len(mainDIGOut) > 0:
+                        if len(mainOnly) == 0: # same channels in both mainDIGOut and altDIGOut
+                            mainPathways = protocol_dig_stim_pathways
+                        else:
+                            # mainPathways = list(x for x in protocol_dig_stim_pathways if x[1].stimulus.channel in mainOnly)
+                            mainPathways = list(x for x in protocol_dig_stim_pathways if x.stimulus.channel in mainOnly)
+                    else:
+                        mainPathways = list()
+                        
+                    if len(altDIGOut) > 0:
+                        if len(altOnly) == 0:
+                            altPathways = protocol_dig_stim_pathways
+                        else:
+                            # altPathways = list(x for x in protocol_dig_stim_pathways if x[1].stimulus.channel in altOnly)
+                            altPathways = list(x for x in protocol_dig_stim_pathways if x.stimulus.channel in altOnly)
+                    else:
+                        altPathways = list()
+                    
+                elif len(protocol_dac_stim_pathways) == 1:
+                    # one stim pathway (main) is DIG, the other (alternative) is DAC
+                    if not protocol.alternateDACOutputStateEnabled:
+                        scipywarn(f"Tracking mode: Alternate DAC outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_stim_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
+                        continue
+                        
+                    mainPathways, altPathways = protocol_dig_stim_pathways, protocol_dac_stim_pathways
+                    
+                else: # one dac and one dig pathway
+                    scipywarn(f"Tracking mode: In protocol {protocol.name}, for source {src.name}: at most one pathway should be declared as simulated via DAC-emulated TTLs")
+                    continue
+                    
+                        
+            else: # nSrcStimPathways > 2
+                # NOTE: 2024-03-09 22:54:05
+                # I think this is technically impossible in Clampex
+                scipywarn(f"Tracking mode: Protocol {protocol.name} seems to be stimulating more than two pathways; This is not currently supported")
+                continue
+            
+            
+#             self.print(f"\t{printStyled(len(mainPathways), 'cyan', True)} mainPathways:")
+#             for p in mainPathways:
+#                 self.print(f"\t\t{printStyled(p.name, 'cyan', True)} ({printStyled(p.stimulus.channel, 'cyan', True)}, digital: {printStyled(p.stimulus.dig, 'cyan', True)})")
+#                 
+#             self.print(f"\t{printStyled(len(altPathways), 'cyan', True)} altPathways:")
+#             for p in altPathways:
+#                 self.print(f"\t\t{printStyled(p.name, 'cyan', False)} ({printStyled(p.stimulus.channel, 'cyan', False)}, digital: {printStyled(p.stimulus.dig, 'cyan', False)})")
+            
+            
+            # allPathways = mainPathways + altPathways
+            # self.print(f"\tall pathways ({printStyled(len(allPathways), 'red')}):")
+            # for p in allPathways:
+            #     self.print(f"\t\tpath {printStyled(p.name, 'red')} ({printStyled(p.stimulus.channel, 'red')}, digital: {printStyled(p.stimulus.dig, 'red')})")
+            
+            uniquePathways = unique(mainPathways + altPathways, idcheck=True)
+            # self.print(f"\tunique pathways ({printStyled(len(uniquePathways), 'red')}):")
+            # for p in uniquePathways:
+            #     self.print(f"\t\tpath {printStyled(p.name, 'red')} ({printStyled(p.stimulus.channel, 'red')}, digital: {printStyled(p.stimulus.dig, 'red')})")
+            
+            for p in uniquePathways:
+                if p not in currentEpisode.pathways and isinstance(p, SynapticPathway):
+                    currentEpisode.pathways.append(p)
+            
+            # self.print("\tcurrentEpisode pathways:")
+            # for p in currentEpisode.pathways:
+            #     self.print(f"\t\tpath {printStyled(p.name, 'red')} ({printStyled(p.stimulus.channel, 'red')})")
+            
+            # NOTE: 2024-05-06 09:59:39
+            # pathStimsBySweep below is a tuple of (sweep index, tuple of 
+            # pathway indices in the sequence of unique pathways mainPathways + altPathways);
+            # when the second element has more than one pathway index, and these
+            # pathway indices are different, it indicates that there is a cross-talk
+            # test stimulation of these pathways in that specific sweep
+            # pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in unique(mainPathways + altPathways)], 
+            #                                                                   indices=False)
+            pathStimsBySweep = protocol.getPathwaysDigitalStimulationSequence(uniquePathways, indices=False)
+            # self.print("\tpathway stimulation by sweep (pathStimsBySweep):")
+            # for sweep_path in pathStimsBySweep:
+            #     self.print(f"\tsweep: {printStyled(sweep_path[0], 'red')}:")
+            #     for path in sweep_path[1]:
+            #         self.print(f"\t\tpath {printStyled(path.name, 'red')} ({printStyled(path.stimulus.channel, 'red')})")
+            
+            # self.print(f"\t\tpathway stimulation by sweep (pathStimsBySweep): {printStyled(pathStimsBySweep, 'magenta', True)}")
+
+            if len(self._runData_.currentAbfTrial.segments) != len(pathStimsBySweep):
+                scipywarn(f"Mismatch between number of sweeps in the trial ({printStyled(len(self._runData_.currentAbfTrial.segments), 'yellow')}) and those in pathways by sweep ({printStyled(len(pathStimsBySweep), 'yellow')})")
+
+            if currentEpisode.type & RecordingEpisodeType.Tracking: 
+                # NOTE: 2024-03-09 07:51:17 tracking mode
+                if any(len(x[1]) > 1 for x in pathStimsBySweep): # crosstalk?
+                    # self.print("\t\tcrosstalk protocol.")
+                    if len(currentEpisode.xtalk) == 0 or currentEpisode.xtalk != pathStimsBySweep:
+                        # self.print("\t\tsetting new crosstalk episode")
+                        if isinstance(self._runData_.prevAbfTrial, neo.Block):
+                            currentEpisode.end = self._runData_.prevAbfTrial.rec_datetime
+                        else:
+                            currentEpisode.end = self._runData_.currentAbfTrial.rec_datetime
+                            
+                        # NOTE: 2024-05-13 08:41:50
+                        # current sweep(s) haven't been added yet
+                        # counter is 0-based, and frame selection is semi-open
+                        # interval [beginFrame .. endFrame+1)!
+                        currentEpisode.endFrame = self._runData_.sweeps - 1 if self._runData_.sweeps > 0 else 0
+                        
+                        xtalkEpisode = RecordingEpisode(currentEpisode.type,
+                                                        name=f"{currentEpisode.type.name}_XTalk", 
+                                                        begin = self._runData_.currentAbfTrial.rec_datetime,
+                                                        beginFrame = self._runData_.sweeps)
+                        xtalkEpisode.xtalk = pathStimsBySweep
+                        xtalkEpisode.pathways = uniquePathways
+                        self._runData_.episodes.append(xtalkEpisode)
+                        currentEpisode = xtalkEpisode
+                        self.sig_xtalk.emit(True)
+                    
+                else: # single path stimulation per sweep
+                    # self.print("\t\tnormal tracking protocol")
+                    if len(currentEpisode.xtalk) > 0 and self._runData_.pathStimsBySweep != pathStimsBySweep:
+                        # self.print("\t\tnew tracking episode")
+                        if isinstance(self._runData_.prevAbfTrial, neo.Block):
+                            currentEpisode.end = self._runData_.prevAbfTrial.rec_datetime
+                        else:
+                            currentEpisode.end = self._runData_.currentAbfTrial.rec_datetime
+                        
+                        # NOTE: 2024-05-13 08:42:17
+                        # see NOTE: 2024-05-13 08:41:50
+                        currentEpisode.endFrame = self._runData_.sweeps - 1 if self._runData_.sweeps > 0 else 0
+                        
+                        newEpisode = RecordingEpisode(currentEpisode.type, 
+                                                      name=f"{currentEpisode.type.name}",
+                                                      begin = self._runData_.currentAbfTrial.rec_datetime,
+                                                      beginFrame = self._runData_.sweeps)
+                        newEpisode.pathways = uniquePathways
+                        
+                        self._runData_.episodes.append(newEpisode)
+                        
+                        currentEpisode = newEpisode
+                        self.sig_xtalk.emit(False)
+                        
+                self._runData_.pathStimsBySweep = pathStimsBySweep
+                    
+                # TODO 2024-05-12 15:01:56 FIXME
+                # refactor the code following distributeSweeps so that sweep 
+                # distribution can happen after this top-level if/else clause
+                self.distributeSweeps(src, adc)
+                
+                # NOTE: 2024-05-06 09:16:37
+                # Figure out the epochs that define synaptic stimulations
+                
+                syn_stim_digs = list()
+                syn_stim_dacs = list()
+                
+                # self.print(f"protocol: {printStyled(protocol.name, 'yellow')} {printStyled(len(mainPathways), 'yellow')} mainPathways: {printStyled(mainPathways, 'yellow')}")
+                # self.print(f"protocol: {printStyled(protocol.name, 'yellow')} {printStyled(len(altPathways), 'yellow')} altPathways: {printStyled(altPathways, 'yellow')}")
+                
+                if nSrcStimPathways == 2:
+                    if len(mainPathways) == 1:
+                        # syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
+                        syn_stim_digs.append(mainPathways[0].stimulus.channel)
+                        
+                        if len(altPathways) == 1:
+                            # two alternative digitally stimulated pathways — the most
+                            # common case
+                            if not protocol.alternateDigitalOutputStateEnabled:
+                                scipywarn( f"In protocol {printStyled(protocol.name, 'red', True)}: For two digitally-stimulated pathways the alternative digital output state must be enabled")
+                                continue
+                            
+                            syn_stim_digs.append(altPathways[0].stimulus.channel)
+                            # syn_stim_digs.append(altPathways[0][1].stimulus.channel)
+                        
+                    else: # implies altPathways are the same (albeit in a different order?)
+                        if all ((len(x[1]) <= 1 for x in pathStimsBySweep)):
+                            scipywarn(f"In protocol {printStyled(protocol.name, 'red', True)}: There must be only one digitally triggered main pathway defined.")
+                            continue
+                        
+                        # syn_stim_digs = list(p[1].stimulus.channel for p in mainPathways)
+                        syn_stim_digs = list(p.stimulus.channel for p in mainPathways)
+                    
+                        
+                    # TODO: 2024-03-10 21:28:46
+                    # provide for altDacPathways as well
+                        
+                else: # nSrcStimPathways ≡ 1 ⟹ alternative pathways do not exist here; 
+                    if len(mainPathways):
+                        syn_stim_digs = list(p.stimulus.channel for p in mainPathways)
+                        # syn_stim_digs = list(p[1].stimulus.channel for p in mainPathways)
+                        # syn_stim_digs.append(mainPathways[0][1].stimulus.channel)
+                            
+                # self.print(f"\t\tdigital channels for synaptic stimulation (syn_stim_digs): {printStyled(syn_stim_digs, 'yellow', True)}")
+                # self.print(f"\t\tDAC channels for synaptic stimulation via emulated TTLs (syn_stim_dacs): {printStyled(syn_stim_dacs, 'yellow', True)}")
+                
+                # NOTE: 2024-05-08 14:13:29
+                # Figure out the membrane test epochs in order to set up LocationMeasures for
+                # the membrane test; we use the source's DAC channel - which may also 
+                # be the activeDAC, although this is not necessary.
+                #
+                # Furthermore, these epochs should exist in eitgher voltage-or current clamp;
+                # if they do not, we just do not provide corresponding measurmements
+                #
+                # The membrane test epochs are COMMON for all the pathways in the source, 
+                # because it is the source that gets manipulated (via the DAC)
+                # ireespective of how many pathways are measured.
+                #
+                mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
+                                                    and not any(x.hasDigitalOutput(d) for d in (syn_stim_digs)) \
+                                                    and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
+                                        dac.epochs))
+                
+                
+                if len(mbTestEpochs) == 0:
+                    if clampMode in (ClampMode.VoltageClamp, ClampMode.CurrentClamp):
+                        scipywarn("No membrane test epoch appears to have been defined", out = self._stdout_)
+                    membraneTestEpoch = None
+                    testAmplitude = None
+                    testStart = None
+                    testDuration = None
+                    
+                else:
+                    membraneTestEpoch = mbTestEpochs[0]
+                    testAmplitude = membraneTestEpoch.firstLevel
+                    testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
+                    testDuration = membraneTestEpoch.firstDuration
+                
+                # in a multi-pathway protocol, the "main" digital pathways are always
+                # delivered on the even-numbered sweeps: 0, 2, etc.
+                
+                
+                # TODO/FIXME 2024-05-11 16:49:12 BUG
+                # bring code for sweep selection and addition to pathway results here
+                # from setMeasuresForPathway
+                
+                #
+                # for k, p in mainPathways:
+                for p in mainPathways:
+                    # NOTE: 2024-03-01 13:50:58
+                    # k is the pathway index; p is the pathway
+                    # self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
+                    p.clampMode = clampMode
+                    
+                    # if "pathway_responses" not in self._runData_.results[src.name][p.name]:
+                    #     self._runData_.results[src.name][p.name]["pathway_responses"] = \
+                    #         neo.Block(name=f"{src.name} {p.name}")
+
+                    self.setMeasuresForPathway(src, p, protocol,
+                                                adc, dac, activeDAC, membraneTestEpoch,
+                                                testStart, testDuration, testAmplitude,
+                                                False)
+                    
+                    if len(self._runData_.episodes[-1].xtalk) == 0:
+                        self.measurePathway(src, p, adc, False)
+
+                for p in altPathways:
+                    # self.print(f"   processing alt (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
+                    p.clampMode = clampMode
+
+                    # if "pathway_responses" not in p.name not in self._runData_.results[src.name][p.name]:
+                    #     self._runData_.results[src.name][p.name]["pathway_responses"] = \
+                    #         neo.Block(name=f"{src.name} {p.name}")
+                    
+                    self.setMeasuresForPathway(src, p, protocol, 
+                                                        adc, dac, activeDAC, membraneTestEpoch, 
+                                                        testStart, testDuration, testAmplitude,
+                                                        True)
+                    
+                    if len(self._runData_.episodes[-1].xtalk) == 0:
+                        self.measurePathway(src, p, adc, True)
+            
+            else: # NOTE: 2024-05-05 14:42:13 conditioning protocol
+                self._runData_.pathStimsBySweep = pathStimsBySweep
                 if src.name not in self._runData_.conditioningProtocols:
                     self._runData_.conditioningProtocols[src.name] = dict()
                     
@@ -1104,8 +1661,11 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # NOTE: 2024-03-08 23:03:41
                 # Figure out which pathway is being conditioned (test pathway)
                 # and which not (control pathway)
+                # Udate the viewers.
                 for p in pathways:
                     if p.stimulus.dig:
+                        # NOTE: 2024-05-12 14:57:26
+                        # determine if this is the Test or Control pathway
                         if p.stimulus.channel in mainDIGOut:
                             p.pathwayType = SynapticPathwayType.Test
                             if p.name not in self._runData_.conditioningProtocols[src.name]:
@@ -1113,529 +1673,139 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                 
                             if protocol.name not in [pr.name for pr in self._runData_.conditioningProtocols[src.name][p.name]]:
                                 self._runData_.conditioningProtocols[src.name][p.name].append(protocol)
-                            
-                        else:
-                            p.pathwayType = SynapticPathwayType.Control
-                            
-                    # NOTE: 2024-03-08 23:03:46 
-                    # Also update the windows names 
-                    if src.name in self._runData_.viewers and src.name in self._runData_.results:
-                        if p.name in self._runData_.viewers[src.name] and p.name in self._runData_.results[src.name]:
+                                
+                            # figure out which measure viewer has been set up; update the viewer title
                             measures = [(l,m) for l, m in self._runData_.results[src.name][p.name]["measures"].items() if l != "MembraneTest"]
+
                             if len(measures):
                                 initResponseLabel = measures[0][0]
                                 if isinstance(self._runData_.viewers[src.name][p.name][initResponseLabel], sv.SignalViewer):
                                     self._runData_.viewers[src.name][p.name][initResponseLabel].winTitle += f" {p.pathwayType.name}"
-                
-            else: # NOTE: 2024-03-09 07:51:17 tracking mode
-                if src.name not in self._runData_.results:
-                    self._runData_.results[src.name] = dict()
-                
-                if src.name not in self._runData_.viewers:
-                    self._runData_.viewers[src.name] = dict()
-                    
-                if src.name not in self._runData_.monitorProtocols:
-                    self._runData_.monitorProtocols[src.name] = dict()
-                    
-                # self.print(f"   source adc: {printStyled(adc.name, 'yellow')}, dac: {printStyled(dac.name, 'yellow')}")
-                
-                # NOTE: 2024-03-09 15:11:20
-                # figure out which of the cases below is met:
-                # (see also NOTE: 2024-03-09 13:49:12)
-                #
-                # case 1:
-                #   • source must define two dig_pathways and zero dac_pathways
-                #   • protocol has alternate dig outputs enabled
-                #   • protocol records two sweeps 
-                #   • number of pathways stimulated by the protocol is exactly two
-                #
-                # case 2:
-                #   • source defines one dig_pathway OR one dac_pathway
-                #   • protocol records two sweeps
-                #   • number of pathways stimulated by the protocol is exactly two
-                #
-                # case 3:
-                #   • source defines any number of pathways
-                #   • there are as many protocols as pathways
-                #   • each protocol stimulates exactly one pathway
-                #   • each protocol generates one sweep, which must NOT be averaged
-                #       by the protocol
-                #   • protocols must be iterated in the same order
-                #   • each protocol is applied once in each iteration
-                
-                # NOTE: 2024-03-09 15:40:48
-                # figure out which of the above pathways are actually used by the
-                # protocol
-
-                # start with dac-stimulated pathways first → find out which of the 
-                # declared ones are actually used by the protocol
-                #
-                # from here onwards, dac_pathways are those used in the protocol
-                dac_pathways = [p for p in dac_pathways if len(protocol.getDAC(p[1].stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC)]
-                
-                # do the same for dig-stimulated pathways:
-                # the filter is simpler: the declares stimulsu channel for the pathway
-                # is one of the main or alt DIG channels defined in the protocol
-                # from here onward dig_pathways are the pathways actually stimulated by the protocol
-                dig_pathways = [p for p in dig_pathways if p[1].stimulus.channel in mainDIGOut or altDIGOut]
-                
-                # this is the total number of pathways actually stimulated by the protocol
-                # by DIG outputs OR DAC-emulated TTLs
-                nPathways = len(dac_pathways) + len(dig_pathways)
-                
-                mainDigPathways = list()
-                altDigPathways = list()
-                altDacPathways = list()
-                
-                if nPathways == 0:
-                    scipywarn(f"Protocol {protcol.name} does not seem to monitor any of the pathways declares in source {src.name}")
-                    continue
-                
-                if nPathways == 1:
-                    # protocol stimulates just one pathway - either DIG or DAC-emulated
-                    mainDigPathways = dig_pathways if len(dig_pathways) else dac_pathways
-                    # altPathways = list()
-                    if protocol.nSweeps == 1:
-                        # this is either a monitoring protocol or a single-sweep
-                        # conditioning protocol
-                        if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
-                            mainDigPathways[0][1].pathwayType = SynapticPathwayType.Test
-                            
-                    else:
-                        if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
-                            mainDigPathways[0][1].pathwayType = SynapticPathwayType.Test
-                        else:
-                            scipywarn(f"Protocol {protocol.name} has invalid number of sweeps ({protocol.nSweeps}) for tracking")
-                    
-                    # pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence([p[1] for p in mainPathways + altPathways])
-                    
-                    # TODO: 2024-03-10 21:00:49
-                    # see TODO 2024-03-10 20:59:00, below
-                    
-                elif nPathways == 2:
-                    if self._runData_.episodeType & RecordingEpisodeType.Conditioning > 0:
-                        scipywarn(f"Protocol {protocol.name} is invalid for conditioning")
-                        continue
-                    # prerequisite for alternate pathway stimulation with either
-                    # two DIGs or one DIG and one DAC-emulated TTLs
-                    # protocol stimulates two one pathways: DIG + DIG or DIG + DAC-emulated
-                    #
-                    # in either case, alternate digital outputs must be enabled
-                    if not protocol.alternateDigitalOutputStateEnabled:
-                        scipywarn(f"Tracking mode: Alternate digital outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
-                        continue
-                    
-                    if len(dac_pathways) == 0:
-                        # both pathways in the protocol are stimulated via DIG outputs
-                        mainDigPathways, altDigPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_pathways)]
-                        
-                        pp = [p[1] for p in mainDigPathways + altDigPathways]
-                        
-                        # figure out the order in which pathways are stimulated
-                        pathStimBySweep = protocol.getPathwaysDigitalStimulationSequence(pp)
-                        
-                        if protocol.nSweeps == 1:
-                            pathsOrder = pathStimBySweep[0][1]
-                            if len(pathsOrder) == 0:
-                                scipywarn("No pathways stimulated in this protocol")
-                                continue
-                            
-                            elif len(pathsOrder) == 1:
-                                # NOTE: 2024-03-10 21:01:32 FIXME
-                                # this should never happen as we are in the condition of
-                                # two dig pathways here
-                                self._runData_.crossTalk = False
-                                
-                            elif len(pathsOrder) == 2:
-                                self._runData_.crossTalk = True
-                                
-                            else:
-                                scipywarn(f"Wrong number of paths in sweep: {len(pathsOrder)}")
-                                continue
-                            # TODO 2024-03-10 20:59:00
-                            # set up persistent mapping of pathways for single-sweep 
-                            # protocols - based on the expectation that such protocols
-                            # must arrive interleaved... but allow for recording 
-                            # interruptions...
-                            
-                        elif protocol.nSweeps == 2:
-                            # if both pathways are stimulated in the same sweep -> cross-talk
-                            # else, expect one pathway stimulated in each sweep
-                            # main pathway on sweep 0, alt pathway on sweep 1
-                            if len(pathStimBySweep[0][1]) == 2:
-                                # TODO 2024-03-10 21:18:40 
-                                # set up persistent mapping of cross-talk
-                                # If each sweep simulates BOTH pathways, and the pathway order
-                                # is reversed in alternate sweeps ⇒ crosstalk = True
-                                # NOTE: implement these checks!
-                                self._runData_.crossTalk = True
-                            else:
-                                self._runData_.crossTalk = False
-                            
-                    elif len(dac_pathways) == 1:
-                        if not protocol.alternateDACOutputStateEnabled:
-                            scipywarn(f"Tracking mode: Alternate DAC outputs are disabled in protocol {protocol.name} yet source {src.name} declares pathway {dac_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
-                            continue
-                        
-                        mainDigPathways = dig_pathways
-                        altDacPathways = dac_pathways
-                        
-                        # TODO: 2024-03-10 21:23:12
-                        # use logic from above to determine if crosstalk and how
-                        
-                    elif len(dac_pathways) > 1:
-                        scipywarn(f"Tracking mode: In protocol {protocol.name}, for source {src.name}: at most one pathway should be declared as simulated via DAC-emulated TTLs")
-                        
-                else: # nPathways > 2
-                    # NOTE: 2024-03-09 22:54:05
-                    # I think this is technically impossible in Clampex
-                    scipywarn(f"Tracking mode: Protocol {protocol.name} seems to be stimulating more than two pathways, and is not supported")
-                    continue
-                
-#                 if protocol.alternateDigitalOutputStateEnabled:
-#                     # alternative digital state indicates a dual-pathway protocol
-#                     # we expect src to advertise two pathways, and the protocol
-#                     # to match these two pathways to separate sweeps (i.e. two sweeps)
-#                     #
-#                     # NOTE: 2024-03-09 13:47:26 
-#                     # protocol.alternateDACOutputStateEnabled must also be True
-#                     # True if one of the pathways emits stimuli via
-#                     # a DAC 
-#                     if len(pathways) != 2:
-#                         scipywarn(f"The source {src.name} must define two pathways")
-#                         return
-#                     
-#                     if protocol.nSweeps != 2:
-#                         scipywarn(f"The protocol {protocol.name} has alternate digital output state enabled and expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
-#                         # TODO: 2024-03-05 23:03:34 decide what to do here
-#                         return
-#                         
-#                     # select pathways by their stimulus channel being a main or
-#                     # and alternative DIG output
-#                     mainDigPathways, altDigPathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.channel in altDIGOut, dig_pathways)]
-#                     
-#                     nDIGPathways = len(mainDigPathways) + len(altDigPathways)# + len(dacPathways)
-#                     
-#                     if nPathways == 0:
-#                         # no pathways recorded in this protocol (how likely that is ?!?)
-#                         continue
-#                     
-#                     if nPathways > 2:
-#                         scipywarn("A Clampex protocol does NOT support recording from more than two pathways")
-#                         continue
-#                     # if len(pathways) == 2:
-                        
-                                
-# ### ---------------------------------------------------------------------- ### #
                                     
-                # if dac != activeDAC:
-                #     if not protocol.alternateDigitalOutputStateEnabled:
-                #         raise ValueError(f"Alternative digital outputs must be enabled in the protocol when digital outputs are configured on a DAC index ({activeDAC.physicalIndex}) different from the DAC sending command waveforms ({src.dac})")
-                    
-                # self.print(f"   data recorded in {printStyled(clampMode.name, 'yellow')}")
-                
-                # figure out which of the pathways use a DIG or a DAC channel for TTLs;
-                # of these figure out which are ACTUALLY used in the protocol
-                # NOTE: 2024-02-17 16:37:26
-                # this should be configured in the protocol, in any case
-                # as noted above, a DIG output MAY be also used to trigger 3ʳᵈ party device
-                #
-                
-                # as noted above, additional DIG outputs MAY be used to trigger 3ʳᵈ party device
-                # furthermore, this is an empty set when the protocol does not enable
-                # alternate digital outputs; 
-                #
-                
-                # NOTE: 2024-03-10 21:24:21
-                # calculatd above
-                # mainDigPathways = list() # empty if len(digOutDacs ) == 0
-                # altDigPathways  = list() # empty if len(digOutDacs ) == 0 or protocol.alternateDigitalOutputStateEnabled is False;
-                # dacPathways     = list() # empty if no passed sources have stimulus on any of the DACs
-                
-                # if len(pathways) == 2:
-                    # there are two options here:
-                    # a) the same protocol uses alternative stimulation to record from
-                    #   both patwhays
-                    #   ⇒ the protocol must:
-                    #       • have EXACTLY TWO sweeps (theoreticaly it can have more,
-                    #           but this complicates things)
-                    #       • have alternateDigitalOutputStateEnabled True
-                    #
-                    #   → in addition, a two-pwathways protocol MAY implement cross-talk
-                    #       via TTL train on the alternate stimuli
-                    #
-                    # b) there are distinct protocols which operate on the same ADC/DAC
-                    #   pair, BUT use a distinct DIG output channel for each pathway
-                    #   ⇒ the protocols must:
-                    #       • have EXACTLY ONE sweep each
-                    #       • have alternateDigitalOutputStateEnabled False
-                    #       • be delivered alternatively ⇒ we need to somehow cache this information
-                    #
-                    #   → in addition, Cross-talk must also be implemented by distinct
-                    #   single pathway protocols, using single TTL pulses (or trains with one pulse each)
-                    #   but defined in successive epochs (so that the paired-pulse interval
-                    #   can match the one in a paired-pulse on a single pathway)
-                    #   e.g. crosstalk_0_1 delivered alternatively with crosstalk_1_0
-                    #   
-#                     if protocol.alternateDigitalOutputStateEnabled:
-#                         if protocol.nSweeps != 2:
-#                             scipywarn(f"The protocol {protocol.name} with alternate digital output state enabled expected to have two sweeps; instead, it has {protocol.nSweeps} sweeps")
-#                             # TODO: 2024-03-05 23:03:34 decide what to do here
-#                             return
-#                         
-#                         for k, p in enumerate(pathways):
-#                             if p.stimulus.dig:
-#                                 # assert p.source.dac in [c.physicalIndex for c in digOutDacs], f"The DAC channel ({p.source.dac}) for pathway {k} does not appear to have DIG outputs enabled"
-#                                 if dac not in digOutDacs:
-#                                     scipywarn(f"The DAC channel ({dac.physicalIndex}) for pathway {k} does not appear to have DIG outputs enabled")
-#                                     continue
-#                                 
-#                                 if p.stimulus.channel in mainDIGOut:
-#                                     mainDigPathways.append((k, p))
-#                                     
-#                                 elif p.stimulus.channel in altDIGOut:
-#                                     altDigPathways.append((k, p))
-#                                     
-#                             else:
-#                                 scipywarn(f"The protocol {protocol.name} does not appear to use digital outputs to stimulate the pathway {k}")
-#                                 return
-#                             
-#                     else:
-#                         if protocol.nSweeps != 1:
-#                             # FIXME: 2024-03-05 23:06:00
-#                             # the condition below applies only to monitoring protocols
-#                             #
-#                             # one can have an induction (i.e. conditioning) protocol
-#                             # with more than one sweep.
-#                             
-#                             scipywarn(f"The protocol {protocol.name} with alternate digital output state disabled expected to have one sweep; instead, it has {protocol.nSweeps} sweeps")
-                        
+                        else:
+                            p.pathwayType = SynapticPathwayType.Control
                             
-                    # elif p.stimulus.channel in protocol.physicalDACIndexes:
-                    #     dacPathways.append((k, p))
+                            measures = [(l,m) for l, m in self._runData_.results[src.name][p.name]["measures"].items() if l != "MembraneTest"]
+
+                            if len(measures):
+                                initResponseLabel = measures[0][0]
+                                if isinstance(self._runData_.viewers[src.name][p.name][initResponseLabel], sv.SignalViewer):
+                                    self._runData_.viewers[src.name][p.name][initResponseLabel].winTitle += f" {p.pathwayType.name}"
+                                    
+                self.distributeSweeps(src, adc)
+    
+    def distributeSweeps(self, src:RecordingSource, adc:pab.ABFInputConfiguration):
+        """Distributes sweeps from the current trial by pathway.
+        Each sweep is copied tot he neo.Block containing the synaptic responses 
+        for the pathway stimulated in the original sweep in the current ABF trial
+        """
+        # NOTE: 2024-05-11 18:59:54
+        # for xtalk protocol, the same principle applies:
+        # fitst stimulated path in the sweep goes to that sweep
+        currentEpisode = self._runData_.episodes[-1]
+        # self.print("\t{self.__class__.__name__}.distributeSweeps: pathway stimulation by sweep (pathStimsBySweep):")
+        # for sweep_path in self._runData_.pathStimsBySweep:
+        #     self.print(f"\tsweep: {printStyled(sweep_path[0], 'red')}:")
+        #     for path in sweep_path[1]:
+        #         self.print(f"\t\tpath {printStyled(path.name, 'red')} ({printStyled(path.stimulus.channel, 'red')})")
+            
+        if currentEpisode.type & RecordingEpisodeType.Tracking:
+            for sweep, paths in self._runData_.pathStimsBySweep:
+                path = paths[0]
+                assert path == self._runData_.results[src.name][path.name]["pathway"], printStyled("synaptic pathway mismatch between the protocol and pathway stimulation by sweep")
+                block = self._runData_.results[src.name][path.name]["pathway_responses"]
+                segment = self._runData_.currentAbfTrial.segments[sweep]
+                sig = segment.analogsignals[adc.logicalIndex]
+                segname = f"{src.name} {path.name}"
+                if len(currentEpisode.xtalk):
+                    segname += f" \u2192 {paths[1].name} Cross-talk"
+                    
+                seg = neo.Segment(index = len(block.segments), name=segname)
+                
+                seg.file_origin = self._runData_.currentAbfTrial.file_origin
+                seg.file_datetime= self._runData_.currentAbfTrial.file_datetime
+                seg.rec_datetime = self._runData_.currentAbfTrial.rec_datetime
+                
+                seg.analogsignals.append(sig)
+                seg.annotations["ABFTrial"] = self._runData_.currentAbfTrial.name
+                seg.annotations["ABFTrialSweep"] = sweep
+                
+                if len(currentEpisode.xtalk):
+                    seg.annotations["Crosstalk"] = [p.stimulus.channel for p in paths]
+                    
+                block.segments.append(seg)
+                
+                for cursor in self._runData_.viewers[src.name][path.name]["pathway_viewer"].signalCursors:
+                    cursor.show()
+                    
+                self._runData_.viewers[src.name][path.name]["pathway_viewer"].view(block)
+                self._runData_.viewers[src.name][path.name]["pathway_viewer"].currentFrame = len(block.segments)-1
+                
+            # NOTE: 2024-05-13 08:37:09
+            # one sweep added per pathway ⟹ episodes should each have self._runData_.sweeps
+            self._runData_.sweeps += 1 
+            
+        elif currentEpisode.type & RecordingEpisodeType.Conditioning:
+            # self.print(f"{self.__class__.__name__}.distributeSweeps for conditioning episode")
+            # NOTE: 2024-05-13 08:37:33
+            # add ALL conditioning sweeps in the conditioning block to the 
+            # test pathway
+            for sweep, paths in self._runData_.pathStimsBySweep:
+                path = paths[0]
+                assert path == self._runData_.results[src.name][path.name]["pathway"], printStyled("synaptic pathway mismatch between the protocol and pathway stimulation by sweep")
+                block = self._runData_.results[src.name][path.name]["pathway_responses"]
+                trialSegment = self._runData_.currentAbfTrial.segments[sweep]
+                segment = neo.Segment(index = len(block.segments) + trialSegment.index)
+                segment.name = f"{src.name} Conditioning {path.name} ({path.pathwayType.name})"
+                segment.file_origin = self._runData_.currentAbfTrial.file_origin
+                segment.file_datetime = self._runData_.currentAbfTrial.file_datetime
+                segment.rec_datetime = self._runData_.currentAbfTrial.rec_datetime
+                
+                sig = trialSegment.analogsignals[adc.logicalIndex]
+                segment.analogsignals.append(sig)
+                segment.annotations["Conditioning_protocol"] = self._runData_.currentProtocol.name
+                block.segments.append(segment)
+                
+                controlPaths = [p["pathway"] for k, p in self._runData_.results[src.name].items() if k not in ("DACPaths", "DIGPaths") and p["pathway"].pathwayType == SynapticPathwayType.Control]
+                
+                for cursor in self._runData_.viewers[src.name][path.name]["pathway_viewer"].signalCursors:
+                    cursor.hide()
+                    
+                self._runData_.viewers[src.name][path.name]["pathway_viewer"].view(block)
+                self._runData_.viewers[src.name][path.name]["pathway_viewer"].currentFrame = len(block.segments)-1
+                
+                # NOTE: 2024-05-13 08:39:24
+                # also add same number of sweeps, but containing dummy signals, 
+                # to the control pathway
+                for p in controlPaths:
+                    b = self._runData_.results[src.name][p.name]["pathway_responses"]
+                    seg = neo.Segment(index = segment.index)
+                    seg.name = f"{src.name} Conditioning {path.name} ({p.pathwayType.name})"
+                    seg.file_origin = self._runData_.currentAbfTrial.file_origin
+                    seg.file_datetime = self._runData_.currentAbfTrial.file_datetime
+                    seg.rec_datetime = self._runData_.currentAbfTrial.rec_datetime
+                    
+                    new_sig = neo.AnalogSignal(np.full_like(sig, fill_value = 0.0), 
+                                                unit = sig.units, t_start = sig.t_start,
+                                                sampling_rate = sig.sampling_rate,
+                                                name = f"{sig.name} (control pathway)")
+                
+                    seg.analogsignals.append(new_sig)
+                    b.segments.append(seg)
+                    
+                    for cursor in self._runData_.viewers[src.name][p.name]["pathway_viewer"].signalCursors:
+                        cursor.hide()
                         
-                # total number of pathways recorded in this protocol; it should be ≤ total number of pathways in _runData_
-                # NOTE: 2024-02-19 18:30:22 TODO: consider NOT pre-populating the pathways field in _runData_
-                # but rather parse the sources here and populate with pathways as necessary.
-                #
-                # FIXME: dacPathways is contentious - To REMOVE
-#                 nPathways = len(mainDigPathways) + len(altDigPathways)# + len(dacPathways)
-#                 
-#                 if nPathways == 0:
-#                     # no pathways recorded in this protocol (how likely that is ?!?)
-#                     continue
-#                 
-#                 if nPathways > 2:
-#                     scipywarn("A Clampex protocol does NOT support recording from more than two pathways")
-#                     continue
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].view(b)
+                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].currentFrame = len(b.segments)-1
                 
-                # self.print(f"   pathways recorded in this protocol: {printStyled(nPathways)}")
-                
-                # If you have just one amplifier, you can record from as many sources as 
-                #   there are channels in the amplifier, for example:
-                #   • just one source for AxoPatch
-                #   • maximum two sources for MultiClamp
-                # 
-                # More amplifiers can allow simultaneous recording from more sources,
-                # provided that the ADC/DACs are appropriately configured and here is
-                # no overlap with any TTL-emulating DACs.
-                #
-                # When the source records from more than one pathway (i.e. more than one pathway for the SAME source)
-                # there should be a temporal separation of sweeps per pathway, so that
-                # synaptic responses recorded through the SAME ADC can be distinguished.
-                #
-                # This can be achieved in two ways:
-                #
-                # 1) the alternate stimulation approach → allows up to TWO pathways per source
-                # (one can use this approach for a single pathway, but then it will 
-                #  result in wasteful "empty" sweeps: the non-existent "alternate" pathway 
-                #   does not generate any responses, yet it will be recorded)
-                #   1.1) uses temporal separation through alternate sweeps in the same run
-                #
-                #   1.2) can be used for up to two pathways:
-                #       1.2.a) either two "digital" pathways ⇒ protocol has:
-                #           • alternateDigitalOutputStateEnabled ≡ True
-                #           • "main" digital pattern set
-                #           • "alternate" digital pattern set
-                #           • alternateDACOutputStateEnabled — irrelevant
-                #
-                #       1.2.b) one "digital" and one "dac" pathway ⇒ protocol has:
-                #           • alternateDigitalOutputStateEnabled ≡ True
-                #           • "main" digital pattern set
-                #           • "alternate" digital pattern NOT set
-                #           • alternateDACOutputStateEnabled ≡ True
-                #
-                #       1.2.c) two "dac" pathways - impossible in Clampex
-                #
-                #   1.3) the protocol should have an even number sweeps per run,
-                #       ideally only two (higher sweep index just repeat the 
-                #       measurements unnecessarily and confound the issue of 
-                #       averaged results - to keep it simple, we expect such protocol
-                #       to produce only two sweeps)
-                #           
-                # 2) single-sweep approach → use ONE pathway per protocol, and configure
-                #   as many protocols as there are pathways.
-                #
-                #   2.1) averaging will be turned off in Clampex ⟹ ABF files contain
-                #       immediate data, which may be averaged offline (TODO: pass arguments to the LTPOnline)
-                #       and data should be grouped by pathway, post-hoc
-                
-                # see above: a protocol DOES NOT support monitoring more than
-                # two pathways
-                # if there are two pathwys, then they should be stimulated
-                # alternatively, and the protocol should (ideally) have an even number 
-                # of sweeps per run; since it does NOT really make sense to have
-                # more than TWO sweeps (because we just repeat the protocol 𝒏
-                # times, for 𝒏 files) we actually ENFORCE THIS precondition:
-                
-            syn_stim_digs = list()
-            syn_stim_dacs = list()
-            
-            if nPathways == 2:
-                if len(mainDigPathways) != 1:
-                    scipywarn("There must be only one digitally triggered pathway in the protocol")
-                    continue
-
-                syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
-                
-                # if len(altDigPathways) + len(dacPathways) != 1:
-                #     scipywarn("There can be only one other pathway, triggered either digitally, or via DAC-emulated TTLs")
-                #     continue
-                if len(altDigPathways) == 1:
-                    # two alternative digitally stimulated pathways — the most
-                    # common case
-                    if not protocol.alternateDigitalOutputStateEnabled:
-                        scipywarn( "For two digitally-stimulated pathways the alternative digital output state must be enabled in the protocol")
-                        continue
-                    syn_stim_digs.append(altDigPathways[0][1].stimulus.channel)
-                    
-                # TODO: 2024-03-10 21:28:46
-                # provide for altDacPathways as well
-                    
-            else: # alternative pathways do not exist here; nPathways ≡ 1 
-                if len(mainDigPathways):
-                    syn_stim_digs.append(mainDigPathways[0][1].stimulus.channel)
-                        
-            # self.print(f"   digital channels for synaptic stimulation: {printStyled(syn_stim_digs, 'yellow')}")
-            # self.print(f"   DAC channels for synaptic stimulation via emulated TTLs: {printStyled(syn_stim_dacs, 'yellow')}")
-            
-            # figure out the epochs that define synaptic stimulations
-            
-            # figure out the membrane test epochs; set up LocationMeasures for
-            # the membrane test; we use the source's DAC channel - which may also 
-            # be the activeDAC, although this is not necessary.
-            # furthermore, these epochs should exist in eitgher voltage-or current clamp
-            # if they do not, we just imply do not provide corresponding measurmements
-            #
-            # also, these are COMMON for all the pathways in the source
-            mbTestEpochs = list(filter(lambda x: x.epochType in (pab.ABFEpochType.Step, pab.ABFEpochType.Pulse) \
-                                                and not any(x.hasDigitalOutput(d) for d in (syn_stim_digs)) \
-                                                and x.firstLevel !=0 and x.deltaLevel == 0 and x.deltaDuration == 0, 
-                                    dac.epochs))
-            
-            if len(mbTestEpochs) == 0:
-                if clampMode in (ClampMode.VoltageClamp, ClampMode.CurrentClamp):
-                    scipywarn("No membrane test epoch appears to have been defined", out = self._stdout_)
-                membraneTestEpoch = None
-                testAmplitude = None
-                testStart = None
-                testDuration = None
-                
-            else:
-                membraneTestEpoch = mbTestEpochs[0]
-                testAmplitude = membraneTestEpoch.firstLevel
-                testStart = dac.getEpochRelativeStartTime(membraneTestEpoch, 0)
-                testDuration = membraneTestEpoch.firstDuration
-                
-            # assert protocol.nSweeps >= nPathways, f"Not enough sweeps ({protocol.nSweeps}) for {nPathways} pathways"
-            
-            # in a multi-pathway protocol, the "main" digital pathways are always
-            # delivered on the even-numbered sweeps: 0, 2, etc.
-            #
-            
-            for k, p in mainDigPathways:
-                # NOTE: 2024-03-01 13:50:58
-                # k is the pathway index; p is the pathway
-                # self.print(f"   processing main (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
-                p.clampMode = clampMode
-                
-                if p.name not in self._runData_.viewers[src.name]:
-                    # FIXME: 2024-03-02 23:32:46
-                    # assumes only one main Dig pathway
-                    self._runData_.viewers[src.name][p.name] = \
-                    {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_,
-                                                    win_title = f"{src.name} {p.name} Synaptic Responses")}
-
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].showNavigator()
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
-
-                    if sys.platform == "win32":
-                        y = self._screenGeom.y() + self._titlebar_height_
-                    else:
-                        y = self._screenGeom.y()
-
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
-                                                                                                        self._winWidth, 
-                                                                                                        self._winHeight))
-                    # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x(), y, 
-                    #                                                                                     int(self._winWidth * 1.1), 
-                    #                                                                                     int(self._winHeight * 1.1)))
-
-                if p.name not in self._runData_.results[src.name]:
-                    self._runData_.results[src.name][p.name] = \
-                        {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
-                        "pathway": p}
-
-                self.setMeasuresForPathway(src, p, protocol,
-                                                    adc, dac, activeDAC, membraneTestEpoch,
-                                                    testStart, testDuration, testAmplitude,
-                                                    False)
-
-                self.measurePathway(src, p, adc, False)
-
-            for k, p in altDigPathways:
-                # self.print(f"   processing alt (dig) pathway {printStyled(k)} ({printStyled(p.name)}) with synaptic simulation via DIG {printStyled(p.stimulus.channel)}")
-                p.clampMode = clampMode
-
-                if p.name not in self._runData_.viewers[src.name]:
-                    self._runData_.viewers[src.name][p.name] = \
-                    {"pathway_viewer": sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_,
-                                                    win_title = f"{src.name} {p.name} Synaptic Responses")}
-
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideSelectors()
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].hideMainToolbar()
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].showNavigator()
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].show()
-
-                    if sys.platform == "win32":
-                        y = self._screenGeom.y() + self._titlebar_height_
-                    else:
-                        y = self._screenGeom.y()
-
-                    self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + self._winWidth, y, 
-                                                                                                        self._winWidth, 
-                                                                                                        self._winHeight))
-                    # self._runData_.viewers[src.name][p.name]["pathway_viewer"].setGeometry(QtCore.QRect(self._screenGeom.x() + int(self._winWidth * 1.1), y, int(self._winWidth * 1.1), int(self._winHeight * 1.1)))
-                    
-                if p.name not in self._runData_.results[src.name]:
-                    self._runData_.results[src.name][p.name] = \
-                        {"pathway_responses": neo.Block(name=f"{src.name} {p.name}"),
-                        "pathway": p}
-                
-                self.setMeasuresForPathway(src, p, protocol, 
-                                                    adc, dac, activeDAC, membraneTestEpoch, 
-                                                    testStart, testDuration, testAmplitude,
-                                                    True)
-                self.measurePathway(src, p, adc, True)
-            
-                
+            self._runData_.sweeps += len(self._runData_.pathStimsBySweep)
+                            
     def measurePathway(self, src: RecordingSource, p: SynapticPathway,
                        adc:pab.ABFInputConfiguration, isAlt:bool=False):
         measureTime = self._runData_.abfTrialDeltaTimesMinutes[-1] # needed below
         measures = self._runData_.results[src.name][p.name]["measures"]
-        sweep = self._runData_.results[src.name][p.name]["ABFTrialSweep"]
+        sweep = self._runData_.results[src.name][p.name]["pathway_responses"].segments[-1].annotations["ABFTrialSweep"]
         currentTrial = self._runData_.currentAbfTrial
         sig = currentTrial.segments[sweep].analogsignals[adc.logicalIndex]
         
@@ -1645,13 +1815,25 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
         initResponse = None
         initResponseLabel = None
+        pathViewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"] 
         
         for kc, (measureLabel, measure) in enumerate(responseMeasures):
             measureFunctor = measure["measure"]
             locations = measure["locations"]
+            # NOTE: 2024-05-13 16:53:01
+            # measure on cursors, not locations, so that adjustments to cursor
+            # positions are reflected in the measurements for the (next) sweep
+            for l in locations:
+                if pathViewer.signalCursor(l.name) is None:
+                    pathViewer.addCursor(SignalCursorTypes.vertical, l, label_position = 0.85)
+                    
+            locationCursors = [pathViewer.signalCursor(l.name) for l in locations]
+            
             args = measure["args"]
             
-            locationMeasure = measureFunctor(*locations, name=measure["name"])
+            # NOTE: 2024-05-13 17:12:19
+            # now, use the signal cursors (NOT data cursors) to perform measurement
+            locationMeasure = measureFunctor(*locationCursors, name=measure["name"])
             
             measureValues = locationMeasure(sig)
             
@@ -1680,25 +1862,24 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 ratio.name = f"Paired-pulse ratio {kc+1}ᵗʰ / 1ˢᵗ"
                 self._runData_.results[src.name][p.name][f"PPR {kc} 0"] = ratio
                 
-        if initResponseLabel not in self._runData_.viewers[src.name][p.name]:
-            self._runData_.viewers[src.name][p.name][initResponseLabel] = \
-                sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                    win_title = f"{src.name} {p.name} {initResponseLabel}")
-            
-            self._runData_.viewers[src.name][p.name][initResponseLabel].hideSelectors()
-            self._runData_.viewers[src.name][p.name][initResponseLabel].hideNavigator()
-            self._runData_.viewers[src.name][p.name][initResponseLabel].hideMainToolbar()
-            
-            x = self._screenGeom.x()
-            
-            if isAlt:
-                x += self._winWidth
-                # x += int(self._winWidth * 1.1)
-                
-            # y = self._screenGeom.y() + int(self._winHeight * 1.1)
-            y = self._screenGeom.y() + self._winHeight
-            
-            self._runData_.viewers[src.name][p.name][initResponseLabel].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+#         if initResponseLabel not in self._runData_.viewers[src.name][p.name]:
+#             self._runData_.viewers[src.name][p.name][initResponseLabel] = \
+#                 sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
+#                                                     win_title = f"{src.name} {p.name} {initResponseLabel}")
+#             
+#             self._runData_.viewers[src.name][p.name][initResponseLabel].hideSelectors()
+#             self._runData_.viewers[src.name][p.name][initResponseLabel].hideNavigator()
+#             self._runData_.viewers[src.name][p.name][initResponseLabel].hideMainToolbar()
+#             
+#             x = self._runData_.screenGeometry.x()
+#             
+#             if isAlt:
+#                 x += self._runData_.resultWindowSize[0]
+#                 # x += int(self._runData_.resultWindowSize[0] * 1.1)
+#                 
+#             y = self._runData_.screenGeometry.y() + self._runData_.resultWindowSize[1]
+#             
+#             self._runData_.viewers[src.name][p.name][initResponseLabel].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
             
         self._runData_.viewers[src.name][p.name][initResponseLabel].plot(self._runData_.results[src.name][p.name][initResponseLabel])
                 
@@ -1707,7 +1888,18 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             locations = mbTestMeasure["locations"]
             args = mbTestMeasure["args"]
             
-            locationMeasure = measureFunctor(*locations, name=mbTestMeasure["name"])
+            # NOTE: 2024-05-13 17:14:02
+            # see NOTE: 2024-05-13 16:53:01
+            for l in locations:
+                if pathViewer.signalCursor(l.name) is None:
+                    pathViewer.addCursor(SignalCursorTypes.vertical, l, label_position = 0.85)
+                    
+            locationCursors = [pathViewer.signalCursor(l.name) for l in locations]
+            
+            # self.print(f"locationCursors {locationCursors}")
+            
+            locationMeasure = measureFunctor(*locationCursors, name=mbTestMeasure["name"])
+            
             measureValues = locationMeasure(sig, *args)
             # print(f"measurePathway: measureValues = {measureValues}")
             
@@ -1730,6 +1922,10 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                     time_units = pq.min,
                                                     name = "Rin")
                 
+                # NOTE: 2024-05-13 17:14:46
+                # create new irregular signals as needed (DC, Rs, Rin), or 
+                # append to the existing ones
+                #
                 if "DC" not in self._runData_.results[src.name][p.name]:
                     self._runData_.results[src.name][p.name]["DC"] = DC
                 else:
@@ -1764,56 +1960,77 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                                                         name = "Rin")
                     
                 if not isAlt:    
-                    x = self._screenGeom.x()
-                    y = self._screenGeom.y() + int(self._winHeight * 2.1)
+                    x = self._runData_.screenGeometry.x()
+                    y = self._runData_.screenGeometry.y() + int(self._runData_.resultWindowSize[1] * 2.1)
                     
-                    if "DC" not in self._runData_.viewers[src.name][p.name]:
-                        self._runData_.viewers[src.name][p.name]["DC"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                        win_title = f"{src.name} {p.name} DC")
+                    # self.print(f"common viewer for source measures: {printStyled(self._runData_.commonViewerForSourceMeasures, 'red', True)}")
                     
-                        self._runData_.viewers[src.name][p.name]["DC"].hideSelectors()
-                        self._runData_.viewers[src.name][p.name]["DC"].hideNavigator()
-                        self._runData_.viewers[src.name][p.name]["DC"].hideMainToolbar()
-                        self._runData_.viewers[src.name][p.name]["DC"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
+                    if self._runData_.commonViewerForSourceMeasures:
+#                         if "SourceMeasures" not in self._runData_.viewers[src.name][p.name]:
+#                             self._runData_.viewers[src.name][p.name]["SourceMeasures"] = \
+#                                 sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
+#                                                             win_title = f"{src.name} {p.name} Source measures")
+#                         
+#                             self._runData_.viewers[src.name][p.name]["SourceMeasures"].hideSelectors()
+#                             self._runData_.viewers[src.name][p.name]["SourceMeasures"].hideNavigator()
+#                             self._runData_.viewers[src.name][p.name]["SourceMeasures"].hideMainToolbar()
+#                             self._runData_.viewers[src.name][p.name]["SourceMeasures"].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                            
+                        signals = [self._runData_.results[src.name][p.name]["Rs"],
+                                    self._runData_.results[src.name][p.name]["Rin"],
+                                    self._runData_.results[src.name][p.name]["DC"]]
+                            
+                        self._runData_.viewers[src.name][p.name]["SourceMeasures"].plot(signals)
+                            
+                            
+                    else:
+#                         if "DC" not in self._runData_.viewers[src.name][p.name]:
+#                             self._runData_.viewers[src.name][p.name]["DC"] = \
+#                                 sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
+#                                                             win_title = f"{src.name} {p.name} DC")
+#                         
+#                             self._runData_.viewers[src.name][p.name]["DC"].hideSelectors()
+#                             self._runData_.viewers[src.name][p.name]["DC"].hideNavigator()
+#                             self._runData_.viewers[src.name][p.name]["DC"].hideMainToolbar()
+#                             self._runData_.viewers[src.name][p.name]["DC"].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                            
+                        self._runData_.viewers[src.name][p.name]["DC"].plot(self._runData_.results[src.name][p.name]["DC"])
+#                             
+#                         if "Rs" not in self._runData_.viewers[src.name][p.name]:
+#                             self._runData_.viewers[src.name][p.name]["Rs"] = \
+#                                 sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
+#                                                             win_title = f"{src.name} {p.name} Rs")
+#                             
+#                             x += self._runData_.resultWindowSize[0]
+#                             self._runData_.viewers[src.name][p.name]["Rs"].hideSelectors()
+#                             self._runData_.viewers[src.name][p.name]["Rs"].hideNavigator()
+#                             self._runData_.viewers[src.name][p.name]["Rs"].hideMainToolbar()
+#                             self._runData_.viewers[src.name][p.name]["Rs"].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                            
+                        self._runData_.viewers[src.name][p.name]["Rs"].plot(self._runData_.results[src.name][p.name]["Rs"])
                         
-                    self._runData_.viewers[src.name][p.name]["DC"].plot(self._runData_.results[src.name][p.name]["DC"])
-                        
-                    if "Rs" not in self._runData_.viewers[src.name][p.name]:
-                        self._runData_.viewers[src.name][p.name]["Rs"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                        win_title = f"{src.name} {p.name} Rs")
-                        
-                        x += self._winWidth
-                        self._runData_.viewers[src.name][p.name]["Rs"].hideSelectors()
-                        self._runData_.viewers[src.name][p.name]["Rs"].hideNavigator()
-                        self._runData_.viewers[src.name][p.name]["Rs"].hideMainToolbar()
-                        self._runData_.viewers[src.name][p.name]["Rs"].setGeometry(QtCore.QRect(x, y, self._winWidth, self._winHeight))
-                        
-                    self._runData_.viewers[src.name][p.name]["Rs"].plot(self._runData_.results[src.name][p.name]["Rs"])
-                    
-                    if "Rin" not in self._runData_.viewers[src.name][p.name]:
-                        self._runData_.viewers[src.name][p.name]["Rin"] = \
-                            sv.SignalViewer(parent=self._emitter_, scipyenWindow = self._emitter_, 
-                                                        win_title = f"{src.name} {p.name} Rin")
-                    
-                        x += self._winWidth
-                        self._runData_.viewers[src.name][p.name]["Rin"].hideSelectors()
-                        self._runData_.viewers[src.name][p.name]["Rin"].hideNavigator()
-                        self._runData_.viewers[src.name][p.name]["Rin"].hideMainToolbar()
-                        self._runData_.viewers[src.name][p.name]["Rin"].setGeometry(x, y, self._winWidth, self._winHeight)
-                        
-                    self._runData_.viewers[src.name][p.name]["Rin"].plot(self._runData_.results[src.name][p.name]["Rin"])
+#                         if "Rin" not in self._runData_.viewers[src.name][p.name]:
+#                             self._runData_.viewers[src.name][p.name]["Rin"] = \
+#                                 sv.SignalViewer(parent=self._runData_.parentWindow, scipyenWindow = self._emitter_, 
+#                                                             win_title = f"{src.name} {p.name} Rin")
+#                         
+#                             x += self._runData_.resultWindowSize[0]
+#                             self._runData_.viewers[src.name][p.name]["Rin"].hideSelectors()
+#                             self._runData_.viewers[src.name][p.name]["Rin"].hideNavigator()
+#                             self._runData_.viewers[src.name][p.name]["Rin"].hideMainToolbar()
+#                             self._runData_.viewers[src.name][p.name]["Rin"].setGeometry(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1])
+                            
+                        self._runData_.viewers[src.name][p.name]["Rin"].plot(self._runData_.results[src.name][p.name]["Rin"])
                     
             else: # current clamp
                 #TODO 2024-02-27 16:18:25
                 scipywarn(f"measurePathway {p.name} in trial {currentTrial.name}: Current-clamp measurements not yet implemented")
 
     def setMeasuresForPathway(self, src: RecordingSource, p: SynapticPathway, 
-                              protocol:pab.ABFProtocol,
-                              adc, dac, activeDAC, membraneTestEpoch,
-                              testStart, testDuration, testAmplitude,
-                              isAlt):
+                        protocol:pab.ABFProtocol,
+                        adc, dac, activeDAC, membraneTestEpoch,
+                        testStart, testDuration, testAmplitude,
+                        isAlt):
         """Sets up measurements for synaptic pathways
         This should happen only once, and requires that subsequent ABF trials
         have the same protocol as the first ABFTrial
@@ -1871,40 +2088,36 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         # ### END   alternative way to collect ABF Epochs defining synaptic stimulation
         
         
-        # NOTE: 2024-03-03 21:03:37
-        # ### BEGIN extract pathway sweeps, concatenate to pathway blocks and plot
-        #
         pathSweeps = [sed[0] for sed in sweepsEpochsForDig]
         
         s = pathSweeps[0]
         
-        block = self._runData_.results[src.name][p.name]["pathway_responses"]   # generated in processProtocol
-        viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in processProtocol
+        block = self._runData_.results[src.name][p.name]["pathway_responses"]   # generated in LTPOnline.__init__
+        # viewer = self._runData_.viewers[src.name][p.name]["pathway_viewer"]     # generated in LTPOnline.__init__
         currentTrial = self._runData_.currentAbfTrial
-        
-        seg_ndx = len(block.segments)
-        
-        if "ABFTrialSweep" not in self._runData_.results[src.name][p.name]:
-            self._runData_.results[src.name][p.name]["ABFTrialSweep"] = s
         
         sig = currentTrial.segments[s].analogsignals[adc.logicalIndex]
         t0 = sig.t_start
         
-        seg = neo.Segment(name=f"{src.name} {p.name}", file_origin = currentTrial.file_origin,
-                            file_datetime=currentTrial.file_datetime,
-                            rec_datetime = currentTrial.rec_datetime,
-                            index = seg_ndx)
-        
-        seg.annotations["ABFTrialSweep"] = s
-        seg.analogsignals.append(sig)
-        block.segments.append(seg)
-        viewer.view(block)
-        viewer.currentFrame  = len(block.segments)-1
-        
-        # ### END  extract pathway sweeps, concatenate to pathway blocks and plot
+        # ### BEGIN setup measures, if needed
+        # FIXME 2024-05-08 15:06:34
+        # crossTalk setting is wrong and not needed, really
+        # crossTalk = False
 
-        crossTalk = False
-
+        # NOTE: set up measures for the first run;
+        # since we only measure during tracking protocols, all trials recorded
+        # using this protocol use the same locations.
+        #
+        # The measurements themselves are done using SignalCursor objects in the
+        # pathway response viewer windows (which are NOT serializable), with the
+        # advantage that they can be adjusted by the user (and thus affecting the
+        # measurement in ALL subsequent sweeps, NOT the current one)
+        #
+        # We store these measures with locations based on Datacursor objects, 
+        # which are serializable (i.e. can be saved/pickled), on the implication
+        # than ALL cursors in these measures are vertical cursors.
+        #
+        #
         if "measures" not in self._runData_.results[src.name][p.name]:
             pMeasures = dict()
             measureTime = self._runData_.abfTrialDeltaTimesMinutes[-1] # needed below
@@ -1930,38 +2143,16 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # collection of unique digital channels used for stimulation on THIS pathway
             stimDIG = unique(list(itertools.chain.from_iterable(e.getUsedDigitalOutputChannels("all") for e in digStimEpochs)))
 
-
             if len(stimDIG) == 1:
                 if stimDIG[0] != p.stimulus.channel:
                     scipywarn(f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} is different from the {stimDIG[0]} used in the epochs {[e.letter for e in digStimEpochs]}")
                     # return
 
-                crossTalk = False
+                # crossTalk = False
                 
             elif len(stimDIG) == 2:
                 if p.stimulus.channel not in stimDIG:
                     scipywarn(f"Stimulus channel ({p.stimulus.channel}) for pathway {p.name} in source {src.name} does not appear to be used in the epochs {[e.letter for e in digStimEpochs]}")
-                    crossTalk = False
-                else:
-                    crossTalk = True
-
-            # NOTE: 2024-03-01 22:57:37 TODO consider the below ↴
-    #         elif len(stimDIG) == 0:
-    #             raise RuntimeError(f"No digital stimlus channels used in the epochs {[e.letter for e in digStimEpochs]}")
-    #             
-    #         else:
-    #             raise RuntimeError(f"Too may digital stimlus channels used ({len(stimDIG)}) in the epochs {[e.letter for e in digStimEpochs]}")
-                
-            
-            # NOTE: 2024-03-01 22:52:10
-            # figure out stimulus pattern on the digStimEpochs in order to 
-            # determine stimulus timings (may be a TTL pulse or a TTL train!)
-            # then infer response(s) baseline(s) and the time stamps for the 
-            # response(s) maximum (maxima) or minimum (minima) in voltage-clamp
-            # or response slope (in current-clamp or voltage follower mode)
-            #
-            # This should be done independently of where they occur relative to any
-            # membrane test epoch(s)
             
             # NOTE: 2024-03-01 23:03:01 below, main pattern is on even index sweeps, alternate pattern is on odd index sweeps
             # NOTE: 2024-03-01 23:04:48 also, a TTL train if present occurs in the first epoch in digStimEpochs
@@ -1987,7 +2178,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # merge with creation of signal cursors in the viewer window, below at NOTE 2024-03-03 00:00:40
             #
             # NOTE: 2024-03-01 23:34:52 
-            # adjust for real sweep times then:
+            # adjust for real sweep times
             if clampMode == ClampMode.VoltageClamp:
                 labelPfx = "EPSC"
                 
@@ -1995,8 +2186,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 # • for response amplitude use 10 ms AFTER stimulus, with window 3 ms
                 # • cursors should be manually adjusted in the pathway responses windows
                 #
-                dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
-                dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
+                dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s, name=f"{labelPfx}{kt}Base") for kt, t in enumerate(stimTimes)]
+                dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s, name=f"{labelPfx}{kt}") for kt, t in enumerate(stimTimes)]
                 
                 locationMeasureFunctor = ephys.amplitudeMeasure
                 measureUnits = sig.units
@@ -2016,8 +2207,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     # we take 5 ms and 10 ms AFTER the stimulus - they'd have to be
                     # adjusted on the signal viewer window for the pathway;
                     # cusros windows are 2 ms each
-                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t + 0.005 * pq.s, 0.002 * pq.s) for t in stimTimes]
-                    dataCursorsResponses = [DataCursor(t0 + holdingTime + t + 0.01 * pq.s, 0.002 * pq.s) for t in stimTimes]
+                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t + 0.005 * pq.s, 0.002 * pq.s, name=f"{labelPfx}{kt}Base") for kt, t in enumerate(stimTimes)]
+                    dataCursorsResponses = [DataCursor(t0 + holdingTime + t + 0.01 * pq.s, 0.002 * pq.s, name=f"{labelPfx}{kt}") for kt, t in enumerate(stimTimes)]
                     
                     locationMeasureFunctor = ephys.chordSlopeMeasure
                     measureUnits = sig.units/sig.times.units # (e.g., mV/ms)
@@ -2025,8 +2216,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     
                 else:
                     # do the same as for voltage clamp above.
-                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
-                    dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s) for t in stimTimes]
+                    dataCursorsResponsesBase = [DataCursor(t0 + holdingTime + t - 0.01 * pq.s, 0.003 * pq.s, name=f"{labelPfx}{kt}Base") for kt, t in enumerate(stimTimes)]
+                    dataCursorsResponses = [DataCursor(t0 + holdingTime +t + 0.01 * pq.s, 0.003 * pq.s, name=f"{labelPfx}{kt}") for kt, t in enumerate(stimTimes)]
                     
                     locationMeasureFunctor = ephys.amplitudeMeasure
                     measureUnits = sig.units
@@ -2036,19 +2227,22 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             # create signal cursors if needed, then measure
             for kc, c in enumerate(dataCursorsResponsesBase):
                 measureLabel = f"{labelPfx}{kc}"
-                if viewer.signalCursor(f"{measureLabel}Base") is None:
-                    viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{measureLabel}Base", label_position=0.85)
+                # if viewer.signalCursor(f"{measureLabel}Base") is None:
+                #     viewer.addCursor(SignalCursorTypes.vertical, c, label_position=0.85)
+                    # viewer.addCursor(SignalCursorTypes.vertical, c, label = f"{measureLabel}Base", label_position=0.85)
                     
-                if viewer.signalCursor(f"{measureLabel}") is None:
-                    viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{measureLabel}", label_position=0.85)
+                # if viewer.signalCursor(f"{measureLabel}") is None:
+                #     viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label_position=0.85)
+                    # viewer.addCursor(SignalCursorTypes.vertical, dataCursorsResponses[kc], label = f"{measureLabel}", label_position=0.85)
                     
                 pMeasures[measureLabel] = {"measure": locationMeasureFunctor,
-                                        "locations": (viewer.signalCursor(f"{measureLabel}Base"),
-                                                        viewer.signalCursor(f"{measureLabel}")),
-                                        "args" : [],
-                                        "sweeps": pathSweeps, # redundant ?!?
-                                        "name": measureName
-                                        }
+                                           # "locations": (viewer.signalCursor(f"{measureLabel}Base"),
+                                           #              viewer.signalCursor(f"{measureLabel}")),
+                                           "locations": (c,dataCursorsResponses[kc]),
+                                           "args" : [],
+                                           # "sweeps": pathSweeps, # redundant ?!?
+                                           "name": measureName,
+                                           }
                                         
             #  NOTE: 2024-03-02 11:23:55
             # 4) generate signal cursors in the signal viewer window, for 
@@ -2057,7 +2251,6 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
             #  NOTE: 2024-03-02 11:55:36 membraneTestEpoch and testStart are calculated in processProtocol
             #  because they are the same for both pathways (they are specific to the recording source)
             #
-            
             if isinstance(membraneTestEpoch, pab.ABFEpoch):
                 # self.print(f"testStart = {testStart}; testDuration = {testDuration}")
                 if testStart + testDuration < dac.getEpochRelativeStartTime(firstDigStimEpoch, 0):
@@ -2083,7 +2276,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                             signalBaselineStart = max(testStart - 2 * dac.holdingTime, 0 * pq.s)
                             
                 elif testStart > activeDAC.getEpochRelativeStartTime(digStimEpochs[-1], 0) + digStimEpochs[-1].firstDuration:
-                    # mb test delivered AFTGER the last digital simulation epoch 
+                    # mb test delivered AFTER the last digital simulation epoch 
                     # ideally, somwehere towards the end of the sweep, 
                     # hopefully AFTER synaptic responses have decayed to baseline
                     #
@@ -2111,817 +2304,127 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     raise RuntimeError("Membrane test appears to overlap with synaptic stimulation epochs")
                 
                 if clampMode == ClampMode.VoltageClamp:
-                    # last 10 ms before end of test, window of 5 ms
-                    if viewer.signalCursor("DC") is None:
-                        dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 0.005 * sig.times.units)
-                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorDC, label="DC", label_position=0.85)
-                        
-                    if viewer.signalCursor("Rs") is None:
-                        dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 0.005 * sig.times.units)
-                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorRs, label="Rs", label_position=0.85)
-                        
-                    if viewer.signalCursor("Rin") is None:
-                        dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 0.005*sig.times.units)
-                        viewer.addCursor(SignalCursorTypes.vertical, dataCursorRin, label="Rin", label_position=0.85)
+                    # NOTE: 2024-05-13 16:54:41
+                    # set up location measure for the first run; on subsequent
+                    # runs we rely on signal cursor positions in the path viewer,
+                    # possibly adjusted
+                    #
+                    dataCursorDC  = DataCursor(t0 + holdingTime + testStart - 0.0025 * sig.times.units, 
+                                                0.005 * sig.times.units, 
+                                                name="DC")
+                    
+                    dataCursorRs  = DataCursor(t0 + holdingTime + testStart, 
+                                                0.005 * sig.times.units, 
+                                                name="Rs")
+                    
+                    dataCursorRin = DataCursor(t0 + holdingTime + testStart + testDuration - 0.01 * sig.times.units, 
+                                                0.005*sig.times.units, 
+                                                name="Rin")
                     
                     
                     pMeasures["MembraneTest"] = {"measure": ephys.membraneTestVClampMeasure,
-                                                "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
-                                                "args": (testAmplitude,),
-                                                "sweeps": pathSweeps,
-                                                "name": "MembraneTest"}
+                                                 # "locations": (viewer.signalCursor("DC"), viewer.signalCursor("Rs"), viewer.signalCursor("Rin")),
+                                                 "locations": (dataCursorDC, dataCursorRs, dataCursorRin),
+                                                 "args": (testAmplitude,),
+                                                 # "sweeps": pathSweeps,
+                                                 "name": "MembraneTest",
+                                                }
                 elif clampMode == ClampMode.CurrentClamp:
                     #TODO 2024-02-27 16:18:25
-                    scipywarn("setMeasuresForPathway: Current-clamp measurements not yet implemented")
+                    scipywarn("setMeasuresForPathway: Current-clamp membrane test measurements not yet implemented")
                 
             # store pathway measures for measurements
             self._runData_.results[src.name][p.name]["measures"] = pMeasures
             
+        # ### END setup measures
+        
+        self.setupMeasurementViewers()
+            
+    def setupMeasurementViewers(self):
+        pw = self._runData_.parentWindow
+        x = self._runData_.screenGeometry.x()
+        y = self._runData_.screenGeometry.height() - self._runData_.resultWindowSize[1] * len(self._runData_.results)
+            
+        for src_name, src_dict in self._runData_.results.items():
+            for path_name, path_dict in src_dict.items():
+                if path_name not in ("DIGPaths", "DACPaths"): 
+                    measures = self._runData_.results[src_name][path_name].get("measures", None)
+                    if measures is None:
+                        continue
+                    responseMeasures = [measureLabel for measureLabel in measures.keys() if measureLabel != "MembraneTest" and "Base" not in measureLabel and measureLabel.endswith("0")]
+                    
+                    for k, label in enumerate(responseMeasures):
+                        if label not in self._runData_.viewers[src_name][path_name]:
+                            self._runData_.viewers[src_name][path_name][label] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_,
+                                                                                                win_title=f"{src_name} {path_name} {label}")
+                            self._runData_.viewers[src_name][path_name][label].setGeometry(QtCore.QRect(x + k*self._runData_.resultWindowSize[0], y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                            self._runData_.viewers[src_name][path_name][label].hideSelectors()
+                            self._runData_.viewers[src_name][path_name][label].hideNavigator()
+                            self._runData_.viewers[src_name][path_name][label].hideMainToolbar()
+                            
+                            x += self._runData_.resultWindowSize[0]
+                            
+                            
+                    mbTestMeasure = measures.get("MembraneTest", None)
+                    
+                    if isinstance(mbTestMeasure, dict) and "locations" in mbTestMeasure and isinstance(mbTestMeasure["locations"], (tuple, list)):
+                        if self._runData_.commonViewerForSourceMeasures:
+                            if "SourceMeasures" not in self._runData_.viewers[src_name][path_name]:
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_,
+                                                                                                        win_title=f"{src_name} {path_name} {'Source measures'}")
+                                
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideSelectors()
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideNavigator()
+                                self._runData_.viewers[src_name][path_name]["SourceMeasures"].hideMainToolbar()
+                            
+                        else:
+                            for label in mbTestMeasure["locations"].keys():
+                                if label not in self._runData_.viewers[src_name][path_name]:
+                                    self._runData_.viewers[src_name][path_name][label] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_,
+                                                                                                        win_title=f"{src_name} {path_name} {label}")
+                                    self._runData_.viewers[src_name][path_name][label].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                                    self._runData_.viewers[src_name][path_name][label].hideSelectors()
+                                    self._runData_.viewers[src_name][path_name][label].hideNavigator()
+                                    self._runData_.viewers[src_name][path_name][label].hideMainToolbar()
+                                    
+                                    x += self._runData_.resultWindowSize[0]
+                                
+            
+            y += self._runData_.resultWindowSize[1]
+        
+        
+        
+        
 class LTPOnline(QtCore.QObject):
     """On-line analysis for synaptic plasticity experiments
     """
     # TODO: update episodes in the pathway's schedule
-
-    resultsReady = pyqtSignal(object, name="resultsReady")
-
-    _instance = None # singleton pattern
-
-    def __new__(cls, *args,
-                 episodeName: str = "baseline",
-                 useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
-                 emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
-                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=False, # NOTE: change to True when done coding TODO
-                 parent=None,
-                 simulate = None,
-                 timeout = None,
-                 out: typing.Optional[io.TextIOBase] = None,
-                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
-                 ):
-        # implementation of singleton pattern
-        if cls._instance is None:
-            cls._instance = super().__new__(cls, *args, episodeName,
-                 useEmbeddedProtocol, useSlopeInIClamp, emitterWindow,
-                 directory, autoStart, parent, simulate, timeout, out,
-                 locationMeasures)
-
-        return cls._instance
-
-    def __init__(self, *args,
-                 episodeName: str = "baseline",
-                 useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
-                 emitterWindow:typing.Optional[QtWidgets.QMainWindow] = None,
-                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=False, # NOTE: change to True when done coding TODO
-                 parent=None,
-                 simulate = None,
-                 timeout = None,
-                 out: typing.Optional[io.TextIOBase] = None,
-                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
-                 ):
-        """
-
-        """
-        # NOTE: 2024-03-03 10:31:16
-        # user-defined location measures are NOT used (for now)
-        super().__init__(parent=parent)
-
-        self._stdout_ = out
-
-        self._running_ = False
-        # self._sources_ = None # preallocate
-        self._locationMeasures_ = locationMeasures
-
-        self._sources_ = self._check_sources_(*args)
-
-        # NOTE: 2024-03-03 22:10:02 TODO (maybe)
-        # curently not used, but reserve for the future...
-        self._presynaptic_triggers_ = dict()
-
-        # ### BEGIN set up emitter window and viewers
-        #
-        # NOTE: 2023-10-07 11:20:22
-        # _emitterWindow_ needed here, to set up viewers
-        wsp = wf.user_workspace()
-
-        if emitterWindow is None:
-            self._emitterWindow_ = wsp["mainWindow"]
-
-        else:
-            self._emitterWindow_ = emitterWindow
-
-        if type(self._emitterWindow_).__name__ != 'ScipyenWindow':
-            raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
-
-
-        if directory is None:
-            self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
-
-        elif isinstance(directory, str):
-            self._watchedDir_ = pathlib.Path(directory)
-
-        elif isinstance(directory, pathlib.Path):
-            self._watchedDir_ = directory
-
-        else:
-            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
-
-        self._viewers_ = dict()
-
-        self._results_ = dict()
-
-        #
-        # ### END set up emitter window and viewers
-
-        self._runData_ = DataBag(sources = self._sources_,
-                                 currentProtocol = None,
-                                 monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ protocol}
-                                 sweeps = 0,
-                                 currentAbfTrial = None,
-                                 viewers = self._viewers_,
-                                 results = self._results_,
-                                 abfTrialTimesMinutes = list(),
-                                 abfTrialDeltaTimesMinutes = list(),
-                                 useSlopeInIClamp = useSlopeInIClamp,
-                                 useEmbeddedProtocol = useEmbeddedProtocol,
-                                 )
-
-        self._abfTrialBuffer_ = collections.deque()
-
-        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
-                                                             self._emitterWindow_,
-                                                             self._abfTrialBuffer_,
-                                                             self._runData_,
-                                                             self._stdout_)
-
-        self._simulation_ = None
-
-        self._simulatorThread_ = None
-
-        self._doSimulation_ = False
-
-        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
-
-        if isinstance(simulate, dict):
-            files = simulate.get("files", None)
-            timeout = simulate.get("timeout", 2000) # ms
-            directory = simulate.get("dir", None)
-            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
-                self._doSimulation_ = True
-
-            elif isinstance(directory, str) and os.path.isdir(directory):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-
-            elif isinstance(directory, pathlib.Path) and directory.is_dir():
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-
-        elif isinstance(simulate, bool):
-            self._doSimulation_ = simulate
-            if isinstance(timeout, int):
-                self._simulator_params_ = dict(files=None, timeout = int(timeout))
-
-
-        elif isinstance(simulate, (int, float)):
-            self._doSimulation_ = True
-            self._simulator_params_ = dict(files=None, timeout = int(simulate))
-
-        if self._doSimulation_:
-            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
-            self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
-                                        self._emitterWindow_, self._watchedDir_,
-                                        simulator = self._simulatorThread_,
-                                        out = self._stdout_)
-
-            if not autoStart:
-                cdir = self._simulator_params_.get("dir", os.getcwd())
-                print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
-
-        else:
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
-                                        self._emitterWindow_, self._watchedDir_,
-                                        out = self._stdout_)
-            if not autoStart:
-                print(f"\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in {self._watchedDir_}.\n", file = sys.stdout)
-
-        self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
-                                                     QtCore.Qt.QueuedConnection)
-
-        if autoStart:
-            self._abfSupplierThread_.start()
-            self._abfProcessorThread_.start()
-            self._running_ = True
-
-    def __del__(self):
-        # we need to check attribute existence to cover the case when we delete
-        # an incompletely initialized object
-        if hasattr(self, "_running_") and self._running_:
-            self.stop()
-
-        try:
-            self.closeViewers(True)
-            self._viewers_.clear()
-
-            if hasattr(self, "_emitterWindow_") and self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-                self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-
-            if hasattr(self, "_simulatorThread_") and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
-                self._simulatorThread_.requestInterruption()
-                self._simulatorThread_.quit()
-                self._simulatorThread_.wait()
-                self._simulatorThread_.deleteLater()
-
-            if hasattr(self, "_abfSupplierThread_") and hasattr(self, "_abfProcessorThread_"):
-                self._abfSupplierThread_.abfListener.stop()
-                self._abfSupplierThread_.quit()
-                self._abfSupplierThread_.wait()
-
-                self._abfProcessorThread_.quit()
-                self._abfProcessorThread_.wait()
-
-                self._abfSupplierThread_.deleteLater()
-                self._abfProcessorThread_.deleteLater()
-
-        except:
-            traceback.print_exc()
-
-        if hasattr(super(object, self), "__del__"):
-            super().__del__()
-
-        self.__class__._instance = None
-
-    def _check_sources_(self, *args):
-        """Verifies consistency of recording sources:
-        Requirements are either hard (•) or soft (∘); unmet soft requirements
-        will cause adjustments to be made to the sources; unmed hard requirements
-        will raise exceptions
-        Distinct sources require:
-        • distinct ADC
-        • distinct DAC
-        • distinct SynapticStimulus configurations
-        ∘ distinct name
-        ∘ when several sources have SynapticStimulus configured, these SynapticStimulus
-            must have distinct names across all the sources
-        """
-        # print(f"{self.__class__.__name__}._check_sources_: args = {args}")
-        if len(args) == 0:
-            raise ValueError("I must have at least one RecordingSource defined")
-            # self._sources_ = None
-            # TODO: 2024-01-04 22:19:44
-            # write code to infer RecordingSource from first ABF file (in _LTPOnlineFileProcessor_)
-            # NOTE: 2024-02-12 08:46:34
-            # this is difficult due to ambiguities when two ADCs are used, e.g.,
-            # when recording secondary amplifier output as well (useful to infer
-            # the command signal waveforms when the protocol is not accessible)
-
-        if not all(isinstance(a, RecordingSource) for a in args):
-            raise TypeError(f"Expecting one or more RecordingSource objects")
-
-        dupsrc = duplicates(args, indices=True)
-
-        if len(dupsrc):
-            raise ValueError(f"Duplicate sources detected in 'args': {dupsrc}")
-
-        # parse sources from args; make sure there are identical names
-        dupNames = duplicates([a.name for a in args], indices=True)
-
-        if len(dupNames):
-            warnings.warn("The sources do not have unique names; names will be adapted.")
-            snames = list()
-            _sources = list()
-            for src in args:
-                if src.name not in snames:
-                    snames.append(src.name)
-                    _sources.append(src)
-
-                else:
-                    # adapt name to avoid duplicates; since an ephys.RecordingSource is
-                    # an immutable named tuple, we use its _replace method to create
-                    # a copy with a new name
-                    new_name = utilities.counter_suffix(src.name, snames)
-                    snames.append(new_name)
-                    _sources.append(src._replace(name=new_name))
-
-            # now use these as args
-            args = _sources
-
-        #### BEGIN Checks
-        #
-        # NOTE: 2024-01-04 22:20:55
-        # check consistency of synaptic stimuli in sources
-
-        # make sure sources specify distinct signal layouts for synaptic
-        # simulations; in particular sources must specifiy:
-        # • unique ADC ↦ DAC pairs
-        # • unique synaptic stimulus configurations
-        # • unique auxiliary ADCs (when used) — these are useful to infer
-        #   trigger protocols from input signals recorded via auxiliary inputs
-        #   — specified using AuxiliaryInput objects:
-        #
-
-        # DACs used to emulate TTLs for synaptic stimuli
-        syndacs = set(itertools.chain.from_iterable(s.syn_dac for s in args))
-
-        # DACs used to emulate TTLs for other purposes
-        ttldacs = set(itertools.chain.from_iterable(s.out_dac_triggers for s in args))
-
-        # DACs used to emit waveforms other than clamping
-        # these should REALLY be distinct from ttldacs
-        cmddacs = set(itertools.chain.from_iterable(s.other_outputs for s in args))
-
-        # DIGs used for synaptic stimulation
-        syndigs = set(itertools.chain.from_iterable(s.syn_dig for s in args))
-
-        # DIGs used to trigger anything other than synapses
-        digs = set(itertools.chain.from_iterable(s.out_dig_triggers for s in args))
-
-
-        # 1. all sources must have a primary ADC
-        if any(s.adc is None for s in args):
-            raise ValueError("All source must specify a primary ADC input")
-
-        adcs, snames  = list(zip(*[(s.adc, s.name) for s in args]))
-
-        # 2. primary ADCs cannot be shared among sources
-        dupadcs     = duplicates(adcs)  # sources must have distinct main ADCs
-        if len(dupadcs):
-            raise ValueError(f"Sharing of primary ADCs ({dupadcs}) among sources is forbidden")
-
-        # 3. source names should be unique
-        dupnames = duplicates(snames)
-        if len(dupnames):
-            raise ValueError(f"RecordingSource objects must have distinct names; instead got the following duplicates ({dupnames})")
-
-        # 4. for clamped sources only - by definition these define a primary DAC
-        #   needed for clamping and to provide waveforms for optionally for
-        #   membrane test (recommended) and possibly other electrical
-        #   manipulations of the clamped cell (e.g., to elicit postsynaptic spikes).
-        #
-        #   See detailed checks below (4.1, 4.2, etc)
-        #
-        # In the SAME experiment, a DAC cannot be used, simultaneously, for:
-        # • clamping command waveforms
-        # • TTL emulation (± 5 V !)
-        #
-
-        clamped_sources = [s for s in args if s.clamped]
-        if len(clamped_sources):
-            # these DACs MUST be unique
-            dacs = [s.dac for s in clamped_sources]
-
-            # 4.1 primary DACs must be unique
-            dupdacs = duplicates(dacs)
-            if len(dupdacs):
-                raise ValueError(f"Sharing of primary DACs ({dupdacs}) among sources is forbidden")
-
-            # 4.2 primary DACs CANNOT be used for synaptic stimulation
-            ovlap = syndacs & set(dacs)
-            if len(ovlap):
-                raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and synaptic stimulation")
-
-            # 4.3 primary DACs CANNOT be used to emulate TTLs for 3ʳᵈ party devices in the same experiment
-            ovlap = ttldacs & set(dacs)
-            if len(ovlap):
-                raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and TTL emulation for 3ʳᵈ party devices")
-
-            # 4.4 primary DACs CANNOT be used to send command signal waveforms
-            # to other than the source (cell or membrane patch)
-            ovlap = cmddacs & set(dacs)
-            if len(ovlap):
-                raise ValueError(f"The following DACs {ovlap} seem to be used both for clamping and controlling 3ʳᵈ party devices")
-
-        # 5. check that DIG channels do not overlap with those used for syn stim
-        ovlap = digs & syndigs
-        if len(ovlap):
-            raise ValueError(f"The following DIGs {ovlap} seem to be used both for synaptic stimulation and triggering 3ʳᵈ party devices")
-
-        # 6. in each RecordingSource, the SynapticStimulus objects must have unique names
-        # and channels, but OK to share across sources
-
-        for k, s in enumerate(args):
-            if isinstance(s.syn, typing.Sequence):
-                assert len(set(s_.name for s_ in s.syn)) == len(s.syn), f"{k}ᵗʰ source ({s.name}) has duplicate names for SynapticStimulus"
-
-        #
-        #### END   Checks
-
-        return args
-
-    def print(self, msg):
-        if isinstance(self._stdout_, io.TextIOBase):
-            print(msg, file = self._stdout_)
-        else:
-            print(msg)
-
-    def showViewers():
-        if hasattr(self, "_viewers_"):
-            for src in self._sources_:
-                source_viewers = self._viewers_.get(src.name, None)
-                if isinstance(source_viewers, dict) and len(source_viewers):
-                    path_viewers = [v for v in source_viewers.values() if isinstance(v, dict) and len(v)]
-                    for path_viewers_dict in path_viewers:
-                        for name, viewer in path_viewers_dict.items():
-                            if isinstance(viewer, QtWidgets.QMainWindow):
-                                viewer.show()
-
-
-
-    @pyqtSlot()
-    def slot_doWork(self):
-        self.start()
-
-    @pyqtSlot()
-    def _slot_simulationDone(self):
-        # self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
-        print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
-        self.stop()
-
-    @property
-    def running(self) -> bool:
-        return self._running_
-
-    @property
-    def viewers(self) -> dict:
-        return self._viewers_
-
-    @property
-    def results(self) -> dict:
-        return self._results_
-
-    @property
-    def sources(self) -> typing.Sequence:
-        return self._sources_
-
-    @property
-    def runData(self) -> DataBag:
-        return self._runData_
-
-    @property
-    def pathways(self) -> dict:
-        return dict((src.name, dict((k, p["pathway"]) for k, p in self._results_[src.name].items())) for src in self._sources_)
-
-    def setTestPathway(self, srcIndex:int, pathwayIndex:int):
-        """Flags the pathway at 'pathwayIndex' in the recording source at 'srcIndex' as a Test pathway.
-        The Test pathway is where conditioning is applied.
-
-        All other pathways in the source are set to "Control"
-        """
-        try:
-            src = self._sources_[srcIndex]
-            if src.name in self._runData_.results:
-                src_dict = self._runData_.results[src.name]
-                pdicts = [p for p in src_dict.values() if isinstance(p,  dict)]
-                paths = sorted([p["pathway"] for p in pdicts if "pathway" in p], key = lambda x: x.name)
-
-                for k, p in enumerate(paths):
-                    p.pathwayType = SynapticPathwayType.Test if k == pathwayIndex else SynapticPathwayType.Control
-                    measures = [(l,m) for l, m in self._runData_.results[src.name][p.name]["measures"].items() if l != "MembraneTest"]
-                    if len(measures):
-                        initResponseLabel = measures[0][0]
-                        if isinstance(self._runData_.viewers[src.name][p.name][initResponseLabel], sv.SignalViewer):
-                            self._runData_.viewers[src.name][p.name][initResponseLabel].winTitle += f" {p.pathwayType.name}"
-
-        except:
-            traceback.print_exc()
-
-    def exportResults(self, normalize:typing.Optional[typing.Union[tuple, range]]=None, normalizeIndexes:bool=True):
-        if self.running:
-            scipywarn("LTPOnline is still running; call its stop() method first.")
-            return
-
-        # runTimesMinutes = np.array(self._runData_.abfTrialDeltaTimesMinutes)
-
-
-        for src_name, src in self._results_.items():
-            for p_name, path in src.items():
-                path_responses = path["pathway_responses"]
-                wf.assignin(path_responses, f"{src_name}_{p_name}_synaptic_responses")
-                initialResponse = [(k, v) for k, v in path.items() if k in ("EPSC0", "EPSP0")]
-                if len(initialResponse):
-                    runTimesMinutes = initialResponse[0][1].times.flatten()
-                    pathway_result = {"RunTime (min)": runTimesMinutes}
-                    if isinstance(normalize, tuple) and len(normalize) == 2:
-                        if normalizeIndexes:
-                            start = int(normalize[0])
-                            stop = int(normalize[1])
-                            if start < 0 or start >= runTimesMinutes.size:
-                                raise ValueError(f"Invalid start index for normalization {start}")
-                            if stop < 0 or stop >= runTimesMinutes.size:
-                                raise ValueError(f"Invalid stop index for normalization {stop}")
-
-                            start, stop = min([start, stop]), max([start, stop])
-
-                            baselineSweeps = range(start, stop)
-
-                        else:
-                            start = np.where(runTimesMinutes <= normalize[0])[0]
-                            if start.size == 0:
-                                raise ValueError(f"Trial time {normalize[0]} not found")
-                            start = int(start[-1])
-
-                            stop = np.where(runTimesMinutes < normalize[1])[0]
-                            if stop.size == 0:
-                                raise ValueError(f"Trial time {normalize[1]} not found")
-                            stop = int(stop[-1])
-                            if stop < (runTimesMinutes.size-1):
-                                stop += 1
-                            start, stop = min([start, stop]), max([start, stop])
-
-                            baselineSweeps = range(start, stop)
-
-                    elif isinstance(normalize, range):
-                        if normalize.start < 0 or normaize.start >= runTimesMinutes.size:
-                            raise ValueError(f"Invalid start index for normalization {normalize.start}")
-                        if normalize.stop < 0 or normaize.stop >= runTimesMinutes.size:
-                            raise ValueError(f"Invalid start index for normalization {normalize.stop}")
-
-                        baselineSweeps = normalize
-
-                    else:
-                        baselineSweeps = None
-
-                    if isinstance(baselineSweeps, range):
-                        baselineAvg = initialResponse[0][1][baselineSweeps.start:baselineSweeps.stop].mean()
-                        normalizedResponse = initialResponse[0][1].flatten()/baselineAvg
-                        pathway_result[f"{initialResponse[0][0]}_norm"] = normalizedResponse
-
-                fields = [k for k in path.keys() if k not in ("pathway_responses", "pathway", "measures", "ABFTrialSweep")]
-
-                pathway_result.update(dict((k, path[k]) for k in fields))
-                dd = dict((k,v.flatten()) for k,v in pathway_result.items())
-                df = pd.DataFrame(dd, columns = list(dd.keys()), index = range(max(len(v) for v in dd.values())))
-                if path["pathway"].pathwayType in (SynapticPathwayType.Test, SynapticPathwayType.Control):
-                    ptype = f"{path['pathway'].pathwayType.name}_"
-                else:
-                    ptype = ""
-                wf.assignin(pathway_result, f"{src_name}_{p_name}_{ptype}results_dict")
-                wf.assignin(df, f"{src_name}_{p_name}_{ptype}results")
-
-
-    def pause(self):
-        """Pause the simulation.
-        Does nothing when LTPOnline is running in normal mode (i.e. is waiting for
-        files produced by the acquisition software).
-        """
-        if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
-            self._simulatorThread_.requestInterruption()
-
-    def resume(self):
-        """Resumes simulation, if there are files left in the simulation stack.
-        Does nothing when LTPOnline is running in normal mode (i.e. is waiting for
-        files produced by the acquisition software).
-
-        """
-        if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
-            self._simulatorThread_.resume()
-
-
-    def stop(self):
-        if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
-            self._simulatorThread_.requestInterruption()
-            self._simulatorThread_.quit()
-            self._simulatorThread_.wait()
-
-        # NOTE: 2024-02-09 08:14:30
-        # this will never occur
-        # if isinstance(self._abfSupplierThread_, FileStatChecker):
-        #     self._abfSupplierThread_.abfListener.stop()
-
-
-        self._abfSupplierThread_.quit()
-        self._abfSupplierThread_.wait()
-        self._abfProcessorThread_.quit()
-        self._abfProcessorThread_.wait()
-
-        if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-
-        # self.resultsReady.emit(self._runData_)
-        self.resultsReady.emit(self._results_)
-
-        self._running_ = False
-
-        if self._doSimulation_:
-            wf.assignin(self._runData_, "rundata")
-        else:
-            print("\nNow call the exportResults method of the LTPOnline instance")
-
-    def closeViewers(self, clear:bool = False):
-        if hasattr(self, "_viewers_"):
-            for src in self._sources_:
-                source_viewers = self._viewers_.get(src.name, None)
-                if isinstance(source_viewers, dict) and len(source_viewers):
-                    path_viewers = [v for v in source_viewers.values() if isinstance(v, dict) and len(v)]
-                    for path_viewers_dict in path_viewers:
-                        for name, viewer in path_viewers_dict.items():
-                            if isinstance(viewer, QtWidgets.QMainWindow):
-                                if clear:
-                                    viewer.clear()
-                                viewer.close()
-
-
-    def _reset_state_(self, *args,
-              episodeName: str = "baseline",
-                 useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
-                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=False, # NOTE: change to True when done coding TODO
-                 parent=None,
-                 simulate = None,
-                 timeout = None,
-                 out: typing.Optional[io.TextIOBase] = None,
-                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
-                 ):
-        """Resets and optionally, starts the instance of LTPOnline"""
-        if self.running:
-            scipywarn("LTPOnline instance is still running; call its stop() method first")
-            return
-
-        self.closeViewers(True)
-
-        self._viewers_.clear()
-
-        if len(args):
-            self._check_sources_(*args)
-
-
-        self._results_.clear()
-
-        self._runData_.sources = self._sources_
-        self._runData_.currentProtocol = None
-        self._runData_.sweeps = 0
-        self._runData_.currentAbfTrial = None,
-        self._runData_.abfTrialTimesMinutes = list()
-        self._runData_.abfTrialDeltaTimesMinutes = list()
-        self._runData_.useSlopeInIClamp = useSlopeInIClamp
-        self._runData_.useEmbeddedProtocol = useEmbeddedProtocol
-
-        self._stdout_ = out
-        self._locationMeasures_ = locationMeasures
-        self._abfTrialBuffer_ = collections.deque()
-
-        # NOTE: 2024-03-03 22:10:02 TODO (maybe)
-        # curently not used, but reserve for the future...
-        self._presynaptic_triggers_ = dict()
-
-        # ### BEGIN set up emitter window and viewers
-        #
-        # NOTE: 2023-10-07 11:20:22
-        # _emitterWindow_ needed here, to set up viewers
-        wsp = wf.user_workspace()
-
-        newDir = None
-        if directory is None:
-            newDir = pathlib.Path(self._emitterWindow_.currentDir).absolute()
-
-        elif isinstance(directory, str):
-            newDir = pathlib.Path(directory)
-
-        elif isinstance(directory, pathlib.Path):
-            newDir = directory
-
-        else:
-            raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
-
-        print(f"{self.__class__.__name__}._reset_state_:\n\tnewDir = {newDir};\n\tprev watched dir = {self._watchedDir_}")
-
-        if newDir != self._watchedDir_:
-            if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-                print(f"\n\tremoving {self._watchedDir_} from {self._emitterWindow_.__class__.__name__}.dirFileMonitor")
-                self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-
-        self._watchedDir_ = newDir
-        if not self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-            print(f"\n\tadding {self._watchedDir_} to {self._emitterWindow_.__class__.__name__}.dirFileMonitor")
-            self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
-
-
-        self._simulation_ = None
-
-        self._simulatorThread_ = None
-
-        self._doSimulation_ = False
-
-        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
-
-    def reset(self, *args,
-              episodeName: str = "baseline",
-                 useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
-                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=False, # NOTE: change to True when done coding TODO
-                 parent=None,
-                 simulate = None,
-                 timeout = None,
-                 out: typing.Optional[io.TextIOBase] = None,
-                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
-                 ):
-
-        self._reset_state_(*args, episodeName=episodeName, useEmbeddedProtocol=useEmbeddedProtocol,
-                           useSlopeInIClamp=useSlopeInIClamp, directory=directory, autoStart=autoStart, # NOTE: change to True when done coding TODO
-                           parent=parent, simulate=simulate, timeout=timeout, out=out,
-                           locationMeasures=locationMeasures)
-
-        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
-                                                             self._emitterWindow_,
-                                                             self._abfTrialBuffer_,
-                                                             self._runData_,
-                                                             self._stdout_)
-
-        if isinstance(simulate, dict):
-            files = simulate.get("files", None)
-            timeout = simulate.get("timeout", 2000) # ms
-            directory = simulate.get("dir", None)
-            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
-                self._doSimulation_ = True
-
-            elif isinstance(directory, str) and os.path.isdir(directory):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-
-            elif isinstance(directory, pathlib.Path) and directory.is_dir():
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-
-        elif isinstance(simulate, bool):
-            self._doSimulation_ = simulate
-            if isinstance(timeout, int):
-                self._simulator_params_ = dict(files=None, timeout = int(timeout))
-
-
-        elif isinstance(simulate, (int, float)):
-            self._doSimulation_ = True
-            self._simulator_params_ = dict(files=None, timeout = int(simulate))
-
-        if self._doSimulation_:
-            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
-            self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
-                                        self._emitterWindow_, self._watchedDir_,
-                                        simulator = self._simulatorThread_,
-                                        out = self._stdout_)
-
-            if not autoStart:
-                cdir = self._simulator_params_.get("dir", os.getcwd())
-                print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
-
-        else:
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
-                                        self._emitterWindow_, self._watchedDir_,
-                                        out = self._stdout_)
-            if not autoStart:
-                print("\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in the current directory.\n", file = sys.stdout)
-
-        self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
-                                                     QtCore.Qt.QueuedConnection)
-        if autoStart:
-            self._abfSupplierThread_.start()
-            self._abfProcessorThread_.start()
-            self._running_ = True
-
-        return True
-
-    def start(self):
-        """Starts the instance of LTPOnline.
-        To change parameters, first call `reset` with new arguments and, if needed,
-        call `start` again.
-        """
-        if self._running_:
-            print("Already started")
-            return
-
-        self._abfSupplierThread_.start()
-        self._abfProcessorThread_.start()
-
-        if self._doSimulation_:
-            print("Starting simulation mode\n\n")
-        else:
-            print(f"Monitoring directory {self._watchedDir_}\n\n")
-
-        self._running_ = True
-
-    def kill(self):
-        self.stop()
-        # if self._instance.running:
-        #     scipywarn(f"An instance of {self.__class__.__name__} is still running; call the stop() method on that instance first")
-        #     return
-        self._state_()
-        self._instance = None
-        self.__del__()
-
-
-class LTPOnline2(QtCore.QObject):
-    """On-line analysis for synaptic plasticity experiments
-    """
-    # TODO: update episodes in the pathway's schedule
+    # TODO: decide if:
+    # 1) "guestimating" episode type form the first run, OR
+    # 2)  expect the user to manually enter data (i.e. tracking vs xtalk vs 
+    # conditioning vs tracking again)
+    #
+    # What this entails (fields of runData):
+    # option (1):
+    #   • on first trial:
+    #       ∘ currentEpisode = None
+    #       ∘ episodeType = Tracking (the default — anything else doesn't make sense here)
+    #       ∘ pathways unknown — WARNING if first run file is a conditioning one
+    #           it will mis-set all the subsequent parameters
+    #       ∘ protocol unknown
+    #           ⋄ to be inferred from the ABF trial
+    #           ⋄ set up pathway measures
+    #
+    #   • on subsequent trials:
+    #       ∘ test against protocol from previous trial
+    #       ∘ must find a way to infer whether this is a conditioning trial — difficult
+    #
+    # option (2)
+    #   • start in tracking mode
+    #   • use con/coff to signal conditioning
         
-    resultsReady = pyqtSignal(object, name="resultsReady")
+    resultsReady = Signal(object, name="resultsReady")
     
     _instance = None # singleton pattern
     
@@ -2937,13 +2440,14 @@ class LTPOnline2(QtCore.QObject):
                  timeout = None,
                  out: typing.Optional[io.TextIOBase] = None,
                  locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
+                 commonViewerForSourceMeasures:bool=True,
                  ):
-        # implementation of singleton pattern
+        # implementation of singleton pattern ?!?
         if cls._instance is None:
             cls._instance = super().__new__(cls, *args, episodeName,
                  useEmbeddedProtocol, useSlopeInIClamp, emitterWindow,
                  directory, autoStart, parent, simulate, timeout, out,
-                 locationMeasures)
+                 locationMeasures, commonViewerForSourceMeasures)
             
         return cls._instance
 
@@ -2959,6 +2463,7 @@ class LTPOnline2(QtCore.QObject):
                  timeout = None,
                  out: typing.Optional[io.TextIOBase] = None,
                  locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
+                 commonViewerForSourceMeasures:bool=True,
                  ):
         """
         
@@ -2967,13 +2472,20 @@ class LTPOnline2(QtCore.QObject):
         # user-defined location measures are NOT used (for now)
         super().__init__(parent=parent)
         
+        self._useEmbeddedProtocol = useEmbeddedProtocol
+        self._useSlopeInIClamp=  useSlopeInIClamp
+        self._autoStart = autoStart
         self._stdout_ = out
+        self._timeout = timeout
+        self._commonViewerForSourceMeasures = commonViewerForSourceMeasures
         
         self._running_ = False
         # self._sources_ = None # preallocate
         self._locationMeasures_ = locationMeasures
         
         self._sources_ = self._check_sources_(*args)
+        # if len(self._sources_) != 1:
+        #     raise RuntimeError(f"Expecting EXACTLY ONE SOURCE; instead, got {len(self._sources_)}")
         
         # NOTE: 2024-03-03 22:10:02 TODO (maybe)
         # curently not used, but reserve for the future...
@@ -2994,6 +2506,13 @@ class LTPOnline2(QtCore.QObject):
         if type(self._emitterWindow_).__name__ != 'ScipyenWindow':
             raise ValueError(f"Expecting an instance of ScipyenWindow; instead, got {type(emitterWindow).__name__}")
 
+        self._screen_ = self._emitterWindow_.desktopScreen
+        self._titlebar_height_ = QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)
+        self._screenGeometry_ = self._screen_.geometry()
+        self._viewerWinWidth  = 750
+        self._viewerWinHeight = 450
+        self._resultWinWidth  = 400
+        self._resultWinHeight = 300
 
         if directory is None:
             self._watchedDir_ = pathlib.Path(self._emitterWindow_.currentDir).absolute()
@@ -3011,26 +2530,13 @@ class LTPOnline2(QtCore.QObject):
         
         self._results_ = dict()
         
-        #
-        # ### END set up emitter window and viewers
+        self._parentWindow_ = parent if isinstance(parent, QtWidgets.QWidget) else None
         
-        self._runData_ = DataBag(sources = self._sources_,
-                                 currentProtocol = None,
-                                 monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ list of protocols}
-                                 conditioningProtocols = dict(),
-                                 sweeps = 0,
-                                 currentAbfTrial = None,
-                                 viewers = self._viewers_,
-                                 results = self._results_,
-                                 abfTrialTimesMinutes = list(),
-                                 abfTrialDeltaTimesMinutes = list(),
-                                 useSlopeInIClamp = useSlopeInIClamp,
-                                 useEmbeddedProtocol = useEmbeddedProtocol,
-                                 exportedResults = True,
-                                 episodeType = RecordingEpisodeType.Tracking,
-                                 previousEpisodeType = RecordingEpisodeType.Tracking,
-                                 crossTalk = False
-                                 )
+        # NOTE: 2024-05-10 13:32:25
+        # populate pathways straight away
+        self._parse_sources_()
+        
+        self._setup_rundata_()
         
         self._abfTrialBuffer_ = collections.deque()
         
@@ -3040,42 +2546,16 @@ class LTPOnline2(QtCore.QObject):
                                                              self._runData_,
                                                              self._stdout_)
         
-        self._simulation_ = None
+        # self._simulation_ = None
         
         self._simulatorThread_ = None
         
-        self._doSimulation_ = False
-        
-        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
-        
-        if isinstance(simulate, dict):
-            files = simulate.get("files", None)
-            timeout = simulate.get("timeout", 2000) # ms
-            directory = simulate.get("dir", None)
-            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
-                self._doSimulation_ = True
-                
-            elif isinstance(directory, str) and os.path.isdir(directory):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-                
-            elif isinstance(directory, pathlib.Path) and directory.is_dir():
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-                
-        elif isinstance(simulate, bool):
-            self._doSimulation_ = simulate
-            if isinstance(timeout, int):
-                self._simulator_params_ = dict(files=None, timeout = int(timeout))
-                
-            
-        elif isinstance(simulate, (int, float)):
-            self._doSimulation_ = True
-            self._simulator_params_ = dict(files=None, timeout = int(simulate))
+        self._setup_simulation_params(simulate)
         
         if self._doSimulation_:
-            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
+            # print(f"Simulator parameters: {self._simulator_params_}")
+            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, 
+                                                         self._stdout_)
             self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
@@ -3083,15 +2563,15 @@ class LTPOnline2(QtCore.QObject):
                                         out = self._stdout_)
             
             if not autoStart:
-                cdir = self._simulator_params_.get("dir", os.getcwd())
-                print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
+                cdir = self._simulator_params_.get("dir", self._watchedDir_)
+                # self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n")
         
         else:
             self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
                                         self._emitterWindow_, self._watchedDir_,
                                         out = self._stdout_)
-            if not autoStart:
-                print(f"\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in {self._watchedDir_}.\n", file = sys.stdout)
+            # if not autoStart:
+            #     self.print(f"\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in {self._watchedDir_}.\n")
         
         self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
                                                      QtCore.Qt.QueuedConnection)
@@ -3109,7 +2589,8 @@ class LTPOnline2(QtCore.QObject):
             
         try:
             self.closeViewers(True)
-            self._viewers_.clear()
+            if hasattr(self, "_viewers_") and hasattr(self._viewers_, "clear"):
+                self._viewers_.clear()
 
             if hasattr(self, "_emitterWindow_") and self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
@@ -3119,17 +2600,19 @@ class LTPOnline2(QtCore.QObject):
                 self._simulatorThread_.quit()
                 self._simulatorThread_.wait()
                 self._simulatorThread_.deleteLater()
+                self._simulatorThread_ = None
             
             if hasattr(self, "_abfSupplierThread_") and hasattr(self, "_abfProcessorThread_"):
                 self._abfSupplierThread_.abfListener.stop()
                 self._abfSupplierThread_.quit()
                 self._abfSupplierThread_.wait()
+                self._abfSupplierThread_.deleteLater()
+                self._abfSupplierThread_ = None
                 
                 self._abfProcessorThread_.quit()
                 self._abfProcessorThread_.wait()
-                
-                self._abfSupplierThread_.deleteLater()
                 self._abfProcessorThread_.deleteLater()
+                self._abfProcessorThread_ = None
             
         except:
             traceback.print_exc()
@@ -3163,6 +2646,7 @@ class LTPOnline2(QtCore.QObject):
             # when recording secondary amplifier output as well (useful to infer
             # the command signal waveforms when the protocol is not accessible)
 
+        # print(args)
         if not all(isinstance(a, RecordingSource) for a in args):
             raise TypeError(f"Expecting one or more RecordingSource objects")
         
@@ -3297,7 +2781,10 @@ class LTPOnline2(QtCore.QObject):
         return args
         
     def print(self, msg):
-        if isinstance(self._stdout_, io.TextIOBase):
+        if isinstance(self._stdout_, io.StringIO):
+            print(msg, file = self._stdout_)
+            
+        elif isinstance(self._stdout_, io.TextIOBase):
             print(msg, file = self._stdout_)
         else:
             print(msg)
@@ -3312,18 +2799,94 @@ class LTPOnline2(QtCore.QObject):
                         for name, viewer in path_viewers_dict.items():
                             if isinstance(viewer, QtWidgets.QMainWindow):
                                 viewer.show()
+                                
+    def closeViewers(self):
+        if hasattr(self, "_viewers_"):
+            for src in self._sources_:
+                source_viewers = self._viewers_.get(src.name, None)
+                if isinstance(source_viewers, dict) and len(source_viewers):
+                    path_viewers = [v for v in source_viewers.values() if isinstance(v, dict) and len(v)]
+                    for path_viewers_dict in path_viewers:
+                        for name, viewer in path_viewers_dict.items():
+                            if isinstance(viewer, QtWidgets.QMainWindow):
+                                viewer.close()
+    def hideViewers(self):
+        if hasattr(self, "_viewers_"):
+            for src in self._sources_:
+                source_viewers = self._viewers_.get(src.name, None)
+                if isinstance(source_viewers, dict) and len(source_viewers):
+                    path_viewers = [v for v in source_viewers.values() if isinstance(v, dict) and len(v)]
+                    for path_viewers_dict in path_viewers:
+                        for name, viewer in path_viewers_dict.items():
+                            if isinstance(viewer, QtWidgets.QMainWindow):
+                                viewer.hide()
 
-
+    @Slot(SignalCursor)
+    def slot_signalCursorPositionChanged(self, c:SignalCursor):
+        """Updates the X coordinate of the location measure after a SignalCursors was adjusted by the user"""
+        emitter = self.sender()
+        for src_name, src_dict in self._viewers_.items():
+            for path_name, path_dict in src_dict.items():
+                if emitter == path_dict["pathway_viewer"]:
+                    cmeasure = c.ID
+                    baseMeasure = cmeasure.replace("Base", "")
+                    if baseMeasure in self._results_[src_name][path_name]["measures"]:
+                        locationNdx = 0 if "Base" in cmeasure else 1
+                        dc = self._results_[src_name][path_name]["measures"][baseMeasure]["locations"][locationNdx]
+                        if isinstance(dc, DataCursor):
+                            dc.coord = c.x
+                            dc.span = c.xwindow
+                    
+                    else:
+                        mbTestMeasures = self._results_[src_name][path_name]["measures"].get("MembraneTest", dict())
+                        if len(mbTestMeasures) and "locations" in mbTestMeasures and all(isinstance(v, DataCursor) for v in mbTestMeasures["locations"]):
+                            mbTestLocs = [l.name for l in mbTestMeasures["locations"]]
+                            if baseMeasure in mbTestLocs:
+                                locationNdx = mbTestLocs.index(baseMeasure)
+                                dc = mbTestLocs[locationNdx]
+                                if isinstance(dc, DataCursor):
+                                    dc.coord = c.x
+                                    dc.span = c.xwindow
+                    
                
-    @pyqtSlot()
+    @Slot()
     def slot_doWork(self):
         self.start()
         
-    @pyqtSlot()
+    @Slot()
     def _slot_simulationDone(self):
-        # self.print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
-        print(f"\n{self.__class__.__name__}.run: {colorama.Fore.YELLOW}{colorama.Style.BRIGHT}Simulation done!{colorama.Style.RESET_ALL}\n")
+        self.print(f"\n{self.__class__.__name__}.run: {printStyled('Simulation done!', 'yellow', False)}\n")
         self.stop()
+        
+    @property
+    def directory(self) -> pathlib.Path:
+        return self._watchedDir_
+    
+    @directory.setter
+    def directory(self, val:typing.Union[str, pathlib.Path]) -> None:
+        if self.running:
+            scipywarn("Cannot change directory while this LTPOnline instance is still running")
+            return
+        
+        
+        if isinstance(val, str) and len(val.strip()) and os.path.isdir(val):
+            val = pathlib.Path(val)
+            
+        elif not isinstance(val, pathlib.Path):
+            scipywarn(f"Expecting a string or a pathlib.Path; instead, got {type(val).__name__}")
+            return
+            
+        val = val.absolute()
+        
+        if not val.is_dir():
+            scipywarn(f"{val} is not a valid directory")
+            return
+        
+        self._watchedDir_ = val
+        
+        self._abfSupplierThread_.watchedDirectory = self._watchedDir_
+            
+            
         
     @property
     def running(self) -> bool:
@@ -3348,6 +2911,42 @@ class LTPOnline2(QtCore.QObject):
     @property
     def pathways(self) -> dict:
         return dict((src.name, dict((k, p["pathway"]) for k, p in self._results_[src.name].items())) for src in self._sources_)
+    
+    def newSource(self, val:RecordingSource) -> None:
+        """Replaces currently defined recording source(s) with `val`.
+        Does nothing if the instance of LTPOnline is still running
+        CAUTION: Will reset the internal state!
+        """
+        
+        if self.running:
+            scipywarn("This instance of LTPOnline is still running; cannot alter the recording source.")
+            return
+        
+        if not isinstance(val, RecordingSource):
+            raise TypeError(f"Expecting a RecordingSource; instead, got a {type(val).__name__}")
+        
+        self.reset(force=False)
+        
+        self._sources_ = self._check_sources_(val)
+        
+        self._parse_sources_()
+        
+        self._setup_rundata_()
+        
+    def newEpisode(self, episodeType:typing.Optional[typing.Union[RecordingEpisodeType, int, str]] = None, 
+                   episodeName:typing.Optional[str]=None):
+        if isinstance(episodeType, (str, int)):
+            episodeType = RecordingEpisodeType.type(episodeType)
+        elif episodeType is None:
+            episodeType = RecordingEpisodeType.Tracking
+        elif not isinstance(episodeType, RecordingEpisodeType):
+            scipywarn(f"Expecting a RecordingEpisodeType value, an int or a str")
+            return
+        ename = episodeName if isinstance(episodeName, str) and len(episodeName.strip()) else episodeType.name
+        if len(self._runData_.episodes):
+            epNames = [e.name for e in self._runData_.episodes]
+            ename = counter_suffix(ename, epNames)
+        self._runData_.newEpisodeOnNextRun = (episodeType,  ename)
     
     @property
     def conditioning(self) -> bool:
@@ -3388,29 +2987,28 @@ class LTPOnline2(QtCore.QObject):
         and 'coff'. The last two quickly toggle the conditioning mode from the 
         console.
     """
-        return self._runData_.episodeType & RecordingEpisodeType.Conditioning
+        if len(self._runData_.episodes):
+            return self._runData_.episodes[-1].type & RecordingEpisodeType.Conditioning
+        return False
     
     @conditioning.setter
     def conditioning(self, val:typing.Union[bool, str, int]):
+        # we ONLY support Conditioning and Tracking as episode types
         if (isinstance(val, str) and val.lower() == "on") or (isinstance(val, int) and val==1) \
             or (isinstance(val, bool) and val == True):
-            val = RecordingEpisodeType.Conditioning
+            val = RecordingEpisodeType.Conditioning if self._runData_.drug is None else RecordingEpisodeType.Conditioning | RecordingEpisodeType.Drug
             
         else:
-            val = self._runData_.previousEpisodeType if (self._runData_.previousEpisodeType & RecordingEpisodeType.Tracking) else RecordingEpisodeType.Tracking
+            val = RecordingEpisodeType.Tracking if self._runData_.drug is None else RecordingEpisodeType.Tracking | RecordingEpisodeType.Drug
             
-        self._runData_.previousEpisodeType = self._runData_.episodeType
-        self._runData_.episodeType = val
+        self.print(f"Next episode set to {printStyled(val.name, 'red', True)}")
+        
+        # set this in order to flag the _LTPOnlineFileProcessor_ that a new 
+        # recording episode should be created on the next run
+        # we do this to because the user KNOWS that the next run will be 
+        # (tracking or conditioning)
+        self._runData_.newEpisodeOnNextRun = (val, val.name)
             
-#         elif isinstance(val, int):
-#             self._runData_.conditioning = val == 1
-#             
-#         elif isinstance(val, bool):
-#             self._runData_.conditioning = val == True
-#             
-#         else:
-#             raise TypeError(f"Expecting a bool, str (e.g. 'on', 'off') or an int; instead, got {type(val).__name__}")
-    
     @property
     def con(self):
         """Switch conditioning mode ON"""
@@ -3425,6 +3023,73 @@ class LTPOnline2(QtCore.QObject):
     def c(self)->bool:
         """Query conditioning mode"""
         return self.conditioning
+    
+    @property
+    def drug(self):
+        return self._runData_.drug
+    
+    @drug.setter
+    def drug(self, val:typing.Optional[str]):
+        if isinstance(val, str):
+            if len(val.strip()) == 0:
+                val = None
+                
+        elif val is not None:
+            scipywarn(f"'drug' expected to be a string or None; instead, got {drug}")
+            
+        self._runData_.drug = val
+        
+        if len(self._runData_.episodes):
+            if self._runData_.drug is None:
+                if self.conditioning:
+                    self.newEpisode(RecordingEpisodeType.Conditioning)
+                else:
+                    self.newEpisode(RecordingEpisodeType.Tracking)
+            else:
+                if self.conditioning:
+                    self.newEpisode(RecordingEpisodeType.Conditioning | RecordingEpisodeType.Drug, drug)
+                else:
+                    self.newEpisode(RecordingEpisodeType.Tracking | RecordingEpisodeType.Drug, drug)
+    
+    @property
+    def xton(self):
+        if len(self._runData_.episodes):
+            etype = self._runData_.episodes[-1].type
+        else:
+            etype = RecordingEpisodeType.Tracking
+            
+        self._runData_.newEpisodeOnNextRun(etype, eype.name)
+        
+    @property
+    def xtoff(self):
+        if len(self._runData_.episodes):
+            etype = self._runData_.episodes[-1].type
+        else:
+            etype = RecordingEpisodeType.Tracking
+            
+        self._runData_.newEpisodeOnNextRun(etype, eype.name)
+        
+    
+    @property
+    def p(self):
+        self.pause()
+        
+    @property
+    def r(self):
+        self.resume()
+        
+    @property
+    def s(self):
+        self.start()
+        
+    @property
+    def h(self):
+        """Stops the LTP online app"""
+        self.stop()
+        
+    @property
+    def R(self):
+        self.reset(force=True)
     
     def setTestPathway(self, srcIndex:int, pathwayIndex:int):
         """Flags the pathway at 'pathwayIndex' in the recording source at 'srcIndex' as a Test pathway.
@@ -3449,6 +3114,21 @@ class LTPOnline2(QtCore.QObject):
                         
         except:
             traceback.print_exc()
+        
+    @property
+    def hasResults(self) -> bool:
+        path_results = itertools.chain.from_iterable([[(p.get("pathway_responses", None), p.get("measures", None), p) for p_name, p in s.items() if p_name not in ("DACPaths", "DIGPaths")]
+                                                     for s in self._results_.values()])
+        
+        ret = any(isinstance(t[0], neo.Block) and len(t[0].segments) for t in path_results)
+        
+        if ret:
+            # TODO: 2024-05-19 12:02:06
+            # also check for analysis results
+            ret &= all(isinstance(t[1], dict) and all(k in t[2] for k in list(t[1].keys()) if k != "MembraneTest") for t in path_results) # measures
+            
+        return ret
+            
     
     def exportResults(self, normalize:typing.Optional[typing.Union[tuple, range]]=None, normalizeIndexes:bool=True):
         if self.running:
@@ -3461,7 +3141,13 @@ class LTPOnline2(QtCore.QObject):
         try:
             for src_name, src in self._results_.items():
                 for p_name, path in src.items():
+                    if p_name in ("DACPaths", "DIGPaths"):
+                        continue
                     path_responses = path["pathway_responses"]
+                    if isinstance(path_responses, neo.Block):
+                        path_responses.annotations["measures"] = dict()
+                        path_responses.annotations["measures"].update(self._runData_.results[src_name][p_name]["measures"])
+                        
                     wf.assignin(path_responses, f"{src_name}_{p_name}_synaptic_responses")
                     initialResponse = [(k, v) for k, v in path.items() if k in ("EPSC0", "EPSP0")]
                     if len(initialResponse):
@@ -3524,7 +3210,7 @@ class LTPOnline2(QtCore.QObject):
                     wf.assignin(pathway_result, f"{src_name}_{p_name}_{ptype}results_dict")
                     wf.assignin(df, f"{src_name}_{p_name}_{ptype}results")
                 
-            self._runData_.exportedResults = True
+            self._runData_.resultsExported = True
         except:
             traceback.print_exc()
             
@@ -3555,15 +3241,20 @@ class LTPOnline2(QtCore.QObject):
         # this will never occur
         # if isinstance(self._abfSupplierThread_, FileStatChecker):
         #     self._abfSupplierThread_.abfListener.stop()
-            
-            
+
         self._abfSupplierThread_.quit()
         self._abfSupplierThread_.wait()
+        
         self._abfProcessorThread_.quit()
         self._abfProcessorThread_.wait()
         
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+            
+        if len(self._runData_.episodes):
+            if isinstance(self._runData_.currentAbfTrial, neo.Block):
+                self._runData_.episodes[-1].end = self._runData_.currentAbfTrial.rec_datetime
+                self._runData_.episodes[-1].endFrame = self._runData_.sweeps
             
         # self.resultsReady.emit(self._runData_)
         self.resultsReady.emit(self._results_)
@@ -3572,8 +3263,8 @@ class LTPOnline2(QtCore.QObject):
         
         if self._doSimulation_:
             wf.assignin(self._runData_, "rundata")
-        else:
-            print("\nNow call the exportResults method of the LTPOnline instance")
+
+        # self.print("\nNow call the exportResults method of the LTPOnline instance")
             
     def closeViewers(self, clear:bool = False):
         if hasattr(self, "_viewers_"):
@@ -3588,14 +3279,148 @@ class LTPOnline2(QtCore.QObject):
                                     viewer.clear()
                                 viewer.close()
         
+    def _parse_sources_(self):
+        if len(self._sources_) == 0:
+            return
         
+        if sys.platform == "win32":
+            y = self._screenGeometry_.y() + self._titlebar_height_
+        else:
+            y = self._screenGeometry_.y()
+        
+        
+        for src in self._sources_:
+            pathways = src.pathways
+            if len(pathways) == 0:
+                scipywarn(f"Ignoring source {src.name} which does not declare any pathways")
+                continue
+                
+            # NOTE: 2024-05-10 14:35:42
+            # these two variables are ALWAYS present, as they are defined at 
+            # source level (i.e., nothing to do with the actual protocol)
+            # dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))]
+            dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways)]
+            # self.print(f"source {printStyled(src.name, 'green', True)}")
+            # self.print(f"dig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
+            # self.print(f"dac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
+            # bad_dac_paths = [p for p in dac_stim_pathways if p[1].stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
+            bad_dac_paths = [p for p in dac_stim_pathways if p.stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
+        
+            if len(bad_dac_paths):
+                # scipywarn(f"The pathways {[p[1].name for p in bad_dac_paths]} in source {src.name} are incorrectly declared as using a recording DAC for stimulation; check how LTPOnline was invoked")
+                scipywarn(f"The pathways {[p.name for p in bad_dac_paths]} in source {src.name} are incorrectly declared as using a recording DAC for stimulation; check how LTPOnline was invoked")
+                continue
+            
+            self._results_[src.name] = dict()
+
+            for k, p in enumerate(pathways):
+                self._results_[src.name][p.name] = {"pathway": p,
+                                                    "pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
+                
+            self._results_[src.name]["DACPaths"] = dac_stim_pathways
+            self._results_[src.name]["DIGPaths"] = dig_stim_pathways
+            
+        self._setup_pathway_viewers()
+            
+    def _setup_pathway_viewers(self):
+        if len(self._sources_) == 0:
+            return 
+        
+        if sys.platform == "win32":
+            y = self._screenGeometry_.y() + self._titlebar_height_
+        else:
+            y = self._screenGeometry_.y()
+            
+        for src in self._sources_:
+            self._viewers_[src.name] = dict()
+            pathways = [p["pathway"] for p_name, p in self._results_[src.name].items() if p_name not in ("DACPaths", "DIGPaths")]
+            
+            for k, p in enumerate(pathways):
+                self._results_[src.name][p.name] = {"pathway": p,
+                                                    "pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
+                
+                viewer = sv.SignalViewer(parent=self._parentWindow_, scipyenWindow = self._emitterWindow_,
+                                            win_title = f"{src.name} {p.name} Synaptic Responses")
+                viewer.sig_signalCursorPositionChanged[SignalCursor].connect(self.slot_signalCursorPositionChanged)
+                viewer.hideSelectors()
+                viewer.hideMainToolbar()
+                viewer.showNavigator()
+                # viewer.show()
+                
+                viewer.setGeometry(QtCore.QRect(self._screenGeometry_.x() + k * self._viewerWinWidth, y, 
+                                                self._viewerWinWidth, self._viewerWinHeight))
+                
+                self._viewers_[src.name][p.name] = {"pathway_viewer": viewer}
+        
+            
+    def _setup_simulation_params(self, simulate):
+        self._doSimulation_ = False
+        
+        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout, dir=None)
+        
+        if isinstance(simulate, dict):
+            files = simulate.get("files", None)
+            timeout = simulate.get("timeout", 2000) # ms
+            directory = simulate.get("dir", self._watchedDir_)
+            
+            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
+                self._simulator_params_ = dict(files=files, timeout=self._timeout, dir=directory)
+                self._doSimulation_ = True
+                
+            elif isinstance(directory, str) and os.path.isdir(directory):
+                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
+                self._doSimulation_ = True
+                
+            elif isinstance(directory, pathlib.Path) and directory.is_dir():
+                self._simulator_params_ = dict(files=files, timeout=self._timeout, dir=directory)
+                self._doSimulation_ = True
+                
+        elif isinstance(simulate, bool):
+            self._doSimulation_ = simulate
+            if isinstance(self._timeout, int):
+                self._simulator_params_ = dict(files=None, timeout = int(self._timeout), dir=self._watchedDir_)
+                
+            
+        elif isinstance(simulate, (int, float)):
+            self._doSimulation_ = True
+            self._timeout = int(simulate)
+            self._simulator_params_ = dict(files=None, timeout = self._timeout, dir=self._watchedDir_)
+            
+    def _setup_rundata_(self):
+        self._runData_ = DataBag(sources = self._sources_,
+                                 currentAbfTrial = None,
+                                 currentProtocol = None,
+                                 prevAbfTrial = None,
+                                 monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ list of protocols}
+                                 conditioningProtocols = dict(),
+                                 sweeps = 0, # the number of analysed sweeps
+                                 totalSweeps = 0, # the number of recorded sweeps
+                                 viewers = self._viewers_,
+                                 results = self._results_,
+                                 abfTrialTimesMinutes = list(),
+                                 abfTrialDeltaTimesMinutes = list(),
+                                 useSlopeInIClamp = self._useSlopeInIClamp,
+                                 useEmbeddedProtocol = self._useEmbeddedProtocol,
+                                 resultsExported = True,
+                                 # currentEpisodeType = RecordingEpisodeType.Tracking,
+                                 # previousEpisodeType = None,
+                                 pathStimsBySweep = tuple(),
+                                 episodes = list(),
+                                 newEpisodeOnNextRun = (RecordingEpisodeType.Tracking, None), # episode type, episode name
+                                 drug = None, # or a suitable mnemonic string
+                                 screenGeometry = self._screenGeometry_,
+                                 resultWindowSize = (self._resultWinWidth, self._resultWinHeight),
+                                 parentWindow = self._parentWindow_,
+                                 commonViewerForSourceMeasures = self._commonViewerForSourceMeasures,
+                                 )
+        
+            
     def _reset_state_(self, *args,
               episodeName: str = "baseline",
                  useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
+                 useSlopeInIClamp:bool = False,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=False, # NOTE: change to True when done coding TODO
-                 parent=None,
+                 autoStart:bool=False,
                  simulate = None,
                  timeout = None,
                  out: typing.Optional[io.TextIOBase] = None,
@@ -3626,9 +3451,9 @@ class LTPOnline2(QtCore.QObject):
         self._runData_.useEmbeddedProtocol = useEmbeddedProtocol
         self._runData_.monitorProtocols.clear()
         self._runData_.conditioningProtocols.clear()
-        self._runData_.episodeType = RecordingEpisodeType.Tracking
+        self._runData_.currentEpisodeType = RecordingEpisodeType.Tracking
         self._runData_.previousEpisodeType = RecordingEpisodeType.Tracking
-        self._runData_.crossTalk = False
+        self._runData_.pathStimsBySweep = False
         
         self._stdout_ = out
         self._locationMeasures_ = locationMeasures
@@ -3669,97 +3494,78 @@ class LTPOnline2(QtCore.QObject):
             # print(f"\n\tadding {self._watchedDir_} to {self._emitterWindow_.__class__.__name__}.dirFileMonitor")
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
 
-        
-        self._simulation_ = None
+        if isinstance(self._simulatorThread_, QtCore.QThread):
+            self._simulatorThread_.requestInterruption()
+            self._simulatorThread_.quit()
+            self._simulatorThread_.wait()
+            self._simulatorThread_.deleteLater()
         
         self._simulatorThread_ = None
+        self._setup_simulation_params(simulate)
         
-        self._doSimulation_ = False
+        # self._doSimulation_ = False
         
-        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
+        # self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
         
-    def reset(self, *args,
-              episodeName: str = "baseline",
-                 useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
-                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=False, # NOTE: change to True when done coding TODO
-                 parent=None,
-                 simulate = None,
-                 timeout = None,
-                 out: typing.Optional[io.TextIOBase] = None,
-                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
-                 force:bool=False):
+    def quit(self):
+        self.reset(force=True)
+        self.__del__()
         
-        if not self._runData_.exportedResults and not force:
+    def reset(self, *args, episodeName: str = "baseline", force:bool=False) -> bool:
+        
+        if self.hasResults and not self._runData_.resultsExported and not force:
             scipywarn("There are unsaved results; call exportResults() first, or pass 'force=True' to this call")
-            return
+            return False
         
-        self._reset_state_(*args, episodeName=episodeName, useEmbeddedProtocol=useEmbeddedProtocol, 
-                           useSlopeInIClamp=useSlopeInIClamp, directory=directory, autoStart=autoStart, # NOTE: change to True when done coding TODO
-                           parent=parent, simulate=simulate, timeout=timeout, out=out,
-                           locationMeasures=locationMeasures)
+        try:
+            self._reset_state_(*args, episodeName=episodeName, useEmbeddedProtocol=self._useEmbeddedProtocol, 
+                            useSlopeInIClamp=self._useSlopeInIClamp, directory=self._watchedDir_, 
+                            autoStart=self._autoStart, # NOTE: change to True when done coding TODO
+                            simulate=self._simulator_params_, timeout=self._timeout, out=self._stdout_,
+                            locationMeasures=self._locationMeasures_)
 
-        self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
-                                                             self._emitterWindow_,
-                                                             self._abfTrialBuffer_,
-                                                             self._runData_,
-                                                             self._stdout_)
-        
-        if isinstance(simulate, dict):
-            files = simulate.get("files", None)
-            timeout = simulate.get("timeout", 2000) # ms
-            directory = simulate.get("dir", None)
-            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
-                self._doSimulation_ = True
+            self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
+                                                                self._emitterWindow_,
+                                                                self._abfTrialBuffer_,
+                                                                self._runData_,
+                                                                self._stdout_)
+            # self._setup_simulation_params(simulate)
+
+            if self._doSimulation_:
+                self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
+                self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
+                self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
+                                            self._emitterWindow_, self._watchedDir_,
+                                            simulator = self._simulatorThread_,
+                                            out = self._stdout_)
                 
-            elif isinstance(directory, str) and os.path.isdir(directory):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-                
-            elif isinstance(directory, pathlib.Path) and directory.is_dir():
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-                
-        elif isinstance(simulate, bool):
-            self._doSimulation_ = simulate
-            if isinstance(timeout, int):
-                self._simulator_params_ = dict(files=None, timeout = int(timeout))
-                
+                if not self._autoStart:
+                    cdir = self._simulator_params_.get("dir", os.getcwd())
+                    # self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n")
+
+            else:
+                self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
+                                            self._emitterWindow_, self._watchedDir_,
+                                            out = self._stdout_)
+                # if not autoStart:
+                #     self.print("\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in the current directory.\n")
+
+            self._exported_results_ = True
+            self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
+                                                        QtCore.Qt.QueuedConnection)
+            if self._autoStart:
+                self._abfSupplierThread_.start()
+                self._abfProcessorThread_.start()
+                self._running_ = True
             
-        elif isinstance(simulate, (int, float)):
-            self._doSimulation_ = True
-            self._simulator_params_ = dict(files=None, timeout = int(simulate))
-        
-        if self._doSimulation_:
-            self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
-            self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
-                                        self._emitterWindow_, self._watchedDir_,
-                                        simulator = self._simulatorThread_,
-                                        out = self._stdout_)
+            # self._log_
             
-            if not autoStart:
-                cdir = self._simulator_params_.get("dir", os.getcwd())
-                print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n", file = sys.stdout)
-
-        else:
-            self._abfSupplierThread_ = _LTPOnlineSupplier_(self, self._abfTrialBuffer_,
-                                        self._emitterWindow_, self._watchedDir_,
-                                        out = self._stdout_)
-            if not autoStart:
-                print("\nCall start() method of this LTPOnline instance to listen to ABF files generated by Clampex in the current directory.\n", file = sys.stdout)
-
-        self._exported_results_ = True
-        self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
-                                                     QtCore.Qt.QueuedConnection)
-        if autoStart:
-            self._abfSupplierThread_.start()
-            self._abfProcessorThread_.start()
-            self._running_ = True
-        
-        return True
+            return True
+        except:
+            msgBuf = io.StringIO()
+            traceback.print_exc(file=msgBuf)
+            scipywarn(f"Could not reset\n{msgBuf.getvalue()}")
+            return False
             
     def start(self):
         """Starts the instance of LTPOnline.
@@ -3767,18 +3573,19 @@ class LTPOnline2(QtCore.QObject):
         call `start` again.
         """
         if self._running_:
-            print("Already started")
+            self.print("Already started")
             return
 
         self._abfSupplierThread_.start()
         self._abfProcessorThread_.start()
         
         if self._doSimulation_:
-            print("Starting simulation mode\n\n")
+            self.print("Starting simulation\n\n")
         else:
-            print(f"Monitoring directory {self._watchedDir_}\n\n")
+            self.print(f"Monitoring directory {self._watchedDir_}\n\n")
         
         self._running_ = True
+        self._runData_.resultsExported = False
         
     def kill(self):
         self.stop()
@@ -3789,6 +3596,392 @@ class LTPOnline2(QtCore.QObject):
         self._instance = None
         self.__del__()
             
+
+# class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWindow__):
+class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
+    def __init__(self, simulate:bool=False, parent=None):
+        super().__init__(parent=parent)
+        
+        self._metadata_ = DataBag()
+        
+        self._metadata_.name = f"Recording_{yyMdd()}"
+        self._metadata_.annotations = {"Source": "AnimalID", "Cell": "Cell", "Field": "",
+                                       "Genotype": "", "Sex": "", "Age": ""}
+        
+        self._metadata_.source = None
+        self._metadata_.workdir = os.getcwd()
+        
+        self._onlineLTP_ = None
+        
+        self._pathSpinBoxBgDefaultColor = QtGui.QColor()
+        self._darkUI = False
+        
+        self._running_ = False
+        
+        self._simulation_ = simulate
+        
+        self._winTitle_ = "Synaptic Plasticity - Two pathways"
+        
+        if self._simulation_: self._winTitle_ += " (Simulation)"
+        
+        self._logIO_ = io.StringIO() 
+    
+        self._configureUi_()
+        
+        self._generate_recording_source() # assigns to self._metadata_.source
+        
+        self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
+                            emitterWindow = self.scipyenWindow, simulate= self._simulation_,
+                            parent=self)
+        
+        if isinstance(self._oltp._abfProcessorThread_, _LTPOnlineFileProcessor_):
+            self._oltp._abfProcessorThread_.sig_xtalk.connect(self._slot_xtalk)
+        
+        # self._oltp.hideViewers()
+        
+        # try:
+        #     self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
+        #                         emitterWindow = self.scipyenWindow)
+        # except:
+        #     traceback.print_exc()
+                
+        self.scipyenWindow.sig_changedDirectory.connect(self._slot_changedWorkingDirectory)
+        self.loadSettings()
+        # self.show()
+    
+    def _configureUi_(self):
+        self.setupUi(self)
+        self._pathSpinBoxBgDefaultColor = self.path0SpinBox.palette().color(QtGui.QPalette.Active, QtGui.QPalette.Window)
+        
+        self._darkUI = self._pathSpinBoxBgDefaultColor.getHsv()[2] < 128
+        self._errorColor = colormaps.qcolor(f"{'#aa0000' if self._darkUI else '#ff0000'}")
+        self._warningColor = colormaps.qcolor(f"{'#aa5500' if self._darkUI else '#ff5500'}")
+        self._conditioningColor = colormaps.qcolor('#aa0000')
+        
+        self.ADCIndexSpinBox.valueChanged.connect(self._slot_adc_changed)
+        self.DACIndexSpinBox.valueChanged.connect(self._slot_dac_changed)
+        
+        self.path0SpinBox.setValue(0)
+        self.path0SpinBox.valueChanged.connect(self._slot_path_channel_changed)
+        self.path1SpinBox.setValue(1)
+        self.path1SpinBox.valueChanged.connect(self._slot_path_channel_changed)
+        
+        self.path0NameEdit.undoAvailable = True
+        self.path0NameEdit.redoAvailable = True
+        self.path0NameEdit.editingFinished.connect(self._slot_path_name_changed)
+        
+        self.path1NameEdit.undoAvailable = True
+        self.path1NameEdit.redoAvailable = True
+        self.path1NameEdit.editingFinished.connect(self._slot_path_name_changed)
+        
+        self.metaDataWidget.dataName = self._metadata_.name
+        self.metaDataWidget.sourceID = self._metadata_.annotations["Source"]
+        self.metaDataWidget.cell = self._metadata_.annotations["Cell"]
+        
+        self.metaDataWidget.sig_valueChanged.connect(self._slot_metaDataChanged)
+        
+        self.runningLabel = QtWidgets.QLabel("Idle", parent=self)
+        self.statusBar().addPermanentWidget(self.runningLabel)
+        
+        self.startStopPushButton.clicked.connect(self._slot_startStop)
+        
+        self.conditioningPushButton.clicked.connect(self._slot_conditioningOnOff)
+        
+        self.showViewersToolButton.triggered.connect(self._slot_showViewers)
+        
+        self.defaultTrackingLabelPalette = self.TrackingConditioningLabel.palette()
+        self.defaultTrackingLabelBgColor = self.defaultTrackingLabelPalette.color(self.TrackingConditioningLabel.backgroundRole())
+        
+        self.exportResultsPushButton.clicked.connect(self._slot_exportResults)
+        
+        self.setWindowTitle(self._winTitle_)
+        
+        
+        
+    @Slot()
+    def _slot_startStop(self):
+        ww = (self.metaDataWidget,  self.exportResultsPushButton,
+              self.ADCIndexSpinBox, self.DACIndexSpinBox,
+              self.path0SpinBox,    self.path0NameEdit,
+              self.path1SpinBox,    self.path1NameEdit)
+        
+        if self._oltp.running:
+            self._oltp.stop()
+            for w in ww:
+                w.setEnabled(True)
+            self.startStopPushButton.setText("Start")
+            self.startStopPushButton.setStatusTip("Start monitoring Clampex output")
+            self.startStopPushButton.setToolTip("Start monitoring Clampex output")
+            self.startStopPushButton.setWhatsThis("Start monitoring Clampex output")
+            self.conditioningPushButton.setEnabled(False)
+            self.runningLabel.setText("Idle")
+            
+        else:
+            if self._oltp.hasResults and not self._oltp._runData_.resultsExported:
+                carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
+                if carryOn:
+                    self._oltp.reset(force=True)
+                else:
+                    return
+                
+            for w in ww:
+                w.setEnabled(False)
+                
+            self.startStopPushButton.setText("Stop")
+            self.startStopPushButton.setStatusTip("Stop monitoring Clampex output")
+            self.startStopPushButton.setToolTip("Stop monitoring Clampex output")
+            self.startStopPushButton.setWhatsThis("Stop monitoring Clampex output")
+            self.conditioningPushButton.setEnabled(True)
+            self._oltp.start()
+            self.runningLabel.setText("Running")
+            
+    @Slot(str)
+    def _slot_changedWorkingDirectory(self, val):
+        if self._oltp.running:
+            return
+        self._oltp.directory = val
+        
+    @Slot()
+    def _slot_conditioningOnOff(self):
+        if self._oltp.running:
+            if self._oltp.conditioning:
+                self._oltp.coff
+                self.conditioningPushButton.setText("Conditioning ON")
+                self.conditioningPushButton.setToolTip("Activate conditioning mode for subsequent trials")
+                self.conditioningPushButton.setStatusTip("Activate conditioning mode for subsequent trials")
+                self.conditioningPushButton.setWhatsThis("Activate conditioning mode for subsequent trials")
+                # self.TrackingConditioningLabel.setPalette(self.defaultTrackingLabelPalette)
+                self.TrackingConditioningLabel.setText("Tracking")
+                color = self.defaultTrackingLabelBgColor
+            else:
+                self._oltp.con
+                self.TrackingConditioningLabel.setText("Conditioning")
+                self.conditioningPushButton.setText("Conditioning OFF")
+                self.conditioningPushButton.setToolTip("Switch back to tracking mode for subsequent trials")
+                self.conditioningPushButton.setStatusTip("Switch back to tracking mode for subsequent trials")
+                self.conditioningPushButton.setWhatsThis("Switch back to tracking mode for subsequent trials")
+                color = colormaps.qcolor("#aa0000")
+
+            p = self.TrackingConditioningLabel.palette()
+            p.setColor(self.TrackingConditioningLabel.backgroundRole(), color)
+            self.TrackingConditioningLabel.setPalette(p)
+        
+    @Slot()
+    def _slot_showViewers(self):
+        self._oltp.showViewers()
+        
+    @Slot()
+    def _slot_exportResults(self):
+        self._oltp.exportResults()
+        
+    @Slot()
+    def _slot_metaDataChanged(self):
+        # print(f"{self.__class__.__name__}._slot_metaDataChanged")
+        if self._oltp.running:
+            return
+        
+        newData = False
+        
+        if not eq(self._metadata_.name, self.metaDataWidget.dataName):
+            self._metadata_.name = self.metaDataWidget.dataName
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Source"], self.metaDataWidget.sourceID):
+            # avoid pitfalls of pandas NAType
+            self._metadata_.annotations["Source"] = self.metaDataWidget.sourceID
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Cell"], self.metaDataWidget.cell):
+            self._metadata_.annotations["Cell"] = self.metaDataWidget.cell
+            newData = True
+            
+        if not eq (self._metadata_.annotations["Field"], self.metaDataWidget.field):
+            self._metadata_.annotations["Field"] = self.metaDataWidget.field
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Genotype"], self.metaDataWidget.genotype):
+            self._metadata_.annotations["Genotype"] = self.metaDataWidget.genotype
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Sex"], self.metaDataWidget.sex):
+            self._metadata_.annotations["Sex"] = self.metaDataWidget.sex
+            newData = True
+            
+        if not eq(self._metadata_.annotations["Age"], self.metaDataWidget.age):
+            self._metadata_.annotations["Age"] = self.metaDataWidget.age
+            newData = True
+            
+        if newData:
+            self._generate_recording_source()
+            
+            
+    @Slot(int)
+    def _slot_adc_changed(self, val:int):
+        if val < 0 : 
+            val = 0
+            
+        self._generate_recording_source()
+    
+    @Slot(int)
+    def _slot_dac_changed(self, val:int):
+        if val < 0:
+            val = 0
+
+        self._generate_recording_source()
+    
+    @Slot(int)
+    def _slot_path_channel_changed(self, val:int):
+        w = self.sender()
+        w1 = self.path1SpinBox if w == self.path0SpinBox else self.path0SpinBox
+        
+        # le = [w_ for w_ in w.children() if isinstance(w_, QtWidgets.QLineEdit)]
+        # le1 = [w_ for w_ in w1.children() if isinstance(w_, QtWidgets.QLineEdit)]
+        
+        if val < 0:
+            val = 0
+            
+        p = w.palette()
+        p1 = w1.palette()
+        
+        c = p.color(w.backgroundRole())
+        c1 = p1.color(w1.backgroundRole())
+        
+        if val == w1.value():
+            if c != self._errorColor:
+                if c1 != self._errorColor:
+                    p1.setColor(w1.backgroundRole(), self._errorColor)
+                    w1.setPalette(p1)
+                    # p1.setColor(le1[0].backgroundRole(), self._errorColor)
+                    # le1[0].setPalette(p1)
+                p.setColor(w.backgroundRole(), self._errorColor)
+                w.setPalette(p)
+                # le[0].setPalette(p)
+                
+        else:
+            self._generate_recording_source()
+            if c != self._pathSpinBoxBgDefaultColor:
+                if c1 != self._pathSpinBoxBgDefaultColor:
+                    p1.setColor(w1.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                    w1.setPalette(p1)
+                p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                w.setPalette(p)
+                
+    @Slot(bool)
+    def _slot_xtalk(self, val:bool):
+        if val is True:
+            self.TrackingConditioningLabel.setText("Tracking (cross-talk)")
+            
+        else:
+            self.TrackingConditioningLabel.setText("Tracking")
+                
+    @Slot()
+    def _slot_path_name_changed(self):
+        w = self.sender()
+        
+        w1 = self.path1NameEdit if w == self.path0NameEdit else self.path0NameEdit
+        
+        p = w.palette()
+        p1 = w1.palette()
+        
+        c = p.color(w.backgroundRole())
+        c1 = p1.color(w1.backgroundRole())
+        
+        pathName = w.text()
+        otherPathName =  w1.text()
+        
+        if pathName == otherPathName:
+            if c != self._warningColor:
+                if c1 != self._warningColor:
+                    p1.setColor(w1.backgroundRole(), self._warningColor)
+                    w1.setPalette(p1)
+                p.setColor(w.backgroundRole(), self._warningColor)
+                w.setPalette(p)
+                
+        else:
+            self._generate_recording_source()
+            if c != self._pathSpinBoxBgDefaultColor:
+                if c1 != self._pathSpinBoxBgDefaultColor:
+                    p1.setColor(w1.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                    w1.setPalette(p1)
+                p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                w.setPalette(p)
+                
+                
+    def closeEvent(self, evt):
+        self._oltp.stop()
+        if self._oltp.hasResults and not self._oltp._runData_.resultsExported:
+            carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
+            if carryOn:
+                self._oltp.reset(force=True)
+            else:
+                return
+        # self._oltp.reset(force=True)
+        self.saveSettings()
+        if self.isTopLevel:
+            if any([v is self for v in self.appWindow.workspace.values()]):
+                self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
+                self.appWindow.removeFromWorkspace(self, by_name=False)
+            
+        
+                    
+    def _generate_recording_source(self) -> RecordingSource:
+        if isinstance(getattr(self, "_oltp", None), LTPOnline):
+            if self._oltp.running:
+                return
+        
+            if self._oltp.hasResults and not self._oltp.resultsExported:
+                carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
+                if not carryOn:
+                    return
+            
+        adc = self.ADCIndexSpinBox.value()
+        dac = self.DACIndexSpinBox.value()
+        path0 = self.path0SpinBox.value()
+        path1 = self.path1SpinBox.value()
+        path0Name = self.path0NameEdit.text()
+        path1Name = self.path1NameEdit.text()
+        # srcName = self._metadata_.annotations["Cell"]
+        
+        # print(self._metadata_.annotations["Cell"])
+        # print(self._metadata_.name)
+        
+        # print(f"adc = {adc}, dac = {dac}, path0 = {path0} ({path0Name}), path1 = {path1} ({path1Name})")
+        
+        if isinstance(self._metadata_.annotations["Cell"], str) and len(self._metadata_.annotations["Cell"].strip()) > 0:
+            srcName = self._metadata_.annotations["Cell"]
+        else:
+            if isinstance(self._metadata_.name, str) and len(self._metadata_.name.strip()) > 0:
+                srcName = self._metadata_.name
+            else:
+                srcName = None
+        
+        if path0 == path1:
+            scipywarn("Pathways must use distinct DIG channels")
+            self.statusBar().showMessage("Pathways must use distinct DIG channels")
+            return
+            
+        if path0Name == path1Name:
+            scipywarn("Pathways should have distinct names")
+            self.statusBar().showMessage("Pathways should have distinct names")
+            return
+        
+        # print(f"srcName = {srcName}")
+
+        if srcName is None:
+            scipywarn("Name or Cell must be non-empty strings")
+            self.statusBar().showMessage("Name or Cell must be non-empty strings")
+            return
+        
+        src = twoPathwaysSource(adc, dac, path0, path1, srcName,
+                                                   path0name = path0Name,
+                                                   path1name = path1Name)
+        # print(f"src = {src}")
+        self._metadata_.source = src
+        
+        if isinstance(getattr(self, "_oltp", None), LTPOnline):
+            self._oltp.newSource(self._metadata_.source)
+        
+                
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
     """Constructs a dict with options for synaptic plasticity experiments.
     
@@ -5443,3 +5636,13 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
 #     return RecordingSource(name, 0, 0, synStims)
 #     
 
+
+def launch():
+    try:
+        win = mainWindow.newViewer(TwoPathwaysOnlineLTP, parent = mainWindow, win_title="Synaptic Plasticity")
+        win.show()
+    except:
+        traceback.print_exc()
+        
+def init_scipyen_plugin():
+    return {"Applications|SynapticPlasticity - online":launch}

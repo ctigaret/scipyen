@@ -12,6 +12,9 @@ try:
 except:
     hasNeuron = False
 
+# print(f"argv: {sys.argv}")
+# print(f"orig_argv: {sys.orig_argv}")
+
 myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 myfile = pathlib.Path(myfile).absolute()
 scipyen_dir = os.fspath(myfile.parent)
@@ -21,9 +24,12 @@ print(f"scipyen_dir = {scipyen_dir}")
 # NOTE: 2023-06-26 17:25:32
 # This is for the developer, NOT the final user:
 # To create a distributable scipyen application, you need to:
+#
 # 1) clone the scipyen git repo locally (e.g. to $HOME/scipyen)- NOTE: this is assumed to be the case from here onwards
+#
 # 2) use the install.sh script to create a local virtual environment with all the 
 #   binaries needed for Scipyen (this includes building PyQt5, VIGRA and - -optionally - NEURON)
+#
 # 3) activate the new environment, then buld the distributable app:
 #   in a bash shell do something like (NOTE: 'user@host:>'is your terminal prompt
 #   and it may look different on your machine, make sure you understand this):
@@ -35,7 +41,23 @@ print(f"scipyen_dir = {scipyen_dir}")
 #   alternatively, you don't have to cd to scipyen_app, so from the $HOME, call:
 #       user@host:> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
 #
+# 4) On Windows:
+# • assuming the following (please adjust pathways to reflect your local machine; avoid spaces in directory and file names):
+#   ∘ scipyen git clone is in e:\scipyen
+#   ∘ python's virtual envronment (created with mambaforge, see below) is in e:\scipyenv
+#   ∘ there exists a scipyen_app directory where the frozen bundle will be created — e.g, e:\scipyen_app
 #
+# • as for linux (see above) you must have the scipyen python environment activated
+#   (in windows, just execute the scipyact command)
+#
+# • in windows command prompte, make sure you are in the top directory where you
+#   want to build the frozen application (e.g., e:\scipyen_app, see above)
+#
+#   for example, your prompt should look something like:
+#       (e:\scipyenv) E:\scipyen_app>
+# • run:
+#   pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm e:\scipyen\scipyen.spec
+#  
 # On windows I use mamba (a faster alternative to <ana>conda) to build a virtual environment (e.g. e:\scipyenv) - best is
 # to use a Miniforge terminal running with as administrator.
 # With that environment activated (see mamba documentation for details), call (e.g. from the root of e: drive):
@@ -44,11 +66,15 @@ print(f"scipyen_dir = {scipyen_dir}")
 # TODO: For more customization contemplate calling pyinstaller as above from a
 # bash script
 
+# NOTE: 2024-05-15 09:03:24
+# looks like we do have to define DEFAULT_DISTPATH
+DEFAULT_DISTPATH = "./dist"
 
-if "--distpath" in sys.argv:
-    ndx = sys.argv.index("--distpath")
-    if ndx < (len(sys.argv) - 1):
-        distpath = sys.argv[ndx+1]
+
+if "--distpath" in sys.orig_argv:
+    ndx = sys.orig_argv.index("--distpath")
+    if ndx < (len(sys.orig_argv) - 1):
+        distpath = sys.orig_argv[ndx+1]
 
     else:
         distpath = DEFAULT_DISTPATH
@@ -273,14 +299,17 @@ day = f"{now.day}"
 hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
-product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
+build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
+product = f"scipyen{namesfx}_{platform}_{build_sfx}"
+# product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
 
-print(f"bundlepath = {bundlepath}")
+# print(f"bundlepath = {bundlepath}")
 if sys.platform == "linux":
+    # add a system-wide installation script
     desktoptempdir = tempfile.mkdtemp()
-    desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
+    desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{namesfx}.desktop")
     # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
     desktop_icon_file = "pythonbackend.svg"
     exec_file = os.path.join(bundlepath, "scipyen")
@@ -308,13 +337,13 @@ if sys.platform == "linux":
     with open(desktop_file_name, "wt") as desktop_file:
         for line in desktop_file_contents:
             desktop_file.write(f"{line}\n")
-            
+
     dist_install_script = ["#!/bin/bash",
                         "mydir=`dirname $0`",
                         "whereami=`realpath ${mydir}`",
-                        "chown -R root:root ${whereami}",
-                        "ln -s -b ${whereami}/scipyen /usr/local/bin/",
-                        "ln -s -b ${whereami}/Scipyen.desktop /usr/share/applications/"]
+                        # "chown -R root:root ${whereami}",
+                        "sudo ln -s -b ${whereami}/scipyen /usr/local/bin/",
+                        "sudo ln -s -b ${whereami}/Scipyen_app" + f"{namesfx}.desktop /usr/share/applications/"]
 
     install_script_tempdir = tempfile.mkdtemp()
     dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
@@ -323,7 +352,8 @@ if sys.platform == "linux":
         for line in dist_install_script:
             dist_install.write(f"{line}\n")
             
-    datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
+    datas.append((f"{os.path.join(scipyen_dir, 'src/scipyen/gui/resources/images', desktop_icon_file)}", '.'))
+    # datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
     datas.append((desktop_file_name, '.'))
     datas.append((dist_install_script_name, '.'))
 
@@ -351,7 +381,7 @@ datas.extend(yamltoc)
 # I think the next line below ('collect_all') is better than trying to see what
 # can be tweaked in hook-pygments.py / hook-pkg_resources.py
 jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
-print(f"jqc_hiddenimports = {jqc_hiddenimports}")
+# print(f"jqc_hiddenimports = {jqc_hiddenimports}")
 datas.extend(jqc_datas)
 binaries.extend(jqc_binaries)
 hiddenimports.extend(jqc_hiddenimports)
@@ -361,7 +391,7 @@ hiddenimports.extend(jqc_hiddenimports)
 # when starting external IPython console in Scipyen)
 
 jc_datas, jc_binaries, jc_hiddenimports = collect_all("jupyter_client")
-print(f"jc_hiddenimports = {jc_hiddenimports}")
+# print(f"jc_hiddenimports = {jc_hiddenimports}")
 datas.extend(jc_datas)
 binaries.extend(jc_binaries)
 hiddenimports.extend(jc_hiddenimports)
@@ -402,10 +432,6 @@ a = Analysis(
     [os.path.join(scipyen_dir, 'src/scipyen/scipyen.py')],
     pathex=[os.path.join(scipyen_dir, 'src/scipyen')], # ← to find the scipyen package
     binaries=binaries,
-    # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
-    #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
-    #           ('/home/cezar/scipyenv.3.11.3/lib64/*', 'lib64'),
-    #           ],
     datas=datas,
     # NOTE: 2023-06-28 11:08:08
     # Example of what is needed for this attribute:
@@ -422,8 +448,8 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[os.path.join(scipyen_dir, 'src/scipyen/__pyinstaller')],
     hooksconfig={"matplotlib":{"backends":"all"}, "exclude_module": "PySide2"},
-    runtime_hooks=[],
-    excludes=[],
+    runtime_hooks=[os.path.join(scipyen_dir, 'src/scipyen/__pyinstaller', 'rthooks','pyi_rth_typeguard.py')],
+    excludes=["OpenGL"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -431,13 +457,18 @@ a = Analysis(
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+options = [
+    ('X frozen_modules=off', None, 'OPTION'),
+    ('O', None, 'OPTION')
+    ]
+
 if sys.platform == "win32":
     exe = EXE(
         pyz,
         a.scripts,
         [],
         exclude_binaries=True,
-        name='scipyen', # name of the final executable
+        name='scipyen_app', # name of the final executable
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -448,7 +479,8 @@ if sys.platform == "win32":
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=os.path.join(scipyen_dir, "doc/install/pythonbackend.ico")
+        icon=os.path.join(scipyen_dir, "doc/install/pythonbackend.ico"),
+        options = options
     )
 else:
     exe = EXE(
@@ -456,7 +488,7 @@ else:
         a.scripts,
         [],
         exclude_binaries=True,
-        name='scipyen', # name of the final executable
+        name='scipyen_app', # name of the final executable
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -467,6 +499,7 @@ else:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
+        options=options
     )
     
 coll = COLLECT(
@@ -487,3 +520,6 @@ if isinstance(tempdir, str) and os.path.isdir(tempdir):
 if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
     shutil.rmtree(desktoptempdir)
     
+# app_location =
+if sys.platform == "linux":
+    print(f"To install system-wide, run {os.path.join(product, '_internal', 'dist_install.sh')}.")

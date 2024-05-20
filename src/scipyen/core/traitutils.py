@@ -20,7 +20,8 @@ import typing
 from collections import deque
 from functools import (partial, partialmethod)
 
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 # import six
 # 
 # 

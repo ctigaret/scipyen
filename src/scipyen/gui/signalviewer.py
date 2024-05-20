@@ -65,8 +65,8 @@ Usage examples:
 
 4. Dependencies:
 python >= 3.4
-matplotlib with Qt5Agg backend
-PyQt5
+matplotlib with Qt (5/6) backend
+PyQt5/6
 vigra and built against python 3
 boost C++ libraries built against python 3 (for building vigra against python3)
 numpy (for python 3)
@@ -84,7 +84,7 @@ __scipyen_plugin__ = None
 from pprint import pprint
 
 import sys, os, traceback, numbers, warnings, weakref, inspect, typing, math
-
+# import importlib
 import collections
 from collections.abc import Iterable
 from functools import partial, singledispatch, singledispatchmethod
@@ -99,9 +99,12 @@ from traitlets import Bunch
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+from qtpy.QtCore import Signal, Slot
+from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
+# from PyQt5.QtCore import Signal, Slot
+# from PyQt5.uic import loadUiType as __loadUiType__
 
 import math
 import numpy as np
@@ -114,8 +117,10 @@ from matplotlib import pyplot as plt
 from matplotlib import cm, colors
 import matplotlib.widgets as mpw
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import (FigureCanvasQTAgg as FigureCanvas, 
-                                                NavigationToolbar2QT as NavigationToolbar)
+# import matplotlib.cbook as cbook
+# backend_mod = importlib.import_module(cbook._backend_module_name(mpl.rcParams["backend"]))
+# from backend_mod import (FigureCanvasQTAgg as FigureCanvas, 
+#                                                 NavigationToolbar2QT as NavigationToolbar)
 
 import neo
 if neo.__version__ >= '0.13.0':
@@ -406,14 +411,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     #dockedWidgetsNames = ["cursorsDockWidget"]
 
-    sig_activated = pyqtSignal(int, name="sig_activated")
-    sig_plot = pyqtSignal(dict, name="sig_plot")
-    sig_newEpochInData = pyqtSignal(name="sig_newEpochInData")
-    sig_axisActivated = pyqtSignal(int, name="sig_axisActivated")
-    sig_frameDisplayReady = pyqtSignal(name="sig_frameDisplayReady")
+    sig_activated = Signal(int, name="sig_activated")
+    sig_plot = Signal(dict, name="sig_plot")
+    sig_newEpochInData = Signal(name="sig_newEpochInData")
+    sig_axisActivated = Signal(int, name="sig_axisActivated")
+    sig_frameDisplayReady = Signal(name="sig_frameDisplayReady")
+    sig_signalCursorPositionChanged = Signal(SignalCursor, name="sig_signalCursorPositionChanged")
     
-    closeMe  = pyqtSignal(int)
-    frameChanged = pyqtSignal(int)
+    closeMe  = Signal(int)
+    frameChanged = Signal(int)
     
     # TODO: 2019-11-01 22:43:50
     # implement viewing for all these
@@ -1154,11 +1160,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionShow_Legends.setChecked(value==True)
         self.showLegends(self._show_legends_)
             
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_showLegends(self, value):
         self.showsLegends = value == True
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_setIgnoreEmptySpikeTrains(self, value):
         self.ignoreEmptySpikeTrains = value==True
         if self.yData is not None:
@@ -3001,7 +3007,7 @@ anything else       anything else       ❌
         crsID = self._addCursor_(cursor_type = cursorType,
                                 x = x, y = y, xwindow = xwindow, ywindow = ywindow,
                                 xBounds = xBounds, yBounds = yBounds,
-                                axis = axis, label=label,
+                                axis = axis, label=cname,
                                 follows_mouse=follows_mouse,
                                 precision = precision,
                                 editFirst = editFirst,
@@ -3193,7 +3199,7 @@ anything else       anything else       ❌
         
     # ### BEGIN PyQt slots
     
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_analogSignalsComboBoxIndexChanged(self, index):
         """Triggered by a change in Analog signal selection combo box.
@@ -3244,34 +3250,34 @@ anything else       anything else       ❌
         self.displayFrame()
         self._new_frame_ = True
         
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_plotSpikeTrainsCheckStateChanged_(self, state):
         self._plot_spiketrains_ = state == QtCore.Qt.Checked
         self.displayFrame()
         
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_plotEventsCheckStateChanged_(self, state):
         self._plot_events_ = state == QtCore.Qt.Checked
         self.displayFrame()
         
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_plotEpochsCheckStateChanged_(self, state):
         self._plot_epochs_ = state == QtCore.Qt.Checked
         self.displayFrame()
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slot_plotAnalogSignalsCheckStateChanged_(self, state):
         self._plot_analogsignals_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def _slot_plotIrregularSignalsCheckStateChanged_(self, state):
         self._plot_irregularsignals_ = state == QtCore.Qt.Checked
         self.displayFrame()
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_showCursorsDock(self, value:bool):
         self.cursorsDockWidgetEnabled = value==True
@@ -3280,7 +3286,7 @@ anything else       anything else       ❌
         # else:
         #     self.cursorsDockWidget.hide()
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_showAnnotationsDock(self, value:bool):
         self.annotationsDockWidgetEnabled = value == True
@@ -3289,7 +3295,7 @@ anything else       anything else       ❌
         # else:
         #     self.annotationsDockWidget.hide()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_detectTriggers(self):
         if isinstance(self._yData_, (neo.Block, neo.Segment)) or (isinstance(self._yData_, (tuple, list)) and all([isinstance(v, (neo.Block, neo.Segment)) for v in self._yData_])):
@@ -3297,12 +3303,15 @@ anything else       anything else       ❌
             tdlg = TriggerDetectDialog(ephysdata=self._yData_, ephysViewer=self, parent=self)
             tdlg.open()
         
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_reportCursorPosition(self, crsId = None):
         self.reportCursors()
+        if isinstance(crsId, str) and len(crsId.strip()):
+            c = self.signalCursor(crsId)
+            self.sig_signalCursorPositionChanged.emit(c)
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_mainToolbarVisibilityChanged(self, val):
         self._mainToolBarVisible_ = val == True
         signalBlocker = QtCore.QSignalBlocker(self.actionViewMain_Toolbar)
@@ -3310,7 +3319,7 @@ anything else       anything else       ❌
         
     # NOTE: 2024-03-03 23:02:33
     # QWidget does NOT have visibilityChanged signal
-    # @pyqtSlot(bool)
+    # @Slot(bool)
     # def _slot_selectorsVisibilityChanged(self, val):
     #     self._selectorsVisible_ = val == True
     #     signalBlocker = QtCore.QSignalBlocker(self.actionViewSignal_Selectors)
@@ -3318,14 +3327,14 @@ anything else       anything else       ❌
     
     # NOTE: 2024-03-03 23:02:33
     # QWidget does NOT have visibilityChanged signal
-    # @pyqtSlot(bool)
+    # @Slot(bool)
     # def _slot_navigatorVisibiltyChanged(self, val):
     #     self._navigatorVisible_ = val == True
     #     signalBlocker = QtCore.QSignalBlocker(self.actionViewFrame_Navigator)
     #     self.actionViewFrame_Navigator.setChecked(self._navigatorVisible_)
         
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_irregularSignalsComboBoxIndexChanged(self, index):
         """Triggered by a change in Irregular signal selection combo box.
@@ -3489,13 +3498,13 @@ anything else       anything else       ❌
     #"def" selectCursor(self, ID):
         #self.slot_selectCursor(ID)
         
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_varModified(self, obj):
         """Connected to _scipyenWindow_.workspaceModel.varModified signal
         """
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
         if self._scipyenWindow_ is None:
@@ -3814,12 +3823,27 @@ anything else       anything else       ❌
         # print(f"{self.__class__.__name__}._addCursor_ crsPrefix = {crsPrefix}")
         
         if label is None:
-            crsId = "%s%s" % (crsPrefix, str(nCursors))
+            if cursor_type in ("vertical", "v", SignalCursorTypes.vertical) and isinstance(x, DataCursor):
+                label = getattr(x, 'name', None)
+                
+            elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal) and isinstance(y, DataCursor):
+                label = getattr(y, "name", None)
+                
+            elif cursor_type in ("crosshair", "c", SignalCursorTypes.crosshair) and all(isinstance(v, DataCursor) for v in (x,y)):
+                labels = list(filter(lambda x: isinstance(x, str) and len(x.strip()), [getattr(v, "name", None) for v in (x,y)]))
+                if len(labels):
+                    label = "_".join(labels)
+                
+            if label is None:
+                crsId = "%s%s" % (crsPrefix, str(nCursors))
+                
+            else:
+                crsId = label
             
         else:
-            currentCursorLabels = cursorDict.keys()
+            currentCursorLabels = list(cursorDict.keys() )
             
-            crsId = label
+            crsId = counter_suffix(label, currentCursorLabels)
             
         if precision is None:
             if isinstance(axis, pg.PlotItem):
@@ -4064,7 +4088,7 @@ anything else       anything else       ❌
         return SignalCursor.default_precision
         
 
-    @pyqtSlot((QtCore.QPoint))
+    @Slot((QtCore.QPoint))
     @safeWrapper
     def slot_annotationsContextMenuRequested(self, point):
         if self._scipyenWindow_ is None: 
@@ -4084,7 +4108,7 @@ anything else       anything else       ❌
         
         cm.popup(self.annotationsViewer.mapToGlobal(point), copyItemData)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportAnnotationDataToWorkspace(self):
         if self._scipyenWindow_ is None:
@@ -4097,7 +4121,7 @@ anything else       anything else       ❌
         
         self._export_data_items_(items)
         
-    @pyqtSlot()
+    @Slot()
     def slot_exportDataToWorkspace(self):
         if self._yData_ is None:
             return
@@ -4170,7 +4194,7 @@ anything else       anything else       ❌
                         self._scipyenWindow_.assignToWorkspace(newVarName, value, check_name=False)
         
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addVerticalCursor(self, label = None, follows_mouse=False):
         return self._addCursor_("vertical", axis=self._selected_plot_item_, 
@@ -4178,7 +4202,7 @@ anything else       anything else       ❌
                                   show_value=self.setCursorsShowValue.isChecked(),
                                   editFirst = self.editCursorUponCreation)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addHorizontalCursor(self, label=None, follows_mouse=False):
         return self._addCursor_("horizontal", axis=self._selected_plot_item_, 
@@ -4186,7 +4210,7 @@ anything else       anything else       ❌
                                   show_value=self.setCursorsShowValue.isChecked(),
                                   editFirst = self.editCursorUponCreation)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addCrosshairCursor(self, label=None, follows_mouse=False):
         return self._addCursor_("crosshair", axis=self._selected_plot_item_, 
@@ -4194,7 +4218,7 @@ anything else       anything else       ❌
                                   show_value=self.setCursorsShowValue.isChecked(),
                                   editFirst = self.editCursorUponCreation)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_export_svg(self):
         if self.viewerWidget.scene() is None:
@@ -4202,7 +4226,7 @@ anything else       anything else       ❌
         
         self._export_to_graphics_file_("svg")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_export_tiff(self):
         if self.viewerWidget.scene() is None:
@@ -4210,7 +4234,7 @@ anything else       anything else       ❌
         
         self._export_to_graphics_file_("tiff")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_export_png(self):
         if self.viewerWidget.scene() is None:
@@ -4302,21 +4326,21 @@ anything else       anything else       ❌
             
             out.save(fileName, file_format.strip().lower(), 100)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addDynamicCrosshairCursor(self, label=None):
         return self._addCursor_("crosshair", item=self._selected_plot_item_, 
                                   label=label, follows_mouse=True, 
                                   editFirst = self.editCursorUponCreation)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addDynamicVerticalCursor(self, label=None):
         return self._addCursor_("vertical", item=self._selected_plot_item_, 
                                   label=label, follows_mouse=True,
                                   editFirst = self.editCursorUponCreation)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addDynamicHorizontalCursor(self, label=None):
         return self._addCursor_("horizontal", item=self._selected_plot_item_, 
@@ -4361,14 +4385,14 @@ anything else       anything else       ❌
                                     editFirst=editFirst)
         
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addMultiAxisVerticalCursor(self, label=None):
         askForParams = bool(
             QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
         self._construct_multi_axis_vertical_(label=label, editFirst=askForParams)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addDynamicMultiAxisVerticalCursor(self, label=None):
         self._construct_multi_axis_vertical_(label=label, dynamic=True,
@@ -4405,13 +4429,13 @@ anything else       anything else       ❌
                                     editFirst = editFirst)
         
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addMultiAxisCrosshairCursor(self, label=None):
         self._construct_multi_axis_crosshair_(label=label, 
                                               editFirst = self.editCursorUponCreation)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_addDynamicMultiAxisCrosshairCursor(self, label=None):
         self._construct_multi_axis_crosshair_(label=label, dynamic=True,
@@ -4423,7 +4447,7 @@ anything else       anything else       ❌
         """
         self.slot_removeCursors()
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     def slot_toggleNavigator(self, value):
         self.navigatorVisible = value
         # self.showNavigator() if self.actionViewMain_Toolbar.isChecked() else self.hideNavigator()
@@ -4434,7 +4458,7 @@ anything else       anything else       ❌
     def showNavigator(self):
         self.navigatorVisible = True
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     def slot_toggleSelectors(self, value):
         self.selectorsVisible = value
         # self.showSelectors() if self.actionViewMain_Toolbar.isChecked() else self.hideSelectors()
@@ -4445,7 +4469,7 @@ anything else       anything else       ❌
     def showSelectors(self):
         self.selectorsVisible = True
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     def slot_toggleMainToolbar(self, value):
         self.mainToolBarVisible = value
         # self.showMainToolbar() if self.actionViewMain_Toolbar.isChecked() else self.hideMainToolbar()
@@ -4464,7 +4488,7 @@ anything else       anything else       ❌
     def removeCursor(self, crsID=None):
         self.slot_removeCursor(crsID)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeCursors(self):
         #if len(self._data_cursors_) == 0:
@@ -4485,7 +4509,7 @@ anything else       anything else       ❌
         self._cursor_coordinates_text_ = ""
         self._update_coordinates_viewer_()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeCursor(self, crsID=None):
         if len(self._data_cursors_) == 0:
@@ -4539,7 +4563,7 @@ anything else       anything else       ❌
         self._cursor_coordinates_text_=""
         self._update_coordinates_viewer_()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeSelectedCursor(self):
         if len(self._data_cursors_) == 0:
@@ -4552,7 +4576,7 @@ anything else       anything else       ❌
         self._cursor_coordinates_text_=""
         self._update_coordinates_viewer_()
 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_selectCursor(self, crsID=None):
         #print("SignalViewer.slot_selectCursor", crsID)
@@ -4585,7 +4609,7 @@ anything else       anything else       ❌
         if isinstance(self.selectedDataCursor, SignalCursor):
             self.slot_reportCursorPosition(self.selectedDataCursor.ID)
                 
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_deselectCursor(self, crsID=None):
         if len(self._data_cursors_) == 0:
@@ -4611,13 +4635,13 @@ anything else       anything else       ❌
                 
                 self.selectedDataCursor = None
                 
-    @pyqtSlot(str)
+    @Slot(str)
     def slot_cursorMenu(self, crsId):
         # TODO ?
         return
         # print(f"{self.__class__.__name__} ({self.windowTitle()}) slot_cursorMenu RMB click on {crsId}")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_makeVerticalCursorsFromEpoch(self):
             if isinstance(self._yData_, neo.Block):
@@ -4673,7 +4697,7 @@ anything else       anything else       ❌
             cursors = epoch2cursors(selEpoch, axis=self.currentAxis,
                                     signal_viewer = self)
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_makeMultiAxisVerticalCursorsFromEpoch(self):
             if isinstance(self._yData_, neo.Block):
@@ -4729,13 +4753,13 @@ anything else       anything else       ❌
             cursors = epoch2cursors(selEpoch, axis=self.signalsLayout.scene(),
                                     signal_viewer = self)
             
-    @pyqtSlot(str)
-    @pyqtSlot(bool)
+    @Slot(str)
+    @Slot(bool)
     @safeWrapper
     def slot_editCursor(self, crsId=None, choose=False):
         self._editCursor_(crsId, choose)
     
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def _slot_updateCursorEditorDlg_(self, cid, d):
         if not isinstance(cid, str) or len(cid.strip()) == 0:
@@ -4818,7 +4842,7 @@ anything else       anything else       ❌
         if hasattr(d, "showsValueCheckBox"):
             d.showsValueCheckBox.setChecked(c.showsValue)
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editSelectedCursor(self):
         if isinstance(self.selectedDataCursor, SignalCursor):
@@ -4830,7 +4854,7 @@ anything else       anything else       ❌
 #         exec("a=np.eye(3)", workspace)
         
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_cursorsToEpoch(self):
         """Creates a neo.Epoch from existing cursors and exports it to the workspace.
@@ -4907,7 +4931,7 @@ anything else       anything else       ❌
             
         # if scipyenWindow is not None:
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_cursorsToEpochInData(self):
         """Creates a neo.Epoch from current vertical/crosshair cursors.
@@ -4997,7 +5021,7 @@ anything else       anything else       ❌
             QtWidgets.QMessageBox.warning(self,"Attach epoch to data", 
                                           "Epochs can only be embedded in neo.Block and neo.Segment data.")
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_cursorToEpochInData(self):
         vertAndCrossCursors = collections.ChainMap(self._crosshairSignalCursors_, self._verticalSignalCursors_)
@@ -5056,7 +5080,7 @@ anything else       anything else       ❌
         else:
             QtWidgets.QMessageBox.warning(self,"Attach epoch to data", "Epochs can only be embedded in neo.Block and neo.Segment data.\n\nPlease use actions in 'Make epochs' sub-menu")
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_epochInDataBetweenCursors(self):
         vertAndCrossCursors = collections.ChainMap(self._crosshairSignalCursors_, self._verticalSignalCursors_)
@@ -5129,7 +5153,7 @@ anything else       anything else       ❌
                 
                 self.displayFrame()
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_update_cursor_to_epoch_dlg(self, cid, d):
         if not isinstance(cid, str) or len(cid.strip()) == 0:
@@ -5161,7 +5185,7 @@ anything else       anything else       ❌
                 d.namePrompt.setText("%s from %s" % ("Epoch", cid))
         
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_cursorToEpoch(self):
         scipyenWindow = self.scipyenWindow
@@ -5205,7 +5229,7 @@ anything else       anything else       ❌
                 scipyenWindow.assignToWorkspace(name, epoch)
                 
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_epochBetweenCursors(self):
         scipyenWindow = self.scipyenWindow
@@ -7640,28 +7664,28 @@ signals in the signal collection.
         """
         return [c for c in self._crosshairSignalCursors_.values()]
     
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_showXgrid(self, value:bool):
         self.xGrid = value
     
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_showYgrid(self, value:bool):
         self.yGrid = value
     
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_setXAxesLinked(self, value:bool):
         self.xAxesLinked = value == True
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_setEditCursorWhenCreated(self, value):
         # print(f"{self.__class__.__name__}._slot_setEditCursorWhenCreated {value}")
         self.editCursorUponCreation = value == True
             
-    @pyqtSlot(bool)
+    @Slot(bool)
     def _slot_setCursorsShowValue(self, val):
         self.cursorsShowValue = val is True
             
-    @pyqtSlot()
+    @Slot()
     def _slot_setCursorLabelPrecision(self):
         dlg = qd.QuickDialog()
         wdg = QtWidgets.QSpinBox(parent=dlg)
@@ -7673,23 +7697,23 @@ signals in the signal collection.
             
             self.cursorLabelPrecision = val
             
-    @pyqtSlot()
+    @Slot()
     def _slot_setCursorHoverColor(self):
         self._gui_chose_cursor_color_("hover")
             
-    @pyqtSlot()
+    @Slot()
     def _slot_setVerticalCursorColors(self):
         self._gui_chose_cursor_color_("vertical")
     
-    @pyqtSlot()
+    @Slot()
     def _slot_setHorizontalCursorColors(self):
         self._gui_chose_cursor_color_("horizontal")
     
-    @pyqtSlot()
+    @Slot()
     def _slot_setCrosshairCursorColors(self):
         self._gui_chose_cursor_color_("crosshair")
 
-    @pyqtSlot(object, object)
+    @Slot(object, object)
     @safeWrapper
     def _slot_plot_axis_x_range_changed(self, vb, x0x1):
         """Captures changes in the view range on the X axis.
@@ -7723,7 +7747,7 @@ signals in the signal collection.
             if len(self._cached_epochs_[self.currentFrame]):
                 self._plotEpochs_(from_cache=True)
                 
-    @pyqtSlot(object)
+    @Slot(object)
     def _slot_plot_axis_range_changed_manually(self, value:object):
         """Triggered by PlotItem's ViewBox sigRangeChangedManually signal"""
         vb = self.sender()
@@ -8085,7 +8109,7 @@ signals in the signal collection.
         
         return yv0, yv1
     
-    @pyqtSlot()
+    @Slot()
     def _slot_post_frameDisplay(self):
         self._align_X_range()
         self._update_axes_spines_()
@@ -8592,7 +8616,7 @@ signals in the signal collection.
         raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
     
     @_plot_data_.register(neo.Block)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:neo.Block, *args, **kwargs):
         # NOTE: 2019-11-24 22:31:26
         # select a segment then delegate to _plotSegment_()
         # Segment selection is based on self.frameIndex, or on self.channelIndex
@@ -8678,7 +8702,8 @@ signals in the signal collection.
         self.currentFrameAnnotations = {type(obj).__name__ : obj.annotations}
         
     @_plot_data_.register(neo.core.spiketrainlist.SpikeTrainList)
-    def _(self, obj:neo.core.spiketrainlist.SpikeTrainList, *args, **kwargs):
+    def _(self, obj:neo.core.spiketrainlist.SpikeTrainList,
+          *args, **kwargs):
         self._plotSpikeTrains_(obj)
         self.currentFrameAnnotations = {type(obj).__name__: [st.annotations for st in obj]}
                 
@@ -8691,7 +8716,8 @@ signals in the signal collection.
     @_plot_data_.register(neo.IrregularlySampledSignal)
     @_plot_data_.register(DataSignal)
     @_plot_data_.register(IrregularlySampledDataSignal)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal], 
+          *args, **kwargs):
         if self.frameAxis == 1:
             if self._current_frame_index_ in self.frameIndex:
                 ndx = self.frameIndex[self._current_frame_index_]
@@ -8708,7 +8734,8 @@ signals in the signal collection.
             
     @_plot_data_.register(neo.Epoch)
     @_plot_data_.register(DataZone)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:typing.Union[neo.Epoch, DataZone], 
+          *args, **kwargs):
         """ Plots a single neo.Epoch 
         NOTE: a single Epoch MAY contain several time intervals.
         """
@@ -8729,7 +8756,8 @@ signals in the signal collection.
         
     @_plot_data_.register(neo.Event)
     @_plot_data_.register(DataMark)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:typing.Union[neo.Event, DataMark],
+          *args, **kwargs):
         """Plot stand-alone events"""
         if len(obj) == 0:
             self._events_axis_.clear()
@@ -8740,7 +8768,7 @@ signals in the signal collection.
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
             
     @_plot_data_.register(np.ndarray)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:np.ndarray, *args, **kwargs):
         # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}> dims: {obj.ndim})")
         try:
             if obj.ndim > 3:
@@ -8809,7 +8837,8 @@ signals in the signal collection.
     @_plot_data_.register(tuple)
     @_plot_data_.register(list)
     @_plot_data_.register(NeoObjectList)
-    def _(self, obj, *args, **kwargs):
+    def _(self, obj:typing.Union[tuple, list, NeoObjectList],
+          *args, **kwargs):
         if len(obj) == 0:
             return False
         
@@ -9080,7 +9109,7 @@ signals in the signal collection.
         if len(analog) + len(irregs) == 0:
             return None, None
         
-        assert len(self.signalAxes) == len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
+        assert len(self.signalAxes) >= len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
 
         # NOTE: 2023-01-12 16:45:48
         # by convention, analog signals are plotted in order, BEFORE the 
@@ -9112,6 +9141,7 @@ signals in the signal collection.
         selected_irreg_names = list()
         selected_irreg_ndx = list()
         
+        used_axes_ndx = list()
         #### BEGIN plot regular (analog) signals
         # NOTE: update only those plotItems where a selected signal should be
         # all other plotItems are hidden
@@ -9120,6 +9150,7 @@ signals in the signal collection.
             
             for k, signal in enumerate(analog):
                 ax_ndx = analog_axes[k]
+                used_axes_ndx.append(ax_ndx)
                 plotItem = self.signalAxes[ax_ndx]
                 if k in selected_analog_ndx:
                     plot_name_ndx = selected_analog_ndx.index(k)
@@ -9155,6 +9186,7 @@ signals in the signal collection.
             
             for k, signal in enumerate(irregs):
                 ax_ndx = irregs_axes[k]
+                used_axes_ndx.append(ax_ndx)
                 plotItem = self.signalAxes[ax_ndx]
                 if k in selected_irreg_ndx:
                     plot_name_ndx = selected_irreg_ndx.index(k)
@@ -9166,9 +9198,15 @@ signals in the signal collection.
                     plotItem.setVisible(True)
                 else:
                     plotItem.setVisible(False)
+                    
         else:
             for ax_ndx in irregs_axes.values():
                 self.signalAxes[ax_ndx].setVisible(False)
+                
+        # finally, if anything was plotted, HIDE the extra axes (if any)
+        for k, ax in enumerate(self.signalAxes):
+            if k not in used_axes_ndx:
+                ax.setVisible(False)
 
         #### END plot irregular signals
         
@@ -9467,7 +9505,7 @@ signals in the signal collection.
                 "args": args, "kwargs": kwargs}
                     
     @safeWrapper
-    @pyqtSlot(dict)
+    @Slot(dict)
     def _slot_plot_numeric_data_(self, data:dict):
         """For dict's keys and values see parameters of self._plot_numeric_data_
         For threading...
@@ -10185,7 +10223,7 @@ signals in the signal collection.
             self.actionShow_Y_grid.setEnabled(False)
             
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_mouseHoverInPlotItem(self, obj): 
         """ Connected to a PlotItem's scene sigMouseHover signal.
@@ -10205,7 +10243,7 @@ signals in the signal collection.
         else:
             self._hovered_plot_item_ = None
             
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_mouseMovedInPlotItem(self, pos):
         # pos is a QPointF
@@ -10372,7 +10410,7 @@ signals in the signal collection.
     def _update_coordinates_viewer_(self):
         self.coordinatesViewer.setPlainText(self._cursor_coordinates_text_)
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_mouseClickSelectPlotItem(self, evt):
         focusItem = self.sender().focusItem()

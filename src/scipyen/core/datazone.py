@@ -12,7 +12,8 @@ import pyqtgraph as pg
 from core import quantities as cq
 from core.quantities import check_time_units
 from .prog import (safeWrapper, with_doc)
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
+# from PyQt5 import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,
@@ -451,7 +452,7 @@ however, the first part of this exercise is already done bny constructing an #
 Interval).
         
 Another use of Interval is to store SignalCursor coordinates to files; since a
-SignalCursor is a PyQt5 object that handles graphic items, IT IS NOT SERIALIZABLE
+SignalCursor is a Qt object that handles graphic items, IT IS NOT SERIALIZABLE
 HENCE IT CANNOT BE "PICKLED" or otherwise "saved" to a file.
         
 The only thing an Interval does not know about is the type of the cursor where 
@@ -675,7 +676,8 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
-    from PyQt5 import QtGui, QtCore
+    from qtpy import QtGui, QtCore
+    # from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
@@ -779,7 +781,8 @@ def intervals2cursors(*args,
                       **kwargs):
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
-    from PyQt5 import QtGui, QtCore
+    from qtpy import QtGui, QtCore
+    # from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     cursor_type = kwargs.pop("cursor_type", "vertical")

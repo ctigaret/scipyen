@@ -4,8 +4,10 @@
 import collections, enum, numbers, typing
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
-from PyQt5 import (QtCore, QtGui, QtWidgets,) 
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+from qtpy import (QtCore, QtGui, QtWidgets,) 
+from qtpy.QtCore import (Signal, Slot, )
+# from PyQt5 import (QtCore, QtGui, QtWidgets,) 
+# from PyQt5.QtCore import (Signal, Slot, )
 
 # import pyqtgraph as pg
 # pg.Qt.lib = "PyQt5"
@@ -21,9 +23,10 @@ from core.quantities import check_time_units
 
 @dataclass
 class DataCursor:
-    """Convenience structure for notional cursors represented by a coordinate and a span"""
+    """Convenience structure for notional 1D cursor represented by a coordinate and a span"""
     coord:typing.Union[float, pq.Quantity]
     span:typing.Union[float, pq.Quantity]
+    name:str = ""
     
 class SignalCursorTypes(enum.Enum):
     """Enumeration of signal cursor types.
@@ -90,7 +93,7 @@ class SignalCursorTypes(enum.Enum):
             
 
 class CursorLine(pg.InfiniteLine):
-    sig_double_clicked = pyqtSignal()
+    sig_double_clicked = Signal()
     
     def _init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -140,20 +143,37 @@ class SignalCursor(QtCore.QObject):
     """SignalCursor object.
     Covers either a SINGLE pyqtgraph.PlotItem (see crosshair.py in pyqtgraph/examples)
     or a pyqtgraph.GraphicsScene (with possibly multiple plot items)
+        
+    WARNING: As of 2024-05-13 16:59:55 this class is NOT seralizable: saving 
+        or pickling will raise an exception.
+        
+        
     """
+    # TODO: 2024-05-13 17:00:45 FIXME:
+    #     Seralization (pickling) could be implemented using special dunder 
+    #       methods (__reduce__ for seralizing and __new__ for reconstructing, 
+    #       and instantiating QObject components on the fly) -  but this may be
+    #       quite expensive in terms of coding time.
+    #
+    # Similarly, serialization via HDF5 is also theoretically possible, but with 
+    # the same caveat as above (i.e. coding time).
+    #
+    # Probably more convenient is to use DataCursor for now
+    
+    
     # TODO: 2019-02-07 17:31:43
     # 1) implement cursors linking
     
-    sig_cursorSelected = pyqtSignal(str, name="sig_cursorSelected") 
-    sig_cursorDeselected = pyqtSignal(str, name="sig_cursorDeselected") 
-    #sig_cursorMoved = pyqtSignal(str, float, float, name="sig_cursorMoved")
-    sig_editMe = pyqtSignal(str, name="sig_editMe")
-    sig_reportPosition = pyqtSignal(str, name="sig_reportPosition")
-    #sig_reportDynamicPosition = pyqtSignal(str, name="sig_reportDynamicPosition")
-    sig_doubleClicked = pyqtSignal(str, name = "sig_doubleClicked")
-    sig_lineContextMenuRequested = pyqtSignal(str, name = "sig_lineContextMenuRequested")
+    sig_cursorSelected = Signal(str, name="sig_cursorSelected") 
+    sig_cursorDeselected = Signal(str, name="sig_cursorDeselected") 
+    #sig_cursorMoved = Signal(str, float, float, name="sig_cursorMoved")
+    sig_editMe = Signal(str, name="sig_editMe")
+    sig_reportPosition = Signal(str, name="sig_reportPosition")
+    #sig_reportDynamicPosition = Signal(str, name="sig_reportDynamicPosition")
+    sig_doubleClicked = Signal(str, name = "sig_doubleClicked")
+    sig_lineContextMenuRequested = Signal(str, name = "sig_lineContextMenuRequested")
     
-    sig_axisPositionChanged = pyqtSignal(tuple, name="sig_axisPositionChanged")
+    sig_axisPositionChanged = Signal(tuple, name="sig_axisPositionChanged")
 
     default_precision = 3
     
@@ -752,8 +772,8 @@ class SignalCursor(QtCore.QObject):
         self._show_value_ = value == True
         self._update_labels_()
                     
-    @pyqtSlot()
-    @pyqtSlot(object)
+    @Slot()
+    @Slot(object)
     @safeWrapper
     def slot_positionChanged(self, evt=None):
         self.sig_cursorSelected.emit(self._cursorId_)
@@ -769,14 +789,14 @@ class SignalCursor(QtCore.QObject):
         if self._cursor_type_ != SignalCursorTypes.crosshair:
             self.sig_reportPosition.emit(self.ID)
             
-    @pyqtSlot(tuple)
+    @Slot(tuple)
     @safeWrapper
     def slot_linkedPositionChanged(self, pos):
         signalBlockers = [QtCore.QSignalBlocker(c) for c in self._linked_cursors_]
         self.x = pos[0]
         self.y = pos[1]
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_line_selected_(self):
         if not self._follows_mouse_:
@@ -784,7 +804,7 @@ class SignalCursor(QtCore.QObject):
             self.sig_cursorSelected.emit(self.ID)
             
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_setSelected(self, val):
         if not self._follows_mouse_:
@@ -1212,7 +1232,7 @@ class SignalCursor(QtCore.QObject):
                 self._dragging_ = True
                 #print("_interpret_scene_mouse_events_ _dragging_", self._dragging_)
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_selected_in_scene_(self, evt):
         # NOTE: 2019-02-09 23:29:22
@@ -1225,18 +1245,18 @@ class SignalCursor(QtCore.QObject):
             (self.hline is not None and self.hline in items):
             self.sig_cursorSelected.emit(self.ID)
             
-    @pyqtSlot(object, object)
+    @Slot(object, object)
     def slot_line_Clicked(self, obj, evt):
         # print(f"{self.__class__.__name__}.slot_line_Clicked evt {evt}")
         # print(f"host item {self._host_graphics_item_}")
         if evt.button() == QtCore.Qt.MouseButton.RightButton:
             self.sig_lineContextMenuRequested.emit(self.ID)
             
-    @pyqtSlot()
+    @Slot()
     def slot_line_doubleClicked(self):
         self.sig_doubleClicked.emit(self.ID)
             
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_mouse_event_(self, evt):
         """Workaround to synchronize movement of BOTH lines when mouse is dragged in the scene.
@@ -1877,6 +1897,22 @@ class SignalCursor(QtCore.QObject):
     @property
     def isVertical(self):
         return self._vl_ is not None and self._hl_ is None
+    
+    def isVisible(self):
+        return (self._vl_ is not None and self._vl_.isVisible()) or (self._hl_ is not None and self._hl_.isVisible())
+    
+    def setVisible(self, val:bool):
+        if self._vl_ is not None:
+            self._vl_.setVisible(val)
+            
+        if self._hl_ is not None:
+            self._hl_.setVisible(val)
+            
+    def show(self):
+        self.setVisible(True)
+        
+    def hide(self):
+        self.setVisible(False)
             
     
 @safeWrapper

@@ -37,12 +37,14 @@ $launchArgs="python -Xfrozen_modules=off $myScipyenLaunchScript"
 
 $activateScriptContent = @"
 @echo off
+echo Activating python virtual environment (mamba) in $myCondaEnv
 $activateArgs1 && $activateArgs2
 "@
 
 
 $launchScriptContent = @"
 @echo off
+echo Activating python virtual environment (mamba) in $myCondaEnv
 $activateArgs1 && $activateArgs2 && $launchArgs
 "@
 
@@ -66,6 +68,6 @@ Set-Content -Path $activateScript -Value $activateScriptContent
 Write-host "To activate scipyen's environment call $activateScript"
 $launchScript=Join-Path -Path $myScriptsDir -ChildPath "scipyen.bat"
 Set-content -Path $launchScript -Value $launchScriptContent
-Write-host "To launch scipyen call $launchScript"
+Write-host "To launch scipyen from local git clone call $launchScript"
 
 

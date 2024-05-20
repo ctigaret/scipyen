@@ -18,9 +18,11 @@ import numpy as np
 import quantities as pq
 import neo
 import vigra
+from qtpy import (QtCore, QtWidgets, QtGui,)
+from qtpy.QtCore import Signal, Slot
 #from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5 import (QtCore, QtWidgets, QtGui,)
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
+# from PyQt5 import (QtCore, QtWidgets, QtGui,)
+# from PyQt5.QtCore import Signal, Slot
 #### END 3rd party modules
 
 #### BEGIN scipyen modules

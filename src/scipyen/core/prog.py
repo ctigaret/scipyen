@@ -32,7 +32,6 @@ import quantities as pq
 
 import colorama
 
-
 # try:
 #     import mypy
 # except:
@@ -1560,29 +1559,6 @@ def processtimefunc(func):
 #     return wrap
     
 
-def no_sip_autoconversion(klass):
-    """Decorator for classes to suppresses sip autoconversion of Qt to Python
-    types.
-    
-    Mostly useful to prevent sip to convert QVariant to a python type when
-    a QVariant is passed as argument to methods of Qt objects, inside the
-    decorated function or method.
-    
-    Parameter:
-    ==========
-    klass: a Qt :class:
-    
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            import sip
-            oldValue = sip.enableautoconversion(klass, False)
-            ret = func(*args, *kwargs)
-            sip.enableautoconversion(klass, oldValue)
-            return ret
-        return wrapper
-    return decorator
         
 #def cli_export(name:str):
     #def wrapper(f):

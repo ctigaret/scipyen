@@ -6,6 +6,7 @@ Module for image processing routines
 
 #### BEGIN core python modules
 import os, sys, traceback, warnings, numbers
+import typing
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -309,4 +310,8 @@ def sliceFilter():
     """
     pass
     
+def fftshift(img:vigra.VigraArray):
+    return vigra.VigraArray(np.fft.fftshift(img), img.dtype, "V", axistags = img.axistags)
+
+
     

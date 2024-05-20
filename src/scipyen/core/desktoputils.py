@@ -48,8 +48,11 @@ import xml.etree.ElementTree as ET
 from enum import Enum, IntEnum
 from functools import (singledispatch, singledispatchmethod)
 
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+from qtpy.QtCore import (Signal, Slot, Property,)
+# from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
 
 # desktop integration - according to freedesktop.org (XDG)
 # ATTENTION: DO NOT install xdg as it will mess up pyxdg
@@ -541,7 +544,7 @@ class PlacesItem(QtCore.QObject):
     
     """
     
-    # itemChanged = pyqtSignal(str, name="itemChanged")
+    # itemChanged = Signal(str, name="itemChanged")
     
     def __init__(self, address:str, parent):
         super().__init__(parent)
@@ -615,15 +618,15 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     of Python bindings for KDE framework libraries, but I'm not holding my breadth...
     
     """
-    errorMessage = pyqtSignal(str, name = "errorMessage", arguments=["message"])
+    errorMessage = Signal(str, name = "errorMessage", arguments=["message"])
     
-    setupDone = pyqtSignal(QtCore.QModelIndex, bool, name="setupDone", arguments=["index", "success"])
+    setupDone = Signal(QtCore.QModelIndex, bool, name="setupDone", arguments=["index", "success"])
     
-    teardownDone = pyqtSignal(QtCore.QModelIndex, object, object, name="teardownDone", arguments=["index", "error", "errorData"])
+    teardownDone = Signal(QtCore.QModelIndex, object, object, name="teardownDone", arguments=["index", "error", "errorData"])
     
-    reloaded = pyqtSignal(name="reloaded")
+    reloaded = Signal(name="reloaded")
     
-    supportedSchemesChanged = pyqtSignal(name = "supportedSchemesChanged")
+    supportedSchemesChanged = Signal(name = "supportedSchemesChanged")
     
     def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent)

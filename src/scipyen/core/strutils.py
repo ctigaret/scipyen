@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Various string utilties
 """
 
@@ -18,7 +19,8 @@ import quantities as pq
 import inflect
 InflectEngine = inflect.engine()
 
-from PyQt5 import QtCore, QtGui
+# from PyQt5 import QtCore, QtGui
+from qtpy import QtCore, QtGui
 
 REGEXP_METACHARACTERS = (".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "\\", "|", "(", ")")
 

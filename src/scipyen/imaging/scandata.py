@@ -4358,7 +4358,7 @@ class ScanData(BaseScipyenData):
         name: a string or None (default) -- when a string, it will be assigned 
             as new name for the result.
             
-        progressSignal None (default) or a pyqtSignal accepting an int as value
+        progressSignal None (default) or a Signal accepting an int as value
         
         progressValue None (default) or an int that will be emitted by progressSignal
                 after the code has executed

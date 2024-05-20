@@ -13,19 +13,20 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib.mlab as mlb
 from matplotlib.axes import Axes as Axes
+# NOTE: 2024-05-02 12:43:20
+# all below taken care on, in mainwindow.py
 # NOTE: 2019-07-29 18:27:45
-mpl.rcParams['backend']='Qt5Agg'
-mpl.rcParams["savefig.format"] = "svg"
-mpl.rcParams["xtick.direction"] = "in"
-mpl.rcParams["ytick.direction"] = "in"
-mpl.rcParams["svg.fonttype"]="none"
-# see NOTE: 2019-07-29 18:25:30 in pict.py
-mpl.use("Qt5Agg") 
-plt.rcParams['backend']='Qt5Agg'
-plt.rcParams["savefig.format"] = "svg"
-plt.rcParams["xtick.direction"] = "in"
-plt.rcParams["ytick.direction"] = "in"
-plt.rcParams["svg.fonttype"]="none"
+# mpl.rcParams['backend']='Qt5Agg'
+# mpl.rcParams["savefig.format"] = "svg"
+# mpl.rcParams["xtick.direction"] = "in"
+# mpl.rcParams["ytick.direction"] = "in"
+# mpl.rcParams["svg.fonttype"]="none"
+# mpl.use("QtAgg") 
+# plt.rcParams['backend']='Qt5Agg'
+# plt.rcParams["savefig.format"] = "svg"
+# plt.rcParams["xtick.direction"] = "in"
+# plt.rcParams["ytick.direction"] = "in"
+# plt.rcParams["svg.fonttype"]="none"
 
 import numpy as np
 import pandas as pd

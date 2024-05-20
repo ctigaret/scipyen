@@ -563,6 +563,10 @@ class ABFEpoch:
         # self._pulseWidth_in_samples_ = 0
         self._dacNum_ = -1
         
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__} Epoch {self.epochNumber} ({self.letter}), type {self.epochType.name}"
+        
+        
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
@@ -577,7 +581,8 @@ class ABFEpoch:
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
+        return all(np.all(utilities.safe_identity_check(getattr(self, p[0]), getattr(other, p[0]), idcheck=False)) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
+        # return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
         
     @property
     def letter(self) -> str:
@@ -1160,15 +1165,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        ret = True
-        for p in properties:
-            # NOTE: see NOTE: 2023-11-05 21:05:46 and NOTE: 2023-11-05 21:06:10
-            # if getattr(self, p[0]) != getattr(other, p[0]):
-            if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0])):
-                return False
+        # ret = True
+        # for p in properties:
+        #     # NOTE: see NOTE: 2023-11-05 21:05:46 and NOTE: 2023-11-05 21:06:10
+        #     if not np.all(getattr(self, p[0]) == getattr(other, p[0])):
+        #     # if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False):
+        #         return False
         
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
-        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
 
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!
@@ -1207,17 +1212,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 if not np.all(myattr == otherattr):
                     return False
             else:
-                # if getattr(self, p[0]) != getattr(other, p[0]):
                 if myattr != otherattr:
                     return False
-        # check equality of properties (descriptors); this includes nSweeps and nADCChannels
-        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
         
         if ret:
             for k in range(self.nDACChannels):
                 if not self.getDAC(k).is_identical_except_digital(other.getDAC(k)):
                     return False
-            # ret = all(self.getDAC(d).is_identical_except_digital(other.getDAC(d)) for d in range(self.nDACChannels))
                     
         if ret:
             for k in range(self.nADCChannels):
@@ -1792,7 +1793,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     def getPathwaysDigitalStimulationSequence(self, pathways:typing.Sequence[SynapticPathway],
                                         dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                                        byFirstStimulus:bool=True):
+                                        byFirstStimulus:bool=True,
+                                        indices:bool=True):
         """Returns sweep-specific digital stimulation of pathways.
         
         Often, a protocol is used to digitally stimulate more than one synaptic
@@ -1800,8 +1802,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         pathways based on short-term plasticity phenomena such as paired-pulse
         facilitation).
         
-        This function helps identifying such cases, abnd the order in which the 
-        pathways are stimulated, in each sweep.
+        This function helps identifying such cases, including the order in which 
+        the pathways are stimulated, in each sweep.
         
         For each sweep in the protocol, returns a tuple with the indices of the 
         pathways that have been stimulated (in the `pathways` sequence), ordered
@@ -1842,11 +1844,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
             When False, the output reflects sequence of pathways in all ABF Epochs
             that emit stimulus signals. See examples below
         
+        indices: bool, default is True.
+            When True, the returned tuple will contain
+            the indexes of the pathways in the sequence of pathways suppkied in 
+            the 'pathways' parameter (see above)
+            When False, the return tuple will contin a reference to 
+            the pathway itself
+            
+        
         Returns:
         -------
         A tuple of 2-tuples, eacb containing:
-            sweep index, tuple of indexes in the `pathways` sequence, for the 
-                pathways that have been stimulated in that sweep
+            sweep index, tuple of indexes in the `pathways` sequence (when the 
+                'indices' parameter is True), or tuple of pathways (when 'indices'
+                is False) that have been stimulated in that sweep.
         
         NOTE: Depending on the value of the `byFirstStimulus` parameter (see above)
             the tuple of pathway indexes contains:
@@ -1967,6 +1978,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if not all(isinstance(v, self.SynapticPathway) for v in pathways):
             raise TypeError("`pathways` expected to be a sequence of ephys.SynapticPathway objects")
         
+        # pathways = utilities.unique([p for p in pathways if p.stimulus.dig])
         pathways = [p for p in pathways if p.stimulus.dig]
         
         if len(pathways) == 0:
@@ -1975,7 +1987,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         if byFirstStimulus:
             # NOTE: 2024-03-10 20:11:22
-            # description of the algorithm (one-liner nested comprehensions)
+            # description of the algorithm in the one-line nested comprehension
+            # below:
             # for each sweep:
             #   for each pathway:
             #       get the epochs with digital stimulus ON for the pathway's stimulus channel, in current sweep
@@ -1984,15 +1997,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
             #       take out (filter) the entries with no epochs
             #       sort entries by the start time of the first epoch in the entry (does nothing of no entry left after the filter step)
             # collect a tuple of tuples: (sweep index, tuple of pathway indices ordered by the time of their first epoch, sorted above)
-            return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
+            if indices:
+                return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
+            return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(p, dac.getEpochsForDigitalChannel(p.stimulus.channel, s)) for p in pathways]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
+            
         else:
             # NOTE: 2024-03-10 20:14:34
             # description of the algorithm (one-liner nested comprehensions)
             # for each sweep:
             #   get epochs with digital output
-            #   collect out those that use the stimulus digital channel declared in the pathway specifications
+            #   collect only those that use the stimulus digital channel declared in the pathway specifications
             # collect a tuple of tuples: (sweep index, tuple of pathway indices stimulated in all epochs in the sweep)
-            return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+            if indices:
+                return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+            return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda p: p.stimulus.channel == c, pathways) for c in e.getUsedDigitalOutputChannels(s%2 > 0))])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
                 
     
     @property
@@ -2263,7 +2281,7 @@ class ABFInputConfiguration:
         
         props = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        return np.all(getattr(self, p[0]) == getattr(other, p[0]) for p in props if x[0] != "protocol")
+        return np.all([utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False) for p in props if p[0] != "protocol"])
 
     def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex
@@ -2634,7 +2652,8 @@ class ABFOutputConfiguration:
             if p[0] not in ("protocol", "epochs"):
                 # NOTE: 2023-11-05 21:05:46
                 # no need to compare all; just compare until first distinct one
-                if getattr(self, p[0]) != getattr(other, p[0]):
+                # if getattr(self, p[0]) != getattr(other, p[0]):
+                if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False):
                     return False
         # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] != "protocol")
 
@@ -2686,10 +2705,6 @@ class ABFOutputConfiguration:
             for k in range(len(epochs)):
                 if not epochs[k].is_identical_except_digital(other_epochs[k]):
                     return False
-            # ret = all(self.epochs[k].is_identical_except_digital(other.epochs[k]) for k in range(len(self.epochs)))
-
-        # if ret:
-        #     ret = all(np.all(self.getEpochsTable(s, includeDigitalPattern=False) == other.getEpochsTable(s, includeDigitalPattern=False)) for s in range(self.protocol.nSweeps))
                     
         return ret
     

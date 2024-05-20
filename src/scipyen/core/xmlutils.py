@@ -28,8 +28,12 @@ import xml.dom.minidom
 
 # 2016-08-16 09:30:07
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5
-from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
+from qtpy.QtCore import (Signal, Slot, )
+# from qtpy.uic import loadUiType as __loadUiType__
+
+# from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
+# from PyQt5.QtCore import (Signal, Slot, )
 # from PyQt5.uic import loadUiType as __loadUiType__
 #from datatypes import DataBag
 # NOTE: use Python re instead of QRegExp
@@ -172,126 +176,126 @@ def attributesToDict(node):
         
     return ret
 
-def createXQuery(xmlstring, useXSLT=False):
-    ''' 
-    FIXME: when calling evaluateToString on the returned object, python crashes
-    -- why ?!?
-    
-    however, is does not crash when called inside testQuery function below
-    
-    Helper function to create an QXmlQuery (QtXmlPatterns XQuery) object on an XML document given as a string.
-    
-    Arguments:
-        
-            xmlstring = a string representation of an XML document;
-                        This string is bound to the XQuery variable $input
-                        
-            useXSLT = a boolean, optional (default: False) specifying the language
-                        the XQuery object (False: use XQuery 1.0; True: use XSLT 2.0)
-    
-    
-    Returns: an QXmlQuery object with the input XML document (as string) bound
-            to the internal variable $input,
-            
-            The language used is XQuery 1.0 (XPath), unless the useXSLT=True is passed
-            as argument.
-            
-            In either case, the XQuery uses a default (emty) namepool.
-            
-            The XQuery object has no query set, therefore is empty and invalid. 
-            
-            Before evaluating it, one must call one of the setQuery(...) methods.
-    
-    '''
-    device = QtCore.QBuffer()           # this is a QIOdevice
-    
-    device.setData(xmlstring.encode()) 
-    
-    device.open(QtCore.QIODevice.ReadOnly)
-    
-    if useXSLT:
-        xquery = QtXmlPatterns.QXmlQuery(QtXmlPatterns.QXmlQuery.XSLT20)
-    else:
-        xquery = QtXmlPatterns.QXmlQuery()
-    
-    xquery.bindVariable("input",device)
-    
-    device.close()
-    
-    return xquery
-
-def testQuery(stringdata, querystring=None):
-    ''' test xquery on the OME XML metadata -- doesn't seem to work properly
-    '''
-    device = QtCore.QBuffer()           # this is a QIOdevice
-    
-    # pass the string to the device
-    # NOTE: support for creating a QByteArray from a Latin-1 encoded string is 
-    # deprecated in PyQt v5.4 and will be removed in v5.5
-    # therefore we call encode() function (by default uses utf-8 codec) to generate
-    # a QByteArray
-    device.setData(stringdata.encode()) 
-    
-    
-    # NOTE: alternatively:
-    #qba = QtCore.QByteArray()
-    #qba.append(stringdata.encode()) # see comment above
-    #device = QtCore.QBuffer(qba) # create the QIODevice in memory, on the QByteArray
-    
-    
-    # whichever way the QIODevice has been created, it MUST be open in ReadOnly mode
-    device.open(QtCore.QIODevice.ReadOnly)
-    
-    # create an XQuery object
-    xquery = QtXmlPatterns.QXmlQuery()
-    
-    # now we bind the xquery to the data stream from the "device"
-    xquery.bindVariable("input",device)
-    
-    # another option might be to set focus to the string data !?
-    #xquery.setFocus(stringdata)
-    
-    if querystring is None:
-        querystring = "doc($input)"
-    else:
-        querystring = "doc($input)" + querystring
-        
-    print("querystring: ", querystring)
-
-    xquery.setQuery(querystring)
-    
-    #namePool = xquery.namePool()
-    
-    #print("namePool: ", namePool)
-    
-    #xquery.values()
-    
-    
-    if xquery.isValid():
-        xmlitems = QtXmlPatterns.QXmlResultItems()
-        xquery.evaluateTo(xmlitems)
-        
-        # without a querystring argument, the following returns a string 
-        # representation of the document node 
-        # a.k.a the root element in the OME XML metadata with its attributes and
-        # contents (i.e. children, if any) -- that is, it returns the part 
-        # of the stringdata between and including the OME start and end tags: 
-        # <OME> ... <OME/>; in other words, it skips the processing instructions header
-        # (<?xml ... ?>)
-        # 
-        # ret is basically the result of concatenating a QStringList (NOT present in PyQt5)
-        ret = xquery.evaluateToString() 
-        
-    else:
-        xmlitems = None
-        ret = None
-        print("invalid query")
-        
-    device.close()
-    
-    return ret, xmlitems
-    
-    #return (ret, xmlitems, xquery)
+# def createXQuery(xmlstring, useXSLT=False):
+#     ''' 
+#     FIXME: when calling evaluateToString on the returned object, python crashes
+#     -- why ?!?
+#     
+#     however, is does not crash when called inside testQuery function below
+#     
+#     Helper function to create an QXmlQuery (QtXmlPatterns XQuery) object on an XML document given as a string.
+#     
+#     Arguments:
+#         
+#             xmlstring = a string representation of an XML document;
+#                         This string is bound to the XQuery variable $input
+#                         
+#             useXSLT = a boolean, optional (default: False) specifying the language
+#                         the XQuery object (False: use XQuery 1.0; True: use XSLT 2.0)
+#     
+#     
+#     Returns: an QXmlQuery object with the input XML document (as string) bound
+#             to the internal variable $input,
+#             
+#             The language used is XQuery 1.0 (XPath), unless the useXSLT=True is passed
+#             as argument.
+#             
+#             In either case, the XQuery uses a default (emty) namepool.
+#             
+#             The XQuery object has no query set, therefore is empty and invalid. 
+#             
+#             Before evaluating it, one must call one of the setQuery(...) methods.
+#     
+#     '''
+#     device = QtCore.QBuffer()           # this is a QIOdevice
+#     
+#     device.setData(xmlstring.encode()) 
+#     
+#     device.open(QtCore.QIODevice.ReadOnly)
+#     
+#     if useXSLT:
+#         xquery = QtXmlPatterns.QXmlQuery(QtXmlPatterns.QXmlQuery.XSLT20)
+#     else:
+#         xquery = QtXmlPatterns.QXmlQuery()
+#     
+#     xquery.bindVariable("input",device)
+#     
+#     device.close()
+#     
+#     return xquery
+# 
+# def testQuery(stringdata, querystring=None):
+#     ''' test xquery on the OME XML metadata -- doesn't seem to work properly
+#     '''
+#     device = QtCore.QBuffer()           # this is a QIOdevice
+#     
+#     # pass the string to the device
+#     # NOTE: support for creating a QByteArray from a Latin-1 encoded string is 
+#     # deprecated in PyQt v5.4 and will be removed in v5.5
+#     # therefore we call encode() function (by default uses utf-8 codec) to generate
+#     # a QByteArray
+#     device.setData(stringdata.encode()) 
+#     
+#     
+#     # NOTE: alternatively:
+#     #qba = QtCore.QByteArray()
+#     #qba.append(stringdata.encode()) # see comment above
+#     #device = QtCore.QBuffer(qba) # create the QIODevice in memory, on the QByteArray
+#     
+#     
+#     # whichever way the QIODevice has been created, it MUST be open in ReadOnly mode
+#     device.open(QtCore.QIODevice.ReadOnly)
+#     
+#     # create an XQuery object
+#     xquery = QtXmlPatterns.QXmlQuery()
+#     
+#     # now we bind the xquery to the data stream from the "device"
+#     xquery.bindVariable("input",device)
+#     
+#     # another option might be to set focus to the string data !?
+#     #xquery.setFocus(stringdata)
+#     
+#     if querystring is None:
+#         querystring = "doc($input)"
+#     else:
+#         querystring = "doc($input)" + querystring
+#         
+#     print("querystring: ", querystring)
+# 
+#     xquery.setQuery(querystring)
+#     
+#     #namePool = xquery.namePool()
+#     
+#     #print("namePool: ", namePool)
+#     
+#     #xquery.values()
+#     
+#     
+#     if xquery.isValid():
+#         xmlitems = QtXmlPatterns.QXmlResultItems()
+#         xquery.evaluateTo(xmlitems)
+#         
+#         # without a querystring argument, the following returns a string 
+#         # representation of the document node 
+#         # a.k.a the root element in the OME XML metadata with its attributes and
+#         # contents (i.e. children, if any) -- that is, it returns the part 
+#         # of the stringdata between and including the OME start and end tags: 
+#         # <OME> ... <OME/>; in other words, it skips the processing instructions header
+#         # (<?xml ... ?>)
+#         # 
+#         # ret is basically the result of concatenating a QStringList (NOT present in PyQt5)
+#         ret = xquery.evaluateToString() 
+#         
+#     else:
+#         xmlitems = None
+#         ret = None
+#         print("invalid query")
+#         
+#     device.close()
+#     
+#     return ret, xmlitems
+#     
+#     #return (ret, xmlitems, xquery)
 
 def testExpatParse(data, sep=None):
     def start_element(name, attrs):
