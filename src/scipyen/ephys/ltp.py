@@ -2357,7 +2357,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                         if label not in self._runData_.viewers[src_name][path_name]:
                             self._runData_.viewers[src_name][path_name][label] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_,
                                                                                                 win_title=f"{src_name} {path_name} {label}")
-                            self._runData_.viewers[src_name][path_name][label].setGeometry(QtCore.QRect(x, y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
+                            self._runData_.viewers[src_name][path_name][label].setGeometry(QtCore.QRect(x + k*self._runData_.resultWindowSize[0], y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
                             self._runData_.viewers[src_name][path_name][label].hideSelectors()
                             self._runData_.viewers[src_name][path_name][label].hideNavigator()
                             self._runData_.viewers[src_name][path_name][label].hideMainToolbar()
@@ -2472,7 +2472,12 @@ class LTPOnline(QtCore.QObject):
         # user-defined location measures are NOT used (for now)
         super().__init__(parent=parent)
         
+        self._useEmbeddedProtocol = useEmbeddedProtocol
+        self._useSlopeInIClamp=  useSlopeInIClamp
+        self._autoStart = autoStart
         self._stdout_ = out
+        self._timeout = timeout
+        self._commonViewerForSourceMeasures = commonViewerForSourceMeasures
         
         self._running_ = False
         # self._sources_ = None # preallocate
@@ -2504,11 +2509,6 @@ class LTPOnline(QtCore.QObject):
         self._screen_ = self._emitterWindow_.desktopScreen
         self._titlebar_height_ = QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)
         self._screenGeometry_ = self._screen_.geometry()
-        if sys.platform == "win32":
-            y = self._screenGeometry_.y() + self._titlebar_height_
-        else:
-            y = self._screenGeometry_.y()
-        
         self._viewerWinWidth  = 750
         self._viewerWinHeight = 450
         self._resultWinWidth  = 400
@@ -2534,80 +2534,9 @@ class LTPOnline(QtCore.QObject):
         
         # NOTE: 2024-05-10 13:32:25
         # populate pathways straight away
-        for src in self._sources_:
-            pathways = src.pathways
-            if len(pathways) == 0:
-                scipywarn(f"Ignoring source {src.name} which does not declare any pathways")
-                continue
-                
-            # NOTE: 2024-05-10 14:35:42
-            # these two variables are ALWAYS present, as they are defined at 
-            # source level (i.e., nothing to do with the actual protocol)
-            # dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))]
-            dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways)]
-            # self.print(f"source {printStyled(src.name, 'green', True)}")
-            # self.print(f"dig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
-            # self.print(f"dac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
-            # bad_dac_paths = [p for p in dac_stim_pathways if p[1].stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
-            bad_dac_paths = [p for p in dac_stim_pathways if p.stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
+        self._parse_sources_()
         
-            if len(bad_dac_paths):
-                # scipywarn(f"The pathways {[p[1].name for p in bad_dac_paths]} in source {src.name} are incorrectly declared as using a recording DAC for stimulation; check how LTPOnline was invoked")
-                scipywarn(f"The pathways {[p.name for p in bad_dac_paths]} in source {src.name} are incorrectly declared as using a recording DAC for stimulation; check how LTPOnline was invoked")
-                continue
-            
-            self._results_[src.name] = dict()
-            self._viewers_[src.name] = dict()
-            
-            for k, p in enumerate(pathways):
-                self._results_[src.name][p.name] = {"pathway": p,
-                                                    "pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
-                
-                viewer = sv.SignalViewer(parent=self._parentWindow_, scipyenWindow = self._emitterWindow_,
-                                         win_title = f"{src.name} {p.name} Synaptic Responses")
-                viewer.sig_signalCursorPositionChanged[SignalCursor].connect(self.slot_signalCursorPositionChanged)
-                viewer.hideSelectors()
-                viewer.hideMainToolbar()
-                viewer.showNavigator()
-                # viewer.show()
-                
-                viewer.setGeometry(QtCore.QRect(self._screenGeometry_.x() + k * self._viewerWinWidth, y, 
-                                                self._viewerWinWidth, self._viewerWinHeight))
-                
-                self._viewers_[src.name][p.name] = {"pathway_viewer": viewer}
-#             
-            self._results_[src.name]["DACPaths"] = dac_stim_pathways
-            self._results_[src.name]["DIGPaths"] = dig_stim_pathways
-            
-        #
-        # ### END set up emitter window and viewers
-        
-        self._runData_ = DataBag(sources = self._sources_,
-                                 currentAbfTrial = None,
-                                 currentProtocol = None,
-                                 prevAbfTrial = None,
-                                 monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ list of protocols}
-                                 conditioningProtocols = dict(),
-                                 sweeps = 0, # the number of analysed sweeps
-                                 totalSweeps = 0, # the number of recorded sweeps
-                                 viewers = self._viewers_,
-                                 results = self._results_,
-                                 abfTrialTimesMinutes = list(),
-                                 abfTrialDeltaTimesMinutes = list(),
-                                 useSlopeInIClamp = useSlopeInIClamp,
-                                 useEmbeddedProtocol = useEmbeddedProtocol,
-                                 exportedResults = True,
-                                 # currentEpisodeType = RecordingEpisodeType.Tracking,
-                                 # previousEpisodeType = None,
-                                 pathStimsBySweep = tuple(),
-                                 episodes = list(),
-                                 newEpisodeOnNextRun = (RecordingEpisodeType.Tracking, None), # episode type, episode name
-                                 drug = None, # or a suitable mnemonic string
-                                 screenGeometry = self._screenGeometry_,
-                                 resultWindowSize = (self._resultWinWidth, self._resultWinHeight),
-                                 parentWindow = self._parentWindow_,
-                                 commonViewerForSourceMeasures = commonViewerForSourceMeasures,
-                                 )
+        self._setup_rundata_()
         
         self._abfTrialBuffer_ = collections.deque()
         
@@ -2617,40 +2546,11 @@ class LTPOnline(QtCore.QObject):
                                                              self._runData_,
                                                              self._stdout_)
         
-        self._simulation_ = None
+        # self._simulation_ = None
         
         self._simulatorThread_ = None
         
-        self._doSimulation_ = False
-        
-        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
-        
-        if isinstance(simulate, dict):
-            files = simulate.get("files", None)
-            timeout = simulate.get("timeout", 2000) # ms
-            directory = simulate.get("dir", None)
-            
-            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
-                self._doSimulation_ = True
-                
-            elif isinstance(directory, str) and os.path.isdir(directory):
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-                
-            elif isinstance(directory, pathlib.Path) and directory.is_dir():
-                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                self._doSimulation_ = True
-                
-        elif isinstance(simulate, bool):
-            self._doSimulation_ = simulate
-            if isinstance(timeout, int):
-                self._simulator_params_ = dict(files=None, timeout = int(timeout))
-                
-            
-        elif isinstance(simulate, (int, float)):
-            self._doSimulation_ = True
-            self._simulator_params_ = dict(files=None, timeout = int(simulate))
+        self._setup_simulation_params(simulate)
         
         if self._doSimulation_:
             # print(f"Simulator parameters: {self._simulator_params_}")
@@ -2663,7 +2563,7 @@ class LTPOnline(QtCore.QObject):
                                         out = self._stdout_)
             
             if not autoStart:
-                cdir = self._simulator_params_.get("dir", os.getcwd())
+                cdir = self._simulator_params_.get("dir", self._watchedDir_)
                 # self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n")
         
         else:
@@ -3025,8 +2925,13 @@ class LTPOnline(QtCore.QObject):
         if not isinstance(val, RecordingSource):
             raise TypeError(f"Expecting a RecordingSource; instead, got a {type(val).__name__}")
         
-        
         self.reset(force=False)
+        
+        self._sources_ = self._check_sources_(val)
+        
+        self._parse_sources_()
+        
+        self._setup_rundata_()
         
     def newEpisode(self, episodeType:typing.Optional[typing.Union[RecordingEpisodeType, int, str]] = None, 
                    episodeName:typing.Optional[str]=None):
@@ -3374,14 +3279,148 @@ class LTPOnline(QtCore.QObject):
                                     viewer.clear()
                                 viewer.close()
         
+    def _parse_sources_(self):
+        if len(self._sources_) == 0:
+            return
         
+        if sys.platform == "win32":
+            y = self._screenGeometry_.y() + self._titlebar_height_
+        else:
+            y = self._screenGeometry_.y()
+        
+        
+        for src in self._sources_:
+            pathways = src.pathways
+            if len(pathways) == 0:
+                scipywarn(f"Ignoring source {src.name} which does not declare any pathways")
+                continue
+                
+            # NOTE: 2024-05-10 14:35:42
+            # these two variables are ALWAYS present, as they are defined at 
+            # source level (i.e., nothing to do with the actual protocol)
+            # dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x[1].stimulus.dig, enumerate(pathways))]
+            dac_stim_pathways, dig_stim_pathways = [list(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways)]
+            # self.print(f"source {printStyled(src.name, 'green', True)}")
+            # self.print(f"dig_stim_pathways: {printStyled(dig_stim_pathways, 'green', True)}")
+            # self.print(f"dac_stim_pathways: {printStyled(dac_stim_pathways, 'green', True)}")
+            # bad_dac_paths = [p for p in dac_stim_pathways if p[1].stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
+            bad_dac_paths = [p for p in dac_stim_pathways if p.stimulus.channel in (dac.physicalIndex, activeDAC.physicalIndex)]
+        
+            if len(bad_dac_paths):
+                # scipywarn(f"The pathways {[p[1].name for p in bad_dac_paths]} in source {src.name} are incorrectly declared as using a recording DAC for stimulation; check how LTPOnline was invoked")
+                scipywarn(f"The pathways {[p.name for p in bad_dac_paths]} in source {src.name} are incorrectly declared as using a recording DAC for stimulation; check how LTPOnline was invoked")
+                continue
+            
+            self._results_[src.name] = dict()
+
+            for k, p in enumerate(pathways):
+                self._results_[src.name][p.name] = {"pathway": p,
+                                                    "pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
+                
+            self._results_[src.name]["DACPaths"] = dac_stim_pathways
+            self._results_[src.name]["DIGPaths"] = dig_stim_pathways
+            
+        self._setup_pathway_viewers()
+            
+    def _setup_pathway_viewers(self):
+        if len(self._sources_) == 0:
+            return 
+        
+        if sys.platform == "win32":
+            y = self._screenGeometry_.y() + self._titlebar_height_
+        else:
+            y = self._screenGeometry_.y()
+            
+        for src in self._sources_:
+            self._viewers_[src.name] = dict()
+            pathways = [p["pathway"] for p_name, p in self._results_[src.name].items() if p_name not in ("DACPaths", "DIGPaths")]
+            
+            for k, p in enumerate(pathways):
+                self._results_[src.name][p.name] = {"pathway": p,
+                                                    "pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
+                
+                viewer = sv.SignalViewer(parent=self._parentWindow_, scipyenWindow = self._emitterWindow_,
+                                            win_title = f"{src.name} {p.name} Synaptic Responses")
+                viewer.sig_signalCursorPositionChanged[SignalCursor].connect(self.slot_signalCursorPositionChanged)
+                viewer.hideSelectors()
+                viewer.hideMainToolbar()
+                viewer.showNavigator()
+                # viewer.show()
+                
+                viewer.setGeometry(QtCore.QRect(self._screenGeometry_.x() + k * self._viewerWinWidth, y, 
+                                                self._viewerWinWidth, self._viewerWinHeight))
+                
+                self._viewers_[src.name][p.name] = {"pathway_viewer": viewer}
+        
+            
+    def _setup_simulation_params(self, simulate):
+        self._doSimulation_ = False
+        
+        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout, dir=None)
+        
+        if isinstance(simulate, dict):
+            files = simulate.get("files", None)
+            timeout = simulate.get("timeout", 2000) # ms
+            directory = simulate.get("dir", self._watchedDir_)
+            
+            if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
+                self._simulator_params_ = dict(files=files, timeout=self._timeout, dir=directory)
+                self._doSimulation_ = True
+                
+            elif isinstance(directory, str) and os.path.isdir(directory):
+                self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
+                self._doSimulation_ = True
+                
+            elif isinstance(directory, pathlib.Path) and directory.is_dir():
+                self._simulator_params_ = dict(files=files, timeout=self._timeout, dir=directory)
+                self._doSimulation_ = True
+                
+        elif isinstance(simulate, bool):
+            self._doSimulation_ = simulate
+            if isinstance(self._timeout, int):
+                self._simulator_params_ = dict(files=None, timeout = int(self._timeout), dir=self._watchedDir_)
+                
+            
+        elif isinstance(simulate, (int, float)):
+            self._doSimulation_ = True
+            self._timeout = int(simulate)
+            self._simulator_params_ = dict(files=None, timeout = self._timeout, dir=self._watchedDir_)
+            
+    def _setup_rundata_(self):
+        self._runData_ = DataBag(sources = self._sources_,
+                                 currentAbfTrial = None,
+                                 currentProtocol = None,
+                                 prevAbfTrial = None,
+                                 monitorProtocols = dict(), # maps src.name ↦ {path.name ↦ list of protocols}
+                                 conditioningProtocols = dict(),
+                                 sweeps = 0, # the number of analysed sweeps
+                                 totalSweeps = 0, # the number of recorded sweeps
+                                 viewers = self._viewers_,
+                                 results = self._results_,
+                                 abfTrialTimesMinutes = list(),
+                                 abfTrialDeltaTimesMinutes = list(),
+                                 useSlopeInIClamp = self._useSlopeInIClamp,
+                                 useEmbeddedProtocol = self._useEmbeddedProtocol,
+                                 resultsExported = True,
+                                 # currentEpisodeType = RecordingEpisodeType.Tracking,
+                                 # previousEpisodeType = None,
+                                 pathStimsBySweep = tuple(),
+                                 episodes = list(),
+                                 newEpisodeOnNextRun = (RecordingEpisodeType.Tracking, None), # episode type, episode name
+                                 drug = None, # or a suitable mnemonic string
+                                 screenGeometry = self._screenGeometry_,
+                                 resultWindowSize = (self._resultWinWidth, self._resultWinHeight),
+                                 parentWindow = self._parentWindow_,
+                                 commonViewerForSourceMeasures = self._commonViewerForSourceMeasures,
+                                 )
+        
+            
     def _reset_state_(self, *args,
               episodeName: str = "baseline",
                  useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
+                 useSlopeInIClamp:bool = False,
                  directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=False, # NOTE: change to True when done coding TODO
-                 parent=None,
+                 autoStart:bool=False,
                  simulate = None,
                  timeout = None,
                  out: typing.Optional[io.TextIOBase] = None,
@@ -3455,9 +3494,6 @@ class LTPOnline(QtCore.QObject):
             # print(f"\n\tadding {self._watchedDir_} to {self._emitterWindow_.__class__.__name__}.dirFileMonitor")
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, True)
 
-        
-        self._simulation_ = None
-        
         if isinstance(self._simulatorThread_, QtCore.QThread):
             self._simulatorThread_.requestInterruption()
             self._simulatorThread_.quit()
@@ -3465,70 +3501,36 @@ class LTPOnline(QtCore.QObject):
             self._simulatorThread_.deleteLater()
         
         self._simulatorThread_ = None
+        self._setup_simulation_params(simulate)
         
-        self._doSimulation_ = False
+        # self._doSimulation_ = False
         
-        self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
+        # self._simulator_params_ = dict(files=None, timeout=_LTPFilesSimulator_.defaultTimeout)
         
     def quit(self):
         self.reset(force=True)
         self.__del__()
         
-    def reset(self, *args,
-              episodeName: str = "baseline",
-                 useEmbeddedProtocol:bool=True,
-                 useSlopeInIClamp:bool = True,
-                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 autoStart:bool=False, # NOTE: change to True when done coding TODO
-                 parent=None,
-                 simulate = None,
-                 timeout = None,
-                 out: typing.Optional[io.TextIOBase] = None,
-                 locationMeasures: typing.Optional[typing.Sequence[LocationMeasure]] = None,
-                 force:bool=False) -> bool:
+    def reset(self, *args, episodeName: str = "baseline", force:bool=False) -> bool:
         
         if self.hasResults and not self._runData_.resultsExported and not force:
             scipywarn("There are unsaved results; call exportResults() first, or pass 'force=True' to this call")
             return False
         
         try:
-            self._reset_state_(*args, episodeName=episodeName, useEmbeddedProtocol=useEmbeddedProtocol, 
-                            useSlopeInIClamp=useSlopeInIClamp, directory=directory, autoStart=autoStart, # NOTE: change to True when done coding TODO
-                            parent=parent, simulate=simulate, timeout=timeout, out=out,
-                            locationMeasures=locationMeasures)
+            self._reset_state_(*args, episodeName=episodeName, useEmbeddedProtocol=self._useEmbeddedProtocol, 
+                            useSlopeInIClamp=self._useSlopeInIClamp, directory=self._watchedDir_, 
+                            autoStart=self._autoStart, # NOTE: change to True when done coding TODO
+                            simulate=self._simulator_params_, timeout=self._timeout, out=self._stdout_,
+                            locationMeasures=self._locationMeasures_)
 
             self._abfProcessorThread_ = _LTPOnlineFileProcessor_(self,
                                                                 self._emitterWindow_,
                                                                 self._abfTrialBuffer_,
                                                                 self._runData_,
                                                                 self._stdout_)
-            
-            if isinstance(simulate, dict):
-                files = simulate.get("files", None)
-                timeout = simulate.get("timeout", 2000) # ms
-                directory = simulate.get("dir", None)
-                if isinstance(files, (tuple,list)) and len(files) > 0 and all(isinstance(v, str) for v in files):
-                    self._simulator_params_ = dict(files=files, timeout=timeout, dir=None)
-                    self._doSimulation_ = True
-                    
-                elif isinstance(directory, str) and os.path.isdir(directory):
-                    self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                    self._doSimulation_ = True
-                    
-                elif isinstance(directory, pathlib.Path) and directory.is_dir():
-                    self._simulator_params_ = dict(files=files, timeout=timeout, dir=directory)
-                    self._doSimulation_ = True
-                    
-            elif isinstance(simulate, bool):
-                self._doSimulation_ = simulate
-                if isinstance(timeout, int):
-                    self._simulator_params_ = dict(files=None, timeout = int(timeout))
-                    
-                
-            elif isinstance(simulate, (int, float)):
-                self._doSimulation_ = True
-                self._simulator_params_ = dict(files=None, timeout = int(simulate))
-            
+            # self._setup_simulation_params(simulate)
+
             if self._doSimulation_:
                 self._simulatorThread_ = _LTPFilesSimulator_(self, self._simulator_params_, self._stdout_)
                 self._simulatorThread_.simulationDone.connect(self._slot_simulationDone)
@@ -3537,7 +3539,7 @@ class LTPOnline(QtCore.QObject):
                                             simulator = self._simulatorThread_,
                                             out = self._stdout_)
                 
-                if not autoStart:
+                if not self._autoStart:
                     cdir = self._simulator_params_.get("dir", os.getcwd())
                     # self.print(f"\nCall start() method of this LTPOnline instance to simulate a Clampex experiment using ABF files in {cdir}.\n")
 
@@ -3551,7 +3553,7 @@ class LTPOnline(QtCore.QObject):
             self._exported_results_ = True
             self._abfSupplierThread_.abfTrialReady.connect(self._abfProcessorThread_.processAbfFile,
                                                         QtCore.Qt.QueuedConnection)
-            if autoStart:
+            if self._autoStart:
                 self._abfSupplierThread_.start()
                 self._abfProcessorThread_.start()
                 self._running_ = True
@@ -3923,6 +3925,15 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         
                     
     def _generate_recording_source(self) -> RecordingSource:
+        if isinstance(getattr(self, "_oltp", None), LTPOnline):
+            if self._oltp.running:
+                return
+        
+            if self._oltp.hasResults and not self._oltp.resultsExported:
+                carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
+                if not carryOn:
+                    return
+            
         adc = self.ADCIndexSpinBox.value()
         dac = self.DACIndexSpinBox.value()
         path0 = self.path0SpinBox.value()
@@ -3966,6 +3977,9 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                                                    path1name = path1Name)
         # print(f"src = {src}")
         self._metadata_.source = src
+        
+        if isinstance(getattr(self, "_oltp", None), LTPOnline):
+            self._oltp.newSource(self._metadata_.source)
         
                 
 def generate_synaptic_plasticity_options(npathways, mode, /, **kwargs):
