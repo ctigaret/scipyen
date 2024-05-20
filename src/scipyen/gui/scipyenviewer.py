@@ -204,7 +204,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # session
         # >>> NOTE <<< you still get the "qt.qpa.wayland: Wayland does not support QWindow::requestActivate()"
         # warnings at the system console, though ⌢
-        if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+        elif sys.platform == "linux" and os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             parent = None
             
         super().__init__(parent)
