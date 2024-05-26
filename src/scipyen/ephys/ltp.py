@@ -693,6 +693,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         
     """
     sig_xtalk = Signal(bool, name="sig_xtalk")
+    sig_processingFile = Signal(object, name="sig_processingFile")
+    
     # TODO: 2024-03-03 22:09:16
     # detect triggers and add trigger events to the pathway blocks?
     # maybe ...
@@ -872,6 +874,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
         #   cross-talk trials and the pathway conditioning trial
         
         self.print(f"\n{self.__class__.__name__}.processAbfFile {printStyled(abfFile, 'yellow', True)}")
+        
+        self.sig_processingFile.emit(abfFile)
 
         try:
             currentAbfTrial = pio.loadAxonFile(str(abfFile))
@@ -1780,7 +1784,7 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                 for p in controlPaths:
                     b = self._runData_.results[src.name][p.name]["pathway_responses"]
                     seg = neo.Segment(index = segment.index)
-                    seg.name = f"{src.name} Conditioning {path.name} ({p.pathwayType.name})"
+                    seg.name = f"{src.name} Conditioning {p.name} ({p.pathwayType.name})"
                     seg.file_origin = self._runData_.currentAbfTrial.file_origin
                     seg.file_datetime = self._runData_.currentAbfTrial.file_datetime
                     seg.rec_datetime = self._runData_.currentAbfTrial.rec_datetime
@@ -2356,7 +2360,8 @@ class _LTPOnlineFileProcessor_(QtCore.QThread):
                     for k, label in enumerate(responseMeasures):
                         if label not in self._runData_.viewers[src_name][path_name]:
                             self._runData_.viewers[src_name][path_name][label] = sv.SignalViewer(parent=pw, scipyenWindow = self._emitter_,
-                                                                                                win_title=f"{src_name} {path_name} {label}")
+                                                                                                win_title=f"{src_name} {path_name} {label}",
+                                                                                                configTag = f"OnlineLTP_{label}_Viewer_{path_name}")
                             self._runData_.viewers[src_name][path_name][label].setGeometry(QtCore.QRect(x + k*self._runData_.resultWindowSize[0], y, self._runData_.resultWindowSize[0], self._runData_.resultWindowSize[1]))
                             self._runData_.viewers[src_name][path_name][label].hideSelectors()
                             self._runData_.viewers[src_name][path_name][label].hideNavigator()
@@ -2581,47 +2586,48 @@ class LTPOnline(QtCore.QObject):
             self._abfProcessorThread_.start()
             self._running_ = True
 
-    def __del__(self):
-        # we need to check attribute existence to cover the case when we delete
-        # an incompletely initialized object
-        if hasattr(self, "_running_") and self._running_:
-            self.stop()
-            
-        try:
-            self.closeViewers(True)
-            if hasattr(self, "_viewers_") and hasattr(self._viewers_, "clear"):
-                self._viewers_.clear()
+#     def __del__(self):
+#         # we need to check attribute existence to cover the case when we delete
+#         # an incompletely initialized object
+#         if hasattr(self, "_running_") and self._running_:
+#             self.stop()
+#             
+#         try:
+#             self.closeViewers(True)
+#             if hasattr(self, "_viewers_") and hasattr(self._viewers_, "clear"):
+#                 self._viewers_.clear()
+# 
+#             if hasattr(self, "_emitterWindow_") and self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
+#                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
+#                 
+#             if hasattr(self, "_simulatorThread_") and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
+#                 self._simulatorThread_.requestInterruption()
+#                 self._simulatorThread_.quit()
+#                 self._simulatorThread_.wait()
+#                 self._simulatorThread_.deleteLater()
+#                 self._simulatorThread_ = None
+#             
+#             if hasattr(self, "_abfSupplierThread_") and hasattr(self, "_abfProcessorThread_"):
+#                 self._abfSupplierThread_.abfListener.stop()
+#                 self._abfSupplierThread_.quit()
+#                 self._abfSupplierThread_.wait()
+#                 self._abfSupplierThread_.deleteLater()
+#                 self._abfSupplierThread_ = None
+#                 
+#                 self._abfProcessorThread_.quit()
+#                 self._abfProcessorThread_.wait()
+#                 self._abfProcessorThread_.deleteLater()
+#                 self._abfProcessorThread_ = None
+#             
+#         except:
+#             traceback.print_exc()
+#         
+#         if hasattr(super(object, self), "__del__"):
+#             super().__del__()
+#             
+#         self.__class__._instance = None
+#  
 
-            if hasattr(self, "_emitterWindow_") and self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-                self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-                
-            if hasattr(self, "_simulatorThread_") and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
-                self._simulatorThread_.requestInterruption()
-                self._simulatorThread_.quit()
-                self._simulatorThread_.wait()
-                self._simulatorThread_.deleteLater()
-                self._simulatorThread_ = None
-            
-            if hasattr(self, "_abfSupplierThread_") and hasattr(self, "_abfProcessorThread_"):
-                self._abfSupplierThread_.abfListener.stop()
-                self._abfSupplierThread_.quit()
-                self._abfSupplierThread_.wait()
-                self._abfSupplierThread_.deleteLater()
-                self._abfSupplierThread_ = None
-                
-                self._abfProcessorThread_.quit()
-                self._abfProcessorThread_.wait()
-                self._abfProcessorThread_.deleteLater()
-                self._abfProcessorThread_ = None
-            
-        except:
-            traceback.print_exc()
-        
-        if hasattr(super(object, self), "__del__"):
-            super().__del__()
-            
-        self.__class__._instance = None
-            
     def _check_sources_(self, *args):
         """Verifies consistency of recording sources:
         Requirements are either hard (•) or soft (∘); unmet soft requirements
@@ -3143,12 +3149,17 @@ class LTPOnline(QtCore.QObject):
                 for p_name, path in src.items():
                     if p_name in ("DACPaths", "DIGPaths"):
                         continue
+                    
+                    pathwayType = path["pathway"].pathwayType
+                    
                     path_responses = path["pathway_responses"]
                     if isinstance(path_responses, neo.Block):
                         path_responses.annotations["measures"] = dict()
                         path_responses.annotations["measures"].update(self._runData_.results[src_name][p_name]["measures"])
+                        path_responses.annotations["PathwayType"] = pathwayType.name
                         
-                    wf.assignin(path_responses, f"{src_name}_{p_name}_synaptic_responses")
+                    wf.assignin(path_responses, f"{src_name}_{p_name}_{pathwayType.name}_synaptic_responses")
+                    
                     initialResponse = [(k, v) for k, v in path.items() if k in ("EPSC0", "EPSP0")]
                     if len(initialResponse):
                         runTimesMinutes = initialResponse[0][1].times.flatten()
@@ -3203,8 +3214,8 @@ class LTPOnline(QtCore.QObject):
                     pathway_result.update(dict((k, path[k]) for k in fields))
                     dd = dict((k,v.flatten()) for k,v in pathway_result.items())
                     df = pd.DataFrame(dd, columns = list(dd.keys()), index = range(max(len(v) for v in dd.values())))
-                    if path["pathway"].pathwayType in (SynapticPathwayType.Test, SynapticPathwayType.Control):
-                        ptype = f"{path['pathway'].pathwayType.name}_"
+                    if pathwayType in (SynapticPathwayType.Test, SynapticPathwayType.Control):
+                        ptype = f"{pathwayType.name}_"
                     else:
                         ptype = ""
                     wf.assignin(pathway_result, f"{src_name}_{p_name}_{ptype}results_dict")
@@ -3232,21 +3243,28 @@ class LTPOnline(QtCore.QObject):
             self._simulatorThread_.resume()
     
     def stop(self):
+        # self.print(f"{self.__class__.__name__}.stop() called")
         if self._doSimulation_ and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
-            self._simulatorThread_.requestInterruption()
+            if self._simulatorThread_.isRunning():
+                self._simulatorThread_.requestInterruption()
             self._simulatorThread_.quit()
             self._simulatorThread_.wait()
+            # self._simulatorThread_.deleteLater()
             
         # NOTE: 2024-02-09 08:14:30
         # this will never occur
         # if isinstance(self._abfSupplierThread_, FileStatChecker):
         #     self._abfSupplierThread_.abfListener.stop()
 
-        self._abfSupplierThread_.quit()
-        self._abfSupplierThread_.wait()
-        
-        self._abfProcessorThread_.quit()
-        self._abfProcessorThread_.wait()
+        if isinstance(self._abfSupplierThread_, _LTPOnlineSupplier_):
+            self._abfSupplierThread_.quit()
+            self._abfSupplierThread_.wait()
+            # self._abfSupplierThread_.deleteLater()
+            
+        if isinstance(self._abfProcessorThread_, _LTPOnlineFileProcessor_):
+            self._abfProcessorThread_.quit()
+            self._abfProcessorThread_.wait()
+            # self._abfProcessorThread_.deleteLater()
         
         if self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
             self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
@@ -3265,6 +3283,10 @@ class LTPOnline(QtCore.QObject):
             wf.assignin(self._runData_, "rundata")
 
         # self.print("\nNow call the exportResults method of the LTPOnline instance")
+        
+    @property
+    def threads(self):
+        return (self._abfSupplierThread_, self._abfProcessorThread_, self._simulatorThread_)
             
     def closeViewers(self, clear:bool = False):
         if hasattr(self, "_viewers_"):
@@ -3340,7 +3362,8 @@ class LTPOnline(QtCore.QObject):
                                                     "pathway_responses": neo.Block(name=f"{src.name} {p.name}")}
                 
                 viewer = sv.SignalViewer(parent=self._parentWindow_, scipyenWindow = self._emitterWindow_,
-                                            win_title = f"{src.name} {p.name} Synaptic Responses")
+                                            win_title = f"{src.name} {p.name} Synaptic Responses",
+                                            configTag = f"OnlineLTP_Pathway_Viewer_{p.name}")
                 viewer.sig_signalCursorPositionChanged[SignalCursor].connect(self.slot_signalCursorPositionChanged)
                 viewer.hideSelectors()
                 viewer.hideMainToolbar()
@@ -3573,16 +3596,16 @@ class LTPOnline(QtCore.QObject):
         call `start` again.
         """
         if self._running_:
-            self.print("Already started")
+            # self.print("Already started")
             return
 
         self._abfSupplierThread_.start()
         self._abfProcessorThread_.start()
         
-        if self._doSimulation_:
-            self.print("Starting simulation\n\n")
-        else:
-            self.print(f"Monitoring directory {self._watchedDir_}\n\n")
+        # if self._doSimulation_:
+        #     self.print("Starting simulation\n\n")
+        # else:
+        #     self.print(f"Monitoring directory {self._watchedDir_}\n\n")
         
         self._running_ = True
         self._runData_.resultsExported = False
@@ -3599,6 +3622,44 @@ class LTPOnline(QtCore.QObject):
 
 # class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWindow__):
 class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
+    
+    help_text = ["Usage:",
+                 "• Launch Clampex, use the 'File/Set data filenames' menuitem to set the destination to an empty working directory."
+                 "• Using Scipyen's 'File System' tab navigate to the (empty) directory where Clampex outputs ABF files (see above)",
+                 "• From Scipyen's toolbar/Applications launch 'SynapticPlasticity - online'"
+                 "• Enter the relevant metadata in the fields at the top of the window",
+                 "• IMPORTANT: Make sure the ADC, DAC and Path0/1 fields point to the same channels as used by Clampex protocols",
+                 "  (Path names are arbitrary, but they should be relevant to the experiment)"
+                 "",
+                 "1. Acquire baseline synaptic responses",
+                 "• Press 'Start' button in the Synaptic Plasticity window",
+                 "• Start a tracking recording sequence using the Clampex Sequencing toolbar"
+                 "• For Cross-talk testing, use Clampex sequencing window to stop acquisition, then start a cross-talk recording sequence using Clampex seuquencing toolbar",
+                 " 𝑵𝑶𝑻𝑬: The tracking and cross-talk protocols MUST be defined such that:",
+                 "  ∘ they stimulate two pathways alternatively, using DIGITAL output channels (DIG)",
+                 "      □ the final trial saves TWO sweeps, one per pathway"
+                 "      □ for cross-talk, each sweep has different ORDER in which the two pathways are stimulated"
+                 "• You can alternate between tracking and cross-talk in this way, for any number of times.",
+                 ""
+                 "2. Apply conditoning to a single pathway",
+                 "------------------------------",
+                 "• Click on 'Conditionnig ON' button in Synaptic Plasticity window",
+                 "• In Clampex:",
+                 "  ∘ set up a new file name e.g. 'tbp', etc (choose something relevant)",
+                 "  ∘ using Clampex sequencing toolbar, start a recording sequences with the conditoning protocol",
+                 "• After conditoning, click 'Conditioning OFF' in Synaptic Plasticity window, then",
+                 "  in Clampex: ",
+                 "  ∘ set up the common nme for chase tracking"
+                 "  ∘ start recording a tracking sequence using Clampex sequencing toolbar",
+                 "",
+                 "At the end of the experiment, press 'Stop' in the Synaptic Plasticity window.",
+                 "Examine the results created in Scipyen workspace, export thenm as pickle files,",
+                 "  and also export the DataFrame objects as *.csv files"
+                 "",
+                 "To start a new session, navigate Scipyen to another empty directory; ",
+                 "Make sure you also set Clampex to output records in this new empty directory"]
+    
+    
     def __init__(self, simulate:bool=False, parent=None):
         super().__init__(parent=parent)
         
@@ -3630,12 +3691,14 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         
         self._generate_recording_source() # assigns to self._metadata_.source
         
-        self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
-                            emitterWindow = self.scipyenWindow, simulate= self._simulation_,
-                            parent=self)
+        self._oltp = None
         
-        if isinstance(self._oltp._abfProcessorThread_, _LTPOnlineFileProcessor_):
-            self._oltp._abfProcessorThread_.sig_xtalk.connect(self._slot_xtalk)
+        # self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
+        #                     emitterWindow = self.scipyenWindow, simulate= self._simulation_,
+        #                     parent=self)
+        
+        # if isinstance(self._oltp._abfProcessorThread_, _LTPOnlineFileProcessor_):
+        #     self._oltp._abfProcessorThread_.sig_xtalk.connect(self._slot_xtalk)
         
         # self._oltp.hideViewers()
         
@@ -3647,6 +3710,7 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 
         self.scipyenWindow.sig_changedDirectory.connect(self._slot_changedWorkingDirectory)
         self.loadSettings()
+        # self.currentDirLabel.setText(f"Work directory: {self.scipyenWindow.currentDir}")
         # self.show()
     
     def _configureUi_(self):
@@ -3700,46 +3764,76 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         
     @Slot()
     def _slot_startStop(self):
+        # print(f"{self.__class__.__name__}._slot_startStop()")
         ww = (self.metaDataWidget,  self.exportResultsPushButton,
               self.ADCIndexSpinBox, self.DACIndexSpinBox,
               self.path0SpinBox,    self.path0NameEdit,
               self.path1SpinBox,    self.path1NameEdit)
+        for w in ww:
+            w.setEnabled(True)
         
-        if self._oltp.running:
+        if isinstance(self._oltp, LTPOnline) and self._oltp.running:
+            # print("\tstopping oltp...")
             self._oltp.stop()
-            for w in ww:
-                w.setEnabled(True)
+            if self._oltp.hasResults and not self._oltp._runData_.resultsExported:
+                self._oltp.exportResults()
+            for thread in self._oltp.threads:
+                if isinstance(thread, QtCore.QThread):
+                    thread.quit()
+                    thread.wait()
+                    thread.deleteLater()
+                thread = None
+                
+            self._oltp = None
+            # for w in ww:
+            #     w.setEnabled(True)
             self.startStopPushButton.setText("Start")
-            self.startStopPushButton.setStatusTip("Start monitoring Clampex output")
-            self.startStopPushButton.setToolTip("Start monitoring Clampex output")
-            self.startStopPushButton.setWhatsThis("Start monitoring Clampex output")
-            self.conditioningPushButton.setEnabled(False)
-            self.runningLabel.setText("Idle")
+            # self.startStopPushButton.setStatusTip("Start monitoring Clampex output")
+            # self.startStopPushButton.setToolTip("Start monitoring Clampex output")
+            # self.startStopPushButton.setWhatsThis("Start monitoring Clampex output")
+            # self.conditioningPushButton.setEnabled(False)
+            # self.runningLabel.setText("Idle")
             
         else:
-            if self._oltp.hasResults and not self._oltp._runData_.resultsExported:
-                carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
-                if carryOn:
-                    self._oltp.reset(force=True)
-                else:
-                    return
+            self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
+                                emitterWindow = self.scipyenWindow, simulate= self._simulation_,
+                                parent=self)
                 
-            for w in ww:
-                w.setEnabled(False)
+            if isinstance(self._oltp._abfProcessorThread_, _LTPOnlineFileProcessor_):
+                self._oltp._abfProcessorThread_.sig_xtalk.connect(self._slot_xtalk)
+                self._oltp._abfProcessorThread_.sig_processingFile.connect(self._slot_processingFile)
+        
+            # for w in ww:
+            #     w.setEnabled(False)
                 
             self.startStopPushButton.setText("Stop")
-            self.startStopPushButton.setStatusTip("Stop monitoring Clampex output")
-            self.startStopPushButton.setToolTip("Stop monitoring Clampex output")
-            self.startStopPushButton.setWhatsThis("Stop monitoring Clampex output")
-            self.conditioningPushButton.setEnabled(True)
+            # self.startStopPushButton.setStatusTip("Stop monitoring Clampex output")
+            # self.startStopPushButton.setToolTip("Stop monitoring Clampex output")
+            # self.startStopPushButton.setWhatsThis("Stop monitoring Clampex output")
+            # self.conditioningPushButton.setEnabled(True)
+            
+            # print("\tstarting oltp...")
             self._oltp.start()
             self.runningLabel.setText("Running")
             
+    @Slot(object)
+    def _slot_processingFile(self, val:object):
+        if isinstance(val, pathlib.Path):
+            s = val.name
+            
+        elif isinstance(val, str) and os.path.isfile(val):
+            s = os.path.basename(val)
+        else:
+            s = val
+        self.statusBar().showMessage(f"Processing {s}")
+            
     @Slot(str)
     def _slot_changedWorkingDirectory(self, val):
-        if self._oltp.running:
+        if isinstance(self._oltp, LTPOnline) and self._oltp.running:
             return
-        self._oltp.directory = val
+        self.statusBar().showMessage(f"Work directory: {s}")
+        # self.currentDirLabel.setText(f"Work directory: {self.scipyenWindow.currentDir}")
+        # self._oltp.directory = val
         
     @Slot()
     def _slot_conditioningOnOff(self):
@@ -3777,7 +3871,7 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
     @Slot()
     def _slot_metaDataChanged(self):
         # print(f"{self.__class__.__name__}._slot_metaDataChanged")
-        if self._oltp.running:
+        if isinstance(self._oltp, LTPOnline) and self._oltp.running:
             return
         
         newData = False
@@ -3906,23 +4000,42 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
                 w.setPalette(p)
                 
-                
+#     def print(self, msg):
+#         if isinstance(self._stdout_, io.StringIO):
+#             print(msg, file = self._stdout_)
+#             
+#         elif isinstance(self._stdout_, io.TextIOBase):
+#             print(msg, file = self._stdout_)
+#         else:
+#             print(msg)
+            
+               
     def closeEvent(self, evt):
-        self._oltp.stop()
-        if self._oltp.hasResults and not self._oltp._runData_.resultsExported:
-            carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
-            if carryOn:
-                self._oltp.reset(force=True)
-            else:
-                return
+        # print(f"{self.__class__.__name__}.closeEvent(…)")
+        if isinstance(self._oltp, LTPOnline):
+            if self._oltp.running:
+                # print("\tstopping oltp...")
+                self._oltp.stop()
+                
+            if self._oltp.hasResults and not self._oltp._runData_.resultsExported:
+                # print("\toltp has results...")
+                carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
+                if carryOn:
+                    # print("\t\forcefully resetting oltp...")
+                    self._oltp.reset(force=True)
+                else:
+                    evt.ignore()
+                    return
         # self._oltp.reset(force=True)
         self.saveSettings()
-        if self.isTopLevel:
-            if any([v is self for v in self.appWindow.workspace.values()]):
-                self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
-                self.appWindow.removeFromWorkspace(self, by_name=False)
             
-        
+        # super().closeEvent(evt)
+        # if self.isTopLevel:
+        #     if any([v is self for v in self.appWindow.workspace.values()]):
+        #         print("\t\tremoving myself from workspace...")
+        #         self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
+        #         self.appWindow.removeFromWorkspace(self, by_name=False)
+        evt.accept()
                     
     def _generate_recording_source(self) -> RecordingSource:
         if isinstance(getattr(self, "_oltp", None), LTPOnline):

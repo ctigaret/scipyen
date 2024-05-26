@@ -217,7 +217,7 @@ and / or main digital output pattern (patch and field recording)</string>
         <item>
          <widget class="QPushButton" name="conditioningPushButton">
           <property name="enabled">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <property name="toolTip">
            <string>Activate conditioning mode for subsequent trials</string>
@@ -752,7 +752,7 @@ and / or main digital output pattern (patch and field recording)</string>
      <x>0</x>
      <y>0</y>
      <width>462</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
   </widget>
