@@ -26,13 +26,11 @@ function show_help ()
     echo -e "\tthis will include installing an activation script for the environmment \n"
 }
 
-scipyact
-
 if [ -z ${VIRTUAL_ENV} ]; then
     scipyact
 fi
 
-destination=${HOME}\scipyen_app 
+destination=${HOME}/scipyen_app 
 
 for i in "$@" ; do
     case $i in 
