@@ -1,0 +1,50 @@
+This notes are for rebuilding Python and Scipyen dependencies on a machine that
+was migrated or upgraded to a different Linux distribution.
+
+The steps necessary to build Python and scipyenv (with dependencies) from scratch
+see the accompanying README file in this directory.
+
+In particular, Python MUST BE REBUILT e.g., , after migrating from OpenSUSE Leap 
+15.2 to Tumbleweed (done so for Tumbleweed 20220213), so that packages that rely 
+on Python's C API (ctypes) can work again. 
+
+To rebuild Python:
+    1. run `make clean` then `configure` (as in the accompanying README file),
+    2. run `make` followed by `make altinstall` and `ldconfig`  
+
+    This is because ALL binary code (including the various tests run during the 
+    build process) must be built with the same version of the gcc compiler, 
+    including the test code.
+
+    
+ATTENTION:
+Since this means rebuilding Python with a new compiler version, the following 
+almost surely applies:
+
+Scipyen dependencies (3rd party software) that also need to be rebuilt
+(not least because of their dependence on Python, and of a new compiler) include:
+    
+    NEURON
+        
+        To rebuild, activate the scipyen virtual environment (see the file 
+        'INSTALL' in doc/install directory of the Scipyen git tree); it is best
+        to refresh the cloned 'nrn' git repository, then create a NEW out-of-source
+        build tree. 
+        
+        For example, assuming the sources are in $VIRTUAL_ENV/src:
+            cd $VIRTUAL_ENV/src/nrn
+            git checkout # NOTE: you should already be on the 'master' branch
+            git pull     # NOTE: this updates the local repository, by pulling
+                         # and merging all the changes
+            cd ..
+            mv nrn-build nrn-build-old
+            mkdir nrn-build
+            cd nrn-build
+            cmake-gui ../nrn # NOTE: follow the instructions in the 
+                             # $SCIPYEN/doc/install/INSTALL file, where $SCIPYEN
+                             # is the directory with the cloned scipyen git repo.
+            
+    VIGRA
+    
+    BOOST
+

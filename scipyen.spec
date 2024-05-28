@@ -479,7 +479,7 @@ if sys.platform == "win32":
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=os.path.join(scipyen_dir, "doc/install/pythonbackend.ico"),
+        icon=os.path.join(scipyen_dir, "install/pythonbackend.ico"),
         options = options
     )
 else:

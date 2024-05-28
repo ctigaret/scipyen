@@ -1,0 +1,77 @@
+# WARNING: some of the packages listed below may have already been installed, or 
+# are available from your Linux distribution. Therefore by installing them INSIDE
+# the virtual environment they will overshadow the packages in the system-wide
+# site-packages directory. This has consequences ONLY IF the virtual environment 
+# was created with the --system-site-packages option .
+#
+# ATTENTION: ONLY USE THIS FILE INSIDE A VIRTUAL PYTHON ENVIRONMENT (see INSTALL
+# for details).
+#
+# You may manually check this list against the python packages installed on 
+# your machine (either locally as "user", see $HOME/local/lib/pythonX.Y/site-packages,
+# or system-wide, see /usr/lib64/PythonX.Y.site-packages) and comment out, below,
+# the ones already installed on your system. Otherwise, the packages installed 
+# here will take precedence over those available.
+#
+#
+# NOTE: Not all packages here are used/needed by Scipyen in its current version
+# (some are installed for experimentation, e.g. the extra jupyter kernel packages,
+# and others). 
+
+numpy           
+sphinx          
+nose            
+confuse
+dill
+# PyQt5         # on Windows run 'pip install PyQt5'; 
+                # on Unix must build  - see INSTALL file
+jupyter
+jupyter_qtconsole_colorschemes
+ipython
+matplotlib
+viscm
+scipy
+sympy
+pandas
+pyqtgraph
+nixio
+neo
+h5py
+qimage2ndarray
+imreg-dft
+seaborn
+statsmodels
+pyxdg
+python-magic
+cmocean
+cmasher
+nibabel
+twine
+jupyter_cms
+jupyterlab
+jupyterthemes
+nodejs
+pingouin
+researchpy
+scikit-learn
+scikit-image
+octave_kernel
+gnuplot_kernel
+matlab_kernel
+cython
+bokeh
+pytest
+pyneuroml       # optional
+pylmeasure      # optional
+language_tool_python
+pyabf
+ipyparallel
+# also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
+# packages already listed above
+sphinx_rtd_theme
+nbconvert
+recommonmark
+plotnine
+plotly
+# NOTE as of 2021-10-12 11:59:52 might have to compile from source if using Python >= 3.9.7
+tables 

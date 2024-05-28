@@ -1,0 +1,496 @@
+PREAMBLE: This is for Windows 10
+=========
+I. LOCATION OF SOURCE CODE, BUILDS & INSTALLED LIBRARIES
+
+We follow the following convention:
+
+1) all source code and built software resides in a ROOT directory on a LOCAL
+drive (i.e. NOT mapped network drive or anything else)
+
+On this machine, the ROOT is E:\
+NOTE it can also be the virtual environment directory
+
+It goes without saying that you need read/write acess to that. Failing that,
+you MAY choose the ROOT to be a directory where you have read/write access.
+
+2) The path to the root and to all things inside it MUST NOT CONTAIN SPACES OR
+SPECIAL CHARACTERS (e.g accented characters, etc).
+
+3) The ROOT itself has the following subdirectories:
+    ROOT\src        - contains the source trees, including cloned git repositories
+                    NOTE this must be created manually
+                    
+    ROOT\bin        - installations will place built *.exe and *.dll here
+    ROOT\lib        - installations will place built *.lib files here
+    ROOT\include    - installations will place header files (e.g., *.h, *.hxx, *.hpp) here
+    ROOT\share      - installations will place other auxiliary files here
+    
+    Optional (these can be places somwhere else more convenient):
+    ROOT\downloads  - contains downloaded installers for ancillary software (see
+                      below) and archives of source trees NOT available from
+                      git/gitlab (e.g., boost_1_77_0.7z, etc.)
+
+    The directories ("bin", "lib", "include", "share") will be created during the
+    installation after building.
+
+    AFTER BUILDING AND INSTALLING THE FIRST LIBRARY BELOW (zlib) edit the
+    environment variables for your account (Using windows settings) to:
+
+    add ROOT\bin to PATH
+    create INCLUDE=e:\include
+    create LIB=e:\lib
+    
+    NOTE that these can also be set dynamically from within the scipact*.bat scripts
+
+    The "downloads" directory contains software installers for required software
+    as well as zip archives for source code trees that cannot be obtained from
+    online repositories (git, gitlab).
+
+    NOTE: This layout makes it very easy for CMake-based building of software
+    from source trees (as most of the ones below are)
+
+4) All source code trees for various libraries reside in their own subdirectories
+in ROOT\src
+
+II. DRIVE SPACE REQUIREMENTS
+----------------------------
+All source code trees and built dependencies will require about 20-30 GiB (tbc).
+so the drive containing the ROOT directory should have well in excess of that.
+
+Visual Studio and Code, Python and user-installed python packages via pip,
+usually reside on the C: drive (the pip-installed packages reside inside the
+Users\Your Account\AppData\Programs\PythonXY\Library\site-packages).
+Visual Studio also needs extra temporary drive space during building.
+To be comfortable, there should be a free space in excess of 20 GiB on your
+C: drive.
+
+Please take this into account if you decide to place ROOT on the C: drive.
+
+III. Compiler & toolset
+-----------------------
+The C compiler identification is MSVC 19.29.30133.0
+The CXX compiler identification is MSVC 19.29.30133.0
+Windows-10.0.19043
+
+For every library built in Visual Studio you need to make an x64-Release
+configuration
+    Build configurations: x64 release,
+        For CMake-based projects (as mot of them are) the CMAKE_BUILD_TYPE will
+        read "RelWithDebInfo"
+    toolset msvc_x64_x64 (as reported by VisualStudio)
+
+Configure to install each library in in ROOT (see I.3 above).
+
+    For CMake-based projects build with Visual Studio 2019 the installation
+    directory MUST be configured using the Advanced settings section of the
+    IDE's CMake settings - DO NOT change CMAKE_INSTALL_PREFIX.
+
+    Generally is it a BAD idea to make direct changes to CMake settings in
+    VisuaStudio - the only exception if building VigRA but we will use cmake-gui
+    to generate a solution (*.sln) file.
+
+IV. Prerequisites (ancillary software):
+--------------------------------------
+Visual Studio community editon 2019 and visual studio code;
+git, gh and github desktop
+7zip
+cmake - no need
+doxygen
+
+make sure no other CMake is on your path other than what is provided by
+Visual Studio 2019 (later we will use a standalone CMake-gui exe to build vigra,
+but that need not be on your PATH)
+
+NOTE: to use gh you should have an account with github (eaziest way and costs
+nothing) otherwise clone with VisualStudio ofr github desktop
+
+================================================================================
+
+Clone Scipyen git repo (dev branch):
+=====================================
+gh repo clone ctigaret/scipyen
+git checkout dev
+git pull
+
+
+Create python virtual environment
+=====================================
+e:
+virtualenv scipyenv -p python3
+modify and copy scipyact.bat to a Scripts directory in your home directory
+(i.e., your %USERPROFILE% e.g.c:\Users\your_user_name)
+Add the Scripts directory to your PATH (using Windows Settings, as described above)
+
+See scipyen/doc/install/Python/Windows/README Windows 10.txt for details
+
+1. build zlib
+=====================
+
+from https://zlib.net/ download zlib source code, version 1.2.11,
+zipfile format (730K,
+SHA-256 hash d7510a8ee1918b7d0cad197a089c0a2cd4d6df05fee22389f67f115e738b178d)
+
+extract to src => src\zlib-1.2.11
+
+NOTE: this is a CMake project
+
+open the \src\zlib-1.2.11 directory as "Folder" in VisualStudio 2019
+    create x64-Release configuration, build type: RelWithDebInfo
+    save and refresh CMake cache
+    go to advanced settings:
+        select Install directory: the ROOT (see above) where "bin", "include",
+            "lib" and "share" subdirectories will be created.
+
+    save configuration
+    build: Build menu -> Build All
+    install: Build menu -> Install zlib
+    close project
+    close Visual Studio
+
+Modify environment variables (in Windows Settings, search "environment", select
+"Modify Environment variables for your account"):
+(NOTE: 2021-10-07 16:13:05 these are now taken care of by the scipyact*.bat scripts,
+when ROOT is %VIRTUAL_ENV% of scipyenv)
+Add ROOT\bin to PATH
+Create INCLUDE=ROOT\include
+Create LIB=ROOT\lib
+
+(See PREAMBLE for what the ROOT is; on this machine, ROOT is E:)
+
+2. build libpng
+=======================
+download lpng1637.zip
+
+from https://sourceforge.net/projects/libpng/files/libpng16/1.6.37/lpng1637.zip/download?use_mirror=jztkft
+
+extract to src => src\lpng1637
+
+to build: launch visual studio 2019 -> "open project or solution" -> choose:
+    src\lpng1637\projects\vstudio\vstudio.sln
+
+accept all projects
+
+accept migration to VS 14.2 (VS community edition 2019) -> adaps all *.vcxproj files in
+the subdirectories
+
+open configuration manager,
+    in active solution platform (currently, win32) choose <new> ->
+        choose new platform: x64, check ON create new project platforms
+
+    in Active solution configurations select Release
+
+    in the Build check ONLY libpng (we will use the zlib built as above)
+
+    copy src\lpng1637\scripts\pnglibconf.h.prebuilt to src\lpng1637\pnglibconf.h
+
+    open properties for libpng (sub)project -> right click -> properties
+        -> Configuration properties:
+            -> VC++ directories:
+                -> Include directories -> add ROOT\include
+                -> External include directories -> add ROOT\include
+                -> Libray directories -> add ROOT\lib;ROOT\bin
+            -> C/C++:
+                -> General:
+                    -> Additional include directories -> add ROOT\src\lpng1637;ROOT\include
+                    -> Treat warning as errors -> No (/WX-)
+
+            -> Linker:
+                -> General:
+                    -> Additional librarr directories -> add ROOT\lib
+
+    Build menu -> build solution (Ctrl+Shift+B)
+    the built files are in
+    src\lpng1637\projects\vstudio\x64\Release
+    from there:
+        copy libpng16.dll, libpng16.pdb to ROOT\bin
+        copy libpng16.lib, libpng16.exp to ROOT\lib
+
+    also copy all include files (*.h) from src\lpng1637 to ROOT\include
+
+3. build jpeg9d (optional, see jpeg-turbo, below)
+
+4. build jpeg-turbo => jpeg AND jpeg-turbo
+==========================================
+gh repo clone winlibs/libjpeg
+open "folder" in VisualStudio 2019 -> CMake project
+configuration x64-Release:
+    build type RelWithDebInfo
+    toolset msvc_x64_x64
+    CMake generator: Ninja
+    CMake variables:
+        CMAKE_BUILD_TYPE=RelWithDebInfo
+        ENABLE_SHARED (true)
+        ENABLE_STATIC (true)
+        FORCE_INLINE (true)
+        WITH_ARITH_DEC (true)
+        WITH_ARITH_ENC (true)
+        WITH_JPEG7 (true)
+        WITH_JPEG8 (true)
+        WITH_MEM_SCRDST (true)
+        WITH_SIMD (true)
+        WITH_TURBOJPEG (true)
+
+5. build libtiff
+================
+from https://gitlab.com/libtiff/libtiff clone (blue button) -> open in Visual Studio Code (HTTPS)
+    -> choose location directory ROOT\src
+
+    => will create a clone of libtiff repository in ROOT\src\libtiff
+
+open visual studio -> Open a filder -> select ROOT\src\libtiff
+
+read through the CMake output
+
+create configuration x64-Release (in CMake Setting -> Configurations)
+
+Build menu -> build all
+Buils menu -> Install tiff
+
+check that it works: from http://www.simplesystems.org/libtiff/images.html
+download https://download.osgeo.org/libtiff/pics-3.8.0.tar.gz
+unpack with 7zip => ROOT\src\libtiffpics
+
+open command prompt, cd ROOT\libtiffpic
+tiffcp -lzw cramps.tif x.tif
+tiffcmp cramps.tif x.tif
+tiff2pdf -o cramps.pdf cramps.tif
+tiff2bw jello.tif jello_bw.tif
+
+also you may run tiffinfo on all tif files in this directory
+
+6. build Imath (NOTE this is "eye-math" not "ell-math" !)
+==============================================================
+get it from https://github.com/AcademySoftwareFoundation/Imath
+
+clone git repo:
+gh repo clone AcademySoftwareFoundation/Imath
+
+open "folder" in VS2019; as above make x64 release configuration, select ROOT
+for install directory (here this is e:\).
+
+Build all
+Install Imath
+
+7. build openEXR
+=================
+get it from https://github.com/AcademySoftwareFoundation/openexr
+cd to ROOT\src and clone git repo :
+gh repo clone AcademySoftwareFoundation/openexr
+
+open Visual Studio -> open folder -> ROOT\src\openexr
+create x64 release
+Imath should be recognized
+build & install
+
+8. build HDF5
+===============
+get the CMake version of the source tree :
+from https://www.hdfgroup.org/downloads/hdf5/source-code/
+download CMake-hdf5-1.12.1.zip
+extract
+copy build-VS2019-64-Hermes.bat from downloads to
+ROOT\src\CMake-hdf5-1.12.1
+
+Open command prompt, run vs64
+
+cd to ROOT\src\CMake-hdf5-1.12.1 and execute build-VS2019-64-Hermes
+
+don't worry about test 1726 - H5DUMP-tfloatsattrs (Failed) message
+(see here https://forum.hdfgroup.org/t/h5dump-test-failed/8762/2)
+to install, extract the newly created zip file
+ROOT\src\CMake-hdf5-1.12.1\build\HDF5-1.12.1-win64.zip and copy the contents of
+the subdirectories to their corresponding directories in ROOT
+(e.g. from bin\*.* to ROOT\bin, etc)
+NOTE: DO NOT copy zconf.h obe the one already present in ROOT\include
+(they are identical, and the latter has been provided by zlib, see above)
+
+
+9. Install fftw3 libraries
+=============================
+
+download fftw-3.3.5-dll64.zip from http://www.fftw.org/install/windows.html
+
+Extract all into ROOT\src\fftw3
+
+As per the above web page create import libraries (from an x64 command prompt):
+
+cd ROOT\src\fftw3
+
+lib /machine:x64 /def:libfftw3-3.def
+lib /machine:x64 /def:libfftw3f-3.def
+lib /machine:x64 /def:libfftw3l-3.def
+
+then copy:
+    *.exe and *.dll files to ROOT\bin
+    *.lib, *.def, *.exp files to ROOT\lib
+    *.h files (actually fftw3.h) to ROOT\include
+
+10.Install Boost libraries:
+===========================
+
+from https://www.boost.org/doc/libs/1_77_0/more/getting_started/windows.html#get-boost
+download boost_1_77_0.7z
+extract to ROOT\src\ => will create ROOT\src\boost_1_77_0
+Create the b2 Boost.Build program
+cd boost_1_77_0\tools\build
+bootstrap
+.\b2 --prefix=ROOT\Boost.Build toolset=msvc install
+
+(e.g., .\b2 --prefix=E:\Boost.Build\bin)
+
+App ROOT\Boost.Build\bin to PATH
+
+Restart the x64 command prompt
+
+go to ROOT\src\boost_1_77_0
+
+run (NOTE: make sure to replace root with the full real path; as per PREAMBLE 2
+spaces in the ROOT path should be avoided; where this is impossible, then all
+paths below should be enclosed in double-quotes):
+
+b2 toolset=msvc threading=multi address-model=64 variant=release link=shared -prefix=ROOT --build-type=complete msvc stage
+b2 toolset=msvc threading=multi address-model=64 variant=release link=shared -prefix=ROOT --build-type=complete msvc install
+
+When prefix is a drive this will install:
+    * the headers in ROOT\include\boost_1_77_0\boost
+        => add this to the INCLUDE environment variable
+
+    * the *.dll and *.lib files in ROOT\lib
+As per Getting Started page, create, build and run:
+1) header-only program in VS2019 (see heading 4 Build a simple program using boost)
+2)
+
+11. Build and install Qt5
+=========================
+Dependencies:
+    openssl <- perl, nasm
+    icu
+-----------------------------
+11.1 install Perl
+------------------------------
+Use:
+https://strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.msi
+-----------------------------
+11.1 install nasm
+------------------------------
+Use:
+https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/win64/nasm-2.15.05-installer-x64.exe
+-----------------------------
+11.1 Build and install openssl-
+------------------------------
+cd ROOT\src
+git clone https://github.com/openssl/openssl.git
+-----------------------------
+11.2 Build and install icu
+-----------------------------
+-----------------------------
+11.3 build and install Qt5
+-----------------------------
+cd ROOT\src
+git clone git://code.qt.io/qt/qt5.git
+cd Qt5
+git checkout 5.12
+
+
+12 Install python packages
+===========================
+a) Install in the virtual environment
+---------------------------------------
+install (using pip):
+sphinx, nose, PyQt5 (this will pull sip, PyQt5 and PyQt5-sip), numpy, scipy,
+sympy, jupyter, jupyter-qtconsole-colorschemes, matplotlib, jupyterlab,
+pyqtgraph, seaborn, statsmodels, scikit-learn, scikit-image, confuse,
+python-magic, pyxdg, neo, qimage2ndarray, pywavelets, imreg-dft, nixio, h5py
+pingouin, cmasher, cmocean, researchpy
+
+Check that PyQt5 works:
+start python then run:
+import sys
+from PyQt5 import QtWidgets
+app = QtWidgets.QApplication(sys.argv)
+win = QtWidgets.QMainWindow()
+win.show()
+
+close the window then exit()
+
+Check that jupyter qtconsole works:
+jupyter qtconsole
+
+
+Check that matplotlib works in qtconsole:
+%matlplotlib
+expect to see the message "Using matplotlib backend: Qt5Agg" (wait a while)
+import matplotlib.pyplot as plt
+plt.figure()
+exit
+
+Check that matplotlib also works in python
+(run the last three lines above; the %matplotlib is a jupyter-specific macro!)
+in addition you have to call plt.show() to display the figure , when in plain
+python.
+
+b) Install the above outside the virtual environment
+
+13 Build VIGRA
+==============
+
+cd to ROOT\src
+clone the vigra repo:
+git clone https://github.com/ukoethe/vigra.git
+    if cloning 1.11.0, replace:
+        vigra\src\impex\hdf5impex.cxx
+        vigra\vigranumpy\src\core\segmentation.cxx
+
+        with the ones supplied in downloads\vigra_patches
+
+        NOTE: the new hdf5impex.cxx uses a deprecated syntax which does not fit
+        the more recent function signature in H5Opublic.h
+
+        NOTE: the new segmentation.cxx adapts an issue in MSVC C++ sort
+        algorithm in <algorithm> header (apparently their compiler cannot
+        distinguish between iterator and const_iterator from the context -
+        unless there is a hidden compiler flag that would make it behave more
+        like gnu g++)
+
+
+Build using VisualStudio2019
+---------------------------------------
+
+NOTE: if you use the virtual environment then call VS2019 from the command prompt
+AFTER calling scipyact (ie. with the environment activated)
+
+Otherwise you may launch vs2019 as usual.
+
+Open "folder" ROOT\src\vigra
+
+create x64-Release configuration
+
+you may have to:
+1) point to the python libray - choose
+    ROOT\lib\boost_python39-vc142-mt-x64-1_77.lib
+
+build
+
+install
+
+from src\vigra\out\install\x64-Release\ copy:
+    bin\vigraimpex to e:\bin and e\lib
+    lib\*.* to e:\lib
+    include\*.* to e:\include
+
+(here e:\is considered the root)
+
+ATTENTION: the following is required to get python to properly load the vigra
+libraries in windows 10 using Python 3.9:
+in your own Scripts directory create a pyton script wih the following contents:
+
+import os
+os.add_dll_directory("e:/bin") # <-- replace here where vigraimpex.lib and vigraimpex.dll are
+os.add_dll_directory("e:/lib") # <-- replace here where vigraimpex.lib and vigraimpex.dll are
+
+Add the following line to your scipyact.bat script:
+SET PYTHONSTARTUP=%USERPROFILE%\Scripts\scipyen_startup.py
+
+
+
+

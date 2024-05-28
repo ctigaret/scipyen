@@ -1,0 +1,644 @@
+Last modified 2021-06-09 14:47:34
+
+This file describes how to install scipyen and its dependencies in a virtual
+environment (python3), independent of the system or local (i.e. "user") python
+site packages.
+
+The advantage of a virtual environment include the possibility of installing
+build software directly in this environment (without administrator privileges,
+and without interfering with system-wide or account-wide software).
+
+This means the software can be uninstalled re-built, etc, without worrying about
+the local account or system-wide interference.
+
+Requires ~ 1 GiB in home directory (including source trees, see below)
+
+Prerequisites:
+--------------
+a. For creating the virtual environment:
+python3, python3-virtualenv, toml, setuptools, pip3, wheel
+
+b. The following software must be built inside the virtual environment (see
+    NOTE 2021-01-12 10:13:03 Separate builds, below):
+    1. sip
+    2. Pyqt5 - built using the host system's Qt5, but without the designer and 
+        qml plugins, and without the qscintila component.
+    3. PyQt5.sip module
+    4. vigra and python bindings for vigra (vigranumpy)
+    5. NEURON modelling software with python bindings
+    
+
+NOTE 2021-01-12 10:13:03 Separate builds
+------------------------------------------
+The source directories DO NOT need to be located inside the directory of the
+virtual python environment; they can be placed in a source repository separate
+from the environment itself, e.g. ~/scipyenv/src or ~/scipyenv-src.
+
+However, both the build and installation processes MUST be run from a shell
+with the virtual python environment activated (see points 1.2 and 1.3, below).
+
+By separating source and environment directories the source packages can be
+re-built for specific environments. 
+
+NOTE: 2021-01-14 09:02:07 Variations for individual software libraries:
+------------------------------------------------------------------------
+
+    *** Vigra and neuron software ***
+
+        These can be built "outside" the source directories (i.e. in build 
+        directories outside the source tree).
+
+        Out-of-source builds are recommended for both vigra and neuron. The
+        build processes are run from inside the build directories as detailed for 
+        Vigra (section 4) and NEURON (section 5) below. 
+
+        - The builds are configured using 'cmake' or 'cmake-gui'.
+
+        - 'make' performs the building (compiling and linking) of the software;
+
+        - 'make install' will install the software in the environment directory 
+        tree as per configuration as explained in sections 4 and 5.
+
+        Other optional commands are explained in sections 4 and 5.
+
+        NOTE 2021-01-12 11:15:51: all git repositories cloned below can be
+        refreshed (e.g. git checkout master then git pull) followed by 
+        rebuilding & installing
+
+    *** sip, PyQt5, PyQt5_sip module and node ***
+        These do not seem to support out-of-source builds. They must be unpacked
+        in the src directory and built INSIDE the resulting subdirectory.
+
+  1. Create Python 3 virtual environment
+  ======================================
+  
+  1.1 Prerequisites and shell command:
+  ------------------------------------
+  
+  shell command (assumes the python3, and NOT the python2 version of virtualenv
+                 is installed on the system):
+      
+  virtualenv --system-site-packages scipyenv
+  
+  
+  1.2 Activate the virtual environment --  everything below MUST be run under
+  the activated virtual python environment
+  ------------------------------------------------------------------------------
+  cd scipyenv
+  source bin/activate
+  
+  1.3 (Optional) make an activation command alias:
+  -------------------------------------------------
+      
+      in ~/.bashrc enter the following line:
+          
+          alias scipyact='source $HOME/scipyenv/bin/activate'
+          
+    Then, to activate the scipyenv environment just type 'scipyact' command
+    in the shell.
+    
+  The active environment will be indicated by its name in parantheses before the
+  normal shell prompt, e.g.:
+      
+      (scipyenv) user@Host:~>
+  
+  NOTE: While the scipyen environment is active, it can be deactivated with the 
+  'deactivate' shell command
+  
+  1.4 Create directories for source code
+  --------------------------------------
+  
+  As per NOTE 2021-01-12 10:13:03 Separate builds and 
+  NOTE: 2021-01-14 09:02:07 Variations for individual software libraries, the
+  directory tree used in this README is as follows:
+  
+  $HOME
+        |
+        -- scipyenv
+                    |
+                    -- bin
+                    |
+                    -- include
+                    |
+                    -- lib
+                    |
+                    -- lib64 (symbolic link to $HOME/scipyenv/lib)
+                    |
+                    -- nrnipython
+                    |
+                    -- scipyen (the scipyen git repository)
+                    |
+                    -- scipyen_boilerplate
+                    |
+                    -- scipyen_not_staged
+                    
+                    -- src
+                        |
+                        -- nrn-build   
+                        |
+                        -- vigra-build
+                        |
+                        -- sipxxx
+                        |
+                        -- PyQt5xxx
+                        |
+                        -- PyQt5_sipxxx
+        
+    * the src directory inside the environment tree contains cloned git repositories
+    and directories for out-of-source build of 3rd party software, see the README
+    file in there
+    
+  2. Install sip, PyQt5 and PyQt5.sip module
+  ===============================================
+  
+  2.1 Download sources, build and install sip, PyQt5 and PyQt5.sip modules
+  ------------------------------------------------------------------------
+  NOTE: check on the Riverbank computing website:
+  https://riverbankcomputing.com/software/sip/download
+  and
+  https://riverbankcomputing.com/software/pyqt/download
+  
+  before using wget - the versions available may not be the same as in the
+  examples below
+  
+  Examples:
+  sip v 5 (latest before PyQt6, which is in development for Qt6):
+  wget 'https://www.riverbankcomputing.com/static/Downloads/sip/sip-5.5.1.dev2011271026.tar.gz'
+  
+  WARNING: 2021-01-11 16:43:23:
+      sip5.5.1 has been removed form the Riverbank Computing SIP download page.
+      The most recent version is sip6.0.1. However, the build of PyQt5 with sip6
+      installed fails. Therefore, TO BUILD PYQT5 USE SIP5.X ARCHIVE ALREADY 
+      DOWNLOADED HERE.
+    
+      TODO: build sip6 and PyQt6 and check Scipyen still works - expect disruption
+      oin 3rd party packages such as Jupyter qt console, etc. For the moment stick
+      with PySt5/sip5.5.1
+      
+  PyQt5 but see WARNING: 2021-01-11 16:43:23:
+  wget 'https://www.riverbankcomputing.com/static/Downloads/PyQt5/PyQt5-5.15.3.dev2012141313.tar.gz'
+  
+  Pyqt5 sip extension module: 
+  download source tar.gz archive from PyPI web site https://pypi.org/project/PyQt5-sip/
+  
+  Example (NOTE: 2021-01-11 18:07:03: bst downloded manually from the above site)
+  wget 'https://files.pythonhosted.org/packages/73/8c/c662b7ebc4b2407d8679da68e11c2a2eb275f5f2242a92610f6e5024c1f2/PyQt5_sip-12.8.1.tar.gz'
+  
+  2.2.1 Build sip
+  ...............
+  tar xzvf sip-5.5.1.dev2011271026.tar.gz
+  cd sip-5.5.1.dev2011271026/
+  
+  python setup.py build
+  python setup.py install
+  
+  2.2.2 Build PyQt5
+  ...................
+  
+  WARNING: 2021-01-11 17:50:54 see WARNING: 2021-01-11 16:43:23 :
+    Requires sip5.5.1; fails to build if sip6.0.1 is installed.
+
+  cd ..
+  tar xzvf PyQt5-5.15.3.dev2012141313.tar.gz
+  cd PyQt5-5.15.3.dev2012141313
+  
+  python configure.py --qmake=`which qmake-qt5` --no-designer-plugin --no-qml-plugin --no-qsci-api --no-python-dbus
+  
+  python dbus bindings are skipped because they tent to be install in a system directory
+  
+  # NOTE: installation fails when the installer script tries to install the 
+   designer, qml plugins smd pythopn dbus extension in the system-wide Qt5 
+   installation (but without root privileges) -- hence these are all disabled
+  
+  (enter 'yes' to accept the license)
+  
+  make
+  make install
+  
+  2.2.3 Build Pyqt5.sip module
+  .............................
+  cd ..
+  tar xzvf PyQt5_sip-12.8.1.tar.gz
+  cd PyQt5_sip-12.8.1/
+  
+  python setup.py build
+  python setup.py install
+  
+  pip show PyQt5-sip <-- veryfies that PyQt5 sip moduel is installed
+  
+  3. Build and install Node.js in the local virtual environment
+  -----------------------------------------------------------------------
+  (required to use bokeh with jupyterlab)
+  
+  3.1 Download Node.js source code archive from https://nodejs.org/en/download/current/
+  
+  --> node-v15.6.0.tar.gz
+  
+  
+  cd ~/scipyenv-src
+  tar xzf node-v15.6.0.tar.gz
+  cd node-v15.6.0
+  
+  (make sure scipyenv environment is activated)
+  
+  ./configure --prefix=$HOME/scipyenv
+  make -j4
+  make doc
+  make install
+  
+  
+  4. Install python packages inside the environment (via pip install ...)
+  -----------------------------------------------------------------------
+  NOTE: because the environment was created for a python3 environemnt, pip and 
+  pip3 are the same
+  
+  NOTE: do not use --user option because it will install packages 
+    in ~/.local/lib/python-x.y/site-packages and therefore bypass the environment
+    
+  NOTE: is the virtual environemnt has been created with the --system-site-packages
+  option, then you may want to pass the '-I' options to pip install command for
+  those packages that are already installed systemwide
+
+e.g. pip install -I numpy
+    This may flag further needed dependencies, that will have to be installed
+    in the environment.
+    
+    
+  
+    Package         Dependencies                
+                    (installed alongside if not already present
+                     NOTE: some dependencies are required
+                     by multiple packages and, if installed, pip will verify 
+                     their installed versions; therefore, these are listed below
+                     only ONCE: the lists are not exhaustive representations of
+                     these dependencies)
+    ----------------------------------------------------------------------------
+    xxhash (optional, not used currently)
+    distributed
+    blosc
+    numpy
+    matplotlib      (pyparsing, cycler, kiwisolver, Pillow, python_dateutil, six)
+    scipy
+    sympy           (mpmath)
+    cmocean         (for nice colormaps)
+    cmasher         (ditto; brings colorspacious, e13tools, )
+    viscm           matplotlib module to visualize colormaps (pip install viscm)
+    scikit-learn    (joblib, threadpoolctl)
+    scikit-image    (imageio, networkx, decorator, pywavelets, tifffile)
+    seaborn         (pandas, pillow, cycler, python-dateutil, pyparsing, six)
+    bohek           (for jupyterlab plotting from neuron; also install tornado, typing_extension)
+    
+    quantities
+    pandas          (pytz)
+    nixio
+    neo
+    pyqtgraph
+    statsmodels     (patsy)
+    pingouin        (urllib3, idna, chardet, certifi, requests, littleutils, 
+                     tabulate, pandas_flavor, outdated, xarray)
+    pywavelets      (installed by scikit-learn)
+    researchpy
+    h5py            required for vigra
+    nose            required for vigra                            
+    sphinx          required for vigra    
+                    also installs:
+                    (sphinxcontrib-serializinghtml, sphinxcontrib-qthelp, 
+                    sphinxcontrib-jsmath, sphinxcontrib-htmlhelp, sphinxcontrib-devhelp, 
+                    sphinxcontrib-applehelp, snowballstemmer, imagesize, docutils, 
+                    babel, alabaster)
+    qimage2ndarray
+    imreg_dft                               
+    xarray      
+    pyxdg
+    python-magic    Python interface to the libmagic file type identification library
+    nested_lookup
+    dpath
+
+    jupyter         (zipp, typing-extensions, ipython-genutils, traitlets,
+                    pyrsistent, importlib-metadata, attrs, wcwidth, tornado, pyzmq,
+                    ptyprocess, parso, jupyter-core, jsonschema, webencodings, pygments,
+                    pycparser, prompt-toolkit, pickleshare, pexpect, nest-asyncio, 
+                    nbformat, MarkupSafe, jupyter-client, jedi, backcall, async-generator, 
+                    testpath, pandocfilters, nbclient, mistune, jupyterlab-pygments, 
+                    jinja2, ipython, entrypoints, defusedxml, cffi, bleach, terminado,
+                    Send2Trash, prometheus-client, nbconvert, ipykernel, argon2-cffi, 
+                    notebook, widgetsnbextension, qtpy, qtconsole, jupyter-console, 
+                    ipywidgets)
+    
+    NOTE: 2021-06-12 15:46:34 
+    jedi 0.18.0 is incompatible with IPython<=7.19; if you have IPython<=7.19 
+    installed in scipyenv then force install an earlier jedi version:
+        pip install jedi==0.17.2
+        
+        see also here: 
+            https://github.com/davidhalter/jedi/issues/1714
+            https://github.com/ipython/ipython/issues/12740
+            https://github.com/ipython/ipython/issues/12821
+                
+    jupyter_qtconsole_colorschemes
+    
+    NOTE: Scipyen does not aim to replicate the functionality in the jupyter 
+        interfaces available - some people may find it easy(er) to work with 
+        jupyter notebook and/or jupyterlab.
+        
+        jupyter notebook is already installed alongside jupyter; jupyterlab can 
+        be installed separately.
+        
+        jupyter notebooks and/or jupyterlab are useful when trying out gui2 module
+        in neuron package (for plotting outside of neuron's own gui)
+        
+    ipyparallel
+    jupyter_cms     (woosh)
+    jupyterlab      (immutables, contextvars, sniffio, dataclasses, anyio, jupyter-server,
+                     json5, nbclassic, jupyterlab-server, )
+    
+    jupyterlab_templates
+    
+    jupyterthemes   for theming the jupyter notebook
+    
+    nodejs - requires installation of a more recent Node.js version (>- 12.0.0)
+        in the local environment
+        
+    
+    *** Install Python libraries for storing configuration options unrelated to the GUI:
+        NOTE: this is still experimental - testing various configuration libraries
+    
+    confuse     (pyyaml)
+        
+        not used, not installed:
+            config (pip install config) -- 
+                recommended for use inside a virtual environment, which we use here
+            
+            dynaconf -- python library for software configuration framework, independent
+                of the Qt5 framework
+                * not very straightforward to use; 
+                * not straightforward to permamently store changed configurations 
+                    form inside the program
+                    
+            python-configuration -- alternative to config and dynaconf 
+            python-configuration[toml,yaml] -- toml and yaml modules of the above
+                * again, saving configuration to files from within the program not straightforward
+                
+    Optional jupyter kernels:
+    octave_kernel   (metakernal)
+    gnuplot_kernel
+    matlab_kernel   (wurlitzer)
+    
+    Other modules - functionality complementary to NEURON:
+        pyneuroml reader
+            (NOTE: pyneuroml may rewquire installation of NeuroML inside scipyenv)
+        neurom - SWC reader
+        pylmeasure
+
+    # install jupyterlab extensions for bokeh
+    jupyter labextension install @jupyter-widgets/jupyterlab-manager
+    jupyter labextension install @bokeh/jupyter_bokeh - error current version of jupyterlab not supported
+    ValueError: The extension "@bokeh/jupyter_bokeh" does not yet support the current version of JupyterLab.
+
+
+    Conflicting Dependencies:
+    JupyterLab                        Extension      Package
+    >=3.0.3 <3.1.0                    >=2.0.2 <3.0.0 @jupyterlab/application
+    >=3.0.2 <3.1.0                    >=2.0.2 <3.0.0 @jupyterlab/apputils
+    >=3.0.3 <3.1.0                    >=2.0.2 <3.0.0 @jupyterlab/notebook
+    >=3.0.2 <3.1.0                    >=2.0.1 <3.0.0 @jupyterlab/rendermime-interfaces
+    >=6.0.2 <6.1.0                    >=5.0.2 <6.0.0 @jupyterlab/services
+    See the log file for details:  /tmp/jupyterlab-debug-vqsmr_8t.log
+    
+  5. Install (download/clone, build/make & install) vigra
+  ----------------------------------------------------------------
+  5.1 Required depedencies (indluding their development packages)
+    NOTE: These are installed system-wide, (i.e. not just in scipyen virtual environment)
+    typically via the distribution's software management tools 
+    
+    TODO: Contemplate installing these inside the virtual environment - especially
+        when the environment also has its own (stand-alone) Qt5 build.
+  ............................................................................
+  NOTE 2021-01-11 18:44:43: some of these may have already been installed with
+  their development packaged system-wide - use your distribution software manager
+  to verify.
+  ............................................................................
+  
+    cmake, cmake-gui
+    zlib
+    tiff
+    jpeg
+    png
+    fftw3
+        and mpich bindings (for neuron)
+    hdf5
+    openexr
+    valgrind
+    python3 - effected in the virtual environment!
+        numpy, 
+        nose, 
+        sphinx
+    boost-python3 - system-wide
+    boost-graph
+    boost-threads
+    boost-timer
+    doxygen
+    
+  5.2 Clone vigra repo (while in src, with the virtual environment activated):
+  ...........................................................................
+    cd ~/scipyenv-src
+    
+    git clone https://github.com/ukoethe/vigra.git
+    
+    (--> creates ~/scipyenv-src/vigra)
+    
+  5.3 Create out-of-source build for vigra
+  ........................................
+    5.3.1
+    cd ..
+    mkdir ~/scipyenv/src/vigra-build (if not already there, see NOTE: 2021-01-14 09:02:07)
+    cd ~/scipyenv/src/vigra-build
+    
+    5.3.2 generate Makefile
+    cmake-gui ~/scypienv-src/vigra (run cmake-gui --help for options)
+        At first run click "configure" then as cmake variables are set or edited
+        as below, press "configure" again
+        Inside the CMake gui set the following variables as follows:
+            CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) /home/user/scipyenv
+            LIB_SUFFIX (-DLIB_SUFFIX=) 64
+                    
+            - also select in the "WITH" group: 
+                boost-thread, boost-graph, openexr, vigranumpy, valgrind
+    
+            - in the GUI, press configure until all options are satisfied (i.e.,
+            i.e. they are NOT highlighted anymore) - check the environment variables 
+            mentioned above - remember to press "configure" again
+            
+            - finally press "Generate" and quit cmake-gui
+                
+    5.3.3. Build vigra and install
+    make
+    make doc
+    make install (--> installs in scipyenv/doc/vigra and scipyenv/doc/vigranumpy)
+    
+    cd ..
+    
+    6. Install (download/clone, make and install) NEURON
+    ---------------------------------------------------------------
+    6.1 prerequisites: 
+        python3-cython (installed system-wide; on OpenSUSE this is 'python3-Cython')
+        mpich
+        
+    6.2 clone git repository (in src)
+    
+    cd ~/scipyenv-src
+    mdir ~/scipyenv/src/nrn-build (if not present, see NOTE: 2021-01-14 09:02:07)
+    
+    git clone https://github.com/neuronsimulator/nrn 
+    (=> creates ~/scipeynv-src/nrn)
+    
+    6.3 Configure the neuron build
+    
+    cd ~/scipyen/src/nrn-build
+     NOTE: requires libXcomposite development packages
+    cmake-gui ..~/scipyenv-src/nrn
+        "Configure" will also pull iv
+        CMAKE_INSTALL_PREFIX (-DCMAKE_INSTALL_PREFIX=) ~/scipyenv
+        NRN_ENABLE_CORENEURON=true
+        NRN_ENABLE_INTERVIEWS=true
+        NRN_ENABLE_MECH_DLL_STYLE=true
+        NRN_ENABLE_THREADS=true
+        NRN_ENABLE_MODULE_INSTALL=true
+        NRN_ENABLE_INTERNAL_READLINE=false
+        NRN_MODULE_INSTALL --prefix= --home=/home/cezar/scipyenv
+        NRN_ENABLE_MPI=true
+        NRN_ENABLE_MPI_DYNAMIC=false
+        NRN_ENABLE_PYTHON=true (default python3 fallback to python2)
+        NRN_ENABLE_PYTHON_DYNAMIC=false
+        NRN_ENABLE_RX3D=true
+        NRN_ENABLE_SHARED=true
+        NRN_ENABLE_TESTS=false
+        NRN_ENABLE_THREADS=true
+        
+    6.4 Build neuron, then install
+    make
+    make install
+    
+    properly install neuron python modules inside the site-packages corresponding
+    to the environment's python version
+    
+    cd ~/scipyenv/src/nrn-build/src/nrnpython
+    
+    python setup.py install 
+    (to install nrnpython in site-packages)
+    
+    Build neuron documentation locally and install locally (see ~/scipyenv-src/nrn/docs/README.md)
+    
+    cd ~/scipyenv-src/nrn
+    pip3 install -r docs/docs_requirements.txt
+        --> installs required python packages (e.g.commonmark, sphinx-rtd-theme, 
+        recommonmark, etc)
+            inside the virtual environment
+    
+    cd ~/scipyenv/src/nrn-build
+    make docs
+    
+    Optionally, copy (or link, move) ~/scipyenv/src/nrn-build/docs to
+    ~/scipyenv/doc/neuron
+    
+    
+    7. Clone scipyenv (for now use the dev branch)
+    ----------------------------------------------
+    REQUIRES git software (system-wide installation) including gitk and git-gui
+    
+    7.1 install github cli (for Linux; other platforms may use github desktop app)
+    (for various distributions see 
+     https://github.com/cli/cli/blob/trunk/docs/install_linux.md)
+    
+        openSUSE/SUSE Linux (zypper)
+            Install:
+
+            sudo zypper addrepo https://cli.github.com/packages/rpm/gh-cli.repo
+            sudo zypper ref
+            sudo zypper install gh
+            
+    7.2 (in ~scipyenv, with environment activated)
+    
+    7.2.1 authenticate with github (if not already done)
+        gh auth login ==> select GitHub.com, then when prompted enter username
+            and password
+            
+    7.2.2 Clone scipyen
+        gh repo clone ctigaret/scipyen
+        
+        Then cd into scipyen and verify local repo is uptodate with the relevant
+        branches:
+            git checkout master
+            git pull
+            git checkout dev
+            git pull
+            git checkout work
+            git pull
+            
+        Finally, for development work:
+            git checkout dev; make sure to git pull every time
+            
+    8. Link the nrnipython script (in scipyen/nrnipython):
+        cd ~/scipyenv/bin
+        ln -s ../scipyen/scipyen
+        ln -s ../nrnipython/nrnipython nrnipython
+        ln -s ../nrnipython/nrnipython nrnpython
+        ln -s ../nrnipython/nrnipython nrnpy
+        
+        (the last two are just aliases of the first)
+        
+    9 link the scypien bash script (executable)
+        cd ~/scipyenv/bin
+        ln -s ../scipyen/scipyen scipyen
+    
+    10. Other software (optional)
+    ----------------------------
+    10.1 pygrace -  not installed
+    
+    10.2 pykde5 - not built, not installed 
+        requires sipconfig module which doesn't exist anymore
+    
+    10.3 cvapp -- not installed, not used - import 3D data from NEURON directly
+    
+    
+    =======================================
+    NOTE: 2021-09-15 09:02:26 On Windows 10
+    =======================================
+    
+    python 3.9 (windows installer): choose to place executable on PATH
+    virtualenv:
+        C:\Users\xxx>pip install virtualenv
+        C:\Users\xxx>virtualenv scipyenv
+        C:\Users\xxx>cd scipyenv
+        C:\Users\xxx>scipyenv\Scripts\activate -->
+        (scipyenv) C:\Users\xxx\scipyenv>
+        (scipyenv) C:\Users\xxx\scipyenv>pip install PyQt5 --> installs PyQt5-5.5.4, PyQt5-Qt5-5.15.2,PyQt5-sip-12.9.0
+        
+    
+    create C:\Users\xxx\Scripts directory, add it to the registered %PATH%
+    environment variable
+    
+    setx path "%path%;%userprofile%\Scripts;"
+    
+    then restart the command prompt
+    
+    Inside the Scripts directory place the following as scipyact.bat
+    @echo off
+    %userprofile%\scipyenv\Scripts\activate
+    echo on
+    
+    to activate scipyenv inside the command prompt just type 'scipyact'
+
+    
+    
+    ... proceed with python modules installation as above WHILE in: 
+    (scipyenv) C:\Users\xxx\scipyenv (i.e. with environment activated)
+        
+    Qt (Open source edition) - 
+    visual studio community 2019 -  C++ environment only (use python from above, 
+                                don't use visual studio's own python)
+    
+    
+    Download vigra binary with sources and documentation for Visual Studio including dependencies
+    https://github.com/ukoethe/vigra/releases/download/Version-1-11-1/vigra-1.11.1-win64-vc14.zip
+    Extract in C:\Users\xxx\vigra-1.11.1-win64-vc14 => will create vigra-1.11.1 directory in there

@@ -1,0 +1,5 @@
+scipyenvdir=${HOME}/scipyenv39
+scipyact () {
+source ${HOME}/scipyenv39/bin/activate
+source ${HOME}/bin/pyenv 3.9
+}

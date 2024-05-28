@@ -1,13 +1,13 @@
 echo This script requires mambaforge installed from https://github.com/conda-forge/miniforge#mambaforge
-echo run this from a mamba (Microforge) prompt launched as administrator
+echo and must be run from a mamba (Microforge) prompt launched as administrator
 @echo off
 rem  setlocal enabledelayedexpansion enableextensions
 set mypath=%0
 set mydir=%~dp0
-set conda_reqs=%mydir%\doc\install\conda_requirements_win.txt
-set pip_reqs=%mydir%\doc\install\pip_requirements_win.txt
-set default_env_name="e:\scipyenv"
-set /P env_name="Enter the full path name of the new environment (no spaces, please, e.g. %default_env_name%): "
+set conda_reqs=%mydir%\install\conda_requirements_win.txt
+set pip_reqs=%mydir%\install\pip_requirements_win.txt
+set default_env_name="c:\scipyenv"
+set /P env_name="Enter the full path name of the new environment (no spaces, please, default is: %default_env_name%): "
 if [%env_name%] equ [] set env_name=%default_env_name%
 echo Creating mamba environment %env_name%
 call mamba create -y --prefix %env_name% python=3.11 || goto eof
@@ -110,9 +110,9 @@ echo
 echo Installing additional PyPI packages
 call pip install -r %pip_reqs% || goto eof
 
-powershell -ExecutionPolicy Bypass -File %mydir%\doc\install\make_scipyen_batch_scripts.ps1 || goto eof
+powershell -ExecutionPolicy Bypass -File %mydir%\install\make_scipyen_batch_scripts.ps1 || goto eof
 
-powershell -ExecutionPolicy Bypass -File %mydir%\doc\install\make_link.ps1 %mydir%  || goto eof
+powershell -ExecutionPolicy Bypass -File %mydir%\install\make_link.ps1 %mydir%  || goto eof
 echo Scipyen can now be launched from the desktop icon
 
 

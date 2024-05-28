@@ -1,0 +1,19 @@
+To run Scipyen the following requirements must be met:
+    
+    Python 3.9.+ installed on the local machine.
+    
+    A python virtual environment:
+        On Linux: use virtualenv
+        On windows & macOS: use mambaforge
+
+Further requirements:
+MacOS: a rust compiler is needed to build safetensors, needed by torch (from linguistics)
+	to install, get it from https://rustup.rs
+
+
+	
+    
+
+    
+    
+    

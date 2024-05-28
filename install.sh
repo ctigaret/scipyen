@@ -11,9 +11,9 @@ function showinstalldoc ()
 {
     glowexec=`which glow`
     if [ -n $glowexec ] ; then
-        glow -p $installscriptdir/Install.md
+        glow -p $docdir/Install.md
     else
-        cat $installscriptdir/Install.md
+        cat $docdir/Install.md
     fi
 }
 
@@ -228,13 +228,6 @@ function installpipreqs ()
         # by setting up the environment variable below
         # For details please see https://pypi.org/project/sklearn/
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
-        #        if [[ $for_msys -eq 1 ]] ; then
-        #            python3 -m pip install -r "$installscriptdir"/pip_requirements_msys.txt
-        #        else
-        #            python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
-        #        fi
-        #NOTE: commented out previous to prevent a bug with installation
-        
         
         # NOTE: 2023-06-25 10:56:34 
         # when we are root, make sure to use the virtual environment's python 
@@ -291,10 +284,6 @@ function dopyqt5 ()
         
         echo "Using ${py_exec} as `whoami` to build PyQt5"
         
-        # NOTE: locate_pyqt5_src.py uses distlib to locate the (latest) source 
-        # archive (i.e., the sdist) of PyQt5 - its file name typically ends with
-        # .tar.gz
-#         pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
         pyqt5_src_url=`${py_exec} $installscriptdir/locate_pyqt5_src.py`
         pyqt5_src=`basename $pyqt5_src_url`
         
@@ -936,9 +925,7 @@ fi
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
 docdir=${scipyendir}/doc
-installscriptdir=${docdir}/install
-# docdir=`dirname "$installscriptdir"`
-# scipyendir=`dirname "$docdir"`
+installscriptdir=${scipyendir}/install
 scipyensrcdir=${scipyendir}/src/scipyen
 using_python=""
 install_neuron=0
