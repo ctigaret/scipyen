@@ -32,7 +32,7 @@ if [ -z ${VIRTUAL_ENV} ]; then
         source $HOME/.scipyenrc && scipyact
     else
     echo "Cannot activate a python virtual environment for Scipyen"
-    exit 0
+    exit 1
     fi
 fi
 
@@ -68,4 +68,40 @@ workdir=${destination}/build
 distdir=${destination}/dist
 
 pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec
+
+if [[ $? -ne 0 ]] ; then
+echo -e "Compilation of frozen Scipyen application failed"
+exit 1
+fi
+
+echo -e "Creating a desktop file for Scipyen_app\n"
+
+# tmpfiledir=$(mktemp -d)
+# tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
+# tmpfile=${tmpfiledir}/Scipyen_app.desktop
+desktopfile=${workdir}/Scipyen_app.desktop
+
+# cat<<END > ${tmpfile}
+cat<<END > ${desktopfile}
+[Desktop Entry]
+Type=Application
+Name[en_GB]=Scipyen app
+Name=Scipyen app
+Comment[en_GB]=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
+Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
+GenericName[en_GB]=Scipyen application 
+GenericName=Scipyen application 
+Icon=pythonbackend
+Categories=Science;Utilities;
+Exec=${distdir}/Scipyen_app
+MimeType=
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=\s
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+END
 
