@@ -127,7 +127,8 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     _default_template_file = os.path.join(os.path.dirname(get_config_file()),"eventTemplate.h5" )
     
     # def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="Detect Events", **kwargs):
-    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title=None, **kwargs):
+    def __init__(self, ephysdata=None, clearOldPSCs=False, ephysViewer:typing.Optional[sv.SignalViewer]=None, 
+                 parent:(QtWidgets.QMainWindow, type(None)) = None, win_title=None, **kwargs):
         # NOTE: 2022-11-05 14:54:24
         # by default, frameIndex is set to all available frames - KISS
         self._toolbars_locked_ = True
@@ -3632,12 +3633,6 @@ class EventAnalysis(ScipyenFrameViewer, __Ui_EventDetectWindow__):
     @Slot(int)
     def _slot_set_useSlidingDetection(self, value):
         self.useSlidingDetection = value == QtCore.Qt.Checked
-        # maxVal = 100 if self.useSlidingDetection else 10
-        # sigBlock = QtCore.QSignalBlocker(self.detectionThresholdSpinBox)
-        # if self.detectionThresholdSpinBox.value() > maxVal:
-        #     self.detectionThresholdSpinBox.setValue(maxVal)
-        # self.detectionThresholdSpinBox.setMaximum(maxVal)
-        
     
     @Slot(int)
     def _slot_use_mPSCTemplate(self, value):

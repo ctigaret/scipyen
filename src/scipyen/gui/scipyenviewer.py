@@ -145,7 +145,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     viewer_for_types = {object:0}
     view_action_name = None
     
-    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, deleteOnClose:bool=False, **kwargs):
+    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ID:(int, type(None)) = None, win_title: (str, type(None)) = None, 
+                 doc_title: (str, type(None)) = None, 
+                 deleteOnClose:bool=False, **kwargs):
         """Constructor.
         
         Sets up attributes common to all Scipyen's viewers.

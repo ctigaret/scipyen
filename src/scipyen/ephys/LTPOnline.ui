@@ -37,7 +37,7 @@
               <string>Index of ADC channel recording the source</string>
              </property>
              <property name="whatsThis">
-              <string>Index of ADC channel recording the source</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Index of ADC channel recording the source - this is the index of the ADC input of the DAQ device that receives the primary output for the amplifier channel that is used.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline;&quot;&gt;CAUTION&lt;/span&gt;: Some amplifiers define more than one configrable output per amplifier channel, and these outputs can be physically connected to distinct ADC inputs of the DAQ device. Make sure the value here is the index of the ADC channel that records the primary amplifier output.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="text">
               <string>ADC</string>
@@ -48,7 +48,17 @@
             </widget>
            </item>
            <item>
-            <widget class="QSpinBox" name="ADCIndexSpinBox"/>
+            <widget class="QSpinBox" name="ADCIndexSpinBox">
+             <property name="toolTip">
+              <string>Index of ADC channel recording the source</string>
+             </property>
+             <property name="statusTip">
+              <string>Index of ADC channel recording the source</string>
+             </property>
+             <property name="whatsThis">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Index of ADC channel recording the source - this is the index of the ADC input of the DAQ device that receives the primary output for the amplifier channel that is used.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline;&quot;&gt;CAUTION&lt;/span&gt;: Some amplifiers define more than one configrable output per amplifier channel, and these outputs can be physically connected to distinct ADC inputs of the DAQ device. Make sure the value here is the index of the ADC channel that records the primary amplifier output.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+            </widget>
            </item>
            <item>
             <widget class="QLabel" name="path0Label">
@@ -119,8 +129,7 @@ and / or main digital output pattern (patch and field recording)</string>
               <string>Index of DAC channel used for command signal (patch)  and / or main digital output pattern (patch and field recording)</string>
              </property>
              <property name="whatsThis">
-              <string>Index of DAC channel used for command signal (patch) 
-and / or main digital output pattern (patch and field recording)</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Index of DAC channel used for command signal (patch) &lt;/p&gt;&lt;p&gt;and / or main digital output pattern (patch and field recording)&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;This is the index of the DAQ device DAC output sending command waveforms (in voltage or current clamp) to the amplifier channel that is used in the experiment.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600; text-decoration: underline;&quot;&gt;CAUTION:&lt;/span&gt;&lt;span style=&quot; font-weight:400;&quot;&gt; Some amplifiers define more than one &amp;quot;channel&amp;quot;; their inputs are connected to distinct DAC outputs of the DAQ - make sure you select the correct one here.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="text">
               <string>DAC</string>

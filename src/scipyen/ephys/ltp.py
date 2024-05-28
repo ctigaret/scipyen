@@ -95,6 +95,8 @@ from core.utilities import (safeWrapper,
                             yyMdd,
                             NestedFinder)
 
+from core.scipyen_config import (markConfigurable)
+
 
 #### END pict.core modules
 
@@ -2586,48 +2588,6 @@ class LTPOnline(QtCore.QObject):
             self._abfProcessorThread_.start()
             self._running_ = True
 
-#     def __del__(self):
-#         # we need to check attribute existence to cover the case when we delete
-#         # an incompletely initialized object
-#         if hasattr(self, "_running_") and self._running_:
-#             self.stop()
-#             
-#         try:
-#             self.closeViewers(True)
-#             if hasattr(self, "_viewers_") and hasattr(self._viewers_, "clear"):
-#                 self._viewers_.clear()
-# 
-#             if hasattr(self, "_emitterWindow_") and self._emitterWindow_.isDirectoryMonitored(self._watchedDir_):
-#                 self._emitterWindow_.enableDirectoryMonitor(self._watchedDir_, False)
-#                 
-#             if hasattr(self, "_simulatorThread_") and isinstance(self._simulatorThread_, _LTPFilesSimulator_):
-#                 self._simulatorThread_.requestInterruption()
-#                 self._simulatorThread_.quit()
-#                 self._simulatorThread_.wait()
-#                 self._simulatorThread_.deleteLater()
-#                 self._simulatorThread_ = None
-#             
-#             if hasattr(self, "_abfSupplierThread_") and hasattr(self, "_abfProcessorThread_"):
-#                 self._abfSupplierThread_.abfListener.stop()
-#                 self._abfSupplierThread_.quit()
-#                 self._abfSupplierThread_.wait()
-#                 self._abfSupplierThread_.deleteLater()
-#                 self._abfSupplierThread_ = None
-#                 
-#                 self._abfProcessorThread_.quit()
-#                 self._abfProcessorThread_.wait()
-#                 self._abfProcessorThread_.deleteLater()
-#                 self._abfProcessorThread_ = None
-#             
-#         except:
-#             traceback.print_exc()
-#         
-#         if hasattr(super(object, self), "__del__"):
-#             super().__del__()
-#             
-#         self.__class__._instance = None
-#  
-
     def _check_sources_(self, *args):
         """Verifies consistency of recording sources:
         Requirements are either hard (•) or soft (∘); unmet soft requirements
@@ -3621,6 +3581,7 @@ class LTPOnline(QtCore.QObject):
             
 
 # class TwoPathwaysOnlineLTP(QtWidgets.QMainWindow, WorkspaceGuiMixin, __UI_LTPWindow__):
+# class TwoPathwaysOnlineLTP(WorkspaceGuiMixin, __UI_LTPWindow__):
 class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
     
     help_text = ["Usage:",
@@ -3660,8 +3621,22 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                  "Make sure you also set Clampex to output records in this new empty directory"]
     
     
-    def __init__(self, simulate:bool=False, parent=None):
-        super().__init__(parent=parent)
+    def __init__(self, simulate:bool=False, parent=None, **kwargs):
+        self._default_ADC_index = 0
+        self._default_DAC_index = 0
+        self._default_path0_index = 0
+        self._default_path1_index = 1
+        self._default_path0_name = "Path 0"
+        self._default_path1_name = "Path 1"
+        
+        self._ADC_index = self._default_ADC_index
+        self._DAC_index = self._default_DAC_index
+        
+        self._path0_index = self._default_path0_index
+        self._path0_name = self._default_path0_name
+        
+        self._path1_index = self._default_path1_index
+        self._path1_name = self._default_path1_name
         
         self._metadata_ = DataBag()
         
@@ -3686,33 +3661,19 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         if self._simulation_: self._winTitle_ += " (Simulation)"
         
         self._logIO_ = io.StringIO() 
-    
-        self._configureUi_()
-        
-        self._generate_recording_source() # assigns to self._metadata_.source
         
         self._oltp = None
         
-        # self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
-        #                     emitterWindow = self.scipyenWindow, simulate= self._simulation_,
-        #                     parent=self)
-        
-        # if isinstance(self._oltp._abfProcessorThread_, _LTPOnlineFileProcessor_):
-        #     self._oltp._abfProcessorThread_.sig_xtalk.connect(self._slot_xtalk)
-        
-        # self._oltp.hideViewers()
-        
-        # try:
-        #     self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
-        #                         emitterWindow = self.scipyenWindow)
-        # except:
-        #     traceback.print_exc()
-                
+        # super().__init__(self, parent=parent)
+        # self._configureUi_()
+        # self._configureUi_() # called by super().__init__
+        # WorkspaceGuiMixin.__init__(self, parent=parent)
+        super().__init__(self, parent=parent, win_title=self._winTitle_)
+        self._configureUi_()
         self.scipyenWindow.sig_changedDirectory.connect(self._slot_changedWorkingDirectory)
         self.loadSettings()
-        # self.currentDirLabel.setText(f"Work directory: {self.scipyenWindow.currentDir}")
-        # self.show()
-    
+        self._gen_source() # assigns to self._metadata_.source
+        
     def _configureUi_(self):
         self.setupUi(self)
         self._pathSpinBoxBgDefaultColor = self.path0SpinBox.palette().color(QtGui.QPalette.Active, QtGui.QPalette.Window)
@@ -3725,9 +3686,9 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         self.ADCIndexSpinBox.valueChanged.connect(self._slot_adc_changed)
         self.DACIndexSpinBox.valueChanged.connect(self._slot_dac_changed)
         
-        self.path0SpinBox.setValue(0)
+        # self.path0SpinBox.setValue(0)
         self.path0SpinBox.valueChanged.connect(self._slot_path_channel_changed)
-        self.path1SpinBox.setValue(1)
+        # self.path1SpinBox.setValue(1)
         self.path1SpinBox.valueChanged.connect(self._slot_path_channel_changed)
         
         self.path0NameEdit.undoAvailable = True
@@ -3760,6 +3721,88 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         
         self.setWindowTitle(self._winTitle_)
         
+        
+    @property
+    def ADCindex(self) -> int:
+        return self._ADC_index
+    
+    @markConfigurable("ADCIndex", trait_notifier=True)
+    @ADCindex.setter
+    def ADCindex(self, val:int):
+        if isinstance(val, int) and val >=0 :
+            self._ADC_index = val
+            signalBlock = QtCore.QSignalBlocker(self.ADCIndexSpinBox)
+            self.ADCIndexSpinBox.setValue(self._ADC_index)
+            # self.configurable_traits["ADCIndex"] = self._ADC_index
+            
+    @property
+    def DACindex(self) -> int:
+        return self._DAC_index
+    
+    @markConfigurable("DACIndex", trait_notifier=True)
+    @DACindex.setter
+    def DACindex(self, val:int):
+        if isinstance(val, int) and val >=0 :
+            self._DAC_index = val
+            signalBlock = QtCore.QSignalBlocker(self.DACIndexSpinBox)
+            self.DACIndexSpinBox.setValue(self._DAC_index)
+            # self.configurable_traits["ADCIndex"] = self._ADC_index
+            
+    @property
+    def path0Index(self) -> int:
+        return self._path0_index
+    
+    @markConfigurable("Path0Index", trait_notifier=True)
+    @path0Index.setter
+    def path0Index(self, val:int):
+        if isinstance(val, int) and val >=0:
+            self._path0_index = val
+            signalBlock = QtCore.QSignalBlocker(self.path0SpinBox)
+            self.path0SpinBox.setValue(self._path0_index)
+        
+    @property
+    def path1Index(self)->int:
+        return self._path1_index
+    
+    @markConfigurable("Path1Index", trait_notifier=True)
+    @path1Index.setter
+    def path1Index(self, val:int):
+        if isinstance(val, int) and val >=0:
+            self._path1_index = val
+            signalBlock = QtCore.QSignalBlocker(self.path1SpinBox)
+            self.path1SpinBox.setValue(self._path1_index)
+            
+    @property
+    def path0Name(self) -> str:
+        return self._path0_name
+    
+    
+    @markConfigurable("Path0Name", trait_notifier=True)
+    @path0Name.setter
+    def path0Name(self, val:str):
+        if isinstance(val, str) and len(val.strip()):
+            self._path0_name = val
+            signalBlock = QtCore.QSignalBlocker(self.path0NameEdit)
+            self.path0NameEdit.setText(self._path0_name)
+            
+        else:
+            scipywarn(f"{self.__class__.__name__}.path0Name.setter expecting a non-empty str; instead got {val}")
+        
+    @property
+    def path1Name(self) -> str:
+        return self._path1_name
+    
+    
+    @markConfigurable("Path1Name", trait_notifier=True)
+    @path1Name.setter
+    def path1Name(self, val:str):
+        if isinstance(val ,str) and len(val.strip()):
+            self._path1_name = val
+            signalBlock = QtCore.QSignalBlocker(self.path1NameEdit)
+            self.path1NameEdit.setText(self._path1_name)
+        
+        else:
+            scipywarn(f"{self.__class__.__name__}.path1Name.setter expecting a non-empty str; instead got {val}")
         
         
     @Slot()
@@ -3914,12 +3957,16 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         if val < 0 : 
             val = 0
             
+        self.ADCindex = val
+            
         self._generate_recording_source()
     
     @Slot(int)
     def _slot_dac_changed(self, val:int):
         if val < 0:
             val = 0
+            
+        self.DACindex = val
 
         self._generate_recording_source()
     
@@ -3928,8 +3975,7 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         w = self.sender()
         w1 = self.path1SpinBox if w == self.path0SpinBox else self.path0SpinBox
         
-        # le = [w_ for w_ in w.children() if isinstance(w_, QtWidgets.QLineEdit)]
-        # le1 = [w_ for w_ in w1.children() if isinstance(w_, QtWidgets.QLineEdit)]
+        old_val = self._path1_index if w == self.path0SpinBox else self._path0_index
         
         if val < 0:
             val = 0
@@ -3952,6 +3998,11 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 # le[0].setPalette(p)
                 
         else:
+            if w == self.path0SpinBox:
+                self.path0Index = val
+            else:
+                self.path1Index = val
+                
             self._generate_recording_source()
             if c != self._pathSpinBoxBgDefaultColor:
                 if c1 != self._pathSpinBoxBgDefaultColor:
@@ -3992,6 +4043,11 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 w.setPalette(p)
                 
         else:
+            if w == self.path0NameEdit:
+                self.path0Name = pathName
+            else:
+                self.path1Name = pathName
+                
             self._generate_recording_source()
             if c != self._pathSpinBoxBgDefaultColor:
                 if c1 != self._pathSpinBoxBgDefaultColor:
@@ -4000,17 +4056,8 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
                 w.setPalette(p)
                 
-#     def print(self, msg):
-#         if isinstance(self._stdout_, io.StringIO):
-#             print(msg, file = self._stdout_)
-#             
-#         elif isinstance(self._stdout_, io.TextIOBase):
-#             print(msg, file = self._stdout_)
-#         else:
-#             print(msg)
-            
-               
     def closeEvent(self, evt):
+        self.saveSettings()
         # print(f"{self.__class__.__name__}.closeEvent(…)")
         if isinstance(self._oltp, LTPOnline):
             if self._oltp.running:
@@ -4026,16 +4073,9 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 else:
                     evt.ignore()
                     return
-        # self._oltp.reset(force=True)
-        self.saveSettings()
-            
-        # super().closeEvent(evt)
-        # if self.isTopLevel:
-        #     if any([v is self for v in self.appWindow.workspace.values()]):
-        #         print("\t\tremoving myself from workspace...")
-        #         self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
-        #         self.appWindow.removeFromWorkspace(self, by_name=False)
-        evt.accept()
+
+        super().closeEvent(evt)
+        # evt.accept()
                     
     def _generate_recording_source(self) -> RecordingSource:
         if isinstance(getattr(self, "_oltp", None), LTPOnline):
@@ -4046,13 +4086,22 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 carryOn = self.questionMessage(self._winTitle_, "There are unsaved results. Continue?") == QtWidgets.QMessageBox.Yes
                 if not carryOn:
                     return
-            
-        adc = self.ADCIndexSpinBox.value()
-        dac = self.DACIndexSpinBox.value()
-        path0 = self.path0SpinBox.value()
-        path1 = self.path1SpinBox.value()
-        path0Name = self.path0NameEdit.text()
-        path1Name = self.path1NameEdit.text()
+                
+        self._gen_source()
+                
+    def _gen_source(self):
+        # adc = self.ADCIndexSpinBox.value()
+        # dac = self.DACIndexSpinBox.value()
+        # path0 = self.path0SpinBox.value()
+        # path1 = self.path1SpinBox.value()
+        # path0Name = self.path0NameEdit.text()
+        # path1Name = self.path1NameEdit.text()
+        adc = self._ADC_index
+        dac = self._DAC_index
+        path0 = self._path0_index
+        path1 = self._path1_index
+        path0Name = self._path0_name
+        path1Name = self._path1_name
         # srcName = self._metadata_.annotations["Cell"]
         
         # print(self._metadata_.annotations["Cell"])
@@ -5727,27 +5776,6 @@ def extract_sample_EPSPs(data, test_base_segments_ndx, test_chase_segments_ndx,
     result.segments.append(result_segment)
     
     return result
-
-# def make2PathwaysLTPSource(name:str, adc:int=0, dac:int=0, dig0:int=0, dig1:int=1):
-#     """Factory function for a RecordingSource in two pathways LTP.
-#     
-#     Named parameters:
-#     -----------------
-#     adc, dac: int, index of the ADC and DAC channels used in the experiment
-#     
-#     """
-#     assert all(isinstance(v, int) for v in (adc, dac, dig0, dig1)), "The `adc`, `dac`, `dig0`, `dig1` parameters must be of type int"
-#     assert dig0 != dig1, "In two pathway experiments the digital stimulation channels must be distinct"
-#     
-#     digs = (dig0, dig1)
-#     if any(d < 0 for d in digs):
-#         raise ValueError(f"All digital channels must be >= 0; got {digs} instead")
-#     
-#     
-#     synStims = [SynapticStimulus(f"path{k}", digs[k]) for k in range(len(digs))]
-#     
-#     return RecordingSource(name, 0, 0, synStims)
-#     
 
 
 def launch():

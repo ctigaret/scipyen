@@ -1151,7 +1151,7 @@ class ScipyenConfigurable(object):
         
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
         #### BEGIN debug - comment out when done
-#         if self.__class__.__name__ == "EventAnalysis":
+#         if self.__class__.__name__ == "TwoPathwaysOnlineLTP":
 #             print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
 #             stack = inspect.stack()
 #             for s in stack:
@@ -1396,7 +1396,7 @@ class ScipyenConfigurable(object):
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             # #### BEGIN debug - comment out when done
-            # if self.__class__.__name__ == "EventAnalysis":
+            # if self.__class__.__name__ == "TwoPathwaysOnlineLTP":
             #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() to load user_conf:")
             #     pprint(user_conf)
             #### END debug - comment out when done
@@ -1439,11 +1439,14 @@ class ScipyenConfigurable(object):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
                 
             parent = self._get_parent_()
-            tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
+            tag = self.configTag if hasattr(self, "configTag") and isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             #### BEGIN debug - comment out when done
             # if self.__class__.__name__ == "EventAnalysis":
+            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
+            #     pprint(user_conf)
+            # if self.__class__.__name__ == "TwoPathwaysOnlineLTP":
             #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
             #     pprint(user_conf)
             #### END debug - comment out when done
@@ -1459,8 +1462,8 @@ class ScipyenConfigurable(object):
                         continue
 
                     #### BEGIN debug - comment out when done
-                    # if self.__class__.__name__ == "EventAnalysis":
-                    #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
+                    # if self.__class__.__name__ == "Events_Analysis":
+                        # print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
                     #### END debug - comment out when done
                     
                     if val != v:
@@ -1492,7 +1495,10 @@ class ScipyenConfigurable(object):
             self.saveWindowSettings()
             
     def get_configurable_attribute(self, name, config_dict):
-        """Helper to get the actual attribute value given a config entry"""
+        """Helper to get the actual attribute value correspondong to a config entry.
+        Called in order to WRITE a the value of a configurable attribute to the 
+        config file.
+        """
         getset = config_dict.get(name, {})
         gettername = getset.get("getter", None)
         if not isinstance(gettername, str) or len(gettername.strip()) == 0:
@@ -1511,7 +1517,9 @@ class ScipyenConfigurable(object):
             raise RuntimeError(f"{gettername} is not a `get` property")
         
     def set_configurable_attribute(self, name, val, config_dict):
-        """Helper function to assign a value to a configurable attribute
+        """Helper function to assign the value of an attribute to a configurable attribute
+        Called in order to READ a config value from the config file and assign it to
+        the coprrespondng attribute via its 'setter' method
         """
         getset = config_dict.get(name, {})
         settername = getset.get("setter", None)
