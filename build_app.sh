@@ -27,7 +27,13 @@ function show_help ()
 }
 
 if [ -z ${VIRTUAL_ENV} ]; then
-    scipyact
+
+    if [ -a $HOME/.scipyenrc ] ; then
+        source $HOME/.scipyenrc && scipyact
+    else
+    echo "Cannot activate a python virtual environment for Scipyen"
+    exit 0
+    fi
 fi
 
 destination=${HOME}/scipyen_app 
@@ -58,8 +64,8 @@ if [ -d ${destination} ] ; then
     mkdir $destination
 fi
 
-workdir=${destination}\build
-distdir=${destination}\dist
+workdir=${destination}/build
+distdir=${destination}/dist
 
 pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec
 
