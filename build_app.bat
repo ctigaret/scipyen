@@ -15,5 +15,5 @@ set workdir=%destination%\build
 
 set distdir=%destination%\dist
 
-pyinstaller --distpath %distdir% --workpath %workdir% --clean --noconfirm --%mypath%\scipyen.spec
+pyinstaller --distpath %distdir% --workpath %workdir% --clean --noconfirm %mydir%\scipyen.spec
 
