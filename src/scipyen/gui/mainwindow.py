@@ -4059,7 +4059,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # print(f"{self.__class__.__name__}.slot_deleteSelectedWorkspaceObjects {indexList}")
         
+        
         msgBox = QtWidgets.QMessageBox()
+        msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+        msgBox.setInformativeText("This operation cannot be undone!")
+        msgBox.setStandardButtons(
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+
+        msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
         
         if len(indexList) > 1:
             varNames = list()
@@ -4068,19 +4075,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             varNames = sorted(varSet)
 
-            # msgBox = QtWidgets.QMessageBox()
-
             prompt = "Delete %d selected variables?" % len(varSet)
             wintitle = "Delete variables"
             msgBox.setDetailedText("\n".join(varNames))
             
             msgBox.setWindowTitle(wintitle)
-            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
             msgBox.setText(prompt)
-            msgBox.setInformativeText("This operation cannot be undone!")
-            msgBox.setStandardButtons(
-                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-            msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
 
             ret = msgBox.exec()
 
@@ -4110,15 +4110,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         # also removes obj.number from plt.get_fignums()
                         if self.autoRemoveViewers and hasattr(obj, "manager") or hasattr(obj, "number"):
                             plt.close(obj)
-                        # if hasattr(obj, "manager") or hasattr(obj "number"):
-                        #     plt.close(obj)
 
                     else:
                         obj.close()
 
                     # does not remove its symbol for workspace - this has already been removed by delete action
                     self.deRegisterWindow(obj)
-                    # super().deRegisterWindow(obj)
 
                 self.removeWorkspaceSymbol(n)
 
@@ -4132,12 +4129,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             prompt = "Delete '%s'?" % varName
             wintitle = "Delete variable"
             msgBox.setWindowTitle(wintitle)
-            msgBox.setIcon(QtWidgets.QMessageBox.Warning)
             msgBox.setText(prompt)
-            msgBox.setInformativeText("This operation cannot be undone!")
-            msgBox.setStandardButtons(
-                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-            msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
 
             ret = msgBox.exec()
 

@@ -425,7 +425,11 @@ class GuiMessages(object):
         return msgbox.exec()
        
     @staticmethod
-    def detailedMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Message", text:str="", info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
+    def detailedMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, 
+                               title:str="Message", text:str="", 
+                               info:typing.Optional[str]="", 
+                               detail:typing.Optional[str]="", 
+                               msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
         """Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message

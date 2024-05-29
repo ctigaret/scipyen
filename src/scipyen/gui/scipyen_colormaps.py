@@ -1466,13 +1466,27 @@ def auto_fg_color(bg):
     if hsv[2] < 128:
         return "white"
     return "black"
+
+mpl_version_tuple = tuple()
     
+if "version_tuple" in mpl._version.__dict__:
+    mpl_version_tuple = mpl._version.version_tuple
+elif "version" in mpl._version.__dict__:
+    mpl_version_tuple = tuple(int(x) for x in mpl._version.version.split('.'))
     
-if mpl._version.version_tuple[1] >= 6:
-    mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
+if len(mpl_version_tuple) == 3:
+    if mpl_version_tuple[1] >= 6:
+        mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
+    else:
+        cm.register_cmap(name="None", cmap=cm.get_cmap(name="gray"))
+        
 else:
-    cm.register_cmap(name="None", cmap=cm.get_cmap(name="gray"))
+    # assume the latest version and keep fingers crossed
+    mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
+        
     
 register_colormaps(CustomColorMaps)
     
 defaultPalette = ColorPalette()
+
+del mpl_version_tuple

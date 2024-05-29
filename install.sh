@@ -1224,7 +1224,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
 #     build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dopyqt5
     
-    dopyqt6
+#     dopyqt6 # NOTE: 2024-05-29 10:45:15 not yet ...
     
     # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dovigra

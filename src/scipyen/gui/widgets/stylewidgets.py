@@ -1,3 +1,6 @@
+"""Style widgets
+"""
+
 import array, os, typing, numbers
 from collections import OrderedDict
 from traitlets import Bunch
