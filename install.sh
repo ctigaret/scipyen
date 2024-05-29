@@ -1166,7 +1166,8 @@ echo -e "Will install in ${install_dir}"
 # echo "python micro": $micro
 
 if ! [ -v VIRTUAL_ENV ] ; then
-    virtual_env=${install_dir}/${virtual_env_pfx}.$pyver
+#     virtual_env=${install_dir}/${virtual_env_pfx}.$pyver
+    virtual_env=${install_dir}/${virtual_env_pfx}
     python_exec="python${major}.${minor}"
 else
     virtual_env=$VIRTUAL_ENV
