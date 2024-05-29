@@ -18,4 +18,4 @@ Usage:
 
 
 """
-__all__ = ["ephys", "ivramp", "ltp", "membrane"]
+__all__ = ["ephys", "ivramp", "membrane"]

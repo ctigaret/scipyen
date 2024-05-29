@@ -47,7 +47,7 @@
      <x>0</x>
      <y>0</y>
      <width>1159</width>
-     <height>28</height>
+     <height>30</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -115,6 +115,7 @@
     <addaction name="actionAuto_launch_Script_Manager"/>
     <addaction name="menuCode_editor"/>
     <addaction name="actionAuto_delete_viewer"/>
+    <addaction name="actionSet_user_plugins_directory"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -1107,6 +1108,14 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="toolTip">
     <string>Open system terminal in current folder</string>
+   </property>
+  </action>
+  <action name="actionSet_user_plugins_directory">
+   <property name="icon">
+    <iconset theme="folder-extension-symbolic"/>
+   </property>
+   <property name="text">
+    <string>Set user plugins directory</string>
    </property>
   </action>
  </widget>

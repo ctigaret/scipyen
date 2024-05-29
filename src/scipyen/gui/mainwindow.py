@@ -70,7 +70,8 @@ from imaging.axiscalibration import (AxesCalibration,
 from imaging import axisutils, vigrautils
 from imaging import (imageprocessing as imgp, imgsim,)
 from systems import *
-from ephys import (ephys, ltp, membrane, ivramp,)
+from ephys import (ephys, membrane, ivramp,)
+# from ephys import (ephys, ltp, membrane, ivramp,)
 from .workspacemodel import WorkspaceModel
 from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
 from .triggerdetectgui import guiDetectTriggers
@@ -409,28 +410,6 @@ else:
 # symbols tables in IPytyon.core.completer module is already filtered to allow
 # only uncode glyphs acceptable in Python variable names)
 ##
-
-# import IPython
-
-# unicode_input = dict()
-
-# with open(os.path.join(__scipyendir__, "core","unicode_input_table")) as src:
-    # while True:
-    # l = src.readline()
-    # if len(l) == 0:
-    # break
-    # items = l.split("\t")
-    # if len(items) != 4:
-    # break
-    # if "tab completion sequence" in items[2].lower():
-    # continue
-    # unicode_input[items[2]]=items[1]
-
-# for k,i in unicode_input.items():
-    # if k not in IPython.core.completer.latex_symbols:
-    # IPython.core.completer.latex_symbols[k]=i
-
-# IPython.core.completer.reverse_latex_symbol = {v:k for k,v in IPython.core.completer.latex_symbols.items()}
 
 # END NOTE: 2022-04-07 22:39:44
 
@@ -1343,6 +1322,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2022-12-25 10:41:12
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
         self.plugins = dict()
+        
+        self._userenv_varname_ = "USERPROFILE" if sys.platform == "win2" else "HOME"
+        self._user_home_ = os.getenv(self._userenv_varname_)
+        
+        # NOTE: 2024-05-29 13:07:37
+        # additional top plugin directory, where users can place their own plugins
+        # (in addition to self._scipyendir_)
+        self._default_scipyen_user_plugins_dir = os.path.join(self._user_home_, "scipyen_plugins")
+        
+        self._user_plugins_dir = self._default_scipyen_user_plugins_dir
 
         # BEGIN configurables; for each of these we define a read-write property
         # decorated with markConfigurable
@@ -1517,6 +1506,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #
         # _configureUI_ must be called NOW, to initialize additional UI elements
         # and signal-slot connections NOT defined in the *.ui file
+        #
+        # NOTE: 2024-05-29 13:01:37 
+        # this approach IS DIFFERENT from the "regular" child windows that 
+        # inherit from ScipyenViewer
         self._configureUI_()
 
         # NOTE:2022-01-28 23:16:57
@@ -1549,8 +1542,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # finally, inject references to self and the workspace into relevant
         # NOTE: 2022-12-25 22:48:32
         # soon to be deprecated in favour of plugins mechanism
-        ws_aware_modules = (ltp, ivramp, membrane,
-                            CaTanalysis, pgui, sigp, imgp, crvf, plots)
+        # ws_aware_modules = (ltp, ivramp, membrane,
+        #                     CaTanalysis, pgui, sigp, imgp, crvf, plots)
+        
+        # NOTE: 2024-05-29 14:04:11
+        # plugin modules already have this injected by slot_loadPlugins
+        ws_aware_modules = (ivramp, membrane,
+                            pgui, sigp, imgp, crvf, plots)
 
         for m in ws_aware_modules:
             # NOTE: 2022-12-23 10:47:39
@@ -1569,6 +1567,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.__class__._instance = self  # FIXME: what's this for?!? - flag as singleton?
 
+        # NOTE: 2024-05-29 13:04:00
+        # Asynchronously launch the plugin loading mechanism
         self.startPluginLoad.emit()
 
         self.currentVarItem = None
@@ -1594,6 +1594,21 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.workspace["scipyen_settings"] = self._scipyen_settings_
         self.workspaceModel.bindObjectInNamespace("scipyen_settings", self._scipyen_settings_,
                                     hidden=True)
+
+    @property
+    def userPluginsDirectory(self) -> str:
+        return self._user_plugins_dir
+    
+    @markConfigurable("UserPluginsDirectory", trait_notifier=True)
+    @userPluginsDirectory.setter
+    def userPluginsDirectory(self, val:typing.Union[str, pathlib.Path]):
+        if isinstance(val, pathlib.Path):
+            val = str(a)
+            
+        elif not isinstance(val, str) or len(val.strip()) == 0:
+            val = self._default_scipyen_user_plugins_dir
+            
+        self._user_plugins_dir = val
 
     @property
     def consoleDocked(self):
@@ -2874,7 +2889,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.workspace["scipyen_user_settings_file"] = self._user_settings_file_
             self.workspace["scipyen_topdir"] = self._scipyendir_
             self.workspace["external_console"] = self.external_console
-
+            self.workspace["user_home_environment_var"] = self._userenv_varname_
+            self.workspace["user_home"] = self._user_home_
             # print("exit" in self.ipkernel.shell.user_ns)
 
             # NOTE 2020-07-09 11:36:34
@@ -4423,6 +4439,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def _configureUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be 
             done before loading the plugins.
+        
+        NOTE: 2024-05-29 13:02:34 
+        In contrast to the "regular" child windows in Scipyen (i.e., inheriting
+        from ScipyenViewer) this method DOES NOT call setupUi()
+        self.setuo.Ui(self) MUST be called prior to calling this method.
         '''
         self.setDockNestingEnabled(True)
 
@@ -4438,6 +4459,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionGUI_Style.triggered.connect(
             self._slot_set_Application_style)
+        
+        self.actionSet_user_plugins_directory.triggered.connect(
+            self._slot_set_Users_Plugins_directory)
         
         self.actionAuto_launch_Script_Manager.toggled.connect(
             self._slot_set_scriptManagerAutoLaunch)
@@ -6983,6 +7007,30 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self.app.setStyle(val)
 
             self._current_GUI_style_name = val
+            
+    @Slot()
+    @safeWrapper
+    def _slot_set_Users_Plugins_directory(self):
+        targetDir = self._user_plugins_dir
+        caption = "Select users plugins top directory"
+        if sys.platform == "win32":
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+        if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                self, caption=caption, directory=targetDir, **kw))
+        else:
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                self, caption=caption, **kw))
+
+        if len(dirName) > 0:
+            self.userPluginsDirectory = dirName
+            
+        self.slot_reloadPlugins()
+            
+        # self.informationMessage_static(text=f"Restart Scipyen to load plugins from {self.userPluginsDirectory}")
 
     @Slot()
     @safeWrapper
@@ -7780,6 +7828,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print(f"{self.__class__.__name__}.slot_loadPlugins")
         scipyen_plugin_loader.find_frozen()
         scipyen_plugin_loader.find_plugins(self._scipyendir_)  # calls os.walk
+        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory)  # calls os.walk
+        
 
         # NOTE: 2016-04-15 11:53:08
         # let the plugin loader just load plugin module code
@@ -7793,6 +7843,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # NOTE: 2022-12-23 09:06:36
                 # inject references to self and the workspace into the module,
                 # as module attributes; see also NOTE: 2022-12-23 10:47:39
+                # see also NOTE: 2024-05-29 14:04:11 gui/mainwindow.py
                 if not hasattr(module, "mainWindow"):
                     module.__dict__["mainWindow"] = self
 

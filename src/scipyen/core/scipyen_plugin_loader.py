@@ -219,10 +219,13 @@ from __future__ import print_function
 # if the plugin advertises itself on an already used menu item and with a similar callback function
 # the previosuly loaded plugin will be overwritten !!!
 
-import os, inspect, importlib, sys, collections, functools, traceback, types
+import os, inspect, importlib, sys, traceback
+import types, typing, pathlib
+import collections, functools 
 from pprint import pprint
 # import os, inspect, imp, sys, collections
 from core import prog
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
@@ -239,8 +242,8 @@ sys.meta_path.append(pluginsSpecFinder)
 # __avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
 
 def find_frozen():
-    """Useful to locate plugin modules packaged with pyinstaller (i.e., 'frozen')
-"""
+    """Locates plugin modules packaged with pyinstaller (i.e., 'frozen')
+    """
     # this should be run AFTER all relevant modules have been loaded
     # and BEFORE find_plugins(…) is called
     plugin_modules = [sys.modules[n] for n in sys.modules if (hasattr(sys.modules[n], "__scipyen_plugin__") or hasattr(sys.modules[n], "init_scipyen_plugin"))]
@@ -249,7 +252,17 @@ def find_frozen():
             reloaded_module = importlib.reload(module)
             loaded_plugins[module.__name__] = module
 
-def find_plugins(path):
+def find_plugins(path:typing.Union[str, pathlib.Path]):
+    """Loads and located plugins in a directory tree rooted at `path`
+    """
+    if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
+        path = str(path.absolute())
+        
+    elif not isinstance(path, str) or len(path.strip()) == 0 or not os.path.isdir(path) or not os.path.exists(path):
+        prog.scipywarn(f"Expecting a string or pathloib.Path for an absolute directory pathway; instead got {path} ")
+        return
+    
+    
     # NOTE: 2023-06-28 21:13:30
     # an entry is a 3-tuple (root, dirs, file)
     dw = os.walk(path)

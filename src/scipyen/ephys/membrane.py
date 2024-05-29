@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Processing of electrophysiology signal data.
 """
+
 #### BEGIN core python modules
 import sys, traceback, inspect, numbers, typing, datetime, dataclasses
 import warnings
