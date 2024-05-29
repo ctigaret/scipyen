@@ -1585,6 +1585,22 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # BEGIN Properties
     
     @property
+    def desktopScreen(self) -> QtGui.QScreen:
+        myGeom = self.geometry() # a QtCore.QRect
+        screens = QtGui.QGuiApplication.screens()
+        primaryScreen = QtGui.QGuiApplication.primaryScreen()
+        # NOTE: 2024-03-02 23:05:29
+        # verify this by changing your desktop screens layout
+        if len(screens) > 1:
+            screenGeoms = [s.geometry() for s in screens]
+            xscreen = [myGeom.x() >= s.x() + s.width() for s in screenGeoms]
+            yscreen = [myGeom.y() >= s.y() + s.height() for s in screenGeoms]
+            screenNdx = [k for k in range(len(screens)) if all([not xscreen[k] , not yscreen[k]])][0]
+            return screens[screenNdx]
+        
+        return primaryScreen
+
+    @property
     def userHome(self) -> str:
         return self._user_home_
     
@@ -1602,6 +1618,31 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.workspace["scipyen_settings"] = self._scipyen_settings_
         self.workspaceModel.bindObjectInNamespace("scipyen_settings", self._scipyen_settings_,
                                     hidden=True)
+        
+    @property
+    def pluginNames(self) -> tuple:
+        """Tuple of names of currently loaded plugins"""
+        return tuple(scipyen_plugin_loader.loaded_plugins.keys())
+    
+    @property
+    def pluginModules(self) -> tuple:
+        """Tuple of currently loaded plugin modules"""
+        return tuple(scipyen_plugin_loader.loaded_plugins.values())
+    
+    @property
+    def loadedPlugins(self) -> dict:
+        """Mapping of module name ↦ plugin module for currently loaded plugins"""
+        return scipyen_plugin_loader.loaded_plugins
+    
+    @property
+    def plugins(self) -> tuple:
+        """Alias to pluginNames.
+        See also the properties:
+        • pluginNames
+        • pluginModules
+        • loadedPlugins
+        """
+        return self.pluginNames
 
     @property
     def userPluginsDirectory(self) -> str:
@@ -8075,22 +8116,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         return newAction
     
-    @property
-    def desktopScreen(self) -> QtGui.QScreen:
-        myGeom = self.geometry() # a QtCore.QRect
-        screens = QtGui.QGuiApplication.screens()
-        primaryScreen = QtGui.QGuiApplication.primaryScreen()
-        # NOTE: 2024-03-02 23:05:29
-        # verify this by changing your desktop screens layout
-        if len(screens) > 1:
-            screenGeoms = [s.geometry() for s in screens]
-            xscreen = [myGeom.x() >= s.x() + s.width() for s in screenGeoms]
-            yscreen = [myGeom.y() >= s.y() + s.height() for s in screenGeoms]
-            screenNdx = [k for k in range(len(screens)) if all([not xscreen[k] , not yscreen[k]])][0]
-            return screens[screenNdx]
-        
-        return primaryScreen
-
     def installPluginMenu(self, pname, v):
         '''Installs a GUI menu for the  plugin named pname.
 

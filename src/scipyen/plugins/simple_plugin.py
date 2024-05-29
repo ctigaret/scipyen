@@ -62,6 +62,7 @@ def helloWorld():
            "",
            f"Currently, the user plugins directory is {mainWindow.userPluginsDirectory}",
            "",
+           "The currently loaded plugin module names are available via mainWindow.plugins property (a tuple)",
            "Bugs: Isolated menu items - whih should be placed on their own in the menu bar - are not visible",
            "As a workaround, please avoid single-item menu paths in the dict returned by `init_scipyen_plugin` function"
            ]
