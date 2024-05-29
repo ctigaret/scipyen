@@ -259,7 +259,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path]):
         path = str(path.absolute())
         
     elif not isinstance(path, str) or len(path.strip()) == 0 or not os.path.isdir(path) or not os.path.exists(path):
-        prog.scipywarn(f"Expecting a string or pathloib.Path for an absolute directory pathway; instead got {path} ")
+        prog.scipywarn(f"Expecting a string or a pathlib.Path for an absolute pathway to an existing directory; instead got {path} ")
         return
     
     
