@@ -243,25 +243,6 @@ and / or main digital output pattern (patch and field recording)</string>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="exportResultsPushButton">
-          <property name="enabled">
-           <bool>true</bool>
-          </property>
-          <property name="toolTip">
-           <string>Export results to workspace</string>
-          </property>
-          <property name="statusTip">
-           <string>Export results to workspace</string>
-          </property>
-          <property name="whatsThis">
-           <string>Export results to workspace</string>
-          </property>
-          <property name="text">
-           <string>Export results</string>
-          </property>
-         </widget>
-        </item>
-        <item>
          <widget class="QToolButton" name="showViewersToolButton">
           <property name="toolTip">
            <string>Show all viewers</string>

@@ -198,7 +198,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
-        #print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
+        # print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
+        # print(f"ScipyenViewer<{self.__class__.__name__}>.__init__")
         if sys.platform == "win32" or os.name == "nt" or platform.uname().system == "Windows":
             parent = None
             
@@ -940,7 +941,14 @@ class ScipyenFrameViewer(ScipyenViewer):
     # index of the frame in the data
     frameChanged            = Signal(int, name="frameChanged")
     
-    def __init__(self, data: typing.Optional[object] = None, parent: typing.Optional[QtWidgets.QMainWindow] = None, ID: typing.Optional[int] = None, win_title: typing.Optional[str] = None, doc_title: typing.Optional[str] = None, frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, currentFrame: typing.Optional[int] = None, missingFrameValue:typing.Optional[object]=None, *args, **kwargs):
+    def __init__(self, data: typing.Optional[object] = None, 
+                 parent: typing.Optional[QtWidgets.QMainWindow] = None, 
+                 ID: typing.Optional[int] = None, 
+                 win_title: typing.Optional[str] = None, 
+                 doc_title: typing.Optional[str] = None, 
+                 frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, 
+                 currentFrame: typing.Optional[int] = None, 
+                 missingFrameValue:typing.Optional[object]=None, *args, **kwargs):
         """Constructor for ScipyenFrameViewer.
         
         Parameters:

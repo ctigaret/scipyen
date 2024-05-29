@@ -3668,13 +3668,12 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         # self._configureUi_()
         # self._configureUi_() # called by super().__init__
         # WorkspaceGuiMixin.__init__(self, parent=parent)
-        super().__init__(self, parent=parent, win_title=self._winTitle_)
-        self._configureUi_()
-        self.scipyenWindow.sig_changedDirectory.connect(self._slot_changedWorkingDirectory)
-        self.loadSettings()
+        super().__init__(data=None, parent=parent, win_title=self._winTitle_, **kwargs)
+        # self.scipyenWindow.sig_changedDirectory.connect(self._slot_changedWorkingDirectory)
+        # self.loadSettings()
         self._gen_source() # assigns to self._metadata_.source
         
-    def _configureUi_(self):
+    def _configureUI_(self):
         self.setupUi(self)
         self._pathSpinBoxBgDefaultColor = self.path0SpinBox.palette().color(QtGui.QPalette.Active, QtGui.QPalette.Window)
         
@@ -3717,7 +3716,7 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         self.defaultTrackingLabelPalette = self.TrackingConditioningLabel.palette()
         self.defaultTrackingLabelBgColor = self.defaultTrackingLabelPalette.color(self.TrackingConditioningLabel.backgroundRole())
         
-        self.exportResultsPushButton.clicked.connect(self._slot_exportResults)
+        # self.exportResultsPushButton.clicked.connect(self._slot_exportResults)
         
         self.setWindowTitle(self._winTitle_)
         
@@ -3759,7 +3758,31 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
             self._path0_index = val
             signalBlock = QtCore.QSignalBlocker(self.path0SpinBox)
             self.path0SpinBox.setValue(self._path0_index)
+            p1val = self.path1SpinBox.value()
         
+            p = self.path0SpinBox.palette()
+            c = p.color(self.path0SpinBox.backgroundRole())
+            
+            p1 = self.path1SpinBox.palette()
+            c1 = p.color(self.path1SpinBox.backgroundRole())
+            
+            if val == p1val:
+                if c != self._errorColor:
+                    if c1 != self._errorColor:
+                        p1.setColor(self.path1SpinBox.backgroundRole(), self._errorColor)
+                        self.path1SpinBox.setPalette(p1)
+                    p.setColor(self.path0SpinBox.backgroundRole(), self._errorColor)
+                    self.path0SpinBox.setPalette(p)
+                    
+            else:
+                if c != self._pathSpinBoxBgDefaultColor:
+                    if c1 != self._pathSpinBoxBgDefaultColor:
+                        p1.setColor(self.path1SpinBox.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                        self.path1SpinBox.setPalette(p1)
+                    p.setColor(self.path0SpinBox.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                    self.path0SpinBox.setPalette(p)
+                    
+                    
     @property
     def path1Index(self)->int:
         return self._path1_index
@@ -3771,6 +3794,31 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
             self._path1_index = val
             signalBlock = QtCore.QSignalBlocker(self.path1SpinBox)
             self.path1SpinBox.setValue(self._path1_index)
+            p0val = self.path0SpinBox.value()
+            
+            p = self.path1SpinBox.palette()
+            c = p.color(self.path1SpinBox.backgroundRole())
+            
+            p1 = self.path0SpinBox.palette()
+            c1 = p.color(self.path0SpinBox.backgroundRole())
+            
+            if val == p0val:
+                if c != self._errorColor:
+                    if c1 != self._errorColor:
+                        p1.setColor(self.path0SpinBox.backgroundRole(), self._errorColor)
+                        self.path0SpinBox.setPalette(p1)
+                    p.setColor(self.path1SpinBox.backgroundRole(), self._errorColor)
+                    self.path1SpinBox.setPalette(p)
+                    
+            else:
+                if c != self._pathSpinBoxBgDefaultColor:
+                    if c1 != self._pathSpinBoxBgDefaultColor:
+                        p1.setColor(self.path0SpinBox.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                        self.path0SpinBox.setPalette(p1)
+                    p.setColor(self.path1SpinBox.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+                    self.path1SpinBox.setPalette(p)
+                    
+                    
             
     @property
     def path0Name(self) -> str:
@@ -3812,8 +3860,8 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
               self.ADCIndexSpinBox, self.DACIndexSpinBox,
               self.path0SpinBox,    self.path0NameEdit,
               self.path1SpinBox,    self.path1NameEdit)
-        for w in ww:
-            w.setEnabled(True)
+        # for w in ww:
+        #     w.setEnabled(True)
         
         if isinstance(self._oltp, LTPOnline) and self._oltp.running:
             # print("\tstopping oltp...")
@@ -3828,14 +3876,14 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 thread = None
                 
             self._oltp = None
-            # for w in ww:
-            #     w.setEnabled(True)
+            for w in ww:
+                w.setEnabled(True)
             self.startStopPushButton.setText("Start")
-            # self.startStopPushButton.setStatusTip("Start monitoring Clampex output")
-            # self.startStopPushButton.setToolTip("Start monitoring Clampex output")
-            # self.startStopPushButton.setWhatsThis("Start monitoring Clampex output")
-            # self.conditioningPushButton.setEnabled(False)
-            # self.runningLabel.setText("Idle")
+            self.startStopPushButton.setStatusTip("Start monitoring Clampex output")
+            self.startStopPushButton.setToolTip("Start monitoring Clampex output")
+            self.startStopPushButton.setWhatsThis("Start monitoring Clampex output")
+            self.conditioningPushButton.setEnabled(False)
+            self.runningLabel.setText("Idle")
             
         else:
             self._oltp = LTPOnline(self._metadata_.source, directory = self.scipyenWindow.currentDir,
@@ -3846,17 +3894,18 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
                 self._oltp._abfProcessorThread_.sig_xtalk.connect(self._slot_xtalk)
                 self._oltp._abfProcessorThread_.sig_processingFile.connect(self._slot_processingFile)
         
-            # for w in ww:
-            #     w.setEnabled(False)
+            self._oltp.start()
+            
+            for w in ww:
+                w.setEnabled(False)
                 
             self.startStopPushButton.setText("Stop")
-            # self.startStopPushButton.setStatusTip("Stop monitoring Clampex output")
-            # self.startStopPushButton.setToolTip("Stop monitoring Clampex output")
-            # self.startStopPushButton.setWhatsThis("Stop monitoring Clampex output")
-            # self.conditioningPushButton.setEnabled(True)
+            self.startStopPushButton.setStatusTip("Stop monitoring Clampex output")
+            self.startStopPushButton.setToolTip("Stop monitoring Clampex output")
+            self.startStopPushButton.setWhatsThis("Stop monitoring Clampex output")
+            self.conditioningPushButton.setEnabled(True)
             
             # print("\tstarting oltp...")
-            self._oltp.start()
             self.runningLabel.setText("Running")
             
     @Slot(object)
@@ -3905,11 +3954,12 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         
     @Slot()
     def _slot_showViewers(self):
-        self._oltp.showViewers()
+        if isinstance(self._oltp, LTPOnline):
+            self._oltp.showViewers()
         
-    @Slot()
-    def _slot_exportResults(self):
-        self._oltp.exportResults()
+    # @Slot()
+    # def _slot_exportResults(self):
+    #     self._oltp.exportResults()
         
     @Slot()
     def _slot_metaDataChanged(self):
@@ -3974,42 +4024,41 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
     def _slot_path_channel_changed(self, val:int):
         w = self.sender()
         w1 = self.path1SpinBox if w == self.path0SpinBox else self.path0SpinBox
-        
-        old_val = self._path1_index if w == self.path0SpinBox else self._path0_index
+#         
+#         old_val = self._path1_index if w == self.path0SpinBox else self._path0_index
         
         if val < 0:
             val = 0
             
-        p = w.palette()
-        p1 = w1.palette()
+#         p = w.palette()
+#         p1 = w1.palette()
+#         
+#         c = p.color(w.backgroundRole())
+#         c1 = p1.color(w1.backgroundRole())
         
-        c = p.color(w.backgroundRole())
-        c1 = p1.color(w1.backgroundRole())
-        
-        if val == w1.value():
-            if c != self._errorColor:
-                if c1 != self._errorColor:
-                    p1.setColor(w1.backgroundRole(), self._errorColor)
-                    w1.setPalette(p1)
-                    # p1.setColor(le1[0].backgroundRole(), self._errorColor)
-                    # le1[0].setPalette(p1)
-                p.setColor(w.backgroundRole(), self._errorColor)
-                w.setPalette(p)
-                # le[0].setPalette(p)
-                
+        if w == self.path0SpinBox:
+            self.path0Index = val
+            self.path1Index = w1.value()
         else:
-            if w == self.path0SpinBox:
-                self.path0Index = val
-            else:
-                self.path1Index = val
-                
-            self._generate_recording_source()
-            if c != self._pathSpinBoxBgDefaultColor:
-                if c1 != self._pathSpinBoxBgDefaultColor:
-                    p1.setColor(w1.backgroundRole(), self._pathSpinBoxBgDefaultColor)
-                    w1.setPalette(p1)
-                p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
-                w.setPalette(p)
+            self.path0Index = w1.value()
+            self.path1Index = val
+            
+        # if val == w1.value():
+        #     if c != self._errorColor:
+        #         if c1 != self._errorColor:
+        #             p1.setColor(w1.backgroundRole(), self._errorColor)
+        #             w1.setPalette(p1)
+        #         p.setColor(w.backgroundRole(), self._errorColor)
+        #         w.setPalette(p)
+        # else:    
+        #     if c != self._pathSpinBoxBgDefaultColor:
+        #         if c1 != self._pathSpinBoxBgDefaultColor:
+        #             p1.setColor(w1.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+        #             w1.setPalette(p1)
+        #         p.setColor(w.backgroundRole(), self._pathSpinBoxBgDefaultColor)
+        #         w.setPalette(p)
+        
+        self._generate_recording_source()
                 
     @Slot(bool)
     def _slot_xtalk(self, val:bool):
@@ -4045,7 +4094,9 @@ class TwoPathwaysOnlineLTP(ScipyenViewer, __UI_LTPWindow__):
         else:
             if w == self.path0NameEdit:
                 self.path0Name = pathName
+                self.path1Name = w1.text()
             else:
+                self.path0Name = w1.text()
                 self.path1Name = pathName
                 
             self._generate_recording_source()
