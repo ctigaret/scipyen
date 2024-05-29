@@ -3691,6 +3691,21 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def writeText(self, text):
         self.consoleWidget.writeText(text)
+        
+    @property
+    def ipkernel(self):
+        """The IPython kernel runnin in this console"""
+        return self.consoleWidget.ipkernel
+        
+    @property
+    def stdout(self):
+        """The standard output stream of the kernel running in this console"""
+        return self.ipkernel.stdout
+    
+    @property
+    def shell(self):
+        """The interactive shell running in this console"""
+        return self.ipkernel.shell
 
     @property
     def consoleFont(self):

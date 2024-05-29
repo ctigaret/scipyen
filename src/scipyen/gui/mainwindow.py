@@ -1583,7 +1583,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
 
     # BEGIN Properties
-
+    
+    @property
+    def userHome(self) -> str:
+        return self._user_home_
+    
+    @property
+    def userHomeEnvironmentVariable(self) -> str:
+        return self._userenv_varname_
+    
     @property
     def scipyenSettings(self):
         return self._scipyen_settings_
@@ -2750,6 +2758,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             self.ipkernel = self.console.consoleWidget.ipkernel
             self.shell = self.ipkernel.shell
+            self.stdout = self.ipkernel.stdout
 
             # this is always 1 immediately after initialization
             self.executionCount = self.ipkernel.shell.execution_count
@@ -7873,9 +7882,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         [(module.__name__, (module.__file__, module.init_scipyen_plugin()))])
                     if len(menudict) > 0:
                         for (k, v) in menudict.items():
+                            # v[0] is the module.__file__ 
+                            # we restrict to regular plugin files, by REQUIRING that
+                            # this is a file TODO: 2024-05-29 17:15:26 check it exists !
                             if (isinstance(k, str) and len(k) > 0):
-                                pluginMenuActions = self.installPluginMenu(
-                                    k, v)
+                                pluginMenuActions = self.installPluginMenu(k, v)
+                                # print(f"{self.__class__.__name__}.slot_loadPlugins pluginMenuActions = {pluginMenuActions}")
                                 if len(pluginMenuActions):
                                     self._cachePluginActions_(
                                         module, pluginMenuActions)
@@ -7943,7 +7955,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if itemText in parentActionLabels:
             return parentActionMenus[parentActionLabels.index(itemText)]
 
-    def _installPluginFunction_(self, f: types.FunctionType, menuItemLabel: str, parentMenu: QtWidgets.QMenu, before: typing.Optional[QtWidgets.QAction] = None, n_outputs=None, inArgTypes=None):
+    def _installPluginFunction_(self, f: types.FunctionType, menuItemLabel: str, 
+                                parentMenu: QtWidgets.QMenu, 
+                                before: typing.Optional[QtWidgets.QAction] = None, 
+                                n_outputs=None, inArgTypes=None):
         ''' Creates a QAction for calling the module-level function `f`.
         Implements the actual logic of installing individual plugin functions 
         advertised by the init_scipyen_plugin function defined in the plugin module.
@@ -7967,6 +7982,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 of the parnet menu
 
         '''
+        # print(f"{self.__class__.__name__}._installPluginFunction_:")
+        # print(f"\t f = {f}")
+        # print(f"\t menuItemLabel = {menuItemLabel}")
+        # print(f"\t parentMenu = {parentMenu}")
+        # print(f"\t before = {before}")
         # NOTE: TODO: in python 3: use inspect.getfullargspec(f)
         # to parse *args, **kwargs syntax !!!
         argSpec = inspect.getfullargspec(f)
@@ -8083,7 +8103,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             • key is a menu path represented either as a single string 
                 containing names of menu tree items texts separated by '|' 
-                (from left to right: top menu to the deepest submenu)
+                (from left to right: top menu to the deepest submenu, and 
+                 rooted at the menu bar of the Scipyen main window)
 
                 Example: "File|Open|Special" will:
 
@@ -8112,7 +8133,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 in the 'key' is triggered.
 
                 ∘ a sequence of module-level functions defined inside the
-                plugin's module; in this case, the last meun item element in 
+                plugin's module; in this case, the last kenu item element in 
                 the key will generate a deep submenu populated with QActions
                 named after the names of the functions in this sequence.
 
@@ -8135,6 +8156,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         '''
         pluginMenuActions = list()
+        
+        # print(f"{self.__class__.__name__}.installPluginMenu: v[1] = {v[1]}")
 
         if isinstance(v[1], dict) and len(v[1]) > 0:  # the nested dict
             # the plugin's init_scipyen_plugin function outputs a mapping
