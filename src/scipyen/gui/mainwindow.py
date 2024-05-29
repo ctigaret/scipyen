@@ -1323,7 +1323,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
         self.plugins = dict()
         
-        self._userenv_varname_ = "USERPROFILE" if sys.platform == "win2" else "HOME"
+        self._userenv_varname_ = "USERPROFILE" if sys.platform == "win32" else "HOME"
         self._user_home_ = os.getenv(self._userenv_varname_)
         
         # NOTE: 2024-05-29 13:07:37
