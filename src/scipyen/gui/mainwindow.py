@@ -7860,7 +7860,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     module.__dict__["workspace"] = self.workspace
 
                 # NOTE 2022-12-25 21:10:52
-                # crawl the module for Viewer classes - register if any is found
+                # inspect the module for any Viewer classes and register them
                 # Do this independently of installing self advertised menus (see
                 # below)
                 viewerClasses = list(filter(lambda x: inspect.isclass(x[1]) and prog.is_class_defined_in_module(
@@ -7874,6 +7874,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # allow plugins to be intialized without advertising a menu for
                 # the main window; hence, only install menus for those plugins
                 # that provide a menu path via their init_scipyen_plugin
+                # 
+                #
                 if inspect.isfunction(getattr(module, "init_scipyen_plugin", None)):
                     # print(f"slot_loadPlugins self-advertising module {module.__name__}")
                     # NOTE: 2022-12-25 21:10:19
@@ -7982,11 +7984,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 of the parnet menu
 
         '''
-        # print(f"{self.__class__.__name__}._installPluginFunction_:")
-        # print(f"\t f = {f}")
-        # print(f"\t menuItemLabel = {menuItemLabel}")
-        # print(f"\t parentMenu = {parentMenu}")
-        # print(f"\t before = {before}")
+        # if "simple_plugin" in f.__module__:
+        #     print(f"{self.__class__.__name__}._installPluginFunction_:")
+        #     print(f"\t f = {f}")
+        #     print(f"\t menuItemLabel = {menuItemLabel}")
+        #     print(f"\t parentMenu = {parentMenu}")
+        #     print(f"\t before = {before}")
         # NOTE: TODO: in python 3: use inspect.getfullargspec(f)
         # to parse *args, **kwargs syntax !!!
         argSpec = inspect.getfullargspec(f)
@@ -8063,6 +8066,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             parentMenu.insertAction(before, newAction)
         else:
             newAction = parentMenu.addAction(menuItemLabel)
+            
+        if parentMenu == self.menuBar():
+            parentMenu.update()
 
         newAction.triggered.connect(self.slot_wrapPluginFunction(
             f, n_outputs, arg_types, arg_names, arg_defaults, var_args, kw_args))
@@ -8157,7 +8163,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         '''
         pluginMenuActions = list()
         
-        # print(f"{self.__class__.__name__}.installPluginMenu: v[1] = {v[1]}")
+        # if "simple_plugin" in v[0]:
+        #     print(f"{self.__class__.__name__}.installPluginMenu: v[1] = {v[1]}")
 
         if isinstance(v[1], dict) and len(v[1]) > 0:  # the nested dict
             # the plugin's init_scipyen_plugin function outputs a mapping
@@ -8199,10 +8206,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                         beforeActionLabel)
                                     beforeAction = parentMenu.actions()[
                                         beforeNdx]
+                                    
+                            # else:
+                            #     parentMenu.
 
                             if inspect.isfunction(ff):
                                 menuAction = self._installPluginFunction_(
                                     ff, item, parentMenu, before=beforeAction)
+                                # if "simple_plugin" in v[0]:
+                                #     print(f"menuAction: {menuAction}")
                                 if isinstance(menuAction, QtWidgets.QAction):
                                     pluginMenuActions.append((menuAction, ff))
 

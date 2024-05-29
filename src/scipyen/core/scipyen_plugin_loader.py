@@ -229,11 +229,6 @@ from core import prog
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-# NOTE: 2016-04-15 12:06:04
-# not needed anymore, just access the loaded_plugins dict from the caller of 
-# plugin_loader (here, ScipyenWindow)
-#plugin_info=collections.OrderedDict()
-
 loaded_plugins = collections.OrderedDict()
 
 pluginsSpecFinder = prog.SpecFinder({})
