@@ -37,8 +37,8 @@ import core.datatypes
 import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration
 
-import imaging.scandata
-from imaging.scandata import (ScanData, AnalysisUnit)
+# import imaging.scandata
+# from imaging.scandata import (ScanData, AnalysisUnit)
 
 from core.triggerprotocols import TriggerProtocol
 from core.triggerevent import (TriggerEvent, TriggerEventType)

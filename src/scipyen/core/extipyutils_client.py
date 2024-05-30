@@ -168,7 +168,6 @@ init_commands.extend(
     "from imaging import axisutils, vigrautils",
     "from imaging.axisutils import (axisTypeFromString, axisTypeName,axisTypeStrings,axisTypeSymbol, axisTypeUnits,dimEnum,dimIter,evalAxisTypeExpression,getAxisTypeFlagsInt,getNonChannelDimensions,hasChannelAxis,)",
     "from imaging.axiscalibration import (AxesCalibration,AxisCalibrationData, ChannelCalibrationData, CalibrationData)",
-    "from imaging.scandata import (AnalysisUnit, ScanData,)",
     "from iolib import pictio as pio",
     "from iolib import h5io, jsonio",
     "print('To use matplotlib run %matplotlib magic')"

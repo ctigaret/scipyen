@@ -68,8 +68,6 @@ import core.neoutils as neoutils
 #import core.triggerprotocols
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import (TriggerProtocol, auto_define_trigger_events, auto_detect_trigger_protocols)
-#import imaging.scandata
-from imaging.scandata import ScanData
 
 from core.prog import (safeWrapper, with_doc, scipywarn)
 #from core.patchneo import *
