@@ -424,6 +424,13 @@ qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
 
 # print(f"\ndatas = {datas}\n")
 
+hiddenimports.extend(['gui.widgets',
+                      'gui.widgets.metadatawidget',
+                      'gui.widgets.modelfitting_ui'])
+
+print(f"\nhiddenimports = {hiddenimports}\n")
+
+
 # NOTE: 2023-07-14 15:22:26
 # hookspath contains code for pyinstaller hooks called ONLY when the Analyser
 # detects an import in Scipyen code; these won't work for NEURON stuff....
