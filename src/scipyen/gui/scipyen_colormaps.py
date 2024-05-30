@@ -1187,8 +1187,12 @@ def get(name, lut=None, default=None):
     """Returns a registered colormap by its name.
     NOTE: This function is aliased as get_colormap in this module
     """
+    mpl_version_tuple = getattr(mpl._version, "version_tuple", tuple())
+    if len(mpl_version_tuple) == 0:
+        mpl_version_tuple = tuple(int(x) for x in mpl._version.version.split('.'))
+        
     if isinstance(name, str) and len(name.strip()):
-        if mpl._version.version_tuple[1]>= 6:
+        if mpl_version_tuple[1]>= 6:
             if name in mpl.colormaps:
                 cmap = mpl.colormaps[name]
             else:
@@ -1221,7 +1225,7 @@ def get(name, lut=None, default=None):
         return name
     
     else:
-        if mpl._version.version_tuple[1] >= 6:
+        if mpl_version_tuple[1] >= 6:
             if default is None:
                 cmap = mpl.colormaps["gray"]
             
