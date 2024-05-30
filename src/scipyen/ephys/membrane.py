@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """Processing of electrophysiology signal data.
+TODO: 2024-05-30 14:42:46
+extricate AP analysis code from here
 """
 
 #### BEGIN core python modules
