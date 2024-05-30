@@ -1028,7 +1028,13 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
                         s.name = "segment_%d" % k
         
         #protocol_sweeps = axonIO.read_protocol()
+        # NOTE: 2024-05-30 16:17:08
+        # NEO api changed (AGAIN!) so now annotate(…) only accept keys of type `str`
+        #
         axon_info = axonIO._axon_info
+        # print(f"axonio_info = {[(k, type(k).__name__) for k in axonio_info]}")
+        # axon_info = dict()
+        # axon_info.update(axonio_info)
         
         # augment axon_info with missing bits that pyabf can actually get
         # I know this is a bit redundant and duplicates some data, but it simpler
@@ -1054,7 +1060,9 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
         axon_info["sampling_rate"] = axonIO._sampling_rate
         
         
-        data.annotate(**axon_info)
+        # see NOTE: 2024-05-30 16:17:08
+        # data.annotate(axon_info)
+        data.annotations.update(axon_info)
         
         return data
     

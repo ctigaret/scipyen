@@ -21,7 +21,7 @@
 #         typeguard._decorators.instrument = _instrument
 
 def _pyi_rthook():
-    """Makes typeguard._decorators.typechecked a NOOP"""
+    """Makes typeguard._decorators.typecheced a NOOP"""
     has_typeguard_typechecked=False
     has_typeguard_typecheck_instrument = False
 
