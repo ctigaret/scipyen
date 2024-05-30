@@ -1321,7 +1321,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         # NOTE: 2022-12-25 10:41:12
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QtWidgets.QAction}
-        self.plugins = dict()
+        self._ui_plugins_ = dict()
         
         self._userenv_varname_ = "USERPROFILE" if sys.platform == "win32" else "HOME"
         self._user_home_ = os.getenv(self._userenv_varname_)
@@ -1620,30 +1620,102 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                     hidden=True)
         
     @property
+    def applicationName(self)->str:
+        return self.app.applicationName()
+    
+    @property
     def pluginNames(self) -> tuple:
-        """Tuple of names of currently loaded plugins"""
+        """Tuple of names of currently loaded plugins.
+        These include all Scipyen plugins (either in the Scipyen code tree or
+        in the user-defined plugins directory) regardless if whether they define 
+        a UI menu or not.
+        See also the following attributes, properties or methods:
+        • plugins
+        • pluginModules
+        • UIPlugins
+        • UIPluginMenus
+        • UIPluginNames
+        • getMenusForUIPlugin
+        """
         return tuple(scipyen_plugin_loader.loaded_plugins.keys())
     
     @property
     def pluginModules(self) -> tuple:
-        """Tuple of currently loaded plugin modules"""
+        """Tuple of currently loaded plugin modules.
+        These include all Scipyen plugins (either in the Scipyen code tree or
+        in the user-defined plugins directory) regardless if whether they define 
+        a UI menu or not.
+        See also the following attributes, properties or methods:
+        • plugins
+        • pluginNames
+        • UIPlugins
+        • UIPluginMenus
+        • UIPluginNames
+        • getMenusForUIPlugin
+        """
         return tuple(scipyen_plugin_loader.loaded_plugins.values())
     
     @property
-    def loadedPlugins(self) -> dict:
-        """Mapping of module name ↦ plugin module for currently loaded plugins"""
+    def plugins(self) -> dict:
+        """Mapping of module name ↦ plugin module for currently loaded plugins.
+        These include all Scipyen plugins (either in the Scipyen code tree or
+        in the user-defined plugins directory) regardless if whether they define 
+        a UI menu or not.
+        See also the following attributes, properties or methods:
+        • pluginModules
+        • pluginNames
+        • UIPlugins
+        • UIPluginMenus
+        • UIPluginNames
+        • getMenusForUIPlugin
+        """
         return scipyen_plugin_loader.loaded_plugins
     
     @property
-    def plugins(self) -> tuple:
-        """Alias to pluginNames.
-        See also the properties:
-        • pluginNames
+    def UIPlugins(self) -> dict:
+        """Loaded Scipyen "UI" plugins.
+        These are the Scipyen plugins that define a UI menu (i.e. define the 
+        function `init_scipyen_plugin` to generate a UI menu hieracrhy), regardless 
+        of where their files are located (either in the Scipyen code tree or in
+        the user-defined plugins directory).
+        For a collection of ALL plugin modules, see `plugins` property.
+        See also the following attributes, properties or methods:
+        • plugins
         • pluginModules
-        • loadedPlugins
+        • pluginNames
+        • UIPluginMenus
+        • UIPluginNames
+        • getMenusForUIPlugin
         """
-        return self.pluginNames
-
+        return self._ui_plugins_
+    
+    @property
+    def UIPluginNames(self) -> tuple:
+        """Names of loaded Scipyen "UI" plugins
+        See also the following attributes, properties or methods:
+        • plugins
+        • pluginModules
+        • pluginNames
+        • UIPlugins
+        • UIPluginMenus
+        • UIPluginNames
+        • getMenusForUIPlugin
+        """
+        return tuple(x.__name__ for x in self._ui_plugins_.keys())
+    
+    @property
+    def UIPluginMenus(self) -> dict:
+        """Mapping of UI plugins name ↦ mapping of [menu path ↦ plugin function]
+        See also the following attributes, properties or methods:
+        • plugins
+        • pluginModules
+        • pluginNames
+        • UIPlugins
+        • UIPluginNames
+        • getMenusForUIPlugin
+        """
+        return dict((k.__name__, dict((self._crawl_plugin_UI_menu(act), l.__name__) for l,act in v.items())) for k,v in  self._ui_plugins_.items())
+        
     @property
     def userPluginsDirectory(self) -> str:
         return self._user_plugins_dir
@@ -7839,9 +7911,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         '''
         # NOTE: 2022-12-25 10:52:58
         # this does NOT remove the module from sys.modules!
-        if len(self.plugins):
+        if len(self._ui_plugins_):
             parents = list()
-            for module, moduleDict in self.plugins.items():
+            for module, moduleDict in self._ui_plugins_.items():
                 if isinstance(moduleDict, dict) and len(moduleDict) > 0:
                     for func, action in moduleDict.items():
                         if inspect.isfunction(func) and isinstance(action, QtWidgets.QAction):
@@ -7854,7 +7926,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             for p in parents:
                 self._removeMenu_(p)
 
-            self.plugins.clear()
+            self._ui_plugins_.clear()
             scipyen_plugin_loader.loaded_plugins.clear()  # need to clear this, too
 
     @Slot()
@@ -8315,14 +8387,54 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                             raise TypeError("function object expected")
 
         return pluginMenuActions
+    
+    def _crawl_plugin_UI_menu(self, act:QtWidgets.QAction) -> str:
+        if not isinstance(act, QtWidgets.QAction):
+            return str()
+        menu_path = deque()
+        
+        menu_path.append(act.text().replace('&', ''))
+        
+        while act is not None:
+            act = act.parent()
+            if isinstance(act, QtWidgets.QMenu):
+                menu_path.appendleft(act.title().replace('&',''))
+                
+            else:
+                break
+            
+        return " / ".join(menu_path)
+    
+    def getMenusForUIPlugin(self, plugin_name:str) -> tuple:
+        """Returns the menu path ↦ plugin function mappigns for the specified module.
+        For information about installed plugins see the following attributes,
+        properties or methods:
+        • plugins
+        • pluginModules
+        • pluginNames
+        • UIPlugins
+        • UIPluginMenus
+        • UIPluginNames
+        """
+        if not isinstance(plugin_name, str) or len(plugin_name.strip()) == 0:
+            return
+        
+        if plugin_name not in self.UIPluginNames:
+            scipywarn(f"The module named {plugin_name} is not a loaded UI plugin")
+            return
+        
+        plugins_ui = tuple(tuple(f"{self._crawl_plugin_UI_menu(iv)} -> {ik.__name__}" for ik,iv in i.items()) for k,i in self._ui_plugins_.items() if plugin_name == k.__name__)
+        
+        return plugins_ui if len(plugins_ui)>1 else plugins_ui[0]
+        
 
     def _cachePluginActions_(self, pluginModule, pluginMenuActions):
         if inspect.ismodule(pluginModule):
-            if pluginModule not in self.plugins:
-                self.plugins[pluginModule] = dict()
+            if pluginModule not in self._ui_plugins_:
+                self._ui_plugins_[pluginModule] = dict()
 
             for (menuAction, pluginFunction) in pluginMenuActions:
-                self.plugins[pluginModule][pluginFunction] = menuAction
+                self._ui_plugins_[pluginModule][pluginFunction] = menuAction
 
     def _isScipyenViewerClass_(self, x: typing.Type):
         if not inspect.isclass(x):

@@ -214,8 +214,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, on=False)
-        self._docTitle_ = None
-        self._winTitle_ = None # force auto-set in update_title()
+        self._docTitle_ = doc_title
+        self._winTitle_ = win_title # force auto-set in update_title()
+        # self._winTitle_ = None # force auto-set in update_title()
         self._custom_viewer_name_ = None
         
         # NOTE: 2023-01-22 11:14:42
@@ -370,7 +371,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
                 return result
             
-    def update_title(self, doc_title: (str, type(None)) = None, win_title: (str, type(None)) = None, enforce: bool = False):
+    def update_title(self, doc_title: typing.Optional[str] = None, 
+                     win_title: typing.Optional[str] = None, 
+                     enforce: bool = False):
         """Sets up the window title according to the pattern document - viewer.
         
         Parameters:
@@ -417,6 +420,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # user-imposed viewer title
             self._winTitle_ = win_title
             self._custom_viewer_name_ = win_title
+            
+        if not isinstance(self._winTitle_, str):
+            self._winTitle_ = self.__class__.__name__
+            
+        elif len(self._winTitle_.strip()) == 0:
+            self._winTitle_ = self.scipyenWindow.applicationName
             
         if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
             self.setWindowTitle("%s - %s" % (self._docTitle_, self._winTitle_))

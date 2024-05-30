@@ -52,9 +52,18 @@ class TextViewer(ScipyenViewer):
     # FIXME/TODO: 2019-11-10 13:16:56
     # highlighter_types = ("plain", "xml", "html")
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None,win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, edit:bool=False, markdown:bool=False, *args, **kwargs):
+    def __init__(self, data: (object, type(None)) = None, 
+                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ID:(int, type(None)) = None,
+                 win_title: (str, type(None)) = None, 
+                 doc_title: (str, type(None)) = None, 
+                 edit:bool=False,
+                 markdown:bool=False, *args, **kwargs):
         self._readOnly = edit!=True
         self._markdown = markdown==True
+        self._wrapMode_ = kwargs.pop("wrap", None)
+        if not isinstance(self._wrapMode_, QtWidgets.QTextEdit.LineWrapMode):
+            self._wrapMode_ = QtWidgets.QTextEdit.NoWrap
         super().__init__(data=data, parent=parent, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
         # super(QMainWindow, self).__init__(parent)
         # self._wm_id_ = int(self.winId())
@@ -70,7 +79,7 @@ class TextViewer(ScipyenViewer):
         
         self._docViewer_ = QtWidgets.QTextEdit(self)
         self._docViewer_.setReadOnly(self._readOnly)
-        self._docViewer_.setLineWrapMode(QtWidgets.QTextEdit.NoWrap)
+        self._docViewer_.setLineWrapMode(self._wrapMode_)
         
         if not self._readOnly:
             self._docViewer_.textChanged.connect(self.sig_textChanged)
@@ -259,5 +268,16 @@ class TextViewer(ScipyenViewer):
         # lines = list()
             
         
+    @property
+    def lineWrap(self) -> QtWidgets.QTextEdit.LineWrapMode:
+        return self._wrapMode_
+    
+    @lineWrap.setter
+    def lineWrap(self, val:QtWidgets.QTextEdit.LineWrapMode):
+        if not isinstance(val, QtWidgets.QTextEdit.LineWrapMode):
+            val = QtWidgets.QTextEdit.NoWrap
+            
+        self._wrapMode_ = val
+        self._docViewer_.setLineWrapMode(self._wrapMode_)
         
         
