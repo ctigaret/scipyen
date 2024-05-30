@@ -221,7 +221,7 @@ from __future__ import print_function
 
 import os, inspect, importlib, sys, traceback
 import types, typing, pathlib
-import collections, functools 
+import collections, functools, itertools 
 from pprint import pprint
 # import os, inspect, imp, sys, collections
 from core import prog
@@ -236,6 +236,14 @@ sys.meta_path.append(pluginsSpecFinder)
 
 # __avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
 
+def check_plugin_module(file_name) -> bool:
+    with open(file_name, "rt", encoding="utf-8") as module_file:
+        for line in module_file:
+            if line.startswith('__scipyen_plugin__') or line.startswith("def init_scipyen_plugin"):
+                return True
+            
+    return False
+
 def find_frozen():
     """Locates plugin modules packaged with pyinstaller (i.e., 'frozen')
     """
@@ -247,7 +255,7 @@ def find_frozen():
             reloaded_module = importlib.reload(module)
             loaded_plugins[module.__name__] = module
 
-def find_plugins(path:typing.Union[str, pathlib.Path]):
+def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[str,pathlib.Path]):
     """Loads and located plugins in a directory tree rooted at `path`
     """
     if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
@@ -257,32 +265,90 @@ def find_plugins(path:typing.Union[str, pathlib.Path]):
         prog.scipywarn(f"Expecting a string or a pathlib.Path for an absolute pathway to an existing directory; instead got {path} ")
         return
     
+    if isinstance(scipyendir, pathlib.Path) and scipyendir.is_dir() and scipyendir.exists():
+        scipyendir = scipyendir.absolue()
+        
+    elif isinstance(scipyendir, str) and len(scipyendir.strip()) and os.path.isdir(scipyendir) and os.path.exists(scipyendir):
+        scipyendir = pathlib.Path(scipyendir)
+        
+    else:
+        prog.scipywarn(f"Invalid scipyendir parameter: {scipyendir} ")
+        return
+    
+    # NOTE: 2024-05-30 11:33:28
+    # a better? version of the code after NOTE: 2023-06-28 21:13:30
+    
+    topdir = pathlib.Path(path)
+    
+    plugin_source_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(path)))))))
+    
+    # print(f"find_plugins: plugin_source_files = {plugin_source_files}")
+    
+    user_plugin_source_files = list(filter(lambda x: not x.is_relative_to(scipyendir), plugin_source_files))
+    # print(f"find_plugins: user_plugin_source_files = {user_plugin_source_files}")
+    
+    for file_name in plugin_source_files:
+        module_name = inspect.getmodulename(file_name)
+        if module_name is not None:
+            verb = False
+            pluginsSpecFinder.path_map[module_name] = file_name
+            if file_name in user_plugin_source_files:
+                # verb = True
+                file_directory = file_name.parent.relative_to(topdir)
+                if len(file_directory.parts):
+                    package_name = file_directory.parts[0]
+                    package_name_path = ".".join(file_directory.parts)
+                    submodules_path = file_name.parent
+                    submodules_paths = list()
+                    p = file_name.relative_to(topdir)
+                    while len(p.parts):
+                        p = p.parent
+                        if len(p.parts):
+                            submodules_paths.append(topdir.joinpath(p))
+                    if file_name.name == "__init__.py":
+                        module_name = package_name
+                    else:
+                        module_name = f"{package_name_path}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
+                        # module_name = f"{package_name}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
+                    module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
+                                                                         submodule_search_locations = submodules_paths)
+                    # module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
+                    #                                                      submodule_search_locations = [submodules_path])
+                else:
+                    module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+            else:
+                module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+                
+            check_load_module(module_spec, verb)
     
     # NOTE: 2023-06-28 21:13:30
     # an entry is a 3-tuple (root, dirs, file)
-    dw = os.walk(path)
-    # module_dict = dict()
-    for entry in dw:
-        for file_name in (os.path.join(entry[0], i) for i in entry[2]):
-            root, ext = os.path.splitext(file_name)
-            # NOTE: 2022-12-22 22:43:14
-            # stick with source code files only
-            if ext in importlib.machinery.SOURCE_SUFFIXES:
-                module_name = inspect.getmodulename(file_name)
-                if module_name is not None:
-                    with open(file_name, "rt", encoding="utf-8") as module_file:
-                        for line in module_file:
-                            if line.startswith('__scipyen_plugin__') or line.startswith("def init_scipyen_plugin"):
-                                # print(f"found plugin file {file_name}")
-                                pluginsSpecFinder.path_map[module_name] = file_name
-                                module_spec = importlib.util.spec_from_file_location(module_name, file_name)
-                                check_load_module(module_spec)
-                                break
-                        
-            else:
-                continue
+#     dw = os.walk(path)
+#     # module_dict = dict()
+#     for entry in dw:
+#         for file_name in (os.path.join(entry[0], i) for i in entry[2]):
+#             root, ext = os.path.splitext(file_name)
+#             # NOTE: 2022-12-22 22:43:14
+#             # stick with source code files only
+#             if ext in importlib.machinery.SOURCE_SUFFIXES:
+#                 module_name = inspect.getmodulename(file_name)
+#                 if module_name is not None:
+#                     with open(file_name, "rt", encoding="utf-8") as module_file:
+#                         for line in module_file:
+#                             if line.startswith('__scipyen_plugin__') or line.startswith("def init_scipyen_plugin"):
+#                                 # print(f"found plugin file {file_name}")
+#                                 pluginsSpecFinder.path_map[module_name] = file_name
+#                                 module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+#                                 check_load_module(module_spec)
+#                                 break
+#                         
+#             else:
+#                 continue
 
-def check_load_module(spec):
+def check_load_module(spec, verb:bool=False):
+    if verb:
+        print(f"check_load_module: spec = {spec}")
+        
     module = prog.get_loaded_module(spec)
     # print(f"check_load_module get_loaded_module module {module}")
     if isinstance(module, types.ModuleType): # module found, no beef here

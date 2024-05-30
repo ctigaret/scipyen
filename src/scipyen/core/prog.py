@@ -525,7 +525,6 @@ class Timer(object):
         # for use as context manager
         self.stop()
         
-# class SpecFinder(importlib.abc.MetaPathFinder):
 class SpecFinder(importlib_abc.MetaPathFinder):
     """
     See https://stackoverflow.com/questions/62052359/modulespec-not-found-during-reload-for-programmatically-imported-file-in-differe

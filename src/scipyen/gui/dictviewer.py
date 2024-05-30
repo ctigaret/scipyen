@@ -37,8 +37,8 @@ import core.datatypes
 import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration
 
-# import imaging.scandata
-# from imaging.scandata import (ScanData, AnalysisUnit)
+import imaging.scandata
+from imaging.scandata import (ScanData, AnalysisUnit)
 
 from core.triggerprotocols import TriggerProtocol
 from core.triggerevent import (TriggerEvent, TriggerEventType)
@@ -109,6 +109,19 @@ class DataViewer(ScipyenViewer):
     # TODO: 2019-11-01 22:44:34
     # implement viewing of other data structures (e.g., viewing their __dict__
     # for the generic case, )
+    # viewer_for_types = {dict:99, 
+    #                     list:99, 
+    #                     tuple:99,
+    #                     types.TracebackType:99,
+    #                     pd.DataFrame:0,
+    #                     pd.Series:0,
+    #                     pd.Index:0,
+    #                     neo.core.dataobject.DataObject:0,
+    #                     pq.Quantity:0,
+    #                     np.ndarray:0,
+    #                     AxesCalibration:0,
+    #                     neo.core.baseneo.BaseNeo:0,
+    #                     TriggerProtocol:0}
     viewer_for_types = {dict:99, 
                         list:99, 
                         tuple:99,

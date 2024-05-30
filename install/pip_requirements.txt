@@ -29,9 +29,8 @@
 # 2024-05-02 08:45:19
 # accommodate installaiton of PyQt6
 
-#wheel
-
 distlib
+pickleshare
 pyinstaller
 Babel
 GitPython

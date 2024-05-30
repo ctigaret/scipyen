@@ -17,6 +17,7 @@ colorama
 termcolor
 termcolor2
 pyserial
+pickleshare
 
 #### OPTIONAL packages
 researchpy      # ✓ (pip install researchpy)

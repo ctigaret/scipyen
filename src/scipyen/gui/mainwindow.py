@@ -7941,8 +7941,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         '''
         # print(f"{self.__class__.__name__}.slot_loadPlugins")
         scipyen_plugin_loader.find_frozen()
-        scipyen_plugin_loader.find_plugins(self._scipyendir_)  # calls os.walk
-        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory)  # calls os.walk
+        scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
+        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_)  # calls os.walk
         
 
         # NOTE: 2016-04-15 11:53:08
@@ -8396,6 +8396,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 break
             
         return " / ".join(menu_path)
+    
+    def getPluginModule(self, plugin_name:str) -> typing.Optional[types.ModuleType]:
+        if plugin_name not in self.pluginNames:
+            scipwarn(f"Plugin module {printStyled(plugin_name, 'red', True)} not found")
+            return 
+        
+        found = [m for m in self.pluginModules if m.__name__ == plugin_name]
+        # print(f"{self.__class__.__name__}.getPluginModule: found {len(found)} modules with name {plugin_name}")
+        if len(found):
+            return found[0]
     
     def getMenusForUIPlugin(self, plugin_name:str) -> tuple:
         """Returns the menu path ↦ plugin function mappigns for the specified module.

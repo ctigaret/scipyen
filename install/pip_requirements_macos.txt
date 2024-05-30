@@ -14,8 +14,9 @@ pyqtdarktheme
 colorama
 termcolor
 pyserial
+pickleshare
 #### OPTIONAL packages
 researchpy      # ✓ (pip install researchpy)
 modelspec       # ✓ (pip install modelspec)
 gnuplot_kernel  # ✓ (pip install gnuplot_kernel)
-neuron          # ✓ (pip install neurondoes not install)
+neuron          # ✓ (pip install neuron does not install)
