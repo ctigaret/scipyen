@@ -274,7 +274,8 @@ def main():
         #import pudb
         
         # 2. initialize main window
-        mainWindow = mainwindow.ScipyenWindow(app, bundled = __bundled__)# qsettings = qsettings)
+        mainWindow = mainwindow.ScipyenWindow(app)
+        # mainWindow = mainwindow.ScipyenWindow(app, bundled = __bundled__)# qsettings = qsettings)
         
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?
