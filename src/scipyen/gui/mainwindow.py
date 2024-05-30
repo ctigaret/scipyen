@@ -41,7 +41,6 @@ CHANGELOG:
 # NOTE: 2021-10-21 13:24:24
 # all things imported below will be available in the user workspace
 # BEGIN core python modules
-import imaging.CaTanalysis as CaTanalysis
 from imaging.axisutils import (axisTypeFromString,
                                axisTypeName,
                                axisTypeStrings,
@@ -61,7 +60,7 @@ from core.scipyen_config import (markConfigurable, confuse,
                                  saveWindowSettings, loadWindowSettings, )
 from core.workspacefunctions import *
 from core import scipyen_plugin_loader
-import ephys.EventAnalysis as EventAnalysis
+# import ephys.EventAnalysis as EventAnalysis
 from imaging.scandata import (AnalysisUnit, ScanData,)
 from imaging.axiscalibration import (AxesCalibration,
                                      AxisCalibrationData,
@@ -70,8 +69,7 @@ from imaging.axiscalibration import (AxesCalibration,
 from imaging import axisutils, vigrautils
 from imaging import (imageprocessing as imgp, imgsim,)
 from systems import *
-from ephys import (ephys, membrane, ivramp,)
-# from ephys import (ephys, ltp, membrane, ivramp,)
+from ephys import (ephys, membrane)
 from .workspacemodel import WorkspaceModel
 from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
 from .triggerdetectgui import guiDetectTriggers
@@ -1540,15 +1538,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.app.destroyed.connect(self.slot_Quit)
 
         # finally, inject references to self and the workspace into relevant
-        # NOTE: 2022-12-25 22:48:32
-        # soon to be deprecated in favour of plugins mechanism
-        # ws_aware_modules = (ltp, ivramp, membrane,
-        #                     CaTanalysis, pgui, sigp, imgp, crvf, plots)
-        
         # NOTE: 2024-05-29 14:04:11
         # plugin modules already have this injected by slot_loadPlugins
-        ws_aware_modules = (ivramp, membrane,
-                            pgui, sigp, imgp, crvf, plots)
+        ws_aware_modules = (membrane,pgui, sigp, imgp, crvf, plots)
 
         for m in ws_aware_modules:
             # NOTE: 2022-12-23 10:47:39

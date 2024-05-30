@@ -163,7 +163,6 @@ init_commands.extend(
     "from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )",
     "from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)",
     "from core.datazone import DataZone",
-    "from ephys import (ephys, ltp, membrane, ivramp,)",
     "from systems import *",
     "from imaging import (imageprocessing as imgp, imgsim,)",
     "from imaging import axisutils, vigrautils",
