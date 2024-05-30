@@ -61,7 +61,8 @@ from core.scipyen_config import (markConfigurable, confuse,
 from core.workspacefunctions import *
 from core import scipyen_plugin_loader
 # import ephys.EventAnalysis as EventAnalysis
-# from imaging.scandata import (AnalysisUnit, ScanData,)
+# from imaging import CaTanalysis
+from imaging.scandata import (AnalysisUnit, ScanData,)
 from imaging.axiscalibration import (AxesCalibration,
                                      AxisCalibrationData,
                                      ChannelCalibrationData,

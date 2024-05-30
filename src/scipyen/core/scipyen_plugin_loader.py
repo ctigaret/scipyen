@@ -293,7 +293,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[s
             verb = False
             pluginsSpecFinder.path_map[module_name] = file_name
             if file_name in user_plugin_source_files:
-                verb = True
+                # verb = True
                 file_directory = file_name.parent.relative_to(topdir)
                 if len(file_directory.parts):
                     package_name = file_directory.parts[0]
