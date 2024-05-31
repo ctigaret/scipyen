@@ -332,18 +332,6 @@ def collect_internal_scipyen_plugins(path:typing.Union[str, pathlib.Path]):
                     module_name = package_name
                 else:
                     module_name = f"{package_name_path}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
-                    # module_name = f"{package_name}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
-                # module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
-                #                                                         submodule_search_locations = submodules_paths)
-                # module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
-                #                                                      submodule_search_locations = [submodules_path])
-#             if file_name in user_plugin_source_files:
-#                 else:
-#                     module_spec = importlib.util.spec_from_file_location(module_name, file_name)
-#             else:
-#                 module_spec = importlib.util.spec_from_file_location(module_name, file_name)
-#                 
-#             check_load_module(module_spec, verb)
 
             to_hidden_imports.append(module_name)
         
