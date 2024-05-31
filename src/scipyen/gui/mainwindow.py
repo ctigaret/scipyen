@@ -7934,10 +7934,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         module.
         '''
         # print(f"{self.__class__.__name__}.slot_loadPlugins")
-        if self._pyinstaller_bundled_:
-            scipyen_plugin_loader.find_bytecode_plugins()
-        else:
-            scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
+        # if self._pyinstaller_bundled_:
+        #     scipyen_plugin_loader.find_bytecode_plugins()
+        # else:
+        #     scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
+        scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
         scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_)  # calls os.walk
         
 
