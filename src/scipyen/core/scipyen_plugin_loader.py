@@ -291,7 +291,7 @@ def find_bytecode_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typin
             _ = pycfile.read(16) # Header is 16 bytes in 3.6+, 8 bytes on < 3.6
             loaded = marshal.load(pycfile)
             
-        code_info = list(filter(lambda x: any(v in x for v in ("__scipyen_plugin__",  "init_scipyen_plugin"), dis.code_info(loaded).split("\n")))
+        code_info = list(filter(lambda x: any(v in x for v in ("__scipyen_plugin__",  "init_scipyen_plugin")), dis.code_info(loaded).split("\n")))
         if len(code_info) == 0:
             continue
         
