@@ -57,7 +57,7 @@ from core.sysutils import adapt_ui_path
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
-from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
+from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui.widgets import tableeditorwidget
 from gui.widgets.tableeditorwidget import TableEditorWidget
 from . import quickdialog

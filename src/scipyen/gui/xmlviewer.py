@@ -38,7 +38,7 @@ import core.xmlutils as xmlutils
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
-from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
+from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from . import quickdialog
 # from . import resources_rc
 # from . import icons_rc

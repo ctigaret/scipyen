@@ -111,7 +111,8 @@ Key:                                Mapped to:          Result:
     -------------------------------------------------------------------------
         
 '''
-# TODO, FIXME:
+# ### BEGIN
+# TODO, FIXME (some already fixed?):
 # 
 #     Make it easy to introspect the plugin function code so that the number of 
 #     return variables, and possibly, the argument types for positional parameters
@@ -212,6 +213,7 @@ Key:                                Mapped to:          Result:
 #     not enforced (it is up to the plugin installer code to deal with name clashes)
 #     
 # 
+# ### END
 
 from __future__ import print_function
 
@@ -289,7 +291,7 @@ def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[s
     
     for file_name in plugin_source_files:
         module_name = inspect.getmodulename(file_name)
-        if module_name is not None:
+        if module_name is not None: # this will never be None, would it?
             verb = False
             pluginsSpecFinder.path_map[module_name] = file_name
             if file_name in user_plugin_source_files:

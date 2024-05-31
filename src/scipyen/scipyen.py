@@ -56,6 +56,12 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             for line in origin_file:
                 print(line, end="")
     __bundled__ = True
+    
+    # NOTE: 2024-05-31 11:10:49
+    # internal plugins which are NOT imported via the usual importlib mechanism
+    # are skipped by PyInstaller; hence we include their source files INSIDE the
+    # bundle; then we need to make sys aware of their location
+    # sys.path.append(os.path.join(sys._MEIPASS, 'src', 'scipyen'))
 
 else:
     # NOTE: 2024-05-02 10:24:48

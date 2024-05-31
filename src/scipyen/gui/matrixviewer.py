@@ -16,7 +16,7 @@ from iolib import pictio as pio
 #### END pict.iolib modules
 
 #### BEGIN pict.gui modules
-from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
+from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from . import quickdialog
 from . import resources_rc
 # from . import icons_rc

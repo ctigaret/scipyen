@@ -122,16 +122,17 @@ TODO:
 #### BEGIN core python modules
 # from __future__ import print_function
 import os, sys, traceback, inspect
-try:
-    fi = inspect.getframeinfo(sys._getframe())
-    of = inspect.getouterframes(sys._getframe())
-    print(f"CaTanalysis is being imported from {fi}...\n\nCall stack: {of}\n\n")
-    
-    # print(f"CaTanalysis is being imported from {sys._getframe(1).f_back.f_code.co_qualname}...\n\n")
-    # print(f"CaTanalysis is being imported from {sys._getframe(1).f_back.f_code.co_filename}...\n\n")
-except:
-    print(f"CaTanalysis is being imported from {sys._getframe().f_back.f_code.co_qualname}...\n\n")
-    # print(f"CaTanalysis is being imported from {sys._getframe().f_back.f_code.co_filename}...\n\n")
+# try:
+#     fi = inspect.getframeinfo(sys._getframe())
+#     of = inspect.getouterframes(sys._getframe())
+#     ofs = '\n\n'.join([f"{k}: {f}" for k,f in enumerate(of)])
+#     print(f"CaTanalysis is being imported from {fi}...\n\nCall stack:\n {ofs}\n\n")
+#     
+#     # print(f"CaTanalysis is being imported from {sys._getframe(1).f_back.f_code.co_qualname}...\n\n")
+#     # print(f"CaTanalysis is being imported from {sys._getframe(1).f_back.f_code.co_filename}...\n\n")
+# except:
+#     print(f"CaTanalysis is being imported from {sys._getframe().f_back.f_code.co_qualname}...\n\n")
+#     # print(f"CaTanalysis is being imported from {sys._getframe().f_back.f_code.co_filename}...\n\n")
 import sqlite3
 import threading
 import numbers

@@ -107,7 +107,7 @@ from iolib import h5io
 #### END scipyen iolib modules
 
 #### BEGIN scipyen gui modules
-from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
+from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 
 
 from . import signalviewer as sv
