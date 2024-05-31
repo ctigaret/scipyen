@@ -257,6 +257,68 @@ def check_plugin_module(file_name) -> bool:
 #             reloaded_module = importlib.reload(module)
 #             loaded_plugins[module.__name__] = module
 
+def find_bytecode_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[str,pathlib.Path]):
+    """Intended to collect bytecode plugins by pyinstaller
+    """
+    import dis, marshal
+    if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
+        path = str(path.absolute())
+        
+    elif not isinstance(path, str) or len(path.strip()) == 0 or not os.path.isdir(path) or not os.path.exists(path):
+        prog.scipywarn(f"Expecting a string or a pathlib.Path for an absolute pathway to an existing directory; instead got {path} ")
+        return
+    
+    if isinstance(scipyendir, pathlib.Path) and scipyendir.is_dir() and scipyendir.exists():
+        scipyendir = scipyendir.absolue()
+        
+    elif isinstance(scipyendir, str) and len(scipyendir.strip()) and os.path.isdir(scipyendir) and os.path.exists(scipyendir):
+        scipyendir = pathlib.Path(scipyendir)
+        
+    else:
+        prog.scipywarn(f"Invalid scipyendir parameter: {scipyendir} ")
+        return
+    
+    topdir = pathlib.Path(path)
+    
+    plugin_bytecode_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.BYTECODE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(path)))))))
+
+    # these are modules, by definition?
+    
+    for file_name in plugin_bytecode_files:
+        verb=False
+        # see https://mathspp.com/blog/til/read-bytecode-from-a-pyc-file
+        with open(file_name, "rb") as pycfile:
+            _ = pycfile.read(16) # Header is 16 bytes in 3.6+, 8 bytes on < 3.6
+            loaded = marshal.load(pycfile)
+            
+        code_info = list(filter(lambda x: any(v in x for v in ("__scipyen_plugin__",  "init_scipyen_plugin"), dis.code_info(loaded).split("\n")))
+        if len(code_info) == 0:
+            continue
+        
+        module_name = file_name.split('.')[0] # heuristic - is that OK? # FIXME 2024-05-31 16:14:34
+        pluginsSpecFinder.path_map[module_name] = file_name
+        file_directory = file_name.parent.relative_to(topdir)
+        if len(file_directory.parts):
+            package_name = '.'.join(file_directory.parts)
+            
+            submodules_paths = list()
+            p = file_name.relative_to(topdir)
+            while len(p.parts):
+                p = p.parent
+                if len(p.parts):
+                    submodules_paths.append(topdir.joinpath(p))
+            if file_name.name == "__init__.py":
+                module_name = package_name
+            else:
+                module_name = f"{package_name_path}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
+            
+            module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
+                                                                    submodule_search_locations = submodules_paths)
+        else:               
+            module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+            
+    check_load_module(module_spec, verb)
+
 def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[str,pathlib.Path]):
     """Loads and located plugins in a directory tree rooted at `path`
     """
@@ -298,9 +360,9 @@ def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[s
                 # verb = True
                 file_directory = file_name.parent.relative_to(topdir)
                 if len(file_directory.parts):
-                    package_name = file_directory.parts[0]
+                    # package_name = file_directory.parts[0]
                     package_name_path = ".".join(file_directory.parts)
-                    submodules_path = file_name.parent
+                    # submodules_path = file_name.parent
                     submodules_paths = list()
                     p = file_name.relative_to(topdir)
                     while len(p.parts):

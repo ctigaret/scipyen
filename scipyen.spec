@@ -239,7 +239,39 @@ def check_plugin_module(file_name) -> bool:
             
     return False
 
+def check_bytecode_plugin(file_name) -> bool:
+    with open(file_name, "rb") as pycfile:
+        _ = pycfile.read(16) # Header is 16 bytes in 3.6+, 8 bytes on < 3.6
+        loaded = marshal.load(pycfile)
+    
+    code_info = list(filter(lambda x: "init_scipyen_plugin" in x, dis.code_info(loaded).split("\n")))
+    return len(code_info) > 0
+
+
 def collect_internal_scipyen_plugins(path:typing.Union[str, pathlib.Path]):
+    # NOTE: 2024-05-31 16:31:32
+    # So, what we do here, is to check the source files in Scipyen's tree and select
+    # only those that define 'init_scipyen_plugin' or '__scipyen_plugin__' objects
+    # 
+    # We then copy these as datas into the internal final app directory
+    # 
+    # We also check that these also have a cahced compiled bytecode (typically,
+    # in a parallel __pycache__ directory) and we also copy those
+    #
+    # At runtime we currently rely on Scipyen's mechanism to crawl for the source
+    # files, betting on the fact that the cached bytecode hasn't changed
+    # (if the used doesn;t have permission to edit the source files, the cache
+    # would not have changed)
+    #
+    # However, it would be good to rely only on compiled bytecode in the __pycache__
+    #
+    # Sciyen's scipyen_plugin_loader has been adapted to crawl through the __pycache__
+    # bytecode but given the size of the internal app directory this will be highly
+    # taxing on resources.
+    #
+    # So we would need a way to let the bundled Scipyen where to look, insteasd of 
+    # crawling the FULL _internal directory tree...
+    #
     if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
         path = str(path.absolute())
         
@@ -256,13 +288,17 @@ def collect_internal_scipyen_plugins(path:typing.Union[str, pathlib.Path]):
     
     # to_toc_pycs = list()
     
+    sys_pycache_dir = sys.pycache_prefix
+    if sys_pycache_dir is None:
+        sys_pycache_dir = "__pycache__"
+        
     for file_name in plugin_source_files:
         module_name = inspect.getmodulename(file_name)
         if module_name is not None: # this will never be None, would it?
             # pluginsSpecFinder.path_map[module_name] = file_name
             file_directory = file_name.parent.relative_to(topsrcdir)
             pycache = None
-            pycachedir = file_name.parent.joinpath("__pycache__")
+            pycachedir = file_name.parent.joinpath(sys_pycache_dir)
             if pycachedir.exists():
                 pycache = list(pycachedir.glob(f"{file_name.stem}*.pyc"))
                 if len(pycache) == 1:
@@ -270,11 +306,17 @@ def collect_internal_scipyen_plugins(path:typing.Union[str, pathlib.Path]):
                 
             # dest_dir = pathlib.Path("src").joinpath("scipyen", file_directory)
             dest_dir = file_directory
-            # to_toc.append((str(file_name), str(dest_dir)))
+            # NOTE: 2024-05-31 14:43:07
+            # unfortunately, we also need the source!
+            # this is because scipyen_plugin_loader does not (yet) deal with pyc files
+            # FIXME: 2024-05-31 16:30:36 TODO
+            # see NOTE: 2024-05-31 16:31:32
+            #
+            to_toc.append((str(file_name), str(dest_dir)))
             if isinstance(pycache, pathlib.Path):
                 to_toc.append((str(pycache), str(dest_dir.joinpath("__pycache__"))))
-            else:
-                to_toc.append((str(file_name), str(dest_dir)))
+            # else:
+            #     to_toc.append((str(file_name), str(dest_dir)))
             # verb = True
             if len(file_directory.parts):
                 package_name = file_directory.parts[0]
