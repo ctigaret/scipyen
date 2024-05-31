@@ -246,16 +246,16 @@ def check_plugin_module(file_name) -> bool:
             
     return False
 
-def find_frozen():
-    """Locates plugin modules packaged with pyinstaller (i.e., 'frozen')
-    """
-    # this should be run AFTER all relevant modules have been loaded
-    # and BEFORE find_plugins(…) is called
-    plugin_modules = [sys.modules[n] for n in sys.modules if (hasattr(sys.modules[n], "__scipyen_plugin__") or hasattr(sys.modules[n], "init_scipyen_plugin"))]
-    for module in plugin_modules:
-        if isinstance(module, types.ModuleType): # this is guaranteed, no?
-            reloaded_module = importlib.reload(module)
-            loaded_plugins[module.__name__] = module
+# def find_frozen():
+#     """Locates plugin modules packaged with pyinstaller (i.e., 'frozen')
+#     """
+#     # this should be run AFTER all relevant modules have been loaded
+#     # and BEFORE find_plugins(…) is called
+#     plugin_modules = [sys.modules[n] for n in sys.modules if (hasattr(sys.modules[n], "__scipyen_plugin__") or hasattr(sys.modules[n], "init_scipyen_plugin"))]
+#     for module in plugin_modules:
+#         if isinstance(module, types.ModuleType): # this is guaranteed, no?
+#             reloaded_module = importlib.reload(module)
+#             loaded_plugins[module.__name__] = module
 
 def find_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[str,pathlib.Path]):
     """Loads and located plugins in a directory tree rooted at `path`

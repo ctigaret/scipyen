@@ -68,7 +68,7 @@ myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argumen
 myfile = pathlib.Path(myfile).absolute()
 scipyen_dir = os.fspath(myfile.parent)
 
-print(f"scipyen_dir = {scipyen_dir}")
+# print(f"scipyen_dir = {scipyen_dir}")
 
 # NOTE: 2024-05-31 09:21:48
 # Because internal Scipyen plugin modules are NOT imported via the usual import 

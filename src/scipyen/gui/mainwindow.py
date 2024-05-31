@@ -1301,7 +1301,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.viewers = dict(map(lambda x: (x, list()), gui_viewers))
         # for matplotlib figures
         # self.viewers[mpl.figure.Figure] = list()
-
+        
+        # NOTE: 2024-05-31 13:12:31
+        # This is a dictionary mapping viewer class (key) ↦ list of instances of viewr class in the workspace
         self.viewers = {mpl.figure.Figure: list()}
 
         # self.currentViewers = dict(map(lambda x: (x, None), gui_viewers))
@@ -2373,6 +2375,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             return
 
         winClass = type(win)
+        
+        # print(f"{self.__class__.__name__}.registerWindow(win: {winClass})")
 
         if winClass is mpl.figure.Figure:
             win = self._adopt_mpl_figure(win)
@@ -7942,9 +7946,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         module.
         '''
         # print(f"{self.__class__.__name__}.slot_loadPlugins")
-        # if self._pyinstaller_bundled_:
-        scipyen_plugin_loader.find_frozen()
-        # else:
         scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
         scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_)  # calls os.walk
         
@@ -8452,6 +8453,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if not inspect.isclass(x):
             warnings.warn(f"Expecting a class; got {type(x).__name__} instead")
             return False
+        
+        # print(f"{self.__class__.__name__}._register_viewer_class_({name}, {x})")
 
         # NOTE: 2022-12-25 21:43:43
         # the check if this is a ScipyenViewer descendant is done in _isScipyenViewerClass_
