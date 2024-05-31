@@ -110,14 +110,14 @@ from iolib import h5io
 from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 
 
-from . import signalviewer as sv
-from . import pictgui as pgui
+from gui import signalviewer as sv
+from gui import pictgui as pgui
 
 # NOTE 2020-11-28 10:04:05
 # this should automatically import our custom colormaps AND ocean colormaps if found
-from . import scipyen_colormaps as colormaps 
-from . import quickdialog
-from . import painting_shared
+from gui import scipyen_colormaps as colormaps 
+from gui import quickdialog
+from gui import painting_shared
 from gui.itemslistdialog import ItemsListDialog
 #### END scipyen gui modules
 
