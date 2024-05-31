@@ -60,8 +60,7 @@ from core.scipyen_config import (markConfigurable, confuse,
                                  saveWindowSettings, loadWindowSettings, )
 from core.workspacefunctions import *
 from core import scipyen_plugin_loader
-# import ephys.EventAnalysis as EventAnalysis
-# from imaging import CaTanalysis
+
 from imaging.scandata import (AnalysisUnit, ScanData,)
 from imaging.axiscalibration import (AxesCalibration,
                                      AxisCalibrationData,
@@ -360,17 +359,6 @@ has_neuron = neuron_spec is not None
 
 # BEGIN scipyen systems modules
 # END scipyen systems modules
-
-# BEGIN scipyen imaging modules
-
-
-# if CaTanalysis.LSCaTWindow not in gui_viewers:
-#     gui_viewers += [CaTanalysis.LSCaTWindow]
-
-# if EventAnalysis.EventAnalysis not in gui_viewers:
-#     gui_viewers += [EventAnalysis.EventAnalysis]
-
-# END scipyen imaging modules
 
 has_qdarkstyle_for_win = False
 if sys.platform == "win32":
@@ -7851,7 +7839,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     def _run_loop_process_(self, fn, process_name, *args, **kwargs):
         # TODO: 2022-12-23 00:24:19
-        # see EventAnalysis for a working approach !
+        # see EventAnalysis in scipyen_plugins for a working approach !
         # TODO : 2021-08-17 12:43:35
         # check where it is used (currently nowhere, but potentially when running
         # plugins)
@@ -7956,7 +7944,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if len(scipyen_plugin_loader.loaded_plugins) > 0:
             viewers = list()  # list of (name, class) tuples
-            for module in scipyen_plugin_loader.loaded_plugins.values():
+            for module_name, module in scipyen_plugin_loader.loaded_plugins.items():
                 # maps module name to the tuple (module file, menu dict)
                 # menu dict in turn maps a menu tree structure (a '|'-separated string) to a function defined in the plugin
                 # NOTE: 2022-12-23 09:06:36
@@ -8008,6 +7996,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                 if inspect.isfunction(getattr(module, "load_ipython_extension", None)):
                     module.load_ipython_extension(self.ipkernel.shell)
+                    
+                # NOTE: 2024-05-31 14:14:00
+                # make this plugin available at the console
+                # WARNING this is likely to create symbols bound to the same object
+                mname = module_name.split('.')[-1]
+                if mname not in self.workspace:
+                    self.workspaceModel.bindObjectInNamespace(mname, module, hidden=True)
 
             if len(viewers):
                 sortedViewers = sorted(viewers, key=lambda x: x[0])

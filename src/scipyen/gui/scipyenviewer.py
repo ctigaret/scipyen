@@ -852,7 +852,12 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     Derived classes:
     ----------------
-    ImageViewer, SignalViewer, LSCaTWindow, EventAnalysis, LTPAnalysis, APTrains.
+    In Scipyen code tree:
+        ImageViewer, SignalViewer
+
+    In scipyen_plugins (outside main Scipyehn code tree):
+        LSCaTWindow, EventAnalysis, LTPAnalysis, APTrains.
+        (NOTE: Some of these still need to be finalised/written)
 
     ATTENTION: When deriving a viewer window type from ScipyenFrameViewer:
 
