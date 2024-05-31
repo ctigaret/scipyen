@@ -272,7 +272,7 @@ def collect_internal_scipyen_plugins(path:typing.Union[str, pathlib.Path]):
             dest_dir = file_directory
             to_toc.append((str(file_name), str(dest_dir)))
             if isinstance(pycache, pathlib.Path):
-                to_toc.append(str(pycache), str(dest_dir.joinpath("__pycache__")))
+                to_toc.append((str(pycache), str(dest_dir.joinpath("__pycache__"))))
             # verb = True
             if len(file_directory.parts):
                 package_name = file_directory.parts[0]
