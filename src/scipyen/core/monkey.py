@@ -72,6 +72,7 @@ def import_module(name, package=None):
     return module
 
 def import_relocated_module(mname):
+
     spec = get_relocated_module_spec(mname)
     
     if spec is not None:
@@ -107,6 +108,8 @@ def get_relocated_module_spec(mname, scipyen_path=None):
             
             
         mloc = list(scipyen_path.glob("**/%s.py" % mname))
+        
+        # print(f"get_relocated_module_spec: mname = {mname}, mloc = {mloc}")
             
         if len(mloc)==0: # py source file not found
             raise FileNotFoundError("Could not find a module source file for %s\n" % mname)

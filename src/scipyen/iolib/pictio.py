@@ -1114,9 +1114,11 @@ def loadPickleFile(fileName):
     from core import neoevent as neoevent
     from core.neoepoch import Epoch
     from core.neoevent import Event
-    import_relocated_module("neoepoch")
-    import_relocated_module("neoevent")
-    import_relocated_module("datatypes")
+    
+    if not getattr(sys, "frozen", False) or not hasattr(sys, "_MEIPASS"):
+        import_relocated_module("neoepoch")
+        import_relocated_module("neoevent")
+        import_relocated_module("datatypes")
     
     
     try:

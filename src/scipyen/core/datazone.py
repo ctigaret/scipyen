@@ -34,7 +34,8 @@ def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
                    **annotations)
     
 
-class DataZone(DataObject):
+# class DataZone(DataObject):
+class DataZone(neo.Epoch):
     """neo.Epoch-like for DataSignals
     
     The name 'DataZone' was chosen to avoid possible confusions arising from

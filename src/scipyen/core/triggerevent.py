@@ -123,7 +123,8 @@ class TriggerEventType(TypeEnum):
     imaging             = imaging_frame | imaging_line  # 24
     acquisition         = imaging | sweep               # 56
     
-class DataMark(DataObject):
+# class DataMark(DataObject):
+class DataMark(neo.Event):
     """Similar to neo.Event but suitable to all domains, not just time
     """
     _single_parent_objects = ('Segment',)
