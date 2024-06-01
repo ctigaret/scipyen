@@ -3,9 +3,13 @@ import numpy as np
 import quantities as pq
 import pandas as pd
 from core.utilities import get_least_pwr10
-from PyQt5 import (QtCore, QtWidgets, QtGui)
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType
+from qtpy import (QtCore, QtWidgets, QtGui)
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType
+# from PyQt5 import (QtCore, QtWidgets, QtGui)
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)
 
@@ -27,7 +31,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     
     This choice can be restricted to a single family.
     """
-    unitChanged = pyqtSignal(object, name="unitChanged")
+    unitChanged = Signal(object, name="unitChanged")
     
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, unit:typing.Optional[pq.Quantity]=None, unitFamily:typing.Optional[str]=None):
         """
@@ -155,14 +159,14 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             self.unitComboBox.setCurrentIndex(0)
             self._currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
         
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_refresh_unitComboBox(self, value):
         self._currentUnitsFamily = self._unitFamilies[self.unitFamilyComboBox.currentIndex()]
         self._setupUnitCombo()
         self._currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
         self.unitChanged.emit(self._currentUnit)
         
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_unitComboNewIndex(self, value):
         self._currentUnit = self._currentFamilyUnits[self.unitComboBox.currentIndex()]
         
@@ -257,7 +261,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     By default, the 'minimum' property is set to -math.inf. 
         
     """
-    sig_valueChanged = pyqtSignal(object, name="sig_valueChanged")
+    sig_valueChanged = Signal(object, name="sig_valueChanged")
     
     _default_units_             =  pq.dimensionless
     _default_internal_minimum   = -math.inf
@@ -339,7 +343,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             super().setSuffix(f" {self._units_.dimensionality.unicode}")
             
-    @pyqtSlot(float)
+    @Slot(float)
     def _slot_valueChanged(self, val):
         self.sig_valueChanged.emit(self.value())
             
@@ -472,6 +476,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def maximum(self):
         return super().maximum() * self.units
     
+    # def decimals(self)d
+    
     def value(self):
         """ Reimplements QDoubleSpinBox.value() to return a quantity
         """
@@ -487,10 +493,16 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         
         return val * self.units
     
+    def getDecimals(self) -> int:
+        return super().decimals()
+    
     def validate(self, text, pos):
         validator = InftyDoubleValidator(parent=self)
         validator.suffix = self.suffix()
-        validator.setDecimals(self.decimals()) # self.decimals() inherited from QDoubleSpinBox
+        validator.setDecimals(self.getDecimals()) 
+        # NOTE: 2023-12-19 14:37:35
+        # self.decimals is an int property, for a function !!!
+        # validator.setDecimals(self.decimals) # self.decimals inherited from QDoubleSpinBox
         valid = validator.validate(text, pos)
         validstr = validatorString(valid[0])
         # print(f"{self.__class__.__name__}[{self.objectName()}].validate text: {text}, pos: {pos} ⇒ {validstr}")
@@ -583,7 +595,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._unitFamily_ = None
         
         
-    @pyqtSlot()
+    @Slot()
     def _slot_setUnits(self):
         dlg = qd.QuickDialog(parent = self, title="Set units")
         quantityWidget = QuantityChooserWidget(parent = dlg)
@@ -594,7 +606,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if dlg.exec():
             self.units = quantityWidget.currentUnit
             
-    @pyqtSlot()
+    @Slot()
     def _slot_setSingleStep(self):
         dlg = qd.QuickDialog(parent=self, title="Set single step")
         floatInput = qd.FloatInput(dlg, "Step (float)")
@@ -610,7 +622,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if self.decimals() != newDecimals:
                 self.setDecimals(newDecimals)
             
-    @pyqtSlot()
+    @Slot()
     def _slot_setDecimals(self):
         dlg = qd.QuickDialog(parent=self, title="Set decimals")
         intInput = qd.IntegerInput(dlg, "Decimals (int) >= 0")
@@ -622,7 +634,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 value  = 0
             self.setDecimals(value)
             
-    @pyqtSlot()
+    @Slot()
     def _slot_reset(self):
         self.setSingleStep(self._default_singleStep)
         self.setDecimals(self._default_decimals)

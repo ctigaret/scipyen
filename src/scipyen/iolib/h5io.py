@@ -111,6 +111,12 @@ import vigra
 import pandas as pd
 import quantities as pq
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
+    
 from neo.core.dataobject import ArrayDict
 
 from . import jsonio # brings the CustomEncoder type and the decode_hook function
@@ -1195,14 +1201,14 @@ def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
 def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={}):
     """attempt to round trip of makeHDF5Entity
     """
-                   
+    # print("in objectFromHDF5Entity: ")
     # NOTE: 2022-10-08 13:16:14
     # HDF5 entities (Group, Dataset) are hashable;
     # hence, we can use them to store entity → object maps
     # this is useful for dealing with 'soft links' in the HDF5 so we 
     # don't duplicate data upon reading from the file
     
-    # print(f"objectFromHDF5Entity entity = {entity}")
+    # print(f"\tentity : {entity}")
     
     if entity in cache:
         return cache[entity]
@@ -1213,6 +1219,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
 
     try:
         type_name = attrs.get("type_name", None)
+        # print(f"\ttype_name: {type_name}")
         if type_name is None:
             return None
         python_class = attrs["python_class"]
@@ -1224,26 +1231,39 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             target_class = eval(type_name)
         else:
             try:
-                if module_name_comps[0] not in sys.modules:
-                    pymodule = importlib.import_module(module_name_comps[0])
+                if module_name in sys.modules:
+                    pymodule = sys.modules[module_name]
+                    target_class = eval(type_name, pymodule.__dict__)
                     
                 else:
-                    pymodule = sys.modules[module_name_comps[0]]
+                    if module_name_comps[0] not in sys.modules:
+                        pymodule = importlib.import_module(module_name_comps[0])
+                        
+                    else:
+                        pymodule = sys.modules[module_name_comps[0]]
+                    
+                    target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
+                    
+                # print(f"\ttarget_class: {target_class} from pymodule: {pymodule}")
 
                 # NOTE: 2022-10-05 18:40:53 FIXME possible BUG
                 # this doesn't work if the module is imported under an alias
-                target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
                     
             except:
                 traceback.print_exc()
+                print(f"😢 \python_class: {python_class}")
+                print(f"😢 objectFromHDF5Entity -> python_class_comps: {python_class_comps}")
+                print(f"😢 objectFromHDF5Entity -> module_name: {module_name}")
+                print(f"😢 objectFromHDF5Entity -> module_name_comps: {module_name_comps}")
+                print(f"😢 objectFromHDF5Entity -> wanted target_class: {'.'.join(python_class_comps[1:])}")
                 raise
             
     except:
-        print(f"entity: {entity.name}")
+        print(f"😢 objectFromHDF5Entity -> entity: {entity.name}")
         traceback.print_exc()
         raise
     
-    
+    # 😢
     # print(f"objectFromHDF5Entity target_class = {target_class}")
     
     if isinstance(inspect.getattr_static(target_class,"objectFromHDF5Entity", None),
@@ -1330,12 +1350,14 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             obj = group2VigraArray(entity, cache)
         else:
             mro = inspect.getmro(target_class)
+            # print(f"\ttarget_class {target_class} MRO: {mro}")
             if dict in mro:
                 obj = target_class()
                 for k in entity.keys():
                     obj[k] = objectFromHDF5Entity(entity[k], cache)
                 # print(f"objectFromHDF5Entity {obj.__class__.__name__}: {obj}")
                     
+            # elif any(k in mro for k in (list, NeoObjectList)):
             elif list in mro:
                 obj = target_class()
                 for k in entity.keys():
@@ -1352,6 +1374,19 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                     items.append(o)
                     
                 obj = target_class(items = tuple(items))
+                
+            elif target_class == NeoObjectList:
+                items = list()
+                item_types = list()
+                for k in entity.keys():
+                    o = objectFromHDF5Entity(entity[k], cache)
+                    items.append(o)
+                    item_types.append(type(o))
+                    
+                # print(f"\tcontained types -> {item_types}")
+                    
+                obj = target_class(item_types)
+                obj.extend(items)
                 
             elif target_class in (pd.DataFrame, pd.Series):
                 # TODO multi-index types, groupings ?!?

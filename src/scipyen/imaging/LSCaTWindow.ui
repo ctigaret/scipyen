@@ -357,7 +357,7 @@
        </sizepolicy>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="ScanDataTab">
        <attribute name="title">
@@ -1724,7 +1724,7 @@ Integral values are in the interval [0,5]
              <item row="1" column="0">
               <widget class="QStackedWidget" name="scanFiltersConfigStackedWidget">
                <property name="currentIndex">
-                <number>2</number>
+                <number>1</number>
                </property>
                <widget class="QWidget" name="pureletScanPage">
                 <layout class="QGridLayout" name="gridLayout_13">
@@ -1912,7 +1912,6 @@ Integral values are in the interval [0,5]
                   </spacer>
                  </item>
                 </layout>
-                <zorder>verticalSpacer_3</zorder>
                </widget>
                <widget class="QWidget" name="binomialFilterPageScans">
                 <layout class="QGridLayout" name="gridLayout_24">
@@ -1995,7 +1994,6 @@ Integral values are in the interval [0,5]
          </layout>
         </item>
        </layout>
-       <zorder></zorder>
       </widget>
       <widget class="QWidget" name="epscatOptionsPage">
        <attribute name="title">
@@ -3189,7 +3187,7 @@ Integral values are in the interval [0,5]
      <x>0</x>
      <y>0</y>
      <width>834</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="fileMenu">
@@ -3818,7 +3816,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionRemove_unit">
    <property name="icon">
-    <iconset theme="remove">
+    <iconset theme="list-remove">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
@@ -3830,7 +3828,7 @@ Integral values are in the interval [0,5]
   </action>
   <action name="actionBatch_extract_and_write">
    <property name="icon">
-    <iconset resource="../gui/resources/resources.qrc">
+    <iconset theme="document-export">
      <normaloff>:/images/document-export_multiple.svg</normaloff>:/images/document-export_multiple.svg</iconset>
    </property>
    <property name="text">
@@ -4006,8 +4004,5 @@ and also the data-wide analysis unit descriptors (Distance from soma, etc...)</s
    </property>
   </action>
  </widget>
- <resources>
-  <include location="../gui/resources/resources.qrc"/>
- </resources>
  <connections/>
 </ui>

@@ -69,7 +69,8 @@ import matplotlib.mlab as mlb
 from matplotlib import cm as cm
 from matplotlib import colors as colors
 from traitlets import Bunch
-from PyQt5 import QtCore, QtGui
+from qtpy import QtCore, QtGui
+# from PyQt5 import QtCore, QtGui
 
 try:
     import cmocean # some cool palettes/luts
@@ -1186,8 +1187,12 @@ def get(name, lut=None, default=None):
     """Returns a registered colormap by its name.
     NOTE: This function is aliased as get_colormap in this module
     """
+    mpl_version_tuple = getattr(mpl._version, "version_tuple", tuple())
+    if len(mpl_version_tuple) == 0:
+        mpl_version_tuple = tuple(int(x) for x in mpl._version.version.split('.'))
+        
     if isinstance(name, str) and len(name.strip()):
-        if mpl._version.version_tuple[1]>= 6:
+        if mpl_version_tuple[1]>= 6:
             if name in mpl.colormaps:
                 cmap = mpl.colormaps[name]
             else:
@@ -1220,7 +1225,7 @@ def get(name, lut=None, default=None):
         return name
     
     else:
-        if mpl._version.version_tuple[1] >= 6:
+        if mpl_version_tuple[1] >= 6:
             if default is None:
                 cmap = mpl.colormaps["gray"]
             
@@ -1465,13 +1470,27 @@ def auto_fg_color(bg):
     if hsv[2] < 128:
         return "white"
     return "black"
+
+mpl_version_tuple = tuple()
     
+if "version_tuple" in mpl._version.__dict__:
+    mpl_version_tuple = mpl._version.version_tuple
+elif "version" in mpl._version.__dict__:
+    mpl_version_tuple = tuple(int(x) for x in mpl._version.version.split('.'))
     
-if mpl._version.version_tuple[1] >= 6:
-    mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
+if len(mpl_version_tuple) == 3:
+    if mpl_version_tuple[1] >= 6:
+        mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
+    else:
+        cm.register_cmap(name="None", cmap=cm.get_cmap(name="gray"))
+        
 else:
-    cm.register_cmap(name="None", cmap=cm.get_cmap(name="gray"))
+    # assume the latest version and keep fingers crossed
+    mpl.colormaps.register(cmap = mpl.colormaps.get("gray"), name="None")
+        
     
 register_colormaps(CustomColorMaps)
     
 defaultPalette = ColorPalette()
+
+del mpl_version_tuple

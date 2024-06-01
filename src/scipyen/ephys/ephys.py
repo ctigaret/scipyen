@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-""" Functionality for electrophysiology data.
+""" Classes and functions for electrophysiology data.
 
 NOTATIONS USED BELOW:
 
@@ -162,7 +161,9 @@ from functools import singledispatch
 import warnings
 import typing, types
 from enum import Enum, IntEnum
-from dataclasses import (dataclass, MISSING)
+from abc import ABC
+from dataclasses import (dataclass, KW_ONLY, MISSING, field)
+# from dataclasses import (dataclass, MISSING)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -178,32 +179,46 @@ import neo
 import matplotlib as mpl
 # import pyqtgraph as pg
 from gui.pyqtgraph_patch import pyqtgraph as pg
-from PyQt5 import (QtGui, QtCore, QtWidgets)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+from qtpy import (QtGui, QtCore, QtWidgets)
+from qtpy.QtCore import (Signal, Slot, )
+# from PyQt5 import (QtGui, QtCore, QtWidgets)
+# from PyQt5.QtCore import (Signal, Slot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from core.prog import (safeWrapper, with_doc, get_func_param_types)
+from core.basescipyen import BaseScipyenData
+from core.traitcontainers import DataBag
+from core.prog import (safeWrapper, with_doc, get_func_param_types, scipywarn)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
 from core import datatypes
-from core.datatypes import (TypeEnum, check_type)
+from core.datatypes import (Episode, Schedule, TypeEnum, check_type, type2str)
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
-from core import pyabfbridge as pab
-from core.utilities import normalized_index
-from core.neoutils import get_index_of_named_signal
+
+from core.utilities import (safeWrapper, 
+                            reverse_mapping_lookup, 
+                            get_index_for_seq, 
+                            sp_set_loc,
+                            normalized_index,
+                            unique,
+                            GeneralIndexType)
+
+from core.neoutils import (get_index_of_named_signal, concatenate_blocks)
 from core import quantities as scq
 from core.quantities import (units_convertible, check_time_units, 
                              check_electrical_current_units, 
-                             check_electrical_potential_units)
+                             check_electrical_potential_units,
+                             check_rescale)
 
-from gui.cursors import (SignalCursor, SignalCursorTypes)
+from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
+
+from ephys.ephys_protocol import ElectrophysiologyProtocol
 
 #from .patchneo import neo
 
@@ -216,7 +231,7 @@ if __debug__:
 
     __debug_count__ = 0
     
-LOCATOR_TYPES = (SignalCursor, neo.Epoch, DataZone, Interval, type(MISSING))
+LOCATOR_TYPES = (SignalCursor, DataCursor, neo.Epoch, DataZone, Interval, type(MISSING))
 
 LocatorTypeVar = typing.TypeVar('LocatorTypeVar', *LOCATOR_TYPES)
 
@@ -225,211 +240,669 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
-ABF = pab.ABF # useful alias
 
-class LocationMeasure(collections.namedtuple("LocationMeasure", ("func", "locations", "name"))):
-    """Lightweight functor to calculate a signal measure at a location.
-
-A location is an object with one of the following types ('locator' types):
-• SignalCursor
-• neo.Epoch
-• DataZone
-• Interval
-
-or a sequence (tuple, list) of SignalCursor, neo.Epoch, DataZone or Interval
-
-Examples:
----------
-from ephys import (LocationMeasure, cursor_average, interval_average,
-                    cursors_difference, intervals_difference)
-
-from datazone import Interval
-
-from neoutils import get_epoch_interval
-
-We assume a neo.AnalogSignal object is bound to the symbol 'signal' in the 
-workspace, and that 'signal' is a voltage-clamp record of the membrane current
-containing, say, and evoked excitatory synaptic current (EPSC).
-
-1) Calculate the average of signal samples at a vertical cursor, which marks
-the signal region corresponding to the cursor's xwindow extended symmetrically
-around the cursor's x coordinate. The cursors is bound to a symbol 'cursor' in
-the workspace.
-
-c_measure = LocationMeasure(cursor_average, cursor, "c_measure")
-
-a = c_measure(signal) → a quantity array
-
-2) Same as (1) but using datazone.Interval objects; we assume there is a 
-neo.Epoch bound to the symbol 'epoch' in the workspace.
-
-To demonstrate, the following two lines generate two intervals based on an 
-epoch interval labeled "EPSC0Base"; one Interval encapsulates a start time and a
-duration; the other encapsulates a start and a stop time (see datazone.Interval)
-
-intvl = get_epoch_interval(epoch, "EPSC0Base", duration=True)
-intvl2 = get_epoch_interval(epoch, "EPSC0Base")
-
-i_measure_1 = LocationMeasure(interval_average, intvl, "i_measure_1")
-
-i_measure_2 = LocationMeasure(interval_average, intvl, "i_measure_2")
-
-b = i_measure_1(signal)
-
-c = i_measure_2(signal)
-
-assert np.all(a == b) # see example (1) regarding 'a'
-assert np.all(a == c)
-
-3) Obtain a measure at a pair of locations of the same type.
-
-We want to calculate the amplitude of an EPSC elicited as a difference between 
-averages of the membrane current signal around the "peak" (or nadir) of the EPSC
-and a baseline BEFORE the stimulus that elicited the EPSC.
-
-For this example we assume that there are two intervals inside 'epoch' that
-correspond to baseline and EPSC peak regions of the signal, labeled "EPSC0Base"
-"EPSC0Peak".
-
-From this epoch we generate two Interval objects (one each, for baseline and 
-peak; note how we access the corresponding epoch intervals by using their labels):
-
-# 'intervals' will be a list of Interval objects
-intervals = [get_epoch_interval(epoch, i, duration=True) for i in ("EPSC0Base",
-"EPSC0Peak")]
-
-We also assume that there are two vertical cursors available (c0, c1), 
-indicating the baseline and the peak regions of the signal.
-
-We calculate this measure using the intervals (note we construct the LocationMeasure
-and we call it with the signal in a one-line code):
-
-a = LocalMeasure(intervals_difference, intervals, "i_diff") (signal)
-
-For demonstration, we do the same using the cursors:
-
-b = LocationMeasure(cursors_difference, [c0,c1], "c_diff")(signal)
-
-assert np.all(a == b)
-
-4) To calculate the same measure at the same location in several signals, 
-you can call the LocationMeasure on each signal.
-
-Say you want to calculate the input resistance during a voltage-clamp recording,
-based on a recorded membrane current (the 'signal') and a recorded analog command 
-signal (here, the command voltage, i.e. 'command').
-
-For this purpose, the command signal contains a boxcar waveform (a hyperpolarizing
-or depolarizing change in the membrane potential) - the "membrane test". 
-
-If no whole-cell compensation is applied, then the membrane current recorded 
-during the membrane test undergoes a rapid transient change (the "capacitive 
-transient") before it settles to a new steady-state value, different from the 
-baseline before the membrane test).
-
-We calculate Rin by applying Ohm's law:
-
-V = I×R ⇒ R = V / I
-
-In this case:
-V = the amplitude of the boxcar; 
-I = the difference between the membrane current during the steady-state and that
-during the baseline before the membrane test boxcar.
-
-Therefore we need two LocationMeasure objects.
-
-If we were to use two appropriately-placed cursors as locators:
-
-baseline = LocationMeasure(cursor_average, baseline_cursor, "baseline")
-
-steady_state = LocationMeasure(cursor_average, steady_state_cursor, "steady_state")
-
-# next line calculates the average baseline membrane current before the membrane test boxcar
-i0 = baseline(signal) 
-# next line calculates the average baseline potential before the membrane test boxcar
-v0 = baseine(command) # return
-
-# similarly, for the steady-state membrane current and potential
-i1 = steady_state(signal)
-v1 = steady_state(command)
-
-finally we calculate Rin as (v1 - v0) / (i1 - i0)
-
-Note that in both cases we used cursor_average as the function passed to the 
-LocationMeasure functor. Since we are taking a difference between the averages
-of signals at two locations, we can be more direct and use just one 
-LocationMeasure object (see example (3) above):
-
-delta = LocationMeasure(cursors_difference, (baseline_cursor, steady_state_cursor), "delta")
-
-dI = delta(signal)
-dV = delta(command)
-
-Rin = dV/dI # ⇒ this will generate a Quantity in command.units / signal.units
-            # e.g. pq.mV / pq/pA
-            # Most likely we want the resistance in MOhm (pq.MOhm), therefore
-            # we must rescale it, so the last call should be:
-
-Rin = (dV/dI).rescale(pq.MOhm)
-
-Finally, a few reminders:
-
-• Signals are 2D Quantity arrays (with the data represented as column vectors) 
-and MAY have more than one trace (a.k.a "signal channel", not to be confused 
-with a "recording channel"). A trace, therefore is a column in the signal array.
-
-• Functions that calculate a measure at a single location return a Quantity
-array. 
-    ∘ For signals with just one trace, the result has only one element, so 
-    in cases where just a scalar Quantity is needed, this value can be accessed 
-    by indexing, e.g.:
-
-        result[0], or more directly np.squeeze(result)
-
-    ∘ For signals with more than one trace, the result is a subdimensional (1D)
-    Quantity array, with one value per trace. Since the traces are indexed along
-    the second axis (axis 1) of the original signal, one may want to restrict the
-    calculations to the desired trace only, by passing the "channel" keyword to
-    the call by the functor.
-
-    • For situations where a numpy array is constructed from a list comprehension
-    (such as is the case for cursors_difference, intervals_difference) the final
-    result will gain a second axis (hence it will be 2D), even though it only 
-    contains one value.
-
-    I all these situation it is recommended to drop the singleton axes. 
-
-So, we can finish the last example:
-
-Rin = np.squeeze((dV/dI).rescale(pq.MOhm))  # ⇒ e.g. array(90.1997, dtype=float32) * Mohm
-
-This is a SCALAR Quantity (even though it is described as an array, but note the
-absence of square brackets in its string representation).
-
-Indeed:
-
-assert (Rin.ndim == 0) # ⇒ is True
+class __BaseSynStim__(typing.NamedTuple):
+    name: str = "stim"
+    channel: typing.Union[int, str] = 0
+    dig: bool=True
     
-"""
+class SynapticStimulus(__BaseSynStim__):
+    # see https://stackoverflow.com/questions/61844368/how-to-initialize-a-namedtuple-child-class-different-ways-based-on-input-argumen
     __slots__ = ()
     
-    def __call__(self, *args, **kwargs):
-        # *args is a signal or sequence of signals
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSynStim__.__annotations__.items()])
+    
+    __doc__ = "\n".join( ["Logical association between digital or analog outputs and synaptic stimulation.\n",
+                    "Signature:\n",
+                    f"\tSynapticStimulus({__sig__})\n",
+                    "where:",
+                    "• name (str): the name of this synaptic simulus; default is 'stim'\n",
+                    "• channel (int, str): index or name of the output channel sending TTL",
+                    "   triggers to a synaptic stimulation device e.g. stimulus isolation box,",
+                    "   uncaging laser modulator, LED device, 𝑒𝑡𝑐.",
+                    "   Optional; default is 0\n",
+                    "• dig (bool): indicates the type of the triggering channel",
+                    "   (used when the 'channel' field is an int):",
+                    "   when True, the channel is a digital output",
+                    "   when False, the channel is a DAC that emulates TTL triggers",
+                    "   Optional; default is True\n"
+                    "",
+                    "Channel indices are expected to be >= 0 and correspond to the",
+                    "    logical channel indices in the acquisition protocol.\n",
+                    "Channel names are as assigned in the acquisition protocol (if available).",
+                    "",
+                    "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
+                    "",
+                    "Since only DAC channels can be named in a protocol, specifying a str as 'channel'",
+                    "   implied the stimulus is a DAC channel and not a DIG output channel."
+                    ""])
+
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        super_anns = super().__annotations__
+        fields = list(super_anns.keys())
+        super_defaults = super()._field_defaults
         
-        if isinstance(self.locations, (list, tuple)) and not isinstance(self.locations, Interval):
-            args = args + tuple(self.locations)
+        args = args[1:] # drop cls
+        
+        if len(args) > len(super_anns):
+            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        
+        new_args = dict()
+        for k, arg in enumerate(args):
+            # if not isinstance(arg, super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+            new_args[fields[k]] = arg
             
+        if len(new_args) == len(super_anns):
+            if len(kwargs):
+                dups = [k for k in kwargs if k in fields]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                else:
+                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+                
         else:
-            args = args + (self.locations,)
+            if len(kwargs):
+                dups = [k for k in kwargs if k in new_args]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                
+                spurious = [k for k in kwargs if k not in fields]
+                if len(spurious):
+                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+                
+                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+                
+                new_args.update(new_kwargs)
+                
+            # finally, add the default unspecified args
+            for (k,v) in super_defaults.items():
+                if k not in new_args:
+                    new_args[k] = v
+                    
+        return super().__new__(cls, **new_args)
+    
+SynapticStimulus.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
+SynapticStimulus.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
+SynapticStimulus.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
+                
+def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> SynapticStimulus:
+    """Shorthand constructor of SynapticStimulus (saves typing)"""
+    return SynapticStimulus(name, channel, dig)
+
+class __BaseAuxInput__(typing.NamedTuple):
+    name: str = "aux_in"
+    adc: int = 0
+    # adc: typing.Union[int, str] = 0
+    cmd: typing.Optional[bool] = None # reflects an input that "copies" a command signal
+    
+class AuxiliaryInput(__BaseAuxInput__):
+    __slots__ = ()
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseAuxInput__.__annotations__.items()])
+    __doc__ = "\n".join(["An auxiliary input identifies an ADC for recording a signal other than",
+                "the primary amplifier output (e.g. a secondary amplifier output, 'copies' ",
+                "of digital TTLs or DAQ command output signals sent to the amplifier, ", 
+                "output from auxiliary measurement device, 𝑒𝑡𝑐.)\n",
+                "Signature:\n"
+                f"\tAuxiliaryInput({__sig__})\n",
+                "where:",
+                "• name (str): name of this auxiliary input specification; default is 'aux_in'.\n",
+                "• adc (int, str): index or name of the ADC channel used to record the auxiliary input.",
+                "   Optional; default is 0.\n",
+                "• cmd (bool, None): default is None; ",
+                "   when True, this is a 'copy' of a command signal, or of an appropriately chosen",
+                "       secondary amplifier output, as a 'proxy' of the command signal (e.g.",
+                "       membrane potential in voltage clamp, or membrane current in current clamp)¹;",
+                "   when False, this indicates that this auxiliary input is a copy or a trigger (TTL-like)",
+                "       signal (either from a digital output or from a DAC);",
+                "   when None, this auxiliary input carries any other signal NOT mentioned above.\n"
+                "",
+                "Channel indices are expected to be >= 0 and correspond to the logical channel",
+                "    indices in the acquisition protocol.\n",
+                "Channel names are as assigned in the acquisition protocol (if available).",
+                "",
+                "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
+                "",
+                "¹ In modern amplifiers the recording electrode switches between voltage measurement and current injection,",
+                "   with a high cycle rate; therefore, both membrane potential and current are theoretically available "
+                ""])
+    
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        super_anns = super().__annotations__
+        fields = list(super_anns.keys())
+        super_defaults = super()._field_defaults
+        
+        args = args[1:] # drop cls
+        
+        if len(args) > len(super_anns):
+            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        
+        new_args = dict()
+        for k, arg in enumerate(args):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+            new_args[fields[k]] = arg
             
-        return self.func(*args, **kwargs)
-  
+        if len(new_args) == len(super_anns):
+            if len(kwargs):
+                dups = [k for k in kwargs if k in fields]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                else:
+                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+                
+        else:
+            if len(kwargs):
+                dups = [k for k in kwargs if k in new_args]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                
+                spurious = [k for k in kwargs if k not in fields]
+                if len(spurious):
+                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+                
+                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+                
+                new_args.update(new_kwargs)
+                
+            # finally, add the default unspecified args
+            for (k,v) in super_defaults.items():
+                if k not in new_args:
+                    new_args[k] = v
+                    
+        return super().__new__(cls, **new_args)
+
+AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux_in'"
+AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
+AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
+
+def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
+    """Constructs a run-of-the-mill AuxiliaryInput"""
+    if adc is None:
+        adc = 0
+    elif not isinstance(adc, int):
+        raise TypeError(f"'adc' expected an int; instead, got {type(adc).__name__}")
+    return AuxiliaryInput(name, adc, cmd)
+
+class __BaseAuxOutput__(typing.NamedTuple):
+    name: str = "aux_out"
+    channel: int = 0
+    # channel: typing.Union[int, str] = 0
+    digttl: typing.Optional[bool] = None
+    
+class AuxiliaryOutput(__BaseAuxOutput__):
+    __slots__ = ()
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseAuxOutput__.__annotations__.items()])
+    __doc__ = "\n".join(["An auxiliary (analog — DAC — or a digital — DIG) output channel of the DAQ device.\n",
+                         "This channel is used for sending waveforms other than for clamping or synaptic ",
+                         "stimulation (the latter being specified using SynapticStimulus objects).\n",
+                         "Signature:\n",
+                         f"AuxiliaryOutput({__sig__})\n",
+                         "where:"
+                         "• name (str): name of this auxiliary output specification; default is 'aux_out'.\n",
+                         "• channel (int, str): specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only)\n",
+                         "  Optional; default is 0.\n",
+                         "• digttl (bool or None): flag to indicate if the output is used to send out triggers, with:",
+                         "  True ⇒ the auxiliary output is a DIG channel (hence sending out exclusively TTL-like waveforms)",
+                         "  False ⇒ the auxiliary output is a DAC channel used to emulaate TTLs",
+                         "  None ⇒ the auxiliary outoyut is a DAC channel used to send arbitrary¹ waveforms",
+                         "  Optional, default is None.\n",
+                         "",
+                         "Channel indices are expected to be >= 0 and correspond to the logical channel",
+                         "    indices in the acquisition protocol.\n",
+                         "Channel names are as assigned in the acquisition protocol (if available).",
+                         "",
+                         "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
+                         "",
+                         "¹ From the range of waveforms available in the acquisition software."
+                         ])
+    
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        super_anns = super().__annotations__
+        fields = list(super_anns.keys())
+        super_defaults = super()._field_defaults
+        
+        args = args[1:] # drop cls
+        
+        if len(args) > len(super_anns):
+            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        
+        new_args = dict()
+        for k, arg in enumerate(args):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+            new_args[fields[k]] = arg
+            
+        if len(new_args) == len(super_anns):
+            if len(kwargs):
+                dups = [k for k in kwargs if k in fields]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                else:
+                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+                
+        else:
+            if len(kwargs):
+                dups = [k for k in kwargs if k in new_args]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                
+                spurious = [k for k in kwargs if k not in fields]
+                if len(spurious):
+                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+                
+                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+                
+                new_args.update(new_kwargs)
+                
+            # finally, add the default unspecified args
+            for (k,v) in super_defaults.items():
+                if k not in new_args:
+                    new_args[k] = v
+                    
+        return super().__new__(cls, **new_args)
+    
+AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification; default is 'aux_out'"
+AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
+AuxiliaryOutput.digttl.__doc__ = "bool, or None: flag to indicate if the output is used to send out triggers via a DIG (True), emulated via a DAC (False) or other waveforms (None); default is None"
+
+def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optional[bool]=None) -> AuxiliaryOutput:
+    """Constructs a run-of-the-mill AuxiliaryOutput"""
+    if channel is None:
+        channel = 0
+        
+    if not isinstance(channel, int):
+        raise TypeError(f"'channel' expected an int; instead, got {type(channel).__name__}")
+    
+    return AuxiliaryOutput(name, channel, digttl)
+
+class __BaseSource__(typing.NamedTuple):
+    name: str = "cell"
+    adc: int = 0
+    # adc: typing.Union[int, str] = 0
+    dac: typing.Optional[int] = None
+    # dac: typing.Optional[typing.Union[int, str]] = None
+    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
+    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
+    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
+    
+class RecordingSource(__BaseSource__):
+    __slots__ = ()
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
+
+    __doc__ = "\n".join(["Semantic association between input and output signals in single-electrode recordings.\n",
+                   "Signature:\n",
+                   f"\tRecordingSource({__sig__})\n",
+                   "where:",
+                   "• name (str): The name of the source; default is 'cell'\n",
+                   "• adc (int): The PHYSICAL¹ index (int) or name (str) of the ADC channel for the",
+                   "    input signal containing the recorded electric behaviour of the source",
+                   "    (a.k.a the primary 'input' channel i.e., cell or field → amplifier → DAQ device).\n",
+                   "• dac (int, None): The PHYSICAL index (int) or name (str) of the DAC channel",
+                   "    sending analog commands to the source in voltage- or current-clamp, (a.k.a the primary 'output', i.e.,",
+                   "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
+                   "    Optional; default is None².\n",
+                   "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
+                   "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
+                   "    (one SynapticStimulus per synaptic pathway).",
+                   "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
+                   "    from those specified in 'dac', or 'auxout' fields of this object. ",
+                   "    Optional; default is SynapticStimulus('stim', None, None).\n",
+                   "• auxin (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
+                   "    NOTE: When present, these must specify ADCs distinct from the 'adc' above",
+                   "    Optional; default is None.\n",
+                   "• auxout (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
+                   "    Auxiliary outputs for purposes OTHER THAN clamping command waveforms or ",
+                   "    synaptic stimulation (e.g., imaging frame triggers, etc)",
+                   "    NOTE: These must be distinct from the channels specified by the 'dac' ",
+                   "    or 'syn' fields above.",
+                   "    Optional; default is None.\n",
+                   "",
+                   "Channel indices are expected to be >= 0 and correspond to the",
+                   "    PHYSICAL¹ (NOT logical!) channel indices in the acquisition protocol. ",
+                   "",
+                   "Channel names are as assigned in the acquisition protocol (if available).",
+                   "",
+                   "NOTES:",
+                   "",
+                   "¹ Analog channels (analog input — ADCs — or output — DACs) have both physical ",
+                   "    and logical indices. Physical indices are integers from 0 to one less than the ",
+                   "    maximum number of physical channels of the same category (i.e. input or output)",
+                   "    provided by the digital acquisition (DAQ) device.",
+                   "    Logical indices are integers from 0 to one less than maximum number of channels",
+                   "    of the same category, ACTUALLY used in the recording protocol.",
+                   "",
+                   "    Assuming a DAQ device provides eight ADCs (physical indices 0-7)",
+                   "    with only four of these used to record data (say, 0, 1, 5, 6) - their",
+                   "    logical indices would be 0-3, corresponding to physical indices as follows:",
+                   "    0: 0, 1: 1, 2: 5, 3: 6",
+                   "",
+                   "    The logical index is also the index of the recorded signal stored in the file.",
+                   "    E.g. in an ABF file, the signal at index 0 may have been recorded from the physical",
+                   "    ADC 1 (taking data from, say, the second amplifier channel).",
+                   "    In such case, the ADC in question has physical index 1, and logical index 0.",
+                   "",
+                   "    A more complex case is when a large set of inputs is specified in the recording",
+                   "    protocol, such that the signal recorded from the cell via the physical ADC ends up ",
+                   "    with a higher index in the file. Here, specifying a logical index of 0 will not",
+                   "    indicate the actual ADC channel used to record from the cell.",
+                   "",
+                   "    Because of this, it is not possible to infer which ADC channel has been",
+                   "    actually used to record from a source (cell or field) based only on the",
+                   "    signals contained in the recorded file."
+                   "",
+                   "    The RecordingSource object helps avoid such ambiguities.",
+                   "",
+                   "",
+                   "²   The DAC channels are used for sending analog `command` signals to the recorded source",
+                   "    in order to `clamp` the membrane potential or membrane current. However, not all experiments",
+                   "    require this — a good example are field recordings, where there is nothing to `clamp`."
+                   "",
+                   "ADDITIONAL NOTES: ",
+                   "",
+                   "1. This object type is oblivious to the recording mode or electrode mode.",
+                   "",
+                   "2. The order of parameters matters, unless they are given as name↦value pairs.",
+                   "",
+                   "3. A RecordingSource object is immutable. However one can create a modified copy by calling",
+                   "    its '_replace' method specifying different values to selected fields, e.g.:",
+                   "",
+                   "\t source1 = RecordingSource('cell1', 0, 1, SynapticStimulus('path0', 0))",
+                   "",
+                   "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
+                   "",
+                   ])
+    
+    @property
+    def clamped(self) -> bool:
+        """Returns True when a primary DAC is defined.
+    
+        A primary DAC is the index or name of the DAC channel used to send command
+        waveforms to a clamped cell and is specified by the field 'dac'.
+    
+        NOTE: When a 'dac' channel is present (not None) the RecordingSource is considered
+        'clamped' even if technically it is not (e.g. when using the amplifier's
+        'I=0' mode, available in Axon amplifiers, or voltage follower).
+    
+        In field recordings (using voltage follower mode, or 'I=0' mode in Axon 
+        patch-clamp amplifiers) the primay DAC output ("active DAC") is still 
+        be present in the protocol, but it is not used.
+    
+        Setting 'dac' to None (in the constructor) simply flags up the ABSENCE of
+        a clamp signal (and of command waveforms), and the fact that the "active DAC"
+        in the protocol is to be ignored in subsequent analysis.
+        """
+        return isinstance(self.dac, (int, str))
+    
+    @property
+    def syn_dig(self) -> tuple:
+        """Tuple of DIG channels used for synaptic stimulation; may be empty.
+        These channels emit TTLs to drive devices that elicit synaptic activity,
+        such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
+        for optogenetic stimulation.
+        """
+        if isinstance(self.syn, SynapticStimulus):
+            return (self.syn.channel,) if self.syn.dig else tuple()
+        
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+            return tuple(s.channel for s in self.syn if s.dig)
+        
+        return tuple()
+    
+    @property
+    def syn_dac(self) -> tuple:
+        """Tuple of DAC channels used for synaptic stimulation; may be empty.
+        These channels emit TTLs (emulated as pulses or steps in ± 5 V range and 
+        embedded in analog signals) to drive devices that elicit synaptic activity,
+        such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
+        for optogenetic stimulation.
+        """
+        if isinstance(self.syn, SynapticStimulus):
+            return (self.syn.channel, ) if not self.syn.dig else tuple()
+        
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+            return tuple(s.channel for s in self.syn if not s.dig)
+        
+        return tuple()
+    
+    @property
+    def pathways(self):
+        """Factory for SynapticPathway objects based on the `syn` field.
+        The SynapticPathway fields `pathwayType`, `schedule` and `measurement` 
+        will have their default values.
+        
+        Depending on the `syn` field, returns a SynapticPathway, a tuple of 
+        SynapticPathway objects, or None.
+    
+        """
+        if isinstance(self.syn, SynapticStimulus):
+            return SynapticPathway(source = self, stimulus = self.syn,
+                                   name = self.syn.name,
+                                   # name = "_".join([self.name, self.syn.name]),
+                                   # name = " ".join([self.name, self.syn.name]),
+                                   )
+            
+        if isinstance(self.syn, (tuple, list)):
+            if len(self.syn) == 1:
+                return SynapticPathway(source=self, stimulus = self.syn[0],
+                                       name = self.syn[0].name,
+                                       # name = "_".join([self.name, self.syn[0].name]),
+                                       # name = " ".join([self.name, self.syn[0].name]),
+                                       )
+            elif len(self.syn) > 1:
+                return tuple(SynapticPathway(source=self, stimulus = s,
+                                             name = s.name) for s in self.syn)
+                                             # name = "_".join([self.name, s.name])) for s in self.syn)
+                                             # name = " ".join([self.name, s.name])) for s in self.syn)
+        
+    @property
+    def in_daq_cmd(self) -> tuple:
+        """Tuple of ADCs for recording DAQ-issued command waveforms other than TTLs.
+        May be empty.
+        
+        These ADCs are specified in the 'auxin' field, and correspond to the auxiliary
+        input channels of the DAQ device where a 'copy' of the clamping command 
+        signal is being fed. The inputs are configured in the recording protocol.
+        
+        NOTE: Technically, there should be only one such input, which can be: 
+        
+        • a feed of the secondary amplifier output channel (when available, e.g.,
+            membrane potential in voltage clamp, or membrane current in current clamp)
+            into an auxiliary ADC input of the DAQ device, and used as a proxy
+            for the clamping command signal itself;
+        
+        • a branch off the DAQ command output used for clamping (i.e. sent to the
+            amplifier's command input); the branch is fed directly into an
+            auxiliary ADC input to record a 'true' copy of the actual clamping 
+            command signal.
+        
+        A record copy of the command waveforms helps to identify, during subsequent
+        analysis, the electrical manipulations of a cell — such as a membrane test, 
+        steps, ramps, pulses, induction of oscillatory phenomena or spikes, in a 
+        clamped cell, when these manipulations cannot be parsed (or reconstructed) 
+        from the recording protocol.
+        
+        """
+        if isinstance(self.auxin, AuxiliaryInput):
+            return (self.auxin.adc, ) if self.auxin.cmd is True else tuple()
+    
+        if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
+            return tuple(a.adc for a in self.auxin if a.cmd is True)
+        
+        return tuple()
+    
+    @property
+    def in_daq_triggers(self) -> tuple:
+        """Tuple of ADCs for recording DAQ-generated TTL signals; 
+        may be empty.
+        
+        These ADCs (analog inputs) are specified in the 'auxin' field and correspond
+        to the auxiliary input channels of the DAQ device for recording a 'copy' 
+        of DAQ-issued triggers (other than for synaptic stimulaion purposes).
+        
+        These signals are configured in the recording protocol and can be branches
+        off DIG (digital) or DAC (analog) outputs of the DAQ device, fed into 
+        auxiliary analog inputs.
+        
+        In the case of DAC outputs, these are the analog output channels where
+        TTL-like waveforms are generated as pulses or steps in the range of ± 5 V
+        and used in lieu of DIG outputs.
+        
+        Such inputs are useful to create a record copy of the TTLs sent out 
+        during an experiment, when these cannot be parsed from the recording 
+        protocol.
+        
+        """
+        if isinstance(self.auxin, AuxiliaryInput):
+            return tuple(self.auxin.adc) if self.auxin.cmd is False else tuple()
+    
+        if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
+            return tuple(a.adc for a in self.auxin if a.cmd is False)
+        
+        return tuple()
+    
+    @property
+    def other_inputs(self) -> tuple:
+        """Tuple of ADCs recording input signals not issued by the DAQ device.
+        May be empty.
+        
+        These ADCs are specified in the 'auxin' field.
+        
+        Such inputs record auxiliary data signals other than clamping commands or
+        TTLs, e.g. bath temperature, photodetector current, 'external' triggers,
+        etc, and are neither generated by the source (cell or field) nor copies
+        of command signal waveforms sent to the source in patch-clamp experiments.
+        
+        """
+        if isinstance(self.auxin, AuxiliaryInput):
+            return tuple(self.auxin.adc) if self.auxin.cmd is None else tuple()
+    
+        if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
+            return tuple(a.adc for a in self.auxin if a.cmd is None)
+        
+        return tuple()
+    
+    @property
+    def syn_blocks(self) -> tuple:
+        """Tuple of (name, neo.Block) tuples, one for each SynapticStimulus.
+        May be empty.
+        """
+        if isinstance(self.syn, SynapticStimulus):
+            return ((self.syn.name, neo.Block()),)
+        
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+            return tuple((s.name, neo.Block()) for s in self.syn)
+        
+        return tuple()
+    
+    @property
+    def syn_blocks_dict(self) -> dict:
+        """Returns syn_blocks as a dict with syn name ↦ empty neo.Block.
+        """
+        return dict(self.syn_blocks)
+    
+    @property
+    def out_dig_triggers(self) -> tuple:
+        """Tuple of DIG channels used to emit TTL (triggers) to 3ʳᵈ party devices.
+        These TTLs are used for purposes other than synaptic stimulation.
+        May be empty
+        """
+        if isinstance(self.auxout, AuxiliaryOutput):
+            return (self.auxout.channel, ) if self.auxout.digttl is True else (tuple)
+        
+        if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
+            return tuple(o.channel for o in self.auxout if o.digttl is True)
+        
+        return tuple()
+    
+    @property
+    def out_dac_triggers(self) -> tuple:
+        """Tuple of DAC channels used to emit TTL to 3ʳᵈ party devices.
+        These TTLs are emulated (pulses or steps with ± 5 V range) and are used
+        for purposes other than synaptic stimulation.
+        """
+        if isinstance(self.auxout, AuxiliaryOutput):
+            return (self.auxout.channel, ) if self.auxout.digttl is False else (tuple)
+        
+        if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
+            return tuple(o.channel for o in self.auxout if o.digttl is False)
+        
+        return tuple()
+    
+    @property
+    def other_outputs(self) -> tuple:
+        if isinstance(self.auxout, AuxiliaryOutput):
+            return (self.auxout.channel, ) if self.auxout.digttl is None else (tuple)
+        
+        if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
+            return tuple(o.channel for o in self.auxout if o.digttl is None)
+        
+        return tuple()
+    
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        super_anns = super().__annotations__
+        fields = list(super_anns.keys())
+        super_defaults = super()._field_defaults
+        
+        args = args[1:] # drop cls
+        
+        if len(args) > len(super_anns):
+            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        
+        new_args = dict()
+        
+        for k, arg in enumerate(args):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+            new_args[fields[k]] = arg
+            
+        if len(new_args) == len(super_anns):
+            if len(kwargs):
+                dups = [k for k in kwargs if k in fields]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                else:
+                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+                
+        else:
+            if len(kwargs):
+                dups = [k for k in kwargs if k in new_args]
+                if len(dups):
+                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+                
+                spurious = [k for k in kwargs if k not in fields]
+                if len(spurious):
+                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+                
+                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+                
+                new_args.update(new_kwargs)
+                
+            # finally, add the default unspecified args
+            for (k,v) in super_defaults.items():
+                if k not in new_args:
+                    new_args[k] = v
+                    
+        return super().__new__(cls, **new_args)
+    
+RecordingSource.name.__doc__ = "str: The name of the source; default is 'cell'"
+RecordingSource.adc.__doc__  = "int, str: The index or name of the primary ADC channel — records the eletrical behaviour of the source (cell or field)."
+RecordingSource.dac.__doc__  = "int, str: The index or name of the primary DAC channel — the output channel that operates the voltage- or current-clamp."
+RecordingSource.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus objects or None — origin of trigger (TTL-like) signals for synaptic stimulation, one per 'synaptic pathway'."
+RecordingSource.auxin.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
+RecordingSource.auxout.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
+
+
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
                         # but OK with other ElectrodeMode
-    VoltageClamp=2      # these two should be
-    CurrentClamp=4      # self-explanatory
-    
+    VoltageClamp=2      # |these two should be
+    CurrentClamp=4      # |     self-explanatory
     
 class ElectrodeMode(TypeEnum):
     Field=1             # typically, associated with ClampMode.NoClamp; other ClampModes don't make sense
@@ -440,6 +913,763 @@ class ElectrodeMode(TypeEnum):
     LinearArray=32      # local field potentials etc
     MultiElectrodeArray=64 # MEAs on a culture/slice?
    
+class RecordingEpisodeType(TypeEnum):
+    """Once can define valid type combinations as follows:
+    Tracking | Drug     (= 3)   ⇒ Tracking episode recorded in the presence of 
+                                    drug(s)
+    Conditioning | Drug (= 5)   ⇒ Conditioning in the presence of drug(s)
+    
+    A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
+    an episode of "drug washout".
+    
+    A value of 0 and any value > 5 are invalid.
+    
+    """
+    Drug            = 1 # a recording episode in the presence of a drug or mixture
+                        # of drugs
+    
+    Tracking        = 2 # used for tracking the electrophysiological behaviour of
+                        # a source (e.g., synaptic responses, somatic spiking, etc);
+                        
+    Monitoring      = Tracking
+                        
+    Conditioning    = 4 # used for induction of plasticity (i.e. application of 
+                        # the induction protocol)
+                        
+
+
+class SynapticPathway: pass
+
+@with_doc(Episode, use_header=True, header_str = "Inherits from:")
+class RecordingEpisode(Episode):
+    """
+    Specification of an electrophysiology recording episode.
+        
+    An "episode" is a contiguous series of sweeps recorded under a common set 
+    of experimental conditions -- typically, a subset of a larger 
+    experiment where distinct sets of conditions are applied in sequence.
+
+    All sweeps in the episode must have been recorded using the same recording
+    protocol (an ElectrophysiologyProtocol object).
+        
+    Examples:
+    =========
+
+    1) A sequence of three distinct episodes: 
+    • synaptic response recorded without drug
+    ↓
+    • recording in the presence of a drug
+    ↓
+    • recording after drug wash-out
+    
+    In all three episodes the synaptic respones are recorded with the SAME 
+        electrophysiology recording protocol.
+
+    2) Segments recorded while testing for cross-talk between synaptic pathways,
+    (and therefore, where the paired pulses are crossed between pathways) is a
+    distinct episode from the one where each segment contains responses from the
+    same synaptic pathway
+
+    The sweeps in RecordingEpisode are a sequence of neo.Segment objects, where
+    objects where each synaptic pathway has contributed data for a neo.Segment
+    inside the Block.
+
+    Fields (constructor parameters):
+    ================================
+        
+    • protocol: ElectrophysiologyProtocol
+        Currently, only pyabfbridge.ABFProtocol objects are supported. The ABFProtocol
+        is a subclass of ElectrophysiologyProtocol defined in this module.
+
+    • episodeType: RecordingEpisodeType
+        
+    • pathways: optional, a list of SynapticPathways or None (default); can also
+        be an empty list (same as if it was None).
+
+        Indicates the SynapticPathways where this episode applies. Typically,
+        an episode involves a single pathway. However, there are situations where
+        an episode involving more pathways is meaningful, e.g., where additional
+        pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
+        test, or during conditioning in order to test for 'associativity')
+    
+        The pathways define their own clamping modes and recording source.
+    
+    • xtalk: optional, a mapping of int (sweep indices) or tuples (start:int,step:int)
+        to pairs (2-tuples) of valid int indices into the 'pathways' attribute.
+        
+        When not None, it indicates that the episode was used for testing the 
+        independence of two or more synaptic pathways, using paired-pulse stimulations.
+        
+        E.g., for two pathways, using int keys:
+            0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
+            1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
+
+        or, as a tuple of two int:
+            (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from 
+                                path 0 to path 1
+        
+            (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from 
+                                path 1 to path 0
+        
+        The keys should resolve to valid sweep indices in the data; then the keys are 
+        pairs (2-tuples) they contain the 'start' and 'step' values for constructing
+        range objects indicating the sweeps where the test apples to the pathways 
+        given in the value mapped to the key, once the data is fully available.
+        
+        The order of the pathway indices in the values is the order in which each 
+        pathway was stimulated during the paired-pulse.
+
+        WARNING: the pathways attribute must be a list of SynapticPathways.
+    ---
+
+    ¹Exceptions are possible:
+        ∘ 'repatching' the cell (e.g. in order to dialyse with a drug, etc) see, e.g.
+            Oren et al, (2009) J. Neurosci 29(4):939
+            Maier et al, (2011) Neuron, DOI 10.1016/j.neuron.2011.08.016
+        ∘ switch between field recording and patch clamp or sharp electrode recordings
+        (theoretically possible, but then one may also think of this as being two
+        distinct pathways)
+    
+"""
+    # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
+    def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
+                 name: typing.Optional[str] = None,
+                 protocol: typing.Optional[ElectrophysiologyProtocol]=None, 
+                 # sources: typing.Sequence[RecordingSource] = list(), ## → defined in pathways
+                 # segments: typing.Optional[GeneralIndexType] = None, ## → defined in superclass beginFrame endFrame
+                 pathways: typing.Sequence[SynapticPathway] = list(),
+                 xtalk: typing.Optional[tuple] = None ,
+                 # triggers: typing.Sequence[TriggerEvent] = list(),
+                 **kwargs):
+        """Constructor for RecordingEpisode.
+
+        Named parameters:
+        ------------------
+        episodeType: type of the episode (see RecordingEpisodeType);
+                default is Tracking or Monitoring (an alias to Tracking).
+
+        name:str - the name of this episode (optional, default is None)
+            When None, it is up to the user of this object to give an appropriate
+            name
+        protocol: the electrophysiology recording protocol object, or None
+            WARNING: As of 2024-02-18 11:09:55 Scipyen only supports 
+            pyabfbridge.ABFProtocol objects.
+
+            Optional; default is None.
+
+        pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
+            Optional; default is None.
+
+        xtalk: dict of segment index (int) ↦ tuple of int (indexes of pathways)
+            or None.
+
+            Indicates the order of the stimulated pathways in a cross-talk contingency,
+            were each pathway is stimulated in turn, in a paired-pulse stimulation
+
+            Optional, default is None
+
+        Var-keyword parameters (kwargs)
+        -------------------------------
+        These are passed directly to the datatypes.Episode superclass (see documentation
+        for Episode)
+
+        See also the class documentation.
+        """
+        self._type_ = episodeType
+        if not isinstance(name, str):
+            name = self._type_.name
+            
+        super().__init__(name, **kwargs)
+
+        self.protocol = protocol
+        
+        if isinstance(pathways, (tuple, list)):
+            if len(pathways):
+                if not all(isinstance(v, SynapticPathway) for v in pathways):
+                    raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
+            self._pathways_ = pathways
+        else:
+            self._pathways_ = []
+        
+        # NOTE: 2023-10-15 13:27:27
+        # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
+        # between synapses activated by ideally distinct axonal pathways 
+        # (encapsulated by SynapticStimulus objects) in the same RecordingSource
+        #
+        # Testing the degree of pathway separation is based on short-term plasticity
+        # at the synapses under study: the "facilitation" or "depletion" of the synaptic
+        # responses seen when two individual stimuli are delivered to the same synapse
+        # (or group of synapses) at a short time interval ("paired-pulse ratio").
+        #
+        # When the two stimuli are delievered to distinct axonal bundles that synapse
+        # on the same cell, the lack of facilitation or depletion indicates that 
+        # the two axonal pathways activate completely separated groups of synapses
+        # on the postsynaptic cell.
+        #
+        # sweep index:intᵃ or tuple of int ↦ ordered sequence of pathway 
+        # indexes (int), 
+        #   e.g., for two pathways, using int keys:
+        #       0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
+        #       1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
+        #
+        #   or, as a tuple of two int:
+        #       (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from path 0 to path 1
+        #       (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from path 1 to path 0
+        #
+        #   ᵃ NOTE: relative to the first sweep in the episode! 
+        #
+        # NOTE: no checks are done on the value of the key(s) so expect errors
+        #   when trying to match an episode with data having the wrong number of sweeps
+        if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
+            if len(self._pathways_) == 0:
+                raise ValueError("Cannot apply crosstalk when there are no pathways defined")
+            
+            for k,p in xtalk.items():
+                if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
+                    raise TypeError("Cross-talk has invalid key types; expecting int or pairs of int")
+                
+                if any(p_ not in range(len(self._pathways_)) for p_ in p):
+                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self._pathways_)} pathways")
+                
+            self.xtalk = xtalk
+            
+        elif xtalk is None:
+            self.xtalk = tuple()
+            
+        else:
+            raise ValueError(f"Invalid xtalk specification ({xtalk})")
+        
+        # self._data_ = None
+        
+    def __repr__(self):
+        ret = list()
+        ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}, begin={self.begin}, end={self.end}, beginFrame={self.beginFrame}, endFrame={self.endFrame}), with:")
+        if len(self._pathways_) == 0:
+            ret.append(f"\tPathways: []")
+        else:
+            ret.append(f"\tPathways:")
+            for p in self._pathways_:
+                ret.append(f"\t{p}")
+
+        ret.append(f"\txtalk: {self.xtalk}")
+        
+        return "\n".join(ret)
+        
+    def _repr_pretty_(self, p, cycle):
+        supertxt = super().__repr__() + " with :"
+    
+        if cycle:
+            p.text(supertxt)
+        else:
+            p.text(supertxt)
+            p.breakable()
+            attr_repr = [" "]
+            attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
+                                                                                "protocol",
+                                                                                "electrodeMode",
+                                                                                "clampMode",
+                                                                                )]
+            
+            # with p.group(4 ,"(",")"):
+            with p.group(4 ,"",""):
+                for t in attr_repr:
+                    p.text(t)
+                    p.breakable()
+                p.text("\n")
+                
+            p.text("\n")
+                
+            p.text("Pathways:")
+            p.breakable()
+            
+            if isinstance(self._pathways_, (tuple, list)) and len(self._pathways_):
+                # with p.group(4, "(",")"):
+                with p.group(4, "",""):
+                    for pth in self._pathways_:
+                        p.text(pth.name)
+                        p.breakable()
+                    p.text("\n")
+                
+            if isinstance(self.xtalk, (tuple, list)) and len(self.xtalk):
+                link = " \u2192 "
+                txt = ["Test for independence:"]
+                for x in self.xtalk:
+                    if len(x[1]) > 1:
+                        txt.append(f"sweep {x[0]}: {x[1][0].name} {link} {x[1][1].name}")
+                p.text("\n".join(txt))
+                p.breakable()
+                p.text("\n")
+                
+            p.breakable()
+            
+    @property
+    def pathways(self) -> list:
+        return self._pathways_
+    
+    @pathways.setter
+    def pathways(self, val):
+        if isinstance(val, (tuple, list)):
+            if all(isinstance(v, SynapticPathway) for v in val):
+                self._pathways_[:] = [v for v in val]
+            elif len(val) == 0:
+                self._pathways_.clear()
+            else:
+                raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
+            
+        elif val is None:
+            self._pathways_.clear()
+        else:
+            raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
+            
+            
+            
+    @property
+    def type(self) -> RecordingEpisodeType:
+        return self._type_
+    
+    @type.setter
+    def type(self, val:RecordingEpisodeType):
+        if isinstance(val, RecordingEpisodeType):
+            self._type_ = val
+        else:
+            scipywarn(f"Expecting a RecordingEpisodeType, instead got {val}")
+
+@with_doc(Schedule, use_header=True, header_str = "Inherits from:")
+class RecordingSchedule(Schedule):
+    @property
+    def pathways(self):
+        return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
+        
+    def addEpisode(self, episode: RecordingEpisode):
+        if not isinstance(episode, RecordingEpisode):
+            raise TypeError(f"Expecting a RecordingEpisode; instead, got {type(episode).__name__}")
+        super().addEpisode(episode)
+        
+    def addEpisodes(self, episodes:typing.Sequence[RecordingEpisode]):
+        if len(episodes):
+            if not all(isinstance(e, RecordingEpisode) for e in episodes):
+                raise TypeError("Expecting a sequence of Recording Episode objects")
+            
+            super().addEpisodes(episodes)
+        
+        
+class SynapticPathwayType(TypeEnum):
+    """
+    Synaptic pathway type.
+    Encapsulates: Null, Test, Control, Auxiliary, UserDefined
+    
+    A Test pathway is defined by the presence of a Conditioning episode between
+    two non-Conditioning episodes - see RecordingEpisodeType class.
+    
+        A non-Conditioning episode is usually a Tracking episode, but can also be
+        a Crosstalk or Drug episode.
+        
+        Where justified, the test pathway may be "conditioned" more than once.
+        In this case, the Conditioning episodes MUST be separated by at least 
+        one non-Conditioning episode (usually a Tracking episode).
+        
+        In addition, there may be any number of Crosstalk, Drug and Washout
+        applied either before, or after the Conditioning episode.
+    
+    The Control pathway is defined by the presence of at least one Tracking
+        episode. No Conditioning episodes are allowed in a Control pathway.
+        
+    A combination of types IS NOT ALLOWED. The values were chosen to prevent
+    ambiguities. Thus,
+    
+    Null    | Control   ⇒ Control       (1)
+    Null    | Test      ⇒ Test          (2)
+    Control | Test      ⇒ Auxiliary     (3)
+    Control | Auxiliary ⇒ UserDefined   (4)
+    
+    Any value > 4 is invalid.
+    
+    """
+    Null        = 0 # undefined; can associate any episode type, EXCEPT for Conditioning and Tracking
+    Undefined   = Null
+    Control     = 1 # can associate any episode type, EXCEPT for Conditioning
+    Test        = 2 # can associate any episode type
+    Auxiliary   = 3 # can associate any episode type, EXCEPT for Tracking;
+                    # NOTE: this requirement is for analysis purpose only; the 
+                    # pathway can be activated during any type of episode, but
+                    # synaptic responses do not need to be analysed during the 
+                    # tracking episodes.
+                    # auxiliary pathways can be:
+                    # • present along the tracking pathway, during tracking only
+                    # • present along the induction pathway, during induction only
+                    # • present throughout
+    UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
+    
+# @with_doc(BaseScipyenData, use_header=True)
+@dataclass
+class SynapticPathway:
+    """Logical association of a SynapticStimulus with a Schedule.
+    Also specifies the "type" of the SynapticPathway - specifies the role of
+    the SynapticPathway in an experiment.
+
+    SynapticPathway objects have a pathwayType attribute which specifies
+    the pathway's role in a synaptic plasticity experiment.
+    
+    """
+    pathwayType: SynapticPathwayType = SynapticPathwayType.Null
+    name: str = "pathway"
+    stimulus: SynapticStimulus = field(default_factory = lambda: SynapticStimulus())
+    electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
+    clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
+    schedule: typing.Optional[RecordingSchedule] = None
+    measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
+    source: RecordingSource = field(default_factory = lambda: RecordingSource())
+        
+@dataclass
+class LocationMeasure:
+    """Functor to calculate a signal measure at a location using a suitable function or functor.
+
+    In turn, a `location` is an object with one of the following types ('locator' types):
+    • SignalCursor
+    • DataCursor (abstraction of SignalCursor; stores only the cursor's coordinates, NOT type;
+                    depending on the axis it applied to it MAY represent a vertical or horizontal
+                    signal cursor; this class is useful when no SignalViewer axes are present yet)
+    • neo.Epoch
+    • DataZone
+    • Interval
+
+    or a sequence (tuple, list) of such (SignalCursor, DataCursor, neo.Epoch, DataZone or Interval)
+        
+    The LocationMeasure object is callable, taking as first argument a signal-like 
+        object, which will be passed at the functor or function encapsulated by
+        its `func` field, together with the locators specified in the constructor.
+        This call also accepts additional parameters to the `func`.
+    
+            
+    A suitable functor takes a primitive numeric function as argument and uses it 
+    to calculate a measure in a neo signal-like object, using ALL the supplied 
+    locators. Likewise, a suitable function applies a hard-coded function to 
+    calculate a signal measure at the supplied locators.
+        
+    The `ephys` module provides several such functors and functions:
+    1) cursor-based functors and functions — these use gui.SignalCursor objects
+    of vertical type:
+    • measuring at a single cursor, named as `cursor_<abc>` as shown below:
+        ∘ returning a single value:
+            ⋆ cursor_value(signal, cursor, channel): value of the signal at the 
+                horizontal coordinate of a vertical SignalCursor, in the specified
+                signal channel¹ (subject to sampling rate)
+        
+            ⋆ cursor_index(signal, cursor): index of the signal sample(s)¹ at the 
+                horizontal coordinate of the cursor.
+        
+            ⋆ cursor_chord_slope(signal, cursor, channel): the slope of the line
+                through the signal samples (in the specified channel) at the 
+                boundaries of the horizontal window of a vertical cursor
+        
+            ⋆ cursor_reduce(func, signal, cursor, channel) → applies a reducing 
+                numpy function to the specified channel the signal, over the 
+                horizontal extent of a vertical SignalCursor; a reducing function
+                calculates a value based on several 
+                data samples (e.g. `mean`, `sum`, `min`, `max`, etc)
+        
+            Functors that are a particular case of `cursor_reduce` are listed 
+            here:
+        
+            ⋆ cursor_average(signal, cursor, channel) → applied np.mean (or
+                np.nanmean) to calculate the average of signal in the specified
+                channel, over the horizontal extent of the cursor
+        
+            ⋆ cursor_mean → alias for cursor_average
+        
+            ⋆ cursor_min, cursor_max, cursor_argmin, cursor_argmax
+        
+        ∘ returning a tuple of values:
+            ⋆ cursor_minmax, cursor_maxmin, cursor_argminmax, cursor_argmaxmin
+        
+    • measuring at two cursors, named as `cursors_<abc>` as shown below:
+        ∘ returning a single value:
+            ⋆ cursors_difference(signal, cursor0, cursor1, func, channel, subfun)
+                → returns the difference in signal values at the cursors, in the 
+                specified channel
+        
+                `func` is a single cursor functor returning a single value (see above)
+                `subfun` is the actual numeric reducing function used for the `func`
+                    (see examples above)
+                    
+            ⋆ cursors_distance(signal, cursor0, cursor1, channel) → measures the 
+                distance, in samples (or axis 0 coordinates, see ¹) between the
+                vertical coordinates of two vertical SignalCursor objects.
+        
+            ⋆ cursors_chord_slope(signal, cursor0, cursor1, channel) → calculates
+                the chord slope between the cursor_average at the two cursors.
+        
+    2) interval-based functors and functions — these are similar to the cursor-based
+        functions listed above, but use datazone.Interval instead of gui.SignalCursor
+        objects.
+        
+    3) epoch-based functors and functions — similar to cursor-based functions, 
+        using neo.Epoch or datazone.DataZone objects as locations.
+        
+    NOTE:
+        ¹ A signal `channel` is a numeric data vector, not to be confused with 
+        the `input` or `output` hardware channel that carries the signal in your
+        experimental setup. All signals in Scipyen are represented as `neo`
+        objects (essentially, 'enhanced' numpy arrays), that store data in 
+        memory as columns of a matrix: each column (a 1D array, or 'vector') is 
+        a signal `channel`.
+        
+        Normally, all neo signal-like objects have just one such channel (thus 
+        having shape (M,1) where M is the number of samples in the 
+        signal, same as the number of rows in the data matrix). 
+
+        However, there is no restriction to the number of channels a signal can 
+        have, and Scipyen frequently uses this feature to store additional data 
+        (e.g., a "filtered" signal alongside the "raw", unfiltered version of the 
+        signal as it was recorded). It follows that ALL the channels of a signal
+        share the signal's domain (usually, time).
+        
+        Due to this layout, the signal's axes have a very specific meaning:
+        
+        axis 0 ↦ the domain axis (e.g. time). All channels are aligned to this
+                this axis, hence an index `𝑚` along this axis points to the 
+                𝑚ᵗʰ "row" of data spanning ALL channels. For a signal `sig`, 
+                this is sig[𝑚,:].
+        
+        axis 1 ↦ the channel axis. An index `𝑛` along this axis points to the 
+                𝑛ᵗʰ "column" of data (i.e., channel `𝑛`) spanning the entire domain
+                of the signal. For a signal `sig`, this is sig[:,𝑛]
+        
+        Given a signal `sig`, the sample at sig[𝑚,𝑛] is the unique data sample
+            at domain index `𝑚` in channel `𝑛`.
+            
+        
+
+    Examples:
+    ---------
+    from ephys import (LocationMeasure, cursor_average, interval_average,
+                        cursors_difference, intervals_difference)
+
+    from datazone import Interval
+
+    from neoutils import get_epoch_interval
+
+    We assume a neo.AnalogSignal object is bound to the symbol 'signal' in the 
+    workspace, and that 'signal' is a voltage-clamp record of the membrane current
+    containing, say, and evoked excitatory synaptic current (EPSC).
+
+    1) Calculate the average of signal samples at a vertical cursor, which marks
+    the signal region corresponding to the cursor's x window extended symmetrically
+    around the cursor's x coordinate. The cursors is bound to a symbol 'cursor' in
+    the workspace.
+
+    c_measure = LocationMeasure(cursor_average, cursor, "c_measure")
+
+    a = c_measure(signal) → a quantity array
+
+    2) Same as (1) but using datazone.Interval objects; we assume there is a 
+    neo.Epoch bound to the symbol 'epoch' in the workspace.
+
+    To demonstrate, the following two lines generate two intervals based on an 
+    epoch interval labeled "EPSC0Base"; one Interval encapsulates a start time and a
+    duration; the other encapsulates a start and a stop time (see datazone.Interval)
+
+    intvl = get_epoch_interval(epoch, "EPSC0Base", duration=True)
+    intvl2 = get_epoch_interval(epoch, "EPSC0Base")
+
+    i_measure_1 = LocationMeasure(interval_average, intvl, "i_measure_1")
+
+    i_measure_2 = LocationMeasure(interval_average, intvl, "i_measure_2")
+
+    b = i_measure_1(signal)
+
+    c = i_measure_2(signal)
+
+    assert np.all(a == b) # see example (1) regarding 'a'
+    assert np.all(a == c)
+
+    3) Obtain a measure at a pair of locations of the same type.
+
+    We want to calculate the amplitude of an EPSC elicited as a difference between 
+    averages of the membrane current signal around the "peak" (or nadir) of the EPSC
+    and a baseline BEFORE the stimulus that elicited the EPSC.
+
+    For this example we assume that there are two intervals inside 'epoch' that
+    correspond to baseline and EPSC peak regions of the signal, labeled "EPSC0Base"
+    "EPSC0Peak".
+
+    From this epoch we generate two Interval objects (one each, for baseline and 
+    peak; note how we access the corresponding epoch intervals by using their labels):
+
+    # 'intervals' will be a list of Interval objects
+    intervals = [get_epoch_interval(epoch, i, duration=True) for i in ("EPSC0Base",
+    "EPSC0Peak")]
+
+    We also assume that there are two vertical cursors available (c0, c1), 
+    indicating the baseline and the peak regions of the signal.
+
+    We calculate this measure using the intervals (note we construct the LocationMeasure
+    and we call it with the signal in a one-line code):
+
+    a = LocalMeasure(intervals_difference, intervals, "i_diff") (signal)
+
+    For demonstration, we do the same using the cursors:
+
+    b = LocationMeasure(cursors_difference, [c0,c1], "c_diff")(signal)
+
+    assert np.all(a == b)
+
+    4) To calculate the same measure at the same location in several signals, 
+    you can call the LocationMeasure on each signal.
+
+    Say you want to calculate the input resistance during a voltage-clamp recording,
+    based on a recorded membrane current (the 'signal') and a recorded analog command 
+    signal (here, the command voltage, i.e. 'command').
+
+    For this purpose, the command signal contains a boxcar waveform (a hyperpolarizing
+    or depolarizing change in the membrane potential) - the "membrane test". 
+
+    If no whole-cell compensation is applied, then the membrane current recorded 
+    during the membrane test undergoes a rapid transient change (the "capacitive 
+    transient") before it settles to a new steady-state value, different from the 
+    baseline before the membrane test).
+
+    We calculate Rin by applying Ohm's law:
+
+    V = I×R ⇒ R = V / I
+
+    In this case:
+    V = the amplitude of the boxcar; 
+    I = the difference between the membrane current during the steady-state and that
+    during the baseline before the membrane test boxcar.
+
+    Therefore we need two LocationMeasure objects.
+
+    If we were to use two appropriately-placed cursors as locators:
+
+    baseline = LocationMeasure(cursor_average, baseline_cursor, "baseline")
+
+    steady_state = LocationMeasure(cursor_average, steady_state_cursor, "steady_state")
+
+    # next line calculates the average baseline membrane current before the membrane test boxcar
+    i0 = baseline(signal) 
+    # next line calculates the average baseline potential before the membrane test boxcar
+    v0 = baseline(command) # return
+
+    # similarly, for the steady-state membrane current and potential
+    i1 = steady_state(signal)
+    v1 = steady_state(command)
+
+    finally we calculate Rin as (v1 - v0) / (i1 - i0)
+
+    Note that in both cases we used cursor_average as the function passed to the 
+    LocationMeasure functor. Since we are taking a difference between the averages
+    of signals at two locations, we can be more direct and use just one 
+    LocationMeasure object (see example (3) above):
+
+    delta = LocationMeasure(cursors_difference, (baseline_cursor, steady_state_cursor), "delta")
+
+    I = delta(signal)
+    V = delta(command)
+
+    Rin = V/I # ⇒ this will generate a Quantity in command.units / signal.units
+                # e.g. pq.mV / pq/pA
+                # Most likely we want the resistance in MOhm (pq.MOhm), therefore
+                # we must rescale it, so the last call should be:
+
+    Rin = (V/I).rescale(pq.MOhm)
+
+    Finally, a few reminders:
+
+    • Signals are 2D Quantity arrays (with the data represented as column vectors) 
+    and MAY have more than one trace (a.k.a "signal channel", not to be confused 
+    with a "recording channel"). A trace, therefore is a column in the signal array.
+
+    • Functions that calculate a measure at a single location return a Quantity
+    array. 
+        ∘ For signals with just one trace, the result has only one element, so 
+        in cases where just a scalar Quantity is needed, this value can be accessed 
+        by indexing, e.g.:
+
+            result[0], or more directly np.squeeze(result)
+
+        ∘ For signals with more than one trace, the result is a subdimensional (1D)
+        Quantity array, with one value per trace. Since the traces are indexed along
+        the second axis (axis 1) of the original signal, one may want to restrict the
+        calculations to the desired trace only, by passing the "channel" keyword to
+        the call by the functor.
+
+        • For situations where a numpy array is constructed from a list comprehension
+        (such as is the case for cursors_difference, intervals_difference) the final
+        result will gain a second axis (hence it will be 2D), even though it only 
+        contains one value.
+
+        I all these situation it is recommended to drop the singleton axes. 
+
+    So, we can finish the last example:
+
+    Rin = np.squeeze((V/I).rescale(pq.MOhm))  # ⇒ e.g. array(90.1997, dtype=float32) * Mohm
+
+    This is a SCALAR Quantity (even though it is described as an array, but note the
+    absence of square brackets in its string representation).
+
+    Indeed:
+
+    assert (Rin.ndim == 0) # ⇒ is True
+        
+    Changelog:
+    ----------
+    2024-02-09 09:41:11 made this a DataClass to enable mutations
+        WARNING: In order to be fully mutable when locations are specified as 
+        sequences of scalars, the sequences must also be mutable
+    
+"""
+    # NOTE: 2024-02-29 22:37:54
+    # mandatory signature for func:
+    # func(*args, **kwargs) where:
+    # *args: signal or signals, and any other positional parameters NOT locators
+    # **kwargs: named parameters for func; these MAY be 'relative' and 'channel'
+    #   although these two will by supplied in self.__call__ if not present in kwargs
+    # 
+    func: typing.Callable
+    locations: typing.Union[typing.Sequence, DataCursor, Interval, SignalCursor, DataZone, neo.Epoch]
+    name: str = "measure"
+    channel:int  = 0
+    relative:bool = True
+    
+    # __slots__ = ()
+    
+    def __call__(self, *args, **kwargs):
+        """
+        Var-positional parameters (*args):
+        ----------------------------------
+        Passed to encapsulated function (`func` field); MUST contain a signal or
+        signals PLUS any additional positional parameters EXCEPT locators
+
+        Var-keyword parameters (**kwargs):
+        ---------------------------------
+        Any explicitly named parameters to `func`; NOTE that `channel` and `relative`
+        are passed to the `func` if they are not supplied with kwargs here
+            
+        """
+        # *args is a signal or sequence of signals plus any other positional arguments
+        
+        if isinstance(self.locations, (list, tuple)):# and not isinstance(self.locations, Interval):
+            args = args + tuple(self.locations)
+            
+        else:
+            args = args + (self.locations,)
+            
+        relative = kwargs.get("relative", None)
+        
+        if not isinstance(relative, bool):
+            kwargs["relative"] = self.relative
+        
+        channel = kwargs.get("channel", None)
+        if not isinstance(channel, int):
+            kwargs["channel"] = self.channel
+            
+        # print(f"{self.__class__.__name__}.call: relative = {self.relative}")
+        # print(f"{self.__class__.__name__}.call: func = {self.func}")
+        # print(f"{self.__class__.__name__}.__call__ args = {args}")
+        # print(f"{self.__class__.__name__}.__call__ kwargs = {kwargs}")
+        return self.func(*args, **kwargs)
+  
 class DataListener(QtCore.QObject):
     """
     Dynamically constructs and augments neo.Block data as
@@ -457,17 +1687,30 @@ class DataListener(QtCore.QObject):
         self.scipyenWindow.enableDirectoryWatch(False)
 
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesRemoved(self, removedItems):
         print(f"{self.__class__.__name__}.slot_filesRemoved {removedItems}")
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesChanged(self, changedItems):
         print(f"{self.__class__.__name__}.slot_filesChanged {changedItems}")
 
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_filesNew(self, newItems):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
+        
+class Analysis(BaseScipyenData):
+    """TODO Finalize me !!!"""
+    _data_attributes_ = (
+        ("measurements", list, list()),     # list of time-varying measurements, by default is empty
+                                            # e.g., EPSP amplitude(s), fEPSP slope(s), RS, Rin, DC
+                                            # NOTE: even though some parameters such
+                                            # as Rin, DC, etc are not pathway specific,
+                                            # we store them here as 
+        )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(**kwargs)
 
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
@@ -536,8 +1779,26 @@ Returns the signal and the command, possibly with units modified as expected for
 
 def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal], 
                        **kwargs) -> tuple:
-    """Detects or checks the timing and amplitude of the command signal for a membrane test (boxcar).
-Returns a tuple (start, stop, test_amplitude)"""
+    """Detects or checks the timing and amplitude of a membrane test waveform (boxcar).
+    The detection occurs in a command signal (a copy of the DAC command) where the boxcar is defined.
+    Use this an alternative to parsing an ElectrophysiologyProtocol, in order to 
+    infer the parameters of a membrane test epoch.
+
+    Prerequisite: the command signal must have been recorded in the data. This 
+    can be chieved by routing the DAC output directly into an ADC input in the 
+    DAQ device, or by recording an appropriate¹ "secondary" output signal from 
+    the amplifier (if available).
+
+    Returns a tuple (start, stop, test_amplitude).
+
+
+    NOTE:
+    ¹ Some amplifiers provide a secondary output in addition to the main output
+    signal carrying the recorded electrical signal. The secondary output signal
+    may be selected to contain the pipette voltage (in voltage clamp) or
+    pipette current (in current clamp) which can be used as a "proxy" for the 
+    command signal in these clamping modes.
+"""
     up_first = kwargs.pop("up_first", True)
     boxduration = kwargs.pop("boxduration", None) # tuple min , max
     
@@ -588,7 +1849,11 @@ Returns a tuple (start, stop, test_amplitude)"""
     return start, stop, test_amplitude 
         
 
-def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], start:int = 0, span:int=1, isISI:bool=False):
+def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], 
+                 start:int = 0, 
+                 span:int=1, 
+                 isISI:bool=False,
+                 useNan:bool=True):
     """Calculates the reciprocal of an inter-event interval.
     
     This can be the time interval between any two events with indices "start" &
@@ -609,13 +1874,23 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], s
         or time intervals (when True).
         
         Optional, default is False (i.e. data is taken as a sequence of time stamps)
+
+    useNan:bool, flag to return NaN Hz when data contains at most one event.
+            Optional, default is True; when False, returns 0 Hz for such condition.
         
     Returns:
     ========
     The frequency (reciprocal of the interval's duration) as a scalar Quantity 
     in pq.Hz.
+
+    If the data is empty returns nan Hz, or 0. Hz when `useNan` parameter is False.
     
-    If the data is empty or contains only one element, returns 0 Hz
+    If the data contains only element:
+        • if the element is a time stamp (`isISI` parameter is False), returns 
+        nan Hz, unless `useNan` parameter is False, in which case returns 0.
+        
+        • if the element if an interval (`isISI` parameter is Trtue), returns
+        the reciprocal of that interval.
     
     Example:
     ===========
@@ -642,10 +1917,24 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], s
     
     In: isifrequency(Inter_AP_intervals, 0, 2, True) # NOTE the third parameter
     Out: array(16.3441) * Hz
+
+    CHANGELOG:
+    2024-01-20 09:44:10
+        • returns NaN Hz when data has at most one event; this behavour can be 
+            reverted to the previous one (i.e. return 0 Hz when there is at most
+            one event) by passing `useNan` False
+        • added the `useNan` flag to change what is returned when data has at
+            most one event
     
     """
-    if len(data) <= 1:
-        return 0*pq.Hz
+    if len(data) == 0:
+        return np.nan * pq.Hz if useNan else 0*pq.Hz
+        
+    if len(data) == 1:
+        if isISI: # just one inter-spike interval is given
+            return 1/data[0]
+        else: # data is just one time stamp - cannot calculate - return NaN or 0 depending on useNan
+            return np.nan * pq.Hz if useNan else 0*pq.Hz
     
     if start < 0:
         raise ValueError(f"'start' must be >= 0; got {start} instead")
@@ -659,10 +1948,10 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable], s
     if start + span >= len(data):
         raise ValueError(f"'span' cannot be larger than {len(data)-start}; got {span} instead")
     
-    if isISI:
+    if isISI: # data has inter-spike intervals
         return (1/np.sum(data[start:(start+span)])).rescale(pq.Hz)
     
-    else:
+    else: # data is time stamps
         stamps = data[start:(start+span+1)]
         return (1/(stamps[-1]-stamps[start])).rescale(pq.Hz)
     
@@ -969,11 +2258,8 @@ def interval_index(signal, interval:tuple, duration:bool=False):
     if not isinstance(x, pq.Quantity):
         x *= signal.times.units
         
-    elif x.units != signal.times.units:
-        if not units_convertible(x, signal.times):
-            raise TypeError(f"Interval units {x.units} are incompatible with the signal domain {signal.times.units}")
-        
-        x.rescale(signal.times.units)
+    else:
+        x = check_rescale(x, signal.times.units)
         
     return signal.time_index(x)
     
@@ -1104,7 +2390,7 @@ def event_amplitude_at_intervals(signal:typing.Union[neo.AnalogSignal, DataSigna
     
 
 def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                  cursor: typing.Union[SignalCursor, tuple]) -> typing.Union[neo.AnalogSignal, DataSignal]:
+                  cursor: typing.Union[SignalCursor, tuple, DataCursor]) -> typing.Union[neo.AnalogSignal, DataSignal]:
     """Returns a slice of the signal corresponding to a cursor's xwindow"""
     
     if isinstance(cursor, SignalCursor):
@@ -1114,22 +2400,26 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
     elif isinstance(cursor, tuple) and len(cursor) == 2:
         t0, t1 = cursor
         
-        if not isinstance(t0, pq.Quantity):
-            t0 *= signal.times.units
-            
-        else:
-            if not units_convertible(t0, signal.times.units):
-                raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
-    
-        if not isinstance(t1, pq.Quantity):
-            t1 *= signal.times.units
-    
-        else:
-            if not units_convertible(t1, signal.times.units):
-                raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
+    elif isinstance(cursor, DataCursor):
+        t0 = cursor.coord - cursor.span/2
+        t1 = cursor.span + cursor.span/2
         
     else:
-        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor or a 2-tuple of scalars; got {cursors} instead")
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor or a 2-tuple of scalars; got {cursors} instead")
+    
+    if not isinstance(t0, pq.Quantity):
+        t0 *= signal.times.units
+        
+    else:
+        if not units_convertible(t0, signal.times.units):
+            raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
+
+    if not isinstance(t1, pq.Quantity):
+        t1 *= signal.times.units
+
+    else:
+        if not units_convertible(t1, signal.times.units):
+            raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
@@ -1141,8 +2431,9 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
 def cursor_reduce(func:types.FunctionType, 
                   signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[SignalCursor, tuple], 
-                  channel: typing.Optional[int] = None) -> pq.Quantity:
+                  cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+                  channel: typing.Optional[int] = None,
+                  relative:bool = True) -> pq.Quantity:
     """Calculates reduced signal values (e.g. min, max, median etc) across a cursor's window.
     
     The reduced signal value is the value calculated by the `func` parameter
@@ -1174,7 +2465,15 @@ def cursor_reduce(func:types.FunctionType,
     signal: neo.AnalogSignal, DataSignal
     
     cursor: tuple (x, window) or SignalCursor of type vertical or crosshair
+        When a tuple, its elements (`x` and `window`) represent a notional
+            vertical cursor at `x` coordinate, with a horizontal span given by 
+            `window` such that `x` is at the center of the span.
     
+            Both elements are numeric scalars (that will assume the domain units
+            of the signal where the notional cursor is applied), or python Quantities
+            (their units are expected to be convertible to the units of the signal's
+            domain, e.g. time units for neo.AnalogSignal, etc).
+        
     channel: int or None (default)
         For multi-channel signal, specified which channel is used:
         0 <= channel < signal.shape[1]
@@ -1192,39 +2491,55 @@ def cursor_reduce(func:types.FunctionType,
     """
     # from gui.signalviewer import SignalCursor as SignalCursor
     
-    if not isinstance(func, types.FunctionType):
-        raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
+    # if not isinstance(func, types.FunctionType):
+    #     raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
     
+    # print(f"cursor_reduce: signal.t_start = {signal.t_start}; signal.t_stop = {signal.t_stop}")
     if isinstance(cursor, SignalCursor):
-        t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
-        t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
+        # print(f"cursor_reduce: cursor.x = {cursor.x}, cursor.xwindow = {cursor.xwindow}")
+        t0 = (float(cursor.x) - float(cursor.xwindow/2.)) * signal.times.units
+        t1 = (float(cursor.x) + float(cursor.xwindow/2.)) * signal.times.units
+        
+    elif isinstance(cursor, DataCursor):
+        t0 = cursor.coord - cursor.span/2
+        t1 = cursor.coord + cursor.span/2
         
     elif isinstance(cursor, tuple) and len(cursor) == 2:
         t0, t1 = cursor
         
-        if not isinstance(t0, pq.Quantity):
-            t0 *= signal.times.units
-            
-        else:
-            if not units_convertible(t0, signal.times.units):
-                raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
+    else:
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
     
-        if not isinstance(t1, pq.Quantity):
-            t1 *= signal.times.units
-    
-        else:
-            if not units_convertible(t1, signal.times.units):
-                raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
+    if not isinstance(t0, pq.Quantity):
+        t0 *= signal.times.units
         
     else:
-        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor or a 2-tuple of scalars; got {cursors} instead")
+        t0 = check_rescale(t0, signal.times.units)
+
+    if not isinstance(t1, pq.Quantity):
+        t1 *= signal.times.units
+
+    else:
+        t1 = check_rescale(t1, signal.times.units)
+        
+    t0, t1 = min(t0,t1), max(t0,t1)
+        
+    if relative:
+        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+            
+    else:
+        if t0 < signal.t_start or t0 > signal.t_stop:
+            scipywarn(f"t0 {t0} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+            return np.nan
+        
+        if t1 < signal.t_start or t1 > signal.t_stop:
+            scipywarn(f"t1 {t1} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+            return np.nan
     
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
         
     else:
-        # ret = signal.time_slice(t0,t1).max(axis=0).flatten()
-        # ret = func(signal.time_slice(t0,t1), axis=0).flatten()
         ret = func(signal.time_slice(t0,t1), axis=0)
     
     if isinstance(channel, int):
@@ -1232,29 +2547,68 @@ def cursor_reduce(func:types.FunctionType,
     
     return ret
 
+def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], *args) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
+    """Adjust the domain values supplied in `args` relative to signal's domain limit.
+    `args` must contain scalar Quantities with (or convertible to) signal's domain units.
+    
+    Although the function's name refers to 'times', in fact it can be used on
+    regularly sampled signals with any domain (i.e., neo.AnalogSignal and Datasignal
+    objects).
+    
+    Furthermore, the values WILL be sorted in increasing order!
+    
+    """
+    if len(args) == 0:
+        scipywarn("No domain values were supplied")
+        return
+    
+    if not all(isinstance(v, pq.Quantity) and v.size == 1 and units_convertible(v, signal.times.units) for v in args):
+        raise TypeError(f"All domain values expected to be scalar Quantities in {signal.times.units}")
+    
+    args = sorted([check_rescale(t, signal.times.units) for t in args])
+    
+    t0 = args[0]
+    
+    deltas = [t-t0 for t in args[1:]]
+    
+    if t0 < signal.t_start:
+        t0 += signal.t_start
+        
+    elif t0 > signal.t_stop:
+        while t0 > signal.t_stop:
+            t0 -= signal.t_stop
+            
+    if len(deltas):
+        return [t0] + list(map(lambda x: t0 + x if t0 + x < signal.t_stop else signal.t_stop, deltas))
+    
+    return t0
+            
 @safeWrapper
 def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-               cursor: typing.Union[SignalCursor, tuple], 
-               channel: typing.Optional[int] = None) -> typing.Union[float, pq.Quantity]:
+               cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+               channel: typing.Optional[int] = None,
+               relative: bool=True) -> typing.Union[float, pq.Quantity]:
     """The maximum value of the signal across the cursor's window.
     Calls cursor_reduce with np.max as `func` parameter.
     """
-    return cursor_reduce(np.max, signal, cursor, channel)
+    return cursor_reduce(np.max, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-               cursor: typing.Union[SignalCursor, tuple], 
-               channel: typing.Optional[int] = None) -> typing.Union[float, pq.Quantity]:
+               cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+               channel: typing.Optional[int] = None,
+               relative: bool=True) -> typing.Union[float, pq.Quantity]:
     """The maximum value of the signal across the cursor's window.
     Calls cursor_reduce with np.min as `func` parameter.
     """
-    return cursor_reduce(np.min, signal, cursor, channel)
+    return cursor_reduce(np.min, signal, cursor, channel, relaive)
 
 
 @safeWrapper
 def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[SignalCursor, tuple], 
-                  channel: typing.Optional[int] = None):
+                  cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+                  channel: typing.Optional[int] = None,
+                  relative: bool=True) -> int:
     """The index of maximum value of the signal across the cursor's window.
 
     Parameters:
@@ -1275,12 +2629,13 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
     the signal.
     """
     
-    return cursor_reduce(np.argmax, signal, cursor, channel)
+    return cursor_reduce(np.argmax, signal, cursor, channel, relative)
     
 @safeWrapper
 def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[tuple, SignalCursor], 
-                  channel: typing.Optional[int] = None):
+                  cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                  channel: typing.Optional[int] = None,
+                  relative: bool=True) -> int:
     """The index of minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -1301,12 +2656,13 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     the signal.
     """
     
-    return cursor_reduce(np.argmin, signal, cursor, channel)
+    return cursor_reduce(np.argmin, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[tuple, SignalCursor], 
-                  channel: typing.Optional[int] = None):
+                  cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                  channel: typing.Optional[int] = None,
+                  relative: bool=True) -> tuple:
     """The maximum and minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -1329,32 +2685,37 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     """
     
-    return cursor_reduce(sigp.maxmin, signal, cursor, channel)
+    return cursor_reduce(sigp.maxmin, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_minmax(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[tuple, SignalCursor], 
-                  channel: typing.Optional[int]=None):
-    return cursor_reduce(sigp.minmax, signal, cursor, channel)
+                  cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                  channel: typing.Optional[int]=None,
+                  relative: bool=True) -> tuple:
+    return cursor_reduce(sigp.minmax, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                     cursor: typing.Union[tuple, SignalCursor], 
-                     channel: typing.Optional[int] = None):
+                     cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                     channel: typing.Optional[int] = None,
+                     relative: bool=True) -> tuple:
     """The indices of signal maximum and minimum across the cursor's window.
     """
-    return cursor_reduce(sigp.argmaxmin, signal, cursor, channel)
+    return cursor_reduce(sigp.argmaxmin, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_argminmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
-                     cursor: typing.Union[tuple, SignalCursor], 
-                     channel: typing.Optional[int]=None):
-    return cursor_reduce(sigp.argminmax, signal, cursor, channel)
+                     cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                     channel: typing.Optional[int]=None,
+                     relative:bool = True) -> tuple:
+    return cursor_reduce(sigp.argminmax, signal, cursor, channel, relative)
 
 @safeWrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                   cursor: typing.Union[tuple, SignalCursor], 
-                   channel: typing.Optional[int]=None):
+                   cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                   channel: typing.Optional[int]=None,
+                   relative: bool = True,
+                   usenan: bool = False):
     """Average of signal samples across the window of a vertical cursor.
     Calls cursor_reduce with np.mean as `func` parameter
     
@@ -1376,20 +2737,24 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
         
         When channel is an int, the function returns the average at the specifed
         channel (if it is valid)
+    
+    usenan:bool, default is False; when True, uses np.nanmean
         
     Returns:
     -------
     A python Quantity with the same units as the signal.
     
     """
-    return cursor_reduce(np.mean, signal, cursor, channel)
+    fcn = np.nanmean if usenan else np.mean
+    return cursor_reduce(fcn, signal, cursor, channel, relative)
 
 cursor_mean = cursor_average
 
 @safeWrapper
 def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple], 
-                 channel: typing.Optional[int] = None):
+                 cursor: typing.Union[float, SignalCursor, DataCursor, pq.Quantity, tuple], 
+                 channel: typing.Optional[int] = None, 
+                 relative:bool = True):
     """Value of signal at the vertical cursor's time coordinate.
     
     Signal sample values are NOT averaged across the cursor's window.
@@ -1424,7 +2789,7 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     """
     # from gui.signalviewer import SignalCursor as SignalCursor
     
-    data_index = cursor_index(signal, cursor)
+    data_index = cursor_index(signal, cursor, relative)
     
     ret = signal[data_index,:]
     
@@ -1435,7 +2800,8 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
 
 @safeWrapper
 def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                 cursor: typing.Union[float, SignalCursor, pq.Quantity, tuple]):
+                 cursor: typing.Union[float, SignalCursor, DataCursor, pq.Quantity, tuple],
+                 relative: bool = True):
     """Index of signal sample at the vertical cursor's time coordinate.
     
     Parameters:
@@ -1465,7 +2831,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
     # channels in the signal sharethe domain and have the same number of
     # samples
     if isinstance(cursor, float):
-        t = cursor * signal.time.units
+        t = cursor * signal.times.units
         
     elif isinstance(cursor, SignalCursor):
         if cursor.cursorType not in (SignalCursorTypes.vertical, SignalCursorTypes.crosshair):
@@ -1473,11 +2839,25 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         
         t = cursor.x * signal.times.units
         
-    elif isinstance(cursor, pq.Quantity):
-        if not units_convertible(cursor, signal.times.units):
-            raise TypeError("Expecting %s for cursor units; got %s instead" % (signal.times.units, cursor.units))
+    elif isinstance(cursor, DataCursor):
+        t = cursor.coord
+        if isinstance(t, numbers.Number):
+            t *= signal.times.units
+            
+        elif isinstance(t, pq.Quantity):
+            if t.size != 1:
+                raise ValueError(f"Expecting a scalar quantity instead, got {t}")
+            
+            t = check_rescale(t, signal.times.units)
+            
+        else:
+            raise TypeError(f"Invalid domain coordinate {t}")
         
-        t = cursor
+    elif isinstance(cursor, pq.Quantity):
+        if cursor.size != 1:
+            raise ValueError(f"Expecting a scalar quantity; instead, got {cursor}")
+        
+        t = check_rescale(cursor, signal.times.units)
         
     elif isinstance(cursor, (tuple, list)) and len(cursor) in (2,3) and all([isinstance(c, (numbers.Number, pq.Quantity)) for v in cursor[0:2] ]):
         # cursor parameter sequence
@@ -1486,40 +2866,46 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         if isinstance(t, numbers.Number):
             t *= signal.times.units
             
-        else:
-            if t.units != signal.times.units:
-                if not units_convertible(t, signal.times):
-                    raise TypeError("Incompatible units for cursor time")
+        elif isinstance(t, pq.Quantity):
+            if t.size != 1:
+                raise ValueError(f"Expecting a scalar quantity; instead got {t}")
             
-            t = t.rescale(signal.times.units)
+            t = check_rescale(t, signal.times.units)
         
     else:
-        raise TypeError("Cursor expected to be a float, python Quantity or SignalCursor; got %s instead" % type(cursor).__name__)
+        raise TypeError("Cursor expected to be a float, python Quantity, DataCursor or SignalCursor; got %s instead" % type(cursor).__name__)
     
+    if relative:
+        t = adjust_times_relative_to_signal(signal, t)
+        
     data_index = signal.time_index(t)
     
     return data_index
 
 @safeWrapper
 def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                       cursor0: typing.Union[SignalCursor, tuple], 
-                       cursor1: typing.Union[SignalCursor, tuple], 
+                       cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
+                       cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
                        func: typing.Optional[typing.Union[typing.Callable, types.FunctionType]] = None,
                        channel: typing.Optional[int] = None,
-                       subfun: typing.Optional[typing.Union[typing.Callable, types.FunctionType]] = None) -> pq.Quantity:
+                       subfun: typing.Optional[typing.Union[typing.Callable, types.FunctionType]] = None,
+                       relative:bool = True) -> pq.Quantity:
     """Calculates the signal amplitude between two notional vertical cursors.
     
     amplitude = y1 - y0
     
-    where y0, y1 are the average signal values across the windows of cursor0 and
+    where y0, y1 are the AVERAGE signal values across the windows of cursor0 and
     cursor1
     
     Parameters:
     -----------
     signal:neo.AnalogSignal, datatypes.DataSignal
     
-    cursor0, cursor1: (x, window) tuples representing, respectively, the 
-        cursor's x coordinate (time) and window (horizontal extent).
+    cursor0, cursor1: SignalCursor of vertical type, or (x, window) tuples 
+        representing, respectively, the cursor's x coordinate (time) and window 
+        (horizontal extent). When tuples, the `x` and `window` must be numeric
+        scalars (float) or scalar python Quantity objects. For details, see the
+        documentation for cursor_reduce(…)
     
     func: a callable applied to the signal at both cursors. Optional, the default
         is cursor_average(…)
@@ -1579,11 +2965,11 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     (1, ) when channel is specified.
         
     """
-    from gui.cursors import SignalCursor as SignalCursor
+    # from gui.cursors import SignalCursor as SignalCursor
     
     if func is None:
         func = cursor_average
-        functor=False
+        functor = False
         
     elif isinstance(func, (typing.Callable, types.FunctionType)):
         # NOTE: 2023-06-16 11:26:59
@@ -1631,40 +3017,55 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
         raise TypeError(f"'func' must be a callable; got {type(func).__name__} instead")
 
     # NOTE: 2023-06-18 18:08:24
-    # below, we use numpy diff, but this will return a 2D array
+    # below, we use numpy diff, but this will return a 2D array;
     # this is DELIBERATE and is left up to the caller to decide that to do
     # (e.g. call np.squeeze() on the result, if that is suitable)
+    
+    kw = {"relative": relative}
+    
+    # print(f"In cursors_difference: func = {func}, functor = {functor}")
+    
     if functor:
         if not isinstance(subfun, (typing.Callable, types.FunctionType)):
             raise TypeError(f"When 'func' is a functor, 'subfun' must be a callable or function; got {type(subfun).__name__} instead" )
         
-        data = np.array([func(subfun, signal, c, channel=channel) for c in (cursor0, cursor1)]) * signal.units
+        data = np.array([func(subfun, signal, c, channel=channel, **kw) for c in (cursor0, cursor1)]) * signal.units
         
-        # y0 = func(subfun, signal, cursor0, channel=channel)
-        # y1 = func(subfun, signal, cursor1, channel=channel)
     else:
-        data = np.array([func(signal, c, channel=channel) for c in (cursor0, cursor1)]) * signal.units
-        # y0 = func(signal, cursor0, channel=channel)
-        # y1 = func(signal, cursor1, channel=channel)
+        data = np.array([func(signal, c, channel=channel, **kw) for c in (cursor0, cursor1)]) * signal.units
     
     return np.diff(data, axis=0)
-    # return np.ediff1d(data)
-    # return y1-y0
 
 @safeWrapper
 def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                     cursor0: typing.Union[SignalCursor, tuple], 
-                     cursor1: typing.Union[SignalCursor, tuple], 
-                     channel: typing.Optional[int] = None):
-    """Distance between two cursors, in signal samples.
+                     cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
+                     cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
+                     relative:bool = True,
+                     samples:bool = True):
+    """Distance between two cursors.
     
     NOTE: The distance between two cursors in the signal domain is simply the
-            difference between the cursors' x coordinates!.
+            difference between the cursors' x coordinates.
+    
+    Parameters:
+    -----------
+    signal: regularly sampled signal
+    
+    cursor0, cursor1: vertical SignalCursor objects or DataCursor objects; these
+        do not need to be sorted by their coordinate in the signal domain.
+    
+    relative: bool — flag specifying whether the time stamps of the cursors are
+                    to be adjusted relative to the limits of the signal's domain;
+                    default is True
+    
+    samples:bool — flag specifying whether the distance between cursors is to be 
+        reported in samples (True) or in signal domain units (False); default is 
+        True
     
     """
-    ret = [cursor_index(signal, c) for c in (cursor0, cursor1)]
+    ret = [cursor_index(signal, c, relative) for c in (cursor0, cursor1)]
     
-    return abs(ret[1]-ret[0])
+    return abs(ret[1]-ret[0]) if samples else abs(signal.times[ret[1]] - signal.times[ret[0]])
 
 @safeWrapper
 def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
@@ -1751,9 +3152,10 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
 @safeWrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                        cursor0: typing.Union[SignalCursor, tuple], 
-                        cursor1: typing.Union[SignalCursor, tuple], 
-                        channel: typing.Optional[int] = None):
+                        cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
+                        cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
+                        channel: typing.Optional[int] = None,
+                        relative:bool = True):
     """Signal chord slope between two vertical cursors.
     
     The function calculates the slope of a straight line connecting the 
@@ -1773,34 +3175,90 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
         gui.signalviewer.SignalCursor of type "vertical"
     
     """
-    from gui.signalviewer import SignalCursor as SignalCursor
+    # from gui.signalviewer import SignalCursor as SignalCursor
+    
+    if not isinstance(cursor0, (SignalCursor, DataCursor)):
+        raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor0).__name__}")
 
-    t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x
+    if not isinstance(cursor1, (SignalCursor, DataCursor)):
+        raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor1).__name__}")
+
+    t0 = cursor0.x if isinstance(cursor0, SignalCursor) else cursor0.coord
+    # t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x if isinstance(x, SignalCursor) else cursor0.coord
     
     y0 = cursor_average(signal, cursor0, channel=channel)
     
+
     if isinstance(t0, float):
         t0 *= signal.times.units
         
-    t1 = cursor1[0] if isinstance(cursor1, tuple) else cursor1.x
+    t1 = cursor1.x if isinstance(cursor1, SignalCursor) else cursor1.coord
+    # t1 = cursor1[0] if isinstance(cursor1, tuple) else cursor1.x if isinstance(cursor1, SignalCursor) else cursor1.coord
 
     if isinstance(t1, float):
         t1 *= signal.times.units
         
     y1 = cursor_average(signal, cursor1, channel=channel)
     
-    return (y1-y0)/(t1-t0).simlified
+    if relative:
+        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+    else:
+        if t0 < signal.t_start or t0 > signal.t_stop:
+            scipywarn(f"t0 {t0} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+            return np.nan
+        
+        if t1 < signal.t_start or t1 > signal.t_stop:
+            scipywarn(f"t1 {t1} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+            return np.nan
+    
+    return (y1-y0)/(t1-t0).simplified
 
 def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal], 
-                       cursor:SignalCursor, 
-                       channel:typing.Optional[int]=None):
-    t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
-    t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
-    
+                       cursor:typing.Union[SignalCursor, DataCursor], 
+                       channel:typing.Optional[int]=None,
+                       relative:bool = True):
+    if isinstance(cursor, SignalCursor):
+        t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
+        t1 = (cursor.x + cursor.xwindow/2) * signal.times.units
+        
+    elif isinstance(cursor, DataCursor):
+        t0 = cursor.coord - cursor.span/2
+        t1 = cursor.coord + cursor.span/2
+        
+        if isinstance(t0, numbers.Number):
+            t0 *= signal.times.units
+            
+        elif isinstance(t0, pq.Quantity):
+            t0 = check_rescale(t0, signal.times.units)
+        
+        if isinstance(t1, numbers.Number):
+            t1 *= signal.times.units
+            
+        elif isinstance(t1, pq.Quantity):
+            t1 = check_rescale(t1, signal.times.units)
+            
+    else:
+        raise TypeError(f"Invalid cursor specification: expecting a SignalCursor or a DataCursor instead got a {type(cursor).__name__}")
+        
     if t1 == t0:
         raise ValueError(f"Cursor xwindow is 0")
     
+    if relative:
+        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+            
+    else:
+        if t0 < signal.t_start or t0 > signal.t_stop:
+            scipywarn(f"t0 {t0} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+            return np.nan
+        
+        if t1 < signal.t_start or t1 > signal.t_stop:
+            scipywarn(f"t1 {t1} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+            return np.nan
+    
     v0, v1 = list(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
+    
+    print(f"cursor_chord_slope t0 = {t0}, t1 = {t1}, v0 = {v0}, v1 = {v1}")
+    print(f"t1-t0 = {t1-t0}, v1-v0 = {v1-v0}")
     
     ret = ((v1-v0) / (t1-t0)).simplified
     
@@ -2265,48 +3723,6 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency, spike
         return result
 
 
-class ElectrophysiologyProtocol(object):
-    """Electrophysiology data acquisition protocols
-    
-    Intended to provide a common denominator for data acquired with various 
-        electrophysiology software vendors. 
-        
-    WARNING DO NOT USE YET - API under development (i.e. unstable) TODO
-    """
-    # TODO/FIXME see if pyabf can be used (via pyabfbridge)
-    def __init__(self):
-        # possible values for self._data_source_:
-        # "Axon", "CEDSignal", "CEDSpike", "Ephus", "NA", "unknown"
-        # default: "unknown"
-        self._data_source_ = "unknown"  
-        self._acquisition_protocol_ = dict()
-        self._acquisition_protocol_["trigger_protocol"] = TriggerProtocol()
-        self._averaged_runs_ = False
-        self._alternative_DAC_command_output_ = False
-        self._alternative_digital_outputs_ = False
-    
-    def parse_data(self, data:neo.Block, metadata:dict=None):
-        if hasattr(data, "annotations"):
-            self._data_source_ = data.annotations.get("software", "unknown")
-            if self._data_source_ == "Axon":
-                self._parse_axon_data_(data, metadata)
-                
-            else:
-                # TODO 2020-02-20 11:32:16
-                # parse CEDSignal, CEDSpike, EPhus, unknown
-                pass
-            
-    def _parse_axon_data_(self, data:neo.Block, metadata:dict=None):
-        data_protocol = data.annotations.get("protocol", None)
-        
-        self._averaged_runs_ = data_protocol.get("lRunsPerTrial",1) > 1
-        self._n_sweeps_ = data_protocol.get("lEpisodesPerRun",1)
-        self._alternative_digital_outputs_ = data_protocol.get("nAlternativeDigitalOutputState", 0) == 1
-        self._alternative_DAC_command_output_ = data_protocol.get("nAlternativeDACOutputState", 0) == 1
-        
-    def _parse_ced_data_(self, data:object):
-        pass
-
 def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs):
     """Generates a signal containing a synthetic waveform, as a column vector.
     
@@ -2541,7 +3957,7 @@ def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal]
     
 def cursors_measure(func: typing.Callable,
                     signal:typing.Union[neo.AnalogSignal, DataSignal],
-                    cursors: typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor]],
+                    cursors: typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor], typing.Sequence[DataCursor]],
                     channel: typing.Optional[int]=None) -> list:
     """Calculates a signal measure from signal data at cursors locations.
     
@@ -2562,7 +3978,8 @@ def cursors_measure(func: typing.Callable,
 
 # NOTE: 2023-06-14 14:38:31
 # migrating to single dispatch paradigm (dispatches on the locator type, which
-# can be a cursor, an epoch, or an interval)
+# can be a cursor, an epoch, an interval, or NOTE: 2024-02-09 08:50:35 a scalar 
+# time quantity (TODO))
 @singledispatch
 def reduce(locator, func:typing.Callable, 
            signal:typing.Union[neo.AnalogSignal, DataSignal],
@@ -2574,7 +3991,7 @@ def reduce(locator, func:typing.Callable,
 WARNING: this currently is just a springboard for the *_reduce functions already
 defined in the module and delegates to them.
 
-In the future, these functions will be replaced entirely by this function.
+In the future, these functions might be replaced entirely by this function.
 """
     raise NotImplementedError(f"Function does not support {type(locator).__name__} locators")
 
@@ -2594,6 +4011,195 @@ def _(locator, func, signal, channel=None,
       duration=False, locatorIndex:int=None):
     return epoch_reduce(func, signal, locator, 
                         index=locatorIndex, channel=channel)
+# @singledispatch
+def amplitudeMeasure(*args, name:str = "amplitude",
+                     channel:int = 0, 
+                     relative: bool = True) -> LocationMeasure:
+    """LocationMeasure factory for an amplitude of a signal.
+
+    The amplitude is measured as the difference between signal averages at a
+    a location, and a baseline. Each of these two locations can be indicated as:
+    • a coordinate and a span window centered on the coordinate
+    • a DataCursor
+    • a vertical SignalCursor
+
+    Operates on a single channel of the signal (default is channel 0).
+
+    Syntax:
+    -------
+    amplitudeMeasure(refX, refW, locX, locW, name, channel, relative)
+
+    amplitudeMeasure(c0, c1, name, channel, relative)
+
+    Parameters:
+    ----------
+    refX, refW: float — scalars with the X coordinate (e.g., time) and a span 
+        window centered on baseX, defining the "baseline" or "reference" 
+
+    locX, locW: float — as above, defining the location of the amplitude 
+        measurement relative to reference
+
+    ref, loc: DataCursor, SignalCursor — cursors defining, respectively, the 
+        reference (baseline) and the measurement location; NOTE: when SignalCursor
+        objects, they must be of vertical type
+        
+    name: str — name of this LocationMeasure; default is "amplitude"
+
+    channel: int — index of the signal's channel where the measurement is performed;
+        default is 0 (first channel)
+
+    relative: bool  — flag specifying whether the time stamps of the cursors are
+                    to be adjusted relative to the limits of the signal's domain;
+                    default is True
+    
+    
+    """
+    if len(args) == 4:
+        if all(isinstance(v, (float, pq.Quantity)) for v in args):
+            refX, refW, locX, locW = args
+            return LocationMeasure(cursors_difference, 
+                                   (DataCursor(refX, refW), 
+                                    DataCursor(locX, locW)),
+                                   name, channel, relative)
+        else:
+            raise TypeError(f"Expecting four floats or pq.Quantity scalars")
+        
+    elif len(args) == 2:
+        if all(isinstance(v, (DataCursor, SignalCursor)) for v in args):
+            ref, loc = args
+            return LocationMeasure(cursors_difference, 
+                                  (ref,loc),
+                                  name, channel, relative)
+        
+                
+def chordSlopeMeasure(*args, name:str="chord_slope", channel:int = 0, relative:bool=True) -> LocationMeasure:
+    """LocationMeasure factory for the slope of a straight line (chord) between two points on the signal.
+    The two points can be specified as:
+    • two (vertical) SignalCursor or two DataCursor objects
+    • a single (vertical) SignalCursor, or a DataCursor; in this case, the two
+    points on the signal are the ends of the cursor's horizontal window.
+    
+    Operates on a single channel of the signal (default is channel 0).
+    
+    Syntax:
+    -------
+    chordSlopeMeasure(*args, name:str="chord_slope", channel:int = 0, relative:bool=True) -> LocationMeasure
+    
+    Var-positional parameters (*args):
+    ----------------------------------
+    One or two DataCursor or vertical SignalCursor objects
+    
+    Named parameters:
+    -----------------
+    name: str       — name of the LocationMeasure object; default is 'chord_slope'
+    
+    channel: int    — index of the signal channel; default is 0
+    
+    relative: bool  — flag specifying whether the time stamps of the cursors are
+                    to be adjusted relative to the limits of the signal's domain;
+                    default is True
+    
+    """
+    raise NotImplementedError
+
+    if all(isinstance(v, (DataCursor, SignalCursor)) for v in args):
+        if len(args) == 1:
+            return LocationMeasure(cursor_chord_slope, args[0], name, channel, relative)
+        
+        elif len(args) == 2:
+            return LocationMeasure(cursors_chord_slope, args, name, channel, relative)
+        
+        else:
+            raise SyntaxError(f"Expecting at most two cursors; got {len(args)} instead")
+    else:
+        raise TypeError(f"Expecting DataCursor or SignalCursor objects in args; instead, got {args}")
+    
+@singledispatch
+def durationMeasure(c0:typing.Union[DataCursor, SignalCursor], c1: typing.Union[DataCursor, SignalCursor], 
+                    name: str = "duration", relative: bool = True) -> LocationMeasure:
+    """LocationMeasure factory for the distance between two locations in the signal.
+    The locations are specified as two (vertical) SignalCursor or two DataCursor
+    objects. Bt default, the distance between them can be reported in signal domain
+    units — e.g., time units — but it can be reported in samples.
+    
+    Syntax:
+    -------
+    durationMeasure(c0: typing.Union[DataCursor, SignalCursor], c1: typing.Union[DataCursor, SignalCursor],
+                    name: str = "duration", relative: bool = True) -> LocationMeasure
+    
+    Parameters:
+    ----------
+    c0, c1: DataCursor or SignalCursor (vertical) objects
+    
+    name: str       — name of the LocationMeasure object; default is 'chord_slope'
+    
+    relative: bool  — flag specifying whether the time stamps of the cursors are
+                    to be adjusted relative to the limits of the signal's domain;
+                    default is True
+"""    
+    return LocationMeasure(cursors_distance, (c0,c1), name, relative)
+
+def membraneTestVClampMeasure(base: typing.Union[DataCursor, SignalCursor],
+                              Rs: typing.Union[DataCursor, SignalCursor],
+                              Rin: typing.Union[DataCursor, SignalCursor],
+                              name:str = "DC Rs Rin",
+                              channel: int = 0,
+                              relative:bool=True) -> LocationMeasure:
+    """LocationMeasure factory for membrane test in voltage-clamp.
+    Calculates DC, Rs and Rin based on three cursors (baseline, Rs and Rin).
+
+    Rs cursor is located on the extremum of the first current transient at the 
+    start of the membrane potential change during the test; this extremum can be 
+    a peak (for depolarizing Vm step) or a trough (hyperpolarizing Vm step)
+
+    Returns a tuple (DC, Rs, Rin) where DC is the baseline current, Rs and Rin 
+    are, respectively, the series and input membrane resistance.
+    """
+    
+    # NOTE: 2024-02-29 22:37:45 see NOTE: 2024-02-29 22:37:54 for mandatory signature
+    def _func_(s, testVmDelta:pq.Quantity, c1, c2, c3, channel:int = 0, relative:bool = True):
+        # print(f"_func_:\ns = {s}\nc1 = {c1}\nc2 = {c2}\nc3 = {c3}\ntestVmDelta = {testVmDelta}")
+        _dc  = cursor_average(s, c1)
+        _rin = (testVmDelta / (cursor_average(s, c3) - _dc)).rescale(pq.megaohm)
+        _rs  = (testVmDelta / ((cursor_max(s, c2) if testVmDelta > 0 else cursor_min(s, c2)) - _dc)).rescale(pq.megaohm)
+        
+        return (_dc, _rs, _rin)
+    
+    # f = functools.partial(_func_, channel=channel, relative=relative)
+    
+    return LocationMeasure(_func_, (base, Rs, Rin), name, channel, relative)
+    
+def membraneTestVClampRs(base: typing.Union[DataCursor, SignalCursor],
+                   Rs: typing.Union[DataCursor, SignalCursor],
+                   name:str = "Rs",
+                   channel: int = 0,
+                   relative: bool = True) -> LocationMeasure:
+    
+    def _func_(s, c1, c2, testVmDelta:pq.Quantity, channel:int = 0, relative:bool = True):
+        _dc  = cursor_average(s, c1)
+        _rs  = (testVmDelta / ((cursor_max(s, c2) if testVmDelta > 0 else cursor_min(s, c2)) - _dc)).rescale(pq.megaohm)
+        # _rin = (testVmDelta / (cursor_average(s, c3) - _dc)).rescale(pq.megaohm)
+
+        return _rs
+        
+    return LocationMeasure(_func_, (base, Rs), name, channel, relative)
+    
+
+def membraneTestVClampRin(base: typing.Union[DataCursor, SignalCursor],
+                   Rin: typing.Union[DataCursor, SignalCursor],
+                   name:str = "Rs",
+                   channel: int = 0,
+                   relative: bool = True) -> LocationMeasure:
+    
+    def _func_(s, c1, c2, testVmDelta:pq.Quantity, channel:int = 0, relative:bool = True):
+        _dc  = cursor_average(s, c1)
+        # _rs  = (testVmDelta / ((cursor_max(s, c2) if testVmDelta > 0 else cursor_min(s, c2)) - _dc)).rescale(pq.megaohm)
+        _rin = (testVmDelta / (cursor_average(s, c3) - _dc)).rescale(pq.megaohm)
+
+        return _rin
+        
+    return LocationMeasure(_func_, (base, Rin), name, channel, relative)
+    
 
 def signal_measures_in_segment(s: neo.Segment, 
                             signal: typing.Union[int, str],
@@ -3072,4 +4678,3 @@ command signal.
 # should also pass an abf object; 
 # find out adc names and units ⇒ recorded signal
 # then for the DAC: dacNames, dacUnits ⇒ "command signal"
-    

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import typing, os
-from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+from qtpy.QtCore import Signal, Slot
+from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
+# from PyQt5.QtCore import Signal, Slot
+# from PyQt5.uic import loadUiType as __loadUiType__
 
 from core.sysutils import adapt_ui_path
 
@@ -38,7 +41,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     For more atomic changes access self.framesQSpinBox and self.framesQSlider 
     directly
     """
-    valueChanged = pyqtSignal(int, name="valueChanged")
+    valueChanged = Signal(int, name="valueChanged")
     
     def __init__(self, parent=None, **kwargs):
         self._singleStep_ = kwargs.pop("singleStep", 1)
@@ -283,7 +286,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         self.descriptionLabel.setStatusTip(self._toolTip_)
         self.totalFramesCountLabel.setStatusTip(self._toolTip_)
         
-    @pyqtSlot(int)
+    @Slot(int)
     def slot_setValue(self, value:int):
         val = int(value)
         # if val in range(self.minimum, self.maximum+1):

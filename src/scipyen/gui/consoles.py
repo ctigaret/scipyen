@@ -49,8 +49,10 @@ from collections import OrderedDict
 from warnings import warn
 
 
-from PyQt5 import (QtCore, QtGui, QtWidgets, )
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+from qtpy import (QtCore, QtGui, QtWidgets, )
+from qtpy.QtCore import (Signal, Slot, )
+# from PyQt5 import (QtCore, QtGui, QtWidgets, )
+# from PyQt5.QtCore import (Signal, Slot, )
 
 #### BEGIN ipython/jupyter modules
 from traitlets.config.application import boolean_flag
@@ -74,7 +76,8 @@ from tornado.queues import Queue
 
 import zmq
 
-import sip
+# from qtpy import sip as sip
+# import sip
 
 from pygments import styles as pstyles
 
@@ -118,7 +121,12 @@ else:
 
 #makeConfigurable = WorkspaceGuiMixin.makeConfigurable
 
-consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , key = lambda x: x[1]))
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
+                                                key = lambda x: x[1]))
+else:
+    consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in QtCore.Qt.LayoutDirection._member_map_.items()) ,
+                                                key = lambda x: x[1].value))
 
 defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
 
@@ -308,11 +316,13 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.available_colors = ("nocolor", "linux", "lightbg")
         self.scrollbar_positions = Bunch({QtCore.Qt.LeftToRight: "right",
                                            QtCore.Qt.RightToLeft: "left"})
-        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
+        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.Key_K), self)
+        # self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
         
         self.clear_shortcut.activated.connect(self.slot_clearConsole)
         
-        self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
+        self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.ALT | QtCore.Qt.Key_K), self)
+        # self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
         self.reset_shortcut.activated.connect(self.slot_resetConsole)
         
         self.custom_page_control = QtWidgets.QPlainTextEdit()
@@ -337,16 +347,37 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self._pending_text_flush_interval.setInterval(max(100,
                                                  int(time.time()-t)*1000)) # see NOTE: 2022-03-14 21:47:39 CMT
 
+    def clear_last_input(self):
+        """Clears the current block of input NOT executed.
+        Removes the last input block which has not been sent for execution.
+        Useful to remove any commands typed at the console, but not yet executed,
+        when an independent execution request is made (e.g. during launch of a script
+        from Scipyen's script manager).
+        Without this, the input line would still show the input text giving the 
+        false impression that the text had been executed (run)
+        """
+        cursor = self._control.textCursor()
+        cursor.beginEditBlock()
+        cursor.movePosition(QtGui.QTextCursor.StartOfLine,
+                            QtGui.QTextCursor.MoveAnchor)
+        cursor.movePosition(QtGui.QTextCursor.EndOfBlock,
+                            QtGui.QTextCursor.KeepAnchor)
+        cursor.insertText('')
+        cursor.endEditBlock()
+        
+    
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def slot_clearConsole(self):
         self.clear()
-        # self.flush_clearoutput()
-        # self._show_interpreter_prompt()
-        #self.ipkernel.shell.run_line_magic("clear", "", 2)
+        # cursor = self._control.textCursor()
+        # cursor.beginEditBlock()
+        # cursor.insertText('\n')
+        # cursor.endEditBlock()
+        
         
     @safeWrapper
-    @pyqtSlot()
+    @Slot()
     def slot_resetConsole(self):
         self.reset(clear=True)
         
@@ -380,10 +411,24 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                 
         elif not isinstance(value, QtCore.Qt.LayoutDirection):
             value = QtCore.Qt.LayoutDirectionAuto
+
+        try:
+            # FIXME: 2024-05-02 13:09:28 BUG
+            # In PyQt6 (via qtpy) this throws 
+            # argument 1 has unexpected type 'LayoutDirection'
+            self._control.setLayoutDirection(value)
+            self.custom_page_control.setLayoutDirection(value) # doesn't work !?
+        except:
+            try:
+                val = QtCore.Qt.LayoutDirection(value.value)
+                self._control.setLayoutDirection(val)
+                self.custom_page_control.setLayoutDirection(val) # doesn't work !?
+            except:
+                traceback.print_exc()
                 
-        self._control.setLayoutDirection(value)
-        self.custom_page_control.setLayoutDirection(value) # doesn't work !?
-        
+        # finally:
+        #     traceback.print_exc()
+            
     def guiSetScrollBack(self):
         value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
                                              value = self.scrollBackSize, min = -1)
@@ -430,7 +475,19 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def fontStyle(self, val:typing.Union[int, QtGui.QFont.Style, str]):
         style = get_font_style(val) 
         font  = self.font
-        font.setStyle(style)
+        # print(f"{self.__class__.__name__}.fontStyle.setter: current font: {font.family()}; wants style: {style}")
+        # FIXME 2024-05-02 13:10:31 BUG
+        # in PyQt6 (via qtpy) this throws
+        try:
+            font.setStyle(QtGui.QFont.Style(style))
+        except:
+            # print(f"{self.__class__.__name__}.fontStyle.setter style value {style.value}")
+            try:
+                font.setStyle(QtGui.QFont.Style(style.value))
+            except:
+                traceback.print_exc()
+        # finally:
+        #     traceback.print_exc()
         self.font = font
         
     @property
@@ -646,15 +703,15 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     # NOTE 2020-07-08 23:24:47
     # not all of these will be useful in the long term
     # TODO get rid of junk
-    sig_shell_msg_received = pyqtSignal(object)
-    sig_shell_msg_exec_reply_content = pyqtSignal(object)
-    sig_shell_msg_krnl_info_reply_content = pyqtSignal(object)
-    sig_kernel_count_changed = pyqtSignal(int)
-    sig_kernel_started_channels = pyqtSignal(dict)
-    sig_kernel_stopped_channels = pyqtSignal(dict)
-    sig_kernel_restart = pyqtSignal(dict)
-    sig_kernel_disconnect = pyqtSignal(dict)
-    #sig_will_close = pyqtSignal()
+    sig_shell_msg_received = Signal(object)
+    sig_shell_msg_exec_reply_content = Signal(object)
+    sig_shell_msg_krnl_info_reply_content = Signal(object)
+    sig_kernel_count_changed = Signal(int)
+    sig_kernel_started_channels = Signal(dict)
+    sig_kernel_stopped_channels = Signal(dict)
+    sig_kernel_restart = Signal(dict)
+    sig_kernel_disconnect = Signal(dict)
+    #sig_will_close = Signal()
     
     # NOTE: 2021-08-29 19:09:24
     # all widget factories currently generate a RichJupyterWidget
@@ -1989,7 +2046,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
 
         self.update_tab_bar_visibility()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_kernel_client_started_channels(self):
         """Not in use
@@ -1998,7 +2055,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         if kc.connection_file in self._connections_:
             self.sig_kernel_started_channels.emit(self._connections_[kc.connection_file])
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_kernel_client_stopped_channels(self):
         """Not in use
@@ -2007,7 +2064,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         if kc.connection_file in self._connections_:
             self.sig_kernel_stopped_channels.emit(self._connections_[kc.connection_file])
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_kernel_restarted(self):
         """Re-sets the tag title after a kernel restart.
@@ -2028,7 +2085,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 self.sig_kernel_restart.emit(self._connections_[km.connection_file])
         
     @safeWrapper
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_kernel_shell_chnl_msg_recvd(self, msg):
         #print(msg)
         #message = Message(msg)
@@ -3017,12 +3074,12 @@ class ScipyenConsoleWidget(ConsoleWidget):
     """Console widget with an in-process kernel manager.
     Uses an in-process kernel generated and managed by QtInProcessKernelManager.
     """
-    historyItemsDropped = pyqtSignal()
-    workspaceItemsDropped = pyqtSignal()
-    fileSystemItemsDropped = pyqtSignal()
-    #workspaceItemsDropped = pyqtSignal(bool)
-    loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
-    pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
+    historyItemsDropped = Signal()
+    workspaceItemsDropped = Signal()
+    fileSystemItemsDropped = Signal()
+    #workspaceItemsDropped = Signal(bool)
+    loadUrls = Signal(object, bool, QtCore.QPoint)
+    pythonFileReceived = Signal(str, QtCore.QPoint)
     
     def __init__(self, *args, **kwargs):
         ''' ScipyenConsole constructor
@@ -3073,11 +3130,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
         self.drop_cache=None
         
         self.defaultFixedFont = defaultFixedFont
-        
-        #self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_X), self)
-        
-        #self.clear_shortcut.activated.connect(self.slot_clearConsole)
-
         
         # NOTE: 2021-07-18 10:17:26 - FIXME bug or feature?
         # the line below won't have effect unless the RichJupyterWidget is visible
@@ -3221,7 +3273,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
             self._insert_plain_text_into_buffer(cursor, dedent(text))
             
     @safeWrapper
-    def writeText(self, text):
+    def writeText(self, text:typing.Union[str, typing.List[str], typing.Tuple[tuple]]):
         """Writes a text in console buffer
         """
         if isinstance(text, str):
@@ -3424,12 +3476,15 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 #pass
             
 class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
-    historyItemsDropped = pyqtSignal()
-    workspaceItemsDropped = pyqtSignal()
-    fileSystemItemsDropped = pyqtSignal()
-    loadUrls = pyqtSignal(object, bool, QtCore.QPoint)
-    pythonFileReceived = pyqtSignal(str, QtCore.QPoint)
-    executed = pyqtSignal()
+    # NOTE: 2023-09-27 12:55:24 TODO
+    # to implements julia-style propgress indicators;
+    # see/adapt qtconsole.console_widget code -> in ScipyenConsoleWidget
+    historyItemsDropped = Signal()
+    workspaceItemsDropped = Signal()
+    fileSystemItemsDropped = Signal()
+    loadUrls = Signal(object, bool, QtCore.QPoint)
+    pythonFileReceived = Signal(str, QtCore.QPoint)
+    executed = Signal()
     
     def __init__(self, parent=None, **kwargs):
         scipyenWindow = kwargs.pop("scipyenWindow", None) # take this out for below...
@@ -3551,26 +3606,26 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.settings_menu.addAction(self.set_console_scrollbackAction)
         self.addAction(self.set_console_scrollbackAction)
         
-    @pyqtSlot()
+    @Slot()
     def _slot_listMagics(self):
         self.ipkernel.shell.run_cell("%lsmagic")
             
             
-    @pyqtSlot()
+    @Slot()
     def _slot_saveToFile(self):
         self.consoleWidget.select_all_smart() # inherited from qtconsole.ConsoleWidget
         text = self.consoleWidget._format_text_selection(self.consoleWidget._control.textCursor().selection().toPlainText())
         if len(text.strip()):
             self._saveToFile(text, mode="python")
         
-    @pyqtSlot()
+    @Slot()
     def _slot_saveRawToFile(self):
         self.consoleWidget.select_document() # inherited from qtconsole.ConsoleWidget
         text = self.consoleWidget._control.toPlainText()
         if len(text.strip()):
             self._saveToFile(text, mode="raw")
                 
-    @pyqtSlot()
+    @Slot()
     def _slot_saveRawSelectionToFile(self):
         c = self.consoleWidget._get_cursor()
         text = c.selectedText()
@@ -3578,7 +3633,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self._savetoFile(text, mode="raw")
         
         
-    @pyqtSlot()
+    @Slot()
     def _slot_saveSelectionToFile(self):
         c = self.consoleWidget._get_cursor()
         text = self.consoleWidget._format_text_selection(c.selection().toPlainText())
@@ -3636,6 +3691,21 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     def writeText(self, text):
         self.consoleWidget.writeText(text)
+        
+    @property
+    def ipkernel(self):
+        """The IPython kernel runnin in this console"""
+        return self.consoleWidget.ipkernel
+        
+    @property
+    def stdout(self):
+        """The standard output stream of the kernel running in this console"""
+        return self.ipkernel.stdout
+    
+    @property
+    def shell(self):
+        """The interactive shell running in this console"""
+        return self.ipkernel.shell
 
     @property
     def consoleFont(self):

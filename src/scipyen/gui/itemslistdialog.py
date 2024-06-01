@@ -1,8 +1,12 @@
 import os, sys
 import numpy as np
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets, QtXml
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType as __loadUiType__
 
 # NOTE: 2023-07-14 16:32:06
 # necessary to adapt to the situation where Scipyen is bundled
@@ -24,7 +28,7 @@ Ui_ItemsListDialog, QDialog = __loadUiType__(__ui_path__)
 # Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__ui_path__,"itemslistdialog.ui"))
 
 class ItemsListDialog(QDialog, Ui_ItemsListDialog):
-    itemSelected = QtCore.pyqtSignal(str)
+    itemSelected = QtCore.Signal(str)
 
     def __init__(self, parent = None, itemsList=None, title=None, preSelected=None, modal=False, selectmode=QtWidgets.QAbstractItemView.SingleSelection):
         super(ItemsListDialog, self).__init__(parent)
@@ -76,7 +80,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 
             self.setItems(itemsList)
             
-    @pyqtSlot(str)
+    @Slot(str)
     def slot_locateSelectName(self, txt):
         found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchCaseSensitive)
         if len(found_items):
@@ -166,11 +170,11 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 
             self.listWidget.setMinimumWidth(int(w))
 
-    @pyqtSlot(QtWidgets.QListWidgetItem)
+    @Slot(QtWidgets.QListWidgetItem)
     def selectItem(self, item):
         self.itemSelected.emit(str(item.text())) # this is a QString !!!
         
-    @pyqtSlot(QtWidgets.QListWidgetItem)
+    @Slot(QtWidgets.QListWidgetItem)
     def selectAndGo(self, item):
         self.itemSelected.emit(item.text())
         self.accept()

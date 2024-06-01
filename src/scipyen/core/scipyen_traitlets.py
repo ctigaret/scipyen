@@ -1191,8 +1191,10 @@ class NeoContainerTrait(NeoBaseNeoTrait):
 #                 print(f"\n\tdata children container lengths new:\n\t{new_data_child_container_lengths}")
 #                 print(f"\n\tdata children container lengths old:\n\t{self.data_child_containers_lenghts}")
         
-                
-                silent = new_characteristics == self.characteristics
+                if hasattr(self, "characteristics"):
+                    silent = new_characteristics == self.characteristics
+                else:
+                    silent=False
                 # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare characteristics → {silent}")
                 # silent = new_container_child_container_lengths == self.container_child_containers_lenghts and new_data_child_container_lengths == self.data_child_containers_lenghts
                 # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare container lengths → {silent}")
@@ -1259,7 +1261,7 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
         try:
             result = np.all(super().compare_elements(old_value, new_value))
             if result:
-                result = old_value.array_annotations == new_value.array_annotations
+                result = np.all(old_value.array_annotations == new_value.array_annotations)
                 
         except:
             traceback.print_exc()
@@ -1950,6 +1952,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         return {key: value}
     
     def set(self, obj, value):
+        # print(f"{self.__class__.__name__}.set")
         try:
             old_value = obj._trait_values[self.name]
             

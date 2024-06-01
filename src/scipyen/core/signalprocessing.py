@@ -1347,7 +1347,7 @@ def detrend(x:typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
         
     elif detrend_type.lower() == "constant":
         if isinstance(bp, pq.Quantity):
-            if bp.size == 1 and units_convertible(bp, x):
+            if bp.size == 1 and scq.units_convertible(bp, x):
                 return x-bp
             else:
                 raise TypeError(f"Wrong constant value in bp: {bp} for {detrend_type} detrending")
@@ -1593,7 +1593,7 @@ def resample_pchip(sig, new_sampling_period, old_sampling_period = 1):
     
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         if isinstance(new_sampling_period, pq.Quantity):
-            if not units_convertible(new_sampling_period, sig.sampling_period):
+            if not scq.units_convertible(new_sampling_period, sig.sampling_period):
                 raise TypeError("new sampling period units (%s) are incompatible with those of the signal's sampling period (%s)" % (new_sampling_period.units, sig.sampling_period.units))
             
             new_sampling_period.rescale(sig.sampling_period.units)
@@ -2262,7 +2262,12 @@ def batch_remove_offset(*arg):
     return ret
     
 @safeWrapper
-def peak_normalise_signal(sig, minVal=None, maxVal=None):
+def peak_normalise_signal(sig:typing.Union[neo.AnalogSignal, np.ndarray],
+                          minVal:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None,
+                          maxVal:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None,
+                          axis:typing.Optional[int] = None,
+                          minIndex:typing.Optional[int] = None,
+                          maxIndex:typing.Optional[int] = None):
     """Returns a peak-normalized copy of the I(V) curve
     
     Positional parameters:
@@ -2281,20 +2286,83 @@ def peak_normalise_signal(sig, minVal=None, maxVal=None):
             ret = (sig - minVal) / (maxVal - minVal)
     
     """
-    
-    #return neo.AnalogSignal((sig - minVal)/(maxVal - minVal), \
-                            #units = pq.dimensionless, \
-                            #sampling_rate = sig.sampling_rate, \
-                            #t_start = sig.t_start)
-                        
-    if any([v is None for v in (minVal, maxVal)]):
-        if isinstance(sig, neo.AnalogSignal):
-            maxVal = sig.max()
-            minVal = sig.min()
-            
-        else:
-            raise TypeError("When signal is not an analog signal both minVal and maxVal must be specified")
 
+    # NOTE: 2023-10-19 09:20:59
+    # allow individual specification of either minVal or maxVal
+    #
+    # when either minVal or maxVal are NOT given:
+    # • allow specification of axis where the mising extremum can be found
+    #   default is None
+    # • when array (sig) size along the axis for finding the extremum or extrema
+    #   (see above) is > 1 request the index along that axis where the missing
+    #   extremum should be taken from (e.g. for a column-wise multi-channel signal,
+    #   you may want the extremum to be taken from th 1st column, etc)
+    #
+    #   However, we allow normalization of each "channel" to its own extrema by
+    #   specifying minIndex and maxIndex as being None (the default)
+                        
+    if minVal is None:
+        minVal = sig.min(axis)
+        # if isinstance(sig, (neo.AnalogSignal, pq.Quantity)):
+        #     minVal = sig.min(axis)
+        # else:
+        #     raise TypeError("When signal is not an analog signal both minVal must be specified")
+            
+    elif isinstance(minVal, numbers.Number):
+        if isinstance(sig, (neo.AnalogSignal, pq.Quantity)):
+            minVal *= sig.units
+        
+    elif isinstance(minVal, pq.Quantity):
+        if minVal.size > 1:
+            # TODO/FIXME 2023-10-19 09:32:10
+            # what if size of minVal is same as sig.shape[axis]?
+            raise ValueError("minVal must be scalar")
+        
+        if isinstance(sig, (neo.AnalogSignal, pq.Quantity)):
+            if not scq.units_convertible(minVal, sig):
+                raise ValueError(f"Units of minVal ({minVal.units}) are incompatible with signal units ({sig.units})")
+                
+            if minVal.units != sig.units:
+                minVal = minVal.rescale(sig.units)
+                
+        else:
+            minVal = float(minVal) # FIXME: see TODO/FIXME 2023-10-19 09:32:10
+        
+    else:
+        raise TypeError("minVal must be a scalar number or quantity")
+        
+    if maxVal is None:
+        maxVal = sig.max(axis)
+        # if isinstance(sig, (neo.AnalogSignal, pq.Quantity)):
+        #     maxVal = sig.max(axis)
+        # else:
+        #     raise TypeError("When signal is not an analog signal both minVal must be specified")
+            
+    elif isinstance(maxVal, numbers.Number):
+        if isinstance(sig, (neo.AnalogSignal, pq.Quantity)):
+            maxVal *= sig.units
+        
+    elif isinstance(maxVal, pq.Quantity):
+        if maxVal.size > 1:
+            # TODO/FIXME 2023-10-19 09:31:33
+            # this is OK when axis is None, but what if maxVal.size
+            # what if size of maxVal is same as sig.shape[axis]?
+            raise ValueError("maxVal must be scalar")
+        
+        if isinstance(sig, (neo.AnalogSignal, pq.Quantity)):
+            if not scq.units_convertible(maxVal, sig):
+                raise ValueError(f"Units of maxVal ({maxVal.units}) are incompatible with signal units ({sig.units})")
+                
+            if maxVal.units != sig.units:
+                maxVal = maxVal.rescale(sig.units)
+                
+        else:
+            maxVal = float(maxVal) # FIXME: see TODO/FIXME 2023-10-19 09:31:33
+        
+    else:
+        raise TypeError("maxVal must be a scalar number or quantity")
+        
+            
     return (sig - minVal)/(maxVal - minVal)
 
 def correlate(in1, in2, **kwargs):

@@ -9,9 +9,13 @@ from core import strutils
 from core.datatypes import UnitTypes, GENOTYPES
 import pandas as pd
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType
 
 from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
 from gui.textviewer import TextViewer
@@ -25,7 +29,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     Where implemented, it also supports editing.
     NOTE/WARNING: Under development
     """
-    sig_valueChanged = pyqtSignal(name="sig_valueChanged")
+    sig_valueChanged = Signal(name="sig_valueChanged")
     
     def __init__(self, parent=None, **kwargs):
         QWidget.__init__(self, parent=parent)
@@ -206,12 +210,12 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.sex = pd.NA
         self.genotype = pd.NA
             
-    @pyqtSlot()
+    @Slot()
     def _slot_setDataName(self):
         self._dataName = strutils.str2symbol(self.dataNameLineEdit.text())
         self.sig_valueChanged.emit()
         
-    @pyqtSlot()
+    @Slot()
     def _slot_setSourceID(self):
         self._sourceID = self.sourceIDLineEdit.text()
         if self._sourceID in ("NA", "<NA>"):
@@ -219,7 +223,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             
         self.sig_valueChanged.emit()
     
-    @pyqtSlot()
+    @Slot()
     def _slot_setCell(self):
         self._cell = self.cellIDLineEdit.text()
         if self._cell in ("NA", "<NA>"):
@@ -227,7 +231,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             
         self.sig_valueChanged.emit()
     
-    @pyqtSlot()
+    @Slot()
     def _slot_setField(self):
         self._field = self.fieldIDLineEdit.text()
         if self._field in ("NA", "<NA>"):
@@ -235,7 +239,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             
         self.sig_valueChanged.emit()
             
-    @pyqtSlot(str)
+    @Slot(str)
     def _slot_setGenotype(self, value:str):
         if value in ("NA", "<NA>"):
             self._genotype = pd.NA
@@ -252,11 +256,11 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
 
         self.sig_valueChanged.emit()
             
-    @pyqtSlot(float)
+    @Slot(float)
     def _slot_setAge(self, value):
         spinBox = self.sender()
-        self._age = value * sender.units
-        self._age_units = sender.units
+        self._age = value * spinBox.units
+        self._age_units = spinBox.units
         
         self.sig_valueChanged.emit()
             
@@ -264,7 +268,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         # self._age = spinBox.value()
         # self._age_units = self._age.units
             
-    @pyqtSlot(str)
+    @Slot(str)
     def _slot_setSex(self, value:str):
         if value in ("NA", "<NA>"):
             self._sex = pd.NA
@@ -276,7 +280,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     
         self.sig_valueChanged.emit()
             
-    @pyqtSlot()
+    @Slot()
     def _slot_editAnnotations(self):
         # TODO 2022-11-08 08:31:20
         # enable a scrollable view in GenericMappingDialog
@@ -286,7 +290,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             
         print("edit annotations")
     
-    @pyqtSlot()
+    @Slot()
     def _slot_editBiometrics(self):
         # TODO 2022-11-08 08:32:12
         # use GenericMappingDialog
@@ -294,7 +298,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             
         print("edit biometrics")
     
-    @pyqtSlot()
+    @Slot()
     def _slot_editDateTime(self):
         """Edits the date & time of analysis.
         Recording date & time should be immutable
@@ -319,17 +323,17 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             
         print("edit datetime")
         
-    @pyqtSlot()
+    @Slot()
     def _slot_descriptionChanged(self):
         self._data_description_ = self._descriptionEditor.text(True)
         self.sig_valueChanged.emit()
             
-    @pyqtSlot()
+    @Slot()
     def _slot_editDescription(self):
         self._descriptionEditor.setData(self._data_description_)
         self._descriptionEditor.show()
         
-    @pyqtSlot()
+    @Slot()
     def _slot_editProcedures(self):
         # TODO: 2022-11-08 08:35:39 
         # use GenericMappingDialog
@@ -351,7 +355,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.sig_valueChanged.emit()
         print("edit procedures")
     
-    @pyqtSlot()
+    @Slot()
     def _slot_editTriggers(self):
         # TODO: 2022-11-08 08:36:10
         # use gui.protocoleditordialog.ProtocolEditorDialog
@@ -362,7 +366,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.sig_valueChanged.emit()
         print("edit triggers")
     
-    @pyqtSlot()
+    @Slot()
     def _slot_importMetaData(self):
         from gui.workspacegui import WorkspaceGuiMixin
         parentWindow = self.window()
@@ -376,7 +380,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
                 self.setValue(objs[0])
                 
         
-    @pyqtSlot()
+    @Slot()
     def _slot_exportMetaData(self):
         from gui.workspacegui import WorkspaceGuiMixin
         value = self.value()
@@ -384,7 +388,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         if len(value) and isinstance(parentWindow, WorkspaceGuiMixin):
             parentWindow.exportDataToWorkspace(value, "MetaData", title="Export MetaData to Workspace")
         
-    @pyqtSlot()
+    @Slot()
     def _slot_loadMetaData(self):
         from gui.workspacegui import WorkspaceGuiMixin
         parentWindow = self.window()
@@ -403,7 +407,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
                 
             self.setValue(data)
 
-    @pyqtSlot()
+    @Slot()
     def _slot_saveMetaData(self):
         from gui.workspacegui import WorkspaceGuiMixin
         value = self.value()

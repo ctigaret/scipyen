@@ -11,9 +11,9 @@ function showinstalldoc ()
 {
     glowexec=`which glow`
     if [ -n $glowexec ] ; then
-        glow -p $installscriptdir/Install.md
+        glow -p $docdir/Install.md
     else
-        cat $installscriptdir/Install.md
+        cat $docdir/Install.md
     fi
 }
 
@@ -37,13 +37,17 @@ function show_help ()
     echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
     echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
     echo -e "--jobs=N\t\tNumber of parallel tasks during building PyQt5 and neuron; default is 4; set to 0 to disable parallel build\n"
-    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of pips, pyqt5, vigra, neuron, or desktopentry; can be passed more than once\n"
+    echo -e "--reinstall=NAME\t\t\tRe-install/re-building NAME, where NAME is one of:\n"
+    echo -e "\tpips, pyqt5, pyqt6, vigra, neuron, or desktopentry;\n"
+    echo -e "\t(this option can be passed more than once)\n"
+    echo -e "--install=NAME\t\t Alias to --reinstall option above; use it to "
+    echo -e "\tinstall optional libraries AFTER building Scipyen's virtual environment\n "
     echo -e "--about\t\t\tDisplay Install.md at the console (requires the program 'glow')\n"
     echo -e "--dist\t\t\tCreates a binary Scipyen diwstribution using PyInstaller. Requires that a virtual environment has already been built using this script.\n"
     echo -e "-h | -? | --help \tShow this help message and quit\n"
     echo -e "\nFor details, execute install.sh --about\n"
     echo -e "\n"
-    echo -e "When run with the virtual Pythob environment already activated,\n"
+    echo -e "When run with the virtual Python environment already activated,\n"
     echo -e "the script will use the current virtual environment to perform \n"
     echo -e "(re)installations. WARNING: Make sure you activate the appropriate\n"
     echo -e "Python environment for this !\n"
@@ -67,6 +71,25 @@ function findqmake ()
     fi
     
     echo "using qmake: ${qmake_binary}"
+}
+
+function findqmake6 ()
+{
+    qmake6_binary=`which qmake6`
+    if [ -z "$qmake6_binary" ] ; then
+        qmake6_binary=`which qmake-qt6`
+    fi
+    
+    if [ -z "$qmake6_binary" ] ; then
+        read -e -p "Enter a full path to qmake6 (or qmake-qt6): " qmake6_binary
+    fi
+    
+    if [ -z "$qmake6_binary" ] ; then
+        echo -e "Cannot build PyQt6 without qmake6. Goodbye!\n"
+        exit 1
+    fi
+    
+    echo "using qmake: ${qmake6_binary}"
 }
 
 function findcmake ()
@@ -112,25 +135,34 @@ function makevirtenv ()
     # virtual python environment - that is, it contains a file named "pyenv.cfg"
     # containing "virtualenv" in it, has a "bin" directory with "activate" script,
     # which can be sourced to generate VIRTUAL_ENV variable)
-    if [ -d $install_dir/$virtual_env ] ; then
-        if [ -a $install_dir/$virtual_env/pyvenv.cfg ] ; then
-            aa=`cat $install_dir/$virtual_env/pyvenv.cfg | grep "virtualenv"`
+#     if [ -d $install_dir/$virtual_env ] ; then
+    if [ -d $virtual_env ] ; then
+#         if [ -a $install_dir/$virtual_env/pyvenv.cfg ] ; then
+        if [ -a $virtual_env/pyvenv.cfg ] ; then
+#             aa=`cat $install_dir/$virtual_env/pyvenv.cfg | grep "virtualenv"`
+            aa=`cat $virtual_env/pyvenv.cfg | grep "virtualenv"`
             if [ -n "$aa" ] ; then
-                if [ ! -d $install_dir/$virtual_env/bin ] ; then
-                    echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+#                 if [ ! -d $install_dir/$virtual_env/bin ] ; then
+                if [ ! -d $virtual_env/bin ] ; then
+#                     echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                     exit 1
                 fi
-                if [ ! -r $install_dir/$virtual_env/bin ] ; then
-                    echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+#                 if [ ! -r $install_dir/$virtual_env/bin ] ; then
+                if [ ! -r $virtual_env/bin ] ; then
+#                     echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                    echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                     exit 1
                 fi
                 
                 echo -e "Virtual environment found; activating it...\n"
                 
-                source $install_dir/$virtual_env/bin/activate
+#                 source $install_dir/$virtual_env/bin/activate
+                source $virtual_env/bin/activate
                 
                 if [[ -z ${VIRTUAL_ENV} ]]; then
-                    echo -r "Cannot activate a virtual environment from  $install_dir/$virtual_env . Goodbye!\n"
+#                     echo -r "Cannot activate a virtual environment from  $install_dir/$virtual_env . Goodbye!\n"
+                    echo -r "Cannot activate a virtual environment from  $virtual_env . Goodbye!\n"
                     exit 1
                 fi
                 
@@ -141,26 +173,31 @@ function makevirtenv ()
                 
                 
             else
-                echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+#                 echo -e "$install_dir/$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
+                echo -e "$virtual_env/ does not look like a virtual environment directory. Goodbye!\n"
                 exit 1
             fi 
         fi
     else
 #         ${python_executable} -m virtualenv --python ${python_executable} $install_dir/$virtual_env && source $install_dir/$virtual_env/bin/activate
-        ${python_executable} -m virtualenv --python ${python_executable} $install_dir/$virtual_env
+        ${python_executable} -m virtualenv --python ${python_executable} $virtual_env
         
         if [[ $? -ne 0 ]] ; then
-            echo -e "Could NOT create a virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+#             echo -e "Could NOT create a virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+            echo -e "Could NOT create a virtual environment at ${virtual_env}. Bailing out...\n"
             exit 1
         fi
 
-        echo -e "Virtual environment created at ${install_dir}/${virtual_env}\n"
+#         echo -e "Virtual environment created at ${install_dir}/${virtual_env}\n"
+        echo -e "Virtual environment created at ${virtual_env}\n"
         echo -e "Activating the virtual environment\n"
         
-        source $install_dir/$virtual_env/bin/activate
+#         source $install_dir/$virtual_env/bin/activate
+        source $virtual_env/bin/activate
         
         if [[ $? -ne 0 ]] ; then
-            echo -e "Could NOT activate the virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+#             echo -e "Could NOT activate the virtual environment at ${install_dir}/${virtual_env}. Bailing out...\n"
+            echo -e "Could NOT activate the virtual environment at ${virtual_env}. Bailing out...\n"
             exit 1
         fi
         
@@ -191,13 +228,6 @@ function installpipreqs ()
         # by setting up the environment variable below
         # For details please see https://pypi.org/project/sklearn/
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
-        #        if [[ $for_msys -eq 1 ]] ; then
-        #            python3 -m pip install -r "$installscriptdir"/pip_requirements_msys.txt
-        #        else
-        #            python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
-        #        fi
-        #NOTE: commented out previous to prevent a bug with installation
-        
         
         # NOTE: 2023-06-25 10:56:34 
         # when we are root, make sure to use the virtual environment's python 
@@ -254,10 +284,6 @@ function dopyqt5 ()
         
         echo "Using ${py_exec} as `whoami` to build PyQt5"
         
-        # NOTE: locate_pyqt5_src.py uses distlib to locate the (latest) source 
-        # archive (i.e., the sdist) of PyQt5 - its file name typically ends with
-        # .tar.gz
-#         pyqt5_src_url=`python $installscriptdir/locate_pyqt5_src.py`
         pyqt5_src_url=`${py_exec} $installscriptdir/locate_pyqt5_src.py`
         pyqt5_src=`basename $pyqt5_src_url`
         
@@ -311,6 +337,11 @@ function dopyqt5 ()
 
         if [[ $? -ne 0 ]] ; then
             echo -e "sip Cannot build a PyQt5 wheel. Bailing out. Goodbye!\n"
+            echo -e "You might want to upgrade sip and Pyqt5-sip in this environment\n"
+            echo -e " by calling \n\n"
+            echo -e "pip install --upgrade sip\n"
+            echo -e "pip install --upgrade PyQt5-sip\n\n"
+            echo -e "Then run this script again"
             exit 1
         fi
         
@@ -330,6 +361,125 @@ function dopyqt5 ()
             else
                 echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5done
                 echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
+                
+#                 echo -e "\n\n Installing PyQtDataVisualization\n\n"
+#                 # NOTE: WARNING: 2023-07-19 00:12:27 avoid this !!!! 
+#                 pip install PyQtDataVisualization
+            fi
+        fi
+    fi
+}
+
+function dopyqt6 ()
+{
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    
+    if [ ! -r ${VIRTUAL_ENV}/.pyqt6done ] || [[ $reinstall_pyqt6 -gt 0 ]]; then
+        mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+        
+        findqmake6
+        
+        if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
+            echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
+            exit 1
+        fi
+        
+        # NOTE: 2023-06-25 10:56:34 
+        # when we are root, make sure to use the virtual environment's python 
+        # executable here
+        if [[ `id -u` -eq 0 ]] ; then
+            py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+            sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
+        else
+            py_exec=${python_exec}
+            sip_wheel_exec=sip-wheel
+        fi
+        
+        echo "Using ${py_exec} as `whoami` to build PyQt6"
+        
+        # NOTE: locate_pyqt6_src.py uses distlib to locate the (latest) source 
+        # archive (i.e., the sdist) of PyQt6 - its file name typically ends with
+        # .tar.gz
+        pyqt6_src_url=`${py_exec} $installscriptdir/locate_pyqt6_src.py`
+        pyqt6_src=`basename $pyqt6_src_url`
+        
+        pyqt6_src_dir=${pyqt6_src%.tar.gz}
+        
+        echo "PyQt6 source is in "${pyqt6_src_dir}
+        
+        # NOTE: the sdist might have been downloaded alreay - so check this first
+        # before actually downloading
+        if [ ! -r ${pyqt6_src} ] ; then
+            wget ${pyqt6_src_url} && tar xzf ${pyqt6_src} 
+
+            if [[ $? -ne 0 ]] ; then
+            echo -e "Cannot obtain the PyQt6 source. Bailing out. Goodbye!\n"
+            exit 1
+            fi
+        else
+            if [ -d ${pyqt6_src_dir} ] ; then
+                rm -fr ${pyqt6_src_dir}
+            fi
+            tar xzf ${pyqt6_src}
+        fi
+        
+        # NOTE: good practice is to create an out-of-source build tree, » ...
+        pyqt6_build_dir="PyQt6-build"
+        
+        # NOTE: clear build dir if it exists -- best to start fresh
+        if [ -d ${pyqt6_build_dir} ] ; then
+            rm -fr ${pyqt6_build_dir}
+        fi
+        mkdir -p ${pyqt6_build_dir}
+        
+        # NOTE: » ... but run the build process INSIDE the expanded sdist dir
+        # this is because sip-wheel will get extra options from there :)
+        cd ${pyqt6_src_dir}
+        
+        echo "Generating PyQt6 wheel in "$(pwd)"..."
+        
+        # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
+        # • change the value of the --jobs option (e.g. half the number of 
+        # cores in your system seems to be a good choice), or
+        # • remove the --jobs option altogether
+        if [[ $njobs -gt 0 ]] ; then
+            ${sip_wheel_exec} --qmake=${qmake6_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+#             sip-wheel --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+        else
+            ${sip_wheel_exec} --qmake=${qmake6_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+#             sip-wheel --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+        fi
+#         sip-wheel --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+
+        if [[ $? -ne 0 ]] ; then
+            echo -e "sip Cannot build a PyQt6 wheel. Bailing out. Goodbye!\n"
+            echo -e "You might want to upgrade sip and PyQt6-sip in this environment\n"
+            echo -e " by calling \n\n"
+            echo -e "pip install --upgrade sip\n"
+            echo -e "pip install --upgrade PyQt6-sip\n\n"
+            echo -e "Then run this script again"
+            exit 1
+        fi
+        
+        # NOTE: check is a wheel file has been produced; the filename typically
+        # ends in .whl » if found then call pip to install it inside the 
+        # environment ⟶ IT WORKS!
+        wheel_file=`ls | grep whl`
+        if [ -z ${wheel_file} ] ; then
+            echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
+            exit 1
+        else
+            ${py_exec} -m pip install --force-reinstall ${wheel_file}
+            
+            if [[ $? -ne 0 ]] ; then
+                echo -e "Cannot install the PyQt6 wheel; check console output. Goodbye!\n"
+                exit 1
+            else
+                echo "PyQt6 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
+                echo -e "\n\n=====================\n# Pyqt6 installed!\n=====================\n\n"
                 
 #                 echo -e "\n\n Installing PyQtDataVisualization\n\n"
 #                 # NOTE: WARNING: 2023-07-19 00:12:27 avoid this !!!! 
@@ -379,7 +529,15 @@ function dovigra ()
         echo -e "Creating vigra build tree outside the source tree\n"
         mkdir -p vigra-build && cd vigra-build
         
-        $cmake_binary -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+        $cmake_binary -DPython_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
+                      -DPython_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
+                      -DPython_EXECUTABLE:FILEPATH=`which python` \
+                      -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+#         $cmake_binary -DPYTHON_INCLUDE_DIRS=$(python -c "import sysconfig; print(sysconfig.get_paths()['include'])") \
+#                       -DPYTHON_LIBRARIES=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") \
+#                       -DPYTHON_EXECUTABLE:FILEPATH=`which python` \
+#                       -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
+#         $cmake_binary -DPYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") -DPYTHON_LIBRARY=$(python -c "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))") -DPYTHON_EXECUTABLE:FILEPATH=`which python` -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV -DCMAKE_SKIP_INSTALL_RPATH=1 -DCMAKE_SKIP_RPATH=1 -DWITH_BOOST_GRAPH=1 -DWITH_BOOST_THREAD=1 -DWITH_HDF5=1 -DWITH_OPENEXR=1 -DWITH_VIGRANUMPY=1 -DLIB_SUFFIX=64 ../vigra
         
         make && make install
         
@@ -574,6 +732,28 @@ function doneuron ()
     fi
 }
 
+function dofenicsx ()
+{
+    if [[ -z "$VIRTUAL_ENV" ]] ; then
+        echo -e "Not in an active environment! Goodbye!\n"
+        exit 1
+    fi
+    if [[ `id -u` -eq 0 ]] ; then
+        py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+        sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
+    else
+        py_exec=${python_exec}
+        sip_wheel_exec=sip-wheel
+    fi
+    
+    if [ ! -r ${VIRTUAL_ENV}/.fenicsxdone ] || [[ $reinstall_fenicsx -gt 0 ]]; then
+        mkdir -p ${VIRTUAL_ENV}/src && cd $VIRTUAL_ENV/src
+        
+        findcmake
+        
+    fi
+}
+
 function make_scipyenrc () 
 {
 # When the installer script is run as regular user, it will create 
@@ -655,6 +835,7 @@ IFS=$oldifs
 
 function make_launch_script () 
 {
+    # force the use of XCB platform abstraction plugin in Qt
 if [[ `id -u` -eq 0 ]] ; then
     target_dir=/usr/local/bin
 else
@@ -672,7 +853,7 @@ shopt -s lastpipe
 cat <<END > ${target_dir}/scipyen 
 #! /bin/sh
 if [ -z \${VIRTUAL_ENV} ]; then
-source ${install_dir}/${virtual_env}/bin/activate
+source ${virtual_env}/bin/activate
 fi
 git -C $scipyendir rev-parse 2>/dev/null;
 if [[ \$? -eq 0 ]]; then
@@ -698,11 +879,12 @@ if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
-${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py
+${python_executable} -Xfrozen_modules=off ${scipyensrcdir}/scipyen.py "\$*"
 END
 shopt -u lastpipe
 chmod +x ${target_dir}/scipyen 
 echo -e "Scipyen startup script created in ${target_dir} \n"
+# export QT_QPA_PLATFORM=xcb
 # else
 # ln -s ${scipyensrcdir}/scipyen ${target_dir}/scipyen
 # echo -e "Link to scipyen startup script created in ${target_dir} \n"
@@ -743,18 +925,19 @@ fi
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
 docdir=${scipyendir}/doc
-installscriptdir=${docdir}/install
-# docdir=`dirname "$installscriptdir"`
-# scipyendir=`dirname "$docdir"`
+installscriptdir=${scipyendir}/install
 scipyensrcdir=${scipyendir}/src/scipyen
 using_python=""
 install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
+install_fenicsx=0
 njobs=4
 reinstall_pyqt5=0
+reinstall_pyqt6=0
 reinstall_vigra=0
 reinstall_neuron=0
+reinstall_fenicsx=0
 reinstall_pips=0
 reinstall_desktop=0
 refresh_git_repos=0
@@ -794,6 +977,10 @@ for i in "$@" ; do
         use_core_neuron=1
         shift
         ;;
+        --with_fenicsx)
+        install_fenicsx=1
+        shift
+        ;;
         --install_dir=*)
         install_dir="${i#*=}"
         shift
@@ -820,6 +1007,12 @@ for i in "$@" ; do
             PyQt5)
             reinstall_pyqt5=1
             ;;
+            pyqt6)
+            reinstall_pyqt6=1
+            ;;
+            PyQt6)
+            reinstall_pyqt6=1
+            ;;
             vigra)
             reinstall_vigra=1
             ;;
@@ -838,6 +1031,56 @@ for i in "$@" ; do
             NEURON)
             reinstall_neuron=1
             ;;    
+            fenicsx)
+            reinstall_fenicsx=1
+            ;;
+            pips)
+            reinstall_pips=1
+            ;;
+            desktopentry)
+            reinstall_desktop=1
+            ;;
+            *)
+            ;;
+        esac
+        ;;
+        --install=*)
+        reinstall="${i#*=}"
+        shift
+        case $reinstall in
+            pyqt5)
+            reinstall_pyqt5=1
+            ;;
+            PyQt5)
+            reinstall_pyqt5=1
+            ;;
+            pyqt6)
+            reinstall_pyqt6=1
+            ;;
+            PyQt6)
+            reinstall_pyqt6=1
+            ;;
+            vigra)
+            reinstall_vigra=1
+            ;;
+            VIGRA)
+            reinstall_vigra=1
+            ;;
+            Vigra)
+            reinstall_vigra=1
+            ;;
+            neuron)
+            reinstall_neuron=1
+            ;;    
+            Neuron)
+            reinstall_neuron=1
+            ;;    
+            NEURON)
+            reinstall_neuron=1
+            ;;    
+            fenicsx)
+            reinstall_fenicsx=1
+            ;;
             pips)
             reinstall_pips=1
             ;;
@@ -922,8 +1165,14 @@ echo -e "Will install in ${install_dir}"
 # echo "python minor": $minor
 # echo "python micro": $micro
 
-virtual_env=${virtual_env_pfx}.$pyver
-python_exec="python${major}.${minor}"
+if ! [ -v VIRTUAL_ENV ] ; then
+#     virtual_env=${install_dir}/${virtual_env_pfx}.$pyver
+    virtual_env=${install_dir}/${virtual_env_pfx}
+    python_exec="python${major}.${minor}"
+else
+    virtual_env=$VIRTUAL_ENV
+    python_exec=$VIRTUAL_ENV/bin/"python${major}"
+fi
 
 if [[ `id -u ` -eq 0 ]] ; then
 #     echo "running as root"
@@ -932,7 +1181,7 @@ else
     python_executable=${python_exec}
 fi
 
-echo -e "virtual_env is ${virtual_env} \n\twith full path ${install_dir}/${virtual_env}"
+echo -e "virtual_env is ${virtual_env}"
 echo -e "python executable: ${python_executable}"
 
 
@@ -940,7 +1189,10 @@ echo -e "python executable: ${python_executable}"
 if ! [ -v VIRTUAL_ENV ] ; then
 # NOTE: 2023-06-25 20:57:31 
 # these two MUST be run
-upgrade_virtualenv && makevirtenv
+makevirtenv
+# upgrade_virtualenv && makevirtenv
+else
+    virtual_env=$VIRTUAL_ENV
 fi
 
 
@@ -958,7 +1210,7 @@ fi
 # exit
 
 if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
-    echo -e "Checking for / making 'src' directory inside $VIRTUAL_ENV ...\n"
+    echo -e "Checking for, or making 'src' directory inside $VIRTUAL_ENV ...\n"
     mkdir -p "$VIRTUAL_ENV/src" && cd "$VIRTUAL_ENV/src"
     
     # install pip requirements NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
@@ -969,9 +1221,10 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
         exit 1
     fi
     
-#     build Pyqt5 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+#     build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dopyqt5
     
+#     dopyqt6 # NOTE: 2024-05-29 10:45:15 not yet ...
     
     # build vigra NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dovigra
@@ -981,8 +1234,12 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
         doneuron
     fi
     
+    if  [ $install_fenicsx -ne 0 ] ; then
+        dofenicsx
+    fi
+    
     # make scripts
-#     make_scipyenrc
+    make_scipyenrc
 #     
 #     if [[ `id -u` -ne 0 ]] ; then
 #         # only update bashrc for regular users

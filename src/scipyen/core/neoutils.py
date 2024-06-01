@@ -145,7 +145,7 @@ import traceback, datetime, numbers, inspect, warnings, typing, types
 from collections import deque
 import collections.abc
 import operator
-from itertools import chain, filterfalse
+from itertools import (chain, filterfalse, pairwise)
 from functools import (partial, reduce, singledispatch)
 from copy import (copy, deepcopy)
 from enum import (Enum, IntEnum,)
@@ -159,6 +159,12 @@ import numpy as np
 import scipy
 import quantities as pq
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
+    
 # from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations,
 #                               _reference_name, _container_name)
 
@@ -170,6 +176,7 @@ from neo.core.dataobject import (DataObject, ArrayDict)
 import matplotlib as mpl
 import pyqtgraph as pg
 
+import matplotlib.pyplot as plt
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -178,8 +185,7 @@ from .prog import (safeWrapper, deprecation,
                    filter_attr, filterfalse_attr,
                    filter_type, filterfalse_type,
                    iter_attribute, signature2Dict, 
-                   with_doc,
-                   )#SignatureDict)
+                   with_doc, scipywarn,)
 
 from .datatypes import (is_string, is_vector,
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
@@ -692,6 +698,203 @@ def invert_time_ranges(time_ranges):
         i += 1
         
     return new_ranges
+
+def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nanmean,
+                           name:typing.Optional[str] = None) -> typing.Union[IrregularlySampledDataSignal, neo.IrregularlySampledSignal]:
+    """Fusion of irregularly sampled (data) signals.
+    
+    Given a sequence of irregularly sampled signals with compatible domains and 
+    signal units, the function returns a new irregularly sampled signal of the 
+    same class as the first signal in the `args` sequence, such that:
+    • the `times` attribute is a sorted combination of all the values in the
+        `times` attribute in individual signbals in the sequence in `args`
+    • to each domain point in `times`, the data value in the returned signal is 
+        either:
+        ∘ an accumulated result of the values of individual signals at that domain
+        value with np.nan in standing for missing values in signals where this
+        domain point is absent (calculated with the function given in the `func` 
+        parameter — by default, np.nanmean)
+        ∘ an 1D array of the values of individual signals at that domain value,
+        when `func` is None
+    
+    Examples:
+    
+    consider the following four signals in the sequence `sigs`:
+    
+    'domain -> value',          'domain -> value',          'domain -> value',          'domain -> value'
+    -----------------------------------------------------------------------------------------------------
+    -100.0 pA -> [nan] s        -100.0 pA -> [nan] s        -50.0 pA -> [nan] s         -50.0 pA -> [nan] s
+     100.0 pA -> [nan] s        100.0 pA -> [nan] s         0.0 pA -> [nan] s           0.0 pA -> [nan] s
+     300.0 pA -> [0.0935] s     300.0 pA -> [0.1093] s      50.0 pA -> [nan] s          50.0 pA -> [nan] s
+     500.0 pA -> [0.0863] s     500.0 pA -> [0.0882] s      100.0 pA -> [nan] s         100.0 pA -> [nan] s
+     700.0 pA -> [0.0847] s     700.0 pA -> [0.0848] s      150.0 pA -> [nan] s         150.0 pA -> [0.1145] s
+     900.0 pA -> [0.084] s      900.0 pA -> [0.0839] s      200.0 pA -> [0.1324] s      200.0 pA -> [0.1002] s
+     1100.0 pA -> [0.0813] s    1100.0 pA -> [0.0828] s     250.0 pA -> [0.1055] s      250.0 pA -> [0.0963] s
+                                                            300.0 pA -> [0.0981] s      300.0 pA -> [0.0925] s
+                                                            350.0 pA -> [0.0951] s      350.0 pA -> [0.091] s
+                                                            400.0 pA -> [0.0936] s      400.0 pA -> [0.0892] s
+                                                            450.0 pA -> [0.0933] s      450.0 pA -> [0.087] s
+                                                            500.0 pA -> [0.0924] s      500.0 pA -> [0.0851] s
+                                                            550.0 pA -> [0.0894] s      550.0 pA -> [0.0854] s
+                                                            600.0 pA -> [0.087] s       600.0 pA -> [0.085] s
+
+    Examples:
+
+    1. Calling fuse_irregular_signals(*sigs, func=None) returns:
+        
+    -100.0 pA -> [nan nan nan nan] s
+    -50.0 pA -> [nan nan nan nan] s
+    0.0 pA -> [nan nan nan nan] s
+    50.0 pA -> [nan nan nan nan] s
+    100.0 pA -> [nan nan nan nan] s
+    150.0 pA -> [   nan 0.1145    nan    nan] s
+    200.0 pA -> [0.1324 0.1002    nan    nan] s
+    250.0 pA -> [0.1055 0.0963    nan    nan] s
+    300.0 pA -> [0.0935 0.1093 0.0981 0.0925] s
+    350.0 pA -> [0.0951 0.091     nan    nan] s
+    400.0 pA -> [0.0936 0.0892    nan    nan] s
+    450.0 pA -> [0.0933 0.087     nan    nan] s
+    500.0 pA -> [0.0863 0.0882 0.0924 0.0851] s
+    550.0 pA -> [0.0894 0.0854    nan    nan] s
+    600.0 pA -> [0.087 0.085   nan   nan] s
+    700.0 pA -> [0.0847 0.0848    nan    nan] s
+    900.0 pA -> [0.084  0.0839    nan    nan] s
+    1100.0 pA -> [0.0813 0.0828    nan    nan] s
+    
+    i.e., each data point in the new domain associates an array of values
+    taken from the source signals at that domain data point (or NaN if that data 
+    point does not exist in the source signal)
+    
+    This creates a multi-channel IrregularlySampledDataSignal, however with the 
+    number of channels NOT NECESSARILYL equal to the number of source signals.
+    
+    2. Calling fuse_irregular_signals(*sigs) with `func` being the default
+    (np.nammean) returns:
+    
+    'domain -> value'
+    -----------------
+    -100.0 pA -> [nan] s
+    -50.0 pA -> [nan] s
+    0.0 pA -> [nan] s
+    50.0 pA -> [nan] s
+    100.0 pA -> [nan] s
+    150.0 pA -> [0.1145] s
+    200.0 pA -> [0.1163] s
+    250.0 pA -> [0.1009] s
+    300.0 pA -> [0.0983] s
+    350.0 pA -> [0.093] s
+    400.0 pA -> [0.0914] s
+    450.0 pA -> [0.0901] s
+    500.0 pA -> [0.088] s
+    550.0 pA -> [0.0874] s
+    600.0 pA -> [0.086] s
+    700.0 pA -> [0.0848] s
+    900.0 pA -> [0.0839] s
+    1100.0 pA -> [0.0821] s
+    
+    where the values in the right column are the result of np.nanmean over each
+         array in the right column of in Example 1
+   
+    Var-positional parameters:
+    --------------------------
+    A sequence of single-channel IrregularlySampledDataSignal or neo.IrregularlySampledSignal
+        objects
+    
+    Named parameters:
+    -----------------
+    func: callable — an accumulator function taking a 1D numpy array and returning
+        a scalar (e.g. np.mean, np.nanmean¹, etc), or None.
+    
+        Optional, default is np.nanmean
+    
+    name: str — the name of the returned signal; optional; default is "Fused signal"
+    
+    Returns:
+    --------
+    
+    • when `func` is None, return an irregular signal with all values at a given
+        domain as row vectors (see Example 1 above) i.e. a possibly multi-channel 
+        signal. NOTE: The number of channels is <= number of source signals in 
+        `args`.
+    
+    • when `func` is a callable, returns an irregular signal with accumulated 
+        values at domains taken from all signals in args (see Example 2 above)
+    
+    • when args is empty returns None
+    
+    • when args contains a single signal, returns this signal.
+
+"""
+    if len(args) == 0:
+        return
+    
+    assert(all(isinstance(v, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)) for v in args)), "Expecting only neo.IrregularlySampledSignal or IrregularlySampledDataSignal objects"
+    
+    if len(args) == 1:
+        return args[0]
+    
+    assert(all(lambda x: units_convertible(x[0].times.units, x[1].times.units) for x in pairwise(args))), "Signals must have domains with compatible units"
+
+    assert(all(lambda x: units_convertible(x[0].units, x[1].units) for x in pairwise(args))), "Signals must have compatible units"
+    
+    assert(all(lambda x: x[0].ndim == x[1].ndim for x in pairwise(args))), "Signals must have the same dimensions (i.e., number of axes)"
+    
+    assert(all(x.shape[1] == 1 for x in args)), "Only 1D (i.e. single-channel) signals are supported"
+
+    domain_units = args[0].times.units
+    signal_units = args[0].units
+
+    comb = list(zip(args[0].times, args[0]))
+    
+    tt = args[0].times.copy()
+
+    for b in args[1:]:
+        ll = list(zip(b.times, b))
+        
+        for k, v in ll:
+            if k in tt:
+                ndx = list(tt).index(k)
+                val = np.append(comb[ndx][1], v) * signal_units
+                comb[ndx] = (comb[ndx][0], val)
+                
+            else:
+                ndx = int(np.searchsorted(tt, k))
+                tt = np.insert(tt, ndx, k) * domain_units
+                comb.insert(ndx, (k, v))
+            
+    if isinstance(func, typing.Callable):
+        for k, v in enumerate(comb):
+            nanv = np.isnan(v[1])
+            if np.all(nanv):
+                v_ = np.nan
+            elif np.any(nanv):
+                v_ = func(v[1][~nanv])
+            else:
+                v_ = func(v[1])
+                
+            comb[k] = (v[0], v_)
+            
+    else:
+        maxLen = np.max([v[1].size for v in comb])
+        for k, v in enumerate(comb):
+            val = v[1]
+            if val.size < maxLen:
+                v_ = np.full((maxLen,), fill_value = np.nan)
+                v_[:val.shape[0]] = val
+                comb[k] = (v[0], v_)
+                
+        
+    domain, values = zip(*comb)
+    
+    dd = np.array(domain) * domain_units
+    vv = np.array(values) * signal_units
+    
+    if name is None or (isinstance(name, str) and len(name.strip()) == 0):
+        name = "Fused signal"
+    
+    
+    return args[0].__class__(dd, vv, units = signal_units, time_units = domain_units, name=name)
+    
     
 # def get_member_collections(container:typing.Union[type, neo.core.container.Container], 
 #                            membertype:typing.Union[type, tuple, list]):
@@ -2037,21 +2240,28 @@ def get_sample_at_time(data, t, channel=None):
         else:
             t *= u
             
-    if isinstance(data, IrregularlySampledDataSignal):
-        try:
-            ret = data.time_slice(t,t)
-        except:
-            ret = np.nan * data.units
-    else:
-        i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
-        if len(i):
-            i = int(i[-1])
-            ret = data[i]
-        else:
-            ret = np.nan*data.units
-            # raise ValueError(f"domain value {t} not found")
-        
-    return ret
+    ndx = get_domain_index(data, t)
+    
+    if isinstance(ndx, int):
+        return data[ndx,:]
+    
+            
+#     if not isinstance(data, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)):
+#         try:
+#             ret = data.time_slice(t,t).magnitude * data.units
+#         except:
+#             traceback.print_exc()
+#             ret = np.nan * data.units
+#     else:
+#         i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
+#         if len(i):
+#             i = int(i[-1])
+#             ret = data[i]
+#         else:
+#             ret = np.nan*data.units
+#             # raise ValueError(f"domain value {t} not found")
+#         
+#     return ret
 
 def get_workspace_neo_blocks(*args, sortby:typing.Optional[typing.Union[str, typing.Callable]]=None,
                              ascending:bool=False):
@@ -2131,7 +2341,7 @@ def get_domain_index(data, t):
         else:
             t *= u
             
-    if isinstance(data, IrregularlySampledDataSignal):
+    if isinstance(data, (IrregularlySampledDataSignal, neo.IrregularlySampledSignal)):
         try:
             i = np.where(np.isclose(data.times.magnitude, t.magnitude))[0]
             if len(i):
@@ -2690,7 +2900,9 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
                         ignore_annotations:bool=True, ignore_array_annotations:bool=True, 
                         set_domain_start:typing.Optional[float] = None, 
                         force_contiguous:bool=True, 
-                        padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False, overwrite:bool=False):
+                        padding:typing.Optional[typing.Union[bool, pq.Quantity]]=False,
+                        overwrite:bool=False,
+                        name:typing.Optional[str] = None):
     """Concatenates regularly sampled signals.
     
     Implements the functionality of neo.AnalogSignal's merge() and concatenate()
@@ -2845,13 +3057,17 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
         
         if sum(len(x) for x in descr) > 0:
             kwargs["description"] = f"{actionStr}(" + ", ".join(descr) + ")"
+                                                  
+        if isinstance(name, str) and len(name.strip()):
+            kwargs["name"] = name
             
-        if sum(len(x) for x in names) > 0:
-            if len(names) > 3:
-                kwargs["name"] = f"{actionStr} {len(signals)} signals "
-            else:
-                collated = ", ".join(names)
-                kwargs["name"] = f"{actionStr}( {collated} )"
+        else:
+            if sum(len(x) for x in names) > 0:
+                if len(names) > 3:
+                    kwargs["name"] = f"{actionStr} {len(signals)} signals "
+                else:
+                    collated = ", ".join(names)
+                    kwargs["name"] = f"{actionStr}( {collated} )"
                                
         if sum(len(x) for x in files) > 0:
             kwargs["file_origin"] = f"{actionStr}(" + ", ".join(files) + ")"
@@ -3589,6 +3805,9 @@ events:list                                     neo.Event,
     
     reverse = not ascending
     
+    # NOTE: 2023-12-19 09:42:53
+    # ### BEGIN parse args
+    
     if len(args) == 0:
         return None
     
@@ -3630,6 +3849,11 @@ events:list                                     neo.Event,
                 raise TypeError(f"The following workspace objects are of the wrong type; expecting {neo.Block.__name__}")
             
             args = [ws[a] for a in args]
+            
+    # ### END parse args
+    
+    # NOTE: 2023-12-19 09:43:19
+    # ### BEGIN main code
 
     if isinstance(args, neo.Block):
         # nothing to here: return the source, or a copy of it
@@ -3663,24 +3887,109 @@ events:list                                     neo.Event,
                             file_datetime=file_datetime, rec_datetime=rec_datetime, 
                             **annotations)
         
+        
+        firstBlockDatetime = args[0].rec_datetime
+        
         for (k,arg) in enumerate(args):
-            # copy arg to a new block; the **kwargs will take care of 
-            # selective copy of segments and of their contents
+            # copy arg to a new block (block_src_copy); the **kwargs will take 
+            # care of selective copy of segments and of their contents
             try:
-                new_block = copy_with_data_subset(arg, **kwargs)
+                block_src_copy = copy_with_data_subset(arg, **kwargs)
             except:
                 print(f"*****\nCannot copy block {k} (named: {getattr(arg, 'name', None)}) with data subset\n*****\n")
                 raise 
             
             # NOTE: 2023-05-22 17:46:34 
             # propagate time & file stamps to these segments
-            for seg in new_block.segments:
-                seg.rec_datetime = new_block.rec_datetime
-                seg.file_origin = new_block.file_origin
-            ret.segments.extend(new_block.segments)
+            # 
+            # NOTE: 2023-12-19 09:52:44
+            # store the time interval(in s) since the last prev block (may be 0):
+            deltaSeconds = (block_src_copy.rec_datetime - firstBlockDatetime).total_seconds() * pq.s
+            
+            for seg in block_src_copy.segments:
+                seg.rec_datetime = block_src_copy.rec_datetime # not quite correct, is it ?!?
+                seg.file_origin = block_src_copy.file_origin
+                
+                # NOTE: 2023-12-19 09:48:51
+                # also propagate the time to the t_start of contained signals,
+                # RELATIVE to the first segment
+                for sig in seg.analogsignals:
+                    sig.t_start += deltaSeconds
+                    
+                for sig in seg.irregularlysampledsignals:
+                    if check_time_units(sig.times):
+                        sig.times += deltaSeconds
+                        
+                if len(seg.events):
+                    evts = list()
+                    for event in seg.events:
+                        if check_time_units(event.times):
+                            # NOTE: 2023-12-19 10:55:13
+                            # an event may be a DataMsrk or TriggerEvent, not just neo.Event!
+                            evt = event.__class__(times = event.times + deltaSeconds,
+                                                  labels = event.labels, 
+                                                  units = event.units,
+                                                  name = event.name,
+                                                  description = event.description,
+                                                  file_origin = event.file_origin)
+                            evt.annotations.update(event.annotations)
+                            evt.array_annotate(*event.array_annotations)
+                            evts.append(evt)
+                        else:
+                            evts.append(event)
+                            
+                    seg.events = evts
+                        
+                if len(seg.epochs):
+                    epchs = list()
+                    for epoch in seg.epochs:
+                        if check_time_units(epoch.times):
+                            # NOTE: 2023-12-19 10:58:26
+                            # this may be a DataZone!
+                            epch = epoch.__class__(times = epoch.times + deltaSeconds,
+                                                   durations = epopch.durations,
+                                                   labels = epoch.labels,
+                                                   units = epoch.units,
+                                                   name = epoch.name,
+                                                   description = epoch.description,
+                                                   file_origin = epoch.file_origin,
+                                                   )
+                            epch.annotations.update(epoch.annotations)
+                            epch.array_annotate(*epoch.array_annotations)
+                            epchs.append(epch)
+                        else:
+                            epchs.append(epoch)
+                        
+                if len(seg.imagesequences):
+                    for iseq in seg.imagesequences:
+                        iseq.t_start += deltaSeconds
+                        
+                if len(seg.spiketrains):
+                    stt = list()
+                    for st in seg.spiketrains:
+                        st_copy = neo.SpikeTrain(st.times + deltaSeconds,
+                                                 st.t_stop + deltaSeconds, 
+                                                 units = st.units, 
+                                                 sampling_rate=st.sampling_rate,
+                                                 t_start = st.t_start + deltaSeconds, 
+                                                 waveforms = st.waveforms, 
+                                                 left_sweep = st.left_sweep, 
+                                                 name = st.name, 
+                                                 file_origin = st.file_origin, 
+                                                 description = st.description)
+                        
+                        st_copy.annotations.update(st.annotations)
+                        st_copy.array_annotate(*st_array_annotations)
+                        stt.append(st_copy)
+                        
+                    seg.spiketrains.clear()
+                    for s in stt:
+                        seg.spiketrains.append(s)
+                        
+            ret.segments.extend(block_src_copy.segments)
 
-            if len(new_block.groups):
-                for group in new_block.groups:
+            if len(block_src_copy.groups):
+                for group in block_src_copy.groups:
                     existing_groups = [g for g in ret.groups if g.name == group.name]
                     
                     if len(existing_groups):
@@ -3696,7 +4005,7 @@ events:list                                     neo.Event,
                         # NOTE 2021-11-24 09:56:33
                         # see also NOTE: 2021-11-24 09:12:32
                         if child_class_name != "ChannelView":
-                            data = list(chain(*[s.list_children_by_class(child_class_name) for s in new_block.segments]))
+                            data = list(chain(*[s.list_children_by_class(child_class_name) for s in block_src_copy.segments]))
                             objects.extend([o for o in child_container if any(is_same_as(o, o_) for o_ in data)])
                     
                     if len(objects):
@@ -3718,7 +4027,7 @@ events:list                                     neo.Event,
                         if hasattr(group, "channelviews") and len(group.channelviews):
                             for channelview in group.channelviews:
                                 if isinstance(channelview.obj, neo.core.basesignal.BaseSignal):
-                                    data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in new_block.segments]))
+                                    data = list(chain(*[s.list_children_by_class(type(channelview.obj).__name__) for s in block_src_copy.segments]))
                                     if any(is_same_as(channelview.obj, o_) for o_ in data):
                                         new_channelview = neo.ChannelView(channelview.obj,
                                                                         index = channelview.index, 
@@ -3734,6 +4043,8 @@ events:list                                     neo.Event,
     else:
         raise TypeError("Expecting a neo.Block or a sequence of neo.Block objects, got %s instead" % type(args).__name__)
 
+    # ### END main block
+    
     # finally, rename segments
     for k, s in enumerate(ret.segments):
         s.name = f"segment_{k}"
@@ -5827,7 +6138,7 @@ def average_irregular_signals(*args, fun = np.mean, name:typing.Optional[str]=No
                              name=name,
                              description = "Averaged signal")
     
-@safeWrapper
+# @safeWrapper
 def average_signals(*args, fun=np.mean, name:typing.Optional[str]=None):
     """ Returns an AnalogSignal containing the element-by-element average of several neo.AnalogSignals.
     All signals must be single-channel and have compatible shapes and sampling rates.
@@ -5839,6 +6150,9 @@ def average_signals(*args, fun=np.mean, name:typing.Optional[str]=None):
     if len(args) == 1 and isinstance(args[0], (list, tuple)) and all([isinstance(a, (neo.core.analogsignal.AnalogSignal, DataSignal)) for a in args[0]]):
         args = args[0]
 
+    if len(args) == 0:
+        return
+    
     assert all(isinstance(a, neo.AnalogSignal) for a in args) or all(isinstance(a, DataSignal) for a in args), "This function only supports all neo.AnalogSignal OR all DataSignal objects (no mixing of types)"
 
     if any([s.size != args[0].size for s in args]):
@@ -6530,22 +6844,28 @@ def average_segments_in_block(data, **kwargs):
         
 # def average_blocks_old(*args, **kwargs):
 @safeWrapper
-def average_blocks(*args, **kwargs):
-    """Generates a block containing a list of averaged AnalogSignal data from the *args.
-    FIXME/TODO: revisit this
+def average_blocks(*args, **kwargs) -> neo.Block:
+    """Generates a block containing a averaged record from the *args.
+    FIXME: must revisit this
     Parameters:
     -----------
     
     args: a comma-separated list of neo.Block objects
+        NOTE: All blocks must have the same number of segments, and all segments
+        in all blocks must have the same number and identify of analogsignals.
+    
+        If *args has more than one block, the function will work on a sequence 
+        of all segments across all blocks. In this case, it is best to specify
     
     kwargs: keyword/value pairs:
     
-        count               how many segments into one average
+        count               how many blocks into one average
         
-        every               how many segments to skip between averages
+        every               how many blocks to skip between averages
         
-        segments            index of segments taken into average: int, range,
-                            slice, or sequence (tuple, list) of int
+        segments            index of segments (within each block) that will be
+                            used for the virtual sequence of segments (see above)
+                            int, range, slice, or sequence (tuple, list) of int
         
         analogsignals       index of signal into each of the segments to be used;
                             can also be a signal name
@@ -6564,8 +6884,9 @@ def average_blocks(*args, **kwargs):
     Returns:
     --------
     
-    A new Block containing AnalogSignal data that are averages of the AnalogSignal 
-    object in the *args across the segments, taken n segments at a time, every m segments.
+    A neo.Block where the segments contain average AnalogSignal data over
+    n blocks at a time, every m blocks (where n and m are across the entire
+    virtual sequence fo segments form all blocks in *args)
     
     Depending on the values of 'n' and 'm', the result may contain several segments,
     each containing AnalogSignals averaged from the data.
@@ -6580,13 +6901,6 @@ def average_blocks(*args, **kwargs):
     SpikeTrain, Event and Epoch data that may be present in the blocks specified
     by *args.
     
-    This is because, by definition, only AnalogSignal data may be enforced to be 
-    shape-compatible for averaging, and this is what usually one is after, when 
-    averaging multiple electrophysiology record sweeps acquired with the same
-    protocol (sampling, duration, etc).
-    
-    For this reason only analog_index can be specified, to select from the
-    analogsignals list in the segments.
     
     Examples of usage:
     ------------------
@@ -6662,7 +6976,7 @@ def average_blocks(*args, **kwargs):
             
     if len(blocks)==0:
         return
-            
+    
     block_names = [b.name for b in blocks]
             
     n = None
@@ -6675,7 +6989,7 @@ def average_blocks(*args, **kwargs):
     if len(kwargs) > 0 :
         for key in kwargs.keys():
             if key not in ["count", "every", "name", "segment", 
-                           "analog", "annotation", "rec_datetime", 
+                           "analog", "annotations", "rec_datetime", 
                            "file_origin", "file_datetime"]:
                 raise RuntimeError("Unexpected named parameter %s" % key)
             
@@ -6686,6 +7000,8 @@ def average_blocks(*args, **kwargs):
             m = kwargs["every"]
             
         if "name" in kwargs.keys():
+            # NOTE: 2023-11-14 13:57:40 
+            # assign this here and forget about it
             ret.name = kwargs["name"]
             
         if "segment" in kwargs.keys():
@@ -6694,8 +7010,11 @@ def average_blocks(*args, **kwargs):
         if "analog" in kwargs.keys():
             analog_index = kwargs["analog"]
             
-        if "annotation" in kwargs.keys():
-            ret.annotation = kwargs["annotation"]
+        if "annotations" in kwargs.keys():
+            # 
+            # fixed typo 'annotation' -> 'annotations'
+            # also take care of this now
+            ret.annotations = kwargs["annotations"]
 
         if "rec_datetime" in kwargs.keys():
             ret.rec_datetime = kwargs["datetime"]
@@ -6714,29 +7033,171 @@ def average_blocks(*args, **kwargs):
     else:
         signal_str = "all"
         
-    if segment_index is None:
-        segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
-        segment_str = "all"
+    if len(blocks) == 1:
+        if segment_index is None:
+            return blocks[0]
         
-    elif isinstance(segment_index, int):
-        segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
-        segment_str = str(segment_index)
+        elif isinstance(segment_index, int) and segment_index < len(blocks[0].segments):
+            ret.segments = blocks[0].segments[segment_index]
+            ret.annotations["Source"] = {"name": blocks[0].name, "segments":segment_index}
+            
+        elif isinstance(segment_index, (tuple, list)) and all(isinstance(v, int) and v < len(blocks[0].segments) for v in segment_index):
+            ret.segments = [blocks[0].segments[k] for k in segment_index]
+            ret.annotations["Source"] = {"name": blocks[0].name, "segments":segment_index}
+            
+        elif isinstance(segment_index, range) and segment_index.stop <= len(blocks[0].segments):
+            ret.segments = [blocks[0].segments[k] for k in segment_index]
+            ret.annotations["Source"] = {"name": blocks[0].name, "segments":segment_index}
+            
+        elif isinstance(segment_index, slice) and segment_index.stop <= len(blocks[0].segments):
+            r = range(*segment_index.indices(len(blocks[0].segments)))
+            ret.segments = [blocks[0].segments[k] for k in r]
+            ret.annotations["Source"] = {"name": blocks[0].name, "segments":segment_index}
+            
+        else:
+            raise ValueError(f"Invalid segment_index {segment_index}")
         
+        return ret
+            
+            
+    if n is None:
+        n = len(blocks)
+        m = None
+        
+    elif m is None:
+        if n == 1:
+            return blocks # FIXME: return a concatenated block
+        
+        elif n > len(blocks):
+            n = len(blocks)
+            
+        m = n
+        
+    elif m < 0:
+        m = 0
+        
+    if m is None or m == 0:
+        if n is None:
+            ranges_avg = [range(0, len(blocks))]
+            
+        elif n == 1:
+            return blocks # FIXME: return a concatenated block
+        
+        else:
+            ranges_avg = [range(0,n)]
+            
     else:
-        # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
-        raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
+        ranges_avg = [range(k, k+n) for k in range(0, len(blocks), m)]
+        
+    if ranges_avg[-1].stop > len(blocks):
+        ranges_avg[-1] = range(ranges_avg[-1].start, len(blocks))
+        
+    seg_list = list() # will hold averaged data as blocks
     
-    # ret.segments = average_segments_old(segments, count=n, every=m, analog_index=analog_index)
-    ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
+    for r, range_avg in enumerate(ranges_avg):
+        blist = [blocks[k] for k in range_avg]
+        if segment_index is None:
+            b = average_blocks_by_segments(*blist, analogsignals = analog_index)
+            seg_list.extend(b.segments)
+            
+        elif isinstance(segment_index, int):
+            if segment_index < 0:
+                raise ValueError(f"Segment index must be >= 0; instead, got {segment_index}")
+            
+            out_of_range = [k for k in range_avg if segment_index >= len(blist[k].segments)]
+            if len(out_of_range):
+                raise ValueError(f"Segment index {segment_index} out of range for block {k} ({blist[k].name})")
+            
+            slist = [blist[k].segments[segment_index] for k in range_avg]
+            
+            seg_list.extend(average_segments(slist, signals = analog_index))
+            
+        elif isinstance(segment_index, (tuple, list)) and all(isinstance(v, int) for v in segment_index):
+            if any(v < 0 for v in segment_index):
+                raise ValueError("Segment indices must be >= 0")
+            
+            for v in segment_index:
+                out_of_range = [k for k in range_avg if v >= len(blist[k].segments)]
+                if len(out_of_range):
+                    raise ValueError(f"Segment index {v} out of range for block {k} ({blist[k].name})")
+                
+            
+            # slist = [average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]
+            
+            slist = list(itertools.chain.from_iterable([average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]))
+            
+            seg_list.extend(slist)
+
+        elif isinstance(segment_index, range):
+            out_or_range = [k for k in range_avg if segment_index.stop > len(blist[k].segments)]
+            if len(out_of_range):
+                raise ValueError(f"Last segment index in {segment_index} is out of range for block {k} ({blist[k].name})")
+            
+            # slist = [average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]
+            
+            slist = list(itertools.chain.from_iterable([average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in segment_index]))
+            seg_list.extend(slist)
+            
+        elif isinstance(segment_index, range):
+            out_or_range = [k for k in range_avg if segment_index.stop > len(blist[k].segments)]
+            if len(out_of_range):
+                raise ValueError(f"Last segment index in {segment_index} is out of range for block {k} ({blist[k].name})")
+            
+            srange = range(*segment_index.indices(len(blist[0].segments)))
+            slist = [average_segments([blist[k].segments[v] for k in range_avg], signals=analog_index) for v in srange]
+            seg_list.extend(slist)
+            
+        else:
+            raise ValueError(f"Invalid segment index specification: {segment_index}")
+            
+    # print(f"seg_list = {seg_list}")
+    ret.segments = seg_list
+    # ret.name = name # taken care of at NOTE: 2023-11-14 13:57:40 
+    # ret.annotations.update(annotations) # taken care of at NOTE: 2023-11-14 13:58:53 
+    # ret.annotations["Averaged"] = dict()
+    # ret.annotations["Averaged"]["Count"] = n
+    # ret.annotations["Averaged"]["Every"] = m
+    # ret.annotations["Averaged"]["Origin"] = dict()
+    # ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
+    # ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
+    # ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
+            
+    # for k, segment in enumerate(ret.segments):
+    #     segment.block = ret
+    #     segment.index = k
     
-    ret.annotations["Averaged"] = dict()
-    ret.annotations["Averaged"]["Count"] = n
-    ret.annotations["Averaged"]["Every"] = m
-    ret.annotations["Averaged"]["Origin"] = dict()
-    ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
-    ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
-    ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
-    
+            
+            
+#             
+#                 
+#             
+#     if segment_index is None:
+#         segments = [[__applyRecDateTime(sgm, b) for sgm in b.segments] for b in blocks]
+#         segment_str = "all"
+#         
+#     elif isinstance(segment_index, int):
+#         segments = [__applyRecDateTime(b.segments[segment_index], b) for b in blocks if segment_index < len(b.segments)]
+#         segment_str = str(segment_index)
+#         
+#     else:
+#         # raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or sequence of int, or None")
+#         raise TypeError(f"Unexpected segment index type {type(segment_index)} -- expected an int or None")
+#     
+#     # ret.segments = average_segments_old(segments, count=n, every=m, analog_index=analog_index)
+#     ret.segments = average_segments(segments, count=n, every=m, analog_index=analog_index)
+#     
+#     ret.annotations["Averaged"] = dict()
+#     ret.annotations["Averaged"]["Count"] = n
+#     ret.annotations["Averaged"]["Every"] = m
+#     ret.annotations["Averaged"]["Origin"] = dict()
+#     ret.annotations["Averaged"]["Origin"]["Blocks"]   = "; ".join(block_names)
+#     ret.annotations["Averaged"]["Origin"]["Segments"] = segment_str
+#     ret.annotations["Averaged"]["Origin"]["Signals"]  = signal_str
+#     
+#     for k, segment in enumerate(ret.segments):
+#         segment.block = ret
+#         segment.index = k
+#     
     return ret
 
 
@@ -7237,3 +7698,83 @@ def parse_acquisition_metadata(data:neo.Block, configuration:[type(None), dict] 
     if "software" in data.annotations:
         pass
 
+def plot_neo(obj: neo.core.basesignal.BaseSignal, 
+             fig: typing.Optional[typing.Union[mpl.figure.Figure, int]] = None, 
+             pfun: typing.Callable = plt.plot,
+             **kwargs):
+    """Wrapper to matplotlib.pyplot for `neo` signal objects.
+    
+    Parameters:
+    ------------
+    obj: object derived from neo BaseSignal class
+    
+    fig: matplotlib Figure object, int ('handle' for mpl figure) or None (default)
+        When None, the current figure will be used or a new one will be created
+        is not figure is abailable
+    
+    pfun: callable, default is pyplot.plot; other functions that can be used are
+        limited to basic 1D plotting, such as `step`, `stem`, `scatter`.
+        For more fancy plotting the users are encouraged to write their own 
+        wrappers.
+    
+    Var-keyword parameters:
+    -----------------------
+    
+    Parameters for the appearance of the plot lines and markers.
+    
+    All are passed to the matlotlib.pyplot.plot(…) function - see documentation 
+    for pyplot.plot function.
+    
+    NOTE: Title, axes labels and legend labels for the channels of `obj` taken 
+        from the data in `obj`.
+    
+    """
+    if isinstance(fig, (mpl.figure.Figure, int)):
+        if isinstance(fig, int):
+            plt.figure(fig) 
+        else:
+            plt.figure(fig.number)
+        
+    else:
+        plt.gcf()
+        
+    if hasattr(obj, "times"):
+        times = obj.times
+        times_units = times.units
+    else:
+        times = np.arange(0, obj.shape[0], 1)
+        times_units = pq.dimensionless
+        
+    if hasattr(obj, "array_annotations") and len(obj.array_annotations) and "channel_names" in obj.array_annotations:
+        labels = list(obj.array_annotations["channel_names"])
+        
+    else:
+        labels = [f'channel {k}' for k in range(obj.shape[1])]
+        
+    args = list()
+        
+    if pfun == plt.plot and len(kwargs) == 0:
+        if isinstance(obj, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+            args = ['o']
+            
+    if obj.shape[1] == 1:
+        pfun(times, obj, label = labels[0], **kwargs)
+        
+    else:
+        for k in range(obj.shape[1]):
+            pfun(times, obj[:,k], label = labels[k], *args, **kwargs)
+        
+
+    times_units_str = obj.times.units.dimensionality.string
+    xlabel = "" if times_units_str == "dimensionless" else f"{name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+    name = obj.name
+    if name is None or len(name.strip()) == 0:
+        name = name_from_unit(obj.units.dimensionality)
+    ylabel = f"{name} ({obj.units.dimensionality.string})"
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if isinstance(name, str) and len(name.strip()):
+        plt.title(name)
+        
+    plt.legend()
+    

@@ -22,11 +22,11 @@ def check_rise_decay_params(x):
     
     return (len(x)-3) // 2
 
-# def generic_exp_decay(x, parameters):
 def generic_exp_decay(x, y0, α, x0, τ):
     """Realizes y = α × exp(-(x-x₀)/τ) + y₀
     
     x: independent variable (e.g., time)
+    
     parameters: sequence of floats: y₀ (offset), α (scale), x₀ (onset), τ (time constant)
     
     """
@@ -45,6 +45,16 @@ def generic_exp_decay(x, y0, α, x0, τ):
     # y0, α, x0, τ = parameters
     
     return α * np.exp(-(x-x0)/τ) + y0
+
+def generic_exp_rise(x, y0, α, x0, τ):
+    """Realizes α × [1 - exp(-(x-x₀)/τ)] + y₀"""
+    return α * (1 - np.exp(-(x-x0)/τ)) + y0
+
+def generic_exp_decay_model(x, parameters, **kwargs):
+    return generic_exp_decay(x, *parameters, **kwargs)
+
+def generic_exp_rise_model(x, parameters, **kwargs):
+    return generic_exp_rise(x, *parameters, **kwargs)
 
 def alphaFunction(x, parameters):
     """
@@ -130,7 +140,7 @@ def Clements_Bekkers_97(x, parameters, unit_amplitude:bool=False):
     This approximates a single exponential rise and decay each with their own 
     time constant:
     
-    y = α + β * (1 - exp(-(x-x₀)/τ₁)) ⋅ exp(-(x-x₀)/τ₂) for x-x₀ >= 0, or α elsewhere
+    y = α + β × (1 - exp(-(x-x₀)/τ₁)) × exp(-(x-x₀)/τ₂) for x-x₀ >= 0, or α elsewhere
     
     where:
         α  = offset (usually, 0.);

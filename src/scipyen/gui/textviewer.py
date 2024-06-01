@@ -6,8 +6,11 @@ import os
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -15,9 +18,10 @@ import core.xmlutils as xmlutils
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
-from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
-from . import quickdialog
-from . import resources_rc
+from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
+from gui import quickdialog
+# from . import resources_rc
+# from . import icons_rc
 #### END pict.gui modules
 
 import iolib.pictio as pio
@@ -37,10 +41,10 @@ class TextViewer(ScipyenViewer):
     • only save as
     • no drag'n drop
     """
-    sig_activated = pyqtSignal(int)
-    # closeMe  = pyqtSignal(int)
-    # signal_window_will_close = pyqtSignal()
-    sig_textChanged = pyqtSignal(name = "sig_textChanged")
+    sig_activated = Signal(int)
+    # closeMe  = Signal(int)
+    # signal_window_will_close = Signal()
+    sig_textChanged = Signal(name = "sig_textChanged")
     
     viewer_for_types = {str: 99, QtGui.QTextDocument: 99}
     # view_action_name = "Text"
@@ -48,9 +52,18 @@ class TextViewer(ScipyenViewer):
     # FIXME/TODO: 2019-11-10 13:16:56
     # highlighter_types = ("plain", "xml", "html")
     
-    def __init__(self, data: (object, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None,win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, edit:bool=False, markdown:bool=False, *args, **kwargs):
+    def __init__(self, data: (object, type(None)) = None, 
+                 parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ID:(int, type(None)) = None,
+                 win_title: (str, type(None)) = None, 
+                 doc_title: (str, type(None)) = None, 
+                 edit:bool=False,
+                 markdown:bool=False, *args, **kwargs):
         self._readOnly = edit!=True
         self._markdown = markdown==True
+        self._wrapMode_ = kwargs.pop("wrap", None)
+        if not isinstance(self._wrapMode_, QtWidgets.QTextEdit.LineWrapMode):
+            self._wrapMode_ = QtWidgets.QTextEdit.NoWrap
         super().__init__(data=data, parent=parent, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
         # super(QMainWindow, self).__init__(parent)
         # self._wm_id_ = int(self.winId())
@@ -66,7 +79,7 @@ class TextViewer(ScipyenViewer):
         
         self._docViewer_ = QtWidgets.QTextEdit(self)
         self._docViewer_.setReadOnly(self._readOnly)
-        self._docViewer_.setLineWrapMode(QtWidgets.QTextEdit.NoWrap)
+        self._docViewer_.setLineWrapMode(self._wrapMode_)
         
         if not self._readOnly:
             self._docViewer_.textChanged.connect(self.sig_textChanged)
@@ -239,7 +252,7 @@ class TextViewer(ScipyenViewer):
                 
         return ret
             
-    @pyqtSlot()
+    @Slot()
     def _slot_exportDataToWorkspace(self):
         if self._docViewer_.document().isEmpty():
             return
@@ -255,5 +268,16 @@ class TextViewer(ScipyenViewer):
         # lines = list()
             
         
+    @property
+    def lineWrap(self) -> QtWidgets.QTextEdit.LineWrapMode:
+        return self._wrapMode_
+    
+    @lineWrap.setter
+    def lineWrap(self, val:QtWidgets.QTextEdit.LineWrapMode):
+        if not isinstance(val, QtWidgets.QTextEdit.LineWrapMode):
+            val = QtWidgets.QTextEdit.NoWrap
+            
+        self._wrapMode_ = val
+        self._docViewer_.setLineWrapMode(self._wrapMode_)
         
         

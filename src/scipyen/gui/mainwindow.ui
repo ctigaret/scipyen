@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>812</width>
-    <height>595</height>
+    <width>1159</width>
+    <height>843</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -46,8 +46,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>812</width>
-     <height>28</height>
+     <width>1159</width>
+     <height>30</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -64,14 +64,15 @@
      <property name="title">
       <string>&amp;Import</string>
      </property>
+     <property name="icon">
+      <iconset theme="document-import"/>
+     </property>
      <addaction name="actionImport_PrairieView_data"/>
     </widget>
     <addaction name="actionOpen"/>
     <addaction name="menuImport"/>
     <addaction name="actionSave"/>
     <addaction name="actionChange_Working_Directory"/>
-    <addaction name="separator"/>
-    <addaction name="separator"/>
     <addaction name="actionReload_Plugins"/>
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
@@ -89,6 +90,9 @@
     <widget class="QMenu" name="menuSelected_Image_or_Volume">
      <property name="title">
       <string>&amp;Selected Variable</string>
+     </property>
+     <property name="icon">
+      <iconset theme="object"/>
      </property>
      <addaction name="actionView_Data_New_Window"/>
      <addaction name="actionView_Data"/>
@@ -108,6 +112,9 @@
      <property name="title">
       <string>Code editor</string>
      </property>
+     <property name="icon">
+      <iconset theme="editor"/>
+     </property>
      <addaction name="actionChoose_code_editor"/>
      <addaction name="actionUse_system_s_default_code_editor"/>
     </widget>
@@ -115,11 +122,13 @@
     <addaction name="actionAuto_launch_Script_Manager"/>
     <addaction name="menuCode_editor"/>
     <addaction name="actionAuto_delete_viewer"/>
+    <addaction name="actionSet_user_plugins_directory"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
      <string>Consoles</string>
     </property>
+    <addaction name="actionOpen_System_Terminal"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
@@ -141,7 +150,7 @@
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::AllDockWidgetFeatures</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>&amp;User Variables</string>
@@ -154,7 +163,7 @@
      <item>
       <widget class="QTableView" name="workspaceView">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -240,7 +249,7 @@ NOTE: you can click anywhere in the row to select</string>
      <item>
       <widget class="QComboBox" name="varNameFilterFinderComboBox">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -274,7 +283,7 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::AllDockWidgetFeatures</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>&amp;Command History</string>
@@ -287,7 +296,7 @@ NOTE: you can click anywhere in the row to select</string>
      <item>
       <widget class="QTreeWidget" name="historyTreeWidget">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -358,7 +367,7 @@ NOTE: you can click anywhere in the row to select</string>
      <item>
       <widget class="QComboBox" name="commandFinderComboBox">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -392,7 +401,7 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="features">
-    <set>QDockWidget::AllDockWidgetFeatures</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>File S&amp;ystem</string>
@@ -401,11 +410,8 @@ NOTE: you can click anywhere in the row to select</string>
     <number>8</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetFileSystemContents">
-    <layout class="QVBoxLayout" name="verticalLayout_5">
-     <property name="sizeConstraint">
-      <enum>QLayout::SetNoConstraint</enum>
-     </property>
-     <item>
+    <layout class="QGridLayout" name="gridLayout">
+     <item row="0" column="0">
       <layout class="QHBoxLayout" name="horizontalLayout">
        <property name="spacing">
         <number>0</number>
@@ -493,11 +499,14 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="viewFilesFilterToolBtn">
          <property name="text">
-          <string/>
+          <string>Filter...</string>
          </property>
          <property name="icon">
           <iconset theme="view-filter">
            <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -510,14 +519,87 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="selDirBtn">
          <property name="toolTip">
-          <string>Select directory</string>
+          <string>Select working directory</string>
+         </property>
+         <property name="statusTip">
+          <string>Select working directory</string>
+         </property>
+         <property name="whatsThis">
+          <string>Select working directory</string>
          </property>
          <property name="text">
-          <string>Open directory...</string>
+          <string>&amp;Select working directory</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open">
+          <iconset theme="document-open-folder"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="systemOpenFolderBtn">
+         <property name="toolTip">
+          <string>Open current folder in system file manager</string>
+         </property>
+         <property name="statusTip">
+          <string>Open current folder in system file manager</string>
+         </property>
+         <property name="whatsThis">
+          <string>Open current folder in system file manager</string>
+         </property>
+         <property name="text">
+          <string>Open File Manager</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-open-folder">
            <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="systemOpenParentFolderBtn">
+         <property name="toolTip">
+          <string>Opens parent directory of working directory in system file manager</string>
+         </property>
+         <property name="statusTip">
+          <string>Opens parent directory of working directory in system file manager</string>
+         </property>
+         <property name="whatsThis">
+          <string>Opens parent directory of working directory in system file manager</string>
+         </property>
+         <property name="text">
+          <string>Open Parent Folder in File Manager</string>
+         </property>
+         <property name="icon">
+          <iconset theme="go-parent-folder">
+           <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="openTermBtn">
+         <property name="toolTip">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="statusTip">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="whatsThis">
+          <string>Open system terminal in current folder</string>
+         </property>
+         <property name="text">
+          <string>Open System Terminal</string>
+         </property>
+         <property name="icon">
+          <iconset theme="scriptnew"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -529,6 +611,9 @@ NOTE: you can click anywhere in the row to select</string>
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::MinimumExpanding</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
            <width>40</width>
@@ -539,7 +624,7 @@ NOTE: you can click anywhere in the row to select</string>
        </item>
       </layout>
      </item>
-     <item>
+     <item row="1" column="0">
       <widget class="QComboBox" name="directoryComboBox">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
@@ -562,29 +647,13 @@ NOTE: you can click anywhere in the row to select</string>
        <property name="editable">
         <bool>true</bool>
        </property>
+       <property name="sizeAdjustPolicy">
+        <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
+       </property>
       </widget>
      </item>
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
-       <property name="spacing">
-        <number>6</number>
-       </property>
-       <property name="sizeConstraint">
-        <enum>QLayout::SetNoConstraint</enum>
-       </property>
-       <item>
-        <widget class="QLabel" name="currentDirLabel">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
+     <item row="2" column="0">
+      <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="QTreeView" name="fileSystemTreeView">
          <property name="sizePolicy">
@@ -598,6 +667,9 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
          <property name="acceptDrops">
           <bool>false</bool>
+         </property>
+         <property name="sizeAdjustPolicy">
+          <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
          </property>
          <property name="editTriggers">
           <set>QAbstractItemView::DoubleClicked</set>
@@ -638,12 +710,6 @@ NOTE: you can click anywhere in the row to select</string>
          <attribute name="headerCascadingSectionResizes">
           <bool>true</bool>
          </attribute>
-         <attribute name="headerMinimumSectionSize">
-          <number>100</number>
-         </attribute>
-         <attribute name="headerDefaultSectionSize">
-          <number>100</number>
-         </attribute>
          <attribute name="headerHighlightSections">
           <bool>true</bool>
          </attribute>
@@ -658,7 +724,7 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QFrame" name="filesFilterFrame">
          <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
+          <enum>QFrame::StyledPanel</enum>
          </property>
          <property name="frameShadow">
           <enum>QFrame::Plain</enum>
@@ -667,24 +733,6 @@ NOTE: you can click anywhere in the row to select</string>
           <number>0</number>
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <property name="spacing">
-           <number>0</number>
-          </property>
-          <property name="sizeConstraint">
-           <enum>QLayout::SetNoConstraint</enum>
-          </property>
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
-           <number>0</number>
-          </property>
           <item>
            <widget class="QToolButton" name="hideFilesFilterToolBtn">
             <property name="toolTip">
@@ -697,7 +745,7 @@ NOTE: you can click anywhere in the row to select</string>
              <string>Hide file filter</string>
             </property>
             <property name="text">
-             <string/>
+             <string>Hide</string>
             </property>
             <property name="icon">
              <iconset theme="window-close">
@@ -711,7 +759,7 @@ NOTE: you can click anywhere in the row to select</string>
           <item>
            <widget class="QLabel" name="filesFilterLabel">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+             <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
@@ -730,12 +778,12 @@ NOTE: you can click anywhere in the row to select</string>
              <enum>Qt::Horizontal</enum>
             </property>
             <property name="sizeType">
-             <enum>QSizePolicy::Maximum</enum>
+             <enum>QSizePolicy::Preferred</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
-              <width>10</width>
-              <height>20</height>
+              <width>13</width>
+              <height>17</height>
              </size>
             </property>
            </spacer>
@@ -775,13 +823,22 @@ NOTE: you can click anywhere in the row to select</string>
   </widget>
   <widget class="QToolBar" name="toolBar">
    <property name="sizePolicy">
-    <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+    <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
      <horstretch>0</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
    <property name="windowTitle">
     <string>toolBar</string>
+   </property>
+   <property name="toolTip">
+    <string>Save variables to HDF5 file</string>
+   </property>
+   <property name="statusTip">
+    <string>Save selected variables for HDF5 (*.h5) files</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When a single variable is selected in the workspace (User Variables tab), shows a file save dialog to choose among supported file types. &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;When more than one variable is selected, saves all of them to HDF5 files named after the variable name (symbol) in the workspace.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="toolButtonStyle">
     <enum>Qt::ToolButtonFollowStyle</enum>
@@ -792,6 +849,10 @@ NOTE: you can click anywhere in the row to select</string>
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
+   <addaction name="actionOpen"/>
+   <addaction name="actionSave"/>
+   <addaction name="actionChange_Working_Directory"/>
+   <addaction name="separator"/>
   </widget>
   <action name="actionSave">
    <property name="icon">
@@ -799,7 +860,16 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>&amp;Save As ...</string>
+    <string>&amp;Save ...</string>
+   </property>
+   <property name="toolTip">
+    <string>Save (export data)</string>
+   </property>
+   <property name="statusTip">
+    <string>Save (export data)</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When several objects are selected in the workspace (User Variables tab) this will save them as HDF5 files named after the object name (symbol) in the workspace.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;When only one object is selected in the workspace, will show a dialog for selecting the file name and a file type (where appropriate) for saving the object.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionQuit">
@@ -836,8 +906,7 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionImport_PrairieView_data">
    <property name="icon">
-    <iconset theme="document-open">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="document-import"/>
    </property>
    <property name="text">
     <string>PrairieView data</string>
@@ -850,11 +919,6 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>&amp;XY Raster Scan</string>
-   </property>
-  </action>
-  <action name="actionImport_Electrophysiology_File">
-   <property name="text">
-    <string>&amp;Electrophysiology</string>
    </property>
   </action>
   <action name="actionImport_Protocol_File">
@@ -892,8 +956,7 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionReload_Plugins">
    <property name="icon">
-    <iconset theme="view-refresh">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="plugins"/>
    </property>
    <property name="text">
     <string>&amp;Reload Plugins</string>
@@ -910,7 +973,10 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>&amp;Change Working Directory</string>
+    <string>&amp;Select Working Directory</string>
+   </property>
+   <property name="statusTip">
+    <string>Select working directory</string>
    </property>
   </action>
   <action name="actionNew_Signal_Viewer">
@@ -930,6 +996,12 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>&amp;Open...</string>
+   </property>
+   <property name="statusTip">
+    <string>Opens selected files in the file system browser or via a dialog</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Opens the selected file(s) in the File System tab, or presents an file chooser dialog when no files are selected.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionOpen_Files">
@@ -1065,9 +1137,43 @@ NOTE: you can click anywhere in the row to select</string>
     <string>When a viewer is closed , also remove it from the user workspace</string>
    </property>
   </action>
+  <action name="actionOpen_System_Terminal">
+   <property name="icon">
+    <iconset theme="scriptnew"/>
+   </property>
+   <property name="text">
+    <string>Open System Terminal</string>
+   </property>
+   <property name="toolTip">
+    <string>Open system terminal in current folder</string>
+   </property>
+   <property name="statusTip">
+    <string>Open system terminal in current folder</string>
+   </property>
+   <property name="whatsThis">
+    <string>Open system terminal in current folder</string>
+   </property>
+  </action>
+  <action name="actionSet_user_plugins_directory">
+   <property name="icon">
+    <iconset theme="folder-extension-symbolic">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Set user plugins directory</string>
+   </property>
+  </action>
+  <action name="actionImport_Electrophysiology_File">
+   <property name="text">
+    <string>&amp;Electrophysiology</string>
+   </property>
+  </action>
+  <action name="actionRecent">
+   <property name="text">
+    <string>Recent</string>
+   </property>
+  </action>
  </widget>
- <resources>
-  <include location="resources/resources.qrc"/>
- </resources>
+ <resources/>
  <connections/>
 </ui>

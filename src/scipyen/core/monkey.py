@@ -1,3 +1,9 @@
+import os, sys
+import pathlib
+import importlib
+
+from .workspacefunctions import (debug_scipyen, scipyentopdir)
+
 def check_neo_patch(exc_info:tuple):
     stack_summary = traceback.extract_tb(exc_info[2])
     frame_names = [f.name for f in stack_summary]
@@ -66,6 +72,7 @@ def import_module(name, package=None):
     return module
 
 def import_relocated_module(mname):
+
     spec = get_relocated_module_spec(mname)
     
     if spec is not None:
@@ -74,6 +81,48 @@ def import_relocated_module(mname):
         sys.modules[mname] = module
     
 def get_relocated_module_spec(mname, scipyen_path=None):
+        if scipyen_path is None:
+            # BUG 2024-02-02 22:09:31 
+            # WRONG: this is NOT where scipyen is located
+            # scipyen_path = pathlib.Path(sys.path[0]) # this is where scipyen is located 
+            scipyen_path = pathlib.Path(scipyentopdir()) # this is where scipyen is located
+        #print("get_relocated_module_spec: modname =", mname)
+        
+        elif isinstance(scipyen_path, str):
+            if os.path.isdir(scipyen_path):
+                scipyen_path = pathlib.Path(scipyen_path)
+            else:
+                raise ValueError("'scipyen_path' is not a directory")
+            
+        elif isinstance(scipyen_path, pathlib.Path):
+            if not scipyen_path.is_dir():
+                raise ValueError("'scipyen_path' is not a directory")
+            
+            file_path = os.path.join(*(scipyen_path, "%s.py" % mname))
+            
+        else:
+            raise TypeError(f"'scipyen_path' expected to be a str or pathlib.Path or None; instead, got a {type(scipyen_path).__name__}")
+                
+            # elif not isinstance(scipyen_path, pathlib.Path):
+            #     raise ValueError("scipyen_path expected to be a valid directory path string, a pathlib.Path, or None; got %s instead\n" % scipyen_path)
+            
+            
+        mloc = list(scipyen_path.glob("**/%s.py" % mname))
+        
+        # print(f"get_relocated_module_spec: mname = {mname}, mloc = {mloc}")
+            
+        if len(mloc)==0: # py source file not found
+            raise FileNotFoundError("Could not find a module source file for %s\n" % mname)
+        
+            
+        file_path = os.path.join(*mloc[0].parts)
+        
+        #print("get_relocated_module_spec: file_path =", file_path)
+        
+        if isinstance(file_path, str) and len(file_path):
+            return importlib.util.spec_from_file_location(mname, file_path)
+        
+def get_relocated_module_spec_old(mname, scipyen_path=None):
         #print("get_relocated_module_spec: modname =", mname)
         
         if isinstance(scipyen_path, str) and os.path.isdir(scipyen_path):
@@ -81,7 +130,10 @@ def get_relocated_module_spec(mname, scipyen_path=None):
             
         else:
             if scipyen_path is None:
-                scipyen_path = pathlib.Path(sys.path[0]) # this is where scipyen is located
+                # BUG 2024-02-02 22:09:31 
+                # WRONG: this is NOT where scipyen is located
+                # scipyen_path = pathlib.Path(sys.path[0]) # this is where scipyen is located 
+                scipyen_path = pathlib.Path(scipyentopdir()) # this is where scipyen is located
                 
             elif not isinstance(scipyen_path, pathlib.Path):
                 raise ValueError("scipyen_path expected to be a valid directory path string, a pathlib.Path, or None; got %s instead\n" % scipyen_path)

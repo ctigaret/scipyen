@@ -45,19 +45,22 @@ import pandas as pd
 import h5py
 import vigra
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
+    
 import confuse # for programmatic read/write of non-gui settings
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+# from qtpy import QtCore, QtGui, QtWidgets
+# from PyQt5 import QtCore, QtGui, QtWidgets
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-#from core import neo
-#from core import patchneo
-
 from core import pyabfbridge as pab
 
-from core import (xmlutils, strutils, datasignal)
-
+from core import (xmlutils, strutils, datasignal)#, neoepoch, neoevent)
 
 from core.prog import (ContextExecutor, safeWrapper,)
 
@@ -929,7 +932,7 @@ def loadAxonTextFile(fileName:str):
     
     #return result
 
-def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, dict]=False, signal_group_mode:typing.Optional[str]="split-all"):
+def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_segment:typing.Union[bool, dict]=False, signal_group_mode:typing.Optional[str]="split-all"):
     """Loads a binary Axon file (*.abf).
     
     Parameters:
@@ -992,8 +995,14 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
         
     """
     
-    if not os.path.isfile(fileName):
-        raise OSError("File %s not found" % fileName)
+    if isinstance(fileName, str) and not os.path.isfile(fileName):
+        raise OSError(f"File {fileName} not found")
+
+    elif isinstance(fileName, pathlib.Path):
+        if not fileName.is_file():
+            raise OSError(f"File {fileName} not found")
+
+        fileName = str(fileName)
     
     data = neo.Block()
     axon_info = dict()
@@ -1022,7 +1031,13 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
                         s.name = "segment_%d" % k
         
         #protocol_sweeps = axonIO.read_protocol()
+        # NOTE: 2024-05-30 16:17:08
+        # NEO api changed (AGAIN!) so now annotate(…) only accept keys of type `str`
+        #
         axon_info = axonIO._axon_info
+        # print(f"axonio_info = {[(k, type(k).__name__) for k in axonio_info]}")
+        # axon_info = dict()
+        # axon_info.update(axonio_info)
         
         # augment axon_info with missing bits that pyabf can actually get
         # I know this is a bit redundant and duplicates some data, but it simpler
@@ -1030,16 +1045,27 @@ def loadAxonFile(fileName:str, create_group_across_segment:typing.Union[bool, di
         abf = pab.getABF(fileName)
         abfEpochSection = pab.getABFsection(abf, "epoch") # needed for DIG holding levels
         abfStringsSection = pab.getABFsection(abf, "strings") # needed for indexed strings, containing inter alia the name of a stimulus file (when used)
+        abfADCSection = pab.getABFsection(abf, "adc")
+        abfDACSection = pab.getABFsection(abf, "dac")
+        abfProtocolSection = pab.getABFsection(abf, "protocol")
+        abfEpochPerDacSection = pab.getABFsection(abf, "epochperdac")
+        abfHeaderSection = pab.getABFsection(abf, "header")
         
+        axon_info["sections"]["ADCSection"].update(abfADCSection)
+        axon_info["sections"]["DACSection"].update(abfDACSection)
         axon_info["sections"]["EpochSection"].update(abfEpochSection)
+        axon_info["sections"]["EpochPerDACSection"].update(abfEpochPerDacSection)
         axon_info["sections"]["StringsSection"]["IndexedStrings"] = abfStringsSection["_indexedStrings"]
-        
-        
+        axon_info["sections"]["ProtocolSection"].update(abfProtocolSection)
+        axon_info["sections"]["HeaderSection"] = abfHeaderSection
+
         axon_info["t_starts"] = axonIO._t_starts
         axon_info["sampling_rate"] = axonIO._sampling_rate
         
         
-        data.annotate(**axon_info)
+        # see NOTE: 2024-05-30 16:17:08
+        # data.annotate(axon_info)
+        data.annotations.update(axon_info)
         
         return data
     
@@ -1075,26 +1101,48 @@ def importDataFrame(fileName):
 def loadPickleFile(fileName):
     """Loads pickled data.
     ATTENTION: 
-    Doesn't load data from pickle files saved with old (pre-git) Scipyen versions
-    where module hierarchies (and paths) have changed.
+    Work in progress to enable loading data from pickle files saved with old 
+    (pre-git) Scipyen versions where module hierarchies (and paths) have changed.
+    
+    NOTE: Pickled neo objects containing "ChannelView" (neo versions < 0.10) will
+    NOT be loaded.
     
     Will also fail to load pickle files that contain objects of dynamic types
     such as those created in the user workspace - a good example is that of
     namedtuple instances - unless they are defined in a loaded module.
     
-    Moreover it will fail to load neo objects created with older neo versions.
-    
     """
     from core import patchneo as pneo
+    from core import neoepoch as neoepoch
+    from core import neoevent as neoevent
+    from core.neoepoch import Epoch
+    from core.neoevent import Event
+    
+    if not getattr(sys, "frozen", False) or not hasattr(sys, "_MEIPASS"):
+        import_relocated_module("neoepoch")
+        import_relocated_module("neoevent")
+        import_relocated_module("datatypes")
+    
+    
     try:
-        pneo.patch_neo_new()
         with open(fileName, mode="rb") as fileSrc:
             ret = pickle.load(fileSrc)
-        pneo.restore_neo_new()
-    except:
-        pneo.restore_neo_new()
+        return ret
+    except Exception as e:
+        # print(f"loadPickleFile exception {type(e).__name__}:\n {str(e)}")
+        if isinstance(e, (ModuleNotFoundError, TypeError, ValueError)):
+            try:
+                pneo.patch_neo_new()
+                with open(fileName, mode="rb") as fileSrc:
+                    ret = pickle.load(fileSrc)
+                pneo.restore_neo_new()
+            except Exception as e1:
+                # print(f"loadPickleFile exception {type(e1).__name__}:\n {str(e1)}")
+                pneo.restore_neo_new()
+                raise
+            return ret
+        
         raise
-    return ret
         
     
 @safeWrapper            
@@ -1733,7 +1781,7 @@ def getMimeAndFileType(fileName):
     if file_type is None:
         file_type = mime_type
         
-    #print(f"in getMimeAndFileType: mime_type: {mime_type} file_type: {file_type}")
+    # print(f"in getMimeAndFileType: mime_type: {mime_type} file_type: {file_type}")
 
     # # 2.2) try the mimetypes module
     # # NOTE: 2021-04-12 11:31:29
@@ -1751,12 +1799,16 @@ def getMimeAndFileType(fileName):
 def is_python_source(fileName:str):
     mime_type, file_type, encoding = getMimeAndFileType(fileName)
     
-    return any("python" in s.lower() for s in (mime_type, file_type)) or os.path.splitext(fileName)[-1] == ".py"
+    types = tuple([v for v in (mime_type, file_type) if isinstance(v, str) and len(v.strip())])
+    
+    return any("python" in s.lower() for s in types) or os.path.splitext(fileName)[-1] == ".py"
 
 def is_spreadsheet(fileName:str):
     mime_type, file_type, encoding = getMimeAndFileType(fileName)
     
-    return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in (mime_type, file_type)) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
+    types = tuple([v for v in (mime_type, file_type) if isinstance(v, str) and len(v.strip())])
+    
+    return any(any(m in s.lower() for m in ("spreadsheet", "excel", "csv", "tab-separated-values")) for s in types) or os.path.splitext(fileName)[-1] in (".csv", ".tsv", ".xls", ".xlsx")
     
 def loadFile(fName):
     value = None

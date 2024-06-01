@@ -48,8 +48,11 @@ import xml.etree.ElementTree as ET
 from enum import Enum, IntEnum
 from functools import (singledispatch, singledispatchmethod)
 
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+from qtpy.QtCore import (Signal, Slot, Property,)
+# from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
 
 # desktop integration - according to freedesktop.org (XDG)
 # ATTENTION: DO NOT install xdg as it will mess up pyxdg
@@ -105,7 +108,29 @@ def get_trash_icon_name():
         
     return "user-trash"
         
-
+def get_system_terminal_executable():
+    # TODO: 2023-09-28 12:41:32 FIXME
+    # store shell in global configuration
+    # cascade through available options e.g. by calling
+    #   on windows:
+    #       out = subprocess.run(["where", shell], shell=True, capture_output=True)
+    #   on linux:
+    #       out = subprocess.run(["which", shell], shell=True, capture_output=True)
+    #   and test that out.returncode == 0 (i.e. success)
+    #
+    #   while iterating through a list of available shells
+    #
+    #   on windows: powershell, wt, cmd
+    #   on linux:   xterm, konsole, gnome-terminal, qterminal, lxterminal, rxvt, rxvt-unicode. 
+    if sys.platform == "win32":
+        return "cmd"
+    elif sys.platform == "linux":
+        return "konsole" # MY OWN default, for now
+        # return "xterm" # good default, for now
+    else:
+        warnings.warn(f"{sys.platform} platform is not yet supported")
+        
+        
 def get_desktop_places():
     """Collect user places as defined in the freedesktop.org XDG framework.
     Useful for Linux desktops that comply with XDG (e.g. KDE, GNOME, XFCE, LXDE, etc).
@@ -519,7 +544,7 @@ class PlacesItem(QtCore.QObject):
     
     """
     
-    # itemChanged = pyqtSignal(str, name="itemChanged")
+    # itemChanged = Signal(str, name="itemChanged")
     
     def __init__(self, address:str, parent):
         super().__init__(parent)
@@ -593,15 +618,15 @@ class PlacesModel(QtCore.QAbstractItemModel): # TODO/FIXME
     of Python bindings for KDE framework libraries, but I'm not holding my breadth...
     
     """
-    errorMessage = pyqtSignal(str, name = "errorMessage", arguments=["message"])
+    errorMessage = Signal(str, name = "errorMessage", arguments=["message"])
     
-    setupDone = pyqtSignal(QtCore.QModelIndex, bool, name="setupDone", arguments=["index", "success"])
+    setupDone = Signal(QtCore.QModelIndex, bool, name="setupDone", arguments=["index", "success"])
     
-    teardownDone = pyqtSignal(QtCore.QModelIndex, object, object, name="teardownDone", arguments=["index", "error", "errorData"])
+    teardownDone = Signal(QtCore.QModelIndex, object, object, name="teardownDone", arguments=["index", "error", "errorData"])
     
-    reloaded = pyqtSignal(name="reloaded")
+    reloaded = Signal(name="reloaded")
     
-    supportedSchemesChanged = pyqtSignal(name = "supportedSchemesChanged")
+    supportedSchemesChanged = Signal(name = "supportedSchemesChanged")
     
     def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent)

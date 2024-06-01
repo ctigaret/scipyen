@@ -1,5 +1,5 @@
 class BreadCrumb(QtWidgets.QWidget):
-    navigate = pyqtSignal(str, name="navigate")
+    navigate = Signal(str, name="navigate")
         
     def __init__(self, path:pathlib.Path, isBranch:bool=False, parentCrumb=None,parent:typing.Optional[QtWidgets.QWidget]=None):
         super().__init__(parent=parent)
@@ -78,12 +78,12 @@ class BreadCrumb(QtWidgets.QWidget):
         self._isBranch_ = value == True
         self.branchButton.setVisible(self._isBranch_)
         
-    @pyqtSlot()
+    @Slot()
     def dirButtonClicked(self):
         # print(f"{self.__class__.__name__}.dirButtonClicked on {self.name}")
         self.navigate.emit(self.path.as_posix())
         
-    @pyqtSlot()
+    @Slot()
     def branchButtonClicked(self):
         if self.subDirsMenu is None:
             self.subDirsMenu = QtWidgets.QMenu("", self.branchButton)
@@ -106,21 +106,21 @@ class BreadCrumb(QtWidgets.QWidget):
             self.branchButton.setArrowType(QtCore.Qt.DownArrow)
             self.branchButton.showMenu()
         
-    @pyqtSlot()
+    @Slot()
     def slot_subDirClick(self):
         action = self.sender()
         ps = os.path.join(self.path.as_posix(), action.text())
         self.navigate.emit(ps)
         self.branchButton.setArrowType(QtCore.Qt.RightArrow)
         
-    @pyqtSlot()
+    @Slot()
     def slot_menuHiding(self):
         self.branchButton.setArrowType(QtCore.Qt.RightArrow)
         
         
 class BreadCrumbsNavigator(QtWidgets.QWidget):
-    sig_chDirString = pyqtSignal(str, name = "sig_chDirString")
-    sig_switchToEditor = pyqtSignal(name = "sig_switchToEditor")
+    sig_chDirString = Signal(str, name = "sig_chDirString")
+    sig_switchToEditor = Signal(name = "sig_switchToEditor")
     # def __init__(self, url:QtCore.QUrl, parent:typing.Optional[QtWidgets.QWidget] = None):
     def __init__(self, path:pathlib.Path, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
@@ -188,12 +188,12 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
         self.navspot.destroy()
         self.navspot = None
 
-    @pyqtSlot(str)
+    @Slot(str)
     def slot_crumb_clicked(self, path):
         self.sig_chDirString.emit(path)
         # print(f"{self.__class__.__name__}.slot_crumb_clicked {path}")
         
-    @pyqtSlot()
+    @Slot()
     def slot_editPath_request(self):
         self.sig_switchToEditor.emit()
         # print("to switch to path editing mode")
@@ -210,10 +210,10 @@ class BreadCrumbsNavigator(QtWidgets.QWidget):
         
         
 class PathEditor(QtWidgets.QWidget):
-    sig_chDirString = pyqtSignal(str, name = "sig_chDirString")
-    sig_removeCurrentDirFromHistory = pyqtSignal(str, name = "sig_removeCurrentDirFromHistory")
-    sig_clearRecentDirsList = pyqtSignal(str, name = "sig_clearRecentDirsList")
-    sig_switchToNavigator = pyqtSignal(name="sig_switchToNavigator")
+    sig_chDirString = Signal(str, name = "sig_chDirString")
+    sig_removeCurrentDirFromHistory = Signal(str, name = "sig_removeCurrentDirFromHistory")
+    sig_clearRecentDirsList = Signal(str, name = "sig_clearRecentDirsList")
+    sig_switchToNavigator = Signal(name="sig_switchToNavigator")
     
     def __init__(self, path:pathlib.Path, recentDirs:list = [], maxRecent:int=10, parent=None):
         super().__init__(parent=parent) 
@@ -325,14 +325,14 @@ class PathEditor(QtWidgets.QWidget):
         if len(self.history) > self._maxRecent_:
             self.history = self.history[0:self._maxRecent_]
         
-    @pyqtSlot()
+    @Slot()
     def slot_removeDirFromHistory(self):
         signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
         currentNdx = self.directoryComboBox.currentIndex()
         self.directoryComboBox.removeItem(currentNdx)
         self.directoryComboBox.lineEdit().setClearButtonEnabled(True)
         
-    @pyqtSlot()
+    @Slot()
     def slot_clearRecentDirList(self):
         signalBlocker = QtCore.QSignalBlocker(self.directoryComboBox)
         self.history.clear()
@@ -343,7 +343,7 @@ class PathEditor(QtWidgets.QWidget):
             
         self.directoryComboBox.setCurrentIndex(0)
         
-    @pyqtSlot(str)
+    @Slot(str)
     def slot_dirChange(self, value):
         hh = self.history
         p = pathlib.Path(value).resolve().as_posix()

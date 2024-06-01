@@ -1,9 +1,58 @@
 # -*- mode: python ; coding: utf-8 -*-
+"""
+NOTE: 2023-06-26 17:25:32
+This is for the developer, NOT the final user:
+To create a distributable scipyen application, you need to:
+
+1) clone the scipyen git repo locally (e.g. to $HOME/scipyen)- NOTE: this is assumed to be the case from here onwards
+
+2) use the install.sh script to create a local virtual environment with all the 
+  binaries needed for Scipyen (this includes building PyQt5, VIGRA and - -optionally - NEURON)
+
+3) activate the new environment, then buld the distributable app:
+  in a bash shell do something like (NOTE: 'user@host:>'is your terminal prompt
+  and it may look different on your machine, make sure you understand this):
+
+      user@host:>scipyact # to activate the environment
+      user@host:>mkdir -p scipyen_app && cd scipyen_app
+      user@host:~/scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/scipyen.spec
+
+  alternatively, you don't have to cd to scipyen_app, so from the $HOME, call:
+      user@host:> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
+
+4) On Windows:
+• assuming the following (please adjust pathways to reflect your local machine; avoid spaces in directory and file names):
+  ∘ scipyen git clone is in e:\scipyen
+  ∘ python's virtual envronment (created with mambaforge, see below) is in e:\scipyenv
+  ∘ there exists a scipyen_app directory where the frozen bundle will be created — e.g, e:\scipyen_app
+
+• as for linux (see above) you must have the scipyen python environment activated
+  (in windows, just execute the scipyact command)
+
+• in windows command prompte, make sure you are in the top directory where you
+  want to build the frozen application (e.g., e:\scipyen_app, see above)
+
+  for example, your prompt should look something like:
+      (e:\scipyenv) E:\scipyen_app>
+• run:
+  pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm e:\scipyen\scipyen.spec
+ 
+On windows I use mamba (a faster alternative to <ana>conda) to build a virtual environment (e.g. e:\scipyenv) - best is
+to use a Miniforge terminal running with as administrator.
+With that environment activated (see mamba documentation for details), call (e.g. from the root of e: drive):
+pyinstaller --dist_path e:\scipyen_app\dist --workpath e:\scipyen_app\build --clean --noconfirm e:\scipyen\scipyen.spec
+NOTE: You may have to modify the paths above to suit your local installation
+TODO: For more customization contemplate calling pyinstaller as above from a
+bash script
+
+"""
 import io, os, sys, subprocess, shutil, tempfile, typing, pathlib, traceback
-import string, datetime
+import string, datetime, importlib, inspect, itertools, time
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 from PyInstaller.building.datastruct import Tree
+
+start_time = time.perf_counter()
 
 hasNeuron=False
 try:
@@ -12,43 +61,32 @@ try:
 except:
     hasNeuron = False
 
+# print(f"argv: {sys.argv}")
+# print(f"orig_argv: {sys.orig_argv}")
+
 myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 myfile = pathlib.Path(myfile).absolute()
 scipyen_dir = os.fspath(myfile.parent)
 
-print(f"scipyen_dir = {scipyen_dir}")
+# print(f"scipyen_dir = {scipyen_dir}")
 
-# NOTE: 2023-06-26 17:25:32
-# This is for the developer, NOT the final user:
-# To create a distributable scipyen application, you need to:
-# 1) clone the scipyen git repo locally (e.g. to $HOME/scipyen)- NOTE: this is assumed to be the case from here onwards
-# 2) use the install.sh script to create a local virtual environment with all the 
-#   binaries needed for Scipyen (this includes building PyQt5, VIGRA and - -optionally - NEURON)
-# 3) activate the new environment, then buld the distributable app:
-#   in a bash shell do something like (NOTE: 'user@host:>'is your terminal prompt
-#   and it may look different on your machine, make sure you understand this):
+# NOTE: 2024-05-31 09:21:48
+# Because internal Scipyen plugin modules are NOT imported via the usual import 
+# mechanism, PyInstaller will NOT "find" them. Therefore, they will NOT be available
+# to Scipyen when run from a bundled app
 #
-#       user@host:>scipyact # to activate the environment
-#       user@host:>mkdir -p scipyen_app && cd scipyen_app
-#       user@host:~/scipyen_app> pyinstaller --distpath ./dist --workpath ./build --clean --noconfirm $HOME/scipyen/scipyen.spec
-#
-#   alternatively, you don't have to cd to scipyen_app, so from the $HOME, call:
-#       user@host:> pyinstaller --distpath scipyen_app/dist --workpath scipyen_app/build --clean --noconfirm scipyen/scipyen.spec
-#
-#
-# On windows I use mamba (a faster alternative to <ana>conda) to build a virtual environment (e.g. e:\scipyenv) - best is
-# to use a Miniforge terminal running with as administrator.
-# With that environment activated (see mamba documentation for details), call (e.g. from the root of e: drive):
-# pyinstaller --dist_path e:\scipyen_app\dist --workpath e:\scipyen_app\build --clean --noconfirm e:\scipyen\scipyen.spec
-# NOTE: You may have to modify the paths above to suit your local installation
-# TODO: For more customization contemplate calling pyinstaller as above from a
-# bash script
+# The obvious solution to this is to collect these plugins and place them in their
+# appropriate path (re-rooted by PyInstaller to "_internal" inside the app distribution)
+internal_plugins = list()
 
+# NOTE: 2024-05-15 09:03:24
+# looks like we do have to define DEFAULT_DISTPATH
+DEFAULT_DISTPATH = "./dist"
 
-if "--distpath" in sys.argv:
-    ndx = sys.argv.index("--distpath")
-    if ndx < (len(sys.argv) - 1):
-        distpath = sys.argv[ndx+1]
+if "--distpath" in sys.orig_argv:
+    ndx = sys.orig_argv.index("--distpath")
+    if ndx < (len(sys.orig_argv) - 1):
+        distpath = sys.orig_argv[ndx+1]
 
     else:
         distpath = DEFAULT_DISTPATH
@@ -57,8 +95,10 @@ else:
 
 if not myfile.is_absolute():
     myfile = myfile.absolute()
-
     
+# NOTE: 2024-05-31 09:19:27
+# used below — see NOTE: 2023-07-14 15:19:48 — to find out which git branch 
+# we are bundling from, and what is the local status of that branch
 mydir = myfile.parents[0]
 
 print(f"\nWARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
@@ -190,6 +230,113 @@ def getQt5PluginsDir():
 
 def getQt5Plugins(path):
     return Tree(root=path, prefix="PyQt5/Qt5/plugins", typecode="BINARY")
+
+def check_plugin_module(file_name) -> bool:
+    with open(file_name, "rt", encoding="utf-8") as module_file:
+        for line in module_file:
+            if line.startswith('__scipyen_plugin__') or line.startswith("def init_scipyen_plugin"):
+                return True
+            
+    return False
+
+def check_bytecode_plugin(file_name) -> bool:
+    with open(file_name, "rb") as pycfile:
+        _ = pycfile.read(16) # Header is 16 bytes in 3.6+, 8 bytes on < 3.6
+        loaded = marshal.load(pycfile)
+    
+    code_info = list(filter(lambda x: "init_scipyen_plugin" in x, dis.code_info(loaded).split("\n")))
+    return len(code_info) > 0
+
+
+def collect_internal_scipyen_plugins(path:typing.Union[str, pathlib.Path]):
+    # NOTE: 2024-05-31 16:31:32
+    # So, what we do here, is to check the source files in Scipyen's tree and select
+    # only those that define 'init_scipyen_plugin' or '__scipyen_plugin__' objects
+    # 
+    # We then copy these as datas into the internal final app directory
+    # 
+    # We also check that these also have a cahced compiled bytecode (typically,
+    # in a parallel __pycache__ directory) and we also copy those
+    #
+    # At runtime we currently rely on Scipyen's mechanism to crawl for the source
+    # files, betting on the fact that the cached bytecode hasn't changed
+    # (if the used doesn;t have permission to edit the source files, the cache
+    # would not have changed)
+    #
+    # However, it would be good to rely only on compiled bytecode in the __pycache__
+    #
+    # Sciyen's scipyen_plugin_loader has been adapted to crawl through the __pycache__
+    # bytecode but given the size of the internal app directory this will be highly
+    # taxing on resources.
+    #
+    # So we would need a way to let the bundled Scipyen where to look, insteasd of 
+    # crawling the FULL _internal directory tree...
+    #
+    if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
+        path = str(path.absolute())
+        
+    elif not isinstance(path, str) or len(path.strip()) == 0 or not os.path.isdir(path) or not os.path.exists(path):
+        raise ValueError(f"Expecting a string or a pathlib.Path for an absolute pathway to an existing directory; instead got {path} ")
+    
+    topsrcdir = pathlib.Path(path).joinpath('src','scipyen')
+    
+    plugin_source_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(path)))))))
+    
+    to_hidden_imports = list()
+    
+    to_toc = list()
+    
+    # to_toc_pycs = list()
+    
+    sys_pycache_dir = sys.pycache_prefix
+    if sys_pycache_dir is None:
+        sys_pycache_dir = "__pycache__"
+        
+    for file_name in plugin_source_files:
+        module_name = inspect.getmodulename(file_name)
+        if module_name is not None: # this will never be None, would it?
+            # pluginsSpecFinder.path_map[module_name] = file_name
+            file_directory = file_name.parent.relative_to(topsrcdir)
+            pycache = None
+            pycachedir = file_name.parent.joinpath(sys_pycache_dir)
+            if pycachedir.exists():
+                pycache = list(pycachedir.glob(f"{file_name.stem}*.pyc"))
+                if len(pycache) == 1:
+                    pycache = pycache[0]
+                
+            # dest_dir = pathlib.Path("src").joinpath("scipyen", file_directory)
+            dest_dir = file_directory
+            # NOTE: 2024-05-31 14:43:07
+            # unfortunately, we also need the source!
+            # this is because scipyen_plugin_loader does not (yet) deal with pyc files
+            # FIXME: 2024-05-31 16:30:36 TODO
+            # see NOTE: 2024-05-31 16:31:32
+            #
+            to_toc.append((str(file_name), str(dest_dir)))
+            if isinstance(pycache, pathlib.Path):
+                to_toc.append((str(pycache), str(dest_dir.joinpath("__pycache__"))))
+            # else:
+            #     to_toc.append((str(file_name), str(dest_dir)))
+            # verb = True
+            if len(file_directory.parts):
+                package_name = file_directory.parts[0]
+                package_name_path = ".".join(file_directory.parts)
+                submodules_path = file_name.parent
+                submodules_paths = list()
+                p = file_name.relative_to(topsrcdir)
+                while len(p.parts):
+                    p = p.parent
+                    if len(p.parts):
+                        submodules_paths.append(topsrcdir.joinpath(p))
+                if file_name.name == "__init__.py":
+                    module_name = package_name
+                else:
+                    module_name = f"{package_name_path}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
+
+            to_hidden_imports.append(module_name)
+        
+    return to_hidden_imports, to_toc
+    
     
 block_cipher = None
 
@@ -200,7 +347,11 @@ block_cipher = None
 # "forAnalysis" is a flag indicating that tuples are generated for use by the Analysis object
 # constructed below
 uitoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".ui", forAnalysis=True) # WARNING must be reflected in core.sysutils.adapt_ui_path
-#print(f"uitoc: {uitoc}")
+
+# uitoc_txt = '\n'.join([f"{k}: {i}" for k,i in enumerate(uitoc)])
+# 
+# print(f"uitoc: \n{uitoc_txt}\n\n")
+
 txttoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".txt", forAnalysis=True)
 svgtoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".svg", forAnalysis=True)
 pngtoc = DataFiles(os.path.join(scipyen_dir, 'src'), ".png", forAnalysis=True)
@@ -235,6 +386,7 @@ desktoptempdir=""
 # origin_fn = None
 # origin_file = None
 namesfx = ""
+final_exe_file_name = "scipyen.app"
 
 # NOTE: 2023-07-14 15:19:48
 # this gets the name of the scipyen git branch we are packaging ⇒ namesfx
@@ -273,59 +425,70 @@ day = f"{now.day}"
 hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
-product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
+build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
+product = f"scipyen{namesfx}_{platform}_{build_sfx}"
+# product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
 
-print(f"bundlepath = {bundlepath}")
-if sys.platform == "linux":
-    desktoptempdir = tempfile.mkdtemp()
-    desktop_file_name = os.path.join(desktoptempdir, f"Scipyen{namesfx}.desktop")
-    # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
-    desktop_icon_file = "pythonbackend.svg"
-    exec_file = os.path.join(bundlepath, "scipyen")
-    desktop_file_contents = ["[Desktop Entry]",
-    "Type=Application",
-    "Name[en_GB]=Scipyen",
-    "Name=Scipyen",
-    "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
-    "Comment=Scientific Python Environment for Neurophysiology",
-    "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
-    "GenericName=Scientific Python Environment for Neurophysiology",
-    f"Icon={desktop_icon_file}",
-    "Categories=Science;Utilities;",
-    "Exec=%k/scipyen",
-    "MimeType=",
-    "Path=",
-    "StartupNotify=true",
-    "Terminal=true",
-    "TerminalOptions=\s--noclose",
-    "X-DBUS-ServiceName=",
-    "X-DBUS-StartupType=",
-    "X-KDE-SubstituteUID=false",
-    "X-KDE-Username=",
-    ]
-    with open(desktop_file_name, "wt") as desktop_file:
-        for line in desktop_file_contents:
-            desktop_file.write(f"{line}\n")
-            
-    dist_install_script = ["#!/bin/bash",
-                        "mydir=`dirname $0`",
-                        "whereami=`realpath ${mydir}`",
-                        "chown -R root:root ${whereami}",
-                        "ln -s -b ${whereami}/scipyen /usr/local/bin/",
-                        "ln -s -b ${whereami}/Scipyen.desktop /usr/share/applications/"]
+# print(f"bundlepath = {bundlepath}")
+# NOTE: 2024-05-31 09:31:43 FIXME/TODO
+# ------------------------------------
+# this needs more work + adapt for the install script (i.e. when the user wants
+# to install the bundled app directory system-wide, e.g. in /usr/local)
+# ------------------------------------
+#
 
-    install_script_tempdir = tempfile.mkdtemp()
-    dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
-
-    with open(dist_install_script_name, "wt") as dist_install:
-        for line in dist_install_script:
-            dist_install.write(f"{line}\n")
-            
-    datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
-    datas.append((desktop_file_name, '.'))
-    datas.append((dist_install_script_name, '.'))
+# if sys.platform == "linux":
+#     # add a system-wide installation script
+#     desktoptempdir = tempfile.mkdtemp()
+#     desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{namesfx}.desktop")
+#     # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
+#     desktop_icon_file = "pythonbackend.svg"
+#     exec_file = os.path.join(bundlepath, "scipyen")
+#     desktop_file_contents = ["[Desktop Entry]",
+#     "Type=Application",
+#     "Name[en_GB]=Scipyen",
+#     "Name=Scipyen",
+#     "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
+#     "Comment=Scientific Python Environment for Neurophysiology",
+#     "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
+#     "GenericName=Scientific Python Environment for Neurophysiology",
+#     f"Icon={desktop_icon_file}",
+#     "Categories=Science;Utilities;",
+#     "Exec=%k/scipyen",
+#     "MimeType=",
+#     "Path=",
+#     "StartupNotify=true",
+#     "Terminal=true",
+#     "TerminalOptions=\s--noclose",
+#     "X-DBUS-ServiceName=",
+#     "X-DBUS-StartupType=",
+#     "X-KDE-SubstituteUID=false",
+#     "X-KDE-Username=",
+#     ]
+#     with open(desktop_file_name, "wt") as desktop_file:
+#         for line in desktop_file_contents:
+#             desktop_file.write(f"{line}\n")
+# 
+#     dist_install_script = ["#!/bin/bash",
+#                         "mydir=`dirname $0`",
+#                         "whereami=`realpath ${mydir}`",
+#                         # "chown -R root:root ${whereami}",
+#                         "sudo ln -s -b ${whereami}/scipyen /usr/local/bin/",
+#                         "sudo ln -s -b ${whereami}/Scipyen_app" + f"{namesfx}.desktop /usr/share/applications/"]
+# 
+#     install_script_tempdir = tempfile.mkdtemp()
+#     dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
+# 
+#     with open(dist_install_script_name, "wt") as dist_install:
+#         for line in dist_install_script:
+#             dist_install.write(f"{line}\n")
+#             
+#     datas.append((f"{os.path.join(scipyen_dir, 'src/scipyen/gui/resources/images', desktop_icon_file)}", '.'))
+#     # datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
+#     datas.append((desktop_file_name, '.'))
+#     datas.append((dist_install_script_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
@@ -351,7 +514,7 @@ datas.extend(yamltoc)
 # I think the next line below ('collect_all') is better than trying to see what
 # can be tweaked in hook-pygments.py / hook-pkg_resources.py
 jqc_datas, jqc_binaries, jqc_hiddenimports = collect_all("jupyter_qtconsole_colorschemes")
-print(f"jqc_hiddenimports = {jqc_hiddenimports}")
+# print(f"jqc_hiddenimports = {jqc_hiddenimports}")
 datas.extend(jqc_datas)
 binaries.extend(jqc_binaries)
 hiddenimports.extend(jqc_hiddenimports)
@@ -361,7 +524,7 @@ hiddenimports.extend(jqc_hiddenimports)
 # when starting external IPython console in Scipyen)
 
 jc_datas, jc_binaries, jc_hiddenimports = collect_all("jupyter_client")
-print(f"jc_hiddenimports = {jc_hiddenimports}")
+# print(f"jc_hiddenimports = {jc_hiddenimports}")
 datas.extend(jc_datas)
 binaries.extend(jc_binaries)
 hiddenimports.extend(jc_hiddenimports)
@@ -394,18 +557,30 @@ qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
 
 # print(f"\ndatas = {datas}\n")
 
+hiddenimports.extend(['gui.widgets',
+                      'gui.widgets.metadatawidget',
+                      'gui.widgets.modelfitting_ui'])
+
+plugin_hidden_imports, plugin_toc = collect_internal_scipyen_plugins(scipyen_dir)
+# pt_txt = '\n'.join([f"{k}: {i}" for k,i in enumerate(plugin_toc)])
+# print(f"plugins TOC:\n{pt_txt}\n\n")
+
+hiddenimports.extend(plugin_hidden_imports)
+datas.extend(plugin_toc)
+
+# hi_txt = '\n'.join([f"{k}: {i}" for k,i in enumerate(hiddenimports)])
+# 
+# print(f"\nhiddenimports : \n{hi_txt}\n\n")
+
+
 # NOTE: 2023-07-14 15:22:26
 # hookspath contains code for pyinstaller hooks called ONLY when the Analyser
 # detects an import in Scipyen code; these won't work for NEURON stuff....
 
 a = Analysis(
-    [os.path.join(scipyen_dir, 'src/scipyen/scipyen.py')],
-    pathex=[os.path.join(scipyen_dir, 'src/scipyen')], # ← to find the scipyen package
+    [os.path.join(scipyen_dir, 'src','scipyen','scipyen.py')],
+    pathex=[os.path.join(scipyen_dir, 'src','scipyen')], # ← to find the scipyen package
     binaries=binaries,
-    # binaries=[('/home/cezar/scipyenv.3.11.3/bin/*', 'bin'),
-    #           ('/home/cezar/scipyenv.3.11.3/lib/*', 'lib'),
-    #           ('/home/cezar/scipyenv.3.11.3/lib64/*', 'lib64'),
-    #           ],
     datas=datas,
     # NOTE: 2023-06-28 11:08:08
     # Example of what is needed for this attribute:
@@ -420,10 +595,12 @@ a = Analysis(
     #        # ('/home/cezar/scipyen/src/imaging', 'imaging'),
     #        ],
     hiddenimports=hiddenimports,
-    hookspath=[os.path.join(scipyen_dir, 'src/scipyen/__pyinstaller')],
+    hookspath=[os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller')],
     hooksconfig={"matplotlib":{"backends":"all"}, "exclude_module": "PySide2"},
-    runtime_hooks=[],
-    excludes=[],
+    runtime_hooks=[os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_typeguard.py'),
+                   # os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_gui.py'), # these just added manually to hiddenimports, above
+                   ],
+    excludes=["OpenGL"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -431,13 +608,18 @@ a = Analysis(
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+options = [
+    ('X frozen_modules=off', None, 'OPTION'),
+    ('O', None, 'OPTION')
+    ]
+
 if sys.platform == "win32":
     exe = EXE(
         pyz,
         a.scripts,
         [],
         exclude_binaries=True,
-        name='scipyen', # name of the final executable
+        name=final_exe_file_name, # name of the final executable
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -448,7 +630,8 @@ if sys.platform == "win32":
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=os.path.join(scipyen_dir, "doc/install/pythonbackend.ico")
+        icon=os.path.join(scipyen_dir, "install","pythonbackend.ico"),
+        options = options
     )
 else:
     exe = EXE(
@@ -456,7 +639,7 @@ else:
         a.scripts,
         [],
         exclude_binaries=True,
-        name='scipyen', # name of the final executable
+        name=final_exe_file_name, # name of the final executable
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -467,12 +650,12 @@ else:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
+        options=options
     )
     
 coll = COLLECT(
     exe,
-    # a.binaries,
-    a.binaries + qt5plugins_toc,
+    a.binaries + qt5plugins_toc, # add qt5 plugins to the binaries !
     a.zipfiles,
     a.datas,
     strip=False,
@@ -481,9 +664,27 @@ coll = COLLECT(
     name=product, # name of distribution directory (e.g, 'scipyen_dev' etc)
 )
 
-if isinstance(tempdir, str) and os.path.isdir(tempdir):
-    shutil.rmtree(tempdir)
-    
-if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
-    shutil.rmtree(desktoptempdir)
-    
+stop_time = time.perf_counter()
+dt = stop_time - start_time
+dd = int(dt//86400)
+dt = dt % (24*3600)
+hh = int(dt//3600)
+dt = dt % 3600
+mm = int(dt//60)
+dt = dt % 60
+
+print(f"\n\nDuration: {dd} days, {hh} hours, {mm} minutes and {dt} seconds")
+
+# NOTE: 2024-05-31 09:36:11 FIXME/TODO
+# ------------------------------------
+# see NOTE: 2024-05-31 09:31:43 FIXME/TODO
+# ------------------------------------
+# if isinstance(tempdir, str) and os.path.isdir(tempdir):
+#     shutil.rmtree(tempdir)
+#     
+# if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
+#     shutil.rmtree(desktoptempdir)
+#     
+# # app_location =
+# if sys.platform == "linux":
+#     print(f"To install system-wide, run {os.path.join(product, '_internal', 'dist_install.sh')}.")

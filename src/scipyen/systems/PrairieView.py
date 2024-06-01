@@ -15,10 +15,13 @@ import numpy as np
 import quantities as pq
 import neo
 import vigra
+from qtpy import (QtCore, QtWidgets, QtGui,)
+from qtpy.QtCore import Signal, Slot
+from qtpy.uic import loadUiType as __loadUiType__ 
 #from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5 import (QtCore, QtWidgets, QtGui,)
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.uic import loadUiType as __loadUiType__ 
+# from PyQt5 import (QtCore, QtWidgets, QtGui,)
+# from PyQt5.QtCore import Signal, Slot
+# from PyQt5.uic import loadUiType as __loadUiType__ 
 #### END 3rd party modules
 
 #### BEGIN scipyen modules
@@ -42,13 +45,15 @@ from core.sysutils import adapt_ui_path
 
 import iolib.pictio as pio
 
-from gui import resources_rc as resources_rc
+from gui import resources_rc # as resources_rc
+# from gui import icons_rc # as icons_rc
 from gui import quickdialog as qd
 from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
 from gui.protocoleditordialog import ProtocolEditorDialog
 from gui import pictgui as pgui
 from gui.workspacegui import WorkspaceGuiMixin
 import gui.signalviewer as sv
+from gui import resources_rc
 
 from imaging import (imageprocessing as imgp, axisutils, axiscalibration,)
 from imaging.scandata import (ScanData, ScanDataOptions, scanDataOptions,)
@@ -72,7 +77,11 @@ __ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
 
 #__UI_PVImporterDialog__, __QDialog__ = __loadUiType__(os.path.join(__module_path__,"PVImporterDialog.ui"), from_imports=True, import_from="gui")
 # __UI_PrairieImporter, __QDialog__ = __loadUiType__(os.path.join(__module_path__, "PrairieImporter.ui"), from_imports=True, import_from="gui")
-__UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
+
+if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+    __UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__, from_imports=True, import_from="gui")
+else:
+    __UI_PrairieImporter, __QDialog__ = __loadUiType__(__ui_path__)
 
 
 """ NOTE: 2017-09-22 09:28:23
@@ -2176,7 +2185,7 @@ class PVScan(object):
 # place the mixin before other base classes so that it is initialized
 # then super(...).__init__ it
 class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, ):
-    sig_protocolRemoved = pyqtSignal(int, name="sig_protocolRemoved")
+    sig_protocolRemoved = Signal(int, name="sig_protocolRemoved")
     
     def __init__(self, parent=None,
                  name: typing.Optional[str] = None,
@@ -2386,7 +2395,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         self.buttonBox.accepted.connect(self.slot_generateScanData)
         
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_removeProtocol(self, index):
         """Removes a trigger protocol.
         """
@@ -2404,20 +2413,20 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             
             self.sig_protocolRemoved.emit(index)
             
-    @pyqtSlot()
+    @Slot()
     def _slot_protocolAddRequest(self):
         pass
     
-    @pyqtSlot()
+    @Slot()
     def _slot_editTriggerProtocols(self):
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
         self.protocolEditorDialog.open()
         
-    @pyqtSlot()
+    @Slot()
     def _slot_protocolEditorFinished(self):
         pass
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_startTriggerEventDetectionGui(self):
         """Opens the trigger event detection dialog.
@@ -2444,7 +2453,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             # SignalViewer that plots the ephys data
             self.eventDetectionDialog.open() 
             
-    @pyqtSlot()
+    @Slot()
     def _slot_stopTriggerEventDetectionGui(self):
         """Closes trigger event detection dialog and interprets the result.
         If dialog.result() is "accepted" (or yes/ok) then a new set collection
@@ -2468,7 +2477,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             else:
                 self.triggerProtocolFileNameLineEdit.setText("")
             
-    @pyqtSlot()
+    @Slot()
     def _slot_undoTriggers(self):
         if self._ephys_ is None:
             return
@@ -2487,11 +2496,11 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         if len(self.protocolFileName):
             self.triggerProtocolFileNameLineEdit.setText(self.protocolFileName)
             
-    @pyqtSlot(int)
+    @Slot(int)
     def _slot_clearEventsChanged(self, value):
         self.clearEvents = self.clearEventsCheckBox.isChecked()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_setPVScanFileName(self):
         # connected to editing the PVScan field
@@ -2512,7 +2521,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self._pvscan_ = None
             self._scandata_ = None
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_choosePVScanFile(self):
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
@@ -2535,7 +2544,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.pvScanFileName = ""
             self._pvscan_ = None
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_setOptionsFileName(self):
         # connected to editing Options field
@@ -2552,7 +2561,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.optionsFileName = ""
             self.scanDataOptions = None
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_chooseOptionFile(self):
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
@@ -2574,7 +2583,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.optionsFileNameLineEdit.clear()
             self.scanDataOptions = None
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_setEphysFileNames(self):
         # NOTE: 2020-12-26 12:17:01 This always generates a list of str even if
@@ -2592,7 +2601,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         else:
             self._ephys_ = None
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_chooseEphysFiles(self):
         signalblockers =[QtCore.QSignalBlocker(w) for w in (self.ephysFileNameLineEdit,)]
@@ -2619,14 +2628,14 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                 self.ephysFileNameLineEdit.clear()
                 self._ephys_ = None
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_setDataName(self):
         self.dataName = self.dataNameLineEdit.text()
         if len(self.dataName.strip()):
             self.scanDataVarName = strutils.str2symbol(self.dataName)
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_setProtocolFileName(self):
         if any([v in self.triggerProtocolFileNameLineEdit.text() for v in ("imported", "detected")]):
@@ -2639,7 +2648,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         else:
             self.triggerProtocols.clear()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_chooseProtocolFile(self):
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.triggerProtocolFileNameLineEdit,)]
@@ -2657,7 +2666,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.triggerProtocolFileNameLineEdit.setText(self.cachedProtocolFileName)
             self.triggerProtocols.clear()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_importPVScanFromWorkspace(self):
         vars_ = self.importWorkspaceData([xmlutils.xml.dom.minidom.Document, PVScan],
@@ -2675,7 +2684,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             signalblockers = [QtCore.QSignalBlocker(w) for w in (self.pvScanFileNameLineEdit, self.dataNameLineEdit)]
             self.pvScanFileNameLineEdit.setText("<imported>")
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_importOptionsFromWorkspace(self):
         vars_ = self.importWorkspaceData([ScanData, dict],
@@ -2692,7 +2701,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
             self.optionsFileNameLineEdit.setText("<imported>")
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_importEphysFromWorkspace(self):
         vars_ = self.importWorkspaceData([ScanData, neo.Block, neo.Segment, 
@@ -2742,7 +2751,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             signalblockers =[QtCore.QSignalBlocker(w) for w in (self.ephysFileNameLineEdit,)]
             self.ephysFileNameLineEdit.setText("<imported>")
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_importProtocolFromWorkspace(self):
         vars_ = self.importWorkspaceData([ScanData, TriggerProtocol, tuple, list],
@@ -2776,7 +2785,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.cachedProtocolFileName = self.triggerProtocolFileNameLineEdit.text()
             self.triggerProtocolFileNameLineEdit.setText("<imported>")
             
-    @pyqtSlot()
+    @Slot()
     def _slot_addProtocol(self):
         newProtocol = TriggerProtocol()
         if self._scandata_ is not None:
@@ -2911,7 +2920,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             self.errorMessage("PrairieView Importer", "Load protocols from file:\nExpecting a Pickle file; got %s which is a %s instead" % (fileName, mime_type))
             return False
         
-    @pyqtSlot()
+    @Slot()
     def done(self, value):
         """Generates ScanData object (if accepted) and closes the dialog.
         value: a QtWidgets.QDialog.DialogCode (Accepted = 1, Rejected = 2)
@@ -2923,17 +2932,17 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             
         super().done(value)        
         
-    @pyqtSlot()
+    @Slot()
     def accept(self):
         # NOTE: 2021-04-16 11:24:35 this calls done(QDialog.Accepted)
         super().accept()
         
-    @pyqtSlot()
+    @Slot()
     def reject(self):
         # NOTE: 2021-04-16 11:24:48 this calls done(QDialog.Rejected)
         super().reject()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_generateScanData(self):
         """If sel.auto_export is True, it also export the result to workspace.

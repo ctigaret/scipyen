@@ -65,9 +65,13 @@ from pandas import NA
 #import vigra.pyqt 
 import matplotlib as mpl
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets, QtSvg
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+# from PyQt5.uic import loadUiType as __loadUiType__
 
 #### END 3rd party modules
 
@@ -103,17 +107,17 @@ from iolib import h5io
 #### END scipyen iolib modules
 
 #### BEGIN scipyen gui modules
-from .scipyenviewer import ScipyenViewer, ScipyenFrameViewer
+from gui.scipyenviewer import ScipyenViewer, ScipyenFrameViewer
 
 
-from . import signalviewer as sv
-from . import pictgui as pgui
+from gui import signalviewer as sv
+from gui import pictgui as pgui
 
 # NOTE 2020-11-28 10:04:05
 # this should automatically import our custom colormaps AND ocean colormaps if found
-from . import scipyen_colormaps as colormaps 
-from . import quickdialog
-from . import painting_shared
+from gui import scipyen_colormaps as colormaps 
+from gui import quickdialog
+from gui import painting_shared
 from gui.itemslistdialog import ItemsListDialog
 #### END scipyen gui modules
 
@@ -207,12 +211,12 @@ class IntensityCalibrationLegend(pgraph.graphicsItems.GraphicsWidget.GraphicsWid
 class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
     """
     """
-    signalAutoRange             = pyqtSignal(name="signalAutoRange")
-    signalDefaultRange          = pyqtSignal(name="signalDefaultRange")
-    signalApply                 = pyqtSignal(name="signalApply")
-    signalFactorValueChanged    = pyqtSignal(float, name="signalFactorValueChanged")
-    signalMinRangeValueChanged  = pyqtSignal(float, name="signalMinRangeValueChanged")
-    signalMaxRangeValueChanged  = pyqtSignal(float, name="signalMaxRangeValueChanged")
+    signalAutoRange             = Signal(name="signalAutoRange")
+    signalDefaultRange          = Signal(name="signalDefaultRange")
+    signalApply                 = Signal(name="signalApply")
+    signalFactorValueChanged    = Signal(float, name="signalFactorValueChanged")
+    signalMinRangeValueChanged  = Signal(float, name="signalMinRangeValueChanged")
+    signalMaxRangeValueChanged  = Signal(float, name="signalMaxRangeValueChanged")
     
     
     
@@ -235,39 +239,39 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
         self.rangeMinSpinBox.valueChanged[float].connect(self.slot_sendNewRangeMinValue)
         self.rangeMaxSpinBox.valueChanged[float].connect(self.slot_sendNewRangeMaxValue)
         
-    @pyqtSlot()
+    @Slot()
     def slot_requestAutoRange(self):
         self.signalAutoRange.emit()
         
-    @pyqtSlot()
+    @Slot()
     def slot_requestDefaultRange(self):
         self.signalDefaultRange.emit()
     
-    @pyqtSlot()
+    @Slot()
     def slot_requestApplyToData(self):
         self.signalApply.emit()
         
-    @pyqtSlot(float)
+    @Slot(float)
     def slot_sendNewFactorValue(self, val):
         self.signalFactorValueChanged.emit(val)
         
-    @pyqtSlot(float)
+    @Slot(float)
     def slot_sendNewRangeMinValue(self, val):
         self.signalMinRangeValueChanged.emit(val)
         
-    @pyqtSlot(float)
+    @Slot(float)
     def slot_sendNewRangeMaxValue(self, val):
         self.signalMaxRangeValueChanged.emit(val)
         
-    @pyqtSlot(float)
+    @Slot(float)
     def slot_newFactorValueReceived(self, val):
         self.factorSpinBox.setValue(val)
         
-    @pyqtSlot(float)
+    @Slot(float)
     def slot_newMinRangeValueReceived(self, val):
         self.rangeMinSpinBox.setValue(val)
         
-    @pyqtSlot(float)
+    @Slot(float)
     def slot_newMaxRangeValueReceived(self, val):
         self.rangeMaxSpinBox.setValue(val)
         
@@ -397,14 +401,14 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         self.axisDescriptionEdit.clear()
         self.axisDescriptionEdit.plainText = self.description
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_axisIndexChanged(self, value):
         self.selectedAxisIndex = value
         self.updateFieldsFromAxis()
         #self.slot_generateCalibration()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_unitsChanged(self):
         try:
@@ -416,28 +420,28 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.slot_generateCalibration()
 
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_resolutionChecked(self, value):
         self.resolutionSpinBox.setReadOnly(value)
         self.pixelsDistanceSpinBox.setReadOnly(not value)
         self.calibratedDistanceSpinBox.setReadOnly(not value)
     
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_pixelsDistanceChecked(self, value):
         self.pixelsDistanceSpinBox.setReadOnly(value)
         self.resolutionSpinBox.setReadOnly(not value)
         self.calibratedDistanceSpinBox.setReadOnly(not value)
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_calibratedDistanceChecked(self, value):
         self.calibratedDistanceSpinBox.setReadOnly(value)
         self.pixelsDistanceSpinBox.setReadOnly(not value)
         self.resolutionSpinBox.setReadOnly(value)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_generateCalibration(self):
         self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
@@ -454,7 +458,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         
     
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_originChanged(self, value):
         self.origin = value
@@ -462,7 +466,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         self.slot_generateCalibration()
 
 
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_resolutionChanged(self, value):
         if self.pixelsDistanceRadioButton.isChecked(): # calculate distance in pixels
@@ -475,7 +479,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.slot_generateCalibration()
 
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_pixelDistanceChanged(self, value):
         if self.resolutionRadioButton.isChecked(): # calculate resolution
@@ -488,7 +492,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
     
         self.slot_generateCalibration()
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_calibratedDistanceChanged(self, value):
         if self.resolutionRadioButton.isChecked(): # calculate resolution
@@ -501,7 +505,7 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.slot_generateCalibration()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_descriptionChanged(self):
         self.description = self.axisDescriptionEdit.toPlainText()
@@ -521,9 +525,9 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         self.slot_generateCalibration()
         
 class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
-    signalMouseAt = pyqtSignal(int,int,name="signalMouseAt")
+    signalMouseAt = Signal(int,int,name="signalMouseAt")
     
-    signalMouseLeave = pyqtSignal()
+    signalMouseLeave = Signal()
     
     def __init__(self, gpix=None, rect = None, **args):
         if rect is not None:
@@ -640,21 +644,21 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     ####
     # signals
     ####
-    signalMouseAt             = pyqtSignal(int, int, name="signalMouseAt")
-    signalCursorAt            = pyqtSignal(str, list, name="signalCursorAt")
-    signalZoomChanged         = pyqtSignal(float, name="signalZoomChanged")
-    signalCursorPosChanged    = pyqtSignal(str, "QPointF", name="signalCursorPosChanged")
-    signalCursorLinkRequest   = pyqtSignal(pgui.GraphicsObject, name="signalCursorLinkRequest")
-    signalCursorUnlinkRequest = pyqtSignal(pgui.GraphicsObject, name="signalCursorUnlinkRequest")
-    signalCursorAdded         = pyqtSignal(object, name="signalCursorAdded")
-    signalCursorChanged       = pyqtSignal(object, name="signalCursorChanged")
-    signalCursorRemoved       = pyqtSignal(object, name="signalCursorRemoved")
-    signalGraphicsObjectSelected      = pyqtSignal(object, name="signalGraphicsObjectSelected")
-    signalRoiAdded            = pyqtSignal(object, name="signalRoiAdded")
-    signalRoiChanged          = pyqtSignal(object, name="signalRoiChanged")
-    signalRoiRemoved          = pyqtSignal(object, name="signalRoiRemoved")
-    signalRoiSelected         = pyqtSignal(object, name="signalRoiSelected")
-    signalGraphicsDeselected  = pyqtSignal()
+    signalMouseAt             = Signal(int, int, name="signalMouseAt")
+    signalCursorAt            = Signal(str, list, name="signalCursorAt")
+    signalZoomChanged         = Signal(float, name="signalZoomChanged")
+    signalCursorPosChanged    = Signal(str, "QPointF", name="signalCursorPosChanged")
+    signalCursorLinkRequest   = Signal(pgui.GraphicsObject, name="signalCursorLinkRequest")
+    signalCursorUnlinkRequest = Signal(pgui.GraphicsObject, name="signalCursorUnlinkRequest")
+    signalCursorAdded         = Signal(object, name="signalCursorAdded")
+    signalCursorChanged       = Signal(object, name="signalCursorChanged")
+    signalCursorRemoved       = Signal(object, name="signalCursorRemoved")
+    signalGraphicsObjectSelected      = Signal(object, name="signalGraphicsObjectSelected")
+    signalRoiAdded            = Signal(object, name="signalRoiAdded")
+    signalRoiChanged          = Signal(object, name="signalRoiChanged")
+    signalRoiRemoved          = Signal(object, name="signalRoiRemoved")
+    signalRoiSelected         = Signal(object, name="signalRoiSelected")
+    signalGraphicsDeselected  = Signal()
     
     ####
     # constructor
@@ -791,7 +795,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def _removePlanarGraphicsByName(self, name, cursors:bool=True):
         objs = []
         if cursors:
-            if name in iter_attribute(self.dataCursors, "name"):
+            if name in iter_attribute(self.graphicsCursors, "name"):
                 objs = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == name]
             else:
                 return
@@ -806,10 +810,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 
     def _removePlanarGraphics(self, name:typing.Optional[str]=None, cursors:bool=True):
         if cursors:
-            if len([o for o in self.dataCursors]) == 0:
+            if len([o for o in self.graphicsCursors]) == 0:
                 return
             
-            objNames = sorted([o.name for o in self.dataCursors])
+            objNames = sorted([o.name for o in self.graphicsCursors])
 
         else:
             if len([o for o in self.rois]) == 0:
@@ -857,11 +861,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 
         
     def _cursorEditor(self, crsId:str=None):
-        if len([o for o in self.dataCursors]) == 0:
+        if len([o for o in self.graphicsCursors]) == 0:
             return
         
         if not isinstance(crsId, str) or len(crsId.strip()) == 0:
-            selectionDialog = ItemsListDialog(self, sorted([c.name for c in self.dataCursors]), "Select cursor")
+            selectionDialog = ItemsListDialog(self, sorted([c.name for c in self.graphicsCursors]), "Select cursor")
             
             a = selectionDialog.exec_()
             
@@ -1013,7 +1017,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
             if newName is not None and len(newName.strip()) > 0:
                 if newName != old_name:
-                    if newName in [o.name for o in self.dataCursors]:
+                    if newName in [o.name for o in self.graphicsCursors]:
                         QtWidgets.QMessageBox.critical(self, "Cursor name clash", "A cursor named %s already exists" % newName)
                         return
                     
@@ -1101,7 +1105,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
         self._cursorContextMenuSourceId = None
         
-    @pyqtSlot()
+    @Slot()
     def buildROI(self):
         """Interactively builds a new ROI (i.e. using the GUI).
         """
@@ -1533,7 +1537,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     # slots
     ####
     
-    @pyqtSlot(int, str)
+    @Slot(int, str)
     @safeWrapper
     def slot_newROIConstructed(self, roiType, roiName):
         sender = self.sender()
@@ -1581,22 +1585,22 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         self.signalRoiAdded.emit(sender.backend)
             
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_cursorChanged(self, obj):
         self.signalCursorChanged.emit(obj)
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_roiChanged(self, obj):
         self.signalRoiChanged.emit(obj)
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_zoom(self, val):
         self._zoomView(val)
         
-    @pyqtSlot(float)
+    @Slot(float)
     @safeWrapper
     def slot_relativeZoom(self, val):
         newZoom = self.__zoomVal__ + val
@@ -1608,25 +1612,25 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 
         self._zoomView(newZoom)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editAnyCursor(self):
         self._cursorEditor()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editSelectedCursor(self):
         if self.selectedCursor is not None:
             self._cursorEditor(self.selectedCursor.ID)
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editCursor(self):
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
             self._cursorEditor(self._cursorContextMenuSourceId)
             
     def propagateCursorState(self):
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
             cursor = [o for o in filter(lambda x: isinstance(x.backend, pgui.Cursor) and x.backend.name == self._cursorContextMenuSourceId, self.graphicsObjects)]
             if len(cursor) == 0:
                 return
@@ -1637,20 +1641,20 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 cursor.backend.propagateFrameState(cursor.backend.currentFrame, cursor.backend.frameIndices)
                 cursor.backend.updateFrontends()
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editRoi(self):
         # TODO: select a roi fromt the list then bring up a ROI edit dialog
         pass
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editRoiProperties(self): # to always work on selected ROI
         # TODO bring up a ROI edit dialog
         # this MUST have a checkbox to allow shape editing when OK-ed
         pass
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editRoiShape(self): # to always work on selected ROI!
         if self.selectedRoi is not None:
@@ -1658,10 +1662,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             # press RETURN in editMode to turn editMode OFF
         
 
-    @pyqtSlot(str, QtCore.QPoint)
+    @Slot(str, QtCore.QPoint)
     @safeWrapper
     def slot_graphicsObjectMenuRequested(self, objId, pos):
-        if objId in iter_attribute(self.dataCursors,"name"):
+        if objId in iter_attribute(self.graphicsCursors,"name"):
             self._cursorContextMenuSourceId = objId
             
             cm = QtWidgets.QMenu("Cursor Menu", self)
@@ -1693,7 +1697,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             crsRemoveAction.triggered.connect(self.slot_removeRoi)
             cm.exec(pos)
             
-    @pyqtSlot(str, bool)
+    @Slot(str, bool)
     @safeWrapper
     def slot_setSelectedGraphicsObject(self, objId:str, sel:bool):
         # TODO 2021-05-10 13:31:27
@@ -1701,7 +1705,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         # or a unique selection PER GROUP of graphics object type (i.e. cursors
         # vs rois)?
         # I'm partial to the second option...'
-        if objId in iter_attribute(self.dataCursors, "name"):
+        if objId in iter_attribute(self.graphicsCursors, "name"):
             obj = [o for o in self.graphicsObjects if isinstance(o.backend, pgui.Cursor) and o.backend.name == objId]
             if len(obj):
                 self.selectedCursor = obj[0]
@@ -1721,13 +1725,13 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
         #else:
 
-    @pyqtSlot(str, bool)
+    @Slot(str, bool)
     @safeWrapper
     def slot_setSelectedCursor(self, cId:str, sel:bool):
         """To keep track of what cursor is selected, 
         independently of the underlying graphics view fw.
         """
-        if cId in iter_attribute(self.dataCursors, "name"):
+        if cId in iter_attribute(self.graphicsCursors, "name"):
             if sel:
                 c = [o for o in self.graphicsObjects if o.backend.name == cId]
                 if len(c):
@@ -1738,7 +1742,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.selectedCursor = None
         self.signalGraphicsDeselected.emit()
             
-    @pyqtSlot(str, bool)
+    @Slot(str, bool)
     @safeWrapper
     def slot_setSelectedRoi(self, rId:str, sel:bool):
         if rId in iter_attribute(self.rois, "name"):
@@ -1752,60 +1756,60 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.selectedRoi = None
         self.signalGraphicsDeselected.emit()
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_newHorizontalCursor(self):
         obj = self.newGraphicsObject(pgui.HorizontalCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_newPointCursor(self):
         obj = self.newGraphicsObject(pgui.PointCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_newVerticalCursor(self):
         obj = self.newGraphicsObject(pgui.VerticalCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_newCrosshairCursor(self):
         obj = self.newGraphicsObject(pgui.CrosshairCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_selectCursor(self, crsId):
-        if crsId in iter_attribute(self.dataCursors, "name"):
+        if crsId in iter_attribute(self.graphicsCursors, "name"):
             self.slot_setSelectedCursor(crsId, True)
       
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_selectGraphicsObject(self, objId):
         self.slot_setSelectedGraphicsObject(objId)
       
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_receiveCursorUnlinkRequest(self):
         pass
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_receiveCursorLinkRequest(self):
         pass
     
-    @pyqtSlot(str, "QPointF")
+    @Slot(str, "QPointF")
     @safeWrapper
     def slot_reportCursorPos(self, crsId, pos):
-        if crsId in iter_attribute(self.dataCursors, "name"):
-            obj = [o for o in self.dataCursor(crsId)]
+        if crsId in iter_attribute(self.graphicsCursors, "name"):
+            obj = [o for o in self.imageCursor(crsId)]
             
             if len(obj) == 0:
                 return
@@ -1824,12 +1828,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 self.signalCursorAt[str, list].emit(crsId,
                                                     [np.floor(pos.x()), np.floor(pos.y()), obj.xwindow, obj.ywindow])
                 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeCursors(self):
         self._removePlanarGraphics(cursors=True)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeAllCursors(self):
         self._removeAllPlanarGraphics(cursors=True)
@@ -1839,51 +1843,51 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             
         self.selectedCursor = None
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeSelectedCursor(self):
         self._removeSelectedPlanarGraphics(cursors=True)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeCursor(self):
-        if len([o for o in self.dataCursors]) == 0:
+        if len([o for o in self.graphicsCursors]) == 0:
             return
         
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.dataCursors, "name"):
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
             self.slot_removeCursorByName(self._cursorContextMenuSourceId)
         
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_removeCursorByName(self, crsId):
         self._removePlanarGraphics(name=crsId, cursors=True)
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeRois(self):
         self._removePlanarGraphics(cursors=False)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeAllRois(self):
         self._removeAllPlanarGraphics(cursors=False)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeAllGraphics(self):
         self._removeAllPlanarGraphics()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeSelectedRoi(self):
         self._removeSelectedPlanarGraphics(cursors=False)
         
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_removeRoiByName(self, roiId):
         self._removePlanarGraphicsByName(self, roiId, cursors=False)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeRoi(self):
         if len(self.__rois__) == 0:
@@ -1903,7 +1907,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def minZoom(self, val):
         self._minZoom__ = val
         
-    #@pyqtProperty(float)
+    #@Property(float)
     @property
     def maxZoom(self):
         return self.__maxZoom__
@@ -1957,7 +1961,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return filterfalse_type(self.planarGraphics, pgui.Cursor)
     
     @property
-    def dataCursors(self):
+    def graphicsCursors(self):
         """All PlanarGraphics Cursors with frontends in the scene.
         """
         return filter_type(self.planarGraphics, pgui.Cursor)
@@ -2036,7 +2040,10 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return filter_attribute(ret, attribute, value, predicate)
         
     @safeWrapper
-    def dataCursor(self, value:typing.Optional[typing.Any] = None, attribute:str="name", predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, **kwargs):
+    def imageCursor(self, value:typing.Optional[typing.Any] = None, 
+                     attribute:str="name",
+                     predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
+                     **kwargs):
         """Iterates through Cursors with specific attributes.
         
         Data cursors are selected by comparing the value of a specific cursor 
@@ -2050,7 +2057,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         value: any type; optional, default is None
             The value against which the value of the named attribute is compared.
             
-            When None, returns self.dataCursors property directly.
+            When None, returns self.graphicsCursors property directly.
             
         Named Parameters:
         =================
@@ -2079,7 +2086,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             'attribute' parameters described above.
             
             e.g.:
-            dataCursor(name=lambda x: x=="some_name")
+            imageCursor(name=lambda x: x=="some_name")
             
         Returns:
         ========
@@ -2094,9 +2101,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         if len(kwargs):
             ret = list()
             for n, f in kwargs.items():
-                ret.append(filter_attribute(self.dataCursors, n, f))
+                ret.append(filter_attribute(self.graphicsCursors, n, f))
         else:
-            ret = self.dataCursors
+            ret = self.graphicsCursors
             
         return filter_attribute(ret, attribute, value, predicate)
     
@@ -2216,13 +2223,13 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     #### END public methods
         
 class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
-    closeMe                 = pyqtSignal(int)
+    closeMe                 = Signal(int)
     
-    signal_graphicsObjectAdded      = pyqtSignal(object, name="signal_graphicsObjectAdded")
-    signal_graphicsObjectChanged    = pyqtSignal(object, name="signal_graphicsObjectChanged")
-    signal_graphicsObjectRemoved    = pyqtSignal(object, name="signal_graphicsObjectRemoved")
-    signal_graphicsObjectSelected   = pyqtSignal(object, name="signal_graphicsObjectSelected")
-    signal_graphicsObjectDeselected = pyqtSignal(name="signal_graphicsObjectDeselected")
+    signal_graphicsObjectAdded      = Signal(object, name="signal_graphicsObjectAdded")
+    signal_graphicsObjectChanged    = Signal(object, name="signal_graphicsObjectChanged")
+    signal_graphicsObjectRemoved    = Signal(object, name="signal_graphicsObjectRemoved")
+    signal_graphicsObjectSelected   = Signal(object, name="signal_graphicsObjectSelected")
+    signal_graphicsObjectDeselected = Signal(name="signal_graphicsObjectDeselected")
     
     # TODO 2019-11-01 22:41:39
     # implement viewing of Kernel2D, numpy.ndarray with 2 <= ndim <= 3
@@ -2611,14 +2618,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return list(set(self.viewerWidget.planarGraphics))
     
     @property
-    def dataCursors(self):
+    def graphicsCursors(self):
         """List of Cursor planar graphics.
         This is the list of unique planar graphics cursor backends for the 
         displayed cursors
         """
-        return list(self.viewerWidget.dataCursors)
+        return list(self.viewerWidget.graphicsCursors)
     
-    def getDataCursors(self, **kwargs):
+    def getGraphicsCursors(self, **kwargs):
         """List with a specific subset of Cursor planar graphics objects.
         
         Var-keyword parameters
@@ -2627,23 +2634,23 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             subset.
             
             When no var-keyword parameters are passed, the function returns 
-            self.dataCursors property directly.
+            self.graphicsCursors property directly.
         
         (see core.prog.filter_attr)
         """
         if len(kwargs):
-            return list(filter_attr(self.viewerWidget.dataCursors, **kwargs))
+            return list(filter_attr(self.viewerWidget.graphicsCursors, **kwargs))
         
-        return self.dataCursors
+        return self.graphicsCursors
     
     @safeWrapper
-    def dataCursor(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
+    def imageCursor(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
         """Returns a list of pictgui.Cursor selected by one or more attributes.
         
         By default, compares the value of the 'name' attribute of the 
         PlanarGraphics Cursor object to the 'value' parameter.
         
-        Delegates to GraphicsImageViewerWidget.dataCursor, documented below
+        Delegates to GraphicsImageViewerWidget.imageCursor, documented below
         
         Parameters: (from GraphicsImageViewerWidget.cursor(...) docstring)
         ==========
@@ -2669,15 +2676,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             Optional: default is the identity (lambda x,y: x==y)
         """
-        return list(self.viewerWidget.dataCursor(value, *args, **kwargs))
+        return list(self.viewerWidget.imageCursor(value, *args, **kwargs))
 
     @safeWrapper
     def hasCursor(self, *args, **kwargs):
         """Tests for existence of a GraphicsObject cursor with specified ID or name (label).
         
-        Delegates to self.dataCursor(...)
+        Delegates to self.imageCursor(...)
         """
-        return len(set(self.dataCursor(*args, **kwargs))) > 0
+        return len(set(self.imageCursor(*args, **kwargs))) > 0
     
     @property
     def rois(self):
@@ -2871,7 +2878,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             painter.end()
             out.save(fileName, file_format.strip().lower(), 100)
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportSceneAsPNG(self):
         if self._data_ is None:
@@ -2879,7 +2886,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._export_scene_helper_("png")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportSceneAsSVG(self):
         if self._data_ is None:
@@ -2887,7 +2894,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._export_scene_helper_("svg")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_exportSceneAsTIFF(self):
         if self._data_ is None:
@@ -2895,7 +2902,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self._export_scene_helper_("tiff")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_saveTIFF(self):
         if self._data_ is None:
@@ -2926,76 +2933,76 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         pio.saveImageFile(self._data_, fileName)
         
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editCursor(self):
         self.viewerWidget.slot_editAnyCursor()
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_editSelectedCursor(self):
         self.viewerWidget.slot_editSelectedCursor()
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeAllCursors(self):
         self.viewerWidget.slot_removeAllCursors()
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeSelectedCursor(self):
         self.viewerWidget.slot_removeSelectedCursor()
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeAllRois(self):
         self.viewerWidget.slot_removeAllRois()
         
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_removeRoi(self, roiId):
         self.viewerWidget.slot_removeRoiByName(roiId)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_removeSelectedRoi(self):
         self.viewerWidget.slot_removeSelectedRoi()
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_zoomIn(self):
         self._currentZoom_ +=1
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_zoomOriginal(self):
         self._currentZoom_ = 0
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
-    @pyqtSlot(object)
+    @Slot(object)
     def slot_varModified(self, obj):
         """Connected to _scipyenWindow_.workspaceModel.varModified signal
         """
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
         self.displayFrame()
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_zoomOut(self):
         self._currentZoom_ -=1
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_selectZoom(self):
         self.viewerWidget.interactiveZoom()
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_displayColorBar(self, value):
         if value:
@@ -3203,7 +3210,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_displayScaleBar(self, value):
         """
@@ -3367,7 +3374,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             pass
                 
     
-    @pyqtSlot()
+    @Slot()
     def slot_displayChannel(self):
         sender = self.sender()
         
@@ -3382,7 +3389,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             except:
                 return
             
-    @pyqtSlot()
+    @Slot()
     def slot_loadImageFromWorkspace(self):
         from core.workspacefunctions import getvarsbytype
         
@@ -3411,7 +3418,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             self.view(image, doc_title = image_title, displayChannel = self._displayedChannel_)
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     def slot_displayAllChannels(self, value):
         if value:
             self.displayAllChannels()
@@ -3424,37 +3431,37 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # (started in _displayValueAtCoordinates)
     # be aware that here the coordinates are a list
     # which may contain cursor window size as well
-    @pyqtSlot(str, list)
+    @Slot(str, list)
     @safeWrapper
     def slot_displayCursorPos(self, value, coords):
         self._displayValueAtCoordinates(coords, value)
 
-    @pyqtSlot(int,int)
+    @Slot(int,int)
     @safeWrapper
     def slot_displayMousePos(self, x, y):
         self._displayValueAtCoordinates((x,y))
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_graphicsObjectAdded(self, obj):
         self.signal_graphicsObjectAdded.emit(obj)
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_graphicsObjectChanged(self, obj):
         self.signal_graphicsObjectChanged.emit(obj)
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_graphicsObjectRemoved(self, obj):
         self.signal_graphicsObjectRemoved.emit(obj)
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def slot_graphicsObjectSelected(self, obj):
         self.signal_graphicsObjectSelected.emit(obj)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_graphicsObjectDeselected(self):
         self.signal_graphicsObjectDeselected.emit()
@@ -3502,7 +3509,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         try:
             # there may be a previous image stored here
-            if self._data_ is not None and len(self.dataCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
+            if self._data_ is not None and len(self.graphicsCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
                 if self._data_.shape[layout.horizontalAxis] != img.shape[layout.horizontalAxis] or \
                     self._data_.shape[layout.verticalAxis] != img.shape[layout.verticalAxis]:
                     self.questionMessage("Imageviewer:", "New image geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
@@ -3512,7 +3519,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     if ret == QtWidgets.QMessageBox.Cancel:
                         return False
                     
-                    for c in self.dataCursors:
+                    for c in self.graphicsCursors:
                         c.rangeX = img.shape[layout.horizontalAxis]
                         c.rangeY = img.shape[layout.verticalAxis]
                         c.setPos(img.shape[layout.horizontalAxis]/2, img.shape[layout.verticalAxis]/2)
@@ -4070,7 +4077,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def _editColorMap(self):
         pass
     
-    @pyqtSlot(str)
+    @Slot(str)
     @safeWrapper
     def slot_testColorMap(self, item:str):
         # NOTE 2020-11-28 10:19:07
@@ -4079,7 +4086,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             colorMap =  mpl.colormaps.get(item)
             self.displayFrame(colorMap=colorMap)
           
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseColorMap(self, *args):
         if self._data_ is None:
@@ -4120,7 +4127,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.displayFrame()
 
     def _editImageBrightness(self):
-        dlg = pgui.ImageBrightnessDialog(self)
+        dlg = ImageBrightnessDialog(self)
+        # dlg = pgui.ImageBrightnessDialog(self)
         dlg.show()
         
     def _editImageGamma(self):
@@ -5096,7 +5104,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
 
         return obj if returnGraphics else obj.backend
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseCursorsColor(self):
         if isinstance(self.cursorsColor, QtGui.QColor):
@@ -5111,7 +5119,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         self.setGraphicsObjectColor(color, "cursor")
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseLinkedCursorsColor(self):
         if isinstance(self.cursorsColor, QtGui.QColor):
@@ -5124,7 +5132,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.setGraphicsObjectColor(color, "linkedcursor")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseCursorLabelTextColor(self):
         if isinstance(self.cursorLabelTextColor, QtGui.QColor):
@@ -5136,7 +5144,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         color = self._showColorChooser(initial, "Choose color cursor labels text")
         self.setGraphicsObjectColor(color, "cursorLabelText")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseLinkedCursorLabelTextColor(self):
         if isinstance(self.linkedCursorLabelTextColor, QtGui.QColor):
@@ -5148,7 +5156,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         color = self._showColorChooser(initial, "Choose color cursor labels text")
         self.setGraphicsObjectColor(color, "linkedcursorlabeltext")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseCursorLabelBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
@@ -5163,7 +5171,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.setGraphicsObjectColor(color, "cursorLabelBackground")
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseLinkedCursorBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
@@ -5178,7 +5186,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.setGraphicsObjectColor(color, "cursorLabelBackground")
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseRoisColor(self):
         if isinstance(self.roisColor, QtGui.QColor):
@@ -5192,7 +5200,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "rois")
             
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseLinkedRoisColor(self):
         if isinstance(self.linkedROIsColor, QtGui.QColor):
@@ -5205,7 +5213,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.setGraphicsObjectColor(color, "linkedroi")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseRoisLabelTextColor(self):
         if isinstance(self.roiLabelTextColor, QtGui.QColor):
@@ -5218,7 +5226,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.setGraphicsObjectColor(color, "roilabeltext")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseLinkedRoisLabelTextColor(self):
         if isinstance(self.linkedROILabelTextColor, QtGui.QColor):
@@ -5231,7 +5239,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.setGraphicsObjectColor(color, "linkedroilabeltext")
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_chooseROILabelBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
@@ -5246,12 +5254,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.setGraphicsObjectColor(color, "roilabelbackground")
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_setOpaqueCursorLabels(self, value):
         self.setOpaqueGraphicsLabel(cursors=True, opaque=value)
             
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_setOpaqueROILabels(self, value):
         self.setOpaqueGraphicsLabel(cursors=False, opaque=value)
