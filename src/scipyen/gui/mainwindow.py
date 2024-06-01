@@ -3855,9 +3855,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         saveVars.hovered.connect(self._slot_showActionStatusMessage_)
 
         pickleVars = cm.addAction("Save as Pickle")
-        pickleVars.setToolTip("Save selected variables as Pickle files")
-        pickleVars.setStatusTip("Save selected variables as Pickle files")
-        pickleVars.setWhatsThis("Save selected variables as Pickle files")
+        pickleVars.setToolTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
+        pickleVars.setStatusTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
+        pickleVars.setWhatsThis("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
         pickleVars.triggered.connect(self.slot_pickleSelectedVariables)
         pickleVars.hovered.connect(self._slot_showActionStatusMessage_)
 
@@ -4142,6 +4142,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         indexList = self.workspaceView.selectedIndexes()
 
         if len(indexList) == 0:
+            return
+
+        ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
+        if ret != QtWidgets.QMessageBox.Yes:
             return
 
         varSet = set()
@@ -5844,6 +5848,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # self.loadFiles(selectedItems, 
         #                self._openSelectedFileItemsThreaded, updateUi=True)
         
+        return True
+        
     @safeWrapper
     def _saveSelectedObjectsThreaded(self, saveFn: typing.Callable):
         # TODO: replicate the logic in _openSelectedFileItemsThreaded
@@ -6362,7 +6368,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     @safeWrapper
     def slot_saveFile(self):
-        """Saves data to file.
+        """Saves data to HDF5 or pickle file(s).
 
         If one variable is selected in the workspace, opens a dialog to save it
         to a specific file type e.g., VigraArrays are saved as images or volumes
@@ -6390,6 +6396,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 selectedItems[0].row(), 0).text()
 
             if type(self.workspace[varname]).__name__ == 'VigraArray':
+                # NOTE: 2024-06-01 16:52:57
+                # special case because we can export data to image file types
                 fileFilters = list()
                 fileFilters.append("HDF5 (*.h5)")
                 imageFileFilters = list()
@@ -6413,14 +6421,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     kw = {}
 
                 if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-                    fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(
+                    fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(
                         self, caption=u'Save Image File', filter=fileFilt, directory=targetDir,
-                        **kw))
+                        **kw)
 
                 else:
-                    fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(
+                    fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(
                         self, caption=u'Save Image File', filter=fileFilt,
-                        **kw))
+                        **kw)
 
                 if len(fileName) > 0:
                     data = self.workspace[varname]
@@ -6430,15 +6438,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
                     else:
                         if file_flt.startswith("HDF5"):
-                            pio.saveHDF(data, varname)
+                            # print(f"{self.__class__.__name__}.slot_saveFile saving {varname} as {fileName}")
+                            pio.saveHDF5(data, fileName)
 
                         else:
-                            pio.savePickleFile(data, varname)
+                            ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
+                            if ret == QtWidgets.QMessageBox.Yes:
+                                pio.savePickleFile(data, fileName)
 
             else:
                 fileFilters = list()
                 fileFilters.append("HDF5 (*.h5)")
-                fileFilters.append("Pickle (*pkl)")
+                fileFilters.append("Pickle (*.pkl)")
                 fileFilt = ';;'.join(fileFilters)
                 targetDir = self.recentDirectories[0]
 
@@ -6449,28 +6460,43 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     kw = {}
 
                 if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-                    fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save Image File', filter=fileFilt, directory=targetDir,
-                        **kw))
+                    fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(
+                        self, caption=u'Save as', filter=fileFilt, directory=targetDir,
+                        **kw)
 
                 else:
-                    fileName, file_flt = str(QtWidgets.QFileDialog.getSaveFileName(
-                        self, caption=u'Save Image File', filter=fileFilt,
-                        **kw))
+                    fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(
+                        self, caption=u'Save as', filter=fileFilt,
+                        **kw)
 
                 if len(fileName) > 0:
                     data = self.workspace[varname]
                     if file_flt.startswith("HDF5"):
-                        pio.saveHDF5(data, varname)
+                        pio.saveHDF5(data, fileName)
 
+                    elif file_flt.startswith("Pickle"):
+                        ret = self.questionMessage("Save data as pickle file", "Saving data as pickle file is not recommended for long-term data storage. Do you want to continue?")
+                        if ret == QtWidgets.QMessageBox.Yes:
+                            pio.savePickleFile(data, fileName)
+                            
                     else:
-                        pio.savePickleFile(data, varname)
-                # errMsgDlg = QtWidgets.QErrorMessage(self)
-                # errMsgDlg.setWindowTitle("Not implemented for this variable type")
-                # errMsgDlg.showMessage("Not implemented for this variable type")
-
+                        # print(f"{self.__class__.__name__}.slot_saveFile saving {varname} as {fileName} with type {file_flt}")
+                        file_type = "unspecified"
+                        if len(file_flt) == 0:
+                            ext = pathlib.Path(fileName).suffix
+                            if len(ext):
+                                file_type = pio.getMimeAndFileType(f"*{ext}")[0]
+                                
+                        else:
+                            file_type = pio.getMimeAndFileType(file_flt.replace('(', '').replace(')', ''))[0]
+                            
+                        if file_type is None:
+                            file_type = "unspecified"
+                            
+                        self.errorMessage("Save as...",f"I don't know how to save to {type(data).__name__} data to {file_type} file type")
+                        return
         else:
-            self.slot_saveSelectedVariables()
+            self.slot_saveSelectedVariables() # saves as HDF5 by default
 
     # NOTE: 2016-04-01 11:09:49
     # file dialog filtered on all supported image file formats
@@ -6583,6 +6609,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # the below becomes a threaded version, therefore we need to move the code 
         # that is coming past it, to the function that processes the result of the 
         # file loading thread
+        # selectedItems = [self.fileSystemModel.filePath(item) for item in self.fileSystemTreeView.selectedIndexes()
+        #                  if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
+        # if len(selectedItems):
         if self.slot_openSelectedFileItems():
             return
 

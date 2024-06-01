@@ -64,6 +64,9 @@
      <property name="title">
       <string>&amp;Import</string>
      </property>
+     <property name="icon">
+      <iconset theme="document-import"/>
+     </property>
      <addaction name="actionImport_PrairieView_data"/>
     </widget>
     <addaction name="actionOpen"/>
@@ -825,6 +828,9 @@ NOTE: you can click anywhere in the row to select</string>
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
+   <addaction name="actionOpen"/>
+   <addaction name="actionSave"/>
+   <addaction name="separator"/>
   </widget>
   <action name="actionSave">
    <property name="icon">
@@ -832,7 +838,16 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>&amp;Save As ...</string>
+    <string>&amp;Save ...</string>
+   </property>
+   <property name="toolTip">
+    <string>Save (export data)</string>
+   </property>
+   <property name="statusTip">
+    <string>Save (export data)</string>
+   </property>
+   <property name="whatsThis">
+    <string>Exports data to a file type chosen from a dialog.</string>
    </property>
   </action>
   <action name="actionQuit">
@@ -963,6 +978,12 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>&amp;Open...</string>
+   </property>
+   <property name="statusTip">
+    <string>Opens selected files in the file system browser or via a dialog</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Opens the selected file(s) in the File System tab, or presents an file chooser dialog when no files are selected.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionOpen_Files">
@@ -1112,7 +1133,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionSet_user_plugins_directory">
    <property name="icon">
-    <iconset theme="folder-extension-symbolic"/>
+    <iconset theme="folder-extension-symbolic">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Set user plugins directory</string>

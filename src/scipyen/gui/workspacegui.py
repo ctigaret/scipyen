@@ -365,15 +365,15 @@ class GuiMessages(object):
 
     @staticmethod
     def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.question(obj, title, text)
+        return QtWidgets.QMessageBox.question(obj, title, text, defaultButton=default)
         
     @safeWrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.warning(self, title, text)
+        return QtWidgets.QMessageBox.warning(self, title, text, defaultButton=default)
     
     @staticmethod
     def warningMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.warning(obj, title, text)
+        return QtWidgets.QMessageBox.warning(obj, title, text, defaultButton=default)
         
     @safeWrapper
     def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):

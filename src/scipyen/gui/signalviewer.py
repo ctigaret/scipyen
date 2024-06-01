@@ -4273,14 +4273,14 @@ anything else       anything else       ❌
         if self._scipyenWindow_ is not None:
             targetDir = self._scipyenWindow_.currentDir
             
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,
+            fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(self,
                                                                 caption="Export figure as %s" % caption_suffix,
                                                                 filter = file_filter,
                                                                 directory = targetDir,
                                                                 **kw)
             
         else:
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,
+            fileName, file_flt = QtWidgets.QFileDialog.getSaveFileName(self,
                                                                 caption="Export figure as %s" % caption_suffix,
                                                                 filter = file_filter, **kw)
             
