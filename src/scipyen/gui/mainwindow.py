@@ -156,6 +156,11 @@ from qtpy.uic import loadUiType
 # from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from jupyter_core.paths import jupyter_runtime_dir
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
 import vigra
 import h5py
 import xarray as xa

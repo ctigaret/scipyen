@@ -159,6 +159,12 @@ import numpy as np
 import scipy
 import quantities as pq
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
+    
 # from neo.core.baseneo import (MergeError, merge_annotations, intersect_annotations,
 #                               _reference_name, _container_name)
 

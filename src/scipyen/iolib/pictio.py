@@ -45,6 +45,12 @@ import pandas as pd
 import h5py
 import vigra
 import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
+    
 import confuse # for programmatic read/write of non-gui settings
 
 # from qtpy import QtCore, QtGui, QtWidgets
@@ -52,9 +58,6 @@ import confuse # for programmatic read/write of non-gui settings
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-#from core import neo
-#from core import patchneo
-
 from core import pyabfbridge as pab
 
 from core import (xmlutils, strutils, datasignal)#, neoepoch, neoevent)
