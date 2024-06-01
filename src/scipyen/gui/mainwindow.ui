@@ -73,8 +73,6 @@
     <addaction name="menuImport"/>
     <addaction name="actionSave"/>
     <addaction name="actionChange_Working_Directory"/>
-    <addaction name="separator"/>
-    <addaction name="separator"/>
     <addaction name="actionReload_Plugins"/>
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
@@ -507,6 +505,9 @@ NOTE: you can click anywhere in the row to select</string>
           <iconset theme="view-filter">
            <normaloff>.</normaloff>.</iconset>
          </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
@@ -518,14 +519,19 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="selDirBtn">
          <property name="toolTip">
-          <string>Select directory</string>
+          <string>Select working directory</string>
+         </property>
+         <property name="statusTip">
+          <string>Select working directory</string>
+         </property>
+         <property name="whatsThis">
+          <string>Select working directory</string>
          </property>
          <property name="text">
-          <string>Open directory...</string>
+          <string>&amp;Select working directory</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="document-open-folder"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -845,6 +851,7 @@ NOTE: you can click anywhere in the row to select</string>
    </attribute>
    <addaction name="actionOpen"/>
    <addaction name="actionSave"/>
+   <addaction name="actionChange_Working_Directory"/>
    <addaction name="separator"/>
   </widget>
   <action name="actionSave">
@@ -966,7 +973,10 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>&amp;Change Working Directory</string>
+    <string>&amp;Select Working Directory</string>
+   </property>
+   <property name="statusTip">
+    <string>Select working directory</string>
    </property>
   </action>
   <action name="actionNew_Signal_Viewer">
@@ -1156,6 +1166,11 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionImport_Electrophysiology_File">
    <property name="text">
     <string>&amp;Electrophysiology</string>
+   </property>
+  </action>
+  <action name="actionRecent">
+   <property name="text">
+    <string>Recent</string>
    </property>
   </action>
  </widget>

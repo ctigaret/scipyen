@@ -1837,10 +1837,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @recentFiles.setter
     def recentFiles(self, val: typing.Optional[typing.Union[collections.OrderedDict, tuple, list]] = None):
         if isinstance(val, collections.OrderedDict):
-            self._recentFiles = val
-        elif isinstance(val, (tuple, list)):
-            self._recentFiles = collections.OrderedDict(
-                zip(val, ["vigra"] * len(val)))
+            if not all(isinstance(v, dict) and "loader" in v and "timestamp" in v for v in val.values()):
+                return
+            items = tuple(filter(lambda v: pathlib.Path(v[0]).exists(), sorted(val.items(), key = lambda x: x[1]["timestamp"], reverse=True)))
+            
+            self._recentFiles = val.__class__(items)
+        # elif isinstance(val, (tuple, list)):
+        #     self._recentFiles = collections.OrderedDict(
+        #         zip(val, ["vigra"] * len(val)))
         else:
             self._recentFiles = collections.OrderedDict()
 
@@ -1913,6 +1917,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self._showFilesFilter = val is True
 
         self.filesFilterFrame.setVisible(self._showFilesFilter)
+        
+        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.viewFilesFilterToolBtn, self.hideFilesFilterToolBtn)]
+        
+        self.viewFilesFilterToolBtn.setChecked(self._showFilesFilter)
         
     @property
     def currentDir(self):
@@ -4682,13 +4690,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: File menu - some actions defined in mainwindow.ui
         self.actionImport_PrairieView_data.triggered.connect(
             self.slot_importPrairieView)
-        self.recentFilesMenu = QtWidgets.QMenu("Recent Files", self)
+        self.recentFilesMenu = QtWidgets.QMenu("Open recent...", self)
         self.recentFilesMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
-        self.menuFile.insertMenu(self.actionQuit, self.recentFilesMenu)
+        # self.menuFile.insertMenu(self.actionOpen, self.recentFilesMenu)
+        self.menuFile.insertMenu(self.menuImport.menuAction(), self.recentFilesMenu)
 
-        self.recentDirectoriesMenu = QtWidgets.QMenu("Recent Directories", self)
+        self.recentDirectoriesMenu = QtWidgets.QMenu("Recent Working Directories", self)
         self.recentDirectoriesMenu.setIcon(QtGui.QIcon.fromTheme("folder-open-recent"))
-        self.menuFile.insertMenu(self.actionQuit, self.recentDirectoriesMenu)
+        self.menuFile.insertMenu(self.actionReload_Plugins, self.recentDirectoriesMenu)
+        self.menuFile.insertSeparator(self.actionReload_Plugins)
 
         self.menuFile.insertSeparator(self.actionQuit)
 
@@ -4778,6 +4788,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
+            
+        self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        
+        self.tbOpen.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
+        self.tbOpen.setMenu(self.recentFilesMenu)
+        
+        self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
+        self.tbChDir.setMenu(self.recentDirectoriesMenu)
+        
+        
 
         # BEGIN do not delete: action for presenting a list of viewer types to choose from
         # self.menuViewer.addSeparator()
@@ -4873,13 +4894,16 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.dirFwdBtn.released.connect(self.slot_goToNextDir)
         # self.selDirBtn.released.connect(self.slot_selectDir)
         self.selDirBtn.released.connect(self.slot_selectWorkDir)
+        self.selDirBtn.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
+        self.selDirBtn.setMenu(self.recentDirectoriesMenu)
         
         # NOTE: 2023-09-28 12:13:22
         self.openTermBtn.released.connect(self.slot_openCurrentDirInSystemTerminal)
         self.systemOpenFolderBtn.released.connect(self.slot_systemOpenCurrentFolder)
         self.systemOpenParentFolderBtn.released.connect(self.slot_systemOpenParentFolder2)
         
-        self.viewFilesFilterToolBtn.released.connect(self.slot_showFilesFilter)
+        # self.viewFilesFilterToolBtn.released.connect(self.slot_showFilesFilter)
+        self.viewFilesFilterToolBtn.toggled.connect(self.slot_showFilesFilter)
         self.hideFilesFilterToolBtn.released.connect(self.slot_hideFilesFilter)
 
         # filter/select variable names combo
@@ -5041,19 +5065,22 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self._recentFiles = collections.OrderedDict()
 
         if len(self._recentFiles) == 0:
-            self._recentFiles[item] = loader
+            self._recentFiles[item] = {"loader":loader, "timestamp": datetime.datetime.now()}
         else:
-            recFNames = list(self._recentFiles.keys())
+            recFNames = sorted(self._recentFiles.items(), key=lambda x: x[1]["timestamp"], reverse=True)
 
             if item not in recFNames:
                 if len(self._recentFiles) == self._maxRecentFiles:
-                    del (self._recentFiles[recFNames[-1]])
+                    self._recentFiles.pop(recFNames[-1], None)
 
-                self._recentFiles[item] = loader
+                self._recentFiles[item] = {"loader":loader, "timestamp":datetime.datetime.now()}
 
-            elif self._recentFiles[item] != loader:
-                self._recentFiles[item] = loader
-
+            elif self._recentFiles[item]["loader"] != loader:
+                self._recentFiles[item]["loader"] = loader
+                self._recentFiles[item]["timestamp"] = datetime.datetime.now()
+                
+            items = tuple(filter(lambda v: pathlib.Path(v[0]).exists(), sorted(self._recentFiles.items(), key = lambda x: x[1]["timestamp"], reverse=True)))
+            self._recentFiles = self._recentFiles.__class__(items)
         # NOTE: 2023-05-27 23:50:19
         # This function may be called from another thread hence it cannot be
         # expected to modify the UI in self (which lives in the current thread)
@@ -5070,14 +5097,23 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.recentFilesMenu.clear()
 
         if len(self._recentFiles) > 0:
+            if self._maxRecentFiles > 10:
+                clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                    "Clear Recent Files List")
+                clearAction.triggered.connect(self._clearRecentFiles_)
+                self.recentFilesMenu.addSeparator()
+                
             for item in self._recentFiles.keys():
-                action = self.recentFilesMenu.addAction(item)
+                itemName = pathlib.Path(item).name
+                itemText = f"{itemName} [{item}]"
+                action = self.recentFilesMenu.addAction(itemText)
                 action.triggered.connect(self.slot_loadRecentFile)
 
-            self.recentFilesMenu.addSeparator()
-            clearAction = self.recentFilesMenu.addAction(
-                "Clear Recent Files List")
-            clearAction.triggered.connect(self._clearRecentFiles_)
+            if self._maxRecentFiles <= 10:
+                self.recentFilesMenu.addSeparator()
+                clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                    "Clear Recent Files List")
+                clearAction.triggered.connect(self._clearRecentFiles_)
 
     def _refreshRecentDirsComboBox_(self):
         self.directoryComboBox.clear()
@@ -5099,15 +5135,22 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.recentDirectoriesMenu.clear()
 
         if len(self.recentDirectories) > 0:
+            if self._maxRecentDirectories > 10:
+                clearDirAction = self.recentDirectoriesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                    "Clear Recent Directories List")
+                clearDirAction.triggered.connect(self._clearRecentDirectories_)
+                self.recentDirectoriesMenu.addSeparator()
+                
             for item in self.recentDirectories:
                 action = self.recentDirectoriesMenu.addAction(item)
                 action.setText(item)
                 action.triggered.connect(self.slot_changeDirectory)
 
-            self.recentDirectoriesMenu.addSeparator()
-            clearDirAction = self.recentDirectoriesMenu.addAction(
-                "Clear Recent Directories List")
-            clearDirAction.triggered.connect(self._clearRecentDirectories_)
+            if self._maxRecentDirectories <= 10:
+                self.recentDirectoriesMenu.addSeparator()
+                clearDirAction = self.recentDirectoriesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                    "Clear Recent Directories List")
+                clearDirAction.triggered.connect(self._clearRecentDirectories_)
 
     def _clearRecentDirectories_(self):
         self._recentDirectories.clear()
@@ -5856,15 +5899,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 
         return OK
             
-    @Slot()
+    @Slot(bool)
     @safeWrapper
-    def slot_showFilesFilter(self):
-        self.filesFilterFrame.setVisible(True)
+    def slot_showFilesFilter(self, val):
+        self.showFileSystemFilter = val is True
+        # self.filesFilterFrame.setVisible(True)
 
     @Slot()
     @safeWrapper
     def slot_hideFilesFilter(self):
-        self.filesFilterFrame.setVisible(False)
+        self.showFileSystemFilter=False
+        # self.filesFilterFrame.setVisible(False)
 
     @Slot(str)
     @safeWrapper
@@ -6140,8 +6185,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         Delegates to self.loadDiskFile(file_name, fileReader)
         """
         self.loadDiskFile(fName)
-            # # self._addRecentFile_(fName, fileReader) # done inside loadDiskFile
-            # self.workspaceModel.update()
 
     @Slot()
     @safeWrapper
@@ -6156,11 +6199,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         '''
         action = self.sender()
         if isinstance(action, QtWidgets.QAction):
-            fName = str(action.text()).replace('&', '')
-            fileReader = self.recentFiles[fName]
+            itemText = str(action.text()).replace('&', '')
+            pathPart = itemText.split('[')[-1]
+            fName = pathPart.split(']')[0]
+            fileReader = self.recentFiles[fName]["loader"]
 
-            self.loadDiskFile(fName, fileReader)
-                # self.workspaceModel.update()
+            self.loadDiskFile(fName, fileReader=fileReader, addToRecent=False)
 
     @Slot(str)
     @safeWrapper
