@@ -149,8 +149,11 @@ from copy import copy
 #import vigra.pyqt.quickdialog as quickdialog
 import numpy as np
 from traitlets import Bunch
-from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets, QtXml
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 #### END 3rd party modules
 
 #### BEGIN core modules
@@ -7012,7 +7015,7 @@ class Planar2QGraphicsManager(QtCore.QObject):
         
     
     """
-    sig_planar_changed = pyqtSignal(name="sig_planar_changed")
+    sig_planar_changed = Signal(name="sig_planar_changed")
     
     def __init__(self, planarobject=None, grobject=None, parent=None):
         super(Planar2QGraphicsManager, self).__init__(parent=parent)
@@ -7546,23 +7549,23 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     # this is for Qt Graphics View Framework RTTI logic
     Type = QtWidgets.QGraphicsItem.UserType + PlanarGraphicsType.allObjectTypes
     
-    #signalPosition = pyqtSignal(int, str, "QPointF", name="signalPosition")
-    signalPosition = pyqtSignal(str, QtCore.QPointF, name="signalPosition")
+    #signalPosition = Signal(int, str, "QPointF", name="signalPosition")
+    signalPosition = Signal(str, QtCore.QPointF, name="signalPosition")
     
     # used to notify the cursor manager (a graphics viewer widget) that this cursor has been selected
-    selectMe = pyqtSignal(str, bool, name="selectMe") 
+    selectMe = Signal(str, bool, name="selectMe") 
     
-    signalGraphicsObjectPositionChange = pyqtSignal(QtCore.QPointF, name="signalGraphicsObjectPositionChange")
+    signalGraphicsObjectPositionChange = Signal(QtCore.QPointF, name="signalGraphicsObjectPositionChange")
     
     # it is up to the cursor manager (a graphics viewer widget) to decide what 
     # to do with this (i.e., what menu & actions to generate)
-    requestContextMenu = pyqtSignal(str, QtCore.QPoint, name="requestContextMenu")
+    requestContextMenu = Signal(str, QtCore.QPoint, name="requestContextMenu")
     
-    signalROIConstructed = pyqtSignal(int, str, name="signalROIConstructed")
+    signalROIConstructed = Signal(int, str, name="signalROIConstructed")
     
-    signalBackendChanged = pyqtSignal(object, name="signalBackendChanged")
+    signalBackendChanged = Signal(object, name="signalBackendChanged")
     
-    signalIDChanged = pyqtSignal(str, name="signalIDChanged")
+    signalIDChanged = Signal(str, name="signalIDChanged")
     
     # 
     # NOTE: 2021-05-12 14:29:39 look-and-feel matrix:
@@ -9943,7 +9946,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.redraw()
         #self.update()
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slotFrameChanged(self, val):
         self._currentframe_ = val

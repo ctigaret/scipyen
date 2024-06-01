@@ -7,8 +7,19 @@ from abc import (ABC, ABCMeta, abstractmethod,)
 from traitlets import Bunch
 #from abc import (abstractmethod,)
 
-from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty,)
+from qtpy import (QtCore, QtWidgets, QtGui)
+
+has_qdbus = False
+try:
+    from qtpy import QtDBus
+    has_qdbus = True
+except:
+    has_qdbus = False
+    
+from qtpy.QtCore import (Signal, Slot, Property,)
+# from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
+# from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
+# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
 
 from core.utilities import safeWrapper
 # from core import workspacefunctions as wfunc
@@ -72,7 +83,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     _configureUI_() -- configures specific GUI widgets and menus
         
          ATTENTION: If the viewer inherits Qt widgets and actions defined in a
-        QtDesigner *.ui file (loaded with PyQt5.uic.loadUiType()) then this function
+        QtDesigner *.ui file (loaded with uic.loadUiType()) then this function
         must call self.setupUi() very early.
     
     If there are viewer type-specific settigns that need to be made persistent
@@ -126,15 +137,18 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     data types for which there exists a specialized viewer will be displayed, 
     by default, in that specialized viewer, instead of DataViewer.
     """
-    sig_activated           = pyqtSignal(int, name="sig_activated")
-    sig_closeMe             = pyqtSignal()
+    sig_activated           = Signal(int, name="sig_activated")
+    sig_closeMe             = Signal()
     
     # tuple of 2-tuples (python type, priority)
     # if you don;t want this to be registered as a viewer, then make this attribute empty
     viewer_for_types = {object:0}
     view_action_name = None
     
-    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, deleteOnClose:bool=False, **kwargs):
+    def __init__(self, data: object = None, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+                 ID:(int, type(None)) = None, win_title: (str, type(None)) = None, 
+                 doc_title: (str, type(None)) = None, 
+                 deleteOnClose:bool=False, **kwargs):
         """Constructor.
         
         Sets up attributes common to all Scipyen's viewers.
@@ -184,15 +198,25 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         *args, **kwargs: variadic argument and keywords specific to the constructor of the
             derived subclass.
         """
-        #print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
+        # print(f"ScipyenViewer<{self.__class__.__name__}>.__init__ data: {type(data).__name__}")
+        # print(f"ScipyenViewer<{self.__class__.__name__}>.__init__")
         if sys.platform == "win32" or os.name == "nt" or platform.uname().system == "Windows":
+            parent = None
+            
+        # NOTE: 2024-04-17 11:53:29
+        # fixes viewer window stacking when running on Plasma 6 Wayland 
+        # session
+        # >>> NOTE <<< you still get the "qt.qpa.wayland: Wayland does not support QWindow::requestActivate()"
+        # warnings at the system console, though ⌢
+        elif sys.platform == "linux" and os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             parent = None
             
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, on=False)
-        self._docTitle_ = None
-        self._winTitle_ = None # force auto-set in update_title()
+        self._docTitle_ = doc_title
+        self._winTitle_ = win_title # force auto-set in update_title()
+        # self._winTitle_ = None # force auto-set in update_title()
         self._custom_viewer_name_ = None
         
         # NOTE: 2023-01-22 11:14:42
@@ -233,9 +257,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._global_menu_service_ = None
         
-        if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
+        # if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
+        if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
             # if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
-            if sysutils.is_kde_x11():
+            if sysutils.is_kde_x11() and has_qdbus:
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
                 
                 if len(appMenuServiceNames):
@@ -289,21 +314,24 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self._app_menu_ = self.getAppMenu()
         
-        # if hasattr(self._scipyenWindow_, "workspaceModel") and isinstance(self._scipyenWindow_.workspaceModel, WorkspaceModel):
-        #     self.windowTitleChanged.connect(self._scipyenWindow_.workspaceModel._slot_itemGuiObjectTitleChanged)
-        
-        # if self.appWindow is self.scipyenWindow: # both attributes inherited from WorkspaceGuiMixin
-        #     self.appWindow.registerWindow(self)
-
     #def mousePressEvent(self, evt):
         #if sys.platform == "win32":
             #self.activateWindow()
         #super().mousePressEvent(evt)
 
+    def requestActivate(self):
+        """workaround wayland"""
+        if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+            return
+        super().requestActivate()
+        
+
     def activateWindow(self):
         if sys.platform== "win32":
             self.windowHandle().raise_()
         else:
+            if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+                return
             super().activateWindow()
         
     def getAppMenu(self):
@@ -343,7 +371,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             
                 return result
             
-    def update_title(self, doc_title: (str, type(None)) = None, win_title: (str, type(None)) = None, enforce: bool = False):
+    def update_title(self, doc_title: typing.Optional[str] = None, 
+                     win_title: typing.Optional[str] = None, 
+                     enforce: bool = False):
         """Sets up the window title according to the pattern document - viewer.
         
         Parameters:
@@ -390,6 +420,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # user-imposed viewer title
             self._winTitle_ = win_title
             self._custom_viewer_name_ = win_title
+            
+        if not isinstance(self._winTitle_, str):
+            self._winTitle_ = self.__class__.__name__
+            
+        elif len(self._winTitle_.strip()) == 0:
+            self._winTitle_ = self.scipyenWindow.applicationName
             
         if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
             self.setWindowTitle("%s - %s" % (self._docTitle_, self._winTitle_))
@@ -536,6 +572,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         if get_focus:
             self.activateWindow()
+            
             #self.show()
         
     @abstractmethod
@@ -679,7 +716,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         return super().event(evt)
     
-    @pyqtSlot(QtGui.QWindow.Visibility)
+    @Slot(QtGui.QWindow.Visibility)
     def _slot_visibility_changed(self, val):
         if hasattr(self, "_wm_id_") and self._wm_id_ != int(self.winId()):
             if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
@@ -730,7 +767,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                     dereg_reply = dbusinterface.call("UnregisterWindow", old_v)
                     newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1]))
     
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_refreshDataDisplay(self):
         """Triggeres a refresh of the displayed information.
@@ -815,7 +852,12 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     Derived classes:
     ----------------
-    ImageViewer, SignalViewer, LSCaTWindow, EventAnalysis, LTPAnalysis, APTrains.
+    In Scipyen code tree:
+        ImageViewer, SignalViewer
+
+    In scipyen_plugins (outside main Scipyehn code tree):
+        LSCaTWindow, EventAnalysis, LTPAnalysis, APTrains.
+        (NOTE: Some of these still need to be finalised/written)
 
     ATTENTION: When deriving a viewer window type from ScipyenFrameViewer:
 
@@ -911,9 +953,16 @@ class ScipyenFrameViewer(ScipyenViewer):
     
     # signal emitted when the viewer displays a data frame; value:int = the
     # index of the frame in the data
-    frameChanged            = pyqtSignal(int, name="frameChanged")
+    frameChanged            = Signal(int, name="frameChanged")
     
-    def __init__(self, data: typing.Optional[object] = None, parent: typing.Optional[QtWidgets.QMainWindow] = None, ID: typing.Optional[int] = None, win_title: typing.Optional[str] = None, doc_title: typing.Optional[str] = None, frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, currentFrame: typing.Optional[int] = None, missingFrameValue:typing.Optional[object]=None, *args, **kwargs):
+    def __init__(self, data: typing.Optional[object] = None, 
+                 parent: typing.Optional[QtWidgets.QMainWindow] = None, 
+                 ID: typing.Optional[int] = None, 
+                 win_title: typing.Optional[str] = None, 
+                 doc_title: typing.Optional[str] = None, 
+                 frameIndex: typing.Optional[typing.Union[int, tuple, list, range, slice]] = None, 
+                 currentFrame: typing.Optional[int] = None, 
+                 missingFrameValue:typing.Optional[object]=None, *args, **kwargs):
         """Constructor for ScipyenFrameViewer.
         
         Parameters:
@@ -1248,7 +1297,7 @@ class ScipyenFrameViewer(ScipyenViewer):
                     
             self._linkedViewers_.clear()
         
-    @pyqtSlot(int)
+    @Slot(int)
     @safeWrapper
     def slot_setFrameNumber(self, value:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         """Drives frame navigation from the GUI.
@@ -1258,7 +1307,7 @@ class ScipyenFrameViewer(ScipyenViewer):
         
         NOTE: Subclasses can reimplement this function.
         """
-        #print(f"ScipyenFrameViewer<{self.__class__.__name__}> slot_setFrameNumber {value}")
+        # print(f"ScipyenFrameViewer<{self.__class__.__name__}> slot_setFrameNumber {value}")
         
         if isinstance(value, int):
             if value not in range(self._number_of_frames_):

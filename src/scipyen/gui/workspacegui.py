@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
-import typing, warnings, os, inspect, sys, traceback
+import typing, warnings, os, inspect, sys, traceback, types
 import pathlib
 from pprint import pprint
 #### BEGIN Configurable objects with traitlets.config
 from traitlets import (config, Bunch)
 #### END Configurable objects with traitlets.config
 import matplotlib as mpl
-from PyQt5 import (QtCore, QtWidgets, QtGui)
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty)
-#from traitlets.config import SingletonConfigurable
+from qtpy import (QtCore, QtWidgets, QtGui)
+from qtpy.QtCore import (Signal, Slot, Property)
+
 from core.utilities import safeWrapper
-from core.workspacefunctions import (user_workspace, validate_varname,get_symbol_in_namespace)
+from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)
 from core.scipyen_config import (ScipyenConfigurable, 
                                  syncQtSettings, 
                                  markConfigurable, 
@@ -19,12 +19,255 @@ from core.scipyen_config import (ScipyenConfigurable,
                                  confuse)
 from core import strutils, sysutils
 from core.strutils import InflectEngine
+from core.prog import (printStyled, scipywarn)
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
 
+SESSION_TYPE = os.getenv("XDG_SESSION_TYPE")
+
+class DirectoryFileWatcher(QtCore.QObject):
+    """Signal dispatcher between a file system directory monitor and an observer.
+    Binds signals emitted by the monitor to bound methods (callbacks) in the 
+    observer.
+    
+    The monitor must emit the following signals:
+        "sig_newItemsInMonitoredDir",
+        "sig_itemsRemovedFromMonitoredDir",
+        "sig_itemsChangedInMonitoredDir"
+        
+    The observer must have the following methods:
+        "changedFiles",
+        "removedFiles",
+        "filesChanged"
+        
+    Currently, the monitor interface is implemented in Scipyen's MainWindow.
+    Current implementations of the observer interface are:
+        ephys.ltp._LTPOnlineSupplier_
+    """
+    emitter_sigs = ("sig_newItemsInMonitoredDir",
+                    "sig_itemsRemovedFromMonitoredDir",
+                    "sig_itemsChangedInMonitoredDir", 
+                    "sig_changedDirectory")
+    
+    emitter_interface = ("currentDir", "enableDirectoryMonitor", 
+                         "monitoredDirectories", "isDirectoryMonitored", )
+    
+    emitter_attrs = ("_monitoredDirsCache_", )
+
+    observer_interface = ("newFiles",
+                          "changedFiles",
+                          "removedFiles",
+                          "filesChanged", )
+
+    def __init__(self, parent=None, emitter = None,
+                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
+                 observer:typing.Optional[object] = None):
+        super().__init__(parent=parent)
+        self._newFiles_     = list()
+        self._removedFiles_ = list()
+        self._changedFiles_ = list()
+        self._source_       = None
+        self._observer_     = None
+        self._watchedDir_   = None
+        
+        if all(hasattr(observer, x) and (inspect.isfunction(inspect.getattr_static(observer, x)) and inspect.ismethod(getattr(observer, x))) for x in self.observer_interface):
+            self._observer_ = observer
+            
+        # print(f"{self.__class__.__name__}.__init__: emitter = {emitter}")
+
+        if not self._check_emitter_(emitter):
+            raise TypeError(f"Invalid 'emitter' was provided")
+        
+        self._source_ = emitter
+        self._source_.sig_newItemsInMonitoredDir.connect(self.slot_newFiles, type=QtCore.Qt.QueuedConnection)
+        self._source_.sig_itemsRemovedFromMonitoredDir.connect(self.slot_filesRemoved, type=QtCore.Qt.QueuedConnection)
+        self._source_.sig_itemsChangedInMonitoredDir.connect(self.slot_filesChanged, type=QtCore.Qt.QueuedConnection)
+        
+        self.directory = directory
+
+        # if isinstance(emitter, QtCore.QObject):
+        #     if all(hasattr(emitter, x) and isinstance(inspect.getattr_static(emitter, x), QtCore.Signal) for x in self.emitter_sigs):
+        #         self._source_ = emitter
+        #         self._source_.sig_newItemsInMonitoredDir.connect(self.slot_newFiles, type=QtCore.Qt.QueuedConnection)
+        #         self._source_.sig_itemsRemovedFromMonitoredDir.connect(self.slot_filesRemoved, type=QtCore.Qt.QueuedConnection)
+        #         self._source_.sig_itemsChangedInMonitoredDir.connect(self.slot_filesChanged, type=QtCore.Qt.QueuedConnection)
+
+
+        # if directory is None:
+        #     if isinstance(self._source_, QtCore.QObject) and hasattr(self._source_, "currentDir"):
+        #         if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
+        #             self._watchedDir_ = pathlib.Path(self._source_.currentDir).absolute()
+        # 
+        # elif isinstance(directory, str):
+        #     self._watchedDir_ = pathlib.Path(directory)
+        # 
+        # elif isinstance(directory, pathlib.Path):
+        #     self._watchedDir_ = directory
+        # 
+        # else:
+        #     raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
+        
+    def _check_emitter_(self, obj:QtCore.QObject) -> bool:
+        # print(f"{self.__class__.__name__}._check_emitter_(obj):")
+        ret = isinstance(obj, QtCore.QObject)
+        # print(f"\tobj is QObject: {ret}")
+        if ret:
+            ret &= all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), QtCore.Signal) for x in self.emitter_sigs)
+            # print(f"\tobj has emitter signals: {ret}")
+            
+        if ret: 
+            ret &= all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), (property, types.FunctionType)) for x in self.emitter_interface)
+            # print(f"\tobj has emitter interface: {ret}")
+            
+        if ret:
+            ret &= all(hasattr(obj, x) for x in self.emitter_attrs)
+            # print(f"\tobj has emitter attrs: {ret}")
+            
+        return ret
+
+    @property
+    def directory(self) -> typing.Optional[pathlib.Path]:
+        return self._watchedDir_
+
+    @directory.setter
+    def directory(self, val:typing.Optional[typing.Union[str, pathlib.Path]]):
+        # if not (isinstance(self._source_, QtCore.QObject) and all(hasattr(self._source_, v) for v in ("currentDir", "enableDirectoryMonitor", "monitoredDirectories"))):
+        #     scipywarn("Cannot monitor directories as we don't have a valid signal emitter")
+        #     return
+                    
+        if val is None:
+            if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
+                dirToWatch = pathlib.Path(self._source_.currentDir).absolute()
+
+        elif isinstance(val, str):
+            dirToWatch = pathlib.Path(val)
+
+        elif isinstance(val, pathlib.Path):
+            dirToWatch = val
+
+        else:
+            raise TypeError(f"Expecting a str, a pathlib.Path, or None; instead, got {type(val).__name__}")
+        
+        if self._source_.isDirectoryMonitored(dirToWatch):
+            # reset the monitored directory cache
+            self._source_._monitoredDirsCache_[dirToWatch].clear()
+            
+        else:
+            watchedDirectories = self._source_.monitoredDirectories
+            for d in watchedDirectories:
+                self._source_.enableDirectoryMonitor(d, False)
+            self._source_.enableDirectoryMonitor(dirToWatch)
+        
+        self._watchedDir_ = dirToWatch
+        
+        # print(f"{self.__class__.__name__}.directory.setter changed to {self._watchedDir_}")
+
+
+    @property
+    def observer(self) -> object:
+        return self._observer_
+
+    @observer.setter
+    def observer(self, value:typing.Optional[typing.Any]=None):
+        if all(hasattr(value, x) and (inspect.isfunction(inspect.getattr_static(value, x)) and inspect.ismethod(getattr(value, x))) for x in self.observer_interface):
+            self._observer_ = value
+        else:
+            self._observer_ = None
+
+    @Slot(tuple)
+    def slot_filesRemoved(self, value):
+        # Check all items in value are files and are in the same parent directory
+        if not all(isinstance(v, pathlib.Path) for v in value):
+            warnings.warn(f"Should have received a tuple of pathlib.Path objects only!")
+            return
+
+        if not isinstance(self._watchedDir_, pathlib.Path) or not self._watchedDir_.is_dir() or not self._watchedDir_.exists():
+            warnings.warn(f"invalid watched directory {self._watchedDir_}")
+            return
+
+        files = [v for v in value if v.parent == self._watchedDir_]
+        # NOTE: is_file() would return False here because file was removed !
+        # files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
+        self._removedFiles_[:] = files[:] # may clear this; below we only send if not empty
+
+        # if hasattr(self._source_, "console"):
+        #     txt = f"{self.__class__.__name__}.slot_filesRemoved {self._removedFiles_}\n"
+        #     self._source_.console.writeText(txt)
+
+        if len(files):
+            if self.observer is not None :
+                self.observer.removedFiles(self._removedFiles_)
+
+
+    @Slot(tuple)
+    def slot_filesChanged(self, value):
+        # Check all items in value are files and are in the same parent directory
+        if not all(isinstance(v, pathlib.Path) for v in value):
+            warnings.warn(f"Should have received a tuple of pathlib.Path objects only!")
+            return
+
+        if not isinstance(self._watchedDir_, pathlib.Path) or not self._watchedDir_.is_dir() or not self._watchedDir_.exists():
+            warnings.warn(f"invalid watched directory {self._watchedDir_}")
+            return
+
+        files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
+        self._changedFiles_[:] = files[:] # may clear this; below we only send if not empty
+
+        # if hasattr(self._source_, "console"):
+        #     txt = f"{self.__class__.__name__}.slot_filesChanged {self._changedFiles_}\n"
+        #     self._source_.console.writeText(txt)
+
+        if len(files):
+            if self.observer is not None :
+                self.observer.changedFiles(self._changedFiles_)
+
+
+    @Slot(tuple)
+    def slot_newFiles(self, value):
+        """"""
+        # Check all items in value are files and are in the same parent directory
+        if not all(isinstance(v, pathlib.Path) for v in value):
+            warnings.warn(f"Should have received a tuple of pathlib.Path objects only!")
+            return
+
+        if not isinstance(self._watchedDir_, pathlib.Path) or not self._watchedDir_.is_dir() or not self._watchedDir_.exists():
+            warnings.warn(f"invalid watched directory {self._watchedDir_}")
+            return
+
+        files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
+
+        self._newFiles_[:] = files[:] # may clear this; below we only send if not empty
+
+        # if hasattr(self._source_, "console"):
+        #     txt = f"{self.__class__.__name__}.slot_newFiles {self._newFiles_}\n"
+        #     self._source_.console.writeText(txt)
+
+        if len(files):
+            if self.observer is not None :
+                self.observer.newFiles(self._newFiles_)
+                
+                
+    def monitorFile(self, filepath:pathlib.Path, on:bool=True):
+        if filepath.is_file() and filepath.parent == self._watchedDir_:
+            if hasattr(self._source_, "dirFileMonitor") and isinstance(self._source_.dirFileMonitor, QtCore.QFileSystemWatcher):
+                if on:
+                    self._source_.dirFileMonitor.addPath(str(filepath))
+                    self._source_.dirFileMonitor.fileChanged.connect(self.slot_monitoredFileChanged)
+                else:
+                    if str(filepath) in self._source_.dirFileMonitor.files():
+                        self._source_.dirFileMonitor.removePath(str(filepath))
+        
+    @safeWrapper
+    @Slot()
+    def slot_monitoredFileChanged(self, *args, **kwargs):
+        # print(f"{self.__class__.__name__}._slot_monitoredFileChanged:\n\targs = {args}\n\t kwargs = {kwargs}\n\n")
+        self._observer_.filesChanged(self._source_.dirFileMonitor.files())
+        
+    
+
 class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
-    sig_wm_inspect_done = pyqtSignal(name="sig_wm_inspect_done")
+    sig_wm_inspect_done = Signal(name="sig_wm_inspect_done")
     
     def __init__(self, parent=None):
         # NOTE: 2023-01-08 13:19:59
@@ -49,7 +292,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
             self.timer.setInterval(25)
             self.timer.timeout.connect(self.wmctrl.start)
             
-    @pyqtSlot()
+    @Slot()
     def _slot_parseWindowsList(self):
         if not isinstance(self.wmctrl, QtCore.QProcess):
             self.sig_wm_inspect_done.emit()
@@ -122,15 +365,15 @@ class GuiMessages(object):
 
     @staticmethod
     def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.question(obj, title, text)
+        return QtWidgets.QMessageBox.question(obj, title, text, defaultButton=default)
         
     @safeWrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.warning(self, title, text)
+        return QtWidgets.QMessageBox.warning(self, title, text, defaultButton=default)
     
     @staticmethod
     def warningMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.warning(obj, title, text)
+        return QtWidgets.QMessageBox.warning(obj, title, text, defaultButton=default)
         
     @safeWrapper
     def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
@@ -182,7 +425,11 @@ class GuiMessages(object):
         return msgbox.exec()
        
     @staticmethod
-    def detailedMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Message", text:str="", info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
+    def detailedMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, 
+                               title:str="Message", text:str="", 
+                               info:typing.Optional[str]="", 
+                               detail:typing.Optional[str]="", 
+                               msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
         """Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message
@@ -229,6 +476,19 @@ class GuiMessages(object):
             msgbox.setDetailedText(detail)
             
         return msgbox.exec()
+    
+class DirectoryObserver(QtCore.QObject):
+    # NOTE: 2024-05-19 10:58:13 TODO 
+    # finalize this class: move all relevant API from ScipyenWindow here then
+    # make ScipyenWindow inherit this class
+    sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
+    sig_itemsRemovedFromMonitoredDir = Signal(tuple, name="sig_itemsRemovedFromMonitoredDir")
+    sig_itemsChangedInMonitoredDir = Signal(tuple, name="sig_itemsChangedInMonitoredDir")
+
+    def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
+        super().__init__(parent=parent)
+        self._monitoredDirsCache_ = dict()
+    
         
 class FileIOGui(object):
     @safeWrapper
@@ -392,6 +652,135 @@ class FileIOGui(object):
             dirName = str(QtWidgets.QFileDialog.getExistingDirectory(obj, caption=caption, **kw))
             
         return dirName
+    
+class FileStatChecker(QtCore.QObject):
+    """Monitors changes ot a file system file object"""
+    okToProcess = Signal(pathlib.Path, name="okToProcess")
+    
+    def __init__(self, filePath:typing.Optional[pathlib.Path] = None, 
+                 interval:typing.Optional[int] = None,
+                 maxUnchangedIntervals:typing.Optional[int] = None,
+                 callback:typing.Optional[typing.Callable] = None,
+                 parent:typing.Optional[QtCore.QObject] = None):
+        super().__init__(parent=parent)
+        
+        self._filePath_ = filePath
+        
+        if isinstance(callback, typing.Callable):
+            self._callback_ = callback
+        else:
+            self._callback_ = None
+        
+        if not isinstance(interval, int) or interval <= 0:
+            interval = 10 # default
+            
+        if not isinstance(maxUnchangedIntervals, int) or maxUnchangedIntervals < 1:
+            maxUnchangedIntervals = 1
+            
+        self._maxUnchangedIntervals_ = maxUnchangedIntervals # number of intervals
+        
+        self._intervals_since_last_change_ = 0 # ms
+        
+        self._timer_ = QtCore.QTimer(self)
+        self._timer_.timeout.connect(self._slot_checkFile)
+        self._timer_.setInterval(interval) #  ms interval
+        
+        if isinstance(filePath, pathlib.Path) and filePath.is_file():
+            self._currentStat_ = self._filePath_.stat()
+            self._timer_.start()
+        
+    @property
+    def timer(self) -> QtCore.QTimer:
+        return self._timer_
+    
+    @property
+    def interval(self) -> int:
+        return self.timer.interval()
+    
+    @interval.setter
+    def interval(self, val:int):
+        if not isinstance(val, int) or val <= 0:
+            val = 10 #ms, default
+            
+        self.timer.setInterval(val) #  this will also stop the timer ?!?
+        # if not self.timer.isActive():
+        #     self.timer.start()
+        
+    @property
+    def active(self) -> bool:
+        return self.timer.isActive()
+        
+    @property
+    def maxIntervalsQuiet(self) -> int:
+        return self._maxUnchangedIntervals_
+    
+    @maxIntervalsQuiet.setter
+    def maxIntervalsQuiet(self, val:int):
+        if not isinstance(val, int) or val < 1:
+            val = 1
+            
+        self._maxUnchangedIntervals_ = val
+
+    @property
+    def monitoredFile(self) -> pathlib.Path:
+        return self._filePath_
+    
+    @monitoredFile.setter
+    def monitoredFile(self, f:pathlib.Path):
+        if not isinstance(f, pathlib.Path) or not f.exists() or not f.is_file():
+            warnings.warn(f"{self.__class__.__name__}.monitoredFile: {self._filePath_} is not a valid file path")
+            return
+        self.reset()
+        try:
+            self._currentStat_ = f.stat()
+            self._filePath_ = f
+        except:
+            traceback.print_exc()
+        
+    @property
+    def callback(self) -> typing.Optional[typing.Callable]:
+        return self._callback_
+    
+    @callback.setter
+    def callback(self, val:typing.Optional[typing.Callable] = None):
+        if not isinstance(val, (typing.Callable, type(None))):
+            warnings.warn(f"Expecting a callable or None; instead, got {type(val).__name__}")
+            return 
+        self.reset()
+        self._callback_ = val
+        
+    def reset(self):
+        self.stop()
+        self._intervals_since_last_change_ = 0
+        
+    def stop(self):
+        self.timer.stop()
+        
+    def start(self):
+        if isinstance(self._filePath_, pathlib.Path) and self._filePath_.is_file():
+            self.timer.start()
+        else:
+            warnings.warn(f"{self.__class__.__name__}.start: {self._filePath_} is not a valid file path")
+        
+    def _slot_checkFile(self):
+        if isinstance(self._filePath_, pathlib.Path) and self._filePath_.is_file():
+            stat = self._filePath_.stat()
+            
+            if stat == self._currentStat_:
+                # print(f"{self.__class__.__name__} file {self._filePath_.name} has not changed in the last {self.timer.interval()} ms")
+                self._intervals_since_last_change_ += 1 # count up
+                
+            else:
+                # print(f"{self.__class__.__name__} file {self._filePath_.name} has changed in the last {self.timer.interval()} ms")
+                self._currentStat_ = stat
+                self._intervals_since_last_change_  = 0 # reset this
+                
+            # print(f"{self.__class__.__name__} file {self._filePath_.name} long unchanged {self._intervals_since_last_change_ >= self._maxUnchangedIntervals_}")
+            if self._intervals_since_last_change_ >= self._maxUnchangedIntervals_:
+                self.okToProcess.emit(self._filePath_)
+                if inspect.isfunction(self._callback_) or inspect.ismethod(self._callback_):
+                    self._callback_(self._filePath_)
+            
     
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
@@ -573,12 +962,17 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         
         appWindow = kwargs.pop("appWindow", None)
         
+        parent_obj = parent
+        
         
         if isinstance(scipyenWindow, QtWidgets.QMainWindow) and type(scipyenWindow).__name__ == "ScipyenWindow":
             self._scipyenWindow_ = scipyenWindow
             
-        elif isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
-            self._scipyenWindow_   = parent
+        # elif isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
+        #     self._scipyenWindow_   = parent
+            
+        elif isinstance(parent_obj, QtWidgets.QMainWindow) and type(parent_obj).__name__ == "ScipyenWindow":
+            self._scipyenWindow_   = parent_obj
             
         else:
             # NOTE: 2020-12-05 21:24:45 CAUTION FIXME/TODO
@@ -602,52 +996,19 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if isinstance(appWindow, QtWidgets.QMainWindow) and type(appWindow).__name__ != "ScipyenWindow":
             self._appWindow_ = appWindow
             
-        else:
-            self._appWindow_ = self._scipyenWindow_
+        elif self._appWindow_ is None:
+            # if isinstance(parent, QtWidgets.QMainWindow):
+            #     self._appWindow_ = parent
+            if isinstance(parent_obj, QtWidgets.QMainWindow):
+                self._appWindow_ = parent_obj
+                
+            else:
+                self._appWindow_ = self._scipyenWindow_
                     
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)  
             
         ScipyenConfigurable.__init__(self, *args, **kwargs)
-        
-        # self._winFlagsCache_ = None
-        
-        # if sys.platform == "win32":
-        #     if isinstance(self, QtWidgets.QMainWindow):
-        #         self._winFlagsCache_ = self.windowFlags()
-                # flags = self.windowFlags() | QtCore.Qt.MSWindowsOwnDC | QtCore.Qt.BypassWindowManagerHint
-                # self.setWindowFlags(flags);
-                
-                
-#     def event(self, evt):
-#         if not isinstance(self, QtWidgets.QMainWindow):
-#             return False
-#         
-#         if sys.platform == "win32":
-#             if evt == QtCore.QEvent.WindowDeactivate:
-#                 self.setWindowFlags(self._winFlagsCache_);
-#                 self.show();
-#                 return True
-#             
-#             return super(QtWidgets.QMainWindow, self).event(evt)
-#                 
-#                 
-#         else:
-#             return super(QtWidgets.QMainWindow, self).event(evt)
-#  
-#     def activateWindow(self):
-#         if not isinstance(self, QtWidgets.QMainWindow):
-#             return
-#         if sys.platform== "win32":
-#             # flags = self.windowFlags();
-#             # self.show(); # Restore from systray
-#             # self.setWindowState(QtCore.Qt.WindowActive); # Bring window to foreground
-#             self.setWindowFlags(self._winFlagsCache_|QtCore.Qt.WindowStaysOnTopHint);
-#             self.show();
-#             # self.raise_()
-#         else:
-#             super().activateWindow()
-
         
     @property
     def scipyenWindow(self):
@@ -921,7 +1282,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 if isinstance(configData, dict) and len(configData):
                     for k,v in configData.items():
                         self.set_configurable_attribute(k,v,cfg)
-    @pyqtSlot()
+    @Slot()
     def _slot_breakLoop(self):
         """To be connected to the `canceled` signal of a progress dialog.
         Modifies the loopControl variable to interrupt a worker loop gracefully.
@@ -944,7 +1305,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         progressDlg.setMinimumDuration(1000)
         progressDlg.canceled.connect(self._slot_breakLoop)
         kw = {"filePaths": filePaths, "ioReader": ioReaderFn, "updateUi": updateUi}
-        workerThread = pgui.WorkerThread(self, fileLoaderFn, **kw)
+        workerThread = pgui.LoopWorkerThread(self, fileLoaderFn, **kw)
         workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
         workerThread.signals.signal_Result[object].connect(self.workerReady)
         workerThread.signals.signal_Finished.connect(progressDlg.reset)
@@ -960,7 +1321,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # TODO replicate the logic in loadFiles -> mainWindow._saveSelectedObjectsThreaded
         
         
-    @pyqtSlot(object)
+    @Slot(object)
     def workerReady(self, obj):
         # print(f"{self.__class__.__name__}.workerReady: obj = {obj}; self.updateUiWithFileLoad = {self.updateUiWithFileLoad }")
         self.loopControl["break"] = False

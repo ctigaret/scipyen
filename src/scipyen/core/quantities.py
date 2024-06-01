@@ -285,9 +285,6 @@ qe = 1.602176634e-19 * pq.C
 N_A = 6.02214076e23 * pq.mol**(-1)
 
 
-def testme():
-    print(__file__, __name__)
-    
 def get_constants():
     ret = dict()
     
@@ -604,6 +601,30 @@ def str2quantity(x:str):
     else:
         raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; indtead, got {x}")
 
+def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]):
+    if isinstance(x, pq.Quantity):
+        x = x.dimensionality
+    dimstr = f"{x}"
+    if dimstr == "dimensionless":
+        return ""
+    
+    pfx = list(AllPrefixes.keys())
+    
+    mypfx = list(filter(lambda x: dimstr.startswith(x), pfx))
+    
+    if len(mypfx):
+        mypfx = mypfx[0]
+        res = dimstr.split(mypfx)
+        if len(res) > 1:
+            sfx = res[-1]
+            if sfx in ("ohm"):
+                sfx = "Ω"
+            return "".join([AllPrefixes[mypfx]["symbol"], sfx])
+    
+    return dimstr
+        
+        
+
 def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], precision:int = 2, format:str="f"):
     """Returns a str representation of a scalar Quantity or Dimensionality.
     Useful to store quantities via json/yaml etc.
@@ -701,11 +722,18 @@ def name_from_unit(u, as_key:bool=False):
             else:
                 d_name = unitQuantity.name
                 
+                # print(f"d_name = {d_name}")
+                
                 derdims = unique([(u._reference.dimensionality, tuple(v)) for u, v in DERIVED.items()], 
                                 key = lambda x: x[1])
                 
+                # print(f"derdims = {derdims}")
+                
                 indices = index_of([d[0] for d in derdims], u._reference.dimensionality, 
                                 multiple=True, comparator = operator.eq)
+                
+                # print(f"indices = {indices}")
+                
                 
                 if isinstance(indices, list) and len(indices):
                     physQuants = unique(reduce(lambda x, y: x + y, (derdims[k][1] for k in indices)))
@@ -732,7 +760,7 @@ def name_from_unit(u, as_key:bool=False):
                                 
                         return physQname.capitalize() if not as_key else physQname[0].upper()
                 
-                if "arbitrary unit" in d_name:
+                if "arbitrary unit" in d_name.lower():
                     return "Quantity" if not as_key else "?"
                     #d_name = "A.U."
                 
@@ -742,40 +770,40 @@ def name_from_unit(u, as_key:bool=False):
                 if d_name in ("arcdegree"):
                     return "Angle" if not as_key else "Theta"
                     
-                if "volt" in d_name:
+                if "volt" in d_name.lower():
                     return "Potential" if not as_key else "Psi"
                     
-                if "ampere" in d_name:
+                if "ampere" in d_name.lower():
                     return "Current" if not as_key else "I"
                     
-                if "siemens" in d_name:
+                if "siemens" in d_name.lower():
                     return "Conductance" if not as_key else "G"
                     
-                if "ohm" in d_name:
+                if "ohm" in d_name.lower():
                     return "Resistance" if not as_key else "R"
                     
-                if "coulomb" in d_name:
+                if "coulomb" in d_name.lower():
                     return "Charge" if not as_key else "Q"
                     
-                if "farad" in d_name:
+                if "farad" in d_name.lower():
                     return "Capacitance" if not as_key else "C"
                     
-                if "hertz" in d_name:
+                if "hertz" in d_name.lower():
                     return "Frequency" if not as_key else "f"
                 
-                if any([v in d_name for v in ("meter", "foot", "mile", "yard")]):
+                if any([v in d_name.lower() for v in ("meter", "foot", "mile", "yard")]):
                     return "Length" if not as_key else "L"
                     
-                if "postnatal" in d_name:
+                if "postnatal" in d_name.lower():
                     return "Age"
                     
-                if "in vitro" in d_name:
+                if "in vitro" in d_name.lower():
                     return "Age in vitro" if not as_key else "aiv"
                     
-                if "embryonic" in d_name:
+                if "embryonic" in d_name.lower():
                     return "Embryonic age" if not as_key else "ed"
                     
-                if any([v in d_name for v in ("second", "minute", "day","week", "month", "year")]):
+                if any([v in d_name.lower() for v in ("second", "minute", "day","week", "month", "year")]):
                     return "Time" if not as_key else "t"
                     
                 return "Quantity" if not as_key else "?"
@@ -871,7 +899,7 @@ def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     else:
         return 1.0
     
-def units_convertible(x, y):
+def units_convertible(x: pq.Quantity, y: pq.Quantity) -> bool:
     """Checks that the units of python Quantities x and y are identical or convertible to each other.
     NOTE: To check that x and y have IDENTICAL units simply call 'x.units == y.units'
     """
@@ -882,6 +910,17 @@ def units_convertible(x, y):
         raise TypeError("y expected to be a python UnitQuantity or Quantity; got %s instead" % type(y).__name__)
     
     return x._reference.dimensionality == y._reference.dimensionality
+
+def check_rescale(x: pq.Quantity, y: pq.Quantity) -> pq.Quantity:
+    """Checks that units of `x` are convertible to units of `y`.
+    
+    Returns `x` rescaled to units of `y`, or raises AssertionError if `x` units 
+    and `y` units are not convertible to each other (or not identical)
+    
+    """
+    assert(units_convertible(x,y)), f"Cannot convert {x.units} to {y.units}"
+    
+    return x if x.units == y.units else x.rescale(y.units)
 
 def unit_quantity_from_name_or_symbol(s):
     if not isinstance(s, str):

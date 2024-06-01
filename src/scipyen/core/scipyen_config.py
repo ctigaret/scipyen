@@ -97,9 +97,12 @@ import quantities as pq
 
 import matplotlib as mpl # needed to expose the mro of Figure.canvas
 from matplotlib.figure import Figure
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-from PyQt5.QtWidgets import (QWidget, QMainWindow)
-from PyQt5.QtCore import (QSettings, QVariant)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+from qtpy.QtWidgets import (QWidget, QMainWindow)
+from qtpy.QtCore import QSettings # NOTE: 2024-05-03 09:26:33 QVariant not available in PySide
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+# from PyQt5.QtWidgets import (QWidget, QMainWindow)
+# from PyQt5.QtCore import (QSettings, QVariant)
 
 from IPython.lib.pretty import pprint
 
@@ -627,7 +630,10 @@ def loadQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, default:t
     # print(f"loadQSettingsKey group: {gname}, key: {key}, value: {ret} ({type(ret).__name__})")
     return ret
 
-def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None, save:bool=True):
+def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, Figure], 
+                   group_name:typing.Optional[str]=None,
+                   prefix:typing.Optional[str]=None, 
+                   save:bool=True):
     """Synchronize user-specifc settings with the Scipyen's Qt configuration file.
     
     The Scipyen's configuration file is in native format, and on Linux it usually
@@ -943,9 +949,6 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
                 if not isinstance(value_type, type):
                     value_type = type(default)
                     
-                # if settername == "autoRemoveViewers":
-                #     print(f"value_type {value_type}")
-                    
                 try:
                     if value_type is bool:
                         if isinstance(newval, str):
@@ -1148,7 +1151,7 @@ class ScipyenConfigurable(object):
         
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
         #### BEGIN debug - comment out when done
-#         if self.__class__.__name__ == "EventAnalysis":
+#         if self.__class__.__name__ == "TwoPathwaysOnlineLTP":
 #             print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
 #             stack = inspect.stack()
 #             for s in stack:
@@ -1393,7 +1396,7 @@ class ScipyenConfigurable(object):
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             # #### BEGIN debug - comment out when done
-            # if self.__class__.__name__ == "EventAnalysis":
+            # if self.__class__.__name__ == "TwoPathwaysOnlineLTP":
             #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.loadSettings() to load user_conf:")
             #     pprint(user_conf)
             #### END debug - comment out when done
@@ -1436,11 +1439,14 @@ class ScipyenConfigurable(object):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
                 
             parent = self._get_parent_()
-            tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
+            tag = self.configTag if hasattr(self, "configTag") and isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             user_conf = self._get_config_view_(isTop, parent, tag)
             
             #### BEGIN debug - comment out when done
             # if self.__class__.__name__ == "EventAnalysis":
+            #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
+            #     pprint(user_conf)
+            # if self.__class__.__name__ == "TwoPathwaysOnlineLTP":
             #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings() to save user_conf:")
             #     pprint(user_conf)
             #### END debug - comment out when done
@@ -1456,8 +1462,8 @@ class ScipyenConfigurable(object):
                         continue
 
                     #### BEGIN debug - comment out when done
-                    # if self.__class__.__name__ == "EventAnalysis":
-                    #     print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
+                    # if self.__class__.__name__ == "Events_Analysis":
+                        # print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveSettings(), getter={gettername} → {k}={val} ({type(val).__name__}), v {v} ({type(v).__name__})")
                     #### END debug - comment out when done
                     
                     if val != v:
@@ -1489,7 +1495,10 @@ class ScipyenConfigurable(object):
             self.saveWindowSettings()
             
     def get_configurable_attribute(self, name, config_dict):
-        """Helper to get the actual attribute value given a config entry"""
+        """Helper to get the actual attribute value correspondong to a config entry.
+        Called in order to WRITE a the value of a configurable attribute to the 
+        config file.
+        """
         getset = config_dict.get(name, {})
         gettername = getset.get("getter", None)
         if not isinstance(gettername, str) or len(gettername.strip()) == 0:
@@ -1508,7 +1517,9 @@ class ScipyenConfigurable(object):
             raise RuntimeError(f"{gettername} is not a `get` property")
         
     def set_configurable_attribute(self, name, val, config_dict):
-        """Helper function to assign a value to a configurable attribute
+        """Helper function to assign the value of an attribute to a configurable attribute
+        Called in order to READ a config value from the config file and assign it to
+        the coprrespondng attribute via its 'setter' method
         """
         getset = config_dict.get(name, {})
         settername = getset.get("setter", None)
@@ -1908,7 +1919,10 @@ def saveWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QM
     # print("saveWindowSettings %s" % win.__class__.__name__)
     return syncQtSettings(qsettings, win, group_name, prefix, True)
     
-def loadWindowSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainWindow, Figure], group_name:typing.Optional[str]=None, prefix:typing.Optional[str]=None):
+def loadWindowSettings(qsettings:QtCore.QSettings,
+                       win:typing.Union[QtWidgets.QMainWindow, Figure],
+                       group_name:typing.Optional[str]=None,
+                       prefix:typing.Optional[str]=None):
     """Loads window settings from the Scipyen's Qt configuration file.
     
     On recent Linux distributions this is $HOME/.config/Scipyen/Scipyen.conf 

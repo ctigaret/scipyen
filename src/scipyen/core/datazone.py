@@ -1,5 +1,6 @@
 import collections, numbers, typing, itertools
 from copy import deepcopy, copy
+from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
 import numpy as np
 import quantities as pq
@@ -11,7 +12,8 @@ import pyqtgraph as pg
 from core import quantities as cq
 from core.quantities import check_time_units
 from .prog import (safeWrapper, with_doc)
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
+# from PyQt5 import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,
@@ -32,7 +34,8 @@ def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
                    **annotations)
     
 
-class DataZone(DataObject):
+# class DataZone(DataObject):
+class DataZone(neo.Epoch):
     """neo.Epoch-like for DataSignals
     
     The name 'DataZone' was chosen to avoid possible confusions arising from
@@ -415,7 +418,8 @@ class DataZone(DataObject):
                              .format(len(labels), self.size))
         self._labels = np.array(labels)
 
-class Interval(collections.namedtuple("Interval", ("t0", "t1", "name", "extent"))):
+@dataclass
+class Interval:
     """Encapsulates an interval of a signal in a Cartesian axis system.
 This can be specified by two landmarks, or by a landmark and an extent
 (or duration) - in this case is similar to a neo.Epoch or DataZone, except that
@@ -449,29 +453,26 @@ however, the first part of this exercise is already done bny constructing an #
 Interval).
         
 Another use of Interval is to store SignalCursor coordinates to files; since a
-SignalCursor is a PyQt5 object that handles graphic items, IT IS NOT SERIALIZABLE
+SignalCursor is a Qt object that handles graphic items, IT IS NOT SERIALIZABLE
 HENCE IT CANNOT BE "PICKLED" or otherwise "saved" to a file.
         
-The only thing an Interval does not know about is the type of the cursor it took
-its coordinates from (i.e., vertical or horizontal) but that can be deduced from
-the context.
+The only thing an Interval does not know about is the type of the cursor where 
+the coordinates come from (i.e., vertical or horizontal) but that can be deduced 
+from the context.
 
-A croshair cursor, for example would be stored as a pair of
+A croshair cursor, for example might be stored as a pair of
 Interval objects according to an ad-hoc convention (e.g. the horizontal coordinates
 first, then the vertical coordinates).
         
-
-
-        
-WARNING: the class is immutable, hence any of its instance attribute values 
-    (t0, t1, name, extent) cannot be changed.
+Changelog:
+    2024-02-09 09:53:36 this is now mutable
         
 """
-    __slots__ = ()
-    # t0: typing.Union[numbers.Number, pq.Quantity]
-    # t1: typing.Union[numbers.Number, pq.Quantity]
-    # name: str = "Interval"
-    # extent: bool = False
+    # __slots__ = ()
+    t0: typing.Union[numbers.Number, pq.Quantity]
+    t1: typing.Union[numbers.Number, pq.Quantity]
+    name: str = "Interval"
+    extent: bool = False
     
     def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],
                  t1: typing.Union[numbers.Number, pq.Quantity],
@@ -676,7 +677,8 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
-    from PyQt5 import QtGui, QtCore
+    from qtpy import QtGui, QtCore
+    # from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
@@ -749,7 +751,7 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
                     precision=None
                 
                 
-            cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
+            cursorDict = signal_viewer.getSignalCursors(SignalCursorTypes.vertical)
             cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
             cursorPen.setCosmetic(True)
             hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
@@ -780,7 +782,8 @@ def intervals2cursors(*args,
                       **kwargs):
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
-    from PyQt5 import QtGui, QtCore
+    from qtpy import QtGui, QtCore
+    # from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     cursor_type = kwargs.pop("cursor_type", "vertical")
@@ -809,7 +812,7 @@ def intervals2cursors(*args,
                 if axis is not signal_viewer.signalsLayout.scene():
                     return cursors
                 
-            cursorDict = signal_viewer.getDataCursors(SignalCursorTypes.vertical)
+            cursorDict = signal_viewer.getSignalCursors(SignalCursorTypes.vertical)
             cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
             cursorPen.setCosmetic(True)
             hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)

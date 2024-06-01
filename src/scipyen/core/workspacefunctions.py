@@ -10,13 +10,13 @@ from __future__ import print_function
 
 import re as _re # re is also imported directly from pict
 
-import inspect, keyword, warnings, typing
+import inspect, keyword, warnings, typing, os, sys
 
 from operator import attrgetter, itemgetter, methodcaller
 
 from collections import OrderedDict, deque
 
-from core.prog import with_doc
+from core.prog import (with_doc, scipywarn)
 from core.strutils import (is_glob, is_regexp)
 
 try:
@@ -414,22 +414,16 @@ NOTE: The function was designed to complement the %who, %who_ls and %whos
 
 def assignin(variable, varname, ws=None):
     """Assign variable as varname in workspace ws"""
-    
+    user_ws = user_workspace()
     if ws is None:
-        ws = user_workspace()
+        ws = user_ws
         
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
         
-        #frame_records = inspect.getouterframes(inspect.currentframe())
-        ##print(frame_records)
-        #for (n,f) in enumerate(frame_records):
-            #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
-                #ws = f[0].f_globals["mainWindow"].workspace
-                ##ws = f[0].f_globals
-                #break
-        
     ws[varname] = variable
+    if ws is user_ws:
+        ws["mainWindow"].workspaceModel.update()
     
 assign = assignin # syntactic sugar
 
@@ -465,6 +459,29 @@ def user_workspace():
         
 def scipyentopdir():
     user_ns = user_workspace()
+    if user_ns is None: # this sometimes DOES happen - BUG 2024-02-04 10:47:30 FIXME
+        # WARNING 2024-02-04 10:55:53 
+        # this dubious for pyinstaller-bundled scipyen
+        
+        # sys.path contains directories or zip archives!
+        # 1.check for top directory in a source (e.g. locally cloned git repo):
+        # this should be '<some_path>/scipyen/src/scipyen/' containing 'scipyen.py'
+        src = [s for s in sys.path if (s.endswith("scipyen") and "src" in s and os.path.isfile(os.path.join(s, "scipyen.py")))]
+        
+        if len(src):
+            return src[0]
+        
+        # 2. check if this is a pyinstaller-bundled scipyen: has executable 'scipyen'
+        return QtCore.QCoreApplication.applicationDirPath()
+#         app = [s for s in sys.path if (os.path.isfile(os.path.join(s, "scipyen")) and os.access(os.path.join(s, "scipyen"), os.X_OK))]
+#         
+#         if len(app):
+#             return app[0]
+#         
+#         else:
+#             scipwarn("Cannot determine scipyen's top directory", UserWarning)
+#             return
+            
     return user_ns["mainWindow"]._scipyendir_
 
 def delvars(*args, glob=True, ws=None):

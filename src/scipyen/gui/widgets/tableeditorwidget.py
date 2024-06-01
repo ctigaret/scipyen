@@ -12,9 +12,13 @@ import numpy as np
 import neo
 import vigra
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
-from PyQt5.uic import loadUiType as __loadUiType__
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+from qtpy.uic import loadUiType as __loadUiType__
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5.uic import loadUiType as __loadUiType__
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -26,6 +30,7 @@ import matplotlib.mlab as mlb
 #from core.patchneo import *
 import core.datatypes  
 
+import core.utilities as utilities
 import core.strutils as strutils
 from core.strutils import str2float
 
@@ -46,6 +51,7 @@ from core.sysutils import adapt_ui_path
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui import resources_rc
+# from gui import icons_rc
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -105,6 +111,9 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         self._currentSlice_ = 0
         
+        self._selectedRowIndex_ = None
+        self._selectedColumnIndex_ = None
+        
     def setData(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
                        neo.Epoch, neo.Event, neo.SpikeTrain,
@@ -135,18 +144,46 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.nextSliceToolButton.setEnabled(False)
         self._dataModel_.setModelData(self._data_)
         
-    @pyqtSlot()
+    @Slot()
     def _slot_prevSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
             if self.currentSlice > 0:
                 self.currentSlice = self.currentSlice - 1
         
-    @pyqtSlot()
+    @Slot()
     def _slot_nextSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
             if self.currentSlice <= self._data_.shape[self._slicingAxis_] -1 :
                 self.currentSlice = self.currentSlice + 1
         
+    @property
+    def selectedColumnIndex(self) -> typing.Optional[int]:
+        """DEPRECATED"""
+        # warnings.warn("This property is deprecated; please use self.selectedColumnIndexes")
+        return self._selectedColumnIndex_
+    
+    @selectedColumnIndex.setter
+    def selectedColumnIndex(self, val:int):
+        self._selectedColumnIndex_ = val
+        
+    @property
+    def selectedColumnIndexes(self) -> list:
+        return utilities.unique([ndx.column() for ndx in self.tableView.selectedIndexes()])
+    
+    
+    @property
+    def selectedRowIndexes(self) -> list:
+        return utilities.unique([ndx.row() for ndx in self.tableView.selectedIndexes()])
+    
+    @property
+    def selectedRowIndex(self) -> typing.Optional[int]:
+        """DEPRECATED"""
+        return self._selectedRowIndex_
+    
+    @selectedRowIndex.setter
+    def selectedRowIndex(self, val:int):
+        self._selectedRowIndex_ = val
+    
     @property
     def currentSlice(self):
         return self._currentSlice_
@@ -241,24 +278,27 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self.nextSliceToolButton.setEnabled(False)
         self.nextSliceToolButton.clicked.connect(self._slot_nextSlice)
         
-    @pyqtSlot()
+    @Slot()
     def slot_resizeAllColumnsToContents(self):
         #print("TableEditorWidget slot_resizeAllColumnsToContents")
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         
-    @pyqtSlot()
+    @Slot()
     def slot_resizeAllRowsToContents(self):
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
         
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_horizontal_header_context_menu_request(self, pos):
         #print("horizontal header context menu at pos %s" % pos)
         #print("clicked column %s" % self.tableView.columnAt(pos.x()))
         
-        self.selectedColumnIndex = self.tableView.columnAt(pos.x())
+        if len(self.selectedColumnIndexes) == 0:
+            self.selectedColumnIndex = self.tableView.columnAt(pos.x())
+        else:
+            self.selectedColumnIndex = None
         
         cm = QtWidgets.QMenu("Column Menu", self.tableView)
         copyColumnTitleAction = cm.addAction("Copy column name")
@@ -273,10 +313,13 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         cm.exec(self.tableView.mapToGlobal(pos))
         
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_vertical_header_context_menu_request(self, pos):
-        self.selectedRowIndex = self.tableView.rowAt(pos.x())
+        if len(self.selectedRowIndexes) == 0:
+            self.selectedRowIndex = self.tableView.rowAt(pos.x())
+        else:
+            self.selectedRowIndex = None
         
         cm = QtWidgets.QMenu("Row Menu", self.tableView)
         copyColumnTitleAction = cm.addAction("Copy row name")
@@ -291,31 +334,121 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         
         cm.exec(self.tableView.mapToGlobal(pos))
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copyColumnName(self):
-        if not isinstance(self.selectedColumnIndex, int):
-            return
+        quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+        ret = ""
+        if len(self.selectedColumnIndexes):
+            ret = self.getColumnNames(self.selectedColumnIndexes, quoted=quote)
+            # values = [self.tableView.model().headerData(ndx, QtCore.Qt.Horizontal).value() for ndx in self.selectedColumnIndexes]
+            # link = ", "
+            # colNames = link.join([f"'{v}'" for v in values]) if quote else link.join(values)
+            # QtWidgets.QApplication.instance().clipboard().setText(colNames)
+            
+        elif isinstance(self.selectedColumnIndex, int):
+            ret = self.getColumnNames(self.selectedColumnIndex, quoted=quote)
+            # colName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
+            # if quote:
+            #     colName = f"'{colName}'"
+            # QtWidgets.QApplication.instance().clipboard().setText(colName)
+        else:
+            return 
+        QtWidgets.QApplication.instance().clipboard().setText(ret)
         
-        #columnName = self.tableView.horizontalHeaderItem(self.selectedColumnIndex).text()
-        
-        # NOTE: 2018-11-28 23:38:29
-        # this is a QtCore.QVariant that wraps a python str
-        columnName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
-        
-        QtWidgets.QApplication.instance().clipboard().setText(columnName)
-        
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copyRowName(self):
-        if not isinstance(self.selectedRowIndex, int):
-            return
+        quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+        ret = ""
+        if len(self.selectedRowIndexes):
+            ret = self.getRowNames(self.selectedRowIndexes, quoted = quote)
+            # values = [self.tableView.model().headerData(ndx, QtCore.Qt.Vertical).value() for ndx in self.selectedRowIndexes]
+            # link = ", "
+            # rowNames = link.join([f"'{v}'" for v in values]) if quote else link.join(values)
+            # QtWidgets.QApplication.instance().clipboard().setText(rowNames)
+            
+        elif isinstance(self.selectedRowIndex, int):
+            ret = self.getRowNames(self.selectedRowIndex, quoted = quote)
+            # rowName = self.tableView.model().headerData(self.selectedRowIndex, QtCore.Qt.Vertical).value()
+            # if quote:
+            #     rowName = f"'{rowName}'"
+        else:
+            return 
+            # QtWidgets.QApplication.instance().clipboard().setText(rowName)
+        QtWidgets.QApplication.instance().clipboard().setText(ret)
+            
+    def getRowNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                    quoted:bool=False, sep:str = "\t", asList:bool=False):
+        if ndx is None:
+            ndx = range(self.tableView.model().rowCount())
         
-        rowName = self.tableView.verticalheaderItem(self.selectedRowIndex).text()
+        elif isinstance(ndx, int):
+            ndx = [ndx]
         
-        QtWidgets.QApplication.instance().clipboard().setText(rowName)
+        elif isinstance(ndx, (list, tuple)):
+            if len(ndx) == 0:
+                ndx = range(self.tableView.model().rowCount())
+            elif not all(isinstance(v, int) for v in ndx):
+                raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
+        else:
+            raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
         
-    @pyqtSlot(QtWidgets.QTableWidgetItem)
+        values = [self.tableView.model().headerData(k, QtCore.Qt.Vertical).value() for k in ndx]
+        # link = ", "
+        if len(values) == 1:
+            ret = f"'{values[0]}'" if quoted else values[0]
+            
+            if asList:
+                ret = [ret]
+            
+        else:
+            ret = [f"'{v}'" for v in values] if quoted else values
+            if not asList:
+                ret = sep.join(ret)
+                
+        return ret
+        
+    def getColumnNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                    quoted:bool=False, sep:str = ", ", asList:bool=False):
+        if ndx is None:
+            ndx = range(self.tableView.model().columnCount())
+        
+        elif isinstance(ndx, int):
+            ndx = [ndx]
+        
+        elif isinstance(ndx, (list, tuple)):
+            if len(ndx) == 0:
+                ndx = range(self.tableView.model().columnCount())
+                
+            elif not all(isinstance(v, int) for v in ndx):
+                raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
+        else:
+            raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
+        
+        values = [self.tableView.model().headerData(k, QtCore.Qt.Horizontal).value() for k in ndx]
+        # link = ", "
+        if len(values) == 1:
+            ret = f"'{values[0]}'" if quoted else values[0]
+            if asList:
+                ret = [ret]
+        else:
+            ret = [f"'{v}'" for v in values] if quoted else values
+            if not asList:
+                ret = sep.join(ret)
+                
+        return ret
+        
+            
+    # @Slot()
+    # @safeWrapper
+    # def slot_copySelection(self):
+    #     # TODO 2023-11-17 15:00:12
+    #     quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+    #     withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        
+        
+    @Slot(QtWidgets.QTableWidgetItem)
     @safeWrapper
     def slot_tableEdited(self, item):
         # TODO code for xarray.DataArray
@@ -376,7 +509,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             else:
                 raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
             
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_resizeSelectedRowsToContents(self):
         if not isinstance(self.selectedRowIndex, int):
@@ -397,7 +530,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
             self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
 
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_resizeSelectedColumnsToContents(self):
         if not isinstance(self.selectedColumnIndex, int):
@@ -418,31 +551,97 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
             self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def slot_copySelection(self):
+        quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+        withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        commasep = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        
+        colsep = ", " if commasep else "\t"
+        
         modelIndexes = self.tableView.selectedIndexes()
+        
+        if len(modelIndexes) == 0:
+            return
+        
         selected_text = list()
         previous = modelIndexes[0]
         #selected_text.append(self._dataModel_.data(previous).toString())
-        selected_text.append(str(self._dataModel_.data(previous).value()))
         
-        for modelIndex in modelIndexes[1:]:
-            #data = self._dataModel_.data(modelIndex).toString()
-            data = str(self._dataModel_.data(modelIndex).value())
-            if modelIndex.row() != previous.row():
-                selected_text.append("\n")
-                
-            elif modelIndex.column() != previous.column():
-                selected_text.append("\t")
+        minRow = minCol = 0
+        
+        data = str(self._dataModel_.data(previous).value())
+        if quote:
+            data = f"'{data}"
+        
+        if withHeaders:
+            # preallocate column & row names
             
+            minCol = min([m.column() for m in modelIndexes])
+            maxCol = max([m.column() for m in modelIndexes])
+            minRow = min([m.row() for m in modelIndexes])
+            maxRow = max([m.row() for m in modelIndexes])
+            
+            rowTexts = np.full((maxRow-minRow+2, maxCol-minCol+2), " ", dtype=object)
+            
+            column = previous.column()
+            row = previous.row()
+            
+            colNdx = column-minCol+1
+            rowNdx = row-minRow+1
+            
+            rowTexts[0,colNdx] = self.getColumnNames(column)
+            
+            rowTexts[rowNdx,0] = self.getRowNames(row)
+            
+            rowTexts[rowNdx,colNdx] = data
+            
+            for modelIndex in modelIndexes[1:]:
+                data = str(self._dataModel_.data(modelIndex).value())
+                if quote:
+                    data = f"'{data}"
+                row = modelIndex.row()
+                rowNdx = row-minRow+1
+                col = modelIndex.column()
+                colNdx = col-minCol+1
+                
+                if col != previous.column():
+                    rowTexts[0,colNdx] = self.getColumnNames(col)
+                    
+                if row != previous.row():
+                    rowTexts[rowNdx,0] = self.getRowNames(row) 
+                    
+                rowTexts[rowNdx,colNdx] = data
+                
+                previous = modelIndex
+                
+            for r_ in range(rowTexts.shape[0]):
+                selected_text.append(colsep.join(rowTexts[r_,:]))
+                selected_text.append("\n")
+                    
+        else:
             selected_text.append(data)
             
-            previous = modelIndex
+            for modelIndex in modelIndexes[1:]:
+                data = str(self._dataModel_.data(modelIndex).value())
+                if quote:
+                    data = f"'{data}"
+                row = modelIndex.row()
+                col = modelIndex.column()
+                if row != previous.row():
+                    selected_text.append("\n")
+                    
+                elif col != previous.column():
+                    selected_text.append(colsep)
+                
+                selected_text.append(data)
+                
+                previous = modelIndex
             
         QtGui.QGuiApplication.clipboard().setText("".join(selected_text))
     
-    @pyqtSlot(QtCore.QPoint)
+    @Slot(QtCore.QPoint)
     @safeWrapper
     def slot_table_context_menu_requested(self, pos):
         #print("table_context_menu at pos %s" % pos)
@@ -467,10 +666,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     WARNING use with caution
     """
-    editCompleted = pyqtSignal([pd.DataFrame], [pd.Series], [np.ndarray], name="editCompleted")
+    editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="editCompleted")
     
-    signal_rowsPopulated = pyqtSignal(int, name="signal_rowsPopulated")
-    signal_columnsPopulated = pyqtSignal(int, name="signal_columnsPopulated")
+    signal_rowsPopulated = Signal(int, name="signal_rowsPopulated")
+    signal_columnsPopulated = Signal(int, name="signal_columnsPopulated")
     
     def __init__(self, data=None, parent=None):
         super(TabularDataModel, self).__init__(parent=parent)
@@ -917,6 +1116,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
                                 domain_name = getattr(self._modelData_,"domain_name", None)
                                 domain = getattr(self._modelData_, "domain", None)
+                                # NOTE: 2024-01-23 23:45:53
+                                # better do this:
+                                if isinstance(self._modelData_, neo.IrregularlySampledSignal):
+                                    domain_name = "Time"
+                                    domain = self._modelData_.times
                                 if isinstance(domain_name, str) and isinstance(domain, pq.Quantity):
                                     dname = f"{domain_name} ({domain.dimensionality})" if len(domain_name.strip()) else "Sample index"
                                     return QtCore.QVariant(dname)

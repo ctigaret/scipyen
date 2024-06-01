@@ -12,8 +12,11 @@ import numpy as np
 import neo
 import vigra
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Q_ENUMS, Q_FLAGS, pyqtProperty
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Signal, Slot, Property
+# from qtpy.QtCore import Signal, Slot, QEnum, Property
+# from PyQt5 import QtCore, QtGui, QtWidgets
+# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -44,6 +47,7 @@ from core.datatypes import array_slice
 # from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 # from . import quickdialog
 from gui import resources_rc
+# from gui import icons_rc
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules

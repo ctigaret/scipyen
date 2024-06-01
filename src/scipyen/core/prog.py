@@ -15,6 +15,7 @@ from importlib import abc as importlib_abc
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
 import collections
 import importlib, inspect, pathlib, warnings, operator, functools
+from warnings import WarningMessage
 from inspect import Parameter, Signature
     
 from functools import (singledispatch, singledispatchmethod, 
@@ -28,6 +29,8 @@ from traitlets import Bunch
 import numpy as np
 import neo, vigra
 import quantities as pq
+
+import colorama
 
 # try:
 #     import mypy
@@ -513,7 +516,7 @@ class Timer(object):
     def running(self):
         return self._start is not None
     
-    def __enter__(self):
+    def __enter__(self, *args):
         # for use as context manager
         self.start()
         return self
@@ -522,7 +525,6 @@ class Timer(object):
         # for use as context manager
         self.stop()
         
-# class SpecFinder(importlib.abc.MetaPathFinder):
 class SpecFinder(importlib_abc.MetaPathFinder):
     """
     See https://stackoverflow.com/questions/62052359/modulespec-not-found-during-reload-for-programmatically-imported-file-in-differe
@@ -807,7 +809,196 @@ def signature2Str(f:typing.Union[types.FunctionType, inspect.Signature, Bunch], 
     func.append(")")
     
     return "".join(func)
+
+def printStyled(s:str, color:str='yellow', bright:bool=True):
+    c = getattr(colorama.Fore, color.upper())
+    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+    return f"{pre}{s}{colorama.Style.RESET_ALL}"
+
+def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
+    from warnings import (filters, defaultaction)
+    if isinstance(message, Warning):
+        category = message.__class__
+    # Check category argument
+    if category is None:
+        category = UserWarning
+    if not (isinstance(category, type) and issubclass(category, Warning)):
+        raise TypeError("category must be a Warning subclass, "
+                        "not '{:s}'".format(type(category).__name__))
+    try:
+        if stacklevel <= 1 or _is_internal_frame(sys._getframe(1)):
+            # If frame is too small to care or if the warning originated in
+            # internal code, then do not try to hide any frames.
+            frame = sys._getframe(stacklevel)
+        else:
+            frame = sys._getframe(1)
+            # Look for one frame less since the above line starts us off.
+            for x in range(stacklevel-1):
+                frame = _next_external_frame(frame)
+                if frame is None:
+                    raise ValueError
+    except ValueError:
+        globals = sys.__dict__
+        filename = "sys"
+        lineno = 1
+    else:
+        globals = frame.f_globals
+        filename = frame.f_code.co_filename
+        lineno = frame.f_lineno
+    if '__name__' in globals:
+        module = globals['__name__']
+    else:
+        module = "<string>"
+    registry = globals.setdefault("__warningregistry__", {})
     
+    # this from warn_explicit
+    # ### BEGIN
+    if module is None:
+        module = filename or "<unknown>"
+        if module[-3:].lower() == ".py":
+            module = module[:-3] # XXX What about leading pathname?
+    if registry is None:
+        registry = {}
+    # if registry.get('version', 0) != _filters_version:
+    #     registry.clear()
+    #     registry['version'] = _filters_version
+    if isinstance(message, Warning):
+        text = str(message)
+        category = message.__class__
+    else:
+        text = message
+        message = category(message)
+    key = (text, category, lineno)
+    # Quick test for common case
+    if registry.get(key):
+        return
+    # Search the filters
+    for item in filters:
+        action, msg, cat, mod, ln = item
+        if ((msg is None or msg.match(text)) and
+            issubclass(category, cat) and
+            (mod is None or mod.match(module)) and
+            (ln == 0 or lineno == ln)):
+            break
+    else:
+        action = defaultaction
+    # Early exit actions
+    if action == "ignore":
+        return
+    
+    import linecache
+    # linecache.getlines(filename, module_globals)
+    linecache.getlines(filename, globals)
+
+    if action == "error":
+        raise message
+    # Other actions
+    if action == "once":
+        registry[key] = 1
+        oncekey = (text, category)
+        if onceregistry.get(oncekey):
+            return
+        onceregistry[oncekey] = 1
+    elif action == "always":
+        pass
+    elif action == "module":
+        registry[key] = 1
+        altkey = (text, category, 0)
+        if registry.get(altkey):
+            return
+        registry[altkey] = 1
+    elif action == "default":
+        registry[key] = 1
+    else:
+        # Unrecognized actions are errors
+        raise RuntimeError(
+              "Unrecognized action (%r) in warnings.filters:\n %s" %
+              (action, item))
+    # ### END
+    
+    # Print message and context
+    msg = WarningMessage(message, category, filename, lineno, file=out, source=source)
+    _myshowarning(msg)
+    
+def _myshowarning(msg:WarningMessage):#, category, filename, lineno, file=None, line=None):
+    # msg = WarningMessage(message, category, filename, lineno, file, line)
+    file = msg.file
+    if file is None:
+        file = sys.stderr
+        if file is None:
+            # sys.stderr is None when run with pythonw.exe:
+            # warnings get lost
+            return
+    category = msg.category.__name__
+    if sys.platform == "win32":
+        s =  f"In {msg.filename}, line {msg.lineno}: \n{category} {msg.message}\n"
+    else:
+        s =  f"In {msg.filename}, line {msg.lineno}: \n\x1b[0;33m{category}\x1b[0m: {msg.message}\n"
+    # s =  f"{msg.filename}:{msg.lineno}:\n\x1b[0;33;47m{category}\x1b[0m:\n {msg.message}\n"
+    try:
+        file.write(s)
+    except:
+        pass
+    
+def showwarning(message, category, filename, lineno, file=None, line=None):
+    """To replace stock Python warnings.showwarning"""
+    if file is None:
+        file = sys.stderr
+        if file is None:
+            return
+        
+    if isinstance(category, type):
+        category = category.__name__
+        
+    text = f"In {filename}, line {lineno}: \n\x1b[0;33m{category}\x1b[0m: {message}\n"
+                                                           
+    if line is None:
+        try:
+            import linecache
+            line = linecache.getline(filename, lineno)
+        except Exception:
+            # When a warning is logged during Python shutdown, linecache
+            # and the import machinery don't work anymore
+            line = None
+            linecache = None
+
+    if line:
+        line = line.strip()
+        text += f"  \x1b[0;36m{line}\x1b[0m\n"
+                                         
+    try:
+        file.write(text)
+    except OSError:
+        # the file (probably stderr) is invalid - this warning gets lost.
+        pass
+    # return text
+    
+# def formatwarning(message, category, filename, lineno, line=None):
+#     """To replace stock Python warnings.formatwarning
+#     TODO
+#     Do NOT use yet
+#     """
+#     s =  f"{filename}:{lineno}: {category}: {message}\n"
+#     return s
+        
+def term_has_colors():
+    if "NO_COLOR" in os.environ:
+        return False
+    if "CLICOLOR_FORCE" in os.environ:
+        return True
+    return sys.stdout.isatty()
+
+def test_ANSI():
+    RESET = "\x1b[0m"
+    print("To reset attributes: \\x1b[0m\n")
+    for i in range(0, 8):
+        print("\x1b[1;3{0}m\\x1b[1;3{0}m{1} \x1b[0;3{0}m\\x1b[0;3{0}m{1} "
+            "\x1b[1;4{0};3{0}m\\x1b[1;3{0};4{0}m{1}".format(i, RESET))
+        
+    print("Test other characters")
+    print("\x1b[3;37m{0}{1}".format("italic", RESET))
+    print("\x1b[4;37m{0}{1}".format("underline", RESET))
+        
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
     log = file if hasattr(file, "write") else sys.stderr
     traceback.print_stack(file=log)
@@ -1293,8 +1484,6 @@ def deprecated(f, *args, **kwargs):
             
     return wrapper
     
-#NOTE: 2017-11-22 22:00:40 FIXME TODO
-# for pyqtSlots, place this AFTER the @pyqtSlot decorator
 def safeWrapper(f, *args, **kwargs):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -1305,9 +1494,6 @@ def safeWrapper(f, *args, **kwargs):
             stars = "".join(["*"]*len(f.__name__))
             print("\n%s\nIn function %s:\n%s" % (stars, f.__name__, stars))
             traceback.print_exc()
-            #print("Call stack:")
-            #traceback.print_stack()
-            #print("%s" % stars)
             
     return wrapper
 
@@ -1372,29 +1558,6 @@ def processtimefunc(func):
 #     return wrap
     
 
-def no_sip_autoconversion(klass):
-    """Decorator for classes to suppresses sip autoconversion of Qt to Python
-    types.
-    
-    Mostly useful to prevent sip to convert QVariant to a python type when
-    a QVariant is passed as argument to methods of Qt objects, inside the
-    decorated function or method.
-    
-    Parameter:
-    ==========
-    klass: a Qt :class:
-    
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            import sip
-            oldValue = sip.enableautoconversion(klass, False)
-            ret = func(*args, *kwargs)
-            sip.enableautoconversion(klass, oldValue)
-            return ret
-        return wrapper
-    return decorator
         
 #def cli_export(name:str):
     #def wrapper(f):
@@ -1449,12 +1612,13 @@ def is_hashable(x):
     ret = bool(getattr(x, "__hash__", None) is not None)
     if ret:
         try:
-            # because some 3rd party packages 'get smart' and override __hash__()
-            # to raise Exception 
+            # because some classes may override __hash__() to raise Exception 
             hash(x) 
             return True
         except:
             return False
+        
+    return ret
 
 def is_type_or_subclass(x, y):
     if isinstance(x, type):

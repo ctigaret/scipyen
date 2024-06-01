@@ -24,9 +24,11 @@ import xml.dom.minidom
 # add XMl text viewer, schema viewer and xquery editor
 
 # 2016-08-16 09:30:07
-# NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5
-from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+# NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5 ?!
+from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
+from qtpy.QtCore import (Signal, Slot, )
+# from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
+# from PyQt5.QtCore import (Signal, Slot, )
 
 
 #### END 3rd party modules
@@ -36,9 +38,10 @@ import core.xmlutils as xmlutils
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
-from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
-from . import quickdialog
-from . import resources_rc
+from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
+from gui import quickdialog
+# from . import resources_rc
+# from . import icons_rc
 #### END pict.gui modules
 
 
@@ -390,8 +393,8 @@ class XMLViewer(ScipyenViewer):
      problems with converting utf-8 characters => when saving document to file
      results in invalid XML 
     '''
-    sig_activated = pyqtSignal(int)
-    closeMe  = pyqtSignal(int)
+    sig_activated = Signal(int)
+    closeMe  = Signal(int)
     viewer_for_types = {xmlutils.xml.dom.minidom.Document: 99, 
                         xmlutils.xml.etree.ElementTree.Element: 99, 
                         QtXml.QDomNode: 99, 

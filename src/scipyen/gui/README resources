@@ -1,20 +1,44 @@
-To generate resources for the GUI classes in PICT, using the icons in the 'resources'
-directory:
+2023-09-30 21:47:31
 
-1) cd to ./resources
-2) run generate_resources_qrc.sh
-3) cd back here
-4) run generate_resources.sh
-5) in QtDesigner import the resources_rc as per the usual means
-6) if needed, import resources_rc.py in your python module (written as part of PICT):
-    import gui.resources_rc as resources_rc
-    
-7) if the python module loads an UI file, make sure that PyQt5.uic.loadUiType function
-is called with the extra arguments 'from_import' and 'import_from', e.g.:
+The resources for GUI classes (including icons from the breeze and breeze-dark 
+themes) are now generated outside the git tree, to avoid clobbering the git 
+repository. The compilation requires the python module compile_resources.py in 
+this out-of-git tree (currently, in ~/src/for scipyen/resources 23i30b
+on the machine used for Scipyen development).
 
-__UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__,"gui","PictWindow.ui"),
-                                                from_imports=True, 
-                                                import_from="gui")
+When creating/editing new ui files using the qt5 designer (currently, only
+supported on Linux/KDE) make use of the breeze icon theme installed on the 
+developing machine. NOTE: you may want to check that a particular icon IS
+present in the out-of-git tree.
 
-# NOTE 2020-07-08 10:45:46
-Alternatively, run generate_resources2.sh in THIS directory
+Any additional images NOT present in the icon themes mentioned above SHOULD be 
+placed in resource/images (in the out-of-git tree)
+
+TODO: include the icons themes in the scipyenv (provide this for the installation
+script) and somehow install qt5 designer there, too - WARNING: Not sure one can
+do this on non-Linux platforms without installing the entire Qt5 distribution, 
+which, frankly, I would rather NOT do...
+
+All the resource objects required are now distributed in binary form in 
+python modules (*_rc.py) imported via resources_rc.py in this directory. This
+has implications for Windows (and possibly, MacOS) but since Scipyen development
+only takes place on a Linux platform (for the forseeable future), the non-Linux
+platforms are most likely to benefit only from the binary Scipyen distros created
+with pyinstaller.
+
+Therefore, when running Scipyen from the git tree:
+    • on a Linux platform, we rely on the breeze and breeze-dark themes installed
+        system-wide (or any other icon theme, that follows the freedesktop icon
+                     theme specification)
+        
+    • on any other plaform, we rely on the compiled (binary) resources in the 
+        *_rc.py modules, which ARE part of the git repository tree (hence updated
+        upon git pull)
+        
+When running Scipyen from a binary tree (created with pyinstaller) this problem
+should be moot, as the *_rc.py files is all we need and ARE packaged with the 
+binary distribution.
+
+
+
+

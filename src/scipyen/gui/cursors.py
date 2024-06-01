@@ -2,9 +2,12 @@
 """Pyqtgraph-based cursors for signal viewers
 """
 import collections, enum, numbers, typing
+from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
-from PyQt5 import (QtCore, QtGui, QtWidgets,) 
-from PyQt5.QtCore import (pyqtSignal, pyqtSlot, )
+from qtpy import (QtCore, QtGui, QtWidgets,) 
+from qtpy.QtCore import (Signal, Slot, )
+# from PyQt5 import (QtCore, QtGui, QtWidgets,) 
+# from PyQt5.QtCore import (Signal, Slot, )
 
 # import pyqtgraph as pg
 # pg.Qt.lib = "PyQt5"
@@ -18,6 +21,13 @@ import neo
 from core.prog import (safeWrapper, with_doc)
 from core.quantities import check_time_units
 
+@dataclass
+class DataCursor:
+    """Convenience structure for notional 1D cursor represented by a coordinate and a span"""
+    coord:typing.Union[float, pq.Quantity]
+    span:typing.Union[float, pq.Quantity]
+    name:str = ""
+    
 class SignalCursorTypes(enum.Enum):
     """Enumeration of signal cursor types.
     """
@@ -83,7 +93,7 @@ class SignalCursorTypes(enum.Enum):
             
 
 class CursorLine(pg.InfiniteLine):
-    sig_double_clicked = pyqtSignal()
+    sig_double_clicked = Signal()
     
     def _init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -133,24 +143,59 @@ class SignalCursor(QtCore.QObject):
     """SignalCursor object.
     Covers either a SINGLE pyqtgraph.PlotItem (see crosshair.py in pyqtgraph/examples)
     or a pyqtgraph.GraphicsScene (with possibly multiple plot items)
+        
+    WARNING: As of 2024-05-13 16:59:55 this class is NOT seralizable: saving 
+        or pickling will raise an exception.
+        
+        
     """
+    # TODO: 2024-05-13 17:00:45 FIXME:
+    #     Seralization (pickling) could be implemented using special dunder 
+    #       methods (__reduce__ for seralizing and __new__ for reconstructing, 
+    #       and instantiating QObject components on the fly) -  but this may be
+    #       quite expensive in terms of coding time.
+    #
+    # Similarly, serialization via HDF5 is also theoretically possible, but with 
+    # the same caveat as above (i.e. coding time).
+    #
+    # Probably more convenient is to use DataCursor for now
+    
+    
     # TODO: 2019-02-07 17:31:43
     # 1) implement cursors linking
     
-    sig_cursorSelected = pyqtSignal(str, name="sig_cursorSelected") 
-    sig_cursorDeselected = pyqtSignal(str, name="sig_cursorDeselected") 
-    #sig_cursorMoved = pyqtSignal(str, float, float, name="sig_cursorMoved")
-    sig_editMe = pyqtSignal(str, name="sig_editMe")
-    sig_reportPosition = pyqtSignal(str, name="sig_reportPosition")
-    #sig_reportDynamicPosition = pyqtSignal(str, name="sig_reportDynamicPosition")
-    sig_doubleClicked = pyqtSignal(str, name = "sig_doubleClicked")
-    sig_lineContextMenuRequested = pyqtSignal(str, name = "sig_lineContextMenuRequested")
+    sig_cursorSelected = Signal(str, name="sig_cursorSelected") 
+    sig_cursorDeselected = Signal(str, name="sig_cursorDeselected") 
+    #sig_cursorMoved = Signal(str, float, float, name="sig_cursorMoved")
+    sig_editMe = Signal(str, name="sig_editMe")
+    sig_reportPosition = Signal(str, name="sig_reportPosition")
+    #sig_reportDynamicPosition = Signal(str, name="sig_reportDynamicPosition")
+    sig_doubleClicked = Signal(str, name = "sig_doubleClicked")
+    sig_lineContextMenuRequested = Signal(str, name = "sig_lineContextMenuRequested")
     
-    sig_axisPositionChanged = pyqtSignal(tuple, name="sig_axisPositionChanged")
+    sig_axisPositionChanged = Signal(tuple, name="sig_axisPositionChanged")
 
     default_precision = 3
     
-    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], /, x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:float=0.0, ywindow:float=0.0, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, cursorID:str="c", follower:bool=False, relative:bool=False, parent:typing.Optional[typing.Union[pg.GraphicsItem,pg.PlotItem, QtWidgets.QWidget]]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, pen:typing.Optional[QtGui.QPen]=None, hoverPen:typing.Optional[QtGui.QPen]=None, linkedPen:typing.Optional[QtGui.QPen]=None, movable_label:bool=True, show_value:bool=False, precision:int=3, **kwargs):
+    def __init__(self, plot_item:typing.Union[pg.PlotItem, pg.GraphicsScene], /, 
+                 x:typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]]=None, 
+                 y:typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]]=None, 
+                 xwindow:float=0.0, 
+                 ywindow:float=0.0, 
+                 cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]] = None, 
+                 cursorID:str="c", 
+                 follower:bool=False, 
+                 relative:bool=False, 
+                 parent:typing.Optional[typing.Union[pg.GraphicsItem,pg.PlotItem, QtWidgets.QWidget]]=None, 
+                 xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                 yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                 pen:typing.Optional[QtGui.QPen]=None, 
+                 hoverPen:typing.Optional[QtGui.QPen]=None, 
+                 linkedPen:typing.Optional[QtGui.QPen]=None, 
+                 movable_label:bool=True, 
+                 label_position:float = 0.5,
+                 show_value:bool=False, 
+                 precision:int=3, **kwargs):
         """ SignalCursor constructor.
             
             By default, this creates a crosshair cursor.
@@ -163,14 +208,20 @@ class SignalCursor(QtCore.QObject):
             
             Named parameters (key/value pairs):
             ===================================
-            x: numeric or quantity scalar, or None (default) - the cursor's
+            x: numeric or quantity scalar, DataCursor, or None (default) - the cursor's
                 horizontal coordinate
+    
+                When `x` is a DataCursor, it will be used for the vertical component.
             
-            y: numeric or quantity scalar, or None (default) - the cursor's
+            y: numeric or quantity scalar, DataCursor, or None (default) - the cursor's
                 vertical coordinate
+            
+                When `y` is a DataCursor, it will be used for the horizontal component.
             
             xwindow, ywindow: float (default 0.0); horizontal and vertical 
                 cursor windows
+    
+                Ignored when either x` or `y` are DaataCursor objects.
             
             cursor_type: str, SignalCursorTypes value, or a pair of bool flags 
                 (as a list or tuple) specifying which cursor spine is present, 
@@ -179,9 +230,13 @@ class SignalCursor(QtCore.QObject):
                 (True, False)  -> vertical cursor
                 (True, True)   -> crosshair cursor
                 (False, False) -> point cursor
+    
+                Ignored when either `x` or `y` are DataCursor objects. In this
+                case cursor type will be inferred.
             
-            cursor_ID: str; optional, default is "c"
-            
+            cursor_ID: str; optional, default is "v", "h", or "c" depending on 
+                the cursor type
+    
             relative:bool, optional, default is False
                 
                 Because the cursor's coordinates and in the axes domains, when 
@@ -200,7 +255,8 @@ class SignalCursor(QtCore.QObject):
                 When True, the cursor will follow the mouse pointer (a.k.a "dynamic"
                 cursor).
             
-            parent: 
+            parent: pyqtgraph.GraphicsItem, pyqtgraph.PlotItem, QtWidgets.QWidget
+                The parent Qt object where the cursor is shown.
             
             xBounds, yBounds: tuple, list, pq.Quantity, np.ndarray or None (the default)
                 The min & max X and Y coordinates
@@ -227,6 +283,7 @@ class SignalCursor(QtCore.QObject):
         # self._parent_widget_ = None
         
         # print(f"{self.__class__.__name__}.__init__ x = {x}, y = {y}, xBounds = {xBounds}, yBounds = {yBounds}")
+        # print(f"{self.__class__.__name__}.__init__ kwargs = {}, y = {y}, xBounds = {xBounds}, yBounds = {yBounds}")
         
         self._host_graphics_item_ = None
         
@@ -234,7 +291,7 @@ class SignalCursor(QtCore.QObject):
             self._host_graphics_item_ = plot_item
             
         else:
-            raise TypeError("plot_item expected to be a pyqtgraph.PlotItem object or a pyqtgraph.GraphicsScene object got %s instead" % type(plot_items).__name__)
+            raise TypeError("plot_item expected to be a pyqtgraph.PlotItem object or a pyqtgraph.GraphicsScene object got %s instead" % type(plot_item).__name__)
             
         self._cursorId_ = None
         
@@ -247,11 +304,8 @@ class SignalCursor(QtCore.QObject):
         self._hl_ = None
         self._vl_ = None
         
-        self._x_ = None
-        self._y_ = None
-        
-        self._hWin_ = None
-        self._vWin_ = None
+        self._hDataCursor_ = None
+        self._vDataCursor_ = None
         
         self._cursor_type_ = None
         
@@ -308,6 +362,8 @@ class SignalCursor(QtCore.QObject):
         
         self._current_plot_item_ = None # for multi-axes cursors
         self._movable_label_ = movable_label
+        self._label_pos_ = label_position
+        # print(f"{self.__class__.__name__}.__init__: _label_pos_ = {self._label_pos_}")
         self._show_value_ = show_value
         self._value_precision_ = precision if isinstance(precision, int) and precision > 0 else self.default_precision
         
@@ -323,15 +379,20 @@ class SignalCursor(QtCore.QObject):
         
         if self._follows_mouse_:
             pos = QtCore.QPointF()
-            self._x_ = pos.x()
-            self._y_ = pos.y()
+            self._vDataCursor_.coord = pos.x()
+            self._hDataCursor_.coord = pos.x()
+            # self._x_ = pos.x()
+            # self._y_ = pos.y()
             
         else:
-            pos = QtCore.QPointF(self._x_, self._y_)
+            pos = QtCore.QPointF(self._vDataCursor_.coord, self._hDataCursor_.coord)
+            # pos = QtCore.QPointF(self._x_, self._y_)
             
         # print(f"{self.__class__.__name__}._setup_lines_ pos = {pos}")
             
         scene = self.hostScene
+        
+        labelOpts = {"movable": self._movable_label_, "position": self._label_pos_}
         
         if h:
             # set up the horizontal InfiniteLine
@@ -347,7 +408,7 @@ class SignalCursor(QtCore.QObject):
                                         movable=not self._follows_mouse_, 
                                         name="%s_h" % name, 
                                         label=label,
-                                        labelOpts = {"movable": self._movable_label_},
+                                        labelOpts = labelOpts,
                                         pen=self._pen_, 
                                         hoverPen = self._hoverPen_)
                 
@@ -399,7 +460,7 @@ class SignalCursor(QtCore.QObject):
                                         movable=not self._follows_mouse_,
                                         name="%s_v" % name, 
                                         label=label,
-                                        labelOpts={"movable": self._movable_label_},
+                                        labelOpts = labelOpts,
                                         pen=self._pen_, 
                                         hoverPen = self._hoverPen_)
                 
@@ -532,7 +593,8 @@ class SignalCursor(QtCore.QObject):
         """
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             self._hl_.setPos(val)
-            self._y_ = self._hl_.getYPos()
+            self._hDataCursor_.coord = self._hl_.getYPos()
+            # self._y_ = self._hl_.getYPos()
             
         else:
             if plotitem is None:
@@ -545,14 +607,16 @@ class SignalCursor(QtCore.QObject):
             
             if self._hl_ is not None:
                 self._hl_.setYPos(new_Y)
-                self._y_ = self._hl_.getYPos()
+                self._hDataCursor_.coord = self._hl_.getYPos()
+                # self._y_ = self._hl_.getYPos()
                 
     def _update_vline_position_(self, val, plotitem=None):
         """Called by programmatically setting "x" coordinate 
         """
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             self._vl_.setPos(val)
-            self._x_ = self._vl_.getXPos()
+            self._vDataCursor_.coord = self._vl_.getXPos()
+            # self._x_ = self._vl_.getXPos()
             # print(f"{self.ID} _update_vline_position_ val = {val}, self._x_ = {self._x_}")
             
         else:
@@ -567,17 +631,21 @@ class SignalCursor(QtCore.QObject):
             # print(f"{self.ID} _update_vline_position_ val = {val}, new_X = {newX}")
             if self._vl_ is not None:
                 self._vl_.setXPos(new_X)
-                self._x_ = self._vl_.getXPos()
+                self._vDataCursor_.coord = self._vl_.getXPos()
+                # self._x_ = self._vl_.getXPos()
                 
     def _add_lines_to_host_(self):
         if self._cursor_type_ == SignalCursorTypes.crosshair:
-            pos = QtCore.QPointF(self._x_, self._y_)
+            pos = QtCore.QPointF(self._vDataCursor_.coord, self._hDataCursor_.coord)
+            # pos = QtCore.QPointF(self._x_, self._y_)
             
         elif self._cursor_type_ == SignalCursorTypes.horizontal:
-            pos = QtCore.QPointF(0.0, self._y_)
+            pos = QtCore.QPointF(0.0, self._hDataCursor_.coord)
+            # pos = QtCore.QPointF(0.0, self._y_)
             
         else:
-            pos = QtCore.QPointF(self._x_, 0.0)
+            pos = QtCore.QPointF(self._vDataCursor_.coord, 0.0)
+            # pos = QtCore.QPointF(self._x_, 0.0)
             
         # print(f"{self.__class__.__name__}._add_lines_to_host_ pos = {pos}")
         
@@ -646,20 +714,24 @@ class SignalCursor(QtCore.QObject):
                 l.update()
                 if isinstance(getattr(l, "label", None), pg.InfLineLabel):
                     l.label.update()
-        # if isinstance(self._vl_, pg.InfiniteLine):
-        #     self._vl_.update()
-        #     if isinstance(self._vl_.label, pg.InfLineLabel):
-        #         self._vl_.label.update()
-        # if isinstance(self._hl_, pg.InfiniteLine):
-        #     self._hl_.update()
-        #     if isinstance(self._hl_.label, pg.InfLineLabel):
-        #         self._hl_.label.update()
 
     def setMovableLabels(self, value):
         for l in (self._hl_, self._vl_):
             if isinstance(l, pg.InfiniteLine):
                 if isinstance(getattr(l, "label", None), pg.InfLineLabel):
-                    l.label.setmovable(value==True)
+                    l.label.setMovable(value==True)
+                    # l.label.setmovable(value==True)
+                    
+    def setLabelPosition(self, value:float):
+        """Set label's position along its corresponding line.
+        The position is a float (0 ⋯ 1) representin the fraction from the 
+        start of the line to its end
+        """
+        value = 0. if value < 0 else 1. if value > 1. else value
+        for l in (self._hl_, self._vl_):
+            if isinstance(l, pg.InfiniteLine):
+                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
+                    l.label.setPosition(value==True)
                 
     def setShowValue(self, val:bool, precision:typing.Optional[int]=None):
         if isinstance(precision, int):
@@ -700,29 +772,31 @@ class SignalCursor(QtCore.QObject):
         self._show_value_ = value == True
         self._update_labels_()
                     
-    @pyqtSlot()
-    @pyqtSlot(object)
+    @Slot()
+    @Slot(object)
     @safeWrapper
     def slot_positionChanged(self, evt=None):
         self.sig_cursorSelected.emit(self._cursorId_)
         
         if self._hl_ is not None:
-            self._y_ = self._hl_.getYPos()
+            self._hDataCursor_.coord = self._hl_.getYPos()
+            # self._y_ = self._hl_.getYPos()
             
         if self._vl_ is not None:
-            self._x_ = self._vl_.getXPos()
+            self._vDataCursor_.coord = self._vl_.getXPos()
+            # self._x_ = self._vl_.getXPos()
             
         if self._cursor_type_ != SignalCursorTypes.crosshair:
             self.sig_reportPosition.emit(self.ID)
             
-    @pyqtSlot(tuple)
+    @Slot(tuple)
     @safeWrapper
     def slot_linkedPositionChanged(self, pos):
         signalBlockers = [QtCore.QSignalBlocker(c) for c in self._linked_cursors_]
         self.x = pos[0]
         self.y = pos[1]
         
-    @pyqtSlot()
+    @Slot()
     @safeWrapper
     def _slot_line_selected_(self):
         if not self._follows_mouse_:
@@ -730,7 +804,7 @@ class SignalCursor(QtCore.QObject):
             self.sig_cursorSelected.emit(self.ID)
             
         
-    @pyqtSlot(bool)
+    @Slot(bool)
     @safeWrapper
     def slot_setSelected(self, val):
         if not self._follows_mouse_:
@@ -889,6 +963,26 @@ class SignalCursor(QtCore.QObject):
             ret = True
             
         return ret
+    
+    @property
+    def dataCursors(self) -> typing.Tuple[DataCursor]:
+        """A tuple of DataCursor objects.
+        For crosshair cursors, the tuple has DataCursor objects, respectively,
+        for the horizontal and vertical components. For all other types of 
+        SignalCursors the tuple, has only one DataCursor object.
+        """
+        
+        if self.cursorType == SignalCursorTypes.crosshair:
+            return (self._vDataCursor_, self._hDataCursor_)
+            # return (DataCursor(self._x_, self._hWin_), DataCursor(self._y_, self._vWin_))
+        
+        elif self.cursorType == SignalCursorTypes.horizontal:
+            return (self._hDataCursor_, )
+            # return DataCursor(self._x_, self._hWin_)
+        
+        else:
+            return (self._vDataCursor_, )
+            # return DataCursor(self._y_, self._vWin_)
             
     @safeWrapper
     def detach(self):
@@ -950,95 +1044,142 @@ class SignalCursor(QtCore.QObject):
             
         self._add_lines_to_host_()
         
-    def _setup_(self, host:pg.GraphicsItem, cursor_type:typing.Union[str,SignalCursorTypes, tuple, list]="crosshair", x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, xwindow:typing.Optional[float]=None, ywindow:typing.Optional[float]=None, follower:bool=False, cursorID:typing.Optional[str]=None, xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, **kwargs):
+    def _setup_(self, host:pg.GraphicsItem, cursor_type:typing.Optional[typing.Union[str,SignalCursorTypes, tuple, list]]=None, 
+                x:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                y:typing.Optional[typing.Union[numbers.Number, pq.Quantity]]=None, 
+                xwindow:typing.Optional[float]=None, ywindow:typing.Optional[float]=None, 
+                follower:bool=False, 
+                cursorID:typing.Optional[str]=None, 
+                xBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, 
+                yBounds:typing.Optional[typing.Union[tuple, list, pq.Quantity, np.ndarray]]=None, **kwargs):
         """See docstring for __init__
         """
         #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
         
         show_lines = (False, False)
         
-        if isinstance(cursor_type, str):
-            if len(cursor_type) == 1:
-                c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
-                if len(c_type_name):
-                    cursor_type = SignalCursorTypes[c_type_name[0]]
-                    
-                else:
-                    cursor_type = None
-                
-            else:
-                if cursor_type in SignalCursorTypes.names():
-                    cursor_type = SignalCursorTypes[cursor_type]
-                    
-                else:
-                    cursor_type = None
-                
-        elif isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(b, bool) for c in cursor_type]):
-            cursor_type = Signalcursor.SignalCursorTypes.getType(cursor_type) # this may return None
-            
-        elif not isinstance(cursor_type, SignalCursorTypes):
-            raise TypeError("cursor_type expected to be a str, a tuple of two booleans or a SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
-            
-        # to avoid doubts, is cursor_type is None then fallback to the default (crosshair)
-        if cursor_type is None:
-            cursor_type = SignalCursorTypes.crosshair
-            
-        # now we can set which lines are shown
-        show_lines = cursor_type.value
+        self._cursor_type_ = None
         
-        self._cursor_type_ = cursor_type
-            
         # will set self._x_range_ and self._y_range
         self.setBounds(host, xBounds=xBounds, yBounds=yBounds)
         
-        if isinstance(x, numbers.Number):
-            self._x_ = x
-            
-        elif isinstance(x, pq.Quantity):
-            self._x_ = x.magnitude.flatten()[0]
-            
-        elif x is None:
-            self._x_ = self._x_range_[0] + np.diff(self._x_range_)/2
-            
+        if any(isinstance(v, DataCursor) for v in (x,y)):
+            if isinstance(x, DataCursor):
+                self._vDataCursor_ = x
+                if isinstance(y, DataCursor):
+                    self._hDataCursor_ = y
+                    self._cursor_type_ = SignalCursorTypes.crosshair
+                else:
+                    self._hDataCursor_ = DataCursor(self._y_range_[0] + np.diff(self._y_range_)/2, 0.)
+                    self._cursor_type_ = SignalCursorTypes.vertical
+                    
+            elif isinstance(y, DataCursor):
+                self._hDataCursor_ = y
+                if isinstance(x, DataCursor): # will never be reached ?!?
+                    self._vDataCursor_ = x
+                    self._cursor_type_ = SignalCursorTypes.crosshair
+                else:
+                    self._vDataCursor_ = DataCursor(self._x_range_[0] + np.diff(self._x_range_)/2, 0.)
+                    self._cursor_type_ = SignalCursorTypes.horizontal
+                    
         else:
-            raise TypeError("x expected to be a number, python Quantity or None; got %s instead" % type(x).__name__)
-            
-        if isinstance(y, numbers.Number):
-            self._y_ = y
-            
-        elif isinstance(y, pq.Quantity):
-            self._y_ = y.magnitude.flatten()[0]
-            
-        elif y is None:
-            self._y_ = self._y_range_[0] + np.diff(self._y_range_)/2
         
-        else:
-            raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
+            if isinstance(x, numbers.Number):
+                _x = x
+                # self._x_ = x
+                
+            elif isinstance(x, pq.Quantity):
+                _x = x.magnitude.flatten()[0]
+                # self._x_ = x.magnitude.flatten()[0]
+                
+            elif x is None:
+                _x = self._x_range_[0] + np.diff(self._x_range_)/2
+                # self._x_ = self._x_range_[0] + np.diff(self._x_range_)/2
+                
+            else:
+                raise TypeError("x expected to be a number, python Quantity or None; got %s instead" % type(x).__name__)
+                
+            if isinstance(y, numbers.Number):
+                _y = y
+                # self._y_ = y
+                
+            elif isinstance(y, pq.Quantity):
+                _y = y.magnitude.flatten()[0]
+                # self._y_ = y.magnitude.flatten()[0]
+                
+            elif y is None:
+                _y = self._y_range_[0] + np.diff(self._y_range_)/2
+                # self._y_ = self._y_range_[0] + np.diff(self._y_range_)/2
             
-        if isinstance(xwindow, numbers.Number):
-            self._hWin_ = xwindow
+            else:
+                raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
+                
+            if isinstance(xwindow, numbers.Number):
+                _hWin = xwindow
+                # self._hWin_ = xwindow
+                
+            elif isinstance(xwindow, pq.Quantity):
+                _hWin = xwindow.magnitude.flatten()[0]
+                # self._hWin_ = xwindow.magnitude.flatten()[0]
+                
+            elif xwindow is None:
+                _hWin = 0.0
+                # self._hWin_ = 0.0
+                
+            else:
+                raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
+                
+            if isinstance(ywindow, numbers.Number):
+                _vWin = ywindow
+                # self._vWin_ = ywindow
+                
+            elif isinstance(ywindow, pq.Quantity):
+                _vWin = ywindow.magnitude.flatten()[0]
+                # self._vWin_ = ywindow.magnitude.flatten()[0]
+                
+            elif ywindow is None:
+                _vWin = 0.0
+                # self._vWin_ = 0.0
+                
+            else:
+                raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
             
-        elif isinstance(xwindow, pq.Quantity):
-            self._hWin_ = xwindow.magnitude.flatten()[0]
+            self._vDataCursor_ = DataCursor(_x, _hWin)
+            self._hDataCursor_ = DataCursor(_y, _vWin)
             
-        elif xwindow is None:
-            self._hWin_ = 0.0
+        if not isinstance(self._cursor_type_, SignalCursorTypes): # might have been set above
+            if isinstance(cursor_type, str):
+                if len(cursor_type) == 1:
+                    c_type_name = [name for name in SignalCursorTypes.names() if name.startswith(cursor_type)]
+                    if len(c_type_name):
+                        cursor_type = SignalCursorTypes[c_type_name[0]]
+                        
+                    else:
+                        cursor_type = None
+                    
+                else:
+                    if cursor_type in SignalCursorTypes.names():
+                        cursor_type = SignalCursorTypes[cursor_type]
+                        
+                    else:
+                        cursor_type = None
+                    
+            elif isinstance(cursor_type, (tuple, list)) and len(cursor_type) == 2 and all([isinstance(b, bool) for c in cursor_type]):
+                cursor_type = Signalcursor.SignalCursorTypes.getType(cursor_type) # this may return None
+                
+            elif not isinstance(cursor_type, SignalCursorTypes):
+                raise TypeError("cursor_type expected to be a str, a tuple of two booleans or a SignalCursorTypes; got %s instead" % type(cursor_type).__name__)
             
-        else:
-            raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
+            # to avoid doubts, if cursor_type is still None then fallback to the default (crosshair)
+            if cursor_type is None:
+                cursor_type = SignalCursorTypes.crosshair
+                
+            self._cursor_type_ = cursor_type
             
-        if isinstance(ywindow, numbers.Number):
-            self._vWin_ = ywindow
-            
-        elif isinstance(ywindow, pq.Quantity):
-            self._vWin_ = ywindow.magnitude.flatten()[0]
-            
-        elif ywindow is None:
-            self._vWin_ = 0.0
-            
-        else:
-            raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
+        # now we can set which lines are shown
+        show_lines = self._cursor_type_.value
         
+        # print(f"{self.__class__.__name__}._setup_ cursor type = {self._cursor_type_}")
         if cursorID is None or (isinstance(cursorID, str) and len(cursorID.strip())==0):
             # by now self._cursor_type_ is a SignalCursorTypes value
             if self._cursor_type_ == SignalCursorTypes.crosshair:
@@ -1049,7 +1190,7 @@ class SignalCursor(QtCore.QObject):
         
             else:
                 cursorID = "dv" if follower else "v"
-        
+                
         self._cursorId_ = cursorID
         
         self._follows_mouse_ = follower
@@ -1091,7 +1232,7 @@ class SignalCursor(QtCore.QObject):
                 self._dragging_ = True
                 #print("_interpret_scene_mouse_events_ _dragging_", self._dragging_)
         
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_selected_in_scene_(self, evt):
         # NOTE: 2019-02-09 23:29:22
@@ -1104,18 +1245,18 @@ class SignalCursor(QtCore.QObject):
             (self.hline is not None and self.hline in items):
             self.sig_cursorSelected.emit(self.ID)
             
-    @pyqtSlot(object, object)
+    @Slot(object, object)
     def slot_line_Clicked(self, obj, evt):
         # print(f"{self.__class__.__name__}.slot_line_Clicked evt {evt}")
         # print(f"host item {self._host_graphics_item_}")
         if evt.button() == QtCore.Qt.MouseButton.RightButton:
             self.sig_lineContextMenuRequested.emit(self.ID)
             
-    @pyqtSlot()
+    @Slot()
     def slot_line_doubleClicked(self):
         self.sig_doubleClicked.emit(self.ID)
             
-    @pyqtSlot(object)
+    @Slot(object)
     @safeWrapper
     def _slot_mouse_event_(self, evt):
         """Workaround to synchronize movement of BOTH lines when mouse is dragged in the scene.
@@ -1204,11 +1345,13 @@ class SignalCursor(QtCore.QObject):
                     if mp.x() >= d.xData[0] and mp.x() <= d.xData[-1]:
                         if self._hl_ is not None:
                             self._hl_.setPos(mp.y())
-                            self._y_ = mp.y()
+                            self._hDataCursor_.coord = mp.y()
+                            # self._y_ = mp.y()
                             
                         if self._vl_ is not None:
                             self._vl_.setPos(mp.x())
-                            self._x_ = mp.x()
+                            self._vDataCursor_.coord = mp.x()
+                            # self._x_ = mp.x()
                             
                 # NOTE: only report position when mouse is in the sceneBoundingRect
                 self.sig_reportPosition.emit(self.ID)
@@ -1339,8 +1482,9 @@ class SignalCursor(QtCore.QObject):
         NOTE: To obtain the "y" data coordinate in another PlotItem (axes system)
         that is spanned by the cursor, call self.getX(plotitem)
         """
-        if self._hl_ is None and self._vl_ is None:
-            return self._x_
+        if self._hl_ is None and self._vl_ is None and isinstance(self._vDataCursor_, DataCursor):
+            return self._vDataCursor_.coord
+            # return self._x_
         
         if self._vl_ is not None:
             line = self._vl_
@@ -1348,6 +1492,7 @@ class SignalCursor(QtCore.QObject):
         else:
             line = self._hl_ # as last resort
         
+        # BUG 2024-02-09 14:01:42 FIXME
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             self._current_plot_item_ = self._host_graphics_item_
             return line.getXPos()
@@ -1401,7 +1546,8 @@ class SignalCursor(QtCore.QObject):
                 x = self._hl_.getXPos()
                 
             else:
-                x = self._x_ # very last resort; caller should check this
+                x = self._vDataCursor_.coord # very last resort; caller should check this
+                # x = self._x_ # very last resort; caller should check this
             
             return plotitem.vb.mapSceneToView(QtCore.QPointF(x, 0.0)).x()
             
@@ -1444,8 +1590,9 @@ class SignalCursor(QtCore.QObject):
         NOTE: To obtain the "y" data coordinate in another PlotItem (axes system)
         that is spanned by the cursor, call self.getY(plotitem)
         """
-        if self._hl_ is None and self._vl_ is None:
-            return self._y_
+        if self._hl_ is None and self._vl_ is None and isinstance(self._hDataCursor_, DataCursor):
+            return self._hDataCursor_.coord
+            # return self._y_
         
         if self._hl_ is not None:
             line = self._hl_
@@ -1504,7 +1651,8 @@ class SignalCursor(QtCore.QObject):
                 y = self._vl_.getYPos()
                 
             else:
-                y = self._y_ # very last resort; caller should check this
+                y = self._hDataCursor_.coord # very last resort; caller should check this
+                # y = self._y_ # very last resort; caller should check this
             
             return plotitem.vb.mapSceneToView(QtCore.QPointF(0.0, y)).y()
             
@@ -1530,7 +1678,8 @@ class SignalCursor(QtCore.QObject):
             
     @property
     def xwindow(self):
-        return self._hWin_
+        return self._vDataCursor_.span
+        # return self._hWin_
     
     @xwindow.setter
     def xwindow(self, val):
@@ -1540,11 +1689,13 @@ class SignalCursor(QtCore.QObject):
         elif not isinstance(val, numbers.Number):
             raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
         
-        self._hWin_ = val
+        self._vDataCursor_.span = val
+        # self._hWin_ = val
     
     @property
     def ywindow(self):
-        return self._vWin_
+        return self._hDataCursor_.span
+        # return self._vWin_
     
     @ywindow.setter
     def ywindow(self, val):
@@ -1554,7 +1705,8 @@ class SignalCursor(QtCore.QObject):
         elif not isinstance(val, numbers.Number):
             raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
         
-        self._vWin_ = val
+        self._hDataCursor_.span = val
+        # self._vWin_ = val
         
     @property
     def name(self):
@@ -1745,6 +1897,22 @@ class SignalCursor(QtCore.QObject):
     @property
     def isVertical(self):
         return self._vl_ is not None and self._hl_ is None
+    
+    def isVisible(self):
+        return (self._vl_ is not None and self._vl_.isVisible()) or (self._hl_ is not None and self._hl_.isVisible())
+    
+    def setVisible(self, val:bool):
+        if self._vl_ is not None:
+            self._vl_.setVisible(val)
+            
+        if self._hl_ is not None:
+            self._hl_.setVisible(val)
+            
+    def show(self):
+        self.setVisible(True)
+        
+    def hide(self):
+        self.setVisible(False)
             
     
 @safeWrapper

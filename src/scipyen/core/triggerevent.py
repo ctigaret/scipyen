@@ -123,7 +123,8 @@ class TriggerEventType(TypeEnum):
     imaging             = imaging_frame | imaging_line  # 24
     acquisition         = imaging | sweep               # 56
     
-class DataMark(DataObject):
+# class DataMark(DataObject):
+class DataMark(neo.Event):
     """Similar to neo.Event but suitable to all domains, not just time
     """
     _single_parent_objects = ('Segment',)
@@ -380,6 +381,7 @@ class DataMark(DataObject):
         obj = pq.Quantity(places, units=dim).view(cls)
         obj._labels = labels
         obj.segment = None
+        # obj.name = name
         return obj
 
     
@@ -547,16 +549,24 @@ class DataMark(DataObject):
         
         """
         if isinstance(self, TriggerEvent):
-            if other.__event_type__ != self.__mark_type__:
+            if other.__mark_type__ != self.__mark_type__:
                 raise TypeError("Can only merge synaptic events of the same type")
         
-        othertimes = other.times.rescale(self.times.units)
-        times = np.hstack([self.times, othertimes]).sort() * self.times.units
-        labels = np.hstack([self.labels, other.labels]) # CAUTION this will mix the labels!
+        my_times_labels = list(zip(self.times, self.labels))
         
+        other_times_labels = list(zip(other.times, other.labels))
+        
+        new_times_labels = sorted(my_times_labels + other_times_labels, key = lambda x: x[0])
+        
+#         othertimes = other.times.rescale(self.times.units)
+#         times = np.hstack([self.times, othertimes]).sort() * self.times.units
+#         labels = np.hstack([self.labels, other.labels]) # CAUTION this will mix the labels!
+#         
         # NOTE: 2019-03-15 18:45:20
         # preserve _MY_ labels!
-        new_labels = np.full_like(labels, labels[0], dtype=labels.dtype)
+        # new_labels = np.full_like(labels, labels[0], dtype=labels.dtype)
+        
+        new_times, new_labels = zip(*new_times_labels)
         
         # take care of the other constructor parameters
         kwargs = {}
@@ -581,7 +591,7 @@ class DataMark(DataObject):
 
         kwargs.update(merged_annotations)
         
-        return self.__class__(times=times, labels=new_labels, **kwargs)
+        return self.__class__(times=new_times, labels=new_labels, **kwargs)
         #return TriggerEvent(times=times, labels=new_labels, **kwargs)
     
     def rescale(self, units):
@@ -697,15 +707,17 @@ class DataMark(DataObject):
         return self.place_shift(t_shift)
 
     def __getitem__(self, i):
-        obj = super(self.__class__, self).__getitem__(i)
-        if self._labels is not None and self._labels.size > 0:
-            obj._labels = self._labels[i]
-        else:
-            obj._labels = self._labels
+        # obj = super(self.__class__, self).__getitem__(i) # BUG 2023-11-01 22:49:26 FIXME
+        # obj = super().__getitem__(i) 
+        obj = self.__class__(super().__getitem__(i), labels = self._labels[i])
+        # if self._labels is not None and self._labels.size > 0:
+        #     obj._labels = self._labels[i]
+        # else:
+        #     obj._labels = self._labels
             
         try:
             obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
-            obj._copy_data_complement(self)
+            # obj._copy_data_complement(self)
         except AttributeError:  # If Quantity was returned, not Event
             obj.times = obj
         return obj
@@ -1108,7 +1120,8 @@ class TriggerEvent(DataMark):
     
     def __new__(cls, times=None, labels=None, units=None, name=None, description=None,
                 file_origin=None, event_type=None, array_annotations=None, **annotations):
-        
+        # BUG: 2023-10-03 17:57:30 FIXME
+        # when labels are passed as a string the counter is not taken into account
         if times is None:
             times = np.array([]) * pq.s
         
@@ -1129,19 +1142,25 @@ class TriggerEvent(DataMark):
             if isinstance(evt, TriggerEvent):
                 event_type = evt.event_type
                 
+        # print(f"{cls}.__new__ labels = {labels} ({type(labels).__name__})")
+                
         if labels is None:
-            labels = np.array([], dtype='S')
+            ll = [f"trigger{k}" for k in range(times.size)]
+            labels = np.array(ll, dtype='U')
             
         else:
             if isinstance(labels, str):
-                labels = np.array([labels] * times.size)
+                ll = [f"{labels}{k}" for k in range(times.size)]
+                # print(f"ll = {ll}")
+                # labels = np.array(ll, dtype="U")
+                labels = np.array(ll)
                 
             elif isinstance(labels, (tuple, list)):
                 if not all([isinstance(l, str) for l in labels]):
                     raise TypeError("When ''labels' is a sequence, all elements must be str")
                 
                 if len(labels) < times.size:
-                    labels += [labels[-1]] * (times.size - len(labels))
+                    labels += [f"{labels[-1]}{k}" for k in range(len(labels), times.size)]
                     
                 elif len(labels) > times.size:
                     labels = labels[:times.size]
@@ -1153,13 +1172,17 @@ class TriggerEvent(DataMark):
                     raise TypeError("When 'labels' is a numpy array, it must contain strings")
                 
                 if labels.size < times.size:
-                    labels = np.append(labels, [labels[-1]] * (times.size - labels-size))
+                    ll = np.append(labels, [f"{labels[-1]}{k}" for k in range(labels.size, times.size, )])
+                    labels = ll
+                    
                 elif labels.size > times.size:
                     labels = labels[:times.size]
                     
             else:
                 raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
                     
+        # print(f"\t{cls}.__new__ actual labels = {labels} ({type(labels).__name__}, dype={labels.dtype})")
+        
         if units is None:
             # No keyword units, so get from `times`
             try:
@@ -1191,7 +1214,7 @@ class TriggerEvent(DataMark):
         
         By default its __mark_type__ is TriggerEventType.presynaptic
         """
-        super().__init__(times=times, labels=labels, units=units, 
+        super().__init__(times=times, labels=labels, units=units, name=name,
                          description=description, file_origin=file_origin, 
                          mark_type=event_type, array_annotations=array_annotations,
                          **annotations)

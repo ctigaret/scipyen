@@ -29,16 +29,18 @@ import pandas as pd
 import quantities as pq
 import vigra
 import pyqtgraph # for their own eq operator
+import matplotlib as mpl
 #import language_tool_python
 
-from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 # try:
 #     from pyqtgraph import eq # not sure is needed
 # except:
 #     from operator import eq
 
 from core import prog
-from .prog import safeWrapper, deprecation, with_doc
+from .prog import safeWrapper, deprecation, with_doc, is_hashable
 
 from .strutils import get_int_sfx
 from .quantities import units_convertible
@@ -73,7 +75,7 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Object Type","Data Type (DType)", 
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
-                                ]
+                                "Icon"]
 
 GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]
 """Generic index type, used with normalized_indexed and similar functions"""
@@ -576,7 +578,7 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> int:
 
 @safeWrapper
 def gethash(x:typing.Any) -> int:
-    """Calculates a hash-like figure for objects (including of non-hashable types)
+    """Calculates a hash-like figure for objects (including non-hashable types)
     To be used for object comparisons.
     
     Not suitable for secure code.
@@ -588,7 +590,7 @@ def gethash(x:typing.Any) -> int:
     In particular for mutable sequences, or objects containing immutable sequences
     is very likely to return floats
     """
-    from core.datatypes import is_hashable
+    # from core.datatypes import is_hashable
     
     # FIXME 2021-08-20 14:23:26
     # for large data array, calculating the hash after converting to tuple may:
@@ -662,8 +664,11 @@ def get_index_for_seq(index:int, test:typing.Sequence[typing.Any],
                       mapping:typing.Optional[dict]=None) -> typing.Any:
     """Heuristic for computing an index into the target sequence.
     
-    Returns an index into the `target` sequence given `index`:int index into
-    the `test` sequence and an optional index mapping.
+    Returns the index of an element in a `target` sequence given the `index`:int
+    of the element into the `test` sequence and an optional index mapping.
+    
+    In other words, find out at what index in the `target` sequence is located
+    the element at index `index` in the `test` sequence.
     
     Parameters:
     ===========
@@ -906,113 +911,170 @@ def safe_identity_test2(x, y) -> bool:
     """Uses SafeComparator object"""
     return SafeComparator(comp=eq)(x, y)
 
-@safeWrapper
-def safe_identity_test(x, y, idcheck=False) -> bool:
-    ret = True
+# @safeWrapper
+# def safe_identity_test(x, y) -> bool:
+def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
+    """Test that symbols in x and y refer to identical Python objects.
     
-    if x is y:
-        return True
+    Allows for the particular case where a simple comparison using '==', the 
+    operator.eq or the objects' own __eq__ would fail. For example, numpy arrays
+    require the use of np.all(...) to aggregate comparison between elements, but
+    caling np.all() requires the arrays to have the identical shapes, etc.
     
-    if all(isinstance(v, type) for v in (x,y)):
-        return x==y
+    Optionally, the function can bypass the default mechanism that compares the
+    Python "identity" the objects referred by the symbols (see 'idcheck' parameter)
+    such that two objects stored at distinct memory addresses but containing 
+    identical data (e.g., strings, numbers) are viewed as identical for the purpose
+    of the data contents.
     
-    if idcheck:
-        ret &= idcheck(x, y)
+    Parameters:
+    -----------
+    x,y Symbols of Python objects to be tested for identity.
+    
+    idcheck: bool, optional , default is True. Flag to indicate whether to compare
+        the Python "identity" of the two objects (see Python's `id` builtin).
+    
+        In CPython, this is the objects' addresses in memory (a.k.a a "pointer"); 
+        The obejcts referred to by the two symbols 'x' and 'y' are identical if 
+        they have the same memory location.
+    
+        In most situations, simply checking whether the two objects have the same
+        Python "identity" is sufficient - hence this flag is by default True.
+    
+        On some occasions, two objects with distinct `id` can nevertheless contain
+        identical data (numbers, strings) when they are constructed, for example
+        using the same parameters. Although they ARE distinct Python objects from
+        the code's point of view, they are identical from the point of view of the
+        the data they encapsulate. Passing 'idcheck' False will cause this function
+        to compare the data ontent of the objects instead of their ID.
+    
+    NOTE: 2024-05-17 14:58:56
+    to save some typing, you can use the alias 'eq'
+    
+"""
+    try:
+        
+        if x is y:
+            return True
+        
+        # if all(isinstance(v, type) for v in (x,y)):
+        if isinstance(x, type) and isinstance(y, type):
+            return x==y
+        
+        ret = True
+        
+        if idcheck:
+            ret &= ideq(x, y)
+            if not ret:
+                return ret
+        
+        ret &= type(x) == type(y)
+        
         if not ret:
             return ret
-    
-    ret &= type(x) == type(y)
-    
-    if not ret:
-        return ret
-    
-    if isfunction(x):
-        return x == y
-    
-    if isinstance(x, partial):
-        return x.func == y.func and x.args == y.args and x.keywords == y.keywords
         
-    if hasattr(x, "size"): # np arrays and subtypes
-        if not hasattr(y, "size"):
-            return False
+        # if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
+        #     try:
+        #         # return np.all(x == y)
+        #         return x == y
+        #     except:
+        #         print(f"x is {type(x)}, y is {type(y)}")
+        #         raise
         
-        ret &= x.size == y.size
+        if isfunction(x):
+            return x == y
+        
+        if isinstance(x, partial):
+            return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+            
+        if hasattr(x, "size"): # np arrays and subtypes
+            if not hasattr(y, "size"):
+                return False
+            
+            ret &= x.size == y.size
 
-        if not ret:
+            if not ret:
+                return ret
+        
+        elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
+            if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
+                return False
+            
+            ret &= len(x) == len(y)
+            
+            if not ret:
+                return ret
+            
+            if all(isinstance(v, dict) for v in (x,y)):
+                # FIXME: 2023-06-01 13:37:10
+                # prone to infinite recursion when either dict is among either x.values() or y.values()
+                try:
+                    ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1], idcheck=idcheck), zip(x.items(), y.items())))
+                except:
+                    ret = False
+                if not ret:
+                    return ret
+            else:
+                # FIXME: 2023-06-01 13:43:34
+                # prone to infinite recursion when either element is in x or y
+                try:
+                    ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1], idcheck=idcheck), zip(x,y)))
+                except:
+                    ret = False
+            
+            if not ret:
+                return ret
+            
+        if hasattr(x, "shape"):
+            if not hasattr(y, "shape"):
+                return False
+            
+            ret &= x.shape == y.shape
+                
+            if not ret:
+                return ret
+        
+        # NOTE: 2018-11-09 21:46:52
+        # isn't this redundant after checking for shape?
+        # unless an object could have shape attribte but not ndim
+        if hasattr(x, "ndim"):
+            if not hasattr(y, "ndim"):
+                return False
+            ret &= x.ndim == y.ndim
+        
+            if not ret:
+                return ret
+        
+        if hasattr(x, "dtype"):
+            if not hasattr(y, "dtype"):
+                return False
+            ret &= x.dtype == y.dtype
+        
+            if not ret:
+                return ret
+        
+        if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
+            ret &= np.all(x==y)
+            
             return ret
-    
-    elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
-        if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
-            return False
-        
-        ret &= len(x) == len(y)
-        
-        if not ret:
-            return ret
-        
-        if all(isinstance(v, dict) for v in (x,y)):
-            # ret &= list(x.keys()) == list(y.keys())
+            # NOTE: 2023-05-17 08:54:39
+            # event if ret was True here, not sure that falling throhugh to eq would
+            # work for arrays
             # if not ret:
             #     return ret
             
-#             x_items = list(filter(lambda x_: x_[1] not in (x,y), x.items()))
-#             y_items = list(filter(lambda x_: x_[1] not in (x,y), y.items()))
-#             
-#             ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x_items, y_items)))
-            # FIXME: 2023-06-01 13:37:10
-            # prone to infinite recursion when either dict is among either x.values() or y.values()
-            ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1]), zip(x.items(), y.items())))
-            if not ret:
-                return ret
-        else:
-            # FIXME: 2023-06-01 13:43:34
-            # prone to infinite recursion when either element is in x or y
-            ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1]),zip(x,y)))
+        # ret &= pyqtgraph.eq(x,y)
         
-        if not ret:
-            return ret
+        return ret ## good fallback, though potentially expensive
+    
+    except:
+        traceback.print_exc()
+        frame = inspect.currentframe()
+        call_stack = "\n".join([f"{fi.function} from {fi.filename} at line {fi.lineno}" for fi in inspect.getouterframes(frame)])
+        print("Call stack:")
+        print(call_stack)
         
-    if hasattr(x, "shape"):
-        if not hasattr(y, "shape"):
-            return False
-        
-        ret &= x.shape == y.shape
-            
-        if not ret:
-            return ret
-    
-    # NOTE: 2018-11-09 21:46:52
-    # isn't this redundant after checking for shape?
-    # unless an object could have shape attribte but not ndim
-    if hasattr(x, "ndim"):
-        if not hasattr(y, "ndim"):
-            return False
-        ret &= x.ndim == y.ndim
-    
-        if not ret:
-            return ret
-    
-    if hasattr(x, "dtype"):
-        if not hasattr(y, "dtype"):
-            return False
-        ret &= x.dtype == y.dtype
-    
-        if not ret:
-            return ret
-    
-    if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
-        ret &= np.all(x==y)
-        
-        return ret
-        # NOTE: 2023-05-17 08:54:39
-        # event if ret was True here, not sure that falling throhugh to eq would
-        # work for arrays
-        # if not ret:
-        #     return ret
-        
-    ret &= pyqtgraph.eq(x,y)
-    
-    return ret ## good fallback, though potentially expensive
+eq = safe_identity_test
 
 class NestedFinder(object):
     """Provides searching in nesting (hierarchical) data structures.
@@ -1027,6 +1089,8 @@ class NestedFinder(object):
     Index and Series) are considered "leaf" objects - i.e., no further search is
     performed INSIDE their elements when these elements are of a nesting type as
     described above.
+    
+    FIXME: This is buggy whe searching by type !!!
     
     """
     supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index) # this implicitly includes namedtuple
@@ -1402,7 +1466,7 @@ class NestedFinder(object):
         else:# elementary indexing with POD scalars, ndarray or tuple of ndarray
             return self._ndx_expr(src, path)
             
-    def _gen_search(self, var, item, parent=None, as_index=False):#, ntabs=0): # ntabs - for debugging only!
+    def _gen_search(self, var, item, parent=None, as_index=False, by_type=False):#, ntabs=0): # ntabs - for debugging only!
         """Generator to search item in a nesting data structure.
         
         Item can be an indexing object, or a value.
@@ -1457,6 +1521,8 @@ class NestedFinder(object):
         if var is None:
             var = self.data
             
+        # print(f"{self.__class__.__name__}._gen_search as_index = {as_index}, by_type = {by_type}")
+            
             
         if isinstance(var, NestedFinder.nesting_types) and id(var) not in self._visited_:
             self._visited_.append(id(var))
@@ -1479,16 +1545,22 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    if self._comparator_(item, v):
-                        self._found_.append(k)
-                        self._paths_.append(list(self._found_))
-                        # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
-                        yield k
+                    if by_type:
+                        if isinstance(v, item):
+                            self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            yield k
+                    else:
+                        if self._comparator_(item, v):
+                            self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
+                            yield k
                         
                 if isinstance(v, self.supported_collection_types):
                     self._found_.append(k)
                     # print("%ssearch inside %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
-                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    yield from self._gen_search(v, item, k, as_index, by_type)#, ntabs+1) # ntabs for debugging
                     self._found_.pop()
                     
                 # print("%sNOT FOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
@@ -1522,16 +1594,22 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    if self._comparator_(v, item):
-                        #self._found_.append(k)
-                        self._paths_.append(list(self._found_))
-                        # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
-                        yield k
+                    if by_type:
+                        if isinstance(v, item):
+                            self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            yield k
+                    else:
+                        if self._comparator_(v, item):
+                            #self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                            yield k
                         
                 if isinstance(v, self.supported_collection_types):
                     #self._found_.append(k)
                     # print("%ssearch inside %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
-                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    yield from self._gen_search(v, item, k, as_index, by_type)#, ntabs+1) # ntabs for debugging
                     #self._found_.pop()
                         
                 # print("%sNOT FOUND in %s field %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
@@ -1565,16 +1643,23 @@ class NestedFinder(object):
                         yield v
                         
                 else:
-                    if self._comparator_(v, item):
-                        #self._found_.append(k)
-                        self._paths_.append(list(self._found_))
-                        # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
-                        yield k
+                    if by_type:
+                        if isinstance(v, item):
+                            self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            yield v
+                            
+                    else:
+                        if self._comparator_(v, item):
+                            #self._found_.append(k)
+                            self._paths_.append(list(self._found_))
+                            # print("%sFOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
+                            yield k
                         
                 if isinstance(v, self.supported_collection_types):
                     #self._found_.append(k)
                     # print("%ssearch inside %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
-                    yield from self._gen_search(v, item, k, as_index)#, ntabs+1) # ntabs for debugging
+                    yield from self._gen_search(v, item, k, as_index, by_type)#, ntabs+1) # ntabs for debugging
                     #self._found_.pop()
                     
                 # print("%sNOT FOUND in %s element %s: %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(v).__name__, ), "visited:", self._found_)
@@ -1902,15 +1987,16 @@ class NestedFinder(object):
                     # print("%sback up one in %s -" % ("".join(["\t"] * ntabs), type(var).__name__), "visited:", self._found_)
                 
             
-    def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None):
+    def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None,
+             find_by_type:typing.Optional[bool] = False):
         """Search for 'item' in a nesting data structure.
         
         A nesting data structure if a collection (sequence or mapping - a dict)
         that contains other sequnences or dicts nested inside (with arbitrary
         nesting levels).
         
-        Parameters (for Usage, see below):
-        ----------------------------------
+        Parameters (see below for usage details):
+        -----------------------------------------
         
         item: object of the search (optional, default is None)
             When None, the function re-runs the last search. 
@@ -1924,7 +2010,7 @@ class NestedFinder(object):
             When True: 'search by value' mode
             
                 * 'item' is cosidered a value possibly contained deep inside the
-                    nesting data structure
+                    nesting data structure, or a type or tuple of types (see 'find_by_type', below)
                 
                 * the function returns a collection of paths leading to the 
                     values identical to that of 'item' (for primitive data types),
@@ -1954,6 +2040,14 @@ class NestedFinder(object):
                 Otherwise, the function runs a search for 'item', using 
                 'search by value' mode (i.e., as if find_value was passed as 
                 True)
+        
+        find_by_type: bool; default is False
+            When True, 'item' (above) is expected to be a type or tuple of type, 
+            and the search locates nested items of the type(s) specified by the 
+            'item' parameter.
+        
+            WARNING: this search mode is only supported for mappings (dict) and
+            Python sequences (tuple, list, deque)
                 
         Returns:
         -------
@@ -2350,9 +2444,13 @@ class NestedFinder(object):
         if not isinstance(find_value, bool): # force the default here
             find_value = True
             
+        if find_by_type:
+            if not (isinstance(item, type) or (isinstance(item, tuple) and all(isinstance(i, type) for i in item))):
+                raise ValueError(f"When `find_by_type` is True, `item` must be a type or a sequence of types; instead, got {type(item).__name__}")
+            
         self.initialize()
         
-        self._values_ = deque(self._gen_search(self.data, item, None, not find_value))
+        self._values_ = deque(self._gen_search(self.data, item, None, not find_value, find_by_type))
         
         if find_value:
             self._result_ = self._paths_
@@ -2372,7 +2470,7 @@ class NestedFinder(object):
         
         Calls self.find(key_or_indexing_obj, False)
         """
-        return self.find(obj, False)
+        return self.find(obj, find_value=False)
     
     def findindex(self, obj):
         """Calls self.findkey(key_or_indexing_obj).
@@ -2384,7 +2482,7 @@ class NestedFinder(object):
         
         Calls self.find(value, True)
         """
-        return self.find(value, True)
+        return self.find(value, find_value=True)
     
     def path_expression(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
         """Generates a str expression to be valuated on the hierarchical data
@@ -2623,6 +2721,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     the Scipyen main window.
     
     """
+    import builtins
     from core.datatypes import (abbreviated_type_names, dict_types, dict_typenames,
                                 ndarray_type, neo_containernames, 
                                 sequence_types, sequence_typenames, 
@@ -2641,8 +2740,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #result of sys.getsizeof(obj) for any other python object
         
         #TODO construct handlers for other object types as well including 
-        #PyQt5 objects (maybe)
+        #Qt objects (maybe)
             
+    icon = QtGui.QIcon.fromTheme("object")
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
     
@@ -2655,8 +2755,13 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     fqual = ".".join([objcls.__module__, clsname])
     ttip = ".".join([typemodulename, typename])
     
-    if isinstance(obj, QtWidgets.QMainWindow):
-        ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
+    if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+        icon = QtGui.QIcon.fromTheme("window")
+        if isinstance(obj, QtWidgets.QMainWindow):
+            ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
+        
+    # if typename == "module":
+    #     icon = QtGui.QIcon.fromTheme("class-or-package")
     
     wspace_name = "Namespace: %s" % namespace
     
@@ -2673,6 +2778,8 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         #except:
             #ttip = typename
     
+    # icon = None
+    
     result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
     
     tt = abbreviated_type_names.get(typename, typename)
@@ -2683,9 +2790,17 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     if tt == "instance":
         tt = abbreviated_type_names.get(clsname, clsname)
+        icon = QtGui.QIcon.fromTheme("class")
+        
+    if tt == "function":
+        icon = QtGui.QIcon.fromTheme("code-function")
 
+    if tt == "module":
+        icon = QtGui.QIcon.fromTheme("class-or-package")
+        
     if objtype is type:
         tt += f" <{obj.__name__}>"
+        icon = QtGui.QIcon.fromTheme("datatype") if obj.__name__ in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
         
     ttip = tt
         
@@ -2759,6 +2874,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
 
     try:
         if isinstance(obj, type):
+            # icon = QtGui.QIcon.fromTheme("datatype")
             pass
         elif isinstance(obj, sequence_types):
             if len(obj) and all([isinstance(v, Number) for v in obj]):
@@ -2946,11 +3062,12 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         result["Axes"]          = {"display": axes,         "tooltip" : "%s%s" % (axestip, axes)}
         result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
+        result["Icon"]          = icon
         
         # NOTE: 2021-06-12 12:22:38
         # append namespace name to the tooltip at the entries other than Name, as well
         for key, value in result.items():
-            if key != "Name":
+            if key not in ("Name", "Icon"):
                 value["tooltip"] = "\n".join([value["tooltip"], wspace_name])
         
     except Exception as e:
@@ -3080,7 +3197,6 @@ def yyMdd(now=None):
     return "%s%s%s" % (time.strftime("%y", tuple(now)), string.ascii_lowercase[now.tm_mon-1], time.strftime("%d", tuple(now)))
 
 
-
 def make_file_filter_string(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]
 
@@ -3101,7 +3217,7 @@ def elements_types(s) -> typing.Sequence[type]:
 
 
 def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
-    """Appends a counter suffix to x if x is found in the list of strings
+    """Appends a counter suffix to x:str if x is found in the list of strings
     
     Parameters:
     ==========
@@ -3340,12 +3456,13 @@ def sort_with_none(iterable, none_last = True) -> typing.Sequence:
     
     return sorted(iterable, key=lambda x: x if x is not None else noneph)
 
-def unique(seq, key=None) -> typing.Sequence:
+# def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
+def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
     """Returns a sequence of unique elements in the iterable 'seq'.
-    Functional version of gen_unique
+    Functional version of gen_unique.
     Parameters:
     -----------
-    seq: an iterable (tuple, list, range, map)
+    seq: an iterable (tuple, list, range, map, generator)
     
     key: predicate for uniqueness (optional, default is None)
         Typically, this is an object returned by a lambda function
@@ -3354,23 +3471,89 @@ def unique(seq, key=None) -> typing.Sequence:
         
         unique(seq, lambda x: x._some_member_property_or_getter_function_)
     
+    indices: bool, default is False. When True, the function returns a sequence
+        of (element, index) tuples, where 'index' is the 0-based index of 
+        'element' in 'seq'
+    
+    idcheck: see documentation for safe_identity_test function in this module
+    
     Returns:
     =======
-    A tuple containing unique elements in 'seq'.
+    A sequence containing unique elements in 'seq'. When 'indices' is True,
+    returns a sequence of (element, index) tuples for the unique elements in
+    'seq'.
     
     NOTE: Does not guarantee the order of the unique elements is the same as 
             their order in 'seq'
             
-    See also gen_unique for a generator version.
+    See also:
+    • gen_unique for a generator version.
+    • duplicates for a function returning the duplicates in a sequence
+    
+    CHANGELOG:
+    2024-01-02 14:51:23 Returns a sequence of the same type as 'seq'.
     
     """
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
-    return tuple(item for item in gen_unique(seq, key=key))
+    return seq.__class__(gen_unique(seq, key=key, indices=indices, idcheck=idcheck))
+    # return seq.__class__(gen_unique(seq, key=key, indices=indices))
 
-def gen_unique(seq, key=None):
-    """Iterates through unique elements in seq
+def duplicates(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
+    """Returns a sequence of duplicate elements in 'seq'.
+    
+    Implements:
+        if indices:
+            list(gen_unique(gen_duplicates(seq, key=key), key=key, indices=indices))
+        else:
+            list(gen_unique(gen_duplicates(seq, key=key), key=key), key=key)
+    
+    Parameters:
+    -----------
+    seq: a Python iterable (tuple, list, range, map, generator)
+    
+    key: predicate for comparing the elements in 'seq'.
+        Typically, this is an object returned by a lambda function, or a property
+        present in all elements of 'seq', e.g.:
+        
+        lambda x: x._some_member_property_or_getter_function_
+    
+        Default is None (thus relying on the native comparison of the elements
+        in 'seq')
+    
+    indices: bool, default is False. When True, the function returns a sequence
+        of (element, index) tuples, where 'index' is the 0-based index of 
+        'element' in 'seq'
+    
+    idcheck: see documentation for the safe_identity_test in this module
+    
+    Returns:
+    =======
+    A sequence containing duplicate elements in 'seq'; when 'indices' is True, 
+    returns a sequence containing (element, index) tuples for the duplicate
+    elements in 'seq'
+    
+    
+    See also:
+    • gen_duplicates
+    • unique
+    
+    """
+    if not hasattr(seq, "__iter__"):
+        raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
+    
+    if indices:
+        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, indices=indices, idcheck=idcheck)))
+        
+    else:
+        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, idcheck=idcheck), key=key))
+    
+    
+
+# def gen_unique(seq, key=None, indices:bool=False):
+def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
+    """Iterates through unique elements in the sequence 'seq'.
     
     Parameters:
     -----------
@@ -3391,6 +3574,8 @@ def gen_unique(seq, key=None):
         
         unique(seq, lambda x: x._some_member_property_or_getter_function_)
     
+    idcheck: see documentation for the safe_identity_test function in this module
+    
     Yields:
     =======
     Unique elements in 'seq'.
@@ -3398,28 +3583,228 @@ def gen_unique(seq, key=None):
     NOTE: Does not guarantee the order of the unique elements is the same as 
             their order in 'seq'
             
-    WARNING: Only works with sequences of hashable types.
+    NOTE: For most primitive and hashable python types, the following idiom is
+    recommended instead of gen_unique:
+    
+    tuple(set(seq)) 
+
+    where `seq` is an iterable collection of python objects.
+    
+    However, this function is useful to create collections of objects with unique
+    elements based on a value of the objects' property, or the value of a unary 
+    function applied to each object in the original collection.
+    
+    Also, the above idiom works only with hashable types, whereas this function
+    also accepts objects of types that implement the special method __eq__, or 
+    where it makes sense to compare objects using the `is` keyword.
     
     See also:
     ========
     
     unique for a function version
     
+    gen_duplicates for iterating through the duplicates in 'seq'.
+    
     """
+    seenlist = list()
+    seenset = set()
+    
     # if not isinstance(seq, (tuple, list, range, deque, str)):
     if not hasattr(seq, "__iter__"):
         raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
     
-    seen = set()
-    
-    if key is None:
-        yield from (x for x in seq if x not in seen and not seen.add(x))
-    
-    else:
-        if inspect.isfunction(key):
-            yield from (x for x in seq if key(x) not in seen and not seen.add(key(x)))
+    def __check_fun_val_(x, key):
+        val = key(x)
+        if is_hashable(val):
+            if val not in seenset:
+                seenset.add(val)
+                return True
+            return False
+            # return val not in seenset and not __add_to_seen__(val)
         else:
-            yield from (x for x in seq if key not in seen and not seen.add(key))
+            if len(seenlist):
+                # if any(not safe_identity_test(val, x_) for x_ in seenlist):
+                if any(not safe_identity_test(val, x_, idcheck=idcheck) for x_ in seenlist):
+                    seenlist.append(val)
+                    ret = True
+            else:
+                seenlist.append(val)
+                ret = True
+                
+            return False
+            # return val not in seenlist and not __add_to_seen__(val)
+            
+    def __check_val__(x):
+        if is_hashable(x):
+            if x not in seenset:
+                seenset.add(x)
+                return True
+            return False
+            # return x not in seenset and not __add_to_seen__(x)
+        else:
+            if len(seenlist) == 0:
+                seenlist.append(x)
+                return True
+                
+            # if all(not safe_identity_test(x, x_) for x_ in seenlist):
+            if all(not safe_identity_test(x, x_, idcheck=idcheck) for x_ in seenlist):
+                seenlist.append(x)
+                return True
+                
+            return False
+        
+    if indices:
+        try:
+            n = len(seq)
+            if key is None:
+                yield from ((x,k) for x, k in zip(seq, range(n)) if __check_val__(x))
+            
+            else:
+                if inspect.isfunction(key):
+                    yield from ((x, k) for x, k in zip(seq, range(n)) if __check_fun_val_(x, key))
+                else:
+                    yield from ((x, k) for x, k in zip(seq, range(n)) if __check_val__(key))
+                    
+        except:
+            if key is None:
+                yield from ((x,k) for x, k in zip(seq, itertools.count(0)) if __check_val__(x))
+            
+            else:
+                if inspect.isfunction(key):
+                    yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if __check_fun_val_(x, key))
+                else:
+                    yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if __check_val__(key))
+                    
+    else:
+        if key is None:
+            yield from (x for x in seq if __check_val__(x))
+        
+        else:
+            if inspect.isfunction(key):
+                yield from (x for x in seq if __check_fun_val_(x, key))
+            else:
+                yield from (x for x in seq if __check_val__(key))
+            
+# def gen_duplicates(seq, key=None, indices:bool=False):
+def gen_duplicates(seq, key=None, indices:bool=False, idcheck:bool=True):
+    """Iterates through the duplicate elements in the sequence 'seq'.
+    Parameters:
+    -----------
+    seq: an iterable sequence (tuple, list, range)
+    
+    key: predicate for uniqueness (optional, default is None)
+        When present, it is usually a unary predicate function taking an 
+        element of the sequence as first parameter, and returning a bool.
+        
+        Predicates with more than one parameters (e.g., a comparator such as 
+        operator.ge_, etc) can be converted to unary predicates by "fixing" the 
+        second operand through functools.partial.
+        
+        
+        Typically, this is an object returned by a lambda function
+        
+        e.g.
+        
+        unique(seq, lambda x: x._some_member_property_or_getter_function_)
+    
+    idcheck: see documentation for the safe_identity_test function in this module
+
+    Yields:
+    =======
+    Duplicate elements in 'seq' i.e., all but the first occurence of
+    of an element present¹ in 'seq' more than once.
+    
+    NOTE: 
+        Does not guarantee the order of the duplicate elements is the same as 
+            their order in 'seq'.
+    
+    NOTE: 
+        ¹ the presence of the element is established by the 'in'
+        keyword, or by the functor specfied in the 'key' parameter.
+    
+    
+    This function is useful to create collections of objects with the duplicate
+    elements in 'seq' based on a value of the objects' property, or the value of
+    a unary function applied to each object in the original collection.
+    
+    gen_duplicates also accepts objects of types that implement the special 
+    method __eq__, or where it makes sense to compare objects using the `is` 
+    keyword.
+    
+    NOTE: To obtain a sequence (e.g. a list) of unique occurrences of the 
+    duplicate elements in 'seq', call:
+    
+    list(gen_unique(gen_duplicates(seq, key=key), key=key))
+    
+    """
+    seenlist = list()
+    seenset = set()
+    
+    first_index = set()
+    
+    if not hasattr(seq, "__iter__"):
+        raise TypeError("expecting an iterable; got %s instead" % type(seq).__name__)
+    
+    def __check_fun_val_(x, key):
+        val = key(x)
+        if is_hashable(val):
+            if val not in seenset:
+                seenset.add(val)
+                return True
+            return False
+        else:
+            if len(seenlist):
+                # if any(not safe_identity_test(val, x_) for x_ in seenlist):
+                if any(not safe_identity_test(val, x_, idcheck=idcheck) for x_ in seenlist):
+                    seenlist.append(val)
+                    return True
+            else:
+                seenlist.append(val)
+                return True
+                
+            return False
+            
+    def __check_val__(x):
+        if is_hashable(x):
+            if x not in seenset:
+                seenset.add(x)
+                return True
+            return False
+        else:
+            if len(seenlist) == 0:
+                seenlist.append(x)
+                return True
+                
+            # if all(not safe_identity_test(x, x_) for x_ in seenlist):
+            if all(not safe_identity_test(x, x_, idcheck=idcheck) for x_ in seenlist):
+                seenlist.append(x)
+                return True
+                
+            return False
+        
+    if indices:
+        if key is None:
+            yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_val__(x))
+            
+        else:
+            if inspect.isfunction(key):
+                yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_fun_val_(x, key))
+            else:
+                yield from ((x, k) for x, k in zip(seq, itertools.count(0)) if not __check_val__(key))
+                
+    else:
+        
+        if key is None:
+            yield from (x for x in seq if not __check_val__(x))
+        
+        else:
+            if inspect.isfunction(key):
+                yield from (x for x in seq if not __check_fun_val_(x, key))
+            else:
+                yield from (x for x in seq if not __check_val__(key))
+            
+     
+    
             
 def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> typing.Optional[typing.Union[int, typing.Sequence[int]]]:
     """Get indices of container elements with attribute 'name' of given value(s).
@@ -4045,8 +4430,15 @@ def truncate_to_10_power(x):
         if isinstance(x, pq.Quantity):
             u = x.units
             x = x.magnitude
+            
+        absx = np.abs(x)
         
-        pw10 = 10**np.trunc(np.log10(np.abs(x)))
+        x_ = absx >= 10.
+        
+        pw10 = np.full(x.shape, fill_value = 1.)
+        
+        pw10[x_,] = 10. ** np.trunc(np.log10(absx[x_,]))
+        # pw10 = 10**np.trunc(np.log10(np.abs(x)))
         
         ret = np.trunc(x/pw10) * pw10
         
@@ -4056,7 +4448,7 @@ def truncate_to_10_power(x):
         return ret
     
     elif isinstance(x, (float, int)):
-        pw10 = 10**math.trunc(math.log(math.abs(x),10))
+        pw10 = 1. if abs(x) < 10. else 10. ** math.trunc(math.log(abs(x), 10.))
         return math.trunc(x/pw10) * pw10
         
             

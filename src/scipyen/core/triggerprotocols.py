@@ -97,68 +97,111 @@ DEFAULTS["ImagingFrameTrigger"]["Name"] = "imaging"
 class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
     """Encapsulates an experimental stimulation protocol (i.e., "triggers").
     
-    A protocol is composed of at least one type of TriggerEvent objects, and
+    TriggerProtocol objects contain TriggerEvents and indices specifying which 
+    segments (sweep or data frame) the protocol applied to, from a collection 
+    of segments, sweeps or data frames.
+
+    Here 'data' may be a neo.Block object (containing electrophysiology and/or 
+    1D imaging data) or a ScanData object (itself composed of image stacks and
+    optionally electrophysiology data).
+        
+    A protocol has at least one type of TriggerEvent objects, and is associated
     is associated with at least one neo.Segment, encapsulating the set of 
     triggers that ocurred during that particular segment (or "sweep").
     
-    Containers of Segment objects (e.g. a neo.Block) can associate several 
-    TriggerProtocol objects, such that distinct segments contain different
-    sets of trigger events - where each such set represents a trigger
-    protocol.
-    
-    A given trigger protocol can occur in more than one segment. However, any
-    one segment can be associated with at most one trigger protocol.
+    The same trigger protocol may occur in more than one segment. However, any
+    one segment can be associated with at most one trigger protocol. Data can 
+    associate several TriggerProtocol objects, reflecting the fact that that 
+    different protocols may be applied to distinct data segments or frames.
     
     Unlike TriggerEvent, a TriggerProtocol is not currently "embedded" in any of
     the neo containers. Instead, its component TriggerEvent objects are contained
     ("embedded") in the "events" attribute of the Segment associated with this protocol.
     
-    Contains TriggerEvents and indices specifying which segments from a collection
-    of segments, this protocol applies to.
+    Technically a TriggerProtocol obejct has up to three TriggerEvent objects of 
+    the following types:
+        up to one presynaptic event type
+        up to one postsynaptic event type
+        up to one photostimulation event type
+        
+    and a list of TriggerEvent objects of imaging_frame, imaging_line, or segment
+    types
         
     A TriggerProtocol object has the following attributes:
         
-        presynaptic:        one presynaptic event or None
-        postsynaptic:       one postsynaptic event or None
-        photostimulation:   one photostimulation event or None
-        acquisition:        a list (posibly empty) of imaging_frame, imaging_line, segment types events
-        segmentIndex:       list of indices of frames where this protocol applies
-        imaging_delay:      python Quantity scalar
+    presynaptic:        Presynaptic event, typically generated via TTL pulses 
+                        or trains sent via a digital output channel of the DAQ 
+                        device. These TTL signals are used to evoke synaptic 
+                        transmission (e.g., by routing to stimulus isolation
+                        devices) or to activate synapses by other means (e.g., 
+                        optically, such as photouncaging, optogenetic activation
+                        but see below).
+
+                        Can be None.
+
+                        NOTE: TTL-like pulses or trains can also be emulated 
+                        via short pulse-like DAC command waveforms, where the DAC
+                        output is routed to a trigered device, instead of the 
+                        headstage (and the cell) via the amplifier - these TTL-like
+                        pulses are in V (!)
+
+    postsynaptic:       Postsynaptic event, usually generated via the DAC output
+                        using pulse-like command waveforms, typically used to 
+                        evoke postsynaptic spikes
+
+                        Can be None.
+
+                        NOTE: These can also be generated via digital ("true" TTL)
+                        outputs sent via stimulus isolators to axonal efferents
+                        for antidromic activation of spiking in the recorded cell.
+
+    photostimulation:   Photostimulation event - its main role is to distinguish,
+                        where required, between synaptic stimulation via axonal 
+                        activation and synaptic stimulation via photo-uncaging or 
+                        optogenetics. These event types also flag the onset of
+                        other light activated processes not necessarily associated
+                        with synaptic function (such as photobleaching or
+                        photoconversion of fluorescent proteins).
+
+                        Can be None.
+                        
+    acquisition:        A list (posibly empty) of imaging_frame, imaging_line, or
+                        sweep type events.
+
+                        These events represent acquisition triggers for imaging
+                        frame, imaging line, or sweep, in the cases where the 
+                        the acquisition device is triggered externally
+
+    segmentIndex:       indexing object (e.g, list of indices, a range, or a slice) 
+                        for the frames (segments or sweeps) where this protocol 
+                        applies; it may be empty.
+
+    imaging_delay:      python Quantity scalar
         
-        The first three can each be a TriggerEvent object or None.
-        
-        'segmentIndex' is an indexing object for frames (segments or sweeps) 
-        where this protocol applies; it may be empty
-        
-        When segmentIndex is empty, the protocol will apply to ALL segments in 
-        the collection.
-        
-        ATTENTION: In a collection of segments (e.g., neo.Block) each segment
-            can have at most one protocol. It follows that a protocol with an
-            empty segmentIndex cannot co-exist with other protocols given that
-            segment collection (an empty segmentIndex implies that the protocol 
-            applies to all segments in that collection) 
-        
-        (internally it can be a list of int, a range, or a slice)
-        
-        up to three TriggerEvent objects of the following types:
-            up to one presynaptic event type
-            up to one postsynaptic event type
-            up to one photostimulation event type
-            
-        a list of TriggerEvent objects of imaging_frame, imaging_line, segment types
-            
-                
-        The event_type atribute of the events will be overwritten according to the 
-        named parameter to which they are assigned in the function call.
-        
-        NOTE: there can be at most ONE event each, of the presynaptic, postsynaptic,
-        and photostimulation TriggerEvent objects.
-        
-        In turn these events can contain an ARRAY  of time values (i.e., multiple
-        time stamps), so a TriggerEvent can actually encapsulate the notion of
-        an array of events
+    The first three event types describe above can each be a TriggerEvent object 
+    or None.
     
+    When 'segmentIndex' is empty, the protocol will apply to ALL data segments or
+    frames in the collection.
+    
+    ATTENTION: In a collection of segments (e.g., neo.Block) each segment
+        can have at most one protocol. It follows that a protocol with an
+        empty segmentIndex cannot co-exist with other protocols given that
+        segment collection (an empty segmentIndex implies that the protocol 
+        applies to all segments in that collection) 
+    
+            
+    The event_type atribute of the events will be overwritten according to the 
+    named parameter to which they are assigned in the function call.
+    
+    NOTE: there can be at most ONE TriggerEvent each, of the presynaptic, postsynaptic,
+    and photostimulation type.
+    
+    In turn, each of these events can contain an ARRAY of time values (i.e., 
+    multiple time stamps), so a TriggerEvent can actually encapsulate the notion 
+    of an array of events of th same type (e.g. a paired-pulse presynaptic 
+    stimulation, etc).
+
     """
     
     # TODO: 2022-10-11 10:39:31
@@ -1552,11 +1595,11 @@ def detect_trigger_events(x, event_type,
         state transition times when "use_lo_hi" is True, otherwise from the 
         high -> low state transition times.
             
-    label: str, optional (default None): the labels for the events in the 
-        datatypes.TriggerEvent array
+    label: str, optional (default None): common label prefix for the individual 
+        events in the generated triggerevent.TriggerEvent array
     
     name: str, optional (default  None): the name of the generated 
-        datatypes.TriggerEvent array
+        triggerevent.TriggerEvent array
     
     Returns:
     ========
@@ -1588,7 +1631,7 @@ def detect_trigger_events(x, event_type,
    
     # lo_hi, hi_lo, _, _ , _, upward = detect_boxcar(x)
     boxdetect = detect_boxcar(x)
-    print(f"triggerprotocols.detect_trigger_events boxdetect = {boxdetect}")
+    # print(f"triggerprotocols.detect_trigger_events boxdetect = {boxdetect}")
     lo_hi, hi_lo, _ampl, _lvl, _lbl, _up = boxdetect
     
     if all([v is None for v in (lo_hi, hi_lo)]):
@@ -1600,10 +1643,31 @@ def detect_trigger_events(x, event_type,
     else:
         times = hi_lo
         
-    trig = TriggerEvent(times=times, units=x.times.units, event_type=event_type, labels=label, name=name)
+    if times.size > 1:
+        if isinstance(label, str) and len(label.strip()):
+            labels = [f"{label}{k}" for k in range(times.size)]
+            
+        elif isinstance(label, (tuple, list)):
+            if len(label) > times.size:
+                labels = label[:times.size]
+                
+            elif len(label) < times.size:
+                labels = label + [f"{label[-1]}{k}" for k in range(len(label), times.size)]
+                
+            else:
+                labels = label
+                
+        else:
+            labels = [f"{event_type.name}{k}" for k in range(times.size)]
+                
+    else:
+        labels = label
+        
+    trig = TriggerEvent(times=times, units=x.times.units, event_type=event_type, labels=labels, name=name)
     
     if name is None:
-        if label is not None:
+        # if label is not None:
+        if isinstance(label, str) and len(label.strip()):
             trig.name = "%d%s" % (trig.times.size, label)
             
         else:
@@ -1611,7 +1675,14 @@ def detect_trigger_events(x, event_type,
                 trig.name = "%d%s" % (trig.times.size, label)
                 
             else:
-                trig.name = "%dtriggers" % trig.times.size
+                trig.name = f"{trig.times.size}{event_type.name}"
+                # trig.name = event_type.name
+                
+#         else:
+#             trig.name = event_type.name
+#                 
+    elif isinstance(name, str) and len(name.strip()):
+        trig.name = name
                 
     return trig
     

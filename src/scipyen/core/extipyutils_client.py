@@ -163,13 +163,11 @@ init_commands.extend(
     "from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )",
     "from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)",
     "from core.datazone import DataZone",
-    "from ephys import (ephys, ltp, membrane, ivramp,)",
     "from systems import *",
     "from imaging import (imageprocessing as imgp, imgsim,)",
     "from imaging import axisutils, vigrautils",
     "from imaging.axisutils import (axisTypeFromString, axisTypeName,axisTypeStrings,axisTypeSymbol, axisTypeUnits,dimEnum,dimIter,evalAxisTypeExpression,getAxisTypeFlagsInt,getNonChannelDimensions,hasChannelAxis,)",
     "from imaging.axiscalibration import (AxesCalibration,AxisCalibrationData, ChannelCalibrationData, CalibrationData)",
-    "from imaging.scandata import (AnalysisUnit, ScanData,)",
     "from iolib import pictio as pio",
     "from iolib import h5io, jsonio",
     "print('To use matplotlib run %matplotlib magic')"

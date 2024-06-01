@@ -27,6 +27,7 @@ from . import models
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core import datatypes
 from core import prog
+# from core.traitcontainers import DataBag
 #from .patchneo import *
 #### END pict.core modules
 
@@ -853,7 +854,7 @@ def scale_fit_wave2(x, y, p0 = (1,0)):
     return res
     
 def fit_nsfa(data, p0, **kwargs):
-    """Fit the parabola y = x * i - x²/N + b throgh the observed variable data.
+    """Fit the parabola y = x * i - x²/N + b through the observed variable data.
     Parameters:
     ===========
     data: the observed variable
@@ -1062,8 +1063,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     =====================
     data: 1D array-like, numeric - the "dependent" variable to be fitted
     
-    func: python function that takes a scalar and a sequence of model parameters,
-        and returns a scalar, and with signature:
+    func: python function that takes a scalar ('x') and a sequence ('p') of 
+        model parameters, and returns a scalar; the signature is:
     
         func(x, p, /, *args, **kwargs)
     
@@ -1078,6 +1079,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     fargs: tuple with var-positional parameters to `func`
     
     fkwargs: dict with keyword parameters to `func`
+    
+    coef_names: tuple with model parameter names or symbols (str)
     
     The following are passed directly to scipy.optimize.least_squares:
     bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
@@ -1140,32 +1143,8 @@ def fit_model(data, func, p0, *args, **kwargs):
     fargs       = kwargs.pop("fargs",       tuple())
     fkwargs     = kwargs.pop("fkwargs",     dict())
     
-    # def __cost_fun__(x0, t, y, *args, **kwargs):  # returns residuals
     def __cost_fun__(x0, t, y):  # returns residuals
-        # func = model function passed in the params to fit_model
-        # t = independent variable (e.g. time; this is `x` in the main body of fit-model!)
-        # x0 = sequence with initial values for the model parameters!
-        # CAUTION: the model function `func` signature MIGHT expect these parameters
-        # to be passed unpacked (i.e. individually)
-        #
-        # So here we have two accepted signatures:
-        #   func(t, x0, *args, **kwargs) -> TWO named parameters
-        #   OR
-        #   func(t, *args, **kwargs) -> ONE named parameter (with initial parameter
-        #       values contained in *args)
-        # the lines below adapt for that
-        sig = prog.signature2Dict(func)
-        namedPars = list(sig["named"].keys())
-        if len(sig["named"]) == 2:
-            par2 = sig["named"][namedPars[1]]
-            if isinstance(par2[1], typing._UnionGenericAlias):
-                # function expects a sequence of parameters
-                yf = func(t, x0, *fargs, **fkwargs)
-            else:
-                # function may expect a single model parameter
-                myargs = []
-        yf = func(t, x0, *fargs, **fkwargs)
-        
+        yf = func(t, x0, **fkwargs)
         ret = y-yf
         
         return ret
@@ -1189,7 +1168,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         
     else:
         if not isinstance(x, np.ndarray): 
-            raise TypeError(f"When data id a numpy array, x must be given as a numpy array")
+            raise TypeError(f"When data is a numpy array, x must be given as a numpy array")
         
         if x.shape != data.shape:
             raise ValueError(f"x shape {x.shape} is different to to data shape {data.shape}")
@@ -1198,6 +1177,23 @@ def fit_model(data, func, p0, *args, **kwargs):
         xdata = x[realDataNdx]
     
     x0 = p0 # sequence of initial values for the model parameters
+    
+    coef_names = kwargs.pop("coef_names", None)
+    
+    if isinstance(coef_names, typing.Sequence):
+        if len(coef_names) == 0:
+            coef_names = [f"Coefficient {k}" for k in range(len(p0))]
+        else:
+            if len(coef_names) < len(p0):
+                coef_names = tuple([n for n in coef_names] + [f"Coefficient_{k}" for k in range(len(p0)-len(coef_names))])
+                
+            elif len(coef_names) > len(p0):
+                coef_names = coef_names[0:len(p0)]
+                
+    else:
+        coef_names = [f"Coefficient {k}" for k in range(len(p0))]
+        
+            
     lo = list()
     up = list()
     
@@ -1227,7 +1223,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         if l0.size not in (1, len(p0)):
             raise ValueError(f"Incorrect number of lower bounds; expecting 1 or {len(p0)}, got {l0.size} instead")
         
-        if not  datatypes.is_vector(l0):
+        if not datatypes.is_vector(l0):
             raise ValueError("Lower bounds must be a vector")
         
     elif isinstance(l0, pd.Series):
@@ -1289,18 +1285,31 @@ def fit_model(data, func, p0, *args, **kwargs):
 
     fC = func(xdata, res_x, *fargs, **fkwargs)
     
-    sst = np.sum( (ydata - ydata.mean()) ** 2.)
+    sst = np.sum( (ydata - ydata.mean()) ** 2.) # sum of squares about the mean in the data (total sum of squares)
     
-    sse = np.sum((fC - ydata) ** 2.)
+    sse = np.sum((fC - ydata) ** 2.) # sum of squared errors (sum of squared residuals, Sum of Squares Due to Error)
     
-    # R² for the entire fit
+    # Coefficient of determination R² for the entire fit
     rsq = 1 - sse/sst # only one R²
+    
+    df_res = fC.size - len(x0)
+    df_tot = fC.size - 1
+    
+    arsq = 1 - sse * df_tot / (sst * df_res)
+    
+    rmse = np.sqrt(sse/fC.size)
+    
     
     result = collections.OrderedDict()
     result["Model"] = f"{func.__module__}.{func.__name__}"
     result["Fit"] = res
     result["Coefficients"] = res_x
-    result["Rsq"] = rsq
+    result["Coefficient Names"] = coef_names
+    result["GoF"] = dict()
+    result["GoF"]["Rsq"] = rsq
+    result["GoF"]["R2adj"] = arsq
+    result["GoF"]["SSE"] = sse
+    result["GoF"]["RMSE"] = rmse
     
     initialSupport = np.full((data.shape[0],), np.NaN)
     
