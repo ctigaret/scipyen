@@ -3927,6 +3927,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             ndx for ndx in indexList if ndx not in internal_var_indices]
 
         cm = QtWidgets.QMenu("Selected variables", self)
+        cm.setIcon(QtGui.QIcon.fromTheme("object"))
         cm.setToolTipsVisible(True)
 
         if len(internal_var_indices):
@@ -4574,58 +4575,56 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if sys.platform == "win32" and has_qdarkstyle_for_win:
             self._available_Qt_style_names_.append("Dark Style")
 
-        self.actionGUI_Style.triggered.connect(
-            self._slot_set_Application_style)
+        self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
+        self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
+        self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
+        self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)
         
-        self.actionSet_user_plugins_directory.triggered.connect(
-            self._slot_set_Users_Plugins_directory)
-        
-        self.actionAuto_launch_Script_Manager.toggled.connect(
-            self._slot_set_scriptManagerAutoLaunch)
-        # NOTE: 2016-05-02 14:26:58
-        # add HERE a "Recent Files" submenu to the menuFile
+        # ### BEGIN scripts menu
+        self.menuScripts = QtWidgets.QMenu("Scripts", self)
+        self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
+        self.actionScriptRun = QtWidgets.QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
+        self.actionScriptRun.triggered.connect(self.slot_runPythonScript)
+        self.menuScripts.addAction(self.actionScriptRun)
+        self.actionScriptToConsole = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "To Console...", self)
+        self.actionScriptToConsole.triggered.connect(self.slot_pastePythonScript)
+        self.menuScripts.addAction(self.actionScriptToConsole)
+        self.menuScripts.addSeparator()
+        self.recentScriptsMenu = QtWidgets.QMenu("Recent Scripts", self)
+        self.recentScriptsMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
+        self.menuScripts.addMenu(self.recentScriptsMenu)
+        self.menuScripts.addSeparator()
+        self.actionManageScripts = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
+        self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
+        self.menuScripts.addAction(self.actionManageScripts)
+        # END scripts menu
 
-        # NOTE: 2017-11-10 14:17:11 TODO
-        # factor-out the following (BEGIN ... END) in a plugin-like framework
-        # BEGIN
-
-        # NOTE: 2017-11-11 21:30:58 add this as a menu command, and open it in a
-        # separate window, rather than tabbed window, which is more useful for
-        # small screens (e.g.,laptops)
-
+        # BEGIN Applications menu
         self.applicationsMenu = QtWidgets.QMenu("Applications", self)
         self.applicationsMenu.setTearOffEnabled(True)
         self.applicationsMenu.setToolTipsVisible(True)
-        self.menubar.insertMenu(
-            self.menuHelp.menuAction(), self.applicationsMenu)
-
+        self.menubar.insertMenu(self.menuHelp.menuAction(), self.applicationsMenu)
+        # ### END Applications menu
+        
+        # ### BEGIN Help menu
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
-
+        self.whatsThisAction.setIcon(QtGui.QIcon.fromTheme("help-whatsthis"))
         self.menuHelp.addAction(self.whatsThisAction)
-
-        # self.tabWidget.addTab(self.lscatWindow, "CaT Analysis")
-        # END
-
-        # self.tabWidget.setCurrentIndex(0)
-
-        # NOTE:2019-08-06 15:21:23
-        # this will mess up filesFilterFrame visibility!
-        # self.app.lastWindowClosed.connect(self.slot_Quit)
-
+        # ### END Help menu
+        
         self.actionQuit.triggered.connect(self.slot_Quit)
+        
+        self.actionOpen_System_Terminal.triggered.connect(self.slot_openCurrentDirInSystemTerminal)
 
-        self.actionConsole = QtWidgets.QAction(
-            QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
+        self.actionConsole = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
         
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
         if not self._pyinstaller_bundled_:
-            self.actionExternalIPython = QtWidgets.QAction(
-                QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
+            self.actionExternalIPython = QtWidgets.QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
         
-            self.actionExternalIPython.triggered.connect(
-                self.slot_launchExternalIPython)
+            self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
         
             self.menuConsoles.addAction(self.actionExternalIPython)
 
@@ -4636,8 +4635,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.slot_launchExternalNeuronIPython)
                 self.menuConsoles.addAction(self.actionExternalNrnIPython)
 
-            self.menuWith_Running_Kernel = QtWidgets.QMenu(
-                "With Running Kernel", self)
+            self.menuWith_Running_Kernel = QtWidgets.QMenu("With Running Kernel", self)
+            self.menuWith_Running_Kernel.setIcon(QtGui.QIcon.fromTheme("run-build"))
             
             self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
             
@@ -4684,70 +4683,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionImport_PrairieView_data.triggered.connect(
             self.slot_importPrairieView)
         self.recentFilesMenu = QtWidgets.QMenu("Recent Files", self)
+        self.recentFilesMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
         self.menuFile.insertMenu(self.actionQuit, self.recentFilesMenu)
 
-        self.recentDirectoriesMenu = QtWidgets.QMenu(
-            "Recent Directories", self)
+        self.recentDirectoriesMenu = QtWidgets.QMenu("Recent Directories", self)
+        self.recentDirectoriesMenu.setIcon(QtGui.QIcon.fromTheme("folder-open-recent"))
         self.menuFile.insertMenu(self.actionQuit, self.recentDirectoriesMenu)
 
         self.menuFile.insertSeparator(self.actionQuit)
-
-        # ### BEGIN scripts menu
-        self.menuScripts = QtWidgets.QMenu("Scripts", self)
-        self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
-        self.actionScriptRun = QtWidgets.QAction(
-            QtGui.QIcon.fromTheme("system-run"), "Run...", self)
-        self.actionScriptRun.triggered.connect(self.slot_runPythonScript)
-        self.menuScripts.addAction(self.actionScriptRun)
-        self.actionScriptToConsole = QtWidgets.QAction(
-            QtGui.QIcon.fromTheme("scriptnew"), "To Console...", self)
-        self.actionScriptToConsole.triggered.connect(
-            self.slot_pastePythonScript)
-        self.menuScripts.addAction(self.actionScriptToConsole)
-        self.menuScripts.addSeparator()
-        self.recentScriptsMenu = QtWidgets.QMenu("Recent Scripts", self)
-        self.menuScripts.addMenu(self.recentScriptsMenu)
-        self.menuScripts.addSeparator()
-        self.actionManageScripts = QtWidgets.QAction(
-            QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
-        self.actionManageScripts.triggered.connect(
-            self.slot_showScriptsManagerWindow)
-        self.menuScripts.addAction(self.actionManageScripts)
-
-        self.actionAuto_delete_viewer.triggered.connect(
-            self._slot_setAutoRemoveViewers)
-
-        # END scripts menu
 
         # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
         self.startPluginLoad.connect(self.slot_loadPlugins)
         
         self.sig_refreshRecentFilesMenu.connect(self._slot_refreshRecentFilesMenu_)
-
-        # BEGIN custom workspace viewer DO NOT DELETE
-
-        # NOTE: 2019-08-11 00:01:11
-        # replace the workspace viewer in the designer UI file with the derived one
-        # WARNING work in progress, don't use yet
-        # self.workspaceView = WorkspaceViewer(self)
-        # self.workspaceView.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
-        # self.workspaceView.setAlternatingRowColors(True)
-
-        # self.workspaceView.setEditTriggers(QtWidgets.QAbstractItemView.DoubleClicked |
-        # QtWidgets.QAbstractItemView.EditKeyPressed |
-        # QtWidgets.QAbstractItemView.AnyKeyPressed)
-
-        # self.workspaceView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-
-        # self.workspaceView.setAcceptDrops(True)
-        # self.workspaceView.setDragEnabled(True)
-        # self.workspaceView.setDragDropMode(QtWidgets.QAbstractItemView.DragDrop)
-        # self.workspaceView.setDefaultDropAction(QtCore.Qt.IgnoreAction)
-
-        # self.dockWidgetWorkspace.setWidget(self.workspaceView)
-        # self.workspaceView.show()
-
-        # END custom workspace viewer DO NOT DELETE
 
         # BEGIN workspace view
         self.workspaceView.setShowGrid(False)
@@ -4782,7 +4730,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # BEGIN command history view
         self.historyTreeWidget.setHeaderLabels(
             ["Session, line:", "Statement, Date & time:"])
-        # self.historyTreeWidget.setHeaderLabels(["Session, line:", "Statement", "Start date & time","Stop date & time"])
         self.historyTreeWidget.itemActivated[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemActivated)
         self.historyTreeWidget.customContextMenuRequested[QtCore.QPoint].connect(self.slot_historyContextMenuRequest)
         self.historyTreeWidget.itemClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_historyItemSelected)
@@ -4791,9 +4738,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.setWindowTitle("Scipyen")
 
         self.newViewersMenu = QtWidgets.QMenu("New", self)
+        self.newViewersMenu.setIcon(QtGui.QIcon.fromTheme("window-new"))
         self.newViewersMenu.setTearOffEnabled(True)
         self.newViewersMenu.setToolTipsVisible(True)
-        self.newViewersMenu.addAction("Figure", lambda: self.newViewer(mpl.figure.Figure))
+        self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
         self.menuViewers.addMenu(self.newViewersMenu)
 
         # add new viewers menu as toolbar action, too
@@ -4813,6 +4761,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.refreshViewAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
+        
+        # NOTE: 2024-06-01 18:08:54
+        # whats this action should be the last action added to the toolbar
+        
+        self.toolBar.addAction(self.whatsThisAction)
 
         tbactions = (self.newViewersAction, self.consolesAction,
                      self.scriptsAction, self.applicationsAction)
@@ -4985,10 +4938,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # END Dock widgets management
 
         # BEGIN miscellaneous
-        self.actionChoose_code_editor.triggered.connect(
-            self._slot_chooseCodeEditor)
-        self.actionUse_system_s_default_code_editor.triggered.connect(
-            self._slot_setOverrideSystemEditor)
+        self.actionChoose_code_editor.triggered.connect(self._slot_chooseCodeEditor)
+        self.actionUse_system_s_default_code_editor.triggered.connect(self._slot_setOverrideSystemEditor)
         # END miscellaneous
 
         # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
@@ -8047,13 +7998,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 newViewerActions = self.newViewersMenu.actions()
                 if len(newViewerActions) == 0:
                     for v in sortedViewers:
-                        self.newViewersMenu.addAction(
+                        self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),
                             v[0], self.slot_newViewerMenuAction)
                 else:
                     actions = self.newViewersMenu.actions()
                     labels = sorted(list(action.text() for action in actions))
-                    extended = sorted(
-                        labels + list(v[0] for v in sortedViewers))
+                    extended = sorted(labels + list(v[0] for v in sortedViewers))
                     beforeAction = None
                     beforeActionLabel = None
                     for v in sortedViewers:
@@ -8064,13 +8014,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                             if beforeActionLabel in labels:
                                 beforeNdx = labels.index(beforeActionLabel)
                                 beforeAction = actions[beforeNdx]
-                                newAction = QtWidgets.QAction(v[0])
+                                newAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("window"),v[0])
                                 newAction.triggered.connect(
                                     self.slot_newViewerMenuAction)
                                 self.newViewersMenu.insertAction(
                                     beforeAction, newAction)
                             else:
-                                self.newViewersMenu.addAction(
+                                self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),
                                     v[0], self.slot_newViewerMenuAction)
 
         # NOTE: 2016-04-03 00:25:00 - do NOT delete - keep for future reference
