@@ -418,6 +418,12 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                     datas.append((origin_file_name, '.'))
                         
 platform = sys.platform
+host_name=""
+pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
+if pout.returncode == 0:
+    host_name = pout.stdout.strip("\n")
+# if platform == "linux":
+
 now = datetime.datetime.now()
 year = f"{now.year}"[-2:]
 month = f"{string.ascii_lowercase[now.month-1]}"
@@ -426,7 +432,7 @@ hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
-product = f"scipyen{namesfx}_{platform}_{build_sfx}"
+product = f"scipyen{namesfx}_{platform}_{host_name}_{build_sfx}"
 # product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
