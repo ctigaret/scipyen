@@ -418,6 +418,8 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                     datas.append((origin_file_name, '.'))
                         
 platform = sys.platform
+if platform == "win32":
+    datas.append((os.path.join(scipyen_dir, "install", "make_app_link.ps1"), "make_app_link.ps1"))
 host_name=""
 pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
 if pout.returncode == 0:
