@@ -42,12 +42,12 @@ $repodir=$p
 $targetPath=Join-Path -Path $repodir -ChildPath "scipyen.app.exe"
 # $args = "/K $myActivate $myAnaconda && conda activate $myCondaEnv && python -Xfrozen_modules=off $myScipyenLaunchScript"
 $linkPath=Join-Path -Path $desktop -ChildPath "Scipyen.app.lnk"
-$iconPath=Join-Path -Path $srcdir -ChildPath "pythonbackend.ico"
+$iconPath=Join-Path -Path $srcdir -ChildPath "_internal\pythonbackend.ico"
 # Create desktop shortcut
 $shortcut=$shell.CreateShortcut($linkPath)
 # $shortcut | Get-Member
 $shortcut.TargetPath=$targetPath
-$shortcut.Arguments=$args
+# $shortcut.Arguments=$args
 $shortcut.IconLocation=$iconPath
 $shortcut.Workingdirectory=$wdir
 $shortcut.Save()
