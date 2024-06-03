@@ -5726,7 +5726,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         else:
             # add Newdir,
-            if len(self.recentDirectories) == self._maxRecentDirectories:
+            if len(self.recentDirectories) > self._maxRecentDirectories:
                 self.recentDirectories.pop()
 
             self.recentDirectories.appendleft(newDir)
