@@ -111,7 +111,7 @@ from traitlets.utils.bunch import Bunch
 import traitlets.config
 from .traitcontainers import DataBag
 from core import (traitutils, strutils)
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, printStyled)
 from core.workspacefunctions import user_workspace
 from core.quantities import(quantity2str, str2quantity)
 from iolib.jsonio import (object2JSON, json2python)
@@ -856,6 +856,8 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
         qtcfg.update(getattr(win, "_ownqtcfg", Bunch()))
     
     # print(f"\tsyncQtSettings {win.__class__.__name__}, {win.windowTitle()}:\n\t{qtcfg}")
+    # if save:
+    #     print(f"\n\tsyncQtSettings {win.__class__.__name__}, {win.windowTitle()}:")
 
     for confname, getset in qtcfg.items():
         # NOTE: 2021-08-28 21:59:43
@@ -865,7 +867,8 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
         # a function or method, with a '__call__' attribute!)
         #print("\tconfname = %s" % confname)
         gettername = getset.get("getter", None)
-        #print("\t\tgettername = %s" % gettername)
+        # if save: 
+        #     print(f"\t\tgettername = {gettername}")
 
         if not isinstance(gettername, str) or len(gettername.strip()) == 0:
             continue

@@ -4677,12 +4677,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionOpen.triggered.connect(self.slot_openFiles)
         self.actionView_Data.triggered.connect(self.slot_viewSelectedVar)
-        self.actionView_Data_New_Window.triggered.connect(
-            self.slot_viewSelectedVarInNewWindow)
+        self.actionView_Data_New_Window.triggered.connect(self.slot_viewSelectedVarInNewWindow)
         self.actionReload_Plugins.triggered.connect(self.slot_reloadPlugins)
         self.actionSave.triggered.connect(self.slot_saveFile)
-        self.actionChange_Working_Directory.triggered.connect(
-            self.slot_selectWorkDir)
+        self.actionChange_Working_Directory.triggered.connect(self.slot_selectWorkDir)
         # self.actionSave_pickle.triggered.connect(self.slot_saveSelectedVariables)
 
         # NOTE: 2017-07-07 22:14:40
@@ -4761,21 +4759,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.menuViewers.addMenu(self.newViewersMenu)
 
         # add new viewers menu as toolbar action, too
-        self.newViewersAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("window-new"), "New Viewer")
+        self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        self.consolesAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
+        # self.newViewersActionTB = [w for w in self.newViewersAction.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        # self.newViewersActionTB.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
+        self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
         # this one is defined in the ui file mainwindow.ui
         self.consolesAction.setMenu(self.menuConsoles)
-        self.scriptsAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
+        self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
-        self.applicationsAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("homerun"), "Applications")
+        self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.applicationsMenu)
-        self.refreshViewAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
+        self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
         
         # NOTE: 2024-06-01 18:08:54
@@ -4830,16 +4825,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_fileSystemContextMenuRequest)
         self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.fileSystemTreeView.setRootIsDecorated(True)
-        self.fileSystemTreeView.setHorizontalScrollBarPolicy(
-            QtCore.Qt.ScrollBarAsNeeded)        
+        self.fileSystemTreeView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)        
         # self.fileSystemTreeView.setHorizontalScrollBarPolicy(
         #     QtCore.Qt.ScrollBarAlwaysOn)        
 
-        self.fileSystemModel.directoryLoaded[str].connect(
-            self.slot_resizeFileTreeColumnForPath)
+        self.fileSystemModel.directoryLoaded[str].connect(self.slot_resizeFileTreeColumnForPath)
         
-        self.fileSystemModel.rootPathChanged[str].connect(
-            self.slot_rootPathChanged)
+        self.fileSystemModel.rootPathChanged[str].connect(self.slot_rootPathChanged)
         
         self.fileSystemModel.dataChanged[QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>"].connect(self.slot_fileSystemDataChanged)
 
