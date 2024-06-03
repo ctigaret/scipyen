@@ -5071,7 +5071,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             if item not in recFNames:
                 if len(self._recentFiles) == self._maxRecentFiles:
-                    self._recentFiles.pop(recFNames[-1], None)
+                    self._recentFiles.pop(recFNames[-1][0], None)
 
                 self._recentFiles[item] = {"loader":loader, "timestamp":datetime.datetime.now()}
 
