@@ -2211,14 +2211,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # print(f"{self.__class__.__name__}.newViewer winClass = {winClass} (arg type = {type(winClass).__name__})")
         # print("WindowManager.newViewer **kwargs", **kwargs)
+        # print(f"{self.__class__.__name__}: newViewer({winClass})")
         if isinstance(winClass, str) and len(winClass.replace("&", "").strip()):
             wClass = winClass.replace("&", "")
+            
 
             if wClass not in list(v.__name__ for v in self.viewers):
                 raise ValueError(f"Unexpected viewer class name{wClass}")
 
-            win_classes = list(
-                filter(lambda x: x.__name__ == wClass, self.viewers))
+            win_classes = list(filter(lambda x: x.__name__ == wClass, self.viewers))
 
             if len(win_classes):
                 winClass = win_classes[0]
@@ -2226,11 +2227,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             else:
                 raise ValueError(f"Unexpected viewer class name {wClass}")
 
-        elif not isinstance(winClass, (type)) and (has_sip and not isinstance(winClass, sip.wrappertype)):
-            raise TypeError(f"Expecting a type or sip.wrappertype; got {type(winClass).__name__} instead")
+        # elif not isinstance(winClass, (type)):
+        #     raise TypeError(f"Expecting a type or sip.wrappertype; got {type(winClass).__name__} instead")
+#         
+#          and (has_sip and not isinstance(winClass, sip.wrappertype))
 
         else:
-            if winClass not in self.viewers or not issubclass(winClass, QtWidgets.QMainWindow):
+            if winClass not in self.viewers:# or winClass != mpl.figure.Figure or not issubclass(winClass, QtWidgets.QMainWindow):
                 raise ValueError(f"Unexpected viewer class {winClass.__name__}")
 
         if winClass is mpl.figure.Figure:
@@ -2288,6 +2291,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if not isinstance(fig, mpl.figure.Figure):
             return
+        
+        backend_mod = None
+        backend_super_class = mpl.backend_bases._Backend
         # NOTE: 2023-01-29 16:14:04
         # for mpl figures created manually
         # add a manager backend to the figure - we FORCE the use of the
@@ -2296,10 +2302,36 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #
         # print(f"{self.__class__.__name__}._adopt_mpl_figure ({fig}, number {fig.number})")
         import matplotlib.cbook as cbook
-        backend_mod = importlib.import_module(cbook._backend_module_name(mpl.rcParams["backend"]))
-        # backend_mod = importlib.import_module(cbook._backend_module_name("Qt5Agg"))
-        
-        class backend_mod(mpl.backend_bases._Backend):
+        # NOTE: 2024-06-03 13:41:00
+        # with mpl api change cbook has lost _backend_module_name
+        # the condition below I think is correct
+        if hasattr(mpl, "_version") and hasattr(mpl._version, "version") and int(mpl._version.version.split('.')[1]) < 9:
+            backend_mod = importlib.import_module(cbook._backend_module_name(mpl.rcParams["backend"]))
+            # backend_mod = importlib.import_module(cbook._backend_module_name("Qt5Agg"))
+            # backend_class = mpl.backend_bases._Backend
+            # class backend_mod(mpl.backend_bases._Backend):
+            #     locals().update(vars(backend_mod))
+                
+        else: # assume the latest mpl and keep fingers crossed
+            backend_name = mpl.get_backend()
+            
+            candidate_backend_module_names = list(filter(lambda x: backend_name.lower() in x, mpl.backends.__dict__.keys()))
+            
+            if len(candidate_backend_module_names):
+                backend_mod = mpl.backends.__dict__.get(candidate_backend_module_names[0], None)
+                
+            
+        if backend_mod is None:
+            scipywarn(f"{self.__class__.__name__}._adopt_mpl_figure - cannot establish the backend used")
+            return
+
+#                 backend_class = getattr(backend_mod, f"_Backend{backend_name}", getattr(backend_mod, "_Backend", None))
+#                     
+#                 if backend_class is None:
+#                     scipywarn(f"{self.__class__.__name__}._adopt_mpl_figure - cannot establish the backend used")
+            
+            
+        class backend_mod(backend_super_class):
             locals().update(vars(backend_mod))
             
         if getattr(fig.canvas, "manager", None) is None:
