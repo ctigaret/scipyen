@@ -3737,7 +3737,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                             self.viewerWidget.view(cFrame.qimage(normalize = self._imageNormalize))
                         
                     else: # don't apply color map to a multi-band frame data
-                        #warnings.warn("Cannot apply color map to a multi-band image")
+                        #warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot apply color map to a multi-band image")
                         self._currentFrameData_ = self._currentFrameData_.squeeze().copy()
                         self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
                 

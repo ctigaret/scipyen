@@ -1769,11 +1769,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 if isinstance(y, vigra.VigraArray):
                     if isinstance(signalChannelAxis, str) and signalChannelAxis.lower().strip() != "c":
-                            warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
+                            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Channel axis index is specificed by non-canonical axis key {signalChannelAxis}")
                             
                     elif isinstance(signalChannelAxis, vigra.AxisInfo):
                         if signalChannelAxis.key.lower().strip() != "c":
-                            warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
+                            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Channel axis index is specificed by non-canonical axis key {signalChannelAxis}")
                             
                 signalChannelAxis = normalized_axis_index(y, signalChannelAxis)
                 
@@ -2536,11 +2536,11 @@ anything else       anything else       ❌
                 newData.append(obj)
                 
             else:
-                warnings.warn(f"Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
                 return
             
         else:
-            warnings.warn(f"Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
+            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
             return
             
         self._data_frames_ += len(obj.segments)
@@ -2612,11 +2612,11 @@ anything else       anything else       ❌
                     newData.append(obj)
                     
                 else:
-                    warnings.warn(f"Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
                     return
                 
             else:
-                warnings.warn(f"Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
                 return
             
             self.frameIndex = range(len(newData))
@@ -3760,7 +3760,7 @@ anything else       anything else       ❌
             
             if len(self.signalsLayout.items) == 0:
                 # there is no axis (plotitem) - never executed, see NOTE: 2023-01-14 23:23:06
-                # warnings.warn("There is no axis in the viewer; have you plotted anything yet?\nThe cursor's coordinates will be reset when plotting")
+                # warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: There is no axis in the viewer; have you plotted anything yet?\nThe cursor's coordinates will be reset when plotting")
                 
                 scene_rect = self.signalsLayout.scene().sceneRect()
                 
@@ -4689,7 +4689,7 @@ anything else       anything else       ❌
             selEpoch = [e for e in epochs if e.name == selItem]
             
             if len(selEpoch) == 0:
-                warnings.warn(f"There's no epoch named {selItem}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: There's no epoch named {selItem}")
                 return
             
             selEpoch = selEpoch[0]
@@ -4745,7 +4745,7 @@ anything else       anything else       ❌
             selEpoch = [e for e in epochs if e.name == selItem]
             
             if len(selEpoch) == 0:
-                warnings.warn(f"There's no epoch named {selItem}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: There's no epoch named {selItem}")
                 return
             
             selEpoch = selEpoch[0]
@@ -5479,7 +5479,7 @@ anything else       anything else       ❌
         if embed:
             if isinstance(self._yData_, neo.Block):
                 if len(self._yData_.segments) == 0:
-                    warnings.warn("Plotted data is a neo.Block without segments")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Plotted data is a neo.Block without segments")
                     #return epoch
                 
                 elif len(self._yData_.segments) == 1:
@@ -5505,7 +5505,7 @@ anything else       anything else       ❌
                             
             elif isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_]):
                 if len(self._yData_) == 0:
-                    warnings.warn("Plotted data is an empty sequence!")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Plotted data is an empty sequence!")
                 
                 elif len(self._yData_) == 1:
                     if overwrite:
@@ -5543,7 +5543,7 @@ anything else       anything else       ❌
                         self._yData_.segment.epocha.append(epoch)
                         
             else:
-                warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
                 
             self.displayFrame()
                 
@@ -5686,7 +5686,7 @@ anything else       anything else       ❌
         if embed:
             if isinstance(self._yData_, neo.Block):
                 if len(self._yData_.segments) == 0:
-                    warnings.warn("Plotted data is a neo.Block without segments")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Plotted data is a neo.Block without segments")
                     #return epoch
                 
                 elif len(self._yData_.segments) == 1:
@@ -5712,7 +5712,7 @@ anything else       anything else       ❌
                             
             elif isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_]):
                 if len(self._yData_) == 0:
-                    warnings.warn("Plotted data is an empty sequence!")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Plotted data is an empty sequence!")
                 
                 elif len(self._yData_) == 1:
                     if overwrite:
@@ -5750,7 +5750,7 @@ anything else       anything else       ❌
                         self._yData_.segment.epocha.append(epoch)
                         
             else:
-                warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
                 
             self.displayFrame()
                 
@@ -6234,11 +6234,11 @@ anything else       anything else       ❌
                 else:
                     if isinstance(y, vigra.VigraArray):
                         if isinstance(signalChannelAxis, str) and signalChannelAxis.lower().strip() != "c":
-                                warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
+                                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Channel axis index is specificed by non-canonical axis key {signalChannelAxis}")
                                 
                         elif isinstance(signalChannelAxis, vigra.AxisInfo):
                             if signalChannelAxis.key.lower().strip() != "c":
-                                warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
+                                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Channel axis index is specificed by non-canonical axis key {signalChannelAxis}")
                                 
                     signalChannelAxis = normalized_axis_index(y, signalChannelAxis)
                     
@@ -6851,7 +6851,7 @@ Does the behind the scene work of self.setData(...)
                 self.frameChanged.emit(self._current_frame_index_)
                 
             else:
-                warnings.warn(f"Could not parse the data x: {x}, y: {y}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Could not parse the data x: {x}, y: {y}")
                 return
             
 
@@ -7382,7 +7382,7 @@ signals in the signal collection.
         
         if isinstance(index, int):
             if index not in range(len(plotitems)):
-                warnings.warn(f"Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
                 return
                 # raise TypeError(f"Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
             
@@ -7601,13 +7601,13 @@ signals in the signal collection.
             
         crsId = cursor.ID
         if crsId in cursorDict:
-            warnings.warn(f"A {cursor.cursorType.name} cursor named {crsId} already exists")
+            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: A {cursor.cursorType.name} cursor named {crsId} already exists")
             return
         
         if cursor in cursorDict.values():
             ndx = list(cursorDict.values()).index(cursor)
             existing = list(cursorDict.keys())[ndx]
-            warnings.warn(f"This {cursor.cursorType.name} cursor is already registered as {existing} ")
+            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: This {cursor.cursorType.name} cursor is already registered as {existing} ")
             return
             
         pen = kwargs.get("pen", None)
@@ -8458,7 +8458,7 @@ signals in the signal collection.
                 brushes = cycle([epoch_brush])
                 
             else:
-                warnings.warn("Invalid brush specification %s" % epoch_brush)
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Invalid brush specification {epoch_brush}")
                 brushes = cycle([None])
                 
         for epoch in args:
@@ -8914,7 +8914,7 @@ signals in the signal collection.
                     brushes = cycle([epoch_brush])
                     
                 else:
-                    # warnings.warn("Invalid brush specification %s" % epoch_brush)
+                    # warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Invalid brush specification {epoch_brush}")
                     brushes = cycle([QtGui.QBrush(QtGui.QColor(*c)) for c in self.epoch_plot_options["epochs_color_set"]])
                     
             for epoch in obj:

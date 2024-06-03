@@ -4491,6 +4491,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         plt.close("all")
 
         self.saveSettings()
+        
+        openWindows =list(filter(lambda x: isinstance(x, QtWidgets.QMainWindow) and x not in (self, self.console), 
+                                 self.workspace.values()))
+        
+        for w in openWindows:
+            w.close()
 
         # open_windows = ((name, obj) for (name, obj) in self.workspace.items() if isinstance(obj, QtWidgets.QWidget))
         # for win in open_windows:
@@ -4500,7 +4506,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
         # if sys.platform == "win32" or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
         #     QtWidgets.QApplication.closeAllWindows()
-        QtWidgets.QApplication.closeAllWindows()
+        # QtWidgets.QApplication.closeAllWindows()
             
         evt.accept()
 
