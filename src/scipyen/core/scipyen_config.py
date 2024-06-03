@@ -611,7 +611,8 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
 def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
-    key_name = "%s%s" % (pfx, key)
+    # key_name = "%s%s" % (pfx, key)
+    key_name = f"{pfx}{key}"
     # print(f"saveQSettingsKey group: {gname}, key: {key}, value: {val} ({type(val).__name__})")
     qsettings.beginGroup(gname)
     qsettings.setValue(key_name, val)
