@@ -609,7 +609,7 @@ a = Analysis(
     runtime_hooks=[os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_typeguard.py'),
                    # os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_gui.py'), # these just added manually to hiddenimports, above
                    ],
-    excludes=["OpenGL"],
+    excludes=["OpenGL", "torch"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
