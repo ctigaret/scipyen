@@ -83,6 +83,7 @@ internal_plugins = list()
 # looks like we do have to define DEFAULT_DISTPATH
 DEFAULT_DISTPATH = "./dist"
 
+
 if "--distpath" in sys.orig_argv:
     ndx = sys.orig_argv.index("--distpath")
     if ndx < (len(sys.orig_argv) - 1):
@@ -435,7 +436,18 @@ hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
-product = f"scipyen{namesfx}_{platform}_{host_name}_{build_sfx}"
+
+debug_type=""
+
+if "--debug" in sys.orig_argv:
+    ndx = sys.orig_argv.index("--debug")
+    if ndx < (len(sys.orig_argv) - 1):
+        debug_type = sys.orig_argv[ndx+1]
+
+if len(debug_type):
+    product = f"scipyen{namesfx}_{platform}_{host_name}_{build_sfx}_debug_{debug_type}"
+else:
+    product = f"scipyen{namesfx}_{platform}_{host_name}_{build_sfx}"
 # product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)

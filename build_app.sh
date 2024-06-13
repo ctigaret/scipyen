@@ -38,12 +38,19 @@ fi
 
 destination=${HOME}/scipyen_app 
 
+debug=
+
 for i in "$@" ; do
+#     echo $i
     case $i in 
-        --install_dir)
+        --install_dir=*)
         destination="${i#*=}"
         shift
         ;;
+#         --debug=*)
+#         debug="${i#*=}"
+#         shift
+#         ;;
         -h|-?|--help)
         show_help
         exit 0
@@ -61,13 +68,20 @@ for i in "$@" ; do
 done
 
 if [ -d ${destination} ] ; then
-    mkdir $destination
+    mkdir -p $destination
 fi
 
 workdir=${destination}/build
 distdir=${destination}/dist
 
+# echo $"debug: "$debug
+
+# if [ -z $debug ] ;  then
 pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec
+# else
+# pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec -- --debug
+# fi
+
 
 if [[ $? -ne 0 ]] ; then
 echo -e "Compilation of frozen Scipyen application failed"
