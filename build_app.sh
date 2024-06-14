@@ -38,7 +38,7 @@ fi
 
 destination=${HOME}/scipyen_app 
 
-debug=
+debug=0
 
 for i in "$@" ; do
 #     echo $i
@@ -47,10 +47,10 @@ for i in "$@" ; do
         destination="${i#*=}"
         shift
         ;;
-#         --debug=*)
-#         debug="${i#*=}"
-#         shift
-#         ;;
+        --debug)
+        debug=1
+        shift
+        ;;
         -h|-?|--help)
         show_help
         exit 0
@@ -74,13 +74,15 @@ fi
 workdir=${destination}/build
 distdir=${destination}/dist
 
-# echo $"debug: "$debug
+echo $0: $"debug: "$debug
 
-# if [ -z $debug ] ;  then
-pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec
-# else
-# pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec -- --debug
-# fi
+export PYTHONHASHSEED=1
+
+if [[ $debug -gt 0 ]] ;  then
+pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec -- --debug
+else
+pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec 
+fi
 
 
 if [[ $? -ne 0 ]] ; then
