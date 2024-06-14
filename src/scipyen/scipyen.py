@@ -221,7 +221,7 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
 
 def main():
     import gui.mainwindow as mainwindow
-    print(f"Using {os.environ['QT_API']} for GUI and {os.environ['PYQTGRAPH_QT_LIB']} for PyQtGraph\n")
+    # print(f"Using {os.environ['QT_API']} for GUI and {os.environ['PYQTGRAPH_QT_LIB']} for PyQtGraph\n")
     faulthandler.enable()
     
     # NOTE: 2021-08-17 10:02:20
