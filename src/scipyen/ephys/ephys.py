@@ -1044,6 +1044,8 @@ class RecordingEpisode(Episode):
                  # segments: typing.Optional[GeneralIndexType] = None, ## → defined in superclass beginFrame endFrame
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[tuple] = None ,
+                 beginTrial: typing.Optional[int] = None,
+                 endTrial: typing.Optional[int] = None,
                  # triggers: typing.Sequence[TriggerEvent] = list(),
                  **kwargs):
         """Constructor for RecordingEpisode.
@@ -1087,6 +1089,9 @@ class RecordingEpisode(Episode):
         super().__init__(name, **kwargs)
 
         self.protocol = protocol
+        
+        self.beginTrial =  beginTrial
+        self.endTrial = endTrial
         
         if isinstance(pathways, (tuple, list)):
             if len(pathways):
@@ -1149,6 +1154,12 @@ class RecordingEpisode(Episode):
     def __repr__(self):
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}, begin={self.begin}, end={self.end}, beginFrame={self.beginFrame}, endFrame={self.endFrame}), with:")
+        if isinstance(self.beginTrial ,int):
+            ret.append(f"\tFirst trial: {self.beginTrial}")
+            
+        if isinstance(self.endTrial, int):
+            ret.append(f"\tLast trial: {self.endTrial}")
+            
         if len(self._pathways_) == 0:
             ret.append(f"\tPathways: []")
         else:
@@ -4741,14 +4752,33 @@ def infer_schedule(*args):
         raise TypeError("Expecting a sequence of neo.Block objects")
 
     trials_seq , ordered_trials= trials_sequence_info(*args, return_sorted=True)
-    # this below: tuple (running index, trial basename, trial suffix index)
+    # this below: tuple (running index of trial, trial basename, trial suffix index)
     # unique based on trial basename
     trial_indexes = unique(list(map(lambda x: (x[0], *(strutils.get_int_sfx(x[1]))), enumerate(trials_seq.name))),
                            key = lambda v: v[1])
     
     episodes = list(map(lambda x: RecordingEpisode(name=x[1], begin=trials_seq.time.iloc[x[0]],
+                                                   beginTrial = x[0],
                                                    protocol = pab.ABFProtocol(ordered_trials[x[0]])),
                         trial_indexes))
+    
+    for k in range(1, len(episodes)):
+        episode = episodes[k]
+        prev_episode = episodes[k-1]
+        ndx = list(map(lambda x: episode.name in x, trials_seq.name))
+        prev_ndx = list(map(lambda x: prev_episode.name in x, trials_seq.name))
+        first_trial_this_episode = ordered_trials[trials_seq.index[ndx][0]]
+        last_trial_prev_episode = ordered_trials[trials_seq.index[prev_ndx][-1]]
+        dT = datetime.timedelta(seconds = float(neoutils.block_duration(last_trial_prev_episode)))
+        prev_episode.end = prev_episode.begin + dT
+        
+    last_trial_last_episode = ordered_trials[trials_seq.index[ndx][-1]]
+    dT = datetime.timedelta(seconds = float(neoutils.block_duration(last_trial_last_episode)))
+
+    episode.end = episode.begin + dT
+        
+        
+        
     
     return episodes
     

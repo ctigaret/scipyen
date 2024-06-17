@@ -285,6 +285,16 @@ def segment_start(data:neo.Segment):
                [s.t_start for s in data.spiketrains] +
                [min(s.times) for s in data.irregularlysampledsignals])
 
+def block_duration(x:neo.Block):
+    """Returns the duration of a neo.Block. 
+    This is the relative time between the start of the first and last sweep in 
+    the trial, plus the duration of the last trial.
+    
+    NOTE: This is calculated based on the data stored inthe neo.Block, 
+    irrespective of the protocol.
+    """
+    return segment_start(x.segments[-1]) - segment_start(x.segments[0]) + sweep_duration(x.segments[-1])
+
 @singledispatch
 def get_domain_name(obj):
     raise NotImplementedError(f"Objects of type {type(obj).__name__} are not suported")
