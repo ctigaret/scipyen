@@ -34,8 +34,7 @@
         <string>Resize columns</string>
        </property>
        <property name="icon">
-        <iconset theme="resizecol">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="resizecol"/>
        </property>
       </widget>
      </item>
@@ -54,8 +53,7 @@
         <string>Resize rows</string>
        </property>
        <property name="icon">
-        <iconset theme="resizerow">
-         <normaloff>.</normaloff>.</iconset>
+        <iconset theme="resizerow"/>
        </property>
       </widget>
      </item>

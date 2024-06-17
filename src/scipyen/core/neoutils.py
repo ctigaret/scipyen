@@ -159,6 +159,7 @@ import numpy as np
 import scipy
 import quantities as pq
 import neo
+import pandas as pd
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
     
@@ -268,7 +269,6 @@ def copy_to_segment(obj:neo.core.dataobject.DataObject, new_seg:neo.Segment):
 
 def sweep_duration(data:neo.Segment):
     return max(s.duration for s in data.analogsignals + data.irregularlysampledsignals + list(st for st in data.spiketrains))
-    
     
 def segment_start(data:neo.Segment):
     """Returns the minimum of t_start for all signals and spiketrains in a segment.

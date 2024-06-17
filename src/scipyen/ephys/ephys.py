@@ -160,6 +160,8 @@ import functools
 from functools import singledispatch
 import warnings
 import typing, types
+import difflib
+import re as _re
 from enum import Enum, IntEnum
 from abc import ABC
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
@@ -175,6 +177,7 @@ from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import numpy as np
 import quantities as pq
 import neo
+import pandas as pd
 # import pyabf
 import matplotlib as mpl
 # import pyqtgraph as pg
@@ -200,6 +203,7 @@ from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
+from core import strutils
 
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
@@ -215,6 +219,7 @@ from core.quantities import (units_convertible, check_time_units,
                              check_electrical_current_units, 
                              check_electrical_potential_units,
                              check_rescale)
+import core.pyabfbridge as pab 
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
@@ -4638,6 +4643,10 @@ command signal.
         
 
 """
+    # should also pass an abf object; 
+    # find out adc names and units ⇒ recorded signal
+    # then for the DAC: dacNames, dacUnits ⇒ "command signal"
+
     recordsCurrent = False
     recordsPotential = False
     commandIsCurrent = False
@@ -4675,6 +4684,75 @@ command signal.
     
     return ClampMode.NoClamp
     
-# should also pass an abf object; 
-# find out adc names and units ⇒ recorded signal
-# then for the DAC: dacNames, dacUnits ⇒ "command signal"
+
+def trials_sequence_info(*args, return_sorted:bool=False):
+    """Reveals the temporal order of trials represented by neo.Block objects.
+    Returns a DataFrame with the following columns:
+    "name" - the Block `name` attribute
+    "time" - the Block `rec_datetime` attribute
+    "deltaMinutes" - the lapsed time, in minutes, from the start of the first Block
+        in `args`
+
+    This information is stored in ascending order of the `rec_datetime` values.
+
+    Drug "incubation" periods may be inferred from the first difference of the 
+    "deltaMinutes" values
+
+    """
+    if len(args) == 0:
+        return
+    
+    if isinstance(args, (tuple, list, collections.deque)) and len(args) == 1:
+        args = args[0]
+    
+    if not all(isinstance(v, neo.Block) for v in args):
+        raise TypeError("Expecting a sequence of neo.Block objects")
+    
+    sorted_blocks = sorted(args, key = lambda x: x.rec_datetime)
+    
+    trial_names_times = list(map(lambda x: (x.name, x.rec_datetime), sorted_blocks))
+    
+    deltaMinutes = list(map(lambda x: (x[1] - trial_names_times[0][1]).seconds/60, trial_names_times))
+    
+    ret = dict()
+    ret["name"], ret["time"] = zip(*trial_names_times)
+    ret["deltaMinutes"] = deltaMinutes
+    
+    if return_sorted:
+        return pd.DataFrame(ret), sorted_blocks
+    
+    return pd.DataFrame(ret)
+
+def infer_schedule(*args):
+    """WARNING: Based on the naming of the trials (neo.Block objects)
+    The general naming format is aaa_<bbb_>*<xxxx>
+    
+    where a, b are any word character (a-zA-Z0-9_) and x is any digit
+
+    
+    """
+    if len(args) == 0:
+        return
+    
+    if isinstance(args, (tuple, list, collections.deque)) and len(args) == 1:
+        args = args[0]
+    
+    if not all(isinstance(v, neo.Block) for v in args):
+        raise TypeError("Expecting a sequence of neo.Block objects")
+
+    trials_seq , ordered_trials= trials_sequence_info(*args, return_sorted=True)
+    # this below: tuple (running index, trial basename, trial suffix index)
+    # unique based on trial basename
+    trial_indexes = unique(list(map(lambda x: (x[0], *(strutils.get_int_sfx(x[1]))), enumerate(trials_seq.name))),
+                           key = lambda v: v[1])
+    
+    episodes = list(map(lambda x: RecordingEpisode(name=x[1], begin=trials_seq.time.iloc[x[0]],
+                                                   protocol = pab.ABFProtocol(ordered_trials[x[0]])),
+                        trial_indexes))
+    
+    return episodes
+    
+    
+    
+    
+    

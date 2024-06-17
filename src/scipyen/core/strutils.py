@@ -33,6 +33,7 @@ __output_cache_regexp__ = _re.compile("^(_o)|(_+)(h|\d*)$")
 __input_cache_regexp__ = _re.compile("^_i+(h|\d*)$")
 
 import errno, os
+
 def is_sequence(s:str) -> bool:
     """Return True if the s is a string representation of a tuple or list"""
     if not isinstance(s, str):
@@ -94,7 +95,7 @@ def ordinalToLetters(x:int, upperCase:bool=True):
     ¹⁾ Either upper (default) or lower case, depending on the value of the 
     `upperCase` parameter.
 
-"""
+    """
     if x < 0:
         return '?'
     
@@ -284,7 +285,8 @@ def get_int_sfx(s:str, sep:str = "_", use_re:bool=False) -> typing.Tuple[str, in
     
     """
     if not isinstance(sep, str) or len(sep) == 0 or use_re:
-        regexp = _re.compile("^(\D+)*(\d*)$")
+        # regexp = _re.compile("^(\D+)*(\d*)$")
+        regexp = _re.compile("(.*?)??(\d*)$")
         re_match = regexp.match(s)
         if re_match is not None and len(re_match.groups()) > 1:
             try:

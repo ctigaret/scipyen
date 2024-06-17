@@ -70,6 +70,7 @@ from imaging import axisutils, vigrautils
 from imaging import (imageprocessing as imgp, imgsim,)
 from systems import *
 from ephys import (ephys, membrane)
+# from ephys import (ephys,)
 from .workspacemodel import WorkspaceModel
 from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
 from .triggerdetectgui import guiDetectTriggers
@@ -1538,6 +1539,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2024-05-29 14:04:11
         # plugin modules already have this injected by slot_loadPlugins
         ws_aware_modules = (membrane,pgui, sigp, imgp, crvf, plots)
+        # ws_aware_modules = (pgui, sigp, imgp, crvf, plots)
 
         for m in ws_aware_modules:
             # NOTE: 2022-12-23 10:47:39
