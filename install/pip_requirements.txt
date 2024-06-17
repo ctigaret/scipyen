@@ -150,6 +150,7 @@ nodejs
 nose            
 notebook
 notebook_shim
+nuitka
 numpy           
 octave_kernel
 pandas

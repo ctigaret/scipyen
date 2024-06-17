@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# nuitka-project: --standalone
+# nuitka-project: --enable-plugin=pyqt5
+
 '''Main module for the Scipyen application '''
 
 
