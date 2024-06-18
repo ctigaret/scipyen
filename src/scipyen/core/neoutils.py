@@ -591,9 +591,17 @@ def _(obj,/,**kwargs):
     factory_params.update(factory_kwarg_params)
     
     
-    factory = partial(type(obj), *factory_pos_params, **factory_params)
+    # factory = partial(type(obj), *factory_pos_params, **factory_params)
+    # return factory()
+
+    # NOTE: 2024-06-18 08:52:02
+    # more recent verison of neo library enforce against the use of int as annotations keys
     
-    return factory()
+    factory = partial(type(obj), *factory_pos_params)
+    
+    ret = factory()
+    ret.annotations.update(**factory_params)
+    return ret
 
 @make_neo_object.register(neo.core.spiketrainlist.SpikeTrainList)
 def _(obj,/,**kwargs):

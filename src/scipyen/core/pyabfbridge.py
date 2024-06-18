@@ -548,19 +548,14 @@ class ABFEpoch:
         self._epochType_ = ABFEpochType.Unknown
         self._level_ = None # -1 * pq.dimensionless
         self._levelDelta_ = None # -1 * pq.dimensionless
-        # self._duration_ = None # -1 * pq.dimensionless
         self._duration_ = 0 * pq.ms
-        # self._duration_in_samples_ = 0
         self._durationDelta_ = 0 * pq.ms
-        # self._durtationDelta_in_samples_ = 0
         self._mainDigitalPattern_ = (tuple(), tuple())
         self._alternateDigitalPattern_ = (tuple(), tuple())
         self._useAltPattern_ = False
         self._altDIGOutState_ = False
         self._pulsePeriod_ = np.nan * pq.ms
-        # self._pulsePeriod_in_samples_ = 0
         self._pulseWidth_ = np.nan * pq.ms
-        # self._pulseWidth_in_samples_ = 0
         self._dacNum_ = -1
         
     def __repr__(self) -> str:

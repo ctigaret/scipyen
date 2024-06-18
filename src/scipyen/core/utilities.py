@@ -25,6 +25,11 @@ import numpy as np
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
 import pandas as pd
 import quantities as pq
 import vigra
@@ -3973,7 +3978,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         data_len = data
         data = None
         
-    elif isinstance(data, collections.abc.Sequence):
+    elif isinstance(data, (collections.abc.Sequence, NeoObjectList)):
         data_len = len(data)
         
     elif isinstance(data, (pd.Series, pd.DataFrame)):

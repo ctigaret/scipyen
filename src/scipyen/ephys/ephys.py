@@ -956,6 +956,32 @@ class RecordingEpisode(Episode):
 
     All sweeps in the episode must have been recorded using the same recording
     protocol (an ElectrophysiologyProtocol object).
+    
+    The sweeps in an episode may belong to either:
+    
+    1) a single neo.Block — in this case the attributes 'beginFrame' and 'endFrame' 
+    indicate the limits of the segment sub-range in the Block) - this allows for
+    the possibility that subsets of segments in the Block have been recorded under
+    different conditions (and hence they would belong to distinct episodes), 
+    even if data was acquired using the same electrophysiology protocol.
+    
+    Normally, the segments of a Block are — by definition — recorded during the
+    same experimental conditions (protocol, drug, etc). However, during some 
+    analyses, several of these blocks may be concatenated into a larger one —
+    subject to being recorded using the same electrophysiology protocol — which 
+    leads to the situation where contiguous subsets of segments (or sweeps) 
+    recorded under distinct conditions are stored in the same Block object, a 
+    possibility covered by this contigency.
+    
+    2) a collection of neo.Block objects — in this case, the 'beginFrame' and 'endFrame' 
+    attributes cover the entire collection of segments ranges across the blocks. 
+    This is because several blocks are supposed to have been recorded during the SAME
+    experimental conditions, such that an "episode" can be greaded as a standalone 
+    data "unit" (unlike the contigency described above).
+    
+    In this contigency, all the data Blocks must have been acquired using the 
+    same electrophysiology protocol.
+    
         
     Examples:
     =========
@@ -978,11 +1004,14 @@ class RecordingEpisode(Episode):
     The sweeps in RecordingEpisode are a sequence of neo.Segment objects, where
     objects where each synaptic pathway has contributed data for a neo.Segment
     inside the Block.
+    
+    3) No segments are included in the episode - the episode is just a light-weight
+    data grouping by protocol.
 
     Fields (constructor parameters):
     ================================
         
-    • protocol: ElectrophysiologyProtocol
+    • protocols: sequence of ElectrophysiologyProtocol objects
         Currently, only pyabfbridge.ABFProtocol objects are supported. The ABFProtocol
         is a subclass of ElectrophysiologyProtocol defined in this module.
 
@@ -1039,13 +1068,12 @@ class RecordingEpisode(Episode):
     # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
     def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name: typing.Optional[str] = None,
-                 protocol: typing.Optional[ElectrophysiologyProtocol]=None, 
+                 blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
+                 protocols: typing.Sequence[ElectrophysiologyProtocol] = list(), 
                  # sources: typing.Sequence[RecordingSource] = list(), ## → defined in pathways
                  # segments: typing.Optional[GeneralIndexType] = None, ## → defined in superclass beginFrame endFrame
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[tuple] = None ,
-                 beginTrial: typing.Optional[int] = None,
-                 endTrial: typing.Optional[int] = None,
                  # triggers: typing.Sequence[TriggerEvent] = list(),
                  **kwargs):
         """Constructor for RecordingEpisode.
@@ -1058,7 +1086,7 @@ class RecordingEpisode(Episode):
         name:str - the name of this episode (optional, default is None)
             When None, it is up to the user of this object to give an appropriate
             name
-        protocol: the electrophysiology recording protocol object, or None
+        protocols: the electrophysiology recording protocol object, or obejcts, or None
             WARNING: As of 2024-02-18 11:09:55 Scipyen only supports 
             pyabfbridge.ABFProtocol objects.
 
@@ -1086,20 +1114,70 @@ class RecordingEpisode(Episode):
         if not isinstance(name, str):
             name = self._type_.name
             
-        super().__init__(name, **kwargs)
-
-        self.protocol = protocol
         
-        self.beginTrial =  beginTrial
-        self.endTrial = endTrial
+        self._begin_ = datetime.datetime.now()
+        self._end_ = datetime.datetime.now()
+        self._beginFrame_ = 0
+        self._endFrame_ = 0
         
+        self._protocols_ = list()
+        
+        self._blocks_ = list()
+        self._pathways_ = list()
+        
+        super().__init__(name=name)#, **kwargs)
+        
+        if isinstance(blocks, (tuple, list, collections.deque)) and all(isinstance(v, neo.Block) for v in blocks):
+            self._blocks_[:] = sorted(list(blocks), key = lambda x: x.rec_datetime)
+            self._setup_from_blocks_() # also sets up protocols
+            
+        begin = kwargs.pop("begin", None)
+        end = kwargs.pop("end", None)
+        beginFrame = kwargs.pop("beginFrame", None)
+        endFrame = kwargs.pop("endFrame", None)
+        if isinstance(begin, datetime.datetime):
+            self.begin = begin
+        if isinstance(end, datetime.datetime):
+            self.end = end
+            
+        if isinstance(beginFrame, int):
+            if beginFrame < 0:
+                raise ValueError(f"Invalid 'beginFrame': {beginFrame}")
+            
+            if isinstance(endFrame, int):
+                if endFrame < beginFrame:
+                    raise ValueError(f"Invalid 'endFrame': {endFrame} must be larger than {beginFrame}")
+                
+                if len(self._blocks_):
+                    nframes = self.nFrames # cache that:)
+                    if endFrame >= nFrames:
+                        raise ValueError(f"Invalid 'endFrame': {endFrame} must be smaller than {nFrames}  frames")
+            
+            self.beginFrame = beginFrame
+            
+        if isinstance(endFrame, int):
+            self.endFrame = endFrame
+            
+        # TODO 2024-06-18 11:30:48 FIXME
+        # check that all blocks follow the same protocol
+        # self.protocols = list() # set up from blocks, if any
+        if isinstance(protocols, ElectrophysiologyProtocol):
+            if len(self._protocols_) == 0:
+                self._protocols_.append(protocols)
+                
+            else:
+                scipywarn("protocols already set up by the blocks; 'protocol' argument will be ignored")
+                
+        elif isinstance(protocols, (tuple, list, collections.deque)) and all (isinstance(p, ElectrophysiologyProtocol) for p in protocols):
+            self._protocols_.extend(protocols)
+            
         if isinstance(pathways, (tuple, list)):
             if len(pathways):
                 if not all(isinstance(v, SynapticPathway) for v in pathways):
                     raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
             self._pathways_ = pathways
-        else:
-            self._pathways_ = []
+        # else:
+        #     self._pathways_ = []
         
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
@@ -1153,12 +1231,11 @@ class RecordingEpisode(Episode):
         
     def __repr__(self):
         ret = list()
-        ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}, begin={self.begin}, end={self.end}, beginFrame={self.beginFrame}, endFrame={self.endFrame}), with:")
-        if isinstance(self.beginTrial ,int):
-            ret.append(f"\tFirst trial: {self.beginTrial}")
-            
-        if isinstance(self.endTrial, int):
-            ret.append(f"\tLast trial: {self.endTrial}")
+        ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
+        ret.append(f"\tBlocks: {self.nBlocks}")
+        ret.append(f"\tFrames: {self.nFrames}")
+        ret.append(f"\tbegin={self.begin}, end={self.end}")
+        ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
             
         if len(self._pathways_) == 0:
             ret.append(f"\tPathways: []")
@@ -1237,7 +1314,166 @@ class RecordingEpisode(Episode):
         else:
             raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
             
+    @property
+    def blocks(self) -> list:
+        return self._blocks_
+    
+    @blocks.setter
+    def blocks(self, val:typing.Sequence[neo.Block]):
+        """Assign new blocks to the episode.
+        If val is an empty sequence, the blocks will be cleared.
+        """
+        if not isinstance(val, (tuple, list, collections.deque)):
+            raise TypeError(f"Expecting a sequence of neo.Block objects; instead got {type(val).__name__}")
+        
+        if len(val):
+            if not all(isinstance(v, neo.Block) for v in val):
+                raise TypeError("All elements of the sequence must be neo.Block obejcts")
             
+            self._blocks_[:] = sorted(list(val), key = lambda x: x.rec_datetime)
+            
+        else:
+            self._blocks_.clear()
+            
+        self._setup_from_blocks_()
+            
+    def _setup_from_blocks_(self):
+        if len(self._blocks_) == 0:
+            return
+        
+        self._protocols_ = unique([getProtocol(b) for b in self._blocks_])
+#         protocol = getProtocol(self._block_[0])
+#         if len(self._blocks_) > 1:
+#             assert all(getProtocol(b) == protocol for b in self._blocks_[1:]), "All blocks must have been recorded using the same acquisition protocol"
+#             
+#         self.protocol = protocol
+        
+        self.begin = self._blocks_[0].rec_datetime
+        self.end = self._blocks_[-1].rec_datetime + datetime.timedelta(seconds = float(neoutils.block_duration(self._blocks_[-1])))
+        
+        self.beginFrame = 0
+        self.endFrame = sum([len(b.segments) for b in self._blocks_]) - 1
+        
+    
+    def addBlock(self, x:neo.Block):
+        """Adds a new block; blocks will be reordered by rec_datetime if necessary"""
+        if not isinstance(x, neo.Block):
+            raise TypeError(f"Expecting a neo.Block; instead, got {type().__name__}")
+        
+        protocol = getProtocol(x)
+        if len(self._protocols_):
+            if protocol not in self.protocols:
+                scipywarn("The block was acquired with a different protocol")
+        self._protocols_.append(protocol)
+            
+        blocks = self._blocks_ + [x]
+        self.blocks = blocks
+        
+    def removeBlock(self, index:typing.Union[int, str]):
+        """Removes a block by name or by its index in the episode blocks"""
+        if isinstance(index, str):
+            blocknames = [b.name for b in self._blocks_]
+            if index not in blocknames:
+                raise ValueError(f"Block name {index} not found in this episode")
+            
+            x = blocknames.index(index)
+            
+        elif isinstance(index, int):
+            if index>= len(self._blocks_):
+                raise ValueError(f"Invalid block index {index} for {len(self._blocks_)} blocks")
+            
+        else:
+            raise TypeError("")
+        
+        del self._blocks_[index]
+        
+        self._setup_from_blocks_() # will also update the protocols
+            
+    @property
+    def protocols(self) -> list:
+        return self._protocols_
+    
+    @property
+    def begin(self) -> datetime.datetime:
+        return self._begin_
+    
+    @begin.setter
+    def begin(self, val:datetime.datetime):
+        if not isinstance(val, datetime.datetime):
+            raise TypeError(f"Expecting a datetime.datetime; got {type(val).__name__} instead")
+        
+        if val > self.end:
+            scipywarn(f"Setting 'begin' ({val}) to be later than 'end' ({self.end})")
+            
+        self._begin_ = val
+    
+    @property
+    def end(self) -> datetime.datetime:
+        return self._end_
+    
+    @end.setter
+    def end(self, val:datetime.datetime):
+        if not isinstance(val, datetime.datetime):
+            raise TypeError(f"Expecting a datetime.datetime; got {type(val).__name__} instead")
+        
+        if val < self.begin:
+            scipywarn(f"Setting 'end' ({val}) to be earlier than 'begin' ({self.begin})")
+            
+        self._end_ = val
+    
+    @property
+    def beginFrame(self) -> int:
+        return self._beginFrame_
+    
+    @beginFrame.setter
+    def beginFrame(self, val:int):
+        if not isinstance(val, int):
+            raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
+        
+        if val < 0:
+            raise ValueError(f"Cannot set beginFrame to < 0 ({val})")
+        
+        if val > self.endFrame:
+            scipywarn(f"Setting 'beginFrame' ({val}) to a value larger than 'endFrame' ({self.endFrame})")
+            
+        self._beginFrame_ = val
+    
+    @property
+    def endFrame(self) -> int:
+        return self._endFrame_
+    
+    @endFrame.setter
+    def endFrame(self, val:int):
+        if not isinstance(val, int):
+            raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
+        
+        nFrames = sum([len(b.segments) for b in self._blocks_])
+        
+        if len(self._blocks_) and val >= nFrames:
+            raise ValueError(f"'endFrame' ({val}) must be less than {nFrames} available frames")
+        
+        if val < 0:
+            raise ValueError(f"'endFrame' cannot be < 0; got {val} instead")
+        
+        if val < self.beginFrame:
+            scipywarn(f"Setting 'endFrame' ({val}) to a value less than 'beginFrame' ({self.beginFrame})")
+            
+        self._endFrame_ = val
+    
+    @property
+    def nFrames(self) -> int:
+        """Number of frames in this episode; """
+        if len(self._blocks_) == 0:
+            return 0
+        
+        if len(self._blocks_) == 1:
+            return self._endFrame_ - self._beginFrame_ + 1
+        
+        return sum([len(b.segments) for b in self._blocks_])
+    
+    @property
+    def nBlocks(self) -> int:
+        return len(self._blocks_)
             
     @property
     def type(self) -> RecordingEpisodeType:
@@ -1252,6 +1488,21 @@ class RecordingEpisode(Episode):
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
+    def __init__(self, name: typing.Optional[str] = None, **kwargs):
+        super().__init__(name, **kwargs)
+        
+    def __repr__(self):
+        ret = list()
+        ret.append(f"{self.__class__.__name__}(name='{self.name}'), with {len(self.episodes)} episodes:")
+        for k,e in enumerate(self.episodes):
+            ret.append(f"{k}: {e}")
+            
+        return "\n".join(ret)
+        
+    @property
+    def nFrames(self) -> int:
+        return sum([e.nFrames for e in self.episodes])
+        
     @property
     def pathways(self):
         return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
@@ -1833,7 +2084,6 @@ def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal],
     
     if isinstance(upward, (tuple, list)) and not all(upward[0] == v for v in upward):
         raise RuntimeError("All boxcars must be in the same direction")
-    
     if any(v.size > 1 for v in (d,u)): # more than one boxcar detected
         if boxduration is None:
             raise RuntimeError("More than one transition between levels has been detected and no constraints on boxcar width were specified ('boxduration')")
@@ -4734,7 +4984,7 @@ def trials_sequence_info(*args, return_sorted:bool=False):
     
     return pd.DataFrame(ret)
 
-def infer_schedule(*args):
+def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule:
     """WARNING: Based on the naming of the trials (neo.Block objects)
     The general naming format is aaa_<bbb_>*<xxxx>
     
@@ -4751,38 +5001,29 @@ def infer_schedule(*args):
     if not all(isinstance(v, neo.Block) for v in args):
         raise TypeError("Expecting a sequence of neo.Block objects")
 
-    trials_seq , ordered_trials= trials_sequence_info(*args, return_sorted=True)
+    trials_seq , ordered_trials = trials_sequence_info(*args, return_sorted=True)
     # this below: tuple (running index of trial, trial basename, trial suffix index)
     # unique based on trial basename
-    trial_indexes = unique(list(map(lambda x: (x[0], *(strutils.get_int_sfx(x[1]))), enumerate(trials_seq.name))),
+    episode_names_ndx = unique(list(map(lambda x: (x[0], *(strutils.get_int_sfx(x[1]))), enumerate(trials_seq.name))),
                            key = lambda v: v[1])
     
-    episodes = list(map(lambda x: RecordingEpisode(name=x[1], begin=trials_seq.time.iloc[x[0]],
-                                                   beginTrial = x[0],
-                                                   protocol = pab.ABFProtocol(ordered_trials[x[0]])),
-                        trial_indexes))
+    trials_ndx = list(map(lambda n: list(trials_seq.index[list(map(lambda x: n[1] in x, trials_seq.name))]), episode_names_ndx))
     
-    for k in range(1, len(episodes)):
-        episode = episodes[k]
-        prev_episode = episodes[k-1]
-        ndx = list(map(lambda x: episode.name in x, trials_seq.name))
-        prev_ndx = list(map(lambda x: prev_episode.name in x, trials_seq.name))
-        first_trial_this_episode = ordered_trials[trials_seq.index[ndx][0]]
-        last_trial_prev_episode = ordered_trials[trials_seq.index[prev_ndx][-1]]
-        dT = datetime.timedelta(seconds = float(neoutils.block_duration(last_trial_prev_episode)))
-        prev_episode.end = prev_episode.begin + dT
-        
-    last_trial_last_episode = ordered_trials[trials_seq.index[ndx][-1]]
-    dT = datetime.timedelta(seconds = float(neoutils.block_duration(last_trial_last_episode)))
-
-    episode.end = episode.begin + dT
-        
-        
-        
+    episodes = list(map(lambda x: RecordingEpisode(name=x[0][1], blocks = [ordered_trials[k] for k in x[1]]),
+                        zip(episode_names_ndx, trials_ndx)))
     
-    return episodes
+    schedule = RecordingSchedule(episodes=episodes)
+        
+    return schedule
+    # return episodes
     
+def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]):
+    if not isinstance(x, (neo.Block, pab.pyabf.ABF)):
+        raise TypeError(f"Expecting a neo.Block or a pyabf.ABF object; mstead, got {type(x).__name__}")
     
+    if isinstance(x, neo.Block) and not pab.sourcedFromABF(x):
+        raise NotImplementedError("Only ABF protocols are supported for the moment")
+    return pab.ABFProtocol(x)
     
     
     

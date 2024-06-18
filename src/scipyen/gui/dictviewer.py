@@ -766,7 +766,10 @@ class DataViewer(ScipyenViewer):
             #print("name", name)
             src = self._obj_cache_[self._cache_index_][1]
             if self.treeWidget.has_dynamic_private:
-                objs = [getattr(src,path[-1], None)]
+                if isinstance(src, (tuple, list, deque)) and isinstance(path[-1], int):
+                    objs = src[path-1]
+                else:
+                    objs = [getattr(src, str(path[-1]), None)]
             else:
                 # objs = NestedFinder.getvalue(self._data_, path, single=True)
                 objs = NestedFinder.getvalue(src, path, single=True)

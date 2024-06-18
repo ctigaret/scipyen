@@ -4548,48 +4548,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         gname, pfx = saveWindowSettings(
             self.qsettings, self, group_name=self.__class__.__name__)
 
-        # ### BEGIN TODO/FIXME/BUG 2022-12-26 22:44:59
-#         #### NOTE: user-defined gui handlers (viewers) for variable types, or
-#         # user-changed configuration of gui handlers
-#         # FIXME 2021-07-17 22:55:17
-#         # Not written to Scipyen.conf -- WHY ??? because nested groups aren't
-#         # supported by QSettings
-#         self.qsettings.beginGroup("Custom_GUI_Handlers")
-#         for viewerClass in VTH.gui_handlers.keys():
-#             pfx = viewerClass.__name__
-#
-#             if viewerClass not in VTH.default_handlers.keys():
-#                 # store user-defines handlers
-#                 self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
-#
-#                 if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
-#                     type_names = [VTH.gui_handlers[viewerClass]["types"]._name__]
-#
-#                 else:
-#                     type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]]
-#
-#                 self.qsettings.setValue("%s_types" % pfx, type_names)
-#
-#             else:
-#                 # store customizations for built-in handlers:
-#                 default_action_name = VTH.default_handlers[viewerClass]["action"]
-#                 default_types = VTH.default_handlers[viewerClass]["types"]
-#
-#                 if VTH.gui_handlers[viewerClass]["types"] != default_types:
-#                     if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
-#                         type_names = [VTH.gui_handlers[viewerClass]["types"].__name__]
-#
-#                     else:
-#                         type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]]
-#
-#                     self.qsettings.setValue("%s_types" % pfx, VTH.gui_handlers[viewerClass]["types"])
-#
-#                 if VTH.gui_handlers[viewerClass]["action"] is not default_action_name:
-#                     self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
-#
-#         self.qsettings.endGroup()
-        # ### END TODO/FIXME/BUG 2022-12-26 22:44:59
-
     # @processtimefunc
     def loadSettings(self):
         """Overrides ScipyenConfigurable.loadSettings()"""
