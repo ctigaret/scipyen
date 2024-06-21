@@ -115,7 +115,8 @@ except:
 #
 mpath = pathlib.Path(__module_path__)
 
-iconsdir = mpath / "gui" / "resources" / "icons"
+# iconsdir = mpath / "gui" / "resources" / "icons"
+iconsdir = mpath / "gui" / "resources" 
 
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
