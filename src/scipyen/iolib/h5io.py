@@ -2565,13 +2565,13 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,
         
         return entity
     
-    elif isinstance(obj, pab.ABFProtocol):
-        cached_entity = getCachedEntity(entity_cache, obj)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-        
-        entity = group.create_group(target_name)
+#     elif isinstance(obj, pab.ABFProtocol):
+#         cached_entity = getCachedEntity(entity_cache, obj)
+#         if isinstance(cached_entity, h5py.Dataset):
+#             group[target_name] = cached_entity
+#             return cached_entity
+#         
+#         entity = group.create_group(target_name)
         
     elif isinstance(obj, Schedule):
         pass
@@ -2937,20 +2937,20 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     storeEntityInCache(entity_cache, obj, dset)
     return dset
 
-@makeDataset.register(pab.ABFEpoch)
-@makeDataset.register(pab.ABFInputConfiguration)
-@makeDataset.register(pab.ABFOutputConfiguration)
-# @makeDataset.register(pab.ABFProtocol)
-def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
-    cached_entity = getCachedEntity(entity_cache, obj)
-    if isinstance(cached_entity, h5py.Dataset):
-        group[target_name] = cached_entity # make a hard link
-        return cached_entity
-    
-    dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
-    dset.attrs.update(attrs)
-    storeEntityInCache(entity_cache, obj, dset)
-    return dset
+# @makeDataset.register(pab.ABFEpoch)
+# @makeDataset.register(pab.ABFInputConfiguration)
+# @makeDataset.register(pab.ABFOutputConfiguration)
+# # @makeDataset.register(pab.ABFProtocol)
+# def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
+#     cached_entity = getCachedEntity(entity_cache, obj)
+#     if isinstance(cached_entity, h5py.Dataset):
+#         group[target_name] = cached_entity # make a hard link
+#         return cached_entity
+#     
+#     dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+#     dset.attrs.update(attrs)
+#     storeEntityInCache(entity_cache, obj, dset)
+#     return dset
 
 def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None, compression:typing.Optional[str]="gzip",  chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
     """Writes python iterable collection and neo containers to a HDF5 Group.

@@ -497,6 +497,9 @@ from pyabf.abfReader import AbfReader
 from pyabf.stimulus import (findStimulusWaveformFile, 
                             stimulusWaveformFromFile)
 
+from iolib import h5io
+import h5py
+
 # useful alias:
 ABF = pyabf.ABF
 
@@ -543,23 +546,74 @@ class ABFEpoch:
     
     Takes into account digital train pulses.
     """
-    def __init__(self):
-        self._epochNumber_ = -1
-        self._epochType_ = ABFEpochType.Unknown
-        self._level_ = None # -1 * pq.dimensionless
-        self._levelDelta_ = None # -1 * pq.dimensionless
-        self._duration_ = 0 * pq.ms
-        self._durationDelta_ = 0 * pq.ms
-        self._mainDigitalPattern_ = (tuple(), tuple())
-        self._alternateDigitalPattern_ = (tuple(), tuple())
-        self._useAltPattern_ = False
-        self._altDIGOutState_ = False
-        self._pulsePeriod_ = np.nan * pq.ms
-        self._pulseWidth_ = np.nan * pq.ms
-        self._dacNum_ = -1
+    def __init__(self, epochNumber:int = -1, epochType: ABFEpochType = ABFEpochType.Unknown,
+                 level: typing.Optional[pq.Quantity]=None,
+                 levelDelta: typing.Optional[pq.Quantity] = None,
+                 duration: pq.Quantity = 0 * pq.ms,
+                 durationDelta: pq.Quantity = 0* pq.ms,
+                 mainDigitalPattern: tuple = (tuple(), tuple()),
+                 alternateDigitalPattern: tuple = (tuple(), tuple()),
+                 useAltPattern: bool=False,
+                 altDIGOutState: bool = False,
+                 pulsePeriod: pq.Quantity = np.nan * pq.ms,
+                 pulseWidth: pq.Quantity = np.nan * pq.ms,
+                 dacNum: int = -1):
+        # self._epochNumber_ = -1
+        # self._epochType_ = ABFEpochType.Unknown
+        # self._level_ = None # -1 * pq.dimensionless
+        # self._levelDelta_ = None # -1 * pq.dimensionless
+        # self._duration_ = 0 * pq.ms
+        # self._durationDelta_ = 0 * pq.ms
+        # self._mainDigitalPattern_ = (tuple(), tuple())
+        # self._alternateDigitalPattern_ = (tuple(), tuple())
+        # self._useAltPattern_ = False
+        # self._altDIGOutState_ = False
+        # self._pulsePeriod_ = np.nan * pq.ms
+        # self._pulseWidth_ = np.nan * pq.ms
+        # self._dacNum_ = -1
+        self._epochNumber_ = epochNumber
+        self._epochType_ = epochType
+        self._level_ = level # -1 * pq.dimensionless
+        self._levelDelta_ = levelDelta # -1 * pq.dimensionless
+        self._duration_ = duration
+        self._durationDelta_ = durationDelta
+        self._mainDigitalPattern_ = mainDigitalPattern
+        self._alternateDigitalPattern_ = alternateDigitalPattern
+        self._useAltPattern_ = useAltPattern
+        self._altDIGOutState_ = altDIGOutState
+        self._pulsePeriod_ = pulsePeriod
+        self._pulseWidth_ = pulseWidth
+        self._dacNum_ = dacNum
+        
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache):
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        # TODO: 2024-07-17 15:49:20
+        # parse relevant ABFEpoch attributes into obj_attrs
+        # make sure you take h5io.objectFromHDF5Entity into account
+        #
+        attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
+                            inspect.getmembers_static(self, inspect.isdatadescriptor)))
+        
+        objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
+        obj_attrs.update(objattrs)
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        entity = group.create_dataset(name, data = h5py.Empty("f"), track_order = track_order)
+        entity.attrs.update(obj_attrs)
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+        
         
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__} Epoch {self.epochNumber} ({self.letter}), type {self.epochType.name}"
+        return f"{self.__class__.__name__} ({super().__repr__()}) Epoch {self.epochNumber} (\'{self.letter}\'), type: {self.epochType.name}"
         
         
     def __eq__(self, other):
@@ -1147,6 +1201,33 @@ class ABFProtocol(ElectrophysiologyProtocol):
         self._inputs_ = [ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
         self._outputs_ = [ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
             
+    def __repr__(self):
+        ret = [f"{self.__class__.__name__} ({super().__repr__()}) with:"]
+        ret.append(f"{self.nADCChannels} ADCs:")
+        ret += [f"  {o.physicalIndex}: {o.__repr__()}" for o in self.ADCs]
+        ret.append(f"{self.nDACChannels} DACs:")
+        for o in self.DACs:
+            nEpochs = len(o.epochs)
+            ret.append(f"  {o.physicalIndex}: {o.__repr__()} with {nEpochs} epochs{' ' if nEpochs ==0 else ':'}")
+            for e in o.epochs:
+                ret.append(f"    {e.__repr__()}")
+            
+        # ret += [o.__repr__() for o in self.DACs]
+        ret.append(f"• {self.nDigitalOutputs} Digital outputs ")
+        # ret.append(f" ∘ {self.nSychronizedDigitalOutChannels} synchronized digital channels")
+        # ret.append(f" ∘ {self.nAlternateDigitalOutChannels} alternate digital channels ")
+        ret.append(f" ∘ Digital train active logic High: {self.digitalTrainActiveLogic}")
+        ret.append(f" ∘ Digital holding {self.digitalHolding}, ; using last epoch holding: {self.digitalUseLastEpochHolding} ")
+        ret.append(f"• Acquisition mode: {self.acquisitionMode.name}")
+        ret.append(f"• Trials: {self.nTrials}")
+        ret.append(f"• Runs/trial: {self.nRuns}")
+        ret.append(f"• Sweeps/run: {self.nSweeps}")
+        ret.append(f"• Sampling rate: {self.samplingRate}")
+        ret.append(f"• Averaging: {self.averaging.name}")
+        ret.append(f"• Name: {self.name}")
+        ret.append(f"• File: {self.protocolFile}")
+        return "\n".join(ret)
+    
     def __eq__(self, other):
         """Tests for equality of scalar properties and epochs tables.
         Epochs tables are checked for equality sweep by sweep, in all channels.
@@ -2277,6 +2358,10 @@ class ABFInputConfiguration:
         props = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
         return np.all([utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False) for p in props if p[0] != "protocol"])
+    
+    def __repr__(self):
+        # return f"{self.__class__.__name__} ({super().__repr__()}) with units: \'{self.adcUnits.symbol}\' and name: \'{self.name}\', at physical (logical) index: {self.physicalIndex} ({self.logicalIndex}) "
+        return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{self.adcUnits.symbol}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
 
     def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex
@@ -2528,6 +2613,11 @@ class ABFOutputConfiguration:
         self._init_epochs_(obj)
         
         # self._digitalOutputs_ = set(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels() for e in self.epochs]))
+        
+    def __repr__(self):
+        # ret = f"{self.__class__.__name__} ({super().__repr__()}) with units: \'{self.units.symbol}\' and name: \'{self.name}\', at physical (logical) index: {self.physicalIndex} ({self.logicalIndex}) "
+        ret = f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{self.units.symbol}\') at index {self.physicalIndex} ↔ {self.logicalIndex}  (physical ↔ logical)"
+        return ret
         
     def _init_epochs_(self, obj):
         if isinstance(obj, pyabf.ABF):

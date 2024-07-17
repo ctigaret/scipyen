@@ -8713,19 +8713,20 @@ class ScanData(BaseScipyenData):
 
         
         # TODO: write the following as datasets in subgroups
-        # scans
-        # scene
-        # ephys - avoid neo.NixIO/nix !
-        # scans block
-        # scene block
-        # scans profiles
-        # scene profiles
         # triggerProtocols
         #   check consistency with the trigger events embedded in 
         #   ephys, scans/scene block, analysis units
         # landmarks
         # analysis units
         # options
+        # TODO 2024-07-17 11:18:43 -> use h5io API for vigra arrays and neo data
+        # scans
+        # scene
+        # ephys
+        # scans block
+        # scene block
+        # scans profiles
+        # scene profiles
         # 
         # TODO write the following as group attributes
         # name
