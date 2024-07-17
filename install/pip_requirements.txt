@@ -39,6 +39,7 @@ MarkupSafe
 Pillow
 PyLEMS
 qtpy
+pywayland ; sys_platform == "linux"
 # required to build PyQt5/6 locally using the host's Qt stack
 PyQt-builder ; sys_platform == 'linux'
 # required to build PyQt5 locally using the host's Qt stack

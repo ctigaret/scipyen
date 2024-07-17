@@ -22,7 +22,13 @@ os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
 # restore window sizes and positions from Scipyen.conf (Wayland does not allow
 # an application 'client' to control window position)
 if sys.platform == "linux":
-    os.environ["QT_QPA_PLATFORM"]="xcb"
+    if os.getenv("XDG_SESSION_TYPE", None) == "wayland":
+        # print("In a wayland session")
+        os.environ["QT_QPA_PLATFORM"]="xcb"
+        # import pywayland
+        
+    
+    # os.environ["QT_QPA_PLATFORM"]="xcb"
 
 if len(sys.argv) > 1:
     if "pyqt6" in sys.argv:

@@ -48,6 +48,9 @@ from core.neoutils import (clear_events, get_index_of_named_signal, is_empty,)
 #from core.neoutils import (clear_events, get_index_of_named_signal, neo_copy, is_empty,)
 from core.neoutils import (average_segments, )
 
+# import h5py
+from iolib import h5io, jsonio
+
 from imaging.vigrautils import (proposeLayout, concatenateImages, croppedView, 
                                 imageIndexTuple, resampleImage, resampleImageAxis,
                                 removeSlice, padToShape, padAxis,)# nFrames)
@@ -8691,8 +8694,8 @@ class ScanData(BaseScipyenData):
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
                        entity_cache):
         
-        import h5py
-        from iolib import h5io, jsonio
+        # import h5py
+        # from iolib import h5io, jsonio
         
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         

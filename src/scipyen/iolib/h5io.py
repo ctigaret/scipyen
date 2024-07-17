@@ -148,6 +148,7 @@ from core.datatypes import (TypeEnum,UnitTypes, GENOTYPES,
                             is_numeric_string, is_numeric, 
                             is_convertible_to_numpy_array,
                             NUMPY_STRING_KINDS,
+                            Schedule, Episode,
                             )
 
 from core.modelfitting import (FitModel, ModelExpression,)
@@ -156,14 +157,14 @@ from core.triggerprotocols import TriggerProtocol
 from core.utilities import (gethash, unique)
 from core.strutils import (str2symbol, str2float, numbers2str, get_int_sfx,)
 from core import modelfitting
-from core import pyabfbridge as pab
+# from core import pyabfbridge as pab
 import imaging
 from imaging.axiscalibration import (AxesCalibration, 
                                      AxisCalibrationData, 
                                      ChannelCalibrationData)
 
 from imaging.indicator import IndicatorCalibration # do not confuse with ChannelCalibrationData
-from imaging.scandata import (AnalysisUnit, ScanData, ScanDataOptions,)
+# from imaging.scandata import (AnalysisUnit, ScanData, ScanDataOptions,)
 from imaging import vigrautils as vu
 from gui.pictgui import (Arc, ArcMove, CrosshairCursor, Cubic, Ellipse, 
                          HorizontalCursor, Line, Move, Quad, Path, 
@@ -2571,6 +2572,15 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,
             return cached_entity
         
         entity = group.create_group(target_name)
+        
+    elif isinstance(obj, Schedule):
+        pass
+        cached_entity = getCachedEntity(entity_cache, obj)
+        if isinstance(cached_entity, h5py.Group):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        
     
     else:
         if (isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or hasattr(type(obj),"__iter__")) and \
