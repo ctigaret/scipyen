@@ -611,13 +611,45 @@ class ABFEpoch:
         
         return entity
     
-    def objectFromHDF5Entity(self, entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict = {}):
-        print(f"{self.__class__.__name__}.objectFromHDF5Entity entity: {type(entity).__name__}")
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:typing.Union[h5py.Group, h5py.Dataset], attrs:dict, cache:dict = {}):
+        print(f"{cls.__name__}.objectFromHDF5Entity entity: {type(entity).__name__}")
         if entity in cache:
             return cache[entity]
         
         attrs = h5io.attrs2dict(entity.attrs)
         print(f"objectFromHDF5Entity attrs = {attrs}")
+        
+        epochNumber = attrs.get("epochNumber", None)
+        epochType = attrs.get("epochType", ABFEpochType.Unknown)
+        firstLevel = attrs.get("firstLevel",None)
+        deltaLevel = attrs.get("deltaLevel", None)
+        firstDuration = attrs.get("firstDuration", None)
+        if firstDuration is None:
+            firstDuration = 0*pq.ms
+        deltaDuration = attrs.get("deltaDuration", None)
+        if deltaDuration is None:
+            deltaDuration = 0*pq.ms
+        mainDigitalPattern = attrs.get("mainDigitalPattern", None)
+        if isinstance(mainDigitalPattern, list) and len(mainDigitalPattern) == 2:
+            if all(isinstance(b, (tuple, list)) and all(isinstance(v, int) for v in b) for b in mainDigitalPattern):
+                mainDigitalPattern = tuple(tuple(b) for b in mainDigitalPattern)
+        alternateDigitalPattern = attrs.get("alernateDigitalPattern", None)
+        if isinstance(alternateDigitalPattern, list) and len(alternateDigitalPattern) == 2:
+            if all(isinstance(b, (tuple, list)) and all(isinstance(v, int) for v in b) for b in alternateDigitalPattern):
+                alternateDigitalPattern = tuple(tuple(b) for b in alternateDigitalPattern)
+        useAltPattern = attrs.get("useAltPattern", None)
+        altDIGOutState = attrs.get("altDIGOutState", None)
+        pulsePeriod = attrs.get("pulsePeriod", None)
+        pulseWidth = attrs.get("pulseWidth", None)
+        dacNum = attrs.get("dacNum", None)
+        
+        
+        
+        return cls(epochNumber, epochType, firstLevel, deltaLevel, 
+                   firstDuration, deltaDuration, 
+                   mainDigitalPattern, alternateDigitalPattern, useAltPattern, altDIGOutState,
+                   pulsePeriod, pulseWidth, dacNum)
       
         
         
@@ -792,6 +824,22 @@ class ABFEpoch:
         # TODO: 2023-09-14 15:55:11
         # check the argument
         self._mainDigitalPattern_ = val
+        
+    @property
+    def useAltPattern(self) -> bool:
+        return self._useAltPattern_
+    
+    @useAltPattern.setter
+    def useAltPattern(self, val:bool):
+        self._useAltPattern_ = vall==True
+        
+    @property
+    def altDIGOutState(self) -> bool:
+        return self._altDIGOutState_
+    
+    @altDIGOutState.setter
+    def altDIGOutState(selv, val:bool):
+        self._altDIGOutState_ = val == True
         
     @property
     def alternateDigitalPattern(self) -> tuple:

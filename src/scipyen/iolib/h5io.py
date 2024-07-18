@@ -1276,7 +1276,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
     
     if isinstance(inspect.getattr_static(target_class,"objectFromHDF5Entity", None),
                   prog.CALLABLE_TYPES + (classmethod,)):
-        return target_class.objectFromHDF5Entity(entity, cache)
+        return target_class.objectFromHDF5Entity(entity, attrs, cache)
     
     if isinstance(entity, h5py.Dataset):
         # NOTE: 2022-10-06 11:57:32
