@@ -610,6 +610,15 @@ class ABFEpoch:
         h5io.storeEntityInCache(entity_cache, self, entity)
         
         return entity
+    
+    def objectFromHDF5Entity(self, entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict = {}):
+        print(f"{self.__class__.__name__}.objectFromHDF5Entity entity: {type(entity).__name__}")
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        print(f"objectFromHDF5Entity attrs = {attrs}")
+      
         
         
     def __repr__(self) -> str:

@@ -1212,7 +1212,8 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
     # this is useful for dealing with 'soft links' in the HDF5 so we 
     # don't duplicate data upon reading from the file
     
-    # print(f"\tentity : {entity}")
+    print(f"\tentity : {entity}")
+    print(f"\tentity name: {entity.name}")
     
     if entity in cache:
         return cache[entity]
@@ -1231,6 +1232,9 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
         module_name = attrs["module_name"]
         module_name_comps = module_name.split(".")
         
+        print(f"python_class: {python_class}")
+        print(f"module_name: {module_name}")
+        
         if module_name_comps[0] == "builtins":
             target_class = eval(type_name)
         else:
@@ -1248,7 +1252,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                     
                     target_class = eval(".".join(python_class_comps[1:]), pymodule.__dict__)
                     
-                # print(f"\ttarget_class: {target_class} from pymodule: {pymodule}")
+                print(f"target_class: {target_class} from pymodule: {pymodule}")
 
                 # NOTE: 2022-10-05 18:40:53 FIXME possible BUG
                 # this doesn't work if the module is imported under an alias
