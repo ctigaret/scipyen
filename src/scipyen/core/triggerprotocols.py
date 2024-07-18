@@ -1275,7 +1275,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity, cache:dict = {}):
+    def objectFromHDF5Entity(cls, entity, attrs:dict, cache:dict = {}):
         import h5py
         from iolib import h5io
         # print(f"cls {cls}, entity {entity}")
@@ -1287,12 +1287,14 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         if entity in cache:
             return cache[entity]
         
-        attrs = h5io.attrs2dict(entity.attrs)
+        # attrs = h5io.attrs2dict(entity.attrs)
         
         components = dict()
         
         for name in ("presynaptic", "postsynaptic", "photostimulation", 
                      "acquisition", "imagingDelay" ,"segmentIndex"):
+            # NOTE: 2024-07-18 09:59:58
+            # restores the trigger events in the protocol
             obj_entity = entity.get(name, None)
             
             if obj_entity is None:

@@ -551,8 +551,8 @@ class ABFEpoch:
                  levelDelta: typing.Optional[pq.Quantity] = None,
                  duration: pq.Quantity = 0 * pq.ms,
                  durationDelta: pq.Quantity = 0* pq.ms,
-                 mainDigitalPattern: tuple = (tuple(), tuple()),
-                 alternateDigitalPattern: tuple = (tuple(), tuple()),
+                 mainDigitalPattern: typing.Sequence = (tuple(), tuple()),
+                 alternateDigitalPattern: typing.Sequence = (tuple(), tuple()),
                  useAltPattern: bool=False,
                  altDIGOutState: bool = False,
                  pulsePeriod: pq.Quantity = np.nan * pq.ms,
@@ -585,10 +585,18 @@ class ABFEpoch:
         self._pulseWidth_ = pulseWidth
         self._dacNum_ = dacNum
         
+    @classmethod
+    def _check_dig_pattern_args_(cls, val):
+        if isinstance(val, (tuple, list)) and all(isinstance(x, (tuple, list)) and all(isinstance(v, (int, str)) for v in x) for x in val):
+            return tuple(tuple(x) for x in val)
+
+        return (tuple(), tuple())
+        
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
-                       entity_cache):
+                       entity_cache) -> h5py.Dataaset:
         cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Group):
+        # if isinstance(cached_entity, h5py.Group):
+        if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
@@ -612,16 +620,25 @@ class ABFEpoch:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:typing.Union[h5py.Group, h5py.Dataset], attrs:dict, cache:dict = {}):
-        print(f"{cls.__name__}.objectFromHDF5Entity entity: {type(entity).__name__}")
+    def objectFromHDF5Entity(cls, entity:h5py.Dataset, attrs:dict, cache:dict = {}):
+        # print(f"{cls.__name__}.objectFromHDF5Entity entity: {type(entity).__name__}")
         if entity in cache:
             return cache[entity]
         
         attrs = h5io.attrs2dict(entity.attrs)
-        print(f"objectFromHDF5Entity attrs = {attrs}")
+        # print(f"objectFromHDF5Entity attrs = {attrs}")
         
         epochNumber = attrs.get("epochNumber", None)
-        epochType = attrs.get("epochType", ABFEpochType.Unknown)
+        epochType = attrs.get("type", ABFEpochType.Unknown)
+        if isinstance(epochType, np.int64):
+            epochType = int(epochType)
+            
+        if isinstance(epochType, int):
+            if epochType not in (ABFEpochType.values()):
+                epochType = ABFEpochType.Unknown
+            else:
+                epochType = ABFEpochType(epochType)
+                
         firstLevel = attrs.get("firstLevel",None)
         deltaLevel = attrs.get("deltaLevel", None)
         firstDuration = attrs.get("firstDuration", None)
@@ -630,21 +647,13 @@ class ABFEpoch:
         deltaDuration = attrs.get("deltaDuration", None)
         if deltaDuration is None:
             deltaDuration = 0*pq.ms
-        mainDigitalPattern = attrs.get("mainDigitalPattern", None)
-        if isinstance(mainDigitalPattern, list) and len(mainDigitalPattern) == 2:
-            if all(isinstance(b, (tuple, list)) and all(isinstance(v, int) for v in b) for b in mainDigitalPattern):
-                mainDigitalPattern = tuple(tuple(b) for b in mainDigitalPattern)
-        alternateDigitalPattern = attrs.get("alernateDigitalPattern", None)
-        if isinstance(alternateDigitalPattern, list) and len(alternateDigitalPattern) == 2:
-            if all(isinstance(b, (tuple, list)) and all(isinstance(v, int) for v in b) for b in alternateDigitalPattern):
-                alternateDigitalPattern = tuple(tuple(b) for b in alternateDigitalPattern)
+        mainDigitalPattern = cls._check_dig_pattern_args_(attrs.get("mainDigitalPattern", None))
+        alternateDigitalPattern = cls._check_dig_pattern_args_ (attrs.get("alternateDigitalPattern", None))
         useAltPattern = attrs.get("useAltPattern", None)
         altDIGOutState = attrs.get("altDIGOutState", None)
         pulsePeriod = attrs.get("pulsePeriod", None)
         pulseWidth = attrs.get("pulseWidth", None)
         dacNum = attrs.get("dacNum", None)
-        
-        
         
         return cls(epochNumber, epochType, firstLevel, deltaLevel, 
                    firstDuration, deltaDuration, 
@@ -823,7 +832,7 @@ class ABFEpoch:
     def mainDigitalPattern(self, val:tuple):
         # TODO: 2023-09-14 15:55:11
         # check the argument
-        self._mainDigitalPattern_ = val
+        self._mainDigitalPattern_ = self._check_dig_pattern_args_(val)
         
     @property
     def useAltPattern(self) -> bool:
@@ -849,7 +858,7 @@ class ABFEpoch:
     def alternateDigitalPattern(self, val:tuple):
         # TODO: 2023-09-14 15:55:58
         # check the argument
-        self._alternateDigitalPattern_ = val
+        self._alternateDigitalPattern_ = self._check_dig_pattern_args_(val)
         
     def getDigitalPattern(self, alternate:bool=False) -> tuple:
         return self.alternateDigitalPattern if alternate else self.mainDigitalPattern
@@ -2301,9 +2310,11 @@ class ABFInputConfiguration:
         the ABF.
 
     """
-    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block],
+    def __init__(self, obj: typing.Optional[typing.Union[pyabf.ABF, neo.Block]],
                  protocol:typing.Optional[ABFProtocol] = None,
-                 adcChannel:int = 0, physical:bool=False):
+                 adcChannel:int = 0, physical:bool=False,
+                 name:str = None,
+                 units:typing.Optional[typing.Union[pq.Quantity, str]] = None):
         """
         obj: ABF object or neo.Block; both must be read from an ABF file
         adcChannel: logical or physical index of the channel sought (0 -> max ADC channels available)
@@ -2345,6 +2356,12 @@ class ABFInputConfiguration:
 
         assert self._protocol_._sourceHash_ == hash(obj) and self._protocol_._sourceId_ == id(obj), f"The source {type(obj).__name__} object does not appear linked to the supplied protocol"
 
+        adcName = ""
+        
+        adcUnits = None
+        self._adcChannel_ = None
+        self._physicalChannelIndex_ = None
+        
         if isinstance(obj, pyabf.ABF):
             abfVer = obj.abfVersion["major"]
             if abfVer == 1:
@@ -2381,6 +2398,9 @@ class ABFInputConfiguration:
             else:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
 
+            self._adcName_ = adcName
+            self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
+
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
 
@@ -2404,10 +2424,97 @@ class ABFInputConfiguration:
                     self._physicalChannelIndex_ = obj.annotations["listADCInfo"][adcChannel]["nADCNum"]
                     adcName = obj.annotations["listADCInfo"][adcChannel]["ADCChNames"].decode()
                     adcUnits = obj.annotations["listADCInfo"][adcChannel]["ADCChUnits"].decode()
+                    
+            self._adcName_ = adcName
+            self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
 
-        self._adcName_ = adcName
-        self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
+        else:
+            self._physicalChannelIndex_ = self._adcChannel_ = adcChannel
+            if isinstance(name, str) and len(name.strip()):
+                adcName = name
+                
+            else:
+                adcName = f"ADC_{self._physicalChannelIndex_}"
+            
+            if isinstance(units, str) and len(units.strip()):
+                self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(units)
+                
+            elif isinstance(units, pq.Quantity):
+                self._adcUnits_ = units
+            else:
+                self._adcUnits_ = pq.dimensionless
+                
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        """Encodes this ABFInputConfiguration as a HDF5 Group.
+        """
         
+        # NOTE: 2024-07-18 15:10:22
+        # I choose a Group here, and not a Dataset, so that we can store the 
+        # parent protocol as a soft link.
+        #
+        # The other reason is to have some kind of similarity to / symmetry with
+        # ABFOutputConfiguration which is also encoded as HDF5 Group (because of 
+        # the Epochs list)
+        #
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        
+        attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
+                            inspect.getmembers_static(self, inspect.isdatadescriptor)))
+        
+        protocol_attr = attrs.pop("protocol", None)
+        
+        objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
+        obj_attrs.update(objattrs)
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        entity = group.create_group(name, track_order = track_order)
+        entity.attrs.update(obj_attrs)
+            
+        if isinstance(protocol_attr, ABFProtocol):
+            # NOTE: 2024-07-18 14:57:47 Steps:
+            # 1) this DAC is in a member of the parent protocol DACs list;
+            # 2) that list is encoded as a hdf5 Group, and this must be indicated as
+            #   such, in the group's attributes;
+            # 3) furthermore, the encoded list is a member of a hdf5 Group which
+            #   encodes the ABFProtocol → an ABF protocol can only be encoded as
+            #   a hdf5 Group, because the hdf5 Goup is the only hdf5 entity that
+            #   may contain children entities,
+            # 
+            
+            # NOTE: 2024-07-18 15:05:34 check steps (1 & 2) from NOTE: 2024-07-18 14:57:47
+            #
+            # group_attrs = h5io.attrs2dict(group.attrs)
+            # group_obj_class = group_attrs.get("type_name", None)
+            
+            # Not sure the above can be done directly:
+            # group_obj_class = group.attrs.get("type_name", None)
+            # if group_obj_class == "list":
+            group_obj_class = group.attrs.get("python.class", None)
+            if group_obj_class == "builtins.list":
+                # NOTE: 2024-07-18 15:05:53
+                # check step (2) from NOTE: 2024-07-18 14:57:47
+                parent = group.parent   # by definition in HDF5, this is also a Group
+                                        # and its attributes must indicate it is an
+                                        # ABFProtocol
+                
+                # NOTE: 2024-07-18 15:16:06
+                # check step (3) from NOTE: 2024-07-18 14:57:47
+                parent_obj_class = parent.attrs.get("type_name", None)
+                if parent_obj_class == "ABFProtocol":
+                    entity["protocol"] = parent # soft link here
+                
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
@@ -2427,6 +2534,10 @@ class ABFInputConfiguration:
     def logicalIndex(self) -> int:
         return self._adcChannel_
     
+    @logicalIndex.setter
+    def logicalIndex(self, val:int):
+        self._adcChannel_ = val
+    
     @property
     def number(self) -> int:
         """Alias to self.logicalIndex"""
@@ -2435,6 +2546,10 @@ class ABFInputConfiguration:
     @property
     def physicalIndex(self) -> int:
         return self._physicalChannelIndex_
+    
+    @physicalIndex.setter
+    def physicalIndex(self, val:int):
+        self._physicalChannelIndex_ = val
     
     @property
     def physical(self) -> int:
@@ -2445,6 +2560,10 @@ class ABFInputConfiguration:
     def name(self) -> str:
         return self._adcName_
     
+    @name.setter
+    def name(self, val:str):
+        self._adcName_ = val
+    
     @property
     def adcName(self)->str:
         """Alias to self.name for backward compatibility"""
@@ -2453,6 +2572,10 @@ class ABFInputConfiguration:
     @property
     def units(self) -> pq.Quantity:
         return self._adcUnits_
+    
+    @units.setter
+    def units(self. val:pq.Quantity):
+        self._adcUnits_ = val
 
     @property
     def adcUnits(self) -> pq.Quantity:
@@ -2461,6 +2584,17 @@ class ABFInputConfiguration:
     @property
     def protocol(self) -> ABFProtocol:
         return self._protocol_
+    
+    @protocol.setter(self, val:ABFProtocol):
+        if isinstance(val, ABFProtocol):
+            self._protocol_ = val
+            
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Dataset, attrs:dict, cache:dict = {}):
+        if entity in cache:
+            return cache[entity]
+        
+        
 
 class ABFOutputConfiguration:
     """Configuration of a DAC channel and digital outputs in pClamp/Clampex ABF files.
@@ -2535,9 +2669,16 @@ class ABFOutputConfiguration:
     # there are the following possibilities:
     # Alt waveform  | Alt Dig | DAC waveform enabled | DAC Digital output enabled
     #----------------------------------------------------------------------------
-    def __init__(self, obj:typing.Union[pyabf.ABF, neo.Block],
+    def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None,
                  protocol:typing.Optional[ABFProtocol] = None,
-                 dacChannel:int = 0, physical:bool=False):
+                 dacChannel:int = 0, physical:bool=False, name: typing.Optional[str] = None,
+                 units: typing.Optional[typing.Union[str, pq.Quantity]],
+                 dacHoldingLevel:typing.Optional[typing.Union[float,pq.Quantity]] = None,
+                 interEpisodeLevel:bool = True,
+                 waveFormEnabled:bool=False,
+                 waveFormSource:typing.Optional[typing.Union[ABFDACWaveformSource, int]] = None,
+                 epochs:typing.Optional[typing.Sequence[ABFEpoch]] = None
+                 ):
         
         if protocol is None:
             protocol = ABFProtocol(obj)
@@ -2548,6 +2689,8 @@ class ABFOutputConfiguration:
         self._protocol_ = protocol
         
         assert self._protocol_._sourceHash_ == hash(obj) and self._protocol_._sourceId_ == id(obj), f"The source {type(obj).__name__} object does not appear linked to the supplied protocol"
+        
+        self._epochs_ = list()
         
         if isinstance(obj, pyabf.ABF):
             abfVer = obj.abfVersion["major"]
@@ -2592,7 +2735,7 @@ class ABFOutputConfiguration:
                 
                 wsrc = obj._dacSection.nWaveformSource[self._dacChannel_]
                 
-                if wsrc in range(3):
+                if wsrc in ABFDACWaveformSource.values():
                     self._waveformSource_ = ABFDACWaveformSource.type(wsrc)
                 else:
                     self._waveformSource_ = ABFDACWaveformSource.none
@@ -2603,6 +2746,8 @@ class ABFOutputConfiguration:
                 # self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
             else:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
+            
+            self._init_epochs_(obj)
             
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
@@ -2641,12 +2786,18 @@ class ABFOutputConfiguration:
             self._dacHoldingLevel_ = float(obj.annotations["listDACInfo"][self._dacChannel_]["fDACHoldingLevel"]) * self._dacUnits_
             self._interEpisodeLevel_ = bool(obj.annotations["listDACInfo"][self._dacChannel_]["nInterEpisodeLevel"])
             
+            if np.abs(self._dacHoldingLevel_).magnitude > 1e6:
+                self._dacHoldingLevel_ = np.nan * self._dacUnits_
+                
+            elif np.abs(self._dacHoldingLevel_).magnitude > 0 and np.abs(self._dacHoldingLevel_).magnitude < 1e-6:
+                self._dacHoldingLevel_ = 0.0 * self._dacUnits_
+            
             # command (analog) waveform flags:
             self._waveformEnabled_ = bool(obj.annotations["listDACInfo"][self._dacChannel_]["nWaveformEnable"])
             
             wsrc = obj.annotations["listDACInfo"][self._dacChannel_]["nWaveformSource"]
             
-            if wsrc in range(3):
+            if wsrc in ABFDACWaveformSource.values():
                 self._waveformSource_ = ABFDACWaveformSource.type(wsrc)
             else:
                 self._waveformSource_ = ABFDACWaveformSource.none
@@ -2656,21 +2807,60 @@ class ABFOutputConfiguration:
             # not sure this is the correct approach
             # self._digOutEnabled_ = self._dacChannel_ == self.protocol.activeDACChannelIndex
             
+            self._init_epochs_(obj)
+            
         else:
-            raise TypeError(f"Expecting an ABF or a neo.Block sourced from an ABF file; instead, got {type(obj).__name__}")
-    
-        if np.abs(self._dacHoldingLevel_).magnitude > 1e6:
-            self._dacHoldingLevel_ = np.nan * self.units
+            self._physicalChannelIndex_ = self._dacChannel_ = dacChannel
+            if isinstance(name, str) and len(name.strip()):
+                self._dacName_ = name
+            else:
+                self._dacName_ = f"DAC_{self._physicalChannelIndex_}"
+                
+            if isinstance(units, pq.Quantity):
+                self._dacUnits_ = units
+                
+            elif isintance(units, str):
+                self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(units)
+                
+            else:
+                self._dacUnits_ = pq.dimensionless
+
+            if isinstance(dacHoldingLevel, pq.Quantity):
+                if not scq.units_convertible(dacHoldingLevel, self._dacUnits_):
+                    raise TypeError(f"'dacHoldingLevel' has wrong units ({dacHoldingLevel.units}) for a DAC output in {self._dacUnits_}")
+                dacHoldingLevel = dacHoldingLeveL.rescale(self._dacUnits_)
+                
+                if np.abs(dacHoldingLevel).magnitude > 1e6:
+                    self._dacHoldingLevel_ = np.nan * self._dacUnits_
+                elif np.abs(dacHoldingLevel).magnitude > 0 and np.abs(dacHoldingLevel).magnitude < 1e-6:
+                    self._dacHoldingLevel_ = 0.0 * self._dacUnits_
+                else:
+                    self._dacHoldingLevel_ = dacHoldingLevel
+                    
+            elif isinstance(dacHoldingLevel, float):
+                if np.abs(dacHoldingLevel) > 1e6:
+                    self._dacHoldingLevel_ = np.nan * self._dacUnits_
+                elif np.abs(dacHoldingLevel)> 0 and np.abs(dacHoldingLevel) < 1e-6:
+                    self._dacHoldingLevel_ = 0.0 * self._dacUnits_
+                else:
+                    self._dacHoldingLevel_ = dacHoldingLevel
+                    
+            self._interEpisodeLevel_ = interEpisodeLevel
             
-        elif np.abs(self._dacHoldingLevel_).magnitude > 0 and np.abs(self._dacHoldingLevel_).magnitude < 1e-6:
-            self._dacHoldingLevel_ = 0.0 * self.units
+            self._waveformEnabled_ = waveFormEnabled
+            if isinstance(waveFormSource, int) and waveFormSource in ABFDACWaveformSource.values():
+                self._waveformSource_ = ABFDACWaveformSource(waveFormSource)
+                
+            elif isinstance(waveFormSource, ABFDACWaveformSource):
+                self._waveformSource_ = waveFormSource
+                
+            else:
+                self._waveformSource_ = ABFDACWaveformSource.none
+                
+            if isinstance(epochs, (tuple, list)) and all(isinstance(e, ABFEpoch) for e in epochs):
+                self._epochs_ = epochs
+                
             
-        self._epochs_ = list()
-        
-        self._init_epochs_(obj)
-        
-        # self._digitalOutputs_ = set(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels() for e in self.epochs]))
-        
     def __repr__(self):
         # ret = f"{self.__class__.__name__} ({super().__repr__()}) with units: \'{self.units.symbol}\' and name: \'{self.name}\', at physical (logical) index: {self.physicalIndex} ({self.logicalIndex}) "
         ret = f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{self.units.symbol}\') at index {self.physicalIndex} ↔ {self.logicalIndex}  (physical ↔ logical)"
@@ -2819,7 +3009,52 @@ class ABFOutputConfiguration:
         #     ret = all(np.all(self.getEpochsTable(s) == other.getEpochsTable(s)) for s in range(self.protocol.nSweeps))
                     
         return ret
+    
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> hdf5.Group:
+        """Encodes this ABFOutputConfiguration as a HDF5 Group"""
         
+        # NOTE: 2024-07-18 16:01:14
+        # I chose Group because we need to store a link to the parent protocol
+        # and a Group encoding the list of ABFEpoch objects (the "epochs" attribute)
+        
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        
+        attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
+                            inspect.getmembers_static(self, inspect.isdatadescriptor)))
+        
+        protocol_attr = attrs.pop("protocol", None)
+        
+        objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
+        obj_attrs.update(objattrs)
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        entity = group.create_group(name, track_order = track_order)
+        entity.attrs.update(obj_attrs)
+            
+        if isinstance(protocol_attr, ABFProtocol):
+            # NOTE: 2024-07-18 16:03:58
+            # see NOTE: 2024-07-18 14:57:47
+            group_obj_class = group.attrs.get("python.class", None)
+            if group_obj_class == "builtins.list":
+                parent = group.parent   # by definition in HDF5, this is also a Group
+                                        # and its attributes must indicate it is an
+                                        # ABFProtocol
+                parent_obj_class = parent.attrs.get("type_name", None)
+                if parent_obj_class == "ABFProtocol":
+                    entity["protocol"] = parent # soft link here
+                
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+
     def is_identical_except_digital(self, other):
         if not isinstance(other, self.__class__):
             return False
@@ -2874,6 +3109,11 @@ class ABFOutputConfiguration:
     def epochs(self) -> list:
         """List of ABFEpoch objects defined for this DAC channel"""
         return self._epochs_
+    
+    @epochs.setter
+    def epochs(self, val:typing.Sequence[ABFEpoch]):
+        if isinstance(val, (tuple, list)) and all(isinstance(v, ABFEpoch) for v in val):
+            self._epochs_[:] = val[:]
     
     def getEpochsWithDigitalOutput(self) -> typing.List[ABFEpoch]:
         """List of ABF Epochs emitting digital signals (TTLs)"""
@@ -4030,9 +4270,22 @@ class ABFOutputConfiguration:
     def analogWaveformEnabled(self) -> bool:
         return self._waveformEnabled_
     
+    @analogWaveformEnabled.setter
+    def analogWaveformEnabled(self, val:bool):
+        self._waveformEnabled_ = val == True
+    
     @property
     def analogWaveformSource(self) -> ABFDACWaveformSource:
         return self._waveformSource_
+    
+    @analogWaveformSource.setter
+    def analogWaveformSource(self, val:typing.Union[int, ABFDACWaveformSource]):
+        if isinstance(val) and val in ABFDACWaveformSource.values():
+            self._waveformSource_ = ABFDACWaveformSource(val)
+        elif isinstance(val, ABFDACWaveformSource):
+            self._waveformSource_ = val
+        else:
+            self._waveformSource_ = ABFDACWaveformSource.none
     
     # @property
     # def isactiveDACChannel(self) -> bool:
@@ -4073,8 +4326,12 @@ class ABFOutputConfiguration:
         return self._dacChannel_
     
     @property
-    def physicalIndex(self):
+    def physicalIndex(self) -> int:
         return self._physicalChannelIndex_
+    
+    @physicalIndex.setter
+    def physicalIndex(self, val:int):
+        self._physicalIndex_ = val
     
     @property
     def number(self) -> int:
@@ -4089,6 +4346,11 @@ class ABFOutputConfiguration:
     def name(self) -> str:
         return self._dacName_
     
+    @name.setter
+    def name(self, val:str):
+        if isinstance(val, str):
+            self._dacName_ = val
+    
     @property
     def dacName(self)->str:
         """Alias to self.name for backward compatibility"""
@@ -4097,6 +4359,10 @@ class ABFOutputConfiguration:
     @property
     def units(self) -> pq.Quantity:
         return self._dacUnits_
+    
+    @units.setter
+    def units(self, val:pq.Quantity):
+        self._dacUnits_ = val
     
     @property
     def dacUnits(self) -> pq.Quantity:

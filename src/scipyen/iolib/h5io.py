@@ -153,7 +153,7 @@ from core.datatypes import (TypeEnum,UnitTypes, GENOTYPES,
 
 from core.modelfitting import (FitModel, ModelExpression,)
 # from core.triggerevent import (TriggerEvent, TriggerEventType,) # already done above
-from core.triggerprotocols import TriggerProtocol
+# from core.triggerprotocols import TriggerProtocol
 from core.utilities import (gethash, unique)
 from core.strutils import (str2symbol, str2float, numbers2str, get_int_sfx,)
 from core import modelfitting
@@ -1654,7 +1654,8 @@ def makeObjAttrs(obj:typing.Any, oname:typing.Optional[str]=None):
 @singledispatch
 def makeDatasetAttrs(obj):
     """Generates an attribute dict for HDF5 datasets.
-    
+    Only to be used for hdf5 Datasets that actually store data (that is, 
+    numeric arrays)
     """
     if isinstance(obj, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
         # NOTE: 2021-11-18 12:31:59
@@ -2335,11 +2336,17 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,
     """
     from imaging import vigrautils as vu
 
+    # NOTE: 2024-07-18 14:00:22
+    # 1. check if the data type defines an instance method 'makeHDF5Entity'; 
     entity_factory_method = getattr(obj, "makeHDF5Entity", None)
     
+    # 2. check if a custom-made makeHDF5Entity function is passed here (this
+    # will override the instance method above, if defined)
     if entity_factory_method is None:
         entity_factory_method = kwargs.pop("makeHDF5Entity", None)
         
+    # 3. a makeHDF5Entity method or function is available from (1) or (2) above
+    #   → use it 
     if inspect.ismethod(entity_factory_method):
         target_name, obj_attrs = makeObjAttrs(obj, oname=oname)
             
@@ -2352,7 +2359,10 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,
             group[target_name] = cached_entity
             return cached_entity
         
-        return entity_factory_method(group, name, oname, compression,chunks,track_order,entity_cache)
+        # call either the makeHDF5Entity method of the object;s class, or the 
+        # custom (3rd party£makeHDF5Entity), if it exists
+        return entity_factory_method(group, name, oname, compression, chunks,
+                                     track_order, entity_cache)
 
     if not isinstance(group, h5py.Group):
         raise TypeError(f"'group' expected to be a h5py.Group (or h5py.File); got {type(group).__name__} instead")
@@ -2569,14 +2579,6 @@ def makeHDF5Entity(obj, group:h5py.Group,name:typing.Optional[str]=None,
         
         return entity
     
-#     elif isinstance(obj, pab.ABFProtocol):
-#         cached_entity = getCachedEntity(entity_cache, obj)
-#         if isinstance(cached_entity, h5py.Dataset):
-#             group[target_name] = cached_entity
-#             return cached_entity
-#         
-#         entity = group.create_group(target_name)
-        
     elif isinstance(obj, Schedule):
         pass
         cached_entity = getCachedEntity(entity_cache, obj)
