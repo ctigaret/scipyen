@@ -559,19 +559,6 @@ class ABFEpoch:
                  pulsePeriod: pq.Quantity = np.nan * pq.ms,
                  pulseWidth: pq.Quantity = np.nan * pq.ms,
                  dacNum: int = -1):
-        # self._epochNumber_ = -1
-        # self._epochType_ = ABFEpochType.Unknown
-        # self._level_ = None # -1 * pq.dimensionless
-        # self._levelDelta_ = None # -1 * pq.dimensionless
-        # self._duration_ = 0 * pq.ms
-        # self._durationDelta_ = 0 * pq.ms
-        # self._mainDigitalPattern_ = (tuple(), tuple())
-        # self._alternateDigitalPattern_ = (tuple(), tuple())
-        # self._useAltPattern_ = False
-        # self._altDIGOutState_ = False
-        # self._pulsePeriod_ = np.nan * pq.ms
-        # self._pulseWidth_ = np.nan * pq.ms
-        # self._dacNum_ = -1
         self._epochNumber_ = epochNumber
         self._epochType_ = epochType
         self._level_ = level # -1 * pq.dimensionless
@@ -588,6 +575,14 @@ class ABFEpoch:
         
     @classmethod
     def _check_dig_pattern_args_(cls, val):
+        if isinstance(val, str):
+            # eval it then keep fingers crossed
+            try:
+                val = eval(val)
+            except:
+                traceback.print_exc()
+                return (tuple(), tuple())
+                
         if isinstance(val, (tuple, list)) and all(isinstance(x, (tuple, list)) and all(isinstance(v, (int, str)) for v in x) for x in val):
             return tuple(tuple(x) for x in val)
 
@@ -595,13 +590,13 @@ class ABFEpoch:
         
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
+        # print(f"{self.__class__.__name__}.makeHDF5Entity: group = {group}, name = {name}, oname = {oname}")
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
-        # if isinstance(cached_entity, h5py.Group):
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         # TODO: 2024-07-17 15:49:20
         # parse relevant ABFEpoch attributes into obj_attrs
         # make sure you take h5io.objectFromHDF5Entity into account
@@ -611,8 +606,8 @@ class ABFEpoch:
         
         objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
         obj_attrs.update(objattrs)
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
+        # if isinstance(name, str) and len(name.strip()):
+        #     target_name = name
             
         entity = group.create_dataset(name, data = h5py.Empty("f"), track_order = track_order)
         entity.attrs.update(obj_attrs)
@@ -627,9 +622,9 @@ class ABFEpoch:
         if entity in cache:
             return cache[entity]
         
-        if attrs is None:
-            attrs = h5io.attrs2dict(entity.attrs)
-        # print(f"objectFromHDF5Entity attrs = {attrs}")
+        # if attrs is None:
+        attrs = h5io.attrs2dict(entity.attrs)
+        # print(f"\tattrs = {attrs}")
         
         epochNumber = attrs.get("epochNumber", None)
         epochType = attrs.get("type", ABFEpochType.Unknown)
@@ -650,8 +645,18 @@ class ABFEpoch:
         deltaDuration = attrs.get("deltaDuration", None)
         if deltaDuration is None:
             deltaDuration = 0*pq.ms
-        mainDigitalPattern = cls._check_dig_pattern_args_(attrs.get("mainDigitalPattern", None))
-        alternateDigitalPattern = cls._check_dig_pattern_args_ (attrs.get("alternateDigitalPattern", None))
+            
+        # BUG 2024-07-19 23:25:20 
+        # reconstitution of the digital patterns from json doesn't work well
+        # they're stored as strings so we need to eval them
+        #
+        # NOTE: 2024-07-19 23:35:19 fixed in class method _check_dig_pattern_args_(…)
+        
+        mainDigitalPattern = cls._check_dig_pattern_args_(attrs["mainDigitalPattern"])
+        # print(f"\tmainDigitalPattern = {mainDigitalPattern} ({type(mainDigitalPattern).__name__})")
+        
+        alternateDigitalPattern = cls._check_dig_pattern_args_(attrs["alternateDigitalPattern"])
+        # print(f"\talternateDigitalPattern = {alternateDigitalPattern} ({type(alternateDigitalPattern).__name__})")
         useAltPattern = attrs.get("useAltPattern", None)
         altDIGOutState = attrs.get("altDIGOutState", None)
         pulsePeriod = attrs.get("pulsePeriod", None)
@@ -1271,10 +1276,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 
         else:
             if len(kwargs) == 0:
-                raise TypeError(f"A source pyabf.ABF or neo.Block object was not aspecified; instead, got {type(obj).__name__}; in addition no other parameters were given, therefore cannot initialize a {self.__class__.__name__} object")
+                raise TypeError(f"A source pyabf.ABF or neo.Block object was not specified; instead, got {type(obj).__name__}; in addition, no other parameters were given, therefore cannot initialize a {self.__class__.__name__} object")
             
-            adcChannels = kwargs.get("ADCs", list())
-            dacChannels = kwargs.get("DACs", list())
+            adcChannels = kwargs.get("inputs", list())
+            dacChannels = kwargs.get("outputs", list())
             self._nADCChannels_ = len(adcChannels)
             self._nDACChannels_ = len(dacChannels)
             self._activeDACChannel_ = kwargs.get("activeDACChannel", 0)
@@ -1303,15 +1308,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._nDataPointsPerSweep_ = kwargs.get("nDataPointsPerSweep", 0)
             self._samplingRate_ = kwargs.get("samplingRate", 0* pq.Hz)
             self._sweepInterval_ = kwargs.get("sweepInterval", 0*pq.s)
-            self._averaging_ = kwargs.get("averging", ABFAveragingMode.cumulative)
+            averaging = kwargs.get("averaging", ABFAveragingMode.cumulative)
+            if isinstance(averaging, int) and averaging in ABFAveragingMode.values():
+                self._averaging_ = ABFAveragingMode(averaging)
+            elif isinstance(averaging, ABFAveragingMode):
+                self._averaging_ = averaging
+            else:
+                self._averaging_ = ABFAveragingMode.cumulative
             self._averageWeighting_ = kwargs.get("averageWeighting", 1.0)
-            self._protocolFile_ = kwargs.get("profocolFile", MISSING)
+            self._protocolFile_ = kwargs.get("protocolFile", MISSING)
             self._sourceHash_ = kwargs.get("sourceHash", MISSING)
             self._sourceId_ = kwargs.get("sourceID", MISSING)
             self._fileOrigin_ = kwargs.get("fileOrigin", MISSING)
             
             self._inputs_ = [i for i in kwargs.get("inputs", list()) if isinstance(i, ABFInputConfiguration)]
-            self._outputs_ = [i for i in kwargs.get("output", list()) if isinstance(i, ABFOutputConfiguration)]
+            self._outputs_ = [i for i in kwargs.get("outputs", list()) if isinstance(i, ABFOutputConfiguration)]
         
         # NOTE: 2024-07-19 13:43:00
         # All attributes below are calculated from what h been set up so far
@@ -1404,13 +1415,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
                        entity_cache) -> h5py.Group:
         """Encodes this ABFProtocol as a HDF5 Group"""
         
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        # print(f"{self.__class__.__name__}.makeHDF5Entity: group = {group}, name = {name}, oname = {oname}")
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        # print(f"\ttarget_name = {target_name}")
+        # print(f"\tobj_attrs {obj_attrs}")
         
+        
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         
         attrs = dict()
         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
@@ -1429,14 +1444,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
             attrs[arg] = getattr(self, n)
             
         objattrs = h5io.makeAttrDict(**attrs)
+
         obj_attrs.update(objattrs)
+        # objattrs = h5io.makeAttrDict(**obj_attrs)
+        
+        # print(f"{self.__class__.__name__}.makeHDF5Entity:")
+        # print(f"\tobj_attrs: {obj_attrs}")
+        # print(f"\tobjattrs: {objattrs}")
         
         inputs = self._inputs_
         outputs = self._outputs_
         
-        entity_name = name if (isinstance(name, str) and len(name.strip())) else oname if (isinstance(oname, str) and len(oname.strip())) else strutils.str2symbol(self.name)
+        # entity_name = name if (isinstance(name, str) and len(name.strip())) else oname if (isinstance(oname, str) and len(oname.strip())) else strutils.str2symbol(self.name)
         
-        entity = group.create_group(entity_name, track_order = track_order)
+        entity = group.create_group(target_name, track_order = track_order)
         entity.attrs.update(obj_attrs)
         
         inputs_group = h5io.makeHDF5Entity(inputs, entity, name="inputs",
@@ -1469,6 +1490,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if attrs is None:
             attrs = h5io.attrs2dict(entity.attrs)
             
+        # print(f"{cls.__name__}.objectFromHDF5Entity:")
+        # print(f"\tattrs: {attrs}")
+            
         kargs = dict()
             
         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
@@ -1485,8 +1509,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
             arg = n.strip("_")
             kargs[arg] = attrs[arg]
             
+        # print(f"\tentity/inputs = {entity['inputs']}")
+        # print(f"\tentity/outputs = {entity['outputs']}")
+            
         kargs["inputs"] = h5io.objectFromHDF5Entity(entity["inputs"])
         kargs["outputs"] = h5io.objectFromHDF5Entity(entity["outputs"])
+        
+        # print(f"inputs: {kargs['inputs']}")
+        # print(f"outputs: {kargs['outputs']}")
         
         # print(f"kargs: {kargs}")
         
@@ -2617,6 +2647,7 @@ class ABFInputConfiguration:
         """Encodes this ABFInputConfiguration as a HDF5 Group.
         """
         
+        # print(f"{self.__class__.__name__}.makeHDF5Entity: group = {group}, name = {name}, oname = {oname}")
         # NOTE: 2024-07-18 15:10:22
         # I choose a Group here, and not a Dataset, so that we can store the 
         # parent protocol as a soft link.
@@ -2625,12 +2656,15 @@ class ABFInputConfiguration:
         # ABFOutputConfiguration which is also encoded as HDF5 Group (because of 
         # the Epochs list)
         #
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        # print(f"\ttarget_name = {target_name}")
+        # print(f"\tobj_attrs {obj_attrs}")
+        
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         
         attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
                             inspect.getmembers_static(self, inspect.isdatadescriptor)))
@@ -2645,10 +2679,10 @@ class ABFInputConfiguration:
         
         objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
         obj_attrs.update(objattrs)
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
+        # if isinstance(name, str) and len(name.strip()):
+        #     target_name = name
             
-        entity = group.create_group(name, track_order = track_order)
+        entity = group.create_group(target_name, track_order = track_order)
         entity.attrs.update(obj_attrs)
             
         if isinstance(protocol_attr, tuple) and protocol_attr[0] == "protocol":
@@ -2859,7 +2893,9 @@ class ABFOutputConfiguration:
     #----------------------------------------------------------------------------
     def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None,
                  protocol:typing.Optional[ABFProtocol] = None,
-                 dacChannel:int = 0, physical:bool=False, name: typing.Optional[str] = None,
+                 dacChannel:int = 0, 
+                 physical:bool=False, 
+                 name: typing.Optional[str] = None,
                  units: typing.Optional[typing.Union[str, pq.Quantity]]=pq.dimensionless,
                  dacHoldingLevel:typing.Optional[typing.Union[float,pq.Quantity]] = None,
                  interEpisodeLevel:bool = True,
@@ -3213,12 +3249,18 @@ class ABFOutputConfiguration:
         # I chose Group because we need to store a link to the parent protocol
         # and a Group encoding the list of ABFEpoch objects (the "epochs" attribute)
         
+        # print(f"{self.__class__.__name__}.makeHDF5Entity: group = {group}, name = {name}, oname = {oname}")
+        
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        # print(f"\ttarget_name = {target_name}")
+        # print(f"\tobj_attrs {obj_attrs}")
+        
+        
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         
         attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
                             inspect.getmembers_static(self, inspect.isdatadescriptor)))
@@ -3240,10 +3282,10 @@ class ABFOutputConfiguration:
         
         objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
         obj_attrs.update(objattrs)
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
+        # if isinstance(name, str) and len(name.strip()):
+        #     target_name = name
             
-        entity = group.create_group(name, track_order = track_order)
+        entity = group.create_group(target_name, track_order = track_order)
         entity.attrs.update(obj_attrs)
             
         if isinstance(protocol_attr, tuple) and protocol_attr[0] == "protocol":
@@ -3299,14 +3341,11 @@ class ABFOutputConfiguration:
         
         epochs = h5io.objectFromHDF5Entity(entity["epochs"])
         
-        return cls(obj=None, protocol=None, dacChannel=dacChannel,units=units,
+        return cls(obj=None, protocol=None, dacChannel=dacChannel, units=units,
                    dacHoldingLevel=dacHoldingLevel, interEpisodeLevel=interEpisodeLevel,
                    waveFormEnabled=waveFormEnabled, waveFormSource=waveFormSource,
-                   epochs=epochs)
+                   epochs=epochs, name=name)
         
-        
-        
-
     def is_identical_except_digital(self, other):
         if not isinstance(other, self.__class__):
             return False
