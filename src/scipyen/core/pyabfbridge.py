@@ -667,8 +667,6 @@ class ABFEpoch:
                    firstDuration, deltaDuration, 
                    mainDigitalPattern, alternateDigitalPattern, useAltPattern, altDIGOutState,
                    pulsePeriod, pulseWidth, dacNum)
-      
-        
         
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({super().__repr__()}) Epoch {self.epochNumber} (\'{self.letter}\'), type: {self.epochType.name}"
