@@ -95,6 +95,7 @@ gitdb
 gnuplot_kernel
 graphviz
 h5py
+hdf5view
 huggingface-hub
 idna
 imageio

@@ -18,6 +18,7 @@ termcolor
 termcolor2
 pyserial
 pickleshare
+hdf5view
 
 #### OPTIONAL packages
 researchpy      # ✓ (pip install researchpy)

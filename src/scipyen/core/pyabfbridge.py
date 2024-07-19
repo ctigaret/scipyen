@@ -479,7 +479,7 @@ import numpy as np
 import pandas as pd
 import quantities as pq
 import neo
-import pyabf
+from dataclasses import MISSING
 
 from core import quantities as scq
 from core import datatypes, strutils, utilities
@@ -490,6 +490,7 @@ from core.prog import scipywarn
 # pictiio (pio); instead we import pio where it is needed i.e. in getABF()
 from ephys.ephys_protocol import ElectrophysiologyProtocol
 
+import pyabf
 from pyabf.abf1.headerV1 import HeaderV1
 from pyabf.abf2.headerV2 import HeaderV2
 from pyabf.abf2.section import Section
@@ -593,7 +594,7 @@ class ABFEpoch:
         return (tuple(), tuple())
         
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
-                       entity_cache) -> h5py.Dataaset:
+                       entity_cache) -> h5py.Dataset:
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         # if isinstance(cached_entity, h5py.Group):
         if isinstance(cached_entity, h5py.Dataset):
@@ -620,12 +621,14 @@ class ABFEpoch:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset, attrs:dict, cache:dict = {}):
+    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
         # print(f"{cls.__name__}.objectFromHDF5Entity entity: {type(entity).__name__}")
         if entity in cache:
             return cache[entity]
         
-        attrs = h5io.attrs2dict(entity.attrs)
+        if attrs is None:
+            attrs = h5io.attrs2dict(entity.attrs)
         # print(f"objectFromHDF5Entity attrs = {attrs}")
         
         epochNumber = attrs.get("epochNumber", None)
@@ -1130,13 +1133,20 @@ class ABFEpoch:
 #     pass                         # will be (properly) redefined further below
 
 class ABFProtocol(ElectrophysiologyProtocol):
+    # TODO 2024-07-19 13:19:40 FIXME URGENTLY
+    # implement code related to pyabf stimulusFilefolder & stimulusWaveformFromFile
+    # 
     from ephys.ephys import SynapticPathway
     from ephys.ephys import ClampMode
     
-    def __init__(self, obj:typing.Union[pyabf.ABF,neo.Block],
-                 generateOutputConfigs:bool=True,
-                 generateInputConfigs:bool=True):
+    # def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF,neo.Block]]=None,
+    #              generateOutputConfigs:bool=True,
+    #              generateInputConfigs:bool=True,
+    #              **kwargs):
+    def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF,neo.Block]]=None,
+                 **kwargs):
         super().__init__()
+        
         if isinstance(obj, pyabf.ABF):
             abfVer = obj.abfVersion["major"]
             if abfVer !=2:
@@ -1185,11 +1195,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             self._protocolFile_ = obj.protocolPath # store this for future reference
             
+            self._sourceHash_ = hash(obj)
+            self._sourceId_ = id(obj)
+            self._fileOrigin_ = obj.abfFilePath
             
+            self._inputs_ = [ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
+            self._outputs_ = [ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
+                
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
             if obj.annotations["lActualEpisodes"] != obj.annotations["protocol"]["lEpisodesPerRun"]:
-                scipywarn(f"In {obj.name}: Mismatch between lActualEpisodes ({obj.annotations['lActualEpisodes']}) and lEpisodesPerRun ({obj.annotations['protocol']['lEpisodesPerRun']})")
+                scipywarn(f"In {obj.name}: Mismatch betw    een lActualEpisodes ({obj.annotations['lActualEpisodes']}) and lEpisodesPerRun ({obj.annotations['protocol']['lEpisodesPerRun']})")
             
             # ### BEGIN ADC inputs information
             # NOTE: further info in self._inputs_
@@ -1246,27 +1262,72 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             self._protocolFile_ = obj.annotations["sProtocolPath"].decode()
 
+            self._sourceHash_ = hash(obj)
+            self._sourceId_ = id(obj)
+            self._fileOrigin_ = obj.file_origin
+        
+            self._inputs_ = [ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
+            self._outputs_ = [ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
+                
         else:
-            raise TypeError(f"Expecting a pyabf.ABF or a neo.Block; instead, got {type(obj).__name__}")
+            if len(kwargs) == 0:
+                raise TypeError(f"A source pyabf.ABF or neo.Block object was not aspecified; instead, got {type(obj).__name__}; in addition no other parameters were given, therefore cannot initialize a {self.__class__.__name__} object")
+            
+            adcChannels = kwargs.get("ADCs", list())
+            dacChannels = kwargs.get("DACs", list())
+            self._nADCChannels_ = len(adcChannels)
+            self._nDACChannels_ = len(dacChannels)
+            self._activeDACChannel_ = kwargs.get("activeDACChannel", 0)
+            self._hasAltDacOutState_ = kwargs.get("hasAltDacOutState", False)
+            
+            self._nDigitalOutputs_ = kwargs.get("nDigitalOutputs", 0)
+            self._nTotalDigitalOutputs_ = kwargs.get("nTotalDigitalOutputs", 0)
+            self._nSynchronizedDigitalOutputs_ = kwargs.get("nSynchronizedDigitalOutputs", 0)
+            self._hasAltDigOutState_ = kwargs.get("hasAltDigOutState", False)
+            self._digTrainActiveHi_ = kwargs.get("digTrainActiveHi", True)
+            self._digHolding_ = kwargs.get("digHolding", 0)
+            self._digHoldingValue_ = kwargs.get("digHoldingValue", list())
+            self._digUseLastEpochHolding_ = kwargs.get("digUseLastEpochHolding", False)
+            acqMode = kwargs.get("acquisitionMode", ABFAcquisitionMode.episodic_stimulation)
+            if isinstance(acqMode, int) and acqMode in ABFAcquisitionMode.values():
+                self._acquisitionMode_ = ABFAcquisitionMode(acqMode)
+            elif isinstance(acqMode, ABFAcquisitionMode):
+                self._acquisitionMode_ = acqMode
+            else:
+                self._acquisitionMode_ = ABFAcquisitionMode.episodic_stimulation
+                
+            self._nSweeps_ = kwargs.get("nSweeps", 0)
+            self._nRuns_ = kwargs.get("nRuns", 0)
+            self._nTrials_ = kwargs.get("nTrials", 0)
+            self._nTotalDataPoints_ = kwargs.get("nTotalDataPoints", 0)
+            self._nDataPointsPerSweep_ = kwargs.get("nDataPointsPerSweep", 0)
+            self._samplingRate_ = kwargs.get("samplingRate", 0* pq.Hz)
+            self._sweepInterval_ = kwargs.get("sweepInterval", 0*pq.s)
+            self._averaging_ = kwargs.get("averging", ABFAveragingMode.cumulative)
+            self._averageWeighting_ = kwargs.get("averageWeighting", 1.0)
+            self._protocolFile_ = kwargs.get("profocolFile", MISSING)
+            self._sourceHash_ = kwargs.get("sourceHash", MISSING)
+            self._sourceId_ = kwargs.get("sourceID", MISSING)
+            self._fileOrigin_ = kwargs.get("fileOrigin", MISSING)
+            
+            self._inputs_ = [i for i in kwargs.get("inputs", list()) if isinstance(i, ABFInputConfiguration)]
+            self._outputs_ = [i for i in kwargs.get("output", list()) if isinstance(i, ABFOutputConfiguration)]
+        
+        # NOTE: 2024-07-19 13:43:00
+        # All attributes below are calculated from what h been set up so far
+        #
         
         # since Clampex only runs on Windows, we simply split the string up:
-        self._name_ = pathlib.Path(self._protocolFile_.split("\\")[-1]).stem  # strip off the extension
-        
-        self._sourceHash_ = hash(obj)
-        self._sourceId_ = id(obj)
-        
+        if isinstance(self._protocolFile_, str) and len(self._protocolFile_.strip()):
+            self._name_ = pathlib.Path(self._protocolFile_.split("\\")[-1]).stem  # strip off the extension
         self._sweepDuration_ = (self._nDataPointsPerSweep_ / self._samplingRate_).rescale(pq.s)
         self._totalDuration_ = self._nSweeps_ * (self._sweepDuration_ if self._sweepInterval_ == 0*pq.s else self._sweepInterval_)
         if self._nSweeps_ > 1:
             self._totalDuration_ += self._sweepDuration_
             
         self._nAlternateDigitalOutputs = self._nTotalDigitalOutputs_ - self._nSynchronizedDigitalOutputs_
-        
         self._nDataPointsHolding_ = int(self._nDataPointsPerSweep_/64)
         
-        self._inputs_ = [ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
-        self._outputs_ = [ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
-            
     def __repr__(self):
         ret = [f"{self.__class__.__name__} ({super().__repr__()}) with:"]
         ret.append(f"{self.nADCChannels} ADCs:")
@@ -1338,6 +1399,107 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # ret = all(self.getADC(c) == other.getADC(c) for c in range(self.nADCChannels))
             
         return ret
+    
+    def makeHDF5Entity(self, group:h5py.Group, name:str, oname:str, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        """Encodes this ABFProtocol as a HDF5 Group"""
+        
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        
+        attrs = dict()
+        for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
+                  "_hasAltDacOutState_", "_hasAltDigOutState_",
+                  "_nDigitalOutputs_", "_nTotalDigitalOutputs_",
+                  "_nSynchronizedDigitalOutputs_", "_digTrainActiveHi_",
+                  "_digHolding_", "_digHoldingValue_","_digUseLastEpochHolding_",
+                  "_acquisitionMode_", "_nSweeps_", "_nRuns_", "_nTrials_",
+                  "_nTotalDataPoints_", "_nDataPointsPerSweep_",
+                  "_samplingRate_", "_sweepInterval_", 
+                  "_averaging_", "_averageWeighting_", 
+                  "_protocolFile_","_sourceHash_", "_sourceId_", "_fileOrigin_",
+                  ):
+            
+            arg = n.strip("_")
+            attrs[arg] = getattr(self, n)
+            
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        inputs = self._inputs_
+        outputs = self._outputs_
+        
+        entity_name = name if (isinstance(name, str) and len(name.strip())) else oname if (isinstance(oname, str) and len(oname.strip())) else strutils.str2symbol(self.name)
+        
+        entity = group.create_group(entity_name, track_order = track_order)
+        entity.attrs.update(obj_attrs)
+        
+        inputs_group = h5io.makeHDF5Entity(inputs, entity, name="inputs",
+                                           oname="ADCs", 
+                                           compression=compression,
+                                           chunks=chunks, 
+                                           track_order=track_order,
+                                           entity_cache=entity_cache,
+                                           )
+        
+        outputs_group = h5io.makeHDF5Entity(outputs, entity, name="outputs",
+                                            oname="DACs", 
+                                           compression=compression,
+                                           chunks=chunks, 
+                                           track_order=track_order,
+                                           entity_cache=entity_cache,
+                                           )
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        if entity in cache:
+            return cache[entity]
+        
+        if attrs is None:
+            attrs = h5io.attrs2dict(entity.attrs)
+            
+        kargs = dict()
+            
+        for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
+                  "_hasAltDacOutState_", "_hasAltDigOutState_",
+                  "_nDigitalOutputs_", "_nTotalDigitalOutputs_",
+                  "_nSynchronizedDigitalOutputs_", "_digTrainActiveHi_",
+                  "_digHolding_", "_digHoldingValue_","_digUseLastEpochHolding_",
+                  "_acquisitionMode_", "_nSweeps_", "_nRuns_", "_nTrials_",
+                  "_nTotalDataPoints_", "_nDataPointsPerSweep_",
+                  "_samplingRate_", "_sweepInterval_", 
+                  "_averaging_", "_averageWeighting_", 
+                  "_protocolFile_","_sourceHash_", "_sourceId_", "_fileOrigin_",
+                  ):
+            arg = n.strip("_")
+            kargs[arg] = attrs[arg]
+            
+        kargs["inputs"] = h5io.objectFromHDF5Entity(entity["inputs"])
+        kargs["outputs"] = h5io.objectFromHDF5Entity(entity["outputs"])
+        
+        # print(f"kargs: {kargs}")
+        
+        ret = cls(obj = None, **kargs)
+        
+        for i in ret.inputs:
+            i.protocol = ret
+            
+        for o in ret.outputs:
+            o.protocol = ret
+            
+        return ret
+            
     
     def is_identical_except_digital(self, other):
         if not isinstance(other, self.__class__):
@@ -2310,7 +2472,7 @@ class ABFInputConfiguration:
         the ABF.
 
     """
-    def __init__(self, obj: typing.Optional[typing.Union[pyabf.ABF, neo.Block]],
+    def __init__(self, obj: typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None,
                  protocol:typing.Optional[ABFProtocol] = None,
                  adcChannel:int = 0, physical:bool=False,
                  name:str = None,
@@ -2346,15 +2508,19 @@ class ABFInputConfiguration:
             to logical channel 3; in the latter case we get the physical input
             channel IN3 matched to logical channel 2!
         """
-        if protocol is None:
-            protocol =  ABFProtocol(obj)
+        if protocol is None and isinstance(obj, (pyabf.ABF, neo.Block)):
+            protocol = ABFProtocol(obj)
 
-        elif not isinstance(protocol, ABFProtocol):
-            raise TypeError(f"'protocol' expected to be an ABFProtocol object; instead, got {type(protocol).__name__}")
+        if not isinstance(protocol, ABFProtocol):
+            protocol = None
+        # if isinstance(protocol, ABFProtocol):
+        #     assert self._protocol_._sourceHash_ == hash(obj) and self._protocol_._sourceId_ == id(obj), f"The source {type(obj).__name__} object does not appear linked to the supplied protocol"
+        # else:
+        #     protocol = None
+            # raise TypeError(f"'protocol' expected to be an ABFProtocol object; instead, got {type(protocol).__name__}")
 
         self._protocol_ = protocol
 
-        assert self._protocol_._sourceHash_ == hash(obj) and self._protocol_._sourceId_ == id(obj), f"The source {type(obj).__name__} object does not appear linked to the supplied protocol"
 
         adcName = ""
         
@@ -2435,6 +2601,8 @@ class ABFInputConfiguration:
                 
             else:
                 adcName = f"ADC_{self._physicalChannelIndex_}"
+                
+            self._adcName_ = adcName
             
             if isinstance(units, str) and len(units.strip()):
                 self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(units)
@@ -2467,7 +2635,13 @@ class ABFInputConfiguration:
         attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
                             inspect.getmembers_static(self, inspect.isdatadescriptor)))
         
-        protocol_attr = attrs.pop("protocol", None)
+        prattr = list(filter(lambda x: x[0]=="protocol", attrs))
+        
+        protocol_attr = None
+        if len(prattr):
+            ndx = attrs.index(prattr[0])
+            protocol_attr = attrs.pop(ndx)
+            
         
         objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
         obj_attrs.update(objattrs)
@@ -2477,7 +2651,7 @@ class ABFInputConfiguration:
         entity = group.create_group(name, track_order = track_order)
         entity.attrs.update(obj_attrs)
             
-        if isinstance(protocol_attr, ABFProtocol):
+        if isinstance(protocol_attr, tuple) and protocol_attr[0] == "protocol":
             # NOTE: 2024-07-18 14:57:47 Steps:
             # 1) this DAC is in a member of the parent protocol DACs list;
             # 2) that list is encoded as a hdf5 Group, and this must be indicated as
@@ -2515,6 +2689,25 @@ class ABFInputConfiguration:
         
         return entity
     
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        # print(f"{cls.__name__}.objectFromHDF5Entity")
+        if entity in cache:
+            return cache[entity]
+        
+        if attrs is None:
+            attrs = h5io.attrs2dict(entity.attrs)
+        # print(f"attrs: {attrs}")
+        
+        adcChannel = attrs.get("physicalIndex", 0)
+        name = attrs.get("name", f"ADC{adcChannel}")
+        units = attrs.get("units", pq.dimensionless)
+        logicalIndex = attrs.get("logicalIndex", 0)
+        
+        return cls(obj=None, protocol=None, adcChannel=adcChannel,
+                   physical=True, name=name, units=units)
+
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
@@ -2574,7 +2767,7 @@ class ABFInputConfiguration:
         return self._adcUnits_
     
     @units.setter
-    def units(self. val:pq.Quantity):
+    def units(self, val:pq.Quantity):
         self._adcUnits_ = val
 
     @property
@@ -2585,16 +2778,11 @@ class ABFInputConfiguration:
     def protocol(self) -> ABFProtocol:
         return self._protocol_
     
-    @protocol.setter(self, val:ABFProtocol):
+    @protocol.setter
+    def protocol(self, val: ABFProtocol):
         if isinstance(val, ABFProtocol):
             self._protocol_ = val
             
-    @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset, attrs:dict, cache:dict = {}):
-        if entity in cache:
-            return cache[entity]
-        
-        
 
 class ABFOutputConfiguration:
     """Configuration of a DAC channel and digital outputs in pClamp/Clampex ABF files.
@@ -2672,7 +2860,7 @@ class ABFOutputConfiguration:
     def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None,
                  protocol:typing.Optional[ABFProtocol] = None,
                  dacChannel:int = 0, physical:bool=False, name: typing.Optional[str] = None,
-                 units: typing.Optional[typing.Union[str, pq.Quantity]],
+                 units: typing.Optional[typing.Union[str, pq.Quantity]]=pq.dimensionless,
                  dacHoldingLevel:typing.Optional[typing.Union[float,pq.Quantity]] = None,
                  interEpisodeLevel:bool = True,
                  waveFormEnabled:bool=False,
@@ -2680,15 +2868,18 @@ class ABFOutputConfiguration:
                  epochs:typing.Optional[typing.Sequence[ABFEpoch]] = None
                  ):
         
-        if protocol is None:
+        if protocol is None and isinstance(obj, (pyabf.ABF, neo.Block)):
             protocol = ABFProtocol(obj)
 
-        elif not isinstance(protocol, ABFProtocol):
-            raise TypeError(f"'protocol' expected to be an ABFProtocol object; instead, got {type(protocol).__name__}")
+        if not isinstance(protocol, ABFProtocol):
+            protocol = None
+        # if isinstance(protocol, ABFProtocol):
+        #     assert self._protocol_._sourceHash_ == hash(obj) and self._protocol_._sourceId_ == id(obj), f"The source {type(obj).__name__} object does not appear linked to the supplied protocol"
+        # else:
+        #     protocol = None
+            # raise TypeError(f"'protocol' expected to be an ABFProtocol object; instead, got {type(protocol).__name__}")
         
         self._protocol_ = protocol
-        
-        assert self._protocol_._sourceHash_ == hash(obj) and self._protocol_._sourceId_ == id(obj), f"The source {type(obj).__name__} object does not appear linked to the supplied protocol"
         
         self._epochs_ = list()
         
@@ -2810,6 +3001,8 @@ class ABFOutputConfiguration:
             self._init_epochs_(obj)
             
         else:
+            # print(f"{self.__class__.__name__}.__init__ from atoms")
+            
             self._physicalChannelIndex_ = self._dacChannel_ = dacChannel
             if isinstance(name, str) and len(name.strip()):
                 self._dacName_ = name
@@ -2828,7 +3021,7 @@ class ABFOutputConfiguration:
             if isinstance(dacHoldingLevel, pq.Quantity):
                 if not scq.units_convertible(dacHoldingLevel, self._dacUnits_):
                     raise TypeError(f"'dacHoldingLevel' has wrong units ({dacHoldingLevel.units}) for a DAC output in {self._dacUnits_}")
-                dacHoldingLevel = dacHoldingLeveL.rescale(self._dacUnits_)
+                dacHoldingLevel = dacHoldingLevel.rescale(self._dacUnits_)
                 
                 if np.abs(dacHoldingLevel).magnitude > 1e6:
                     self._dacHoldingLevel_ = np.nan * self._dacUnits_
@@ -2845,9 +3038,10 @@ class ABFOutputConfiguration:
                 else:
                     self._dacHoldingLevel_ = dacHoldingLevel
                     
-            self._interEpisodeLevel_ = interEpisodeLevel
+            self._interEpisodeLevel_ = interEpisodeLevel == True
             
-            self._waveformEnabled_ = waveFormEnabled
+            self._waveformEnabled_ = waveFormEnabled == True
+            
             if isinstance(waveFormSource, int) and waveFormSource in ABFDACWaveformSource.values():
                 self._waveformSource_ = ABFDACWaveformSource(waveFormSource)
                 
@@ -2857,6 +3051,7 @@ class ABFOutputConfiguration:
             else:
                 self._waveformSource_ = ABFDACWaveformSource.none
                 
+            # print(f"\tepochs: {epochs}")
             if isinstance(epochs, (tuple, list)) and all(isinstance(e, ABFEpoch) for e in epochs):
                 self._epochs_ = epochs
                 
@@ -3011,7 +3206,7 @@ class ABFOutputConfiguration:
         return ret
     
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
-                       entity_cache) -> hdf5.Group:
+                       entity_cache) -> h5py.Group:
         """Encodes this ABFOutputConfiguration as a HDF5 Group"""
         
         # NOTE: 2024-07-18 16:01:14
@@ -3028,7 +3223,20 @@ class ABFOutputConfiguration:
         attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
                             inspect.getmembers_static(self, inspect.isdatadescriptor)))
         
-        protocol_attr = attrs.pop("protocol", None)
+        prattr = list(filter(lambda x: x[0]=="protocol", attrs))
+        
+        protocol_attr = None
+        if len(prattr):
+            ndx = attrs.index(prattr[0])
+            protocol_attr = attrs.pop(ndx)
+            
+        
+        eattr = list(filter(lambda x: x[0] == "epochs", attrs))
+        
+        epochs_attr = None
+        if len(eattr):
+            ndx = attrs.index(eattr[0])
+            epochs_attr = attrs.pop(ndx)
         
         objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
         obj_attrs.update(objattrs)
@@ -3038,7 +3246,7 @@ class ABFOutputConfiguration:
         entity = group.create_group(name, track_order = track_order)
         entity.attrs.update(obj_attrs)
             
-        if isinstance(protocol_attr, ABFProtocol):
+        if isinstance(protocol_attr, tuple) and protocol_attr[0] == "protocol":
             # NOTE: 2024-07-18 16:03:58
             # see NOTE: 2024-07-18 14:57:47
             group_obj_class = group.attrs.get("python.class", None)
@@ -3050,10 +3258,54 @@ class ABFOutputConfiguration:
                 if parent_obj_class == "ABFProtocol":
                     entity["protocol"] = parent # soft link here
                 
-        
+        if isinstance(epochs_attr, tuple) and epochs_attr[0] == "epochs":
+            epochs = getattr(self, "epochs")
+            # NOTE: 2024-07-19 11:02:03 ATTENTION
+            # this below IS THE CORRECT WAY, as the h5io function will treat the
+            # epochs list appropriately (including descending into it and encoding
+            # its elements, recursively) to be compatible with full round Robin
+            # read/write
+            epochs_group = h5io.makeHDF5Entity(epochs, entity, name="epochs",
+                                               oname="epochs",
+                                               compression=compression,
+                                               chunks=chunks, 
+                                               track_order=track_order,
+                                               entity_cache=entity_cache,
+                                               )
         h5io.storeEntityInCache(entity_cache, self, entity)
         
         return entity
+    
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        # print(f"{cls.__name__}.objectFromHDF5Entity")
+        if entity in cache:
+            return cache[entity]
+        
+        if attrs is None:
+            attrs = h5io.attrs2dict(entity.attrs)
+        
+        dacChannel = attrs.get("physicalIndex", 0)
+        name = attrs.get("name", f"DAC{dacChannel}")
+        units = attrs.get("units", pq.dimensionless)
+        dacHoldingLevel = attrs.get("dacHoldingLevel", pq.dimensionless)
+        interEpisodeLevel = attrs.get("returnToHold", True)
+        waveFormEnabled = attrs.get("analogWaveformEnabled", False)
+        waveFormSource = attrs.get("waveFormSource", 0)
+        
+        # print(f"entity/epochs: {entity['epochs']}")
+        
+        
+        epochs = h5io.objectFromHDF5Entity(entity["epochs"])
+        
+        return cls(obj=None, protocol=None, dacChannel=dacChannel,units=units,
+                   dacHoldingLevel=dacHoldingLevel, interEpisodeLevel=interEpisodeLevel,
+                   waveFormEnabled=waveFormEnabled, waveFormSource=waveFormSource,
+                   epochs=epochs)
+        
+        
+        
 
     def is_identical_except_digital(self, other):
         if not isinstance(other, self.__class__):
@@ -3097,6 +3349,11 @@ class ABFOutputConfiguration:
     @property
     def protocol(self) -> ABFProtocol:
         return self._protocol_
+    
+    @protocol.setter
+    def protocol(self, val:ABFProtocol):
+        self._protocol_ = val
+        # if isinstance(val, ABFProtocol) and self in val.outputs:
         
     @property
     def returnToHold(self) -> bool: 
@@ -3104,6 +3361,10 @@ class ABFOutputConfiguration:
         This is specific to the DAC output.
         """
         return self._interEpisodeLevel_
+    
+    @returnToHold.setter
+    def returnToHold(self, val:bool):
+        self._interEpisodeLevel_ = val == True
     
     @property
     def epochs(self) -> list:
@@ -4398,6 +4659,13 @@ class ABFOutputConfiguration:
     def dacHoldingLevel(self) -> pq.Quantity:
         """DAC-specific"""
         return self._dacHoldingLevel_
+    
+    @dacHoldingLevel.setter
+    def dacHoldingLevel(self, val: pq.Quantity):
+        if not scq.units_convertible(self.units, val.units):
+            raise TypeError(f"Argument units {val.units} are incompatible with this channel units ({self.units})")
+        
+        self._dacHoldingLevel_ = val.rescale(self.units)
     
     @property
     def alternateDigitalOutputStateEnabled(self) -> bool:
