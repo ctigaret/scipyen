@@ -2523,6 +2523,35 @@ def is_class_defined_in_module(x:typing.Any, m:types.ModuleType):
     
     return x_module.__spec__.origin == m.__spec__.origin
 
+
+def parse_module_class_path(x:str) -> typing.Union[type, types.ModuleType]:
+    from core.utilities import unique
+    parts = list()
+    
+    a = x
+    
+    while len(x):
+        xx = x.partition('.')
+        parts.append(xx[0])
+        x = xx[-1]
+        
+    symbol = parts[-1]
+    
+    modules = [v for k,v in sys.modules.items() if hasattr(v, symbol)]
+    
+    obj = unique(list(map(lambda x: getattr(x, symbol), modules)))
+    
+    if len(obj)>1:
+        raise RuntimeError(f"Ambiguous module.class specification {a} - are there duplicates?")
+    
+    if len(obj) == 0:
+        raise RuntimeError(f"The module.class specification {a} is not found. HAs it been defined and imported at all?")
+    
+    if isinstance(obj, type):
+       parent_module_name = obj.__module__ 
+    
+    return obj[0]
+    
     
 def show_caller_stack(stack):
     for s in stack:

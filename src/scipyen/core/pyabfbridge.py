@@ -609,7 +609,8 @@ class ABFEpoch:
         # if isinstance(name, str) and len(name.strip()):
         #     target_name = name
             
-        entity = group.create_dataset(name, data = h5py.Empty("f"), track_order = track_order)
+        entity = group.create_dataset(name, data = h5py.Empty("f"), 
+                                      track_order = track_order)
         entity.attrs.update(obj_attrs)
         h5io.storeEntityInCache(entity_cache, self, entity)
         

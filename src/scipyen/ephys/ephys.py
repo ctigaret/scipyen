@@ -177,6 +177,7 @@ from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import numpy as np
 import quantities as pq
 import neo
+import h5py
 import pandas as pd
 # import pyabf
 import matplotlib as mpl
@@ -329,6 +330,53 @@ class SynapticStimulus(__BaseSynStim__):
                     
         return super().__new__(cls, **new_args)
     
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Dataset:
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name": self.name, "channel": self.channel, "dig": self.dig}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_dataset(name, data = h5py.Empty("f"),
+                                      track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        channel = attrs["channel"]
+        
+        if isinstance(channel, np.int64):
+            channel = int(channel)
+            
+        dig = attrs["dig"]
+        if isinstance(dig, np.bool_):
+            dig = bool(dig)
+        
+        return cls(name, channel, dig)
+    
 SynapticStimulus.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
 SynapticStimulus.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
 SynapticStimulus.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
@@ -419,6 +467,51 @@ class AuxiliaryInput(__BaseAuxInput__):
                     new_args[k] = v
                     
         return super().__new__(cls, **new_args)
+    
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Dataset:
+        
+
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name":self.name, "adc":self.adc, "cmd":self.cmd}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity= group.create_dataset(target_name, h5py.Empty("f"), 
+                                     track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name=attrs["name"]
+        adc =attrs["adc"]
+        cmd =attrs["cmd"]
+        
+        return cls(name, adc, cmd)
+
 
 AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux_in'"
 AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
@@ -511,6 +604,49 @@ class AuxiliaryOutput(__BaseAuxOutput__):
                     
         return super().__new__(cls, **new_args)
     
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Dataset:
+    
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name":self.name, "channel":self.channel, "digttl":self.digttl}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity= group.create_dataset(target_name, h5py.Empty("f"), 
+                                     track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name=attrs["name"]
+        channel =attrs["channel"]
+        digttl =attrs["digttl"]
+        
+        return cls(name, channel, digttl)
+
 AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification; default is 'aux_out'"
 AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
 AuxiliaryOutput.digttl.__doc__ = "bool, or None: flag to indicate if the output is used to send out triggers via a DIG (True), emulated via a DAC (False) or other waveforms (None); default is None"
@@ -622,6 +758,67 @@ class RecordingSource(__BaseSource__):
                    "",
                    ])
     
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name":self.name, "adc":self.adc, "dac":self.dac}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.makeHDF5Entity(self.syn, entity, name="syn", oname="syn",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.makeHDF5Entity(self.auxin, entity, name="auxin", oname="auxin",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.makeHDF5Entity(self.auxout, entity, name="auxout", oname="auxout",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+    
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        adc  = attrs["adc"]
+        dac  = attrs["dac"]
+        
+        syn = h5io.objectFromHDF5Entity(entity["syn"], cache=cache)
+        auxin = h5io.objectFromHDF5Entity(entity["auxin"], cache=cache)
+        auxout = h5io.objectFromHDF5Entity(entity["auxout"], cache=cache)
+        
+        return cls(name=name, adc=adc, dac=dac, syn=syn, auxin=auxin, auxout=auxout)
+        
     @property
     def clamped(self) -> bool:
         """Returns True when a primary DAC is defined.
@@ -1070,11 +1267,8 @@ class RecordingEpisode(Episode):
                  name: typing.Optional[str] = None,
                  blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
                  protocols: typing.Sequence[ElectrophysiologyProtocol] = list(), 
-                 # sources: typing.Sequence[RecordingSource] = list(), ## → defined in pathways
-                 # segments: typing.Optional[GeneralIndexType] = None, ## → defined in superclass beginFrame endFrame
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[tuple] = None ,
-                 # triggers: typing.Sequence[TriggerEvent] = list(),
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1295,6 +1489,74 @@ class RecordingEpisode(Episode):
                 
             p.breakable()
             
+
+    def makeHDF5Entity(self,group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Group:
+        """Overrides datatypes.Episode.makeHDF5Entity"""
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "xtalk", "episodeType"))
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.makeHDF5Entity(self.blocks, entity, name="blocks", oname="blocks",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.makeHDF5Entity(self.protocols, entity, name="protocols", oname="protocols",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.makeHDF5Entity(self.pathways, entity, name="pathways", oname="pathways",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        blocks = h5io.objectFromHDF5Entity(entity["blocks"], cache=cache)
+        protocols = h5io.objectFromHDF5Entity(entity["protocols"], cache=cache)
+        pathways = h5io.objectFromHDF5Entity(entity["pathways"], cache=cache)
+        
+        name=attrs["name"]
+        begin=attrs["begin"]
+        end=attrs["end"]
+        beginFrame=attrs["beginFrame"]
+        endFrame=attrs["endFrame"]
+        xtalk=attrs["xtalk"]
+        
+        return cls(name=name, episodeType=episodeType, begin=begin, end=end,
+                beginframe=beginFrame,endFrame=endFrame,
+                protocols=protocols,
+                pathways=pathways,
+                xtalk=xtalk)
+        
+        
     @property
     def pathways(self) -> list:
         return self._pathways_
@@ -1518,7 +1780,35 @@ class RecordingSchedule(Schedule):
                 raise TypeError("Expecting a sequence of Recording Episode objects")
             
             super().addEpisodes(episodes)
-        
+            
+    # NOTE: 2024-07-20 18:48:45 
+    # inherits makeHDF5Entity and objectFromHDF5Entity from datatypes.Schedule
+#     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+#                        entity_cache) -> h5py.Group:
+#         from iolib import h5io
+#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+#         cached_entity = h5io.getCachedEntity(entity_cache, self)
+#         if isinstance(cached_entity, h5py.Dataset):
+#             group[target_name] = cached_entity
+#             return cached_entity
+#         
+#         attrs = {"name": getattr(self, "name")}
+#         
+#         objattrs = h5io.makeAttrDict(**attrs)
+#         obj_attrs.update(objattrs)
+#         
+#         if isinstance(name, str) and len(name.strip()):
+#             target_name = name
+#         
+#         entity = group.create_group(target_name, track_order=track_order)
+#         entity.attrs.update(obj_attrs)
+#         h5io.makeHDF5Entity(self.episodes, entity, name="episodes", 
+#                             oname="episodes", compression=compression,
+#                             chunks=chunks, track_order=track_order,
+#                             entity_cache=entity_cache)
+#         
+#         h5io.storeEntityInCache(entity_cache, self, entity)
+#         return entity
         
 class SynapticPathwayType(TypeEnum):
     """
@@ -1586,6 +1876,78 @@ class SynapticPathway:
     schedule: typing.Optional[RecordingSchedule] = None
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name": self.name,
+                 "pathwayType": self.pathwayType,
+                 "electrodeMode": self.electrodeMode,
+                 "clampMode": self.clampMode}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.makeHDF5Entity(self.stimulus, entity, name="stimulus", oname="stimulus",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.makeHDF5Entity(self.schedule, entity, name="schedule", oname="schedule",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.makeHDF5Entity(self.measurements, entity, name="measurements", oname="measurements",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.makeHDF5Entity(self.source, entity, name="source", oname="source",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        name = attrs["name"]
+        pathwayType = attrs["pathwayType"]
+        electrodeMode = attrs["electrodeMode"]
+        clampMode = attrs["clampMode"]
+        schedule = h5io.objectFromHDF5Entity(entity["schedule"], cache=cache)
+        stimulus = h5io.objectFromHDF5Entity(entity["stimulus"], cache=cache)
+        source = h5io.objectFromHDF5Entity(entity["source"], cache=cache)
+        measurements = h5io.objectFromHDF5Entity(entity["measurements"], cache=cache)
+        
+        return cls(name=name, pathwayType=pathwayType, stimulus=stimulus,
+                   electrodeMode=electrodeMode, clampMode=clampMode,
+                   schedule=schedule, measurements=measurements, source=source)
+        
+        
+        
         
 @dataclass
 class LocationMeasure:

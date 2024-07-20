@@ -121,13 +121,15 @@ from neo.core.dataobject import ArrayDict
 
 from . import jsonio # brings the CustomEncoder type and the decode_hook function
 import core
-from core.prog import (safeWrapper, signature2Dict,)
+from core.prog import (safeWrapper, signature2Dict, 
+                       parse_module_class_path, get_loaded_module)
 from core import prog
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datazone import DataZone
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType)
 from core.triggerprotocols import TriggerProtocol
+import ephys
 from ephys import ephys
 
 from core.quantities import(arbitrary_unit, 
@@ -1465,6 +1467,15 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                     o = objectFromHDF5Entity(entity[k], cache)
                     obj.append(o)
                     
+            elif tuple in mro:
+                obj = list()
+                for k in entity.keys():
+                    o = objectFromHDF5Entity(entity[k], cache)
+                    obj.append(o)
+                    
+                obj = tuple(obj)
+                
+                    
             elif neo.core.baseneo.BaseNeo in inspect.getmro(target_class):
                 obj = group2neo(entity, target_class, cache)
                 
@@ -1511,8 +1522,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
     
     return obj
 
-# def generateObject(klass, )
-    
+
 def attrs2dict(attrs:h5py.AttributeManager):
     """Generates a dict object from a h5py Group or Dataset 'attrs' property.
     
@@ -1572,8 +1582,27 @@ def attrs2dict(attrs:h5py.AttributeManager):
                     v = eval(v)
                     
                 elif v.startswith("ENUM"):
+                    # print(f"attrs2dict: {v} ({type(v).__name__})")
                     _, v = v.split(" ")
-                    v = eval(v)
+                    # print(f"v.split: {_} {v} ({type(v).__name__})")
+                    srcstr = v
+                    try:
+                        v = eval(v)
+                    except:
+                        target, args = v.split("(")
+                        args = f"({args}" # reattach opening parenthesis
+                            
+                        obj = parse_module_class_path(target)
+                        if not isinstance(obj, type):
+                            raise RuntimeError(f"'{srcstr}' did not resolve to a type")
+                        module = get_loaded_module(obj.__module__)
+                        
+                        v2 = f"{obj.__name__}{args}"
+                        
+                        # print(f"new eval: '{v2}'")
+                        
+                        v = eval(v2, module.__dict__)
+                        # if isinstance(v, type)
                     
         except:
             # print(f"k = {k} v = {v} has dtype: {v.dtype if hasattr(v, 'dtype') else 'no'}")
@@ -2654,6 +2683,7 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
         return entity
     
     elif isinstance(obj, enum.Enum):
+        # we also can store Enums as HDF5 attr, see makeAttr in this module
         # → h5py.Dataset child of group,  with h5py.enum_dtype
         cached_entity = getCachedEntity(entity_cache, obj)
         if isinstance(cached_entity, h5py.Dataset):
@@ -3076,7 +3106,10 @@ def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None, compres
     return entity
     
 @singledispatch
-def makeGroup(obj, group:h5py.Group, attrs:dict, name:str, compression:typing.Optional[str]="gzip", chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
+def makeGroup(obj, group:h5py.Group, attrs:dict, name:str, 
+              compression:typing.Optional[str]="gzip", 
+              chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, 
+              entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
     cached_entity = getCachedEntity(entity_cache, obj)
     
     if isinstance(cached_entity, h5py.Group):
@@ -3115,6 +3148,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
 
 @makeGroup.register(collections.abc.Iterable)
 def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
+    # tuple, list deque, etc
     cached_entity = getCachedEntity(entity_cache, obj)
     
     if isinstance(cached_entity, h5py.Group):
