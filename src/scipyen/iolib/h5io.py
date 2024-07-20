@@ -128,7 +128,6 @@ from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datazone import DataZone
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, MarkType)
 from core.triggerprotocols import TriggerProtocol
-from core.datatypes import (Episode, Schedule, Procedure)
 from ephys import ephys
 
 from core.quantities import(arbitrary_unit, 
@@ -148,7 +147,6 @@ from core.datatypes import (TypeEnum,UnitTypes, GENOTYPES,
                             is_numeric_string, is_numeric, 
                             is_convertible_to_numpy_array,
                             NUMPY_STRING_KINDS,
-                            Schedule, Episode,
                             )
 
 from core.modelfitting import (FitModel, ModelExpression,)
@@ -530,7 +528,8 @@ def string2hdf(s):
     
     return np.array(s, dtype=h5py.string_dtype())
 
-def makeAttr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.ndarray]]=None):
+@singledispatch
+def makeAttr(x):
     """Returns a representation of 'x' suitable as a HDF5 entity attribute.
     
     `x` is typically a basic Python type, and the representation is a JSON string.
@@ -556,40 +555,137 @@ def makeAttr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.nd
     store as attrs value to a Group or Dataset.
     
     """
-    if x is None:
-        return jsonio.dumps(x)
     
-    if isinstance(x, str):
-        # because np.str_ resolves to str in later versions; but data saved with
-        # old numpy API msy still hold scalars of type np.str_
-        if isinstance(x, np.str_):
-            return str(x)
-        
-        return x
-    
-    # NOTE: 2022-11-28 17:54:36
-    # store datetime.datetime in their isoformat string representation
-    if isinstance(x, datetime.datetime):
-        return x.isoformat()
-        
-    if isinstance(x, (list, tuple, dict)): 
-        # will raise exception if elements or values are not json-able
-        # CAUTION Do not use large data objects here!
-        # We use the CustomEncoder which has wider coverage and its own 
-        # limitations/caveats
-        # 
-        try:
-            return jsonio.dumps(x)
-        except:
-            raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
-
-    if isinstance(x, np.ndarray):
-        if x.dtype.kind in NUMPY_STRING_KINDS:
-            return np.array(x, dtype=h5py.string_dtype(), order="K")
-        else:
-            return jsonio.dumps(x) 
-        
     return x
+
+@makeAttr.register(type(None))
+def _(x):
+    return jsonio.dumps(x)
+
+@makeAttr.register(str)
+def _(x):
+    if isinstance(x, np.str_):
+        return str(x)
+    
+    return x
+
+@makeAttr.register(enum.Enum)
+def _(x):
+    mdl = x.__class__.__module__
+    kls = x.__class__.__name__
+    if mdl == "__main__":
+        klass = kls
+    else:
+        klass = f"ENUM {mdl}.{kls}"
+        
+    return f"{klass}({x.value})"
+        
+    
+
+@makeAttr.register(datetime.date)
+@makeAttr.register(datetime.time)
+@makeAttr.register(datetime.datetime)
+def _(x):
+    return f"{x.__class__.__module__}.{x.__class__.__name__} {x.isoformat()}"
+
+@makeAttr.register(datetime.timedelta)
+def _(x):
+    raise NotImplementedError(f"{type(x).__name__} objects cannot (and should not) be encoded as HDF5 Attribute")
+    # return f"{x.__class__.__module__}.{x.__class__.__name__}(days={x.days}, seconds={x.seconds})"
+    
+
+@makeAttr.register(list)
+@makeAttr.register(tuple)
+@makeAttr.register(dict)
+def _(x):
+    # BUG: 2024-07-20 14:28:52 FIXME
+    # will raise exception if elements or values are not json-able
+    # CAUTION Do not use large data objects here!
+    # We use the CustomEncoder which has wider coverage and its own 
+    # limitations/caveats
+    # 
+    try:
+        return jsonio.dumps(x)
+    except:
+        raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
+
+@makeAttr.register(np.ndarray)
+@makeAttr.register(pq.Quantity)
+def _(x):
+    if isinstance(x, pq.Quantity):
+        if x.size > 1:
+            raise ValueError("non-scalar quantities cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
+        
+        return f"pq.Quantity({float(x.magnitude)}, pq.{x.units.dimensionality})"
+    
+    elif x.dtype.kind in NUMPY_STRING_KINDS:
+        return np.array(x, dtype=h5py.string_dtype(), order="K")
+    else:
+        return jsonio.dumps(x) 
+    
+
+    
+
+# def makeAttr(x:typing.Optional[typing.Union[str, list, tuple, dict, deque, np.ndarray, datetime.datetime]]=None):
+#     """Returns a representation of 'x' suitable as a HDF5 entity attribute.
+#     
+#     `x` is typically a basic Python type, and the representation is a JSON string.
+#     
+#     Parameters:
+#     -----------
+#     'x': basic Python type (str or scalar number), or numpy array
+#     
+#     Returns:
+#     --------
+#     A string when 'x' is a str, or is a container with elements that can be
+#         written to a JSON-formatted string.
+#         
+#         As a rule of thumb, these objects should be relatively small, and the 
+#         container should be relatively simple.
+#     
+#     A numpy array with dtype j5py.string_dtype() when 'x' is a numpy array with
+#     dtype.kind of 'S' or 'U' (i.e., strings)
+#     
+#     'x' itself in any other case.
+#     
+#     CAUTION h5py will raise exception when 'x' is of a type that h5py cannot 
+#     store as attrs value to a Group or Dataset.
+#     
+#     """
+#     if x is None:
+#         return jsonio.dumps(x)
+#     
+#     if isinstance(x, str):
+#         # because np.str_ resolves to str in later versions; but data saved with
+#         # old numpy API msy still hold scalars of type np.str_
+#         if isinstance(x, np.str_):
+#             return str(x)
+#         
+#         return x
+#     
+#     # NOTE: 2022-11-28 17:54:36
+#     # store datetime.datetime in their isoformat string representation
+#     if isinstance(x, (datetime.datetime, datetime.date, datetime.time)):
+#         return f"{x.__class__.__module__}.{x.__class__.__name__} {x.isoformat()}"
+#         
+#     if isinstance(x, (list, tuple, dict)): 
+#         # will raise exception if elements or values are not json-able
+#         # CAUTION Do not use large data objects here!
+#         # We use the CustomEncoder which has wider coverage and its own 
+#         # limitations/caveats
+#         # 
+#         try:
+#             return jsonio.dumps(x)
+#         except:
+#             raise HDFDataError(f"The object {x}\n with type {type(x).__name__} cannot be serialized in json")
+# 
+#     if isinstance(x, np.ndarray):
+#         if x.dtype.kind in NUMPY_STRING_KINDS:
+#             return np.array(x, dtype=h5py.string_dtype(), order="K")
+#         else:
+#             return jsonio.dumps(x) 
+#         
+#     return x
 
 def makeAttrDict(**kwargs):
     """Generates a dict suitable for storage as 'attrs' property of a HDF5 entity.
@@ -1462,6 +1558,22 @@ def attrs2dict(attrs:h5py.AttributeManager):
             elif isinstance(v, str):
                 if v.startswith("{") and v.endswith("}"):
                     v = jsonio.loads(v)
+                    
+                elif "datetime" in v:
+                    klass, isofmt = v.split(" ")
+                    v = eval(f"{klass}.fromisoformat('{isofmt}')")
+                    # if "timedelta" in v:
+                    #     v = eval(v)
+                    # else:
+                    #     klass, isofmt = v.split(" ")
+                    #     v = eval(f"{klass}.fromisoformat('{isofmt}')")
+                    
+                elif "pq.Quantity" in v:
+                    v = eval(v)
+                    
+                elif v.startswith("ENUM"):
+                    _, v = v.split(" ")
+                    v = eval(v)
                     
         except:
             # print(f"k = {k} v = {v} has dtype: {v.dtype if hasattr(v, 'dtype') else 'no'}")
@@ -2575,15 +2687,6 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
         storeEntityInCache(entity_cache, obj, entity)
         
         return entity
-    
-    elif isinstance(obj, Schedule):
-        pass
-        cached_entity = getCachedEntity(entity_cache, obj)
-        if isinstance(cached_entity, h5py.Group):
-            group[target_name] = cached_entity
-            return cached_entity
-        
-        
     
     else:
         if (isinstance(obj, (collections.abc.Iterable, neo.core.container.Container)) or hasattr(type(obj),"__iter__")) and \

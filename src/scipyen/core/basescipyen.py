@@ -18,7 +18,7 @@ from core.prog import (ArgumentError, OneOf,
                        setup_descriptor)
 
 from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRoute, 
-                            Procedure, TreatmentProcedure, TypeEnum,
+                            Procedure, TypeEnum,
                             )
 
 class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):

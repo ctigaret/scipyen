@@ -1510,8 +1510,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # print(f"\tentity/inputs = {entity['inputs']}")
         # print(f"\tentity/outputs = {entity['outputs']}")
             
-        kargs["inputs"] = h5io.objectFromHDF5Entity(entity["inputs"])
-        kargs["outputs"] = h5io.objectFromHDF5Entity(entity["outputs"])
+        kargs["inputs"] = h5io.objectFromHDF5Entity(entity["inputs"], cache)
+        kargs["outputs"] = h5io.objectFromHDF5Entity(entity["outputs"], cache)
         
         # print(f"inputs: {kargs['inputs']}")
         # print(f"outputs: {kargs['outputs']}")
@@ -3337,7 +3337,7 @@ class ABFOutputConfiguration:
         # print(f"entity/epochs: {entity['epochs']}")
         
         
-        epochs = h5io.objectFromHDF5Entity(entity["epochs"])
+        epochs = h5io.objectFromHDF5Entity(entity["epochs"], cache)
         
         return cls(obj=None, protocol=None, dacChannel=dacChannel, units=units,
                    dacHoldingLevel=dacHoldingLevel, interEpisodeLevel=interEpisodeLevel,
