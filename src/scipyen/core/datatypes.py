@@ -1368,7 +1368,7 @@ class Treatment:
                 discrete, possibly irregular, times
     
     WARNING: Do not use. See NOTE 2024-07-20 17:32:21 in the docstring for this
-    module.
+    module (near top of the file).
     
     
     """
