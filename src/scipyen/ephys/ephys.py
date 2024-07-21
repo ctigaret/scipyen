@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """ Classes and functions for electrophysiology data.
 
 NOTATIONS USED BELOW:
@@ -1687,21 +1692,17 @@ class RecordingEpisode(Episode):
         block_protocols = list()
         
         try:
-            block_protocols = unique([getProtocol(b) for b in self._blocks_])
+            block_protocols = unique(list(filter(lambda x: isinstance(x, ElectrophysiologyProtocol), map(lambda x: getProtocol(x), blocks))), idcheck=False)
         except:
-            scipywarn("Cannot parse protocols from the Blocm objects")
+            scipywarn("Cannot parse protocols from the Block objects")
             traceback.print_exc()
             
         if len(block_protocols):
-            self._protocols_[:] = block_protocols
-        
-#         protocol = getProtocol(self._block_[0])
-#         if len(self._blocks_) > 1:
-#             assert all(getProtocol(b) == protocol for b in self._blocks_[1:]), "All blocks must have been recorded using the same acquisition protocol"
-#             
-#         self.protocol = protocol
-        
-        
+            if len(self._protocols_):
+                protocols = self._protocols_ + block_protocols
+                self._protocols_ = unique(protocols, idcheck=False)
+            else:
+                self._protocols_[:] = block_protocols
     
     def addBlock(self, x:neo.Block):
         """Adds a new block; blocks will be reordered by rec_datetime if necessary"""
@@ -1709,10 +1710,11 @@ class RecordingEpisode(Episode):
             raise TypeError(f"Expecting a neo.Block; instead, got {type().__name__}")
         
         protocol = getProtocol(x)
-        if len(self._protocols_):
-            if protocol not in self.protocols:
-                scipywarn("The block was acquired with a different protocol")
-        self._protocols_.append(protocol)
+        if isinstance(protocol, ElectrophysiologyProtocol):
+            if len(self._protocols_):
+                if protocol not in self.protocols:
+                    scipywarn("The block was acquired with a different protocol")
+            self._protocols_.append(protocol)
             
         blocks = self._blocks_ + [x]
         self.blocks = blocks
@@ -1733,9 +1735,20 @@ class RecordingEpisode(Episode):
         else:
             raise TypeError("")
         
+        block = self._blocks_[index]
+        
         del self._blocks_[index]
         
-        self._setup_from_blocks_() # will also update the protocols
+        protocol = getProtocol(block)
+        if isinstance(protocol, ElectrophysiologyProtocol):
+            if protocol in self._protocols_:
+                ndx = self._protocols_.index(protocol)
+                del self._protocols_[ndx]
+            
+        self._setup_from_blocks_() # will also update the protocols, 
+        # but best deal with these now
+        
+        
             
     @property
     def protocols(self) -> list:
@@ -5514,6 +5527,10 @@ def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]):
     
     if isinstance(x, neo.Block) and not pab.sourcedFromABF(x):
         raise NotImplementedError("Only ABF protocols are supported for the moment")
+    
+    if isinstance(x, neo.Block) and getattr(x, "annotations", None) is None or getattr(x, "annotations", {}).get("abf_version", None) is None:
+        scipywarn(f"{type(x).__name__} object does not appear to have been created from an ABF file; cannot parse a protocol")
+        return 
     return pab.ABFProtocol(x)
     
     

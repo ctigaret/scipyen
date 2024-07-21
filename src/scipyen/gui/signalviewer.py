@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 '''Signal viewer: enhanced signal plotter
 
 Plots a multi-frame 1D signal (i.e. a matrix where each column is a `frame'), one frame at a time. 

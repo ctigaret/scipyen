@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Functions for processing generic 1D signals (numpy array).
 For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.

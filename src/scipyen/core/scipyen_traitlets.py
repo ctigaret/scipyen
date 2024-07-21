@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Very much work in progress.
 FIXME/TODO:2022-01-29 13:29:19
 The issue with collection "traits", I think, is that changes to the contents of

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 ''' Mon Apr 04 2016 23:41:53 GMT+0100 (BST)
 
     Searches for python module source files declared as plugins and loads them. 

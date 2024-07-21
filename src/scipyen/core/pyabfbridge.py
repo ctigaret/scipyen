@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Module to access ABF meta-information.
 
 This modules provides functionality to access "metadata" (e.g. command waveforms, 
@@ -1371,7 +1376,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         WARNING: This includes any digital output patterns definded.
         
-        If this is not intended, then use self.is_identical_except_digital(other)
+        If this is not intended, then use self.is_identical_except_digital(other).
+        
+        ATTENTION: For comparison and inclusion test purposes, this function 
+        deliberately does not compare object id values (i.e. their memory 
+        addresses). Instead, it compares the value of the relevant object 
+        attributes (numbers and strings). Two protocol objects can have identical 
+        parameter values, and yet be digitally distinct (i.e., stored at different
+        memory locations).
         """
         if not isinstance(other, self.__class__):
             return False

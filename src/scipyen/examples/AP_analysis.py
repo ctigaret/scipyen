@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 """
 WARNING code in this script to be executed block by block by copy/paste into 
 PICT console as it requires modules imported into PICT console workspace

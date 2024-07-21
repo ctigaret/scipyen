@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Processing of electrophysiology signal data.
 TODO: 2024-05-30 14:42:46
 extricate AP analysis code from here

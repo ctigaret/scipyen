@@ -1,4 +1,9 @@
 #! bash
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 
 echo -e "WARNING this script is NOT customized; edit before running"
 echo -e "\tthen run from the root scipyen directory (i.e. root of the git tree)"

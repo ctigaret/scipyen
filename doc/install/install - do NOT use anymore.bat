@@ -1,4 +1,9 @@
 @echo off
+rem  # -*- coding: utf-8 -*-
+rem  # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+rem  # SPDX-License-Identifier: GPL-3.0-or-later
+rem  # SPDX-License-Identifier: LGPL-2.1-or-later
+rem  
 rem  setlocal enabledelayedexpansion enableextensions
 set mypath=%0
 set mydir=%~dp0

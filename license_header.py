@@ -3,7 +3,3 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-from distlib.locators import locate
-pyqt6_locator = locate("PyQt6")
-pyqt6_src_url = pyqt6_locator.download_url
-print(pyqt6_src_url)

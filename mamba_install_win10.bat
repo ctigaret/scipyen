@@ -1,3 +1,8 @@
+rem  # -*- coding: utf-8 -*-
+rem  # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+rem  # SPDX-License-Identifier: GPL-3.0-or-later
+rem  # SPDX-License-Identifier: LGPL-2.1-or-later
+rem  
 echo This script requires mambaforge installed from https://github.com/conda-forge/miniforge#mambaforge
 echo and must be run from a mamba (Microforge) prompt launched as administrator
 @echo off

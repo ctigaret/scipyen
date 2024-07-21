@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """ Collection of 1D and nD functions and helper functions, for use in model fitting.
 
 WARNING: This module is on its way to deprecation, and it wil be superseded by

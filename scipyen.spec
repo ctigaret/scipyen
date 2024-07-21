@@ -1,4 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 NOTE: 2023-06-26 17:25:32
 This is for the developer, NOT the final user:

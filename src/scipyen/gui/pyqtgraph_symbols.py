@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 from gui.pyqtgraph_patch import pyqtgraph as pg
 from qtpy import (QtCore, QtWidgets, QtGui)
 # from PyQt5 import (QtCore, QtWidgets, QtGui)
