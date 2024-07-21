@@ -2773,11 +2773,15 @@ def makeHDF5Dataset(obj, group: h5py.Group, name:typing.Optional[str]=None,
     if isinstance(name, str) and len(name.strip()):
         target_name = name
 
-    dset = makeDataset(obj, group, obj_attrs, target_name, 
-                        compression = compression, chunks = chunks,
-                        track_order = track_order, entity_cache = entity_cache)
-    
-    return dset
+    try:
+        dset = makeDataset(obj, group, obj_attrs, target_name, 
+                            compression = compression, chunks = chunks,
+                            track_order = track_order, entity_cache = entity_cache)
+        return dset
+    except:
+        print(f"makeHDF5Dataset offending object: {obj}")
+        raise
+        
 
 @singledispatch
 def makeDataset(obj, group:h5py.Group, attrs:dict, name:str, 
@@ -3217,7 +3221,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     if hasattr(obj, "annotations"):
         annotations = getattr(obj, "annotations", dict())
         
-        
+        print(f"makeGroup: storing annotations")
         annotations_entity = makeHDF5Entity(annotations, grp, "annotations",
                                                     compression = compression, 
                                                     chunks = chunks,
