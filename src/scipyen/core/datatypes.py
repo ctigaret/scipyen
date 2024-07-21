@@ -1132,6 +1132,7 @@ class Episode:
     def makeHDF5Entity(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Dataset:
+        """Encodes an episode as an empty hdf5 dataset"""
         from iolib import h5io
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
@@ -1144,7 +1145,11 @@ class Episode:
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
         
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
         entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+        # entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         h5io.storeEntityInCache(entity_cache, self, entity)
         

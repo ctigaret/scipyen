@@ -1268,7 +1268,7 @@ class RecordingEpisode(Episode):
                  blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
                  protocols: typing.Sequence[ElectrophysiologyProtocol] = list(), 
                  pathways: typing.Sequence[SynapticPathway] = list(),
-                 xtalk: typing.Optional[tuple] = None ,
+                 xtalk: typing.Optional[typing.Union[dict, tuple, list]] = None ,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1289,8 +1289,64 @@ class RecordingEpisode(Episode):
         pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
             Optional; default is None.
 
-        xtalk: dict of segment index (int) ↦ tuple of int (indexes of pathways)
-            or None.
+        xtalk: dict, tuple, or list — configuration of pathway cross-stimulation
+            (for testing pathway cross-talk, or independence)
+
+            • when a dict it contains key ↦ value mappings
+                ∘ values are tuples of int indices of pathways, and their ORDER
+                    indicates the order in which the pathways are cross-stimulated;
+
+                    in theory, there can be any number of pathways, but in practice
+                    the tuple contains only two pathways tested for cross-talk
+
+                    For example, a tuple (0,1) indicates that the pathways are
+                    given each a single stimulus (pathwya 0 first, then pathway 1).
+
+                    To be useful these stimulations must occur with the same 
+                    inter-stimulus interval (ISI) as the one used for paired-
+                    pulse stimulation of a single pathway (so that pathway 
+                    independence can be assessed based on response facilitation
+                    or lack thereof)
+                    
+                ∘ the keys are either:
+                    □ an int: the index of the segment¹ where the cross-stimulation
+                        of the pathways, indicated in the tuple, has occurred
+
+                        Example: a dictionary with the following structure
+
+                        0 ↦ (0,1)
+                        1 ↦ (1,0)
+
+                        indicates a cross-stimulationof two pathwyas in the 
+                        order 0 → 1 in the first segment, and in the order 1 → 0
+                        in the second segment
+
+                    □ a tuple of two int (x,y) where `x` is the index of the 
+                        first segment where cross-stimulation is applied, and 
+                        `y` is the number of segments skipped.
+
+                        Example: a dictionary with the following structure
+
+                        (0,2) ↦ (0,1)
+                        (1,2) ↦ (1,0)
+
+                        indicates cross-stimulation of two pathways in the 
+                        order 0 → 1 in every other segment, starting with the
+                        first (segment index 0)² i.e., on `even-numbered` segments, 
+                        and in the order 1 → 0 in every other segment, starting
+                        with the second (segment index 1) i.e., on `odd-numbered`
+                        segments
+
+            • when a tuple or list, it indicates the pathway indices and the 
+                order in which they are stimulated, througout the episode
+                
+            By default the `xtalk` attribute of a recording episode is an empty
+            tuple.
+
+            ¹ Here a `segment` has the same meaning as a `sweep`; we use `segment`
+            to also indicate that this refers to a neo.Segment object.
+
+            ² Python uses 0-based indexing of elements in a collection.
 
             Indicates the order of the stimulated pathways in a cross-talk contingency,
             were each pathway is stimulated in turn, in a paired-pulse stimulation
@@ -1415,11 +1471,18 @@ class RecordingEpisode(Episode):
                 
             self.xtalk = xtalk
             
-        elif xtalk is None:
-            self.xtalk = tuple()
+        # elif xtalk is None:
+        #     self.xtalk = tuple()
+        
+        elif isinstance(xtalk, (tuple, list)):
+            if len(xtalk) and not all(isinstance(v, int) for v in xtalk):
+                raise TypeError("When a tuple, 'xtalk' must contain only integers")
+            
+            self.xtalk = tuple(xtalk)
             
         else:
-            raise ValueError(f"Invalid xtalk specification ({xtalk})")
+            self.xtalk = tuple()
+            # raise ValueError(f"Invalid xtalk specification ({xtalk})")
         
         # self._data_ = None
         
@@ -1440,6 +1503,9 @@ class RecordingEpisode(Episode):
 
         ret.append(f"\txtalk: {self.xtalk}")
         
+        ret.append(f"\tprotocols:")
+        ret += unique([f"\t\t{p.name}" for p in self.protocols])
+        
         return "\n".join(ret)
         
     def _repr_pretty_(self, p, cycle):
@@ -1452,10 +1518,13 @@ class RecordingEpisode(Episode):
             p.breakable()
             attr_repr = [" "]
             attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
-                                                                                "protocol",
                                                                                 "electrodeMode",
                                                                                 "clampMode",
                                                                                 )]
+            
+            attr_repr.append("Protocols:")
+            
+            attr_repr += unique([f"\t\t{p.name}" for p in getattr(self, "protocols", list())])
             
             # with p.group(4 ,"(",")"):
             with p.group(4 ,"",""):
@@ -1464,7 +1533,7 @@ class RecordingEpisode(Episode):
                     p.breakable()
                 p.text("\n")
                 
-            p.text("\n")
+            # p.text("\n")
                 
             p.text("Pathways:")
             p.breakable()
@@ -1502,12 +1571,16 @@ class RecordingEpisode(Episode):
             group[target_name] = cached_entity
             return cached_entity
         
-        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "xtalk", "episodeType"))
+        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "xtalk", "type"))
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
         
-        entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        # entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+        entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         
         h5io.makeHDF5Entity(self.blocks, entity, name="blocks", oname="blocks",
@@ -1549,10 +1622,12 @@ class RecordingEpisode(Episode):
         beginFrame=attrs["beginFrame"]
         endFrame=attrs["endFrame"]
         xtalk=attrs["xtalk"]
+        episodeType=attrs["type"]
         
         return cls(name=name, episodeType=episodeType, begin=begin, end=end,
                 beginframe=beginFrame,endFrame=endFrame,
                 protocols=protocols,
+                blocks = blocks,
                 pathways=pathways,
                 xtalk=xtalk)
         
@@ -1603,18 +1678,29 @@ class RecordingEpisode(Episode):
         if len(self._blocks_) == 0:
             return
         
-        self._protocols_ = unique([getProtocol(b) for b in self._blocks_])
+        self.begin = self._blocks_[0].rec_datetime
+        self.end = self._blocks_[-1].rec_datetime + datetime.timedelta(seconds = float(neoutils.block_duration(self._blocks_[-1])))
+        
+        self.beginFrame = 0
+        self.endFrame = sum([len(b.segments) for b in self._blocks_]) - 1
+        
+        block_protocols = list()
+        
+        try:
+            block_protocols = unique([getProtocol(b) for b in self._blocks_])
+        except:
+            scipywarn("Cannot parse protocols from the Blocm objects")
+            traceback.print_exc()
+            
+        if len(block_protocols):
+            self._protocols_[:] = block_protocols
+        
 #         protocol = getProtocol(self._block_[0])
 #         if len(self._blocks_) > 1:
 #             assert all(getProtocol(b) == protocol for b in self._blocks_[1:]), "All blocks must have been recorded using the same acquisition protocol"
 #             
 #         self.protocol = protocol
         
-        self.begin = self._blocks_[0].rec_datetime
-        self.end = self._blocks_[-1].rec_datetime + datetime.timedelta(seconds = float(neoutils.block_duration(self._blocks_[-1])))
-        
-        self.beginFrame = 0
-        self.endFrame = sum([len(b.segments) for b in self._blocks_]) - 1
         
     
     def addBlock(self, x:neo.Block):
@@ -1781,34 +1867,54 @@ class RecordingSchedule(Schedule):
             
             super().addEpisodes(episodes)
             
-    # NOTE: 2024-07-20 18:48:45 
-    # inherits makeHDF5Entity and objectFromHDF5Entity from datatypes.Schedule
-#     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
-#                        entity_cache) -> h5py.Group:
-#         from iolib import h5io
-#         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-#         cached_entity = h5io.getCachedEntity(entity_cache, self)
-#         if isinstance(cached_entity, h5py.Dataset):
-#             group[target_name] = cached_entity
-#             return cached_entity
-#         
-#         attrs = {"name": getattr(self, "name")}
-#         
-#         objattrs = h5io.makeAttrDict(**attrs)
-#         obj_attrs.update(objattrs)
-#         
-#         if isinstance(name, str) and len(name.strip()):
-#             target_name = name
-#         
-#         entity = group.create_group(target_name, track_order=track_order)
-#         entity.attrs.update(obj_attrs)
-#         h5io.makeHDF5Entity(self.episodes, entity, name="episodes", 
-#                             oname="episodes", compression=compression,
-#                             chunks=chunks, track_order=track_order,
-#                             entity_cache=entity_cache)
-#         
-#         h5io.storeEntityInCache(entity_cache, self, entity)
-#         return entity
+    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        # NOTE: 2024-07-20 18:48:45 
+        # although it inherits makeHDF5Entity and objectFromHDF5Entity from 
+        # datatypes.Schedule, that method encodes datatype.Episode as h5py.Datasets
+        # whereas here we need to encode RecordingEpisodes as h5py.Group
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name": getattr(self, "name")}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        h5io.makeHDF5Entity(self.episodes, entity, name="episodes", 
+                            oname="episodes", compression=compression,
+                            chunks=chunks, track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Dataset,
+                             attrs:typing.Optional[dict]=None, cache:dict={}):
+        
+        # NOTE: 2024-07-21 10:05:58 see NOTE: 2024-07-20 18:48:45 
+    
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        
+        episodes = h5io.objectFromHDF5Entity(entity["episodes"], cache)
+        
+        return cls(name, episodes=episodes)
         
 class SynapticPathwayType(TypeEnum):
     """
@@ -5310,16 +5416,22 @@ command signal.
 
 def trials_sequence_info(*args, return_sorted:bool=False):
     """Reveals the temporal order of trials represented by neo.Block objects.
-    Returns a DataFrame with the following columns:
-    "name" - the Block `name` attribute
-    "time" - the Block `rec_datetime` attribute
-    "deltaMinutes" - the lapsed time, in minutes, from the start of the first Block
+
+    Returns:
+    • DataFrame with the following columns:
+        "name" - the Block `name` attribute
+        "time" - the Block `rec_datetime` attribute
+        "deltaMinutes" - the lapsed time, in minutes, from the start of the first Block
         in `args`
 
-    This information is stored in ascending order of the `rec_datetime` values.
+        This information is stored in ascending order of the `rec_datetime` values.
+    
+        Drug "incubation" periods may be inferred from the first difference of 
+        the "deltaMinutes" values.
 
-    Drug "incubation" periods may be inferred from the first difference of the 
-    "deltaMinutes" values
+    • (optionally, and when `return_sorted` is True) a sequence with the 
+        neo.Block objects ordered by `rec_datetime`
+
 
     """
     if len(args) == 0:
@@ -5347,10 +5459,27 @@ def trials_sequence_info(*args, return_sorted:bool=False):
     return pd.DataFrame(ret)
 
 def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule:
-    """WARNING: Based on the naming of the trials (neo.Block objects)
-    The general naming format is aaa_<bbb_>*<xxxx>
+    """WARNING: Based on the naming of the trials (neo.Block objects).
     
-    where a, b are any word character (a-zA-Z0-9_) and x is any digit
+    The names of the blocks must follow the format: aaa_<bbb_>*<xxxx>
+    
+    where a, b are any word character (a-zA-Z0-9_) and x is any digit.
+    
+    These names must be the values of the `name` attribute of the neo.Block
+    objects (and it is useful if these sme  names would also be the symbols bound
+    to these objects, in the workspace). 
+
+    Usually, this is achieved by applying the naming format AT ACQUISITION (e.g.,
+    in Clampex) so that the naming of the stored files is taken up by the neo
+    Block(s) created upon reading the files (and also assigned to tyhe workspace
+    symbol).
+    
+    The `aaa_<bbb_>*<xxxx>` format folows the rule in Clampex (hence operating 
+    with ABF files) but should be easily implemented in other aquisition software
+    such as Signal 5.
+    
+    Returns a RecordingSchedule.
+    
 
     
     """

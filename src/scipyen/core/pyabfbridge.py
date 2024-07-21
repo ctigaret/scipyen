@@ -1436,7 +1436,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
                   "_nTotalDataPoints_", "_nDataPointsPerSweep_",
                   "_samplingRate_", "_sweepInterval_", 
                   "_averaging_", "_averageWeighting_", 
-                  "_protocolFile_","_sourceHash_", "_sourceId_", "_fileOrigin_",
+                  "_protocolFile_","_sourceHash_", "_sourceId_", 
+                  "_fileOrigin_",
                   ):
             
             arg = n.strip("_")
@@ -1455,6 +1456,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
         outputs = self._outputs_
         
         # entity_name = name if (isinstance(name, str) and len(name.strip())) else oname if (isinstance(oname, str) and len(oname.strip())) else strutils.str2symbol(self.name)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
         
         entity = group.create_group(target_name, track_order = track_order)
         entity.attrs.update(obj_attrs)

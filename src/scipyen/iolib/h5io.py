@@ -141,7 +141,8 @@ from core.quantities import(arbitrary_unit,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
                             unit_quantity_from_name_or_symbol,
-                            name_from_unit, units_convertible)
+                            name_from_unit, units_convertible,
+                            str2quantity, quantity2str)
 
 from core.datatypes import (TypeEnum,UnitTypes, GENOTYPES, 
                             is_uniform_sequence, is_uniform_collection, 
@@ -618,7 +619,11 @@ def _(x):
         if x.size > 1:
             raise ValueError("non-scalar quantities cannot be stored as HDF5 Attributes; convert them to HDF5 Dataset")
         
-        return f"pq.Quantity({float(x.magnitude)}, pq.{x.units.dimensionality})"
+        return f"QUANTITY {quantity2str(x)}"
+#         return f"{float(xx.magnitude)}, pq.{xx.units.dimensionality})"
+#         xx = x.simplified
+#         
+#         return f"pq.Quantity({float(xx.magnitude)}, pq.{xx.units.dimensionality})"
     
     elif x.dtype.kind in NUMPY_STRING_KINDS:
         return np.array(x, dtype=h5py.string_dtype(), order="K")
@@ -1579,9 +1584,18 @@ def attrs2dict(attrs:h5py.AttributeManager):
                     #     v = eval(f"{klass}.fromisoformat('{isofmt}')")
                     
                 elif "pq.Quantity" in v:
-                    v = eval(v)
+                    # leave here for back-compatibility
+                    try:
+                        v = eval(v)
+                    except:
+                        vv = v.replace("pq.Quantity(", "").replace(")", "").replace("pq.", "")
+                        v = str2quantity(vv)
                     
-                elif v.startswith("ENUM"):
+                elif v.startswith("QUANTITY "):
+                    v = v.replace("QUANTITY ", "")
+                    v = str2quantity(v)
+                    
+                elif v.startswith("ENUM "):
                     # print(f"attrs2dict: {v} ({type(v).__name__})")
                     _, v = v.split(" ")
                     # print(f"v.split: {_} {v} ({type(v).__name__})")
@@ -3073,21 +3087,6 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     storeEntityInCache(entity_cache, obj, dset)
     return dset
 
-# @makeDataset.register(pab.ABFEpoch)
-# @makeDataset.register(pab.ABFInputConfiguration)
-# @makeDataset.register(pab.ABFOutputConfiguration)
-# # @makeDataset.register(pab.ABFProtocol)
-# def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
-#     cached_entity = getCachedEntity(entity_cache, obj)
-#     if isinstance(cached_entity, h5py.Dataset):
-#         group[target_name] = cached_entity # make a hard link
-#         return cached_entity
-#     
-#     dset = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
-#     dset.attrs.update(attrs)
-#     storeEntityInCache(entity_cache, obj, dset)
-#     return dset
-
 def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None, compression:typing.Optional[str]="gzip",  chunks:typing.Optional[bool]=None, track_order:typing.Optional[bool] = True, entity_cache:typing.Optional[dict] = None):# -> h5py.Group:
     """Writes python iterable collection and neo containers to a HDF5 Group.
         • iterable collections: tuple, list, dict (and subclasses)
@@ -3211,6 +3210,18 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
                                                  track_order = track_order,
                                                  entity_cache = entity_cache,
                                                  parent_neo_container_entity = (obj,grp))
+    
+    if hasattr(obj, "annotations"):
+        annotations = getattr(obj, "annotations", dict())
+        
+        
+        annotations_entity = makeHDF5Entity(annotations, grp, "annotations",
+                                                    compression = compression, 
+                                                    chunks = chunks,
+                                                    track_order = track_order,
+                                                    entity_cache = entity_cache,
+                                                    parent_neo_container_entity = (obj,grp))
+    
     return grp
     
 def read_hdf5(h5file:h5py.File):
