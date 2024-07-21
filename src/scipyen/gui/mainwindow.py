@@ -4735,6 +4735,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceView.setSortingEnabled(True)
         self.workspaceView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.workspaceView.horizontalHeader().setStretchLastSection(False)
+        # TODO 2024-07-21 23:30:05
+        # make this configurable (and locale-dependent?)
+        self.workspaceView.horizontalHeader().setDefaultAlignment(QtCore.Qt.AlignLeft)
 
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         

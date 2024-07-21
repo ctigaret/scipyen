@@ -2933,7 +2933,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif isinstance(obj, str):
+        elif isinstance(obj, (str, bytes, bytearray)):
             sz = str(len(obj))
             sizetip = "size: "
             
