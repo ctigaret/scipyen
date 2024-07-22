@@ -18,6 +18,7 @@ import functools
 import math
 from copy import deepcopy
 from dataclasses import (dataclass, asdict, MISSING)
+import h5py
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -370,6 +371,70 @@ class MembranePropertiesAnalysisParameters:
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
+    
+    def makeHDF5Entity(self, group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Group:
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        # full_attrs = dict((x, getattr(self, x)) for x in self.__match_args__)
+        full_attrs = asdict(self)
+        
+        attrs_to_entities = dict((k,v) for k,v in full_attrs.items() if (isinstance(v, np.ndarray) and v.size > 1))
+        
+        attrs = dict((k,v) for k,v in full_attrs.items() if k not in attrs_to_entities)
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        if len(attrs_to_entities):
+            for k,v in attrs_to_entities.items():
+                h5io.makeHDF5Entity(v, entity, name=k, oname=k,
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+                
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
+    @classmethod
+    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
+        
+        kwargs = dict()
+        
+        for a in cls.__match_args__:
+            if a in attrs:
+                kwargs[a] = attrs[a]
+            else:
+                if a in entity.keys():
+                    kwargs[a] = h5io.objectFromHDF5Entity(entity[a], cache=cache)
+                    
+        return cls(**kwargs)
+        
+        
+        
     
 #     def __setattr__(self, name, value):
 #         if hasattr(self, name):

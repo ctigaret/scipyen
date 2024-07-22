@@ -1567,13 +1567,12 @@ def attrs2dict(attrs:h5py.AttributeManager):
     """
     ret = dict()
     for k,v in attrs.items():
-        # NOTE: 2021-11-10 12:47:52
-        # FIXME / TODO
         try:
             if isinstance(v, str) and v == "null":
                 v = None
             
             elif hasattr(v, "dtype"):
+                # print(f"dtype: {v.dtype}, {v.dtype.kind}")
                 if v.dtype == h5py.string_dtype():
                     v = list(v)
                     # v = v.decode("utf-8")
@@ -1585,6 +1584,18 @@ def attrs2dict(attrs:h5py.AttributeManager):
                         
                     else:
                         v = v[()]
+                        
+                elif v.dtype == np.dtype(np.bool_) and v.size == 1:
+                    v = bool(v) if v.ndim == 0 else bool(v[0])
+                    
+                elif v.dtype == np.dtype(np.int_) and v.size == 1:
+                    v = int(v) if v.ndim == 0 else int(v[0])
+                    
+                elif v.dtype == np.dtype(np.float_) and v.size == 1:
+                    v = float(v) if v.ndim == 0 else float(v[0])
+                    
+                elif np.iscomplex(v) and v.size == 1:
+                    v = complex(v) if v.ndim == 0 else complex(v[0])
                         
                 else:
                     if type(v) == bytes:
@@ -2502,9 +2513,9 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
     own "makeHDF5Entity" method, try to see is the caller of this function has
     supplied a custom function for this purpose (passed as the keyword 
     "makeHDF5Entity", and expecting the same parameters as this function); if 
-    such a function was passed, then it invokes it, and returns.
+    such a function was passed, then it is invoked, and this function returns.
     
-    3) finally, it proceeds to encode tyhhe HDF5
+    3) finally, it proceeds to encode the obj into an HDF5 tree structure.
     
     NOTE: 2021-12-12 12:12:25
     Objects are stored in 'group', typically as a child Dataset, or as a child 
