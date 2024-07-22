@@ -2375,31 +2375,6 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
                    **kwargs):# -> typing.Union[h5py.Group, h5py.Dataset]:
     """
     Encodes Python objects into a HDF5 entity (Group or Dataset).
-    
-    This is the "entry point" for encoding (writing) a Python object as a HDF5
-    data structure (file), in Scipyen.
-    
-    Depending on the type of Python object, the object's data are stored as one
-    or more HDF5 entities collected in a tree-like structure, in a parent HDF5
-    Group. The tree-like layout is characteristic to the Python data type.
-    
-    As a rule of thumb, numeric scalars, arrays and other plain old data types
-    (str, bool, bytes, bytearray) are stored as HDF5 Dataset "leaves".
-    
-    Iterable objects, as well as more complex object types are stored as HDF5
-    Group objects, containing children (HDF5 Group or Dataset) that correspond 
-    to specific attributes of the Python object.
-    
-    Information about the Python object's class and, where necessary, about any
-    specific attributes of the Python's object, are stored in the 'attrs' property
-    of the HDF5 entities.
-    
-    In addition, where possible, the Dataset entities associate axis scales 
-    containing meta-information (e.g., physcial units) associated with the 
-    numeric data in the Dataset.
-    
-    For details, please see doc/h5io.md in Scipyen's source tree.
-    
     Parameters:
     -----------
     obj: object A python object to be stored as a HDF5 entity (Group or Dataset)
@@ -2446,8 +2421,91 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
         property. However, as this occurs _while_ the code making the entity for 
         the parent container is still running, the code will result in infinite 
         recursion and will crash the Python interpreter.
-        
-        
+    
+    About this function:
+    --------------------
+    This is the "entry point" for encoding (writing) a Python object as a HDF5
+    data structure (file), in Scipyen.
+    
+    Depending on the type of Python object, the object's data are encoded as 
+    HDF5 entities (i.e. Group or Dataset) collected in a parent HDF5 Group, as a
+    tree-like structure. A HDF5 File is a particular case of HDF5 Group. 
+    
+    The layout of data in the HDF5 Group is characteristic to the type of Python 
+    data beign encoded.
+    
+    Writing to/reading from HDF5 in Scipyen tries to follow the following
+    general rules:
+    
+    A) Encoding (writing) to HDF5
+    
+    A.1) Numeric scalars, arrays and other plain old data types (str, bool, bytes, 
+    bytearray) are encoded as HDF5 Dataset "leaves".
+    
+    A.2) Collection (iterable) objects, are encoded as HDF5 Group objects; the 
+    elements of the iterable objects are encoded as children of this group (the 
+    children themselves can be HDF5 Group or Dataset).
+    
+    A.3) Complex Python data objects can be stored as HDF5 Group or Dataset, 
+    depending on the object attributes (i.e. their data type, on the Python 
+    side):
+    
+    A.3.1) Objects with all "simple" attributes (strings, bool, numeric scalars, 
+    numpy arrays with one element, small collections — tuple, list — bytes, 
+    bytearray up to the HDF5 limit of 64k) are stored as empty HDF5 datasets;
+    their attributes (on the Pytjhon side) are stored as HDF5 Attributes.
+    
+    A.3.2) Objects with more "complex" attributes — such as (large) collections of 
+    other objects, numpy arrays, pandas objects etc — will be encoded as HDF5
+    Group, and their attributes encoded as children of this Group following the
+    rules defined here.
+    
+    A.3.3) Where possible/appropriate — such as Vigra arrays and neo data objects,
+    the Dataset entities associate axis scales containing meta-information 
+    (e.g., physical units, axes annotations). Therefore, these object types will
+    be encoded as Group arther than Dataset.
+    
+    A.4) The Attributes of the HDF5 entity that encodes a Python objects must also
+    contain information about the original Python object's class and any specific
+    way to initializze it, using the data stored in the HDF5 entity tree.
+    
+    B) Decoding (reading) from HDF5
+    
+    B.1) The Python type must be able to be recontructed using information in the
+    HDF5 Attributes attached to the HDF5 entity encoding the Python object. This
+    entity if either a Grooup, or a Dataset. When a Group, its children encode
+    various attributes of the Python object (on the Python side), therefore the
+    children of the group must be decoded BEFORE the original Python object is 
+    reconstructed.
+    
+    B.2) Not all Python types can be encoded as HDF5 data types. The HDF5 
+    Attributes must contain sufficient information to allow the reconstitution of
+    these Python data types.
+    
+    This function works in tandem with objectFromHDF5Entity() function in this
+    module. Both have been designed to work essentially on immutable Python types
+    (i.e., thiose defined in the standard Python library, and in 3rd party libraries
+    such as `neo` and `pandas`). Although the code was written with a view towards
+    generality, these functions by no means cover a large range of possibilities.
+    
+    In Scipyen, several classes define their own encoding/decoding functions, that
+    follow the rules above.
+    
+    Therefore, the encoding function (this one) operates in the following way:
+    
+    1) first, it inspects the type of the Python object to be encoded, to see if
+    the type provides its own "makeHDF5Entity" method — usually, an instance 
+    method — the signature of wwhich expects the same parameters as this function; 
+    if it does, then it invokes it, and returns.
+    
+    2) second, if the type of the Python object to be encoded does NOT supply its
+    own "makeHDF5Entity" method, try to see is the caller of this function has
+    supplied a custom function for this purpose (passed as the keyword 
+    "makeHDF5Entity", and expecting the same parameters as this function); if 
+    such a function was passed, then it invokes it, and returns.
+    
+    3) finally, it proceeds to encode tyhhe HDF5
+    
     NOTE: 2021-12-12 12:12:25
     Objects are stored in 'group', typically as a child Dataset, or as a child 
     Group containing one or more data sets. These child entities are generated 
