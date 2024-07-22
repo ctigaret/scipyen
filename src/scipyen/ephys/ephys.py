@@ -1692,7 +1692,7 @@ class RecordingEpisode(Episode):
         block_protocols = list()
         
         try:
-            block_protocols = unique(list(filter(lambda x: isinstance(x, ElectrophysiologyProtocol), map(lambda x: getProtocol(x), blocks))), idcheck=False)
+            block_protocols = unique(list(filter(lambda x: isinstance(x, ElectrophysiologyProtocol), map(lambda x: getProtocol(x), self._blocks_))), idcheck=False)
         except:
             scipywarn("Cannot parse protocols from the Block objects")
             traceback.print_exc()
@@ -1748,7 +1748,14 @@ class RecordingEpisode(Episode):
         self._setup_from_blocks_() # will also update the protocols, 
         # but best deal with these now
         
+    def setFrameLimits(self, begin:int, end:int):
+        if abs(end-begin) != self.nFrames-1:
+            raise ValueError(f"Mismatch between number of frames {self.nFrames} and begin / end ({begin} / {end})")
         
+        begin, end = min(begin, end), max(begin, end)
+        
+        self._beginFrame_ = begin
+        self._endFrame_ = end
             
     @property
     def protocols(self) -> list:
@@ -1808,10 +1815,10 @@ class RecordingEpisode(Episode):
         if not isinstance(val, int):
             raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
         
-        nFrames = sum([len(b.segments) for b in self._blocks_])
+        # nFrames = sum([len(b.segments) for b in self._blocks_])
         
-        if len(self._blocks_) and val >= nFrames:
-            raise ValueError(f"'endFrame' ({val}) must be less than {nFrames} available frames")
+        if len(self._blocks_) and val >= self.beginFrame + self.nFrames:
+            raise ValueError(f"'endFrame' ({val}) must be less than {self.nFrames} available frames")
         
         if val < 0:
             raise ValueError(f"'endFrame' cannot be < 0; got {val} instead")
@@ -1827,8 +1834,9 @@ class RecordingEpisode(Episode):
         if len(self._blocks_) == 0:
             return 0
         
-        if len(self._blocks_) == 1:
-            return self._endFrame_ - self._beginFrame_ + 1
+        # if len(self._blocks_) == 1:
+        #     return len(self._blocks_[0].segments)
+            # return self._endFrame_ - self._beginFrame_ + 1
         
         return sum([len(b.segments) for b in self._blocks_])
     
@@ -1868,6 +1876,15 @@ class RecordingSchedule(Schedule):
     def pathways(self):
         return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
         
+    @property
+    def blocks(self) -> typing.List[neo.Block]:
+        ret = list()
+        
+        for episode in self.episodes:
+            ret += episode.blocks
+            
+        return ret
+        
     def addEpisode(self, episode: RecordingEpisode):
         if not isinstance(episode, RecordingEpisode):
             raise TypeError(f"Expecting a RecordingEpisode; instead, got {type(episode).__name__}")
@@ -1879,6 +1896,15 @@ class RecordingSchedule(Schedule):
                 raise TypeError("Expecting a sequence of Recording Episode objects")
             
             super().addEpisodes(episodes)
+            
+    def updateEpisodeFrames(self):
+        currentFrame = 0
+        for k, episode in enumerate(self.episodes):
+            episode.setFrameLimits(currentFrame, currentFrame + episode.nFrames - 1)
+            # episode.endFrame = currentFrame + episode.nFrames - 1
+            # episode.beginFrame = currentFrame
+            currentFrame = episode.endFrame + 1
+            
             
     def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:

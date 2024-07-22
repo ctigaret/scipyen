@@ -433,19 +433,6 @@ class MembranePropertiesAnalysisParameters:
                     
         return cls(**kwargs)
         
-        
-        
-    
-#     def __setattr__(self, name, value):
-#         if hasattr(self, name):
-#             object.__setattr__(self, name, value)
-#             self.__changed__ = True
-#             
-#     @property
-#     def changed(self):
-#         return self.__changed__
-
-
 def parse_current_injection_timings(data:neo.Block):
     """
     Extract current injection timings from the data.
@@ -478,12 +465,6 @@ Returns a tuple (Istart, Istop, Iinj_0, delta_I)
         scipywarn(
             f"Data block {data.name} does not appear to be a current clamp experiment. Expecting a DAC command in current units; instead, got {dac.dacUnits}")
         useProtocol = False
-
-    # currentInjectionEpochs = [e for e in dac.epochs if e.epochType == pab.ABFEpochType.Step and e.firstLevel !=
-    #                             0 * dac.units and e.deltaLevel != 0 * dac.units and e.deltaDuration == 0 * pq.ms]
-
-    # currentInjectionEpochs = [e for e in dac.epochs if e.epochType == pab.ABFEpochType.Step and e.deltaLevel != 
-    #                           0 * dac.units and e.deltaDuration == 0 * pq.ms]
     
     currentInjectionEpochs = [e for e in dac.epochs if e.epochType == pab.ABFEpochType.Step and e.firstLevel != 0 * dac.units ]
 

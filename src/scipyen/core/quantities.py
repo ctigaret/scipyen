@@ -34,6 +34,7 @@ import operator
 from functools import (reduce, partial, cache)
 
 from core import unicode_symbols
+from core.unicode_symbols import uchar
 
 _pqpfx = sorted(inspect.getmembers(pq.prefixes, lambda x: isinstance(x, (float, int))) + [("deca", pq.prefixes.deka)], key = lambda x: x[1])
 
@@ -639,10 +640,18 @@ def prettySymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) 
     if isinstance(x, pq.Quantity):
         x = x.dimensionality
         
-    unit_pwr = list(x.items())
-    ret = list()
+    delim = uchar("\\cdot")
     
+    def _pretty_power_(v):
+        if v > 1 or v < 0:
+            vv = f"{v}"
+            # print(f"{v}: {vv}")
+            return "".join([uchar(f"\\^{v_}") for v_ in vv]) 
+        
+        return ""
     
+    return delim.join(list(map(lambda v: f"{v[0]}{_pretty_power_(v[1])}", list((k.symbol, p) for k,p in x.items()))))
+       
 
 def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], precision:int = 2, format:str="f"):
     """Returns a str representation of a scalar Quantity or Dimensionality.
