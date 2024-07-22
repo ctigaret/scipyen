@@ -33,6 +33,8 @@ from traitlets import Bunch
 import operator
 from functools import (reduce, partial, cache)
 
+from core import unicode_symbols
+
 _pqpfx = sorted(inspect.getmembers(pq.prefixes, lambda x: isinstance(x, (float, int))) + [("deca", pq.prefixes.deka)], key = lambda x: x[1])
 
 def make_prefix_symbol(pfx):
@@ -606,7 +608,10 @@ def str2quantity(x:str):
     else:
         raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; indtead, got {x}")
 
-def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]):
+def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -> str:
+    """Returns the (short) symbol of this quantity's units)
+    E.g., 'V', 'mV', '1/Hz'
+    """
     if isinstance(x, pq.Quantity):
         x = x.dimensionality
     dimstr = f"{x}"
@@ -628,7 +633,16 @@ def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]):
     
     return dimstr
         
+unitSymbol = shortSymbol
+
+def prettySymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -> str:
+    if isinstance(x, pq.Quantity):
+        x = x.dimensionality
         
+    unit_pwr = list(x.items())
+    ret = list()
+    
+    
 
 def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality], precision:int = 2, format:str="f"):
     """Returns a str representation of a scalar Quantity or Dimensionality.

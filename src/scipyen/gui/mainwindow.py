@@ -3897,14 +3897,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 exportCSVAction.hovered.connect(
                     self._slot_showActionStatusMessage_)
 
-        saveVars = cm.addAction("Save as HDF5")
+        saveVars = cm.addAction("Save")
         saveVars.setToolTip("Save selected variables as HDF5 files")
         saveVars.setStatusTip("Save selected variables as HDF5 files")
         saveVars.setWhatsThis("Save selected variables as HDF5 files")
         saveVars.triggered.connect(self.slot_saveSelectedVariables)
         saveVars.hovered.connect(self._slot_showActionStatusMessage_)
 
-        pickleVars = cm.addAction("Save as Pickle")
+        pickleVars = cm.addAction("Pickle")
         pickleVars.setToolTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
         pickleVars.setStatusTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
         pickleVars.setWhatsThis("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")

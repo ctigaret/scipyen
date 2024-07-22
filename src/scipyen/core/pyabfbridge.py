@@ -2766,8 +2766,7 @@ class ABFInputConfiguration:
         return np.all([utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False) for p in props if p[0] != "protocol"])
     
     def __repr__(self):
-        # return f"{self.__class__.__name__} ({super().__repr__()}) with units: \'{self.adcUnits.symbol}\' and name: \'{self.name}\', at physical (logical) index: {self.physicalIndex} ({self.logicalIndex}) "
-        return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{self.adcUnits.symbol}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
+        return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
 
     def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex
@@ -3108,8 +3107,7 @@ class ABFOutputConfiguration:
                 
             
     def __repr__(self):
-        # ret = f"{self.__class__.__name__} ({super().__repr__()}) with units: \'{self.units.symbol}\' and name: \'{self.name}\', at physical (logical) index: {self.physicalIndex} ({self.logicalIndex}) "
-        ret = f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{self.units.symbol}\') at index {self.physicalIndex} ↔ {self.logicalIndex}  (physical ↔ logical)"
+        ret = f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.units.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}  (physical ↔ logical)"
         return ret
         
     def _init_epochs_(self, obj):
