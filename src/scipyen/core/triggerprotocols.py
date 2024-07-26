@@ -1240,7 +1240,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         elif isinstance(self.__segment_index__, (int, tuple, list)):
             return self.__segment_index__
         
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order, entity_cache):
+    def toHDF5(self, group, name, oname, compression, chunks, track_order, entity_cache):
         import h5py
         from iolib import h5io
         
@@ -1270,7 +1270,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
             else:
                 oname = name
                 
-            h5io.makeHDF5Entity(trigger, entity,
+            h5io.toHDF5(trigger, entity,
                                   name=name, oname=oname, 
                                   compression = compression, chunks=chunks, 
                                   track_order = track_order, entity_cache=entity_cache)
@@ -1279,7 +1279,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity, attrs:dict, cache:dict = {}):
+    def fromHDF5(cls, entity, attrs:dict, cache:dict = {}):
         import h5py
         from iolib import h5io
         # print(f"cls {cls}, entity {entity}")
@@ -1308,7 +1308,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
                 components[name] = cache[obj_entity]
                 
             else:
-                components[name] = h5io.objectFromHDF5Entity(obj_entity, cache)
+                components[name] = h5io.fromHDF5(obj_entity, cache)
                 
         return cls(pre              = components["presynaptic"],
                    post             = components["postsynaptic"],

@@ -335,7 +335,7 @@ class SynapticStimulus(__BaseSynStim__):
                     
         return super().__new__(cls, **new_args)
     
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
         
         from iolib import h5io
@@ -361,7 +361,7 @@ class SynapticStimulus(__BaseSynStim__):
         return entity
 
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+    def fromHDF5(cls, entity:h5py.Dataset, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
         
         from iolib import h5io
@@ -473,7 +473,7 @@ class AuxiliaryInput(__BaseAuxInput__):
                     
         return super().__new__(cls, **new_args)
     
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
         
 
@@ -501,7 +501,7 @@ class AuxiliaryInput(__BaseAuxInput__):
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+    def fromHDF5(cls, entity:h5py.Dataset, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
         
         from iolib import h5io
@@ -609,7 +609,7 @@ class AuxiliaryOutput(__BaseAuxOutput__):
                     
         return super().__new__(cls, **new_args)
     
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
     
         from iolib import h5io
@@ -636,7 +636,7 @@ class AuxiliaryOutput(__BaseAuxOutput__):
         return entity
 
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+    def fromHDF5(cls, entity:h5py.Dataset, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
         
         from iolib import h5io
@@ -763,7 +763,7 @@ class RecordingSource(__BaseSource__):
                    "",
                    ])
     
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         
         
@@ -785,17 +785,17 @@ class RecordingSource(__BaseSource__):
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         
-        h5io.makeHDF5Entity(self.syn, entity, name="syn", oname="syn",
+        h5io.toHDF5(self.syn, entity, name="syn", oname="syn",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.makeHDF5Entity(self.auxin, entity, name="auxin", oname="auxin",
+        h5io.toHDF5(self.auxin, entity, name="auxin", oname="auxin",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.makeHDF5Entity(self.auxout, entity, name="auxout", oname="auxout",
+        h5io.toHDF5(self.auxout, entity, name="auxout", oname="auxout",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
@@ -805,7 +805,7 @@ class RecordingSource(__BaseSource__):
     
 
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+    def fromHDF5(cls, entity:h5py.Group, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
     
         from iolib import h5io
@@ -818,9 +818,9 @@ class RecordingSource(__BaseSource__):
         adc  = attrs["adc"]
         dac  = attrs["dac"]
         
-        syn = h5io.objectFromHDF5Entity(entity["syn"], cache=cache)
-        auxin = h5io.objectFromHDF5Entity(entity["auxin"], cache=cache)
-        auxout = h5io.objectFromHDF5Entity(entity["auxout"], cache=cache)
+        syn = h5io.fromHDF5(entity["syn"], cache=cache)
+        auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
+        auxout = h5io.fromHDF5(entity["auxout"], cache=cache)
         
         return cls(name=name, adc=adc, dac=dac, syn=syn, auxin=auxin, auxout=auxout)
         
@@ -1564,10 +1564,10 @@ class RecordingEpisode(Episode):
             p.breakable()
             
 
-    def makeHDF5Entity(self,group:h5py.Group, name:str, oname:str, 
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Group:
-        """Overrides datatypes.Episode.makeHDF5Entity"""
+        """Overrides datatypes.Episode.toHDF5"""
         
         from iolib import h5io
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
@@ -1588,17 +1588,17 @@ class RecordingEpisode(Episode):
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         
-        h5io.makeHDF5Entity(self.blocks, entity, name="blocks", oname="blocks",
+        h5io.toHDF5(self.blocks, entity, name="blocks", oname="blocks",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.makeHDF5Entity(self.protocols, entity, name="protocols", oname="protocols",
+        h5io.toHDF5(self.protocols, entity, name="protocols", oname="protocols",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.makeHDF5Entity(self.pathways, entity, name="pathways", oname="pathways",
+        h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
@@ -1608,7 +1608,7 @@ class RecordingEpisode(Episode):
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+    def fromHDF5(cls, entity:h5py.Group, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
         
         from iolib import h5io
@@ -1617,9 +1617,9 @@ class RecordingEpisode(Episode):
         
         attrs = h5io.attrs2dict(entity.attrs)
         
-        blocks = h5io.objectFromHDF5Entity(entity["blocks"], cache=cache)
-        protocols = h5io.objectFromHDF5Entity(entity["protocols"], cache=cache)
-        pathways = h5io.objectFromHDF5Entity(entity["pathways"], cache=cache)
+        blocks = h5io.fromHDF5(entity["blocks"], cache=cache)
+        protocols = h5io.fromHDF5(entity["protocols"], cache=cache)
+        pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
         
         name=attrs["name"]
         begin=attrs["begin"]
@@ -1906,10 +1906,10 @@ class RecordingSchedule(Schedule):
             currentFrame = episode.endFrame + 1
             
             
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         # NOTE: 2024-07-20 18:48:45 
-        # although it inherits makeHDF5Entity and objectFromHDF5Entity from 
+        # although it inherits toHDF5 and fromHDF5 from 
         # datatypes.Schedule, that method encodes datatype.Episode as h5py.Datasets
         # whereas here we need to encode RecordingEpisodes as h5py.Group
         from iolib import h5io
@@ -1929,7 +1929,7 @@ class RecordingSchedule(Schedule):
         
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
-        h5io.makeHDF5Entity(self.episodes, entity, name="episodes", 
+        h5io.toHDF5(self.episodes, entity, name="episodes", 
                             oname="episodes", compression=compression,
                             chunks=chunks, track_order=track_order,
                             entity_cache=entity_cache)
@@ -1938,7 +1938,7 @@ class RecordingSchedule(Schedule):
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset,
+    def fromHDF5(cls, entity:h5py.Dataset,
                              attrs:typing.Optional[dict]=None, cache:dict={}):
         
         # NOTE: 2024-07-21 10:05:58 see NOTE: 2024-07-20 18:48:45 
@@ -1951,7 +1951,7 @@ class RecordingSchedule(Schedule):
         
         name = attrs["name"]
         
-        episodes = h5io.objectFromHDF5Entity(entity["episodes"], cache)
+        episodes = h5io.fromHDF5(entity["episodes"], cache)
         
         return cls(name, episodes=episodes)
         
@@ -2022,7 +2022,7 @@ class SynapticPathway:
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
     
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         
         from iolib import h5io
@@ -2046,22 +2046,22 @@ class SynapticPathway:
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         
-        h5io.makeHDF5Entity(self.stimulus, entity, name="stimulus", oname="stimulus",
+        h5io.toHDF5(self.stimulus, entity, name="stimulus", oname="stimulus",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.makeHDF5Entity(self.schedule, entity, name="schedule", oname="schedule",
+        h5io.toHDF5(self.schedule, entity, name="schedule", oname="schedule",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.makeHDF5Entity(self.measurements, entity, name="measurements", oname="measurements",
+        h5io.toHDF5(self.measurements, entity, name="measurements", oname="measurements",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.makeHDF5Entity(self.source, entity, name="source", oname="source",
+        h5io.toHDF5(self.source, entity, name="source", oname="source",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
@@ -2070,7 +2070,7 @@ class SynapticPathway:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+    def fromHDF5(cls, entity:h5py.Group, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
 
         from iolib import h5io
@@ -2082,10 +2082,10 @@ class SynapticPathway:
         pathwayType = attrs["pathwayType"]
         electrodeMode = attrs["electrodeMode"]
         clampMode = attrs["clampMode"]
-        schedule = h5io.objectFromHDF5Entity(entity["schedule"], cache=cache)
-        stimulus = h5io.objectFromHDF5Entity(entity["stimulus"], cache=cache)
-        source = h5io.objectFromHDF5Entity(entity["source"], cache=cache)
-        measurements = h5io.objectFromHDF5Entity(entity["measurements"], cache=cache)
+        schedule = h5io.fromHDF5(entity["schedule"], cache=cache)
+        stimulus = h5io.fromHDF5(entity["stimulus"], cache=cache)
+        source = h5io.fromHDF5(entity["source"], cache=cache)
+        measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
         
         return cls(name=name, pathwayType=pathwayType, stimulus=stimulus,
                    electrodeMode=electrodeMode, clampMode=clampMode,

@@ -1827,7 +1827,7 @@ def saveHDF5(data, fileName):
         fileName += ".h5"
         
     with h5py.File(fileName, mode="w") as h5file:
-        h5io.makeHDF5Entity(data, h5file, name=os.path.basename(name))
+        h5io.toHDF5(data, h5file, name=os.path.basename(name))
     
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):

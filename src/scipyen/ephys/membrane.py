@@ -372,7 +372,7 @@ class MembranePropertiesAnalysisParameters:
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
     
-    def makeHDF5Entity(self, group:h5py.Group, name:str, oname:str, 
+    def toHDF5(self, group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Group:
         
@@ -401,7 +401,7 @@ class MembranePropertiesAnalysisParameters:
         
         if len(attrs_to_entities):
             for k,v in attrs_to_entities.items():
-                h5io.makeHDF5Entity(v, entity, name=k, oname=k,
+                h5io.toHDF5(v, entity, name=k, oname=k,
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
@@ -411,7 +411,7 @@ class MembranePropertiesAnalysisParameters:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+    def fromHDF5(cls, entity:h5py.Group, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
         
         from iolib import h5io
@@ -429,7 +429,7 @@ class MembranePropertiesAnalysisParameters:
                 kwargs[a] = attrs[a]
             else:
                 if a in entity.keys():
-                    kwargs[a] = h5io.objectFromHDF5Entity(entity[a], cache=cache)
+                    kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
                     
         return cls(**kwargs)
         

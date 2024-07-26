@@ -593,9 +593,9 @@ class ABFEpoch:
 
         return (tuple(), tuple())
         
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
-        # print(f"{self.__class__.__name__}.makeHDF5Entity: group = {group}, name = {name}, oname = {oname}")
+        # print(f"{self.__class__.__name__}.toHDF5: group = {group}, name = {name}, oname = {oname}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -604,7 +604,7 @@ class ABFEpoch:
         
         # TODO: 2024-07-17 15:49:20
         # parse relevant ABFEpoch attributes into obj_attrs
-        # make sure you take h5io.objectFromHDF5Entity into account
+        # make sure you take h5io.fromHDF5 into account
         #
         attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
                             inspect.getmembers_static(self, inspect.isdatadescriptor)))
@@ -622,9 +622,9 @@ class ABFEpoch:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+    def fromHDF5(cls, entity:h5py.Dataset, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
-        # print(f"{cls.__name__}.objectFromHDF5Entity entity: {type(entity).__name__}")
+        # print(f"{cls.__name__}.fromHDF5 entity: {type(entity).__name__}")
         if entity in cache:
             return cache[entity]
         
@@ -1422,11 +1422,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
         return ret
     
-    def makeHDF5Entity(self, group:h5py.Group, name:str, oname:str, compression, chunks, track_order,
+    def toHDF5(self, group:h5py.Group, name:str, oname:str, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         """Encodes this ABFProtocol as a HDF5 Group"""
         
-        # print(f"{self.__class__.__name__}.makeHDF5Entity: group = {group}, name = {name}, oname = {oname}")
+        # print(f"{self.__class__.__name__}.toHDF5: group = {group}, name = {name}, oname = {oname}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         # print(f"\ttarget_name = {target_name}")
         # print(f"\tobj_attrs {obj_attrs}")
@@ -1460,7 +1460,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         obj_attrs.update(objattrs)
         # objattrs = h5io.makeAttrDict(**obj_attrs)
         
-        # print(f"{self.__class__.__name__}.makeHDF5Entity:")
+        # print(f"{self.__class__.__name__}.toHDF5:")
         # print(f"\tobj_attrs: {obj_attrs}")
         # print(f"\tobjattrs: {objattrs}")
         
@@ -1475,7 +1475,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         entity = group.create_group(target_name, track_order = track_order)
         entity.attrs.update(obj_attrs)
         
-        inputs_group = h5io.makeHDF5Entity(inputs, entity, name="inputs",
+        inputs_group = h5io.toHDF5(inputs, entity, name="inputs",
                                            oname="ADCs", 
                                            compression=compression,
                                            chunks=chunks, 
@@ -1483,7 +1483,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                            entity_cache=entity_cache,
                                            )
         
-        outputs_group = h5io.makeHDF5Entity(outputs, entity, name="outputs",
+        outputs_group = h5io.toHDF5(outputs, entity, name="outputs",
                                             oname="DACs", 
                                            compression=compression,
                                            chunks=chunks, 
@@ -1496,7 +1496,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+    def fromHDF5(cls, entity:h5py.Group, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
         
         if entity in cache:
@@ -1505,7 +1505,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if attrs is None:
             attrs = h5io.attrs2dict(entity.attrs)
             
-        # print(f"{cls.__name__}.objectFromHDF5Entity:")
+        # print(f"{cls.__name__}.fromHDF5:")
         # print(f"\tattrs: {attrs}")
             
         kargs = dict()
@@ -1527,8 +1527,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # print(f"\tentity/inputs = {entity['inputs']}")
         # print(f"\tentity/outputs = {entity['outputs']}")
             
-        kargs["inputs"] = h5io.objectFromHDF5Entity(entity["inputs"], cache)
-        kargs["outputs"] = h5io.objectFromHDF5Entity(entity["outputs"], cache)
+        kargs["inputs"] = h5io.fromHDF5(entity["inputs"], cache)
+        kargs["outputs"] = h5io.fromHDF5(entity["outputs"], cache)
         
         # print(f"inputs: {kargs['inputs']}")
         # print(f"outputs: {kargs['outputs']}")
@@ -2657,12 +2657,12 @@ class ABFInputConfiguration:
             else:
                 self._adcUnits_ = pq.dimensionless
                 
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         """Encodes this ABFInputConfiguration as a HDF5 Group.
         """
         
-        # print(f"{self.__class__.__name__}.makeHDF5Entity: group = {group}, name = {name}, oname = {oname}")
+        # print(f"{self.__class__.__name__}.toHDF5: group = {group}, name = {name}, oname = {oname}")
         # NOTE: 2024-07-18 15:10:22
         # I choose a Group here, and not a Dataset, so that we can store the 
         # parent protocol as a soft link.
@@ -2739,9 +2739,9 @@ class ABFInputConfiguration:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset, 
+    def fromHDF5(cls, entity:h5py.Dataset, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
-        # print(f"{cls.__name__}.objectFromHDF5Entity")
+        # print(f"{cls.__name__}.fromHDF5")
         if entity in cache:
             return cache[entity]
         
@@ -3254,7 +3254,7 @@ class ABFOutputConfiguration:
                     
         return ret
     
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         """Encodes this ABFOutputConfiguration as a HDF5 Group"""
         
@@ -3262,7 +3262,7 @@ class ABFOutputConfiguration:
         # I chose Group because we need to store a link to the parent protocol
         # and a Group encoding the list of ABFEpoch objects (the "epochs" attribute)
         
-        # print(f"{self.__class__.__name__}.makeHDF5Entity: group = {group}, name = {name}, oname = {oname}")
+        # print(f"{self.__class__.__name__}.toHDF5: group = {group}, name = {name}, oname = {oname}")
         
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         # print(f"\ttarget_name = {target_name}")
@@ -3320,7 +3320,7 @@ class ABFOutputConfiguration:
             # epochs list appropriately (including descending into it and encoding
             # its elements, recursively) to be compatible with full round Robin
             # read/write
-            epochs_group = h5io.makeHDF5Entity(epochs, entity, name="epochs",
+            epochs_group = h5io.toHDF5(epochs, entity, name="epochs",
                                                oname="epochs",
                                                compression=compression,
                                                chunks=chunks, 
@@ -3332,9 +3332,9 @@ class ABFOutputConfiguration:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+    def fromHDF5(cls, entity:h5py.Group, 
                              attrs:typing.Optional[dict]=None, cache:dict = {}):
-        # print(f"{cls.__name__}.objectFromHDF5Entity")
+        # print(f"{cls.__name__}.fromHDF5")
         if entity in cache:
             return cache[entity]
         
@@ -3352,7 +3352,7 @@ class ABFOutputConfiguration:
         # print(f"entity/epochs: {entity['epochs']}")
         
         
-        epochs = h5io.objectFromHDF5Entity(entity["epochs"], cache)
+        epochs = h5io.fromHDF5(entity["epochs"], cache)
         
         return cls(obj=None, protocol=None, dacChannel=dacChannel, units=units,
                    dacHoldingLevel=dacHoldingLevel, interEpisodeLevel=interEpisodeLevel,

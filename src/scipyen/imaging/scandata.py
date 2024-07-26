@@ -8700,7 +8700,7 @@ class ScanData(BaseScipyenData):
             else:
                 return max(self._get_component_nFrames_(c[0]) for c in self._data_children_)
                 
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache):
         
         # import h5py

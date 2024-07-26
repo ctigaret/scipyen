@@ -442,7 +442,7 @@ def h5pyIterator(g:h5py.Group, prefix:str='',
         path = '{}/{}'.format(prefix, key)
         if isinstance(item, h5py.Dataset): # test for dataset
             #yield (path, item)
-            return objectFromHDF5Entity(item)
+            return fromHDF5(item)
             # yield (path, item, item.attrs)
         elif isinstance(item, h5py.Group): # test for group (go down)
             print(f"Group '{item.name}' attributes:")
@@ -749,7 +749,7 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
         for child_container in child_containers:
             entity = g.get(child_container, None)
             if isinstance(entity, (h5py.Group, h5py.Dataset)):
-                child = objectFromHDF5Entity(entity, cache)
+                child = fromHDF5(entity, cache)
                 setattr(obj, child_container, child)
             
     obj = target_class() # this automatically creates container children e.g. analosginals, etc
@@ -759,7 +759,7 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
     for child_container in child_containers:
         entity = g.get(child_container, None)
         if isinstance(entity, (h5py.Group, h5py.Dataset)):
-            child = objectFromHDF5Entity(entity, cache)
+            child = fromHDF5(entity, cache)
             # print(f"group2neoContainer child_container {child_container}, entity: {entity}, child: {type(child).__name__}")
             setattr(obj, child_container, child)
         
@@ -767,7 +767,7 @@ def group2neoContainer(g:h5py.Group, target_class:type, cache:dict = {}):
         setattr(obj, k, v)
     
     if "annotations" in g:
-        annotations = objectFromHDF5Entity(g["annotations"], cache)
+        annotations = fromHDF5(g["annotations"], cache)
         if isinstance(annotations, dict):
             obj.annotations.update(annotations)
     
@@ -844,12 +844,12 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     segment_entity = g.get("segment", None)
     if isinstance(segment_entity, h5py.Group):
         # NOTE: 2022-10-09 08:48:24 
-        # in the next call, objectFromHDF5Entity will either:
+        # in the next call, fromHDF5 will either:
         # • get the actual neo.Segment from cache (if this segment_entity is
         #   in the cahche, which means the neo.Segment instance has been 
         #   reconstructed already)
         # • create a new neo.Segment from the segment_entity, rthen cache it
-        segment = objectFromHDF5Entity(segment_entity, cache)
+        segment = fromHDF5(segment_entity, cache)
         
     # data_set_name = f"{g.name.split('/')[-1]}_data"
     data_set = g.get("data", None)
@@ -867,7 +867,7 @@ def group2neoSignal(g:h5py.Group, target_class:type, cache:dict = {}):
     if isinstance(annotations_group, h5py.Group):
         # now, this might be cached, as it corresponds to a real-life python 
         # object: the neo object's annotations
-        annotations = objectFromHDF5Entity(annotations_group)
+        annotations = fromHDF5(annotations_group)
     else:
         annotations = dict()
 
@@ -1066,25 +1066,25 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
 #     labels_set = g.get("labels", None)
 #     
 #     if isinstance(labels_set, h5py.Dataset):
-#         labels = objectFromHDF5Entity(labels_set)
+#         labels = fromHDF5(labels_set)
 #     else:
 #         labels = None
         
     durations_set = g.get("durations", None)
     if isinstance(durations_set, h5py.Dataset):
-        durations = objectFromHDF5Entity(durations_set)
+        durations = fromHDF5(durations_set)
     else:
         durations = None
     
     segment_entity = g.get("segment", None)
     if isinstance(segment_entity, h5py.Group):
         # NOTE: 2022-10-09 08:48:24 
-        # in the next call, objectFromHDF5Entity will either:
+        # in the next call, fromHDF5 will either:
         # • get the actual neo.Segment from cache (if this segment_entity is
         #   in the cahche, which means the neo.Segment instance has been 
         #   reconstructed already)
         # • create a new neo.Segment from the segment_entity, rthen cache it
-        segment = objectFromHDF5Entity(segment_entity, cache)
+        segment = fromHDF5(segment_entity, cache)
         
     # NOTE: 2022-10-10 14:27:21 ATTENTION
     # do NOT confuse with array_annotations
@@ -1092,7 +1092,7 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
     annotations_group = g.get("annotations", None)
     
     if isinstance(annotations_group, h5py.Group):
-        annotations = objectFromHDF5Entity(annotations_group)
+        annotations = fromHDF5(annotations_group)
     else:
         annotations = dict()
 
@@ -1301,7 +1301,7 @@ def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
         signal_entity = g.get("obj", None)
         signal = None
         if isinstance(signal_entity, h5py.Group):
-            signal = objectFromHDF5Entity(signal_entity, cache)
+            signal = fromHDF5(signal_entity, cache)
             
         if all(o is not None for o in (index, signal)):
             obj = target_class(signal, time, **kwargs)
@@ -1311,10 +1311,10 @@ def group2neo(g:h5py.Group, target_class:type, cache:dict = {}):
     else:
         raise TypeError(f"Don't know how to manage {target_class}")
             
-def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={}):
-    """attempt to round trip of makeHDF5Entity
+def fromHDF5(entity:typing.Union[h5py.Group, h5py.Dataset], cache:dict={}):
+    """attempt to round trip of toHDF5
     """
-    # print("in objectFromHDF5Entity: ")
+    # print("in fromHDF5: ")
     # NOTE: 2022-10-08 13:16:14
     # HDF5 entities (Group, Dataset) are hashable;
     # hence, we can use them to store entity → object maps
@@ -1329,7 +1329,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
     
     attrs = attrs2dict(entity.attrs)
     
-    # print(f"objectFromHDF5Entity attrs = {attrs}")
+    # print(f"fromHDF5 attrs = {attrs}")
 
     try:
         type_name = attrs.get("type_name", None)
@@ -1366,23 +1366,23 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             except:
                 traceback.print_exc()
                 print(f"😢 \python_class: {python_class}")
-                print(f"😢 objectFromHDF5Entity -> python_class_comps: {python_class_comps}")
-                print(f"😢 objectFromHDF5Entity -> module_name: {module_name}")
-                print(f"😢 objectFromHDF5Entity -> module_name_comps: {module_name_comps}")
-                print(f"😢 objectFromHDF5Entity -> wanted target_class: {'.'.join(python_class_comps[1:])}")
+                print(f"😢 fromHDF5 -> python_class_comps: {python_class_comps}")
+                print(f"😢 fromHDF5 -> module_name: {module_name}")
+                print(f"😢 fromHDF5 -> module_name_comps: {module_name_comps}")
+                print(f"😢 fromHDF5 -> wanted target_class: {'.'.join(python_class_comps[1:])}")
                 raise
             
     except:
-        print(f"😢 objectFromHDF5Entity -> entity: {entity.name}")
+        print(f"😢 fromHDF5 -> entity: {entity.name}")
         traceback.print_exc()
         raise
     
     # 😢
-    # print(f"objectFromHDF5Entity target_class = {target_class}")
+    # print(f"fromHDF5 target_class = {target_class}")
     
-    if isinstance(inspect.getattr_static(target_class,"objectFromHDF5Entity", None),
+    if isinstance(inspect.getattr_static(target_class,"fromHDF5", None),
                   prog.CALLABLE_TYPES + (classmethod,)):
-        return target_class.objectFromHDF5Entity(entity, attrs, cache)
+        return target_class.fromHDF5(entity, attrs, cache)
     
     if isinstance(entity, h5py.Dataset):
         # NOTE: 2022-10-06 11:57:32
@@ -1390,7 +1390,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
         # not to data sets that are children of groups encapsulating more 
         # specialized objects such a neo signal etc
         # hence these will be dealt with in the "group" branch below; don't
-        # call objectFromHDF5Entity on the children datsets there!
+        # call fromHDF5 on the children datsets there!
         if entity.shape is None or len(entity.shape) == 0: 
             # no axes imply no Dataset dimscales either
             # most likely a scalar and therefore we attempt to instantiate
@@ -1464,7 +1464,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
         # some specialized arrray-like data objects (e.g. neo DataObject etc)
         # are encapsulatd in h5py Group and store their actual array data in 
         # h5py Dataset children of this Group;
-        # therefore, we parse these datasets HERE instead of calling objectFromHDF5Entity
+        # therefore, we parse these datasets HERE instead of calling fromHDF5
         # recursively as we do for Groups storing regular python collections!
         
         if target_class == vigra.VigraArray:
@@ -1479,26 +1479,26 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                         # custom dict keys
                         key_value_grp = entity[k]
                         # exepect two entities: "key" and "value"
-                        key = objectFromHDF5Entity(key_value_grp["key"], {})
-                        value = objectFromHDF5Entity(key_value_grp["value"], cache)
+                        key = fromHDF5(key_value_grp["key"], {})
+                        value = fromHDF5(key_value_grp["value"], cache)
                         obj[key] = value
                     else:
                         # regular (sane) case of dict with str keys
-                        obj[k] = objectFromHDF5Entity(entity[k], cache)
+                        obj[k] = fromHDF5(entity[k], cache)
                         
-                # print(f"objectFromHDF5Entity {obj.__class__.__name__}: {obj}")
+                # print(f"fromHDF5 {obj.__class__.__name__}: {obj}")
                     
             # elif any(k in mro for k in (list, NeoObjectList)):
             elif list in mro:
                 obj = target_class()
                 for k in entity.keys():
-                    o = objectFromHDF5Entity(entity[k], cache)
+                    o = fromHDF5(entity[k], cache)
                     obj.append(o)
                     
             elif tuple in mro:
                 obj = list()
                 for k in entity.keys():
-                    o = objectFromHDF5Entity(entity[k], cache)
+                    o = fromHDF5(entity[k], cache)
                     obj.append(o)
                     
                 obj = tuple(obj)
@@ -1510,7 +1510,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             elif target_class == neo.core.spiketrainlist.SpikeTrainList:
                 items = list()
                 for k in entity.keys():
-                    o = objectFromHDF5Entity(entity[k], cache)
+                    o = fromHDF5(entity[k], cache)
                     items.append(o)
                     
                 obj = target_class(items = tuple(items))
@@ -1519,7 +1519,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
                 items = list()
                 item_types = list()
                 for k in entity.keys():
-                    o = objectFromHDF5Entity(entity[k], cache)
+                    o = fromHDF5(entity[k], cache)
                     items.append(o)
                     item_types.append(type(o))
                     
@@ -1546,7 +1546,7 @@ def objectFromHDF5Entity(entity:typing.Union[h5py.Group, h5py.Dataset], cache:di
             
     cache[entity] = obj
     
-    # print(f"objectFromHDF5Entity: obj = {obj}")
+    # print(f"fromHDF5: obj = {obj}")
     
     return obj
 
@@ -2339,14 +2339,14 @@ def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,
     
     if isinstance(obj, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal,
                         neo.Event, DataMark)) and obj.size > 0:
-        axis_dset = makeHDF5Entity(obj.times, axesgroup,
+        axis_dset = toHDF5(obj.times, axesgroup,
                                      name = axis_dset_name,
                                      compression = compression, 
                                      chunks = chunks,
                                      track_order = track_order)
         
     elif isinstance(obj, (neo.Epoch, DataZone)) and obj.size > 0:
-        axis_dset = makeHDF5Entity(obj.durations, axesgroup,
+        axis_dset = toHDF5(obj.durations, axesgroup,
                                      name = axis_dset_name,
                                      compression = compression, 
                                      chunks = chunks,
@@ -2377,7 +2377,7 @@ def makeAxisScale(obj, dset:h5py.Dataset, axesgroup:h5py.Group, dimindex:int,
     return axis_dset
 
 @safeWrapper
-def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
+def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
                    oname:typing.Optional[str]=None,
                    compression:typing.Optional[str]="gzip",
                    chunks:typing.Optional[bool]=None,
@@ -2493,7 +2493,7 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
     Attributes must contain sufficient information to allow the reconstitution of
     these Python data types.
     
-    This function works in tandem with objectFromHDF5Entity() function in this
+    This function works in tandem with fromHDF5() function in this
     module. Both have been designed to work essentially on immutable Python types
     (i.e., thiose defined in the standard Python library, and in 3rd party libraries
     such as `neo` and `pandas`). Although the code was written with a view towards
@@ -2505,14 +2505,14 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
     Therefore, the encoding function (this one) operates in the following way:
     
     1) first, it inspects the type of the Python object to be encoded, to see if
-    the type provides its own "makeHDF5Entity" method — usually, an instance 
+    the type provides its own "toHDF5" method — usually, an instance 
     method — the signature of wwhich expects the same parameters as this function; 
     if it does, then it invokes it, and returns.
     
     2) second, if the type of the Python object to be encoded does NOT supply its
-    own "makeHDF5Entity" method, try to see is the caller of this function has
+    own "toHDF5" method, try to see is the caller of this function has
     supplied a custom function for this purpose (passed as the keyword 
-    "makeHDF5Entity", and expecting the same parameters as this function); if 
+    "toHDF5", and expecting the same parameters as this function); if 
     such a function was passed, then it is invoked, and this function returns.
     
     3) finally, it proceeds to encode the obj into an HDF5 tree structure.
@@ -2582,22 +2582,22 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
     Python iterable and neo's Container objects (e.g. Block, Segment, etc)
       stored as a group via makeHDF5Group
       
-    Objects that define their own 'makeHDF5Entity' method are stored as defined
+    Objects that define their own 'toHDF5' method are stored as defined
     by the method code. 
       
     """
     from imaging import vigrautils as vu
 
     # NOTE: 2024-07-18 14:00:22
-    # 1. check if the data type defines an instance method 'makeHDF5Entity'; 
-    entity_factory_method = getattr(obj, "makeHDF5Entity", None)
+    # 1. check if the data type defines an instance method 'toHDF5'; 
+    entity_factory_method = getattr(obj, "toHDF5", None)
     
-    # 2. check if a custom-made makeHDF5Entity function is passed here (this
+    # 2. check if a custom-made toHDF5 function is passed here (this
     # will override the instance method above, if defined)
     if entity_factory_method is None:
-        entity_factory_method = kwargs.pop("makeHDF5Entity", None)
+        entity_factory_method = kwargs.pop("toHDF5", None)
         
-    # 3. a makeHDF5Entity method or function is available from (1) or (2) above
+    # 3. a toHDF5 method or function is available from (1) or (2) above
     #   → use it 
     if inspect.ismethod(entity_factory_method):
         target_name, obj_attrs = makeObjAttrs(obj, oname=oname)
@@ -2611,8 +2611,8 @@ def makeHDF5Entity(obj, group:h5py.Group, name:typing.Optional[str]=None,
             group[target_name] = cached_entity
             return cached_entity
         
-        # call either the makeHDF5Entity method of the object;s class, or the 
-        # custom (3rd party£makeHDF5Entity), if it exists
+        # call either the toHDF5 method of the object;s class, or the 
+        # custom (3rd party£toHDF5), if it exists
         return entity_factory_method(group, target_name, oname, compression, chunks,
                                      track_order, entity_cache)
 
@@ -3112,7 +3112,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     #     if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
     #         group["labels"] = cached_entity
     #     else:
-    #         labels_dset = makeHDF5Entity(labels, group, 
+    #         labels_dset = toHDF5(labels, group, 
     #                                     name ="labels",
     #                                     compression = compression,
     #                                     chunks = chunks)
@@ -3136,7 +3136,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
             group["waveforms"] = cached_entity # (hard link)
         else:
-            waveforms_dset = makeHDF5Entity(waveforms, group, 
+            waveforms_dset = toHDF5(waveforms, group, 
                                             name = "waveforms",
                                             compression = compression,
                                             chunks = chunks,
@@ -3152,7 +3152,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         if isinstance(cached_entity, h5py.Group):
             group["annotations"] = cached_entity # hard link
         else:
-            annot_group = makeHDF5Entity(annotations, group, "annotations", 
+            annot_group = toHDF5(annotations, group, "annotations", 
                                         compression=compression, chunks=chunks,
                                         track_order = track_order)
         
@@ -3166,7 +3166,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
             # is identical to the one used before)
             group["segment"] = entity_cache[seg_id]
         else:
-            makeHDF5Entity(segment, group, name="segment", 
+            toHDF5(segment, group, name="segment", 
                            compression=compression, chunks=chunks,
                            track_order=track_order)
     dset.attrs.update(attrs)
@@ -3231,7 +3231,7 @@ def makeHDF5Group(obj, group:h5py.Group, name:typing.Optional[str]=None, compres
         
     # NOTE: 2021-12-14 17:02:04
     # dispatched makeGroup variants descend into the container's elements to
-    # call makeHDF5Entity for each
+    # call toHDF5 for each
     entity = makeGroup(obj, group, obj_attrs, target_name, compression, chunks, track_order, entity_cache)
     
     return entity
@@ -3273,7 +3273,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
                 grp[k] = cached_entity
             
             else:
-                element_entity = makeHDF5Entity(element, grp, k, compression = compression, chunks = chunks,
+                element_entity = toHDF5(element, grp, k, compression = compression, chunks = chunks,
                                 track_order = track_order, entity_cache = entity_cache)
     else:
         for k, (key, element) in enumerate(obj.items()):
@@ -3281,14 +3281,14 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
             key_value_grp_name = f"{k}_{key_type.__name__}_key"
             key_value_grp = grp.create_group(key_value_grp_name, track_order=track_order)
             
-            key_entity = makeHDF5Entity(key, key_value_grp ,"key", compression = compression, chunks = chunks,
+            key_entity = toHDF5(key, key_value_grp ,"key", compression = compression, chunks = chunks,
                                 track_order = track_order, entity_cache = entity_cache)
             
             cached_entity = getCachedEntity(entity_cache, element)
             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
                 key_value_grp["value"] = cached_entity
             else:
-                element_entity = makeHDF5Entity(element, key_value_grp, "value", compression = compression, chunks = chunks,
+                element_entity = toHDF5(element, key_value_grp, "value", compression = compression, chunks = chunks,
                                 track_order = track_order, entity_cache = entity_cache)
             
             
@@ -3314,7 +3314,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
             grp[element_entry_name] = cached_entity
         else:
-            element_entity = makeHDF5Entity(element, grp, element_entry_name, compression = compression, chunks = chunks,
+            element_entity = toHDF5(element, grp, element_entry_name, compression = compression, chunks = chunks,
                             track_order = track_order, entity_cache = entity_cache)
             
     return grp
@@ -3353,7 +3353,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
             grp[collection_group_name] = cached_entity
         else:
-            collection_entity = makeHDF5Entity(collection, grp, collection_group_name, 
+            collection_entity = toHDF5(collection, grp, collection_group_name, 
                                                  compression = compression, 
                                                  chunks = chunks,
                                                  track_order = track_order,
@@ -3364,7 +3364,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
         annotations = getattr(obj, "annotations", dict())
         
         # print(f"makeGroup: storing annotations")
-        annotations_entity = makeHDF5Entity(annotations, grp, "annotations",
+        annotations_entity = toHDF5(annotations, grp, "annotations",
                                                     compression = compression, 
                                                     chunks = chunks,
                                                     track_order = track_order,
@@ -3374,7 +3374,7 @@ def _(obj, group, attrs, name, compression, chunks, track_order, entity_cache):
     return grp
     
 def read_hdf5(h5file:h5py.File):
-    ret = dict((k, objectFromHDF5Entity(i)) for k,i in h5file.items())
+    ret = dict((k, fromHDF5(i)) for k,i in h5file.items())
     # print(f"\nread_hdf5: ret = {ret}\n")
     if len(ret)==1:
         return [v for v in ret.values()][0]

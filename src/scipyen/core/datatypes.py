@@ -1133,7 +1133,7 @@ class Episode:
     # procedure:Procedure = field(default_factory = lambda: Procedure())
     # procedure:Procedure  = field(default_factory = Procedure)
     
-    def makeHDF5Entity(self,group:h5py.Group, name:str, oname:str, 
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Dataset:
         """Encodes an episode as an empty hdf5 dataset"""
@@ -1160,7 +1160,7 @@ class Episode:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Dataset,
+    def fromHDF5(cls, entity:h5py.Dataset,
                              attrs:typing.Optional[dict]=None, cache:dict={}):
         from iolib import h5io
         if entity in cache:
@@ -1183,7 +1183,7 @@ class Schedule:
     _:KW_ONLY
     episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
     
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         
         from iolib import h5io
@@ -1203,7 +1203,7 @@ class Schedule:
         
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
-        h5io.makeHDF5Entity(self.episodes, entity, name="episodes", 
+        h5io.toHDF5(self.episodes, entity, name="episodes", 
                             oname="episodes", compression=compression,
                             chunks=chunks, track_order=track_order,
                             entity_cache=entity_cache)
@@ -1211,7 +1211,7 @@ class Schedule:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group,
+    def fromHDF5(cls, entity:h5py.Group,
                              attrs:typing.Optional[dict] = None, cache:dict={}):
         
         from iolib import h5io
@@ -1222,7 +1222,7 @@ class Schedule:
         
         name = attrs["name"]
         
-        episodes = h5io.objectFromHDF5Entity(entity["episodes"], cache)
+        episodes = h5io.fromHDF5(entity["episodes"], cache)
         
         return cls(name, episodes=episodes)
     
@@ -1316,7 +1316,7 @@ class Procedure:
     # OR:
     # schedule:Schedule = field(default_factory = lambda: Schedule())
     
-    def makeHDF5Entity(self,group:h5py.Group, name:str, oname:str, 
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Group:
         from iolib import h5io
@@ -1336,7 +1336,7 @@ class Procedure:
         
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
-        h5io.makeHDF5Entity(self.schedule, entity, name="schedule", 
+        h5io.toHDF5(self.schedule, entity, name="schedule", 
                             oname="schedule", compression=compression,
                             chunks=chunks, track_order=track_order,
                             entity_cache=entity_cache)
@@ -1344,7 +1344,7 @@ class Procedure:
         return entity
     
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+    def fromHDF5(cls, entity:h5py.Group, 
                              attrs:typing.Optional[dict] = None, cache:dict = {}):
         
         from iolib import h5io
@@ -1356,7 +1356,7 @@ class Procedure:
         name = attrs["name"]
         procedureType = attrs["procedureType"]
         
-        schedule = h5io.objectFromHDF5Entity(entity["schedule"], cache)
+        schedule = h5io.fromHDF5(entity["schedule"], cache)
         
         return cls(name, procedureType=procedureType, schedule=schedule)
         
@@ -1398,7 +1398,7 @@ class Treatment:
         if unitFamily not in acceptableUnitFamilies:
             raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
         
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
 
         from iolib import h5io
@@ -1433,11 +1433,11 @@ class Treatment:
         
         # NOTE: 2024-07-20 15:16:44 see NOTE: 2024-07-20 15:03:37
         # stores the "dose" Quantity as a dataset
-        h5io.makeHDF5Entity(self.dose, entity, name="dose", oname="dose",
+        h5io.toHDF5(self.dose, entity, name="dose", oname="dose",
                             compression=compression,chunks=chunks,
                             track_order=track_order, entity_cache=entity_cache)
         
-        h5io.makeHDF5Entity(self.schedule, entity, name="schedule", 
+        h5io.toHDF5(self.schedule, entity, name="schedule", 
                             oname="schedule", compression=compression,
                             chunks=chunks, track_order=track_order,
                             entity_cache=entity_cache)
@@ -1446,7 +1446,7 @@ class Treatment:
         
         
     @classmethod
-    def objectFromHDF5Entity(cls, entity:h5py.Group, 
+    def fromHDF5(cls, entity:h5py.Group, 
                              attrs:typing.Optional[dict] = None, cache:dict = {}):
         
         from iolib import h5io
@@ -1457,8 +1457,8 @@ class Treatment:
         
         name = attrs["name"]
         
-        schedule = h5io.objectFromHDF5Entity(entity["schedule"], cache)
+        schedule = h5io.fromHDF5(entity["schedule"], cache)
         
-        dose = h5io.objectFromHDF5Entity(entity["dose"], cache)
+        dose = h5io.fromHDF5(entity["dose"], cache)
         
         return cls(name, dose=dose, schedule=schedule)

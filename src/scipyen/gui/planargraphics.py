@@ -4106,7 +4106,7 @@ class PlanarGraphics():
             #if value._backend_ == self:
                 #self._frontend=value
                 
-    def makeHDF5Entity(self, group, name, oname, compression, chunks, track_order,
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache):
         import h5py
         from iolib import h5io, jsonio
@@ -4129,17 +4129,17 @@ class PlanarGraphics():
         if isinstance(self, Path):
             for k, o in enumerate(self):
                 o_name = f"{k}_{type(o).__name__}"
-                o.makeHDF5Entity(entity, o_name, o.name, compression, chunks, track_order, entity_cache)
+                o.toHDF5(entity, o_name, o.name, compression, chunks, track_order, entity_cache)
                 
             return entity
                 
         entity.attr.update({"__graphics_descriptors__": h5io.make_attr(self.descriptors)})
         
         # NOTE: 2021-11-25 09:59:42
-        # do NOT use the generic h5io.makeHDF5Entity here, although states is
+        # do NOT use the generic h5io.toHDF5 here, although states is
         # a list; thisns because we don't want to deeply nest the states' databags
         # as HDF5 Group objects; see NOTE: 2021-11-25 10:04:00 below
-        #states_group = h5io.makeHDF5Entity(self.states, "states", self.name,
+        #states_group = h5io.toHDF5(self.states, "states", self.name,
                                              #compression, chunbks, track_order,
                                              #entity_cache)
         
