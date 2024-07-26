@@ -2666,7 +2666,13 @@ NOTES:
     # Currently this function does almost the same thing as parse_step_waveform_signal.
     # TODO 2023-06-18 22:10:21 merge codes into one function !
     from scipy import (cluster, signal)
-    from scipy.signal import boxcar
+    from scipy.signal.windows import boxcar
+    # try:
+    #     from scipy.signal import boxcar
+    # except:
+    #     from scipy.signal.windows import boxcar
+    # finally:
+    #     raise
 
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)
