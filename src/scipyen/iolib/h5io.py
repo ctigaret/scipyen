@@ -1594,7 +1594,7 @@ def attrs2dict(attrs:h5py.AttributeManager):
                 elif v.dtype == np.dtype(np.float_) and v.size == 1:
                     v = float(v) if v.ndim == 0 else float(v[0])
                     
-                elif np.iscomplex(v) and v.size == 1:
+                elif np.any(np.iscomplex(v)) and v.size == 1:
                     v = complex(v) if v.ndim == 0 else complex(v[0])
                         
                 else:
