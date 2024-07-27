@@ -2881,6 +2881,14 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                     self.errorMessage("PrairieView Importer", "Electrophysiology files must contain neo.Blocks or individual neo.Segments")
                     return False
                 
+                # WARNING 2024-07-27 09:42:55
+                # concatenate_blocks does not reset the signals start time to 0
+                # anymore - this is because the correct times are needed for 
+                # establishing the correct temporal succession of the records in
+                # post hoc analyses
+                #
+                # This MUST be taken into account in scandata analysis, downstream.
+                
         else:
             return False
     

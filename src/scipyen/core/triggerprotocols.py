@@ -1326,11 +1326,18 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
 
 # @with_doc(detect_trigger_events, use_header=True)
 @safeWrapper
-def auto_define_trigger_events(src, event_type, analog_index, 
-                               times=None, label=None, name=None, 
-                               use_lo_hi=True, time_slice=None, clear = False, 
-                               clearSimilarEvents=True, clearTriggerEvents=True, 
-                               clearAllEvents=False):
+def auto_define_trigger_events(src:typing.Union[neo.Block, neo.Segment, typing.Sequence[neo.Segment]],
+                               event_type:typing.Union[str,TriggerEventType], 
+                               analog_index:typing.Union[int,str], 
+                               times:typing.Optional[pq.Quantity] = None, 
+                               label:typing.Optional[str] = None, 
+                               name:typing.Optional[str] = None, 
+                               use_lo_hi:bool = True, 
+                               time_slice:typing.Optional[typing.Sequence[pq.Quantity]] = None, 
+                               clear:bool = False, 
+                               clearSimilarEvents:bool = True, 
+                               clearTriggerEvents:bool = True, 
+                               clearAllEvents:bool = False, reltimes:bool = True):
     """Constructs TriggerEvent objects from events detected in analog signals.
     
     TriggerEvent objects are constructed using either time stamps given as
@@ -1493,7 +1500,11 @@ def auto_define_trigger_events(src, event_type, analog_index,
                         if isinstance(time_slice, (tuple, list)) \
                             and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
                                 and len(time_slice) == 2:
-                            event = detect_trigger_events(s.analogsignals[sndx].time_slice(time_slice[0], time_slice[1]), 
+                            if reltimes:
+                                t0, t1 = (t + s.analogsignals[sndx].t_start for t in time_slice)
+                            else:
+                                t0, t1 = time_slice
+                            event = detect_trigger_events(s.analogsignals[sndx].time_slice(t0, t1), 
                                                         event_type=event_type, 
                                                         use_lo_hi=use_lo_hi, 
                                                         label=label, name=name)
@@ -1516,7 +1527,15 @@ def auto_define_trigger_events(src, event_type, analog_index,
                     if isinstance(time_slice, (tuple, list)) \
                         and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
                             and len(time_slice) == 2:
-                        event = detect_trigger_events(s.analogsignals[analog_index].time_slice(time_slice[0], time_slice[1]), 
+                        print(f"auto_define_trigger_events:\n")
+                        print(f"signal start {s.analogsignals[analog_index].t_start}")
+                        print(f"signal stop {s.analogsignals[analog_index].t_stop}")
+                        print(f"time slice: {time_slice}")
+                        if reltimes:
+                            t0, t1 = (t + s.analogsignals[analog_index].t_start for t in time_slice)
+                        else:
+                            t0, t1 = time_slice
+                        event = detect_trigger_events(s.analogsignals[analog_index].time_slice(t0, t1), 
                                                       event_type=event_type, 
                                                       use_lo_hi=use_lo_hi, 
                                                       label=label, name=name)
@@ -2258,8 +2277,8 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
                                   photostimulation:tuple=(), 
                                   imaging:tuple=(), 
                                   clear:typing.Union[bool, str, int, tuple, list, ]=False, 
-                                  up=True, 
-                                  protocols=True) -> typing.Optional[typing.List[TriggerProtocol]]:
+                                  up=True, protocols=True,
+                                  reltimes:bool=True) -> typing.Optional[typing.List[TriggerProtocol]]:
     
     """Determines the set of trigger protocols in a neo.Block by searching for 
     trigger waveforms in the analogsignals contained in 'data'.
@@ -2277,9 +2296,9 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
     Named parameters:
     =================
     
-    presynaptic, postsynaptic, photostimulation, imaging:
-        Tuples specifying the parameters detecting pre-, postsynaptic, 
-        photostimulation or imaging trigger event types, respectively. 
+    presynaptic, postsynaptic, photostimulation, imaging: tuple
+        Detection parameters, respectively, for the pre-, postsynaptic, 
+        photostimulation and imaging trigger event types. 
     
         Each is a tuple with 0 (default), two, or three elements:
         
@@ -2384,6 +2403,10 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
         When False, the function only detects (and embeds) trigger events in the
         data. TriggerProtocol objects can then be parsed from the data by
         calling parse_trigger_protocols() at a separate stage.
+        
+    reltimes:bool (default True). Indicates if the `t_start` and `t_stop` values
+        in the detection parameter tuples are relative to the signal start, or
+        absoule time values.
                 
     Returns:
     =======

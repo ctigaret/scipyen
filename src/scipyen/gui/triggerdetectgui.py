@@ -731,7 +731,7 @@ class TriggerDetectDialog(qd.QuickDialog):
                                         photostimulation = self.photo,
                                         imaging = self.imaging,
                                         clear = clear_flag,
-                                        protocols=True)
+                                        protocols=True, reltimes=True)
             
             self.triggerProtocols[:] = tp[:]
             

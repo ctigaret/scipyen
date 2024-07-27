@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>550</width>
-    <height>219</height>
+    <width>597</width>
+    <height>212</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -512,6 +512,42 @@
         </item>
        </layout>
       </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="1" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QCheckBox" name="retimesCheckBox">
+       <property name="toolTip">
+        <string>Set all times relative to signal start</string>
+       </property>
+       <property name="statusTip">
+        <string>Set all times relative to signal start</string>
+       </property>
+       <property name="whatsThis">
+        <string>Set all times relative to signal start</string>
+       </property>
+       <property name="text">
+        <string>Relative</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
      </item>
     </layout>
    </item>
