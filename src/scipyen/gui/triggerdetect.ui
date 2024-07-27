@@ -518,7 +518,7 @@
    <item row="1" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
-      <widget class="QCheckBox" name="retimesCheckBox">
+      <widget class="QCheckBox" name="reltimesCheckBox">
        <property name="toolTip">
         <string>Set all times relative to signal start</string>
        </property>

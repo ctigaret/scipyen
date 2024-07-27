@@ -1167,7 +1167,8 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
             setattr(obj, k, v)
     
     elif target_class in (neo.Epoch, DataZone):
-        obj = target_class(times=times, durations=durations, labels=ax0["labels"], units = ax0["units"])
+        obj = target_class(times=times, durations=durations, labels=ax0["labels"], 
+                           units = ax0["units"], relative=ax0.get("relative", False))
     
         for k,v in rec_attrs.items():
             setattr(obj, k, v)
@@ -1178,10 +1179,14 @@ def group2neoDataObject(g:h5py.Group, target_class:type, cache:dict = {}):
         # mark_type = g.name.split("/")[-1]
         if target_class == TriggerEvent:
             etype = TriggerEventType[mark_type]
-            obj = target_class(times = times, labels = ax0["labels"], units = ax0["units"], event_type = etype)
+            obj = target_class(times = times, labels = ax0["labels"], 
+                               units = ax0["units"], event_type = etype,
+                               relative = ax0.get("relative", False))
         else:
             etype = MarkType[mark_type]
-            obj = target_class(times = times, labels = ax0["labels"], units = ax0["units"], mark_type = etype)
+            obj = target_class(times = times, labels = ax0["labels"],
+                               units = ax0["units"], mark_type = etype,
+                               relative = ax0.get("relative", False))
             
         
         for k,v in rec_attrs.items():
@@ -2240,6 +2245,7 @@ def _(obj, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
+        ret["relative"] = obj.relative
         ret["time_units"] = obj.times.units
         ret["time_dtype"] = jsonio.dtype2JSON(obj.times.dtype)
         ret["dtype"] = jsonio.dtype2JSON(obj.dtype)
@@ -2271,6 +2277,7 @@ def _(obj, axisindex):
     ret = dict()
     if axisindex == 0:
         ret["labels"] = obj.labels # labels are contained in the axis_0 attrs
+        ret["relative"] = getattr(obj, "relative", False)
         # ret["durations"] = obj.durations # durations ARE the axis_0 dataset
         ret["time_units"] = obj.times.units
         ret["time_dtype"] = jsonio.dtype2JSON(obj.times.dtype)

@@ -22,7 +22,7 @@ from qtpy import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,
-             array_annotations=None, annotations=None):
+             relative=None, array_annotations=None, annotations=None):
     
     if not isinstance(annotations, dict):
         if annotations is None:
@@ -35,7 +35,8 @@ def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
         
     obj = DataZone(places=places, extents=extents, labels=labels,
                    units=units,name=name,file_origin=file_origin,
-                   description=description,array_annotations=array_annotations,
+                   description=description,relative=relative,
+                   array_annotations=array_annotations,
                    **annotations)
     
 
@@ -58,9 +59,13 @@ class DataZone(neo.Epoch):
                         ('times', pq.Quantity, 1), 
                         ('extents', pq.Quantity, 1),
                         ('durations', pq.Quantity, 1),
-                        ('labels', np.ndarray, 1, np.dtype('U')))
+                        ('labels', np.ndarray, 1, np.dtype('U')),
+                        ('relative', bool, 1, False))
 
-    def __new__(cls, places=None, times=None, extents=None, durations=None, labels=None, units=None, name=None, description=None, file_origin=None, segment=None,array_annotations=None, **annotations):
+    def __new__(cls, places=None, times=None, extents=None, durations=None, 
+                labels=None, units=None, name=None, description=None, 
+                file_origin=None, segment=None, relative=None,
+                array_annotations=None, **annotations):
         """
         """
         if places is None:
@@ -128,16 +133,20 @@ class DataZone(neo.Epoch):
             if labels.size != places.size and labels.size:
                 raise ValueError("Labels array has different length to times")
             
+        if not isinstance(relative, bool):
+            relative = False
+            
         obj = pq.Quantity.__new__(cls, places, units = units.dimensionality)
         
         obj._labels = labels
         obj._extents = extents
+        obj._relative = relative
         obj.segment = segment
         return obj
     
     def __init__(self, place=None, times=None, extents=None, durations=None,
                  labels=None, units=None, name=None, description=None,
-                 file_origin=None, array_annotations=None, **annotations):
+                 file_origin=None, relative=None, array_annotations=None, **annotations):
         DataObject.__init__(self, name=name, file_origin=file_origin,
                             description=description, 
                             array_annotations=array_annotations, **annotations)
@@ -148,13 +157,14 @@ class DataZone(neo.Epoch):
     def __reduce__(self):
         return _newDataZone, (self.__class__, self.places, self.extents,
                               self.labels, self.units, self.name, self.segment,
-                              self.description, self.file_origin, 
+                              self.description, self.file_origin, self.relative,
                               self.array_annotations, self.annotations)
         
     def __array_finalize__(self, obj):
         super().__array_finalize__(obj)
         self._extents = getattr(obj, "extents", getattr(obj, "durations", None))
         self._labels = getattr(obj, "labels", None)
+        self._relative = getattr(obj, "relative", False)
         self.annotations = getattr(obj, "annotations", None)
         self.name = getattr(obj, "name", None)
         self.file_origin = getattr(obj, "file_origin", None)
@@ -362,6 +372,17 @@ class DataZone(neo.Epoch):
         
     def get_durations(self):
         return self.extents
+    
+    @property
+    def relative(self) -> bool:
+        """Indicates if the coordinates are relative to signal's domain origin.
+        This is independent of the extents of the data zone.
+        """
+        return getattr(self, "_relative", False)
+    
+    @relative.setter
+    def relative(self, val:bool):
+        self._relative = val == True
 
     @property
     def domain_name(self):

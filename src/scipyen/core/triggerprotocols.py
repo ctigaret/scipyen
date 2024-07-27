@@ -1527,10 +1527,10 @@ def auto_define_trigger_events(src:typing.Union[neo.Block, neo.Segment, typing.S
                     if isinstance(time_slice, (tuple, list)) \
                         and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
                             and len(time_slice) == 2:
-                        print(f"auto_define_trigger_events:\n")
-                        print(f"signal start {s.analogsignals[analog_index].t_start}")
-                        print(f"signal stop {s.analogsignals[analog_index].t_stop}")
-                        print(f"time slice: {time_slice}")
+                        # print(f"auto_define_trigger_events:\n")
+                        # print(f"signal start {s.analogsignals[analog_index].t_start}")
+                        # print(f"signal stop {s.analogsignals[analog_index].t_stop}")
+                        # print(f"time slice: {time_slice}")
                         if reltimes:
                             t0, t1 = (t + s.analogsignals[analog_index].t_start for t in time_slice)
                         else:

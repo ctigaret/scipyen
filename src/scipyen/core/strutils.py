@@ -475,6 +475,9 @@ def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, li
         values.
     
     """
+    
+    from core.quantities import quantity2str
+    
     if value is None:
         return ""
     # TODO 2020-12-28 11:41:33
