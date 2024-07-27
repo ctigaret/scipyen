@@ -652,7 +652,8 @@ class TriggerDetectDialog(qd.QuickDialog):
         
     @Slot(int)
     def _slot_ephysFrameChanged(self, value):
-        self._update_trigger_detect_ranges_(value)
+        if not self.eventDetectionWidget.relTimes:
+            self._update_trigger_detect_ranges_(value)
         
     @Slot()
     def slot_detect(self):
@@ -763,6 +764,11 @@ class TriggerDetectDialog(qd.QuickDialog):
                 self.detected = True
                 
             nEvents = len(get_trigger_events(self.ephysdata, flat=True))
+            
+            cFrame = self._ephysViewer_.currentFrame
+            
+            self._ephysViewer_.plot(self._ephys_)
+            # self._ephysViewer_.currentFrame = cFrame
             
             self.statusBar.showMessage("%d trigger events detected" % nEvents)
         

@@ -10,6 +10,7 @@ Changelog:
 
 """
 import warnings
+import typing
 #from enum import IntEnum
 from numbers import (Number, Real,)
 from copy import (deepcopy, copy,)
@@ -995,14 +996,14 @@ class DataMark(neo.Event):
         relative = getattr(self, "relative", False)
         if to_epoch:
             if relative:
-                scipywarn("Domain coordinates are relative, but neo.Epoch only supports absolute coordinates")
+                scipywarn(f"{self.__class__.__name__}: Creating a neo.Epoch while domain coordinates are relative! neo.Epoch only supports absolute coordinates")
             return neo.Epoch(times=times, durations=durations, labels=labels)
         else:
             return DataZone(times=times, durations=durations, labels=labels, relative=relative)
         
 
     def to_epoch(self, pairwise=False, durations=None):
-        return self.to_zone, to_epoch=True)
+        return self.to_zone(pairwise=pairwise, durations=durations, to_epoch=True)
             
     labels = property(get_labels, set_labels)
     
@@ -1356,6 +1357,7 @@ class TriggerEvent(DataMark):
         If `durations` is not given, then the event labels A and B bounding
         the epoch are used to set the labels of the epochs in the form 'A-B'.
         """
+        from core.datazone import DataZone
 
         if pairwise:
             # Mode 2
@@ -1380,7 +1382,18 @@ class TriggerEvent(DataMark):
             times = self.times
             labels = self.labels
             
-        return neo.Epoch(times=times, durations=durations, labels=labels)
+        relativ = getattr(self, "relative", False)
+        
+        if to_epoch:
+            if relative:
+                scipywarn(f"{self.__class__.__name__}: Creating a neo.Epoch while domain coordinates are relative! neo.Epoch only supports absolute coordinates")
+            return neo.Epoch(times=times, durations=durations, labels=labels)
+        else:
+            return DataZone(times=times, durations=durations, labels=labels, relative=relative)
+            
+    
+    def to_epoch(self, pairwise=False, durations=None):
+        return self.to_zone(pairwise=pairwise, durations=durations, to_epoch=True)
 
     @property
     def event_type(self):

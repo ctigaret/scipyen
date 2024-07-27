@@ -4821,29 +4821,33 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         # NOTE: 2022-01-12 09:30:49
         # update currentFrame for PlanarGraphics
-        if isinstance(self._data_.scanRegion, pgui.PlanarGraphics):
-            self._data_.scanRegion.currentFrame = self._current_frame_index_
+        # if isinstance(self._data_.scanRegion, pgui.PlanarGraphics):
+        #     self._data_.scanRegion.currentFrame = self._current_frame_index_
         
-        for obj in self._data_.scansRois.values():
-            obj.currentFrame = self._current_frame_index_
-            obj.updateLinkedObjects()
-            obj.updateFrontends()
+        if isinstance(self._data_.scansRois, dict):
+            for obj in self._data_.scansRois.values():
+                obj.currentFrame = self._current_frame_index_
+                obj.updateLinkedObjects()
+                obj.updateFrontends()
             
-        for obj in self._data_.scansCursors.values():
-            obj.currentFrame = self._current_frame_index_
-            obj.updateLinkedObjects()
-            obj.updateFrontends()
+        if isinstance(self._data_.scansCursors, dict):
+            for obj in self._data_.scansCursors.values():
+                obj.currentFrame = self._current_frame_index_
+                obj.updateLinkedObjects()
+                obj.updateFrontends()
             
         
-        for obj in self._data_.sceneRois.values():
-            obj.currentFrame = self._current_frame_index_
-            obj.updateLinkedObjects()
-            obj.updateFrontends()
-            
-        for obj in self._data_.sceneCursors.values():
-            obj.currentFrame = self._current_frame_index_
-            obj.updateLinkedObjects()
-            obj.updateFrontends()
+        if isinstance(self._data_.sceneRois, dict):
+            for obj in self._data_.sceneRois.values():
+                obj.currentFrame = self._current_frame_index_
+                obj.updateLinkedObjects()
+                obj.updateFrontends()
+                
+        if isinstance(self._data_.sceneCursors, dict):
+            for obj in self._data_.sceneCursors.values():
+                obj.currentFrame = self._current_frame_index_
+                obj.updateLinkedObjects()
+                obj.updateFrontends()
             
         if isinstance(self._data_.scanRegion, pgui.Path) and len(self._data_.scanRegion):
             self._data_.scanRegion.currentFrame = self._current_frame_index_
@@ -10710,22 +10714,24 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
             else:
                 graphicsObjects    = self._data_.scansCursors
-                if isinstance(self._data_.scans, (tuple, list)) and len(self._data_.scans):
-                    cursor_span = self._data_.scans[0].shape[0]
-                    
-                elif isinstance(self._data_.scans, vigra.VigraArray):
-                    cursor_span = self._data_scans.shape[0]
-                    
-                for c in graphicsObjects.values():
-                    c.width = cursor_span
-                    
-                # see NOTE: 2018-09-25 22:19:58
-                sigBlock = QtCore.QSignalBlocker(self.selectCursorSpinBox)
-                self.selectCursorSpinBox.setMaximum(len(self._data_.scansCursors)-1)
+                
+                if isinstance(graphicsObjects, dict) and len(graphicsObjects):
+                    if isinstance(self._data_.scans, (tuple, list)) and len(self._data_.scans):
+                        cursor_span = self._data_.scans[0].shape[0]
+                        
+                    elif isinstance(self._data_.scans, vigra.VigraArray):
+                        cursor_span = self._data_scans.shape[0]
+                        
+                    for c in graphicsObjects.values():
+                        c.width = cursor_span
+                        
+                    # see NOTE: 2018-09-25 22:19:58
+                    sigBlock = QtCore.QSignalBlocker(self.selectCursorSpinBox)
+                    self.selectCursorSpinBox.setMaximum(len(self._data_.scansCursors)-1)
                 
                 
         if len(data) > 0 and len(windows) > 0:
-            if len(graphicsObjects):
+            if isinstance(graphicsObjects, dict) and len(graphicsObjects):
                 transparent_label = not self.actionOpaque_cursor_labels.isChecked()
                 # see NOTE: 2018-09-25 22:19:58
                 
@@ -10811,6 +10817,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         
         if self._data_ is None:
+            return
+        
+        if not isinstance(self._data_.scansCursors, dict) or len(self._data_.scansCursors) == 0:
             return
         
         # see NOTE: 2018-09-25 22:19:58
@@ -11080,7 +11089,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                  self.epscatIntegralBeginDoubleSpinBox, self.epscatIntegralEndDoubleSpinBox,
                  self.doFitCheckBox, self.epscatComponentsTableWidget)]
             
-            if len(self._data_.analysisOptions):
+            if isinstance(self._data_.analysisOptions, dict) and len(self._data_.analysisOptions):
                 # Channels groupbox
                 val = get_nested_value(self._data_.analysisOptions, ["Channels", "Indicator"])
                 
@@ -11731,7 +11740,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if len(self._data_.analysisOptions) == 0:
+        if not isinstance(self._data_.analysisOptions, dict) or len(self._data_.analysisOptions) == 0:
             return
         
         if "Channels" not in self._data_.analysisOptions.keys():
@@ -12447,18 +12456,22 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.unitTypeComboBox.currentIndexChanged[str].disconnect(self.slot_gui_changed_unit_type_string)
         #self.defineAnalysisUnitCheckBox.stateChanged[int].disconnect(self.slot_change_analysis_unit_state)
 
-        for r in self._data_.sceneRois.values():
-            r.frontends.clear()
+        if isinstance(self._data_.sceneRois, dict):
+            for r in self._data_.sceneRois.values():
+                r.frontends.clear()
             
-        for c in self._data_.sceneCursors.values():
-            c.frontends.clear()
+        if isinstance(self._data_.sceneCursors, dict):
+            for c in self._data_.sceneCursors.values():
+                c.frontends.clear()
         
-        for r in self._data_.scansRois.values():
-            r.frontends.clear()
+        if isinstance(self._data_.scansRois, dict):
+            for r in self._data_.scansRois.values():
+                r.frontends.clear()
             
-        for c in self._data_.scansCursors.values():
-            c.frontends.clear()
-            
+        if isinstance(self._data_.scansCursors, dict):
+            for c in self._data_.scansCursors.values():
+                c.frontends.clear()
+                
         if hasattr(self._data_, "scanRegion") and isinstance(self._data_.scanRegion, pgui.PlanarGraphics):
             self._data_.scanRegion.frontends.clear()
             

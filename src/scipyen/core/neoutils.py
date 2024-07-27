@@ -325,7 +325,7 @@ def _(obj):
 
 @singledispatch
 def set_relative_time_start(data, t = 0):
-    # TODO: dispatch for neo.ImageSequence; neo.Group; neo.ChannelView, SpikeTrainList
+    # TODO: dispatch for neo.ImageSequence; neo.Group; neo.ChannelView
     raise NotImplementedError
 
 @set_relative_time_start.register(neo.Epoch)
@@ -451,6 +451,8 @@ def _(data, t = 0):
     
     ret.spiketrains = SpikeTrainList(items = spiketrains)
     
+    return ret
+    
 @set_relative_time_start.register(neo.Block)
 def _(data, t = 0):
     """Set the components in each segment to the same t_start.
@@ -467,7 +469,11 @@ def _(data, t = 0):
     
     """
     ret = make_neo_object(data)
-    ret.segments = [set_relative_time_start(s, t) for s in data.segments]
+    
+    # NOTE: 2024-07-27 23:38:18
+    # new neo API ⌢
+    # ret.segments = [set_relative_time_start(s, t) for s in data.segments]
+    ret.segments.extend([set_relative_time_start(s, t) for s in data.segments])
     return ret
 
 @set_relative_time_start.register(tuple)

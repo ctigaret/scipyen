@@ -41,7 +41,7 @@ from core.triggerprotocols import (TriggerProtocol,
                                    remove_trigger_protocol,
                                    parse_trigger_protocols)
 
-from core.neoutils import (concatenate_blocks, concatenate_signals,)
+from core.neoutils import (concatenate_blocks, concatenate_signals,set_relative_time_start)
 
 import core.xmlutils as xmlutils
 import core.strutils as strutils
@@ -2866,7 +2866,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                     
             if len(blocks):
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    self._ephys_ = concatenate_blocks(*blocks)
+                    self._ephys_ = set_relative_time_start(concatenate_blocks(*blocks))
                     self.cachedEvents = [s.events for s in self._ephys_.segments]
                     return True
                     

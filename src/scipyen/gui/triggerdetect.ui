@@ -520,13 +520,13 @@
      <item>
       <widget class="QCheckBox" name="reltimesCheckBox">
        <property name="toolTip">
-        <string>Set all times relative to signal start</string>
+        <string>When checked, start/stop search times are relative to the signal start</string>
        </property>
        <property name="statusTip">
-        <string>Set all times relative to signal start</string>
+        <string>When checked, start/stop search times are relative to the signal start</string>
        </property>
        <property name="whatsThis">
-        <string>Set all times relative to signal start</string>
+        <string>When checked, start/stop search times are relative to the signal start</string>
        </property>
        <property name="text">
         <string>Relative</string>

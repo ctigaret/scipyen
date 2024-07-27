@@ -6,6 +6,24 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
+# TODO: 2024-07-27 22:46:05
+# implement plotting of landmarks with domain coordinates given as values relative
+# to a signal's domain start; currently, these are DataZone, DataMark and
+# TriggerEvent (this feature has been implemented on 2024-07-27 22:49:52). However,
+# the default behaviour of these landmakrs is to have absolute values (therefore
+# compatible to old API) so plotting them should work as usual. The new attribute
+# "relative" of these classes indicates whether the domain coordinate is relative
+# to the "start" of aotional signal, or not. What needs implementing here is
+# correctly plotting landmarks where the "relative" attribute is True (currently,
+# the plotting mechanism ignores this attribute).
+#
+# NOTE: this is quite tricky, as it means postponing the plotting of landmarks
+# until after all signals in the corresponding frame have been plotted (or, at 
+# least, parsed). In addition, to support plotting of standalone landmarks with
+# "relative" attribute set to True (i.e., plot them without any reference signals)
+# should assume a notional signal domain "start" at 0 (i.e., treat the landmarks
+# as if "relative" was False, in such cases).
+# 
 
 '''Signal viewer: enhanced signal plotter
 
@@ -2008,7 +2026,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             symbolStyle,
                                             **labelStyle)
                 
-            elif all(isinstance(v, DataMark) for v in entities_list):
+            elif all(isinstance(v, (DataMark, TriggerEvent)) for v in entities_list):
                 xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
                 if len(xdimstr):
                     xLabel = f"{get_domain_name(entities_list[0])} ({xdimstr})"
@@ -8394,19 +8412,34 @@ signals in the signal collection.
         # events_dict = self._prep_entity_dict_(events, (neo.Event, DataMark))
         
 
-    def _plot_epoch_data_(self, epoch:neo.Epoch, **kwargs):
+    def _plot_epoch_data_(self, epoch:typing.Union[neo.Epoch, DataZone], **kwargs):
         """ Plots the time intervals defined in a single neo.Epoch or DataZone """
         brush = kwargs.pop("brush", self.epoch_plot_options["epoch_brush"])
+        
+        # relative = getattr(epoch, "relative", False)
         
         x0 = epoch.times.flatten().magnitude
         x1 = x0 + epoch.durations.flatten().magnitude
         
         # brush = next(brushes)
         
+        
         for k in range(len(self.axes)):
             self.axes[k].update() # to update its viewRange()
             
-            regions = [v for v in zip(x0,x1)]
+            # NOTE: 2024-07-27 23:00:23
+            # see TODO: 2024-07-27 22:46:05
+#             if relative:
+#                 sig_start = min([i.xData[0] for i in list(filter(lambda v: isinstance(v, pg.PlotDataItem), self.axes[k].items))])
+#                 x0_ = x0 + sig_start
+#                 x1_ = x1 + sig_start
+#             else:
+#                 x0_ = x0
+#                 x1_ = x1
+ 
+            regions = [v for v in zip(x0_, x1_)]
+            
+            regions = [v for v in zip(x0, x1)]
             
             lris = [pg.LinearRegionItem(values=value, 
                                         brush=brush, 
@@ -8764,6 +8797,7 @@ signals in the signal collection.
         
     @_plot_data_.register(neo.Event)
     @_plot_data_.register(DataMark)
+    @_plot_data_.register(TriggerEvent)
     def _(self, obj:typing.Union[neo.Event, DataMark],
           *args, **kwargs):
         """Plot stand-alone events"""
@@ -9551,6 +9585,10 @@ signals in the signal collection.
             
         yy = list()
         
+        # NOTE: 2024-07-27 23:00:57
+        # see TODO: 2024-07-27 22:46:05
+        # sig_start = min([min([i.xData[0] for i in list(filter(lambda v: isinstance(v, pg.PlotDataItem), ax.items))]) for ax in self.signalAxes])
+        
         for k_event, event in enumerate(entities_list):
             if hasattr(event, "type"):
                 data_name = event.type.name
@@ -9577,7 +9615,7 @@ signals in the signal collection.
             if len(event.times):
                 xx[k_event][:,:len(event.times)] = np.atleast_2d(event.times)[:]
                 yy.append(np.full(xx[k_event].shape, height_interval * k_event + height_interval/2))
-                
+
         xx_ = np.concatenate(xx).T
         yy_ = np.concatenate(yy).T
         
