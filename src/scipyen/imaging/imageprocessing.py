@@ -105,17 +105,17 @@ def pureDenoise(image, levels=0, threshold=0, alpha=1, beta=0, sigma2=0):
     if levels<=0:
         pass # TODO implement auto detection of nLevels 
     
-    if threshold < 0:
-        threshold = 0
+    if threshold < 0.:
+        threshold = 0.
         
-    if alpha <=0:
-        alpha = 1
+    if alpha <= 0.:
+        alpha = 1.
         
-    if beta <0:
-        beta = 0
+    if beta < 0.:
+        beta = 0.
         
-    if sigma2 < 0:
-        sigma2 = 0
+    if sigma2 < 0.:
+        sigma2 = 0.
     
     # NOTE: 2017-11-17 22:07:24 this operates on non-calibrated pixel values!
     # i.e. does not take into account existing channel axis calibration
@@ -127,7 +127,7 @@ def pureDenoise(image, levels=0, threshold=0, alpha=1, beta=0, sigma2=0):
     # parameter will be lost
     image = (image.dropChannelAxis()-beta)/alpha
     
-    if alpha != 1:
+    if alpha != 1.:
         sigma2 = sigma2/(alpha**2)
             
     dest = tiwt.fft_purelet(image, levels, sigma2=sigma2, thr=threshold).insertChannelAxis() * alpha + beta

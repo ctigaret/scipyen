@@ -2268,7 +2268,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         self.ephysFileNames = list() 
         
-        self.scanDataOptions = None # ScanDataOptions object - to be assigned to lsdata
+        self.scanDataOptions = ScanDataOptions.default() # ScanDataOptions object - to be assigned to lsdata
         
         self._ephys_ = None # a neo.Block with electrophysiology recordings associated
                             # with lsdata
@@ -2560,11 +2560,14 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             ret = self.loadOptions(self.optionsFileName) 
             if not ret:
                 self.optionsFileName = ""
-                self.scanDataOptions = None
+                # NOTE: 2024-07-28 10:06:23
+                # this may overwrite prev options, so chuck it 
+                # self.scanDataOptions = ScanDataOptions.default()
                 
         else:
             self.optionsFileName = ""
-            self.scanDataOptions = None
+            # see NOTE: 2024-07-28 10:06:23
+            # self.scanDataOptions = ScanDataOptions.default()
 
     @Slot()
     @safeWrapper
@@ -2572,7 +2575,8 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
         caption = "Open ScanData Options file for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open EPSCaT Options file"
         
-        self.optionsFileName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
+        self.optionsFileName, _ = self.chooseFile(caption=caption, fileFilter="HDF5 Files (*.h5)")
+        # self.optionsFileName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
         
         if len(self.optionsFileName.strip()):
             if self.loadOptions(self.optionsFileName):
@@ -2806,11 +2810,11 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             if "xml" in mime_type:
                 self._pvscan_ = PVScan(pio.loadXMLFile(fileName))
                 
-            elif "pickle" in mime_type:
-                self._pvscan_ = pio.loadPickleFile(fileName)
+            # elif "pickle" in mime_type:
+            #     self._pvscan_ = pio.loadPickleFile(fileName)
                 
             else:
-                self.errorMessage("PrairieView Import - Prairiew View Scan file", "%s is not an XML or Pickle file" % self.pvScanFileName)
+                self.errorMessage("PrairieView Import - Prairiew View Scan file", "%s is not an XML file" % self.pvScanFileName)
                 return False
             
             tempDataVarName = os.path.splitext(os.path.basename(fileName))[0]
@@ -2834,7 +2838,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         return False
     
     @safeWrapper
-    def loadEphys(self, fileNamesList):
+    def loadEphys(self, fileNamesList): # TODO 2024-07-28 09:49:36 streamline
         if len(fileNamesList):
             fileNamesList = [f for f in fileNamesList if len(f.strip())]
             if len(fileNamesList) == 0:
@@ -2893,20 +2897,20 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             return False
     
     @safeWrapper
-    def loadOptions(self, fileName):
-        if len(fileName) and os.path.isfile(fileName) and "pickle" in pio.getMimeAndFileType(fileName)[0]:
-            self.scanDataOptions = pio.loadPickleFile(fileName)
-            
-            if fileName != self.optionsFileName:
-                signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
-                self.optionsFileName = fileName
-                self.optionsFileNameLineEdit.setText(self.optionsFileName)
-                
-            return True
-        
-        else:
-            self.errorMessage("PrairieView Importer", "Load options from file:\n%s is not an XML or Pickle file" % self.pvScanFileName)
+    def loadOptions(self, fileName): # TODO 2024-07-28 09:49:36 streamline
+        # if len(fileName) and os.path.isfile(fileName) and "pickle" in pio.getMimeAndFileType(fileName)[0]:
+        if len(fileName) == 0 or not os.path.isfile(fileName) or pio.getMimeAndFileType(fileName)[0] != "application/x-hdf":
+            self.errorMessage("PrairieView Importer", f"Load options from file:\n{fileName} is not a suitable file" )
             return False
+            
+        self.scanDataOptions = pio.loadHDF5File(fileName)
+        
+        if fileName != self.optionsFileName:
+            signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
+            self.optionsFileName = fileName
+            self.optionsFileNameLineEdit.setText(self.optionsFileName)
+            
+        return True
         
     @safeWrapper
     def loadProtocols(self, fileName):
@@ -2958,7 +2962,10 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     @Slot()
     @safeWrapper
     def slot_generateScanData(self):
-        """If sel.auto_export is True, it also export the result to workspace.
+        """Creates a ScanData object based on the loaded data files.
+        The created ScanData object is available as the property `scandata` or 
+        `scanData`. If self.auto_export is True, the ScanData object is also 
+        exported to the Scipyen workspace.
         """
         if isinstance(self._pvscan_, PVScan):
             self._scandata_ = self._pvscan_.scandata()

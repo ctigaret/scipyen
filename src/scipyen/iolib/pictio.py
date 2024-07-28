@@ -212,15 +212,13 @@ def concatPaths(path1:str, path2:str):
         return path1 + path2
         
 def loadHDF5File(fName:str):
-    """FIXME/TODO 2021-12-08 12:19:08
     """
-    # raise NotImplementedError("Not yet...")
+    """
     with h5py.File(fName) as h5file:
         try:
             ret = h5io.read_hdf5(h5file)
         except:
             traceback.print_exc()
-    # print(f"pictio.loadHDF5File {fName} ⇒ {ret}")
     return ret
         
     

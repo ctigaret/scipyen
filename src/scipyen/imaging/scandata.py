@@ -107,7 +107,8 @@ class ScanDataOptions(DataBag):
                          allow_none=allow_none, 
                          **kwargs)
         
-        self.options = self.__defaults__(detection_predicate = detection_predicate, 
+        # a cache dict with intial values 
+        self.initialValues = self.defaultValues(detection_predicate = detection_predicate, 
                            roi_width = roi_width, 
                            roi_auto_width=roi_auto_width,
                            reference = reference,
@@ -125,11 +126,24 @@ class ScanDataOptions(DataBag):
                            initial = initial, 
                            lower = lower, 
                            upper = upper)
+        
+        self.update(self.initialValues)
+        
     @property
     def defaults(self):
-        return ScanDataOptions(self.__defaults__())
+        """A ScanDataOptions object with default values"""
+        return ScanDataOptions.default()
+        # return ScanDataOptions(self.__defaults__())
     
-    def __defaults__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
+    @classmethod
+    def default(cls):
+        """Constructs a ScanDataOptions object with default values
+        See also the `defaults` property
+        """
+        return cls(cls.defaultValues)
+
+    @classmethod
+    def defaultValues(cls, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
                     reference="Ch1", indicator="Ch2", 
                     bleed_ref_ind = 0., bleed_ind_ref = 0., 
                     f0_begin = 0.10*pq.s, f0_end = 0.15*pq.s,
@@ -138,8 +152,10 @@ class ScanDataOptions(DataBag):
                     peak_begin = 0.15 * pq.s, peak_end = 0.3 * pq.s,
                     initial=[], lower=[], upper=[]):
         """
-        TODO: Customize all parameters on function signature; also write a GUI for this
+        Returns a dictionary with default values. 
+        Do not confuse with `default`
         """
+        # TODO: 2024-07-28 09:59:56 Customize all parameters on function signature; also write a GUI for this
         # NOTE: 2020-09-28 13:10:15
         # top container is a DataBag
         # NOTE: 2018-06-20 09:14:25
