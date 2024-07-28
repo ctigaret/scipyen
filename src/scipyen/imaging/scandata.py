@@ -1680,8 +1680,8 @@ class ScanData(BaseScipyenData):
         if isinstance(scans, ScanData):
             self = scans.copy() # make a deep copy
             return
-            
-        self._availableGenotypes_ = [s for s in GENOTYPES]
+        
+        # self._availableGenotypes_ = [s for s in GENOTYPES]
         self._availableUnitTypes_ = [s for s in UnitTypes.values()]
         self._availableUnitTypes_.insert(0, "unknown")
         
@@ -8229,9 +8229,9 @@ class ScanData(BaseScipyenData):
     def availableUnitTypes(self):
         return self._availableUnitTypes_
     
-    @property
-    def availableGenotypes(self):
-        return self._availableGenotypes_
+    # @property
+    # def availableGenotypes(self):
+    #     return self._availableGenotypes_
         
     @property
     def unitType(self):

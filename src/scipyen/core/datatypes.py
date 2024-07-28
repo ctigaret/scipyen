@@ -194,7 +194,10 @@ UnitTypes = collections.defaultdict(lambda: "NA",
                                      "m":"microglia", "n":"interneuron", 
                                      "s":"spine", "t":"terminal",
                                      "y":"astrocyte"})
-                                    
+
+# NOTE: 2024-07-28 15:46:49 
+# these are utterly generic; almost surely you'd want to write your own
+# e.g. Cacna1c+/-, etc...
 GENOTYPES = ["NA", "wt", "het", "hom", "+/+", "+/-", "-/-"]
 
 
