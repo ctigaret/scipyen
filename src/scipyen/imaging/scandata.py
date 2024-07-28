@@ -1604,7 +1604,7 @@ class ScanData(BaseScipyenData):
             
     @safeWrapper
     def __init__(self, scans=None, scene=None, electrophysiology=None, 
-                 metadata=None, **kwargs):
+                 metadata:typing.Optional[dict]=None, **kwargs):
         """Constructs a ScanData object.
         
         Named parameters:

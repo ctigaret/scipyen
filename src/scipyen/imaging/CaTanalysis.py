@@ -3961,14 +3961,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.actionImport_Data_wide_Descriptors.triggered,     self.slot_import_data_wide_descriptors, QtCore.Qt.QueuedConnection]
             ]
         
-        self._common_data_fields_gui_signal_slots_ = [
-                [self.scanDataNameLineEdit.editingFinished,             self.slot_setDataName,              QtCore.Qt.QueuedConnection],
-                [self.sourceIDLineEdit.editingFinished,                 self.slot_gui_changed_source_ID,    QtCore.Qt.QueuedConnection],
-                [self.cellLineEdit.editingFinished,                     self.slot_gui_changed_cell_name,    QtCore.Qt.QueuedConnection],
-                [self.fieldLineEdit.editingFinished,                    self.slot_gui_changed_field_name,   QtCore.Qt.QueuedConnection],
-                [self.genotypeComboBox.currentTextChanged[str],         self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
-                [self.sexComboBox.currentIndexChanged[str],             self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
-                [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
+        # self._common_data_fields_gui_signal_slots_ = [
+        #         [self.scanDataNameLineEdit.editingFinished,             self.slot_setDataName,              QtCore.Qt.QueuedConnection],
+        #         [self.sourceIDLineEdit.editingFinished,                 self.slot_gui_changed_source_ID,    QtCore.Qt.QueuedConnection],
+        #         [self.cellLineEdit.editingFinished,                     self.slot_gui_changed_cell_name,    QtCore.Qt.QueuedConnection],
+        #         [self.fieldLineEdit.editingFinished,                    self.slot_gui_changed_field_name,   QtCore.Qt.QueuedConnection],
+        #         [self.genotypeComboBox.currentTextChanged[str],         self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
+        #         [self.sexComboBox.currentIndexChanged[str],             self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
+        #         [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
+        #     ]
+        
+        self._base_scipyen_data_gui_signal_slots_ = [
+            [self.baseScipyenDataWidget.sig_valueChanged, self.slot_baseScipyenDataChanged, QtCore.Qt.QueuedConnection],
             ]
         
         # NOTE: 2022-01-16 11:45:41
@@ -4484,7 +4488,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @safeWrapper
     def _connect_slots_(self):
         self._connect_gui_slots_(self._menu_actions_gui_slots_)
-        self._connect_gui_slots_(self._common_data_fields_gui_signal_slots_)
+        # self._connect_gui_slots_(self._common_data_fields_gui_signal_slots_)
+        self._connect_gui_slots_(self._base_scipyen_data_gui_signal_slots_)
         self._connect_gui_slots_(self._navigation_gui_signal_slots_)
         self._connect_gui_slots_(self._scene_gui_signal_slots_)
         self._connect_gui_slots_(self._frames_gui_signal_slots_)
@@ -9718,10 +9723,42 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.setData(newdata = lsdata, doc_title = lsdata_varname)
         
     @Slot()
-    @safeWrapper
-    def slot_setDataName(self):
+    def slot_baseScipyenDataChanged(self):
         if self._data_ is None:
             return
+        
+        if not eq(self._data_.name, self.baseScipyenDataWidget.dataName):
+            self._data_.name = self.baseScipyenDataWidget.dataName
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.sourceID, self.baseScipyenDataWidget.sourceID):
+            # avoid pitfalls of pandas NAType
+            self._data_.sourceID = self.baseScipyenDataWidget.sourceID
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.cell, self.baseScipyenDataWidget.cell):
+            self._data_.cell = self.baseScipyenDataWidget.cell
+            self._data_modifed_(True)
+            
+        if not eq (self._data_.field, self.baseScipyenDataWidget.field):
+            self._data_.field = self.baseScipyenDataWidget.field
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.genotype, self.baseScipyenDataWidget.genotype):
+            self._data_.genotype = self.baseScipyenDataWidget.genotype
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.sex, self.baseScipyenDataWidget.sex):
+            self._data_.sex = self.baseScipyenDataWidget.sex
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.age, self.baseScipyenDataWidget.age):
+            self._data_.age = self.baseScipyenDataWidget.age
+            self._data_modifed_(True)
+
+    @Slot()
+    @safeWrapper
+    def slot_setDataName(self):
         
         value = strutils.str2symbol(self.scanDataNameLineEdit.text())
         
@@ -11011,42 +11048,45 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             # ###
             # BEGIN Data tab
             dataWidgetsSignalBockers = [QtCore.QSignalBlocker(widget) for widget in \
-                (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit, self.genotypeComboBox, self.unitTypeComboBox, self.sexComboBox, self.ageLineEdit)]
+                (self.unitTypeComboBox, )]
             
-            self.sourceIDLineEdit.setText(self._data_.sourceID)
+            # dataWidgetsSignalBockers = [QtCore.QSignalBlocker(widget) for widget in \
+            #     (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit, self.genotypeComboBox, self.unitTypeComboBox, self.sexComboBox, self.ageLineEdit)]
             
-            self.scanDataNameLineEdit.setText(self._data_.name)
-            self.cellLineEdit.setText(self._data_.cell)
-            self.fieldLineEdit.setText(self._data_.field)
+            # self.sourceIDLineEdit.setText(self._data_.sourceID)
             
-            genotypes = self._data_._availableGenotypes_
+            # self.scanDataNameLineEdit.setText(self._data_.name)
+            # self.cellLineEdit.setText(self._data_.cell)
+            # self.fieldLineEdit.setText(self._data_.field)
             
-            self.genotypeComboBox.clear()
-            self.genotypeComboBox.addItems(genotypes)
+#             genotypes = self._data_._availableGenotypes_
+#             
+#             self.genotypeComboBox.clear()
+#             self.genotypeComboBox.addItems(genotypes)
             
-            genotype_index = self.genotypeComboBox.findText(self._data_.genotype)
+            # genotype_index = self.genotypeComboBox.findText(self._data_.genotype)
             
-            if genotype_index == -1:
-                self.genotypeComboBox.addItem(self._data_.genotype)
-                self.genotypeComboBox.setCurrentIndex(self.genotypeComboBox.count())
-                if self._data_.genotype not in self._data_._availableGenotypes_:
-                    self._data_._availableGenotypes_.append(self._data_.genotype)
+#             if genotype_index == -1:
+#                 self.genotypeComboBox.addItem(self._data_.genotype)
+#                 self.genotypeComboBox.setCurrentIndex(self.genotypeComboBox.count())
+#                 if self._data_.genotype not in self._data_._availableGenotypes_:
+#                     self._data_._availableGenotypes_.append(self._data_.genotype)
+#             
+#             else:
+#                 self.genotypeComboBox.setCurrentIndex(genotype_index)
             
-            else:
-                self.genotypeComboBox.setCurrentIndex(genotype_index)
-            
-            sex_index = self.sexComboBox.findText(self._data_.sex)
-            
-            if sex_index == -1:
-                self._data_.genotype = "NA"
-                self.genotypeComboBox.setCurrentIndex(0)
+            # sex_index = self.sexComboBox.findText(self._data_.sex)
+#             
+#             if sex_index == -1:
+#                 self._data_.genotype = "NA"
+#                 self.genotypeComboBox.setCurrentIndex(0)
+#                 
+#             else:
+#                 self.genotypeComboBox.setCurrentIndex(sex_index)
                 
-            else:
-                self.genotypeComboBox.setCurrentIndex(sex_index)
-                
-            self.ageLineEdit.setText("%s" % self._data_.age)
+            # self.ageLineEdit.setText("%s" % self._data_.age)
             
-            unit_types = self._data_._availableUnitTypes_
+            # unit_types = self._data_._availableUnitTypes_
             
             self.unitTypeComboBox.clear()
             self.unitTypeComboBox.addItems(self._data_._availableUnitTypes_)
