@@ -139,7 +139,7 @@ class DataViewer(ScipyenViewer):
                         np.ndarray:0,
                         AnalysisUnit:0,
                         AxesCalibration:0,
-                        neo.core.baseneo.BaseNeo:0,
+                        # neo.core.baseneo.BaseNeo:0,
                         ScanData:0, 
                         TriggerProtocol:0}
     

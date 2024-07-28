@@ -219,7 +219,9 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
     
     _decsriptor_attributes_ = _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
     
-    def __init__(self, pre = None, post = None, photo = None, acquisition = None, events = None, segment_index = [], imaging_delay = 0 * pq.s, name="protocol"):
+    def __init__(self, pre = None, post = None, photo = None, acquisition = None, 
+                 events = None, segment_index = [], imaging_delay = 0 * pq.s, 
+                 name="protocol"):
         # TODO/FIXME: do you still need the 'events' parameter?
         """
         Named parameters:
@@ -477,7 +479,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         else:
             raise TypeError("'segment_index' expected to be an int, a sequence of int, a range or a slice; got %s instead" % type(segment_index).__name__)
         
-        if isinstance(name, str):
+        if isinstance(name, str) and len(name.strip()):
             self.__protocol_name__ = name
             
         else:
@@ -528,7 +530,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         return pre + post + photo + imaging
     
     def __str__(self):
-        result = ["%s %s:" % (self.__class__.__name__, self.name)]
+        result = ["%s %s:" % (self.__class__.__name__, self.__protocol_name__)]
         
         if self.__presynaptic__ is not None:
             result += ["\tpresynaptic:\n\t%s" % str(self.__presynaptic__)]

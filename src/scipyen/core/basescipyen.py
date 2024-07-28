@@ -8,10 +8,12 @@
 import functools, typing
 import collections
 from datetime import datetime, date, time, timedelta
+from dataclasses import MISSING
 import numpy as np
 import quantities as pq
 import neo
 import vigra
+import pandas as pd
 from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
@@ -100,21 +102,21 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     
     _data_children_     = ()
     _data_attributes_ = (
-                            ("sourceID",            "NA"),
-                            ("cell",                "NA"),
-                            ("field",               "NA"),
-                            ("genotype",            "NA"),
-                            ("sex",                 "NA"),
-                            ("age",                 (0*pq.s, "NA")),
-                            ("biometric_weight",    (0*pq.g, "NA")), 
-                            ("biometric_height",    (0*pq.m, "NA")),
+                            ("sourceID",            "NA", (str, type(pd.NA), type(MISSING))),
+                            ("cell",                "NA", (str, type(pd.NA), type(MISSING))),
+                            ("field",               "NA", (str, type(pd.NA), type(MISSING))),
+                            ("genotype",            "NA", (str, type(pd.NA), type(MISSING))),
+                            ("sex",                 "NA", (str, type(pd.NA), type(MISSING))),
+                            ("age",                 0*pq.s, (pq.Quantity, type(pd.NA), type(MISSING))),
+                            ("biometric_weight",    0*pq.g, (pq.Quantity, type(pd.NA), type(MISSING))), 
+                            ("biometric_height",    0*pq.m, (pq.Quantity, type(pd.NA), type(MISSING))),
                             ("procedure",           Procedure),
-                            ("procedure_type",      "NA"),
-                            ("procedure_name",      "NA"),
-                            ("procedure_dose",      (0*pq.g, "NA")),
-                            ("procedure_route",     "NA"),
+                            ("procedure_type",      0, (str, int, ProcedureType, type(pd.NA), type(MISSING))),
+                            ("procedure_name",      "NA", (str, type(pd.NA), type(MISSING))),
+                            ("procedure_dose",      0*pq.g, (pq.Quantity, type(pd.NA), type(MISSING))),
+                            ("procedure_route",     "NA", (str, type(pd.NA), type(MISSING))),
                             ("procedure_schedule",  neo.Epoch()),
-                            ("triggers",            list(),     TriggerProtocol),
+                            ("triggers",            TriggerProtocol(),     (TriggerProtocol, list, type(MISSING))),
                             ("file_datetime",       datetime),
                             ("rec_datetime",        datetime),
                             ("analysis_datetime",   datetime),

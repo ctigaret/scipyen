@@ -286,17 +286,17 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
         # enable a scrollable view in GenericMappingDialog
         # when there are more than 5-6 entries in the mapping
         # use that to edit annotations
-        self.sig_valueChanged.emit()
             
         print("edit annotations")
+        # self.sig_valueChanged.emit()
     
     @Slot()
     def _slot_editBiometrics(self):
         # TODO 2022-11-08 08:32:12
         # use GenericMappingDialog
-        self.sig_valueChanged.emit()
             
         print("edit biometrics")
+        # self.sig_valueChanged.emit()
     
     @Slot()
     def _slot_editDateTime(self):

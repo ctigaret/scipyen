@@ -431,7 +431,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                     raise AttributeError(f"For {self.private_name} a subclass of: {comparand} was expected; got {value.__name__} instead")
             
             if not isinstance(value, comparand):
-                raise AttributeError(f"For {self.private_name} one of the types: {comparand} was expected; got {type(value).__name__} instead")
+                raise AttributeError(f"For descriptor '{self.public_name}' ('{self.private_name}') one of the types: {comparand} was expected; got {type(value).__name__} instead")
             
         # NOTE: 2021-11-30 10:42:08
         # it makes sense to validate further, only when allow_none is False
@@ -1849,8 +1849,6 @@ def parse_descriptor_specification(x:tuple):
     from core.datatypes import (TypeEnum, is_enum, is_enum_value, default_value)
     if not isinstance(x, tuple):
         raise TypeError(f"Expecting a tuple, got {type(x).__name__} instead")
-    # print(f"parse_descriptor_specification {x}")
-                
     
     
     # (name, value or type, type or ndims, ndims or units, units)
@@ -1921,6 +1919,9 @@ def parse_descriptor_specification(x:tuple):
                 if all(isinstance(x_, type) for x_ in x[2]):
                     # all elements in x[2] are types
                     if __check_type__(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Set)):
+                        # here, default_value_type as parsed from x[1] is a Sequence or Set
+                        # hence x[2] must specify acceptable types for the elements in the Sequence or Set
+                        #
                         # The default attribute value type has been set as sequence or set:
                         #   ⇒ x[2] specifies acceptable element types
                         ret["default_element_types"] = tuple(x[2])
@@ -1935,6 +1936,9 @@ def parse_descriptor_specification(x:tuple):
                                 raise ValueError(f"Default value expected to be contain {x[2]} elements; got {set((type(v_).__name__ for v_ in ret['default_value']))} instead")
                         
                     elif __check_type__(ret["default_value_type"], collections.abc.Mapping):
+                        # here, default_value_type as parsed from x[1] is a Mapping (e.g. a dict)
+                        # hence x[2] must specify acceptable types for the values in the mapping
+                        #
                         # The default attribute value type has been set as a mapping
                         # ⇒ x[2] specifies acceptable types for the values of the mapping
                         #   i.e., default item types
@@ -1950,7 +1954,8 @@ def parse_descriptor_specification(x:tuple):
                                 raise ValueError(f"Default value expected to be contain {x[2]} items; got {set((type(v_).__name__ for v_ in ret['default_value'].values()))} instead")
                         
                     else:
-                        # Here, the default value type is neither a sequnce or set, nor a mapping.
+                        # Here, the default value type as determined from x[1] is
+                        # neither a sequence, set, nor a mapping.
                         # Check that the default value (if given) conforms - i.e., 
                         # has any of the types specified in x[2]
                         
@@ -2007,7 +2012,7 @@ def parse_descriptor_specification(x:tuple):
                         
                 else: # NOTE: 2023-05-17 18:29:25 x[2] is a type !!!
                     # Default attribute value type is NOT a collection
-                    print(f"parse_descriptor_specification {x}")
+                    # print(f"parse_descriptor_specification {x}")
                     if not isinstance(ret["default_value_type"], x[2]):
                         raise ValueError(f"Type of the default value type {ret['default_value_type']} is different from the specified default value type {x[2]}")
                     # if not isinstance(x[2], (ret["default_value_type"], type(None))):
@@ -2079,6 +2084,9 @@ def parse_descriptor_specification(x:tuple):
     # of it...
             
     result = {"name":ret["name"], "value": ret["default_value"], "args":tuple(args), "kwargs": kwargs}
+    
+    print(f"\nprog.parse_descriptor_specification {x} -> \n{result}")
+                
     
     return result
 
@@ -2234,6 +2242,7 @@ class WithDescriptors(object):
                 proposed_value = suggested_value
                 
             kw = dict()
+            print(f"\nWithDescriptors<{self.__class__.__name__}>.__init__ to set up attr {attr}:\n\t{attr_dict},\n\tproposed value = {proposed_value}")
             type(self).setup_descriptor(attr_dict, **kw)
             setattr(self, attr_dict["name"], proposed_value)
             

@@ -459,7 +459,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         neo.Event: 99,
                         neo.Epoch: 99, 
                         neo.core.spiketrainlist.SpikeTrainList:99,
-                        neo.core.baseneo.BaseNeo: 99,
+                        # neo.core.baseneo.BaseNeo: 99,
                         TriggerEvent: 99,
                         TriggerProtocol: 99,
                         vigra.filters.Kernel1D: 99, 

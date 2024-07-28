@@ -195,7 +195,20 @@ from core.quantities import (arbitrary_unit, check_time_units, units_convertible
                             unit_quantity_from_name_or_symbol, )
 from core.datatypes import UnitTypes
 from core.workspacefunctions import validate_varname
-from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
+from core.utilities import (get_nested_value, set_nested_value, counter_suffix, 
+                            reverse_mapping_lookup, 
+                            get_index_for_seq, 
+                            safe_identity_test,
+                            eq,
+                            sp_set_loc,
+                            normalized_index,
+                            unique,
+                            duplicates,
+                            GeneralIndexType,
+                            counter_suffix,
+                            yyMdd,
+                            NestedFinder)
+
 from core.prog import (safeWrapper, safeGUIWrapper, )
 #import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
@@ -3465,7 +3478,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     # SAVED when LSCaTWindow is closed (see self.slot_Quit() PyQt slot)
     viewer_for_types = (ScanData,)
     
-    view_action_name = "Launch LSCaT"
+    view_action_name = "LSCaT Window"
     
     default_scanline_spline_order = 3
     
@@ -4108,10 +4121,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         # END Menu actions
         ####
-        # BEGIN common widgets
-        self.scanDataNameLineEdit.setClearButtonEnabled(True)
-        self.scanDataNameLineEdit.undoAvailable = True
-        self.scanDataNameLineEdit.redoAvailable = True
+        # # BEGIN common widgets
+        # self.scanDataNameLineEdit.setClearButtonEnabled(True)
+        # self.scanDataNameLineEdit.undoAvailable = True
+        # self.scanDataNameLineEdit.redoAvailable = True
         #self.scanDataNameLineEdit.setValidator(strutils.QNameValidator())
         
         self.framesQSpinBox.setKeyboardTracking(False)
@@ -4156,19 +4169,19 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # NOTE: 2019-01-15 11:40:35
         # implements source ID field in ScanData
         # where by source one means cell culture, animal, patient
-        self.sourceIDLineEdit.setClearButtonEnabled(True)
-        self.sourceIDLineEdit.redoAvailable = True
-        self.sourceIDLineEdit.undoAvailable = True
+        # self.sourceIDLineEdit.setClearButtonEnabled(True)
+        # self.sourceIDLineEdit.redoAvailable = True
+        # self.sourceIDLineEdit.undoAvailable = True
         
          
-        self.cellLineEdit.setClearButtonEnabled(True)
-        self.cellLineEdit.redoAvailable = True
-        self.cellLineEdit.undoAvailable = True
+        # self.cellLineEdit.setClearButtonEnabled(True)
+        # self.cellLineEdit.redoAvailable = True
+        # self.cellLineEdit.undoAvailable = True
         #self.cellLineEdit.setValidator(strutils.QRNameValidator())
         
-        self.fieldLineEdit.setClearButtonEnabled(True)
-        self.fieldLineEdit.redoAvailable = True
-        self.fieldLineEdit.undoAvailable = True
+        # self.fieldLineEdit.setClearButtonEnabled(True)
+        # self.fieldLineEdit.redoAvailable = True
+        # self.fieldLineEdit.undoAvailable = True
         #self.fieldLineEdit.setValidator(strutils.QRNameValidator())
         
         unit_types = sorted([v for v in UnitTypes.values()])
@@ -4183,23 +4196,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         genotypes = ["NA", "wt", "het", "hom"]
         
-        self.genotypeComboBox.setEditable(True)
-        self.genotypeComboBox.lineEdit().setClearButtonEnabled(True)
-        self.genotypeComboBox.lineEdit().redoAvailable = True
-        self.genotypeComboBox.lineEdit().undoAvailable = True
-        self.genotypeComboBox.addItems(genotypes)
-        self.genotypeComboBox.setCurrentIndex(0)
+        # self.genotypeComboBox.setEditable(True)
+        # self.genotypeComboBox.lineEdit().setClearButtonEnabled(True)
+        # self.genotypeComboBox.lineEdit().redoAvailable = True
+        # self.genotypeComboBox.lineEdit().undoAvailable = True
+        # self.genotypeComboBox.addItems(genotypes)
+        # self.genotypeComboBox.setCurrentIndex(0)
         
         sex = ["NA", "F", "M"]
         
-        self.sexComboBox.setEditable(False)
-        self.sexComboBox.addItems(sex)
-        self.sexComboBox.setCurrentIndex(0)
-        
-        self.ageLineEdit.setText("NA")
-        self.ageLineEdit.setClearButtonEnabled(True)
-        self.ageLineEdit.redoAvailable = True
-        self.ageLineEdit.undoAvailable = True
+#         self.sexComboBox.setEditable(False)
+#         self.sexComboBox.addItems(sex)
+#         self.sexComboBox.setCurrentIndex(0)
+#         
+#         self.ageLineEdit.setText("NA")
+#         self.ageLineEdit.setClearButtonEnabled(True)
+#         self.ageLineEdit.redoAvailable = True
+#         self.ageLineEdit.undoAvailable = True
         
         epscatComponentSuccessSelect = ["any", "all", "index"]
         self.selectFailureTestComponentComboBox.addItems(epscatComponentSuccessSelect)
@@ -11031,7 +11044,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else:
                     self._data_var_name_ = ""
                     
-            self.scanDataVarNameLabel.setText(self._data_var_name_)
+            # self.scanDataVarNameLabel.setText(self._data_var_name_)
+            self.baseScipyenDataWidget.dataVarNameLabel.setText(self._data_var_name_)
             
             if self._data_.modified:
                 self.setWindowTitle("%s * \u2014 LSCaT" % (self._data_var_name_))
@@ -11423,13 +11437,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         else:
             self._data_var_name_ = ""
-            self.scanDataVarNameLabel.setText(self._data_var_name_)
-            
+            self.baseScipyenDataWidget.dataVarNameLabel.setText(self._data_var_name_)
+            # self.scanDataVarNameLabel.setText(self._data_var_name_)
+#             
             
         # NOTE: 2017-11-14 12:10:15
         # this edits the name attribute of lsdata, which is NOT 
         # the variable's name in the user workspace
-        self.scanDataNameLineEdit.setText(name) 
+        # self.scanDataNameLineEdit.setText(name) 
             
         self.framesQSpinBox.setMinimum(0)
         self.framesQSpinBox.setMaximum(self._data_.scansFrames-1)
@@ -12476,12 +12491,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         # see NOTE: 2018-09-25 22:19:58
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
-            (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit,
-             self.selectCursorSpinBox, self.analysisUnitNameLineEdit, 
+            (self.selectCursorSpinBox, self.analysisUnitNameLineEdit, 
              self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox, 
              self.cursorXwindow, self.cursorYwindow, 
-             self.unitTypeComboBox, self.genotypeComboBox,
-             self.sexComboBox, self.defineAnalysisUnitCheckBox)]
+             self.unitTypeComboBox, self.defineAnalysisUnitCheckBox)]
+        # signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
+        #     (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit,
+        #      self.selectCursorSpinBox, self.analysisUnitNameLineEdit, 
+        #      self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox, 
+        #      self.cursorXwindow, self.cursorYwindow, 
+        #      self.unitTypeComboBox, self.genotypeComboBox,
+        #      self.sexComboBox, self.defineAnalysisUnitCheckBox)]
 
         #self.scanDataNameLineEdit.editingFinished.disconnect(self.slot_setDataName)
         #self.cellLineEdit.editingFinished.disconnect(self.slot_gui_changed_cell_name)
@@ -12539,15 +12559,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.reportWindow.clear()
             
         
-        self.scanDataVarNameLabel.clear()
-        self.scanDataNameLineEdit.clear()
-        self.cellLineEdit.clear()
-        self.fieldLineEdit.clear()
+        # self.scanDataVarNameLabel.clear()
+        # self.scanDataNameLineEdit.clear()
+        # self.cellLineEdit.clear()
+        # self.fieldLineEdit.clear()
         self.analysisUnitNameLineEdit.clear()
         self.selectCursorSpinBox.setValue(-1)
         self.unitTypeComboBox.setCurrentIndex(0)
-        self.genotypeComboBox.setCurrentIndex(0)
-        self.sexComboBox.setCurrentIndex(0)
+        # self.genotypeComboBox.setCurrentIndex(0)
+        # self.sexComboBox.setCurrentIndex(0)
         
         self.protocolTableWidget.clearContents()
         self.protocolTableWidget.setRowCount(0)
