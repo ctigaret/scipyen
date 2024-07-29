@@ -211,6 +211,9 @@ class DescriptorTypeValidator(BaseDescriptorValidator):
             raise TypeError(f"For {self.private_name} one of {self.types} was expected; got {type(value).__name__} instead")
         
 class DescriptorGenericValidator(BaseDescriptorValidator):
+    # NOTE: 2024-07-29 17:14:57 TODO/FIXME
+    # check rehaul of parse_descriptor_specification and of the 
+    # WithDescriptors.setup_descriptor class method
     def __init__(self, name:str, /, *args, **kwargs):
         """
         args: sequence of objects or unary predicates;
@@ -279,9 +282,9 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                                         "order": str}
                                         
         4.  vigra.AxisInfo              {"key": str,
-                                        "typeFlags": vigral.AxisType
-                                        "resolution": float,
-                                        "description": str}
+                                         "typeFlags": vigral.AxisType
+                                         "resolution": float,
+                                         "description": str}
                                         
         5.  dict                        { (key_name: value_type,)* }
                                         Where 'value_type' is a type
@@ -421,6 +424,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         self._allow_none_ = val is True
         
     def validate(self, value):
+        """Validate `value` against the criteria set in __init__"""
         if len(self.types):
             comparand = tuple(self.types)
             if self.allow_none:
@@ -1639,12 +1643,12 @@ def __check_array_attribute__(rt, param):
         
     if isinstance(param, collections.abc.Sequence):
         if all(isinstance(x_, np.dtype) for x_ in param):
-            if rt["default_value_dtype"] is None:
+            if rt["default_value_dtypes"] is None:
                 if isinstance(rt["default_value"], np.ndarray):
                     if rt["default_value"].dtype not in tuple(param):
                         raise ValueError(f"dtype of the default value type ({type(rt['default_value']).dtype}) is not in {param}")
                         
-                rt["default_value_dtype"] = tuple(param)
+                rt["default_value_dtypes"] = tuple(param)
 
         elif all(isinstance(x_, int) for x_ in param):
             if rt["default_value_shape"] is None or rt["default_value_ndim"] is None:
@@ -1656,11 +1660,11 @@ def __check_array_attribute__(rt, param):
             rt["default_value_ndim"] = len( rt["default_value_shape"])
             
     elif isinstance(param, np.dtype):
-        if rt["default_value_dtype"] is None:
+        if rt["default_value_dtypes"] is None:
             if isinstance(rt["default_value"], np.ndarray):
                 if rt["default_value"].dtype != param and rt["default_value"].dtype.kind != param.kind:
                     raise ValueError(f"Wrong dtype of the default value ({rt['default_value'].dtype}); expecting {param}")
-            rt["default_value_dtype"] = param
+            rt["default_value_dtypes"] = param
 
     elif isinstance(param, int):
         if rt["default_value_ndim"] is None:
@@ -1717,111 +1721,182 @@ def __check_type__(attr_type, specs):
     
     return isinstance(attr_type, type) and issubclass(attr_type, specs)
                 
+# NOTE: 2024-07-29 09:43:00
+# overhauled
 def parse_descriptor_specification(x:tuple):
     """
-    x: tuple with 1 to 6 elements.
+    x: tuple with attribute name, attribute type(s), collection element types, array dtypes, default value
     
         In the most general case (terms in angle brackets are optional):
     
-        (str, instance, type or tuple of types, <default value(s)>, )
+        element:        type & meaning:
+        0               str: the name of the attribute
+    
+        1               a type or a possibly empty sequence of types representing
+                        the acceptable type(s) of the attribute (can be augmented 
+                        as below)
+    
+                        NOTE: numpy arrays and array-like types (including pandas
+                        series and dataframes) should NOT be mixed with other 
+                        types, here
+    
+        2               • when attribute type is a sequence type (deque, list, tuple), 
+                        but NOT a str, bytes or bytearray, then x[2] is the 
+                        the acceptable type or sequence of acceptable types 
+                        of the the attribute elements (see below); otherwise it is 
+                        ignored (and can be an empty tuple)
     
     
-        x[0]: str, name of the attribute
-        
-        x[1]: str, type, tuple of types or anyhing else
-            when a :str: is if first tested for a dotted type name ; if this is
-                a dotted type name then it is interpreted as the type of the 
-                attribute's value (type name qualified by module); 
-                otherwise the attribute type is a str and its default value is x[1];
-                
-            when a type: this is the default value type of the attribute, and 
-                the default value is the default constructor if it takes no 
-                parameters, else None;
-                
-            when a tuple:
-                this can be a tuple of types, or a tuple of instances; 
-                * tuple of types: these are the acceptable types of the attribute
-                
-                    - when the first element is a dict, this indicates that the 
-                    attribute is a dict; the rest of the type objects in the
-                    tuple indicate acceptable types for the dict's values
-                
-                * tuple of instances: these are acceptable default values for the
-                attribute; their types indicate acceptable types of the attribute
-                
-            antyhing else: this is the default value of the attribute, and its
-                type is the type of the attribute
-                
-            NOTE: x[1] is meant to specify the attribute type and/or its 
-            acceptable default value(s). 
-            
-            When x[1] is a single type object, a default value will be 
-            instantiated with zero arguments, if possible. This attempt will 
-            fail when either:
-            
-            a) the intializer of the specified type requires at leat one
-            positional-only parameter (which in this case is absent)
-            
-            b) the specified type is an abstract :class: (see for example, 
-            the module 'collections.abc')
-            
-            These initialization failures are ignored, and the "default" 
-            attribute value will NOT be set (i.e. it is left as it is, which is 
-            None by default).
+                        •NOTE: when x[1] is a mapping type, then x[2] can be:
+                            ∘ a type -> the acceptable type of the mapping values
+                            ∘ a sequence of types -> acceptable types of the mapping values
+                            ∘ a mapping of type or tuple of types ↦ type or sequence of types ->
+                                    acceptable key types and acceptable value types
+                        
+                        is the acceptable type or sequence of acceptable types) of the mapping values
+                        (NOT keys — these are always any hashable type)
     
-            This may impact on attribute validators (see prog.BaseDescriptorValidator and 
-            derived subclasses) used to build dynamic descriptors, UNLESS the
-            validator's property 'allow_none' is set to True.
-                
-            NOTE: 2023-05-18 08:40:56
-            The default value type is now determined in core.datatypes.default_value()
-            and MAY return an actual instance of the specified type, or None
-            
-        x[2]: type or tuple of types
-            a) When a type or tuple of types, this is either:
-                a.1) the explicit type(s) expected for the attribute. 
-                WARNING: this may overwrite the default value type determined
-                    from x[1]
-                
-                a.2) the explicit type(s) of elements of a collection-type attribute
-                
-            b) When attribute type as determined from x[1] is a numpy ndarray, 
-            or a subclass of numpy array (e.g., Python Quantity, VigraArray, 
-            neo DataObect) x[2] may also be:
-            
-            tuple of np.dtype objects:  allowed array dtypes
-            
-            tuple of int:               allowed shape (number of dimensions is 
-                                        deduced)
-            int:                        allowed number of dimensions
-            
-            dtype:                      allowed array dtype
-            
-            pq.Quantity:                allowed units (when attribute type is 
-                                        python Quantity)
-                    NOTE: unit matching is based on the convertibility between 
-                        the expected attribute 'units' property value and the
-                        specified units
-                            
-            str:                        array order (for VigraArrays)
-            
-            NOTE: to avoid further confusions, dtypes must be specified directly    
-                and a str will not be interpreted as dtype 'kind'
-                
-            NOTE: the size of sequence attributes is NOT checked (i.e., they can
-            be empty) but, if given in x[2], they can only accept elements of the
-            specified type
-            
-        x[3]-x[7]: as x[2] for numpy arrays
-            NOTE: duplicate specifications will be ignored
-            
-        NOTE: For objects of any type OTHER than numpy ndarray, only the first
-        three elements are sufficient
-        
+        3               when attribute type is a numpy array or pandas series/dataframe
+                        this is the acceptable dtype, or a sequence of acceptable
+                        dtypes; otherwise it is ignored (and can be an empty tuple)
+    
+        4               futher array predicates: a dict (possibly empty) with
+                        the following keys: "units", "ndim", "shape", "axistags"
+                        where:
+    
+                        units ↦ pq.Quantity or pq.UnitQuantity
 
-        NOTE: The specification for the first three elements of 'x' is intended 
-            to cover the case of attribute definitions in BaseNeo objects.
+                        ndim ↦ int (strictly positive, i.e., > 0)
+    
+                        shape ↦ tuple of ints;
+                            its lenth must be equal to the value of 'ndim' if
+                            'ndim' is specified, else , its length will set the 
+                            value of 'ndim'
+    
+                        axistags ↦ vigra.AxisTags, same length as value of ndim
+                                and same length as shape
+    
+                        NOTE: axistags is used when vigra.VigraArray is among the
+                        attribute types (x[1]); when it is specified, 'axistags' 
+                        length must be:
+                            1) equal to 'ndim' (unless 'ndim' is absent, in which
+                            case 'axistags' will set the value of 'ndim' to the
+                            length of the 'axistags' object)
+    
+                            2) equal to the length of 'shape' (if 'shape' is
+                            specified)
+                        
+                        
+        5               the default attribute value (may be skipped; by default this is set to None)
+    
+    
+    Returns:
+    ------------
+    A dictionaary suitable for the `descr_params` parameter to the 
+    `setup_descriptor` class method of `WithDescriptors`.
+                        
+    
+                                    
+            (str, instance or type, type or tuple of types, <default value(s)>, )
+    
+### BEGIN    
+#         x[0]: str, name of the attribute
+#         
+#         x[1]: str, type, tuple of types or anyhing else
+#             when a :str: is if first tested for a dotted type name ; if this is
+#                 a dotted type name then it is interpreted as the type of the 
+#                 attribute's value (type name qualified by module); 
+#                 otherwise the attribute type is a str and its default value is x[1];
+#                 
+#             when a type: this is the default value type of the attribute, and 
+#                 the default value is the default constructor if it takes no 
+#                 parameters, else None;
+#                 
+#             when a tuple:
+#                 this can be a tuple of types, or a tuple of instances; 
+#                 * tuple of types: these are the acceptable types of the attribute
+#                 
+#                     - when the first element is a dict, this indicates that the 
+#                     attribute is a dict; the rest of the type objects in the
+#                     tuple indicate acceptable types for the dict's values
+#                 
+#                 * tuple of instances: these are acceptable default values for the
+#                 attribute; their types indicate acceptable types of the attribute
+#                 
+#             antyhing else: this is the default value of the attribute, and its
+#                 type is the type of the attribute
+#                 
+#             NOTE: x[1] is meant to specify the attribute type and/or its 
+#             acceptable default value(s). 
+#             
+#             When x[1] is a single type object, a default value will be 
+#             instantiated with zero arguments, if possible. This attempt will 
+#             fail when either:
+#             
+#             a) the intializer of the specified type requires at leat one
+#             positional-only parameter (which in this case is absent)
+#             
+#             b) the specified type is an abstract :class: (see for example, 
+#             the module 'collections.abc')
+#             
+#             These initialization failures are ignored, and the "default" 
+#             attribute value will NOT be set (i.e. it is left as it is, which is 
+#             None by default).
+#     
+#             This may impact on attribute validators (see prog.BaseDescriptorValidator and 
+#             derived subclasses) used to build dynamic descriptors, UNLESS the
+#             validator's property 'allow_none' is set to True.
+#                 
+#             NOTE: 2023-05-18 08:40:56
+#             The default value type is now determined in core.datatypes.default_value()
+#             and MAY return an actual instance of the specified type, or None
+#             
+#         x[2]: type or tuple of types
+#             a) When a type or tuple of types, this is either:
+#                 a.1) the explicit type(s) expected for the attribute. 
+#                 WARNING: this may overwrite the default value type determined
+#                     from x[1]
+#                 
+#                 a.2) the explicit type(s) of elements of a collection-type attribute
+#                 
+#             b) When attribute type as determined from x[1] is a numpy ndarray, 
+#             or a subclass of numpy array (e.g., Python Quantity, VigraArray, 
+#             neo DataObect) x[2] may also be:
+#             
+#             tuple of np.dtype objects:  allowed array dtypes
+#             
+#             tuple of int:               allowed shape (number of dimensions is 
+#                                         deduced)
+#             int:                        allowed number of dimensions
+#             
+#             dtype:                      allowed array dtype
+#             
+#             pq.Quantity:                allowed units (when attribute type is 
+#                                         python Quantity)
+#                     NOTE: unit matching is based on the convertibility between 
+#                         the expected attribute 'units' property value and the
+#                         specified units
+#                             
+#             str:                        array order (for VigraArrays)
+#             
+#             NOTE: to avoid further confusions, dtypes must be specified directly    
+#                 and a str will not be interpreted as dtype 'kind'
+#                 
+#             NOTE: the size of sequence attributes is NOT checked (i.e., they can
+#             be empty) but, if given in x[2], they can only accept elements of the
+#             specified type
+#             
+#         x[3]-x[7]: as x[2] for numpy arrays
+#             NOTE: duplicate specifications will be ignored
+#             
+#         NOTE: For objects of any type OTHER than numpy ndarray, only the first
+#         three elements are sufficient
+#         
+# 
+#         NOTE: The specification for the first three elements of 'x' is intended 
+#             to cover the case of attribute definitions in BaseNeo objects.
             
+### END
         
     Returns:
     --------
@@ -1833,9 +1908,9 @@ def parse_descriptor_specification(x:tuple):
     default_value         ↦ object or tuple           Default attribute  value
     default_value_type    ↦ type or tuple of types    Default attribute type
     default_element_types ↦ type of tuple of types    For sequence or set attributes
+    default_value_dtypes   ↦ dtype or None             Only for ndarray attributes
     default_item_types    ↦ type or tuple of types    For mapping-type attribute
     default_value_ndim    ↦ int or None               Only for ndarray attributes
-    default_value_dtype   ↦ dtype or None             Only for ndarray attributes
     default_value_units   ↦ Quantity or None          Only for Python quantities.Quantity
         
     NOTE: 
@@ -1857,52 +1932,212 @@ def parse_descriptor_specification(x:tuple):
         default_value = None,
         default_value_type = None,
         default_element_types = None,
+        default_value_dtypes = None,
         default_item_types = None,
-        default_value_ndim = None,
-        default_value_dtype = None,
-        default_value_shape = None,
-        default_value_units = None,
-        default_array_order = None,
-        default_axistags    = None,
+        default_value_ndim = None, # not used
+        default_value_shape = None, # not used
+        default_value_units = None, # not used
+        default_array_order = None, # not used
+        default_axistags    = None, # not used
         
         )
     
-    if len(x):
-        # set the attribute name
-        if not isinstance(x[0], str):
-            raise TypeError(f"First element of a descriptor specification must be a str; got {type(x[0]).__name__} instead")
+    val_types = list()
+    el_types = list()
+    k_types = list() # types of keys of a mapping
+    v_types = list() # types of values in a mapping
+    a_dtypes = list() # accetpable dtypes in a numpy array or pandas Series, DataFrame, Index
+    further_array_params = {"units": MISSING, "ndims": MISSING, "shape": MISSING,
+                            "axistags":MISSING}
+    # units = list() # acceptable Quantities units for a pq.Quantity array
+    # ndims = list() # acceptable number of array dimensions (for np.ndarrays)
+    # axtags = list() # acceptable axistags for vigra arrays
+    
+    if len(x) not in range(5,7):
+        raise ValueError(f"Expecting a tuple with 5 or 6 elements; instead got a {len(x)}-tuple")
+    
+    
+    if not isinstance(x[0], str):
+        raise TypeError(f"First element of a descriptor specification must be a str; got {type(x[0]).__name__} instead")
+    
+    attr_name = x[0]
+    
+    if isinstance(x[1], type):
+        val_types.append(x[1])
         
-        ret["name"] = x[0]
+    elif isinstance(x[1], (tuple, list)) and len(x[1]) and all(isinstance(x_, type) for x_ in x[1]):
+        val_types += list(x[1])
+        
+    # NOTE: 2024-07-29 11:21:19 REMEMBER:
+    # list, tuple, deque -> collections.abc.Sequence < Collection < Iterable < Container
+    # dict, OrderedDict -> collections.abc.Mapping < Collection < ...
+    # np.ndarray -> collections.abc.Collection (!!!)
+    # pd.Series -> collections.abc.Collection (!!!)
+    # pd.DataFrame -> collections.abc.Collection (!!!)
+    # pf.Index  -> collections.abc.Collection (!!!)
+    
+    if any(issubclass(t, collections.abc.Sequence) and not issubclass(t, (str, bytes, bytearray)) for t in val_types):
+        if isinstance(x[2], (tuple, list)) and len(x[2]) and all(isinstance(x_, type) for x_ in x[2]):
+            el_types += list(x[2])
+            
+        elif isinstance(x[2], type):
+            el_types.append(x[2])
+            
+    if any(issubclass(t, collections.abc.Mapping) for t in val_types):
+        if isinstance(x[2], type):
+            v_types.append(x[1])
+            
+        elif isinstance(x[2], (tuple, list)) and len(x[1]) and all(isinstance(x_, type) for x_ in x[2]):
+            v_types += list(x[2])
+            
+        elif isinstance(x[2], dict) and len(x[2]):
+            for key, val in x[2].items():
+                if isinstance(key, type):
+                    k_types.append(key)
+                elif isinstance(key, (tuple, list)) and all(isinstance(k_, type) for k_ in key):
+                    k_types += list(key)
+                    
+                if isinstance(val, type):
+                    v_types.append(val)
+                    
+                elif isinstance(val, (tuple, list)) and all(isinstance(v_, type) for v_ in val):
+                    v_types += list(val)
+                    
+    if any(issubclass(t, (np.ndarray, pd.Series, pd.DataFrame, pd.Index)) for t in val_types):
+        if isinstance(x[3], np.dtype):
+            a_dtypes.append(x[3])
+            
+        elif isinstance(x[3], (tuple, list)) and len(x[3]) and all(isinstance(x_, np.dtype) for x_ in x[3]):
+            a_dtypes += list(x[3])
+            
+        if isinstance(x[4], dict) and any(k in x[4] for k in ("units", "ndim", "shape", "axistags")):
+            if any(issubclass(t, p.Quantity) for t in val_types):
+                if "units" in x[4] and issubclass(x[4]["units"], pq.Quantity):
+                    further_array_params["units"] = x[4]["units"]
+                else:
+                    further_array_params["units"] = pq.dimensionless
+                    
+                
+            if "ndim" in x[4] and isinstance(x[4]["ndim"], int) and x[4]["ndim"] > 0:
+                further_array_params["ndim"] = x[4]["ndim"]
+                
+            if "shape" in x[4] and isinstance(x[4]["shape"], tuple) and all(isinstance(s, int) and s >=0 for s in x[4]["shape"]):
+                shape = x[4]["shape"]
+                
+                ndim = further_array_params.get("ndim", MISSING)
+                
+                if isinstance(ndim, int):
+                    if len(shape) != ndim:
+                        raise ValueError(f"Mismatch between the specified shape: {shape} and the number of dimensions: {ndim}")
+                    
+                else:
+                    further_array_params["ndim"] = len(shape)
+                    
+                further_array_params["shape"] = shape
+                
+            if any(issubclass(t, vigra.VigraArray) for t in val_types):
+                if "axistags" in x[4] and isinstance(x[4]["axistags"], vigra.AxisTags):
+                    axistags = x[4]["axistags"]
+                    shape = further_array_params.get("shape", MISSING)
+                    ndim = further_array_params.get("ndim", MISSING)
+                    
+                    if isinstance(ndim, int):
+                        if len(axistags) != ndim:
+                            raise ValueError(f"Mismatch between the number of axistags ({len(axistags)}) and the specified number of dimensions ({ndim})")
+                    else:
+                        further_array_params["ndim"] = len(axistags)
+                    
+                    
+                    if isinstance(shape, tuple) and all(isinstance(s, int) for s in shape) and len(axistags) != len(shape):
+                        raise ValueError(f"Mismatch between the number of axistags ({len(axistags)}) and dimensions expected from shape ({len(shape)})")
+                    
+                    further_array_params["axistags"] = axistags
+            
+            
+            if len(x) == 6 and x[5]:
+                default_value = x[5]
+                if x[5] is not None: # and x[5] is not MISSING:
+                    assert isinstance(default_value, val_types+[type(None)]), f"Default value type ({type(default_value)} is not an instance of the acceptable types)"
+                    
+                    if isinstance(default_value, (np.ndarray, pd.Index, pd.Series, pd.DataFrame)):
+                        if len(a_dtypes):
+                            assert any(np.issubdtype(default_value, dtype) for dtype in a_dtypes), f"Default value dtype ({default_value.dtype}) is not in any hierachy of specified dtypes ({a_dtypes})"
+                            
+                        if isinstance(further_array_params["ndim"], int):
+                            assert default_value.ndim == further_array_params["ndim"], f"Mismatch between default value dimensions ({default_value.ndim}) and the number of specified dimensions ({further_array_params['ndim']})" 
+
+                        if isinstance(further_array_params["shape"], tuple):
+                            assert default_value.shape == further_array_params["shape"], f"Mismatch between the shape of default value ({default_value.shape}) and the specified dhape ({further_array_params['shape']})"
+
+                        if isinstance(default_value, vigra.VigraArray):
+                            if isinstance(further_array_params["axistags"], vigra.AxisTags):
+                                assert(default_value.axistags == further_array_params["axistags"]), f"Axistags mismatch between default value ({default_value.axistags}) and the specified axistags ({further_array_params['axistags']})"
+            else:
+                default_value = None
+                
+    # args = val_types + [type(None)]
+    args = val_types
+    kwargs = dict()
+    kwargs["element_types"] = tuple(el_types)
+    kwargs["key_types"] = tuple(k_types)
+    kwargs["value_types"] = tuple(v_types)
+    kwargs["dtypes"] = tuple(a_dtypes)
+    kwargs["array_specs"] = further_array_params
+    kwargs["default"] = default_value
+                    
+    result = {"name": attr_name, 
+              "value": default_value, 
+              "args":tuple(args), 
+              "kwargs": kwargs}
+    
+    return result
+    
+    
+    
+    
+    # ---- NOTE: 2024-07-29 11:03:19 to remove to end of function definition
+    
+#     if len(x):
+#         # set the attribute name
+#         if not isinstance(x[0], str):
+#             raise TypeError(f"First element of a descriptor specification must be a str; got {type(x[0]).__name__} instead")
+#         
+#         ret["name"] = x[0]
+#         
         
     if len(x) > 1:
         # set the attribute's default value and default value type
         #
         if isinstance(x[1], str):
             try:
-                val_type = import_item(x[1]) # NOTE: import_item() def'ed in traitlets.utils.importstring
+                val_types = [import_item(x[1])] # NOTE: import_item() def'ed in traitlets.utils.importstring
             except:
                 ret["default_value"] = x[1]
-                ret["default_value_type"] = str
+                val_types = [str]
                 
         elif isinstance(x[1], type):
-            ret["default_value_type"] = x[1]
+            val_types = [x[1]]
+            # ret["default_value_type"] = x[1]
             val = default_value(x[1]) # NOTE: default_value() def'ed in core.datatypes
             ret["default_value"] = val
                 
-        elif isinstance(x[1], tuple):
+        elif isinstance(x[1], (tuple, list)):
             if all(isinstance(x_, type) for x_ in x[1]): 
                 # NOTE: x[1] is a tuple of types
                 # this leaves ret["default_value"] as None
-                ret["default_value_type"] = x[1] # any of the types in x[1]
+                val_types = list(x[1])
+                # ret["default_value_type"] = x[1] # any of the types in x[1]
             else:
                 # NOTE: x[1] is a tuple of instances
-                ret["default_value_type"] = tuple(type(x_) for x_ in x[1])
+                val_types = list(type(x_) for x_ in x[1])
+                # ret["default_value_type"] = tuple(type(x_) for x_ in x[1])
                 ret["default_value"] = x[1]
             
         else:
             # x[1] is an instance
             ret["default_value"] = x[1]
-            ret["default_value_type"] = type(x[1])
+            val_types = [type(x[1])]
+            # ret["default_value_type"] = type(x[1])
             
     # print(f"parse_descriptor_specification default_value = {ret['default_value']}, default_value_type = {ret['default_value_type']}")
             
@@ -1911,7 +2146,8 @@ def parse_descriptor_specification(x:tuple):
         # whether it is None, type(None), or anything else
         #
         # x[1]
-        if __check_type__(ret["default_value_type"], (None, type(None))) or not __check_type__(ret["default_value_type"], np.ndarray):
+        # if __check_type__(ret["default_value_type"], (None, type(None))) or not __check_type__(ret["default_value_type"], np.ndarray):
+        if not __check_type__(value_types, np.ndarray):
              # NOTE: 2023-05-17 18:30:44
              # This branch executed when ret["default_value_type"] is None, NoneType, or IS NOT a np.ndarray subclass
             if isinstance(x[2], collections.abc.Sequence):
@@ -2044,7 +2280,7 @@ def parse_descriptor_specification(x:tuple):
     # the following are set only for numpy ndarray objects and optionally some of
     # their subclasses:
     #
-    array_params = ("default_value_ndim", "default_value_dtype", 
+    array_params = ("default_value_ndim", "default_value_dtypes", 
                     "default_value_units", "default_value_shape", 
                     "default_array_order", "default_axistags")
     
@@ -2052,10 +2288,17 @@ def parse_descriptor_specification(x:tuple):
     
     dict_params = ("default_item_types", )
     
+    # if ret["name"] == "age":
+    #     print(f"\nprog.parse_descriptor_specification {x} ->\n\tret = {ret}")
+    
+    
     if isinstance(ret["default_value_type"], type) and all(ret[k] is None for k in array_params + sequence_params + dict_params) or \
         (isinstance(ret["default_value_type"], collections.abc.Sequence) and all(isinstance(v_, type) for v_ in ret["default_value_type"])):
         
         args.append(ret["default_value_type"])
+        
+    elif isinstance(ret["default_value_type"], tuple) and all(isinstance(e, type) for e in ret["default_value_type"]):
+        args.extend(ret["default_value_type"])
     
     else:
         type_dict = dict()
@@ -2063,8 +2306,8 @@ def parse_descriptor_specification(x:tuple):
         if ret["default_value_ndim"] is not None:
             type_dict["ndim"] = ret["default_value_ndim"]
             
-        if isinstance(ret["default_value_dtype"], np.dtype):
-            type_dict["dtype"] = ret["default_value_dtype"]
+        if isinstance(ret["default_value_dtypes"], np.dtype):
+            type_dict["dtype"] = ret["default_value_dtypes"]
             
         if isinstance(ret["default_value_units"], pq.Quantity):
             type_dict["units"] = ret["default_value_units"]
@@ -2082,10 +2325,14 @@ def parse_descriptor_specification(x:tuple):
     # a type or tuple of types, therefore we include the dict enclosing
     # type_dict into the args sequence; the prog.DescriptorGenericValidator will take care
     # of it...
+    
+        
+        
             
     result = {"name":ret["name"], "value": ret["default_value"], "args":tuple(args), "kwargs": kwargs}
     
-    print(f"\nprog.parse_descriptor_specification {x} -> \n{result}")
+    # if ret["name"] == "age":
+    #     print(f"\nprog.parse_descriptor_specification {x} -> \n\tresult =\n\t{result}")
                 
     
     return result
@@ -2207,13 +2454,12 @@ class WithDescriptors(object):
         modify other attributes of the instance owner of the descriptor, based 
         on the new value (to be) assigned to the descriptor.
         
-        See AttributeAdapter for details.
     
         """
-        args = descr_params.get("args", tuple())
+        name = descr_params.get("name", "") # the name of the descriptor
+        defval = descr_params.get("value", None) # descriptor default value
+        args = descr_params.get("args", tuple()) # the acceptable types
         kw = descr_params.get("kwargs", {})
-        name = descr_params.get("name", "")
-        defval = descr_params.get("value", None)
         
         if not isinstance(name, str) or len(name.strip()) == 0:
             return
@@ -2242,7 +2488,8 @@ class WithDescriptors(object):
                 proposed_value = suggested_value
                 
             kw = dict()
-            print(f"\nWithDescriptors<{self.__class__.__name__}>.__init__ to set up attr {attr}:\n\t{attr_dict},\n\tproposed value = {proposed_value}")
+            if attr[0] == "age":
+                print(f"\nWithDescriptors<{self.__class__.__name__}>.__init__ to set up attr {attr}:\n\tattr_dict = {attr_dict},\n\tproposed value = {proposed_value}")
             type(self).setup_descriptor(attr_dict, **kw)
             setattr(self, attr_dict["name"], proposed_value)
             
