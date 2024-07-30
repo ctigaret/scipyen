@@ -3211,6 +3211,20 @@ def yyMdd(now=None):
     
     return "%s%s%s" % (time.strftime("%y", tuple(now)), string.ascii_lowercase[now.tm_mon-1], time.strftime("%d", tuple(now)))
 
+def unpack(x:typing.Union[list, tuple, deque], varnames:typing.Sequence[str]):
+    """Unpacks a sequence x of len(x) <= len(varnames) into len(varnames) variables"""
+    import keyword
+    from core.datatypes import NoData
+    
+    if len(x) > len(varnames):
+        raise ValueError(f"`varnames` has fewer elements ({len(varnames)}) than the tuple in `x`({len(x)})")
+    
+    if not all(isinstance(v, str) and not keyword.iskeyword(v) for v in varnames):
+        raise TypeError(f"All elements in varnames must be valid non-keyword strings")
+    
+    return list(itertools.zip_longest(varnames, x, fillvalue=NoData()))
+    
+
 
 def make_file_filter_string(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]

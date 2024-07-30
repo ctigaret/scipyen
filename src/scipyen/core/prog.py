@@ -1921,7 +1921,10 @@ def parse_descriptor_specification(x:tuple):
         * default_value_type is a tuple of types
     """
     from core.quantities import units_convertible
-    from core.datatypes import (TypeEnum, is_enum, is_enum_value, default_value)
+    from core.datatypes import (
+        TypeEnum, is_enum, is_enum_value, default_value, NoData)
+    from core.utilities import unpack
+    
     if not isinstance(x, tuple):
         raise TypeError(f"Expecting a tuple, got {type(x).__name__} instead")
     
@@ -1942,6 +1945,69 @@ def parse_descriptor_specification(x:tuple):
         
         )
     
+    res = DataBag(
+        name=NoData,
+        type_or_str_or_value=NoData,
+        types=NoData,
+        eltypes_or_dtypes=NoData,
+        dtypes=NoData,
+        default=NoData,
+        )
+    
+    datavars = unpack(x, res.keys())
+    # print(f"datavars = {datavars}")
+    
+    for dv in datavars:
+        res[dv[0]] = dv[1]
+    
+    print(f"res = {res}")
+    
+    
+    return res
+
+    if not isinstance(res.name, str) or len(res.name.strip()) == 0:
+        raise ValueError(f"No attribute name was supplied")
+    
+    if isinstance(res.type_or_str_or_value, type):
+        if isinstance(res.types, list):
+            res.types.append(res.type_or_str_or_value)
+        else:
+            res.types = [res.type_or_str_or_value]
+            
+        res.type_or_str_or_value = NoData # consume this
+        
+    elif isinstance(res.type_or_str_or_value, str):
+        try:
+            val_types = [import_item(res.type_or_str_or_value)]
+            if isinstance(res.types, list):
+                res.types.extend(val_types)
+            else:
+                res.types = val_types
+        except:
+            if isinstance(res.types, list):
+                if str not in res.types:
+                    res.types.append(str)
+                    
+            else:
+                res.types = [str]
+                
+                    
+            res.default = res.type_or_str_or_value
+            
+        res.type_or_str_or_value = NoData # consume this
+        
+    elif res.type_or_str_or_value is not NoData:
+        res.default = res.type_or_str_or_value
+        val_type = type(res.default)
+        if isinstance(res.types, list):
+            if val_type not in res.types:
+                res.types.append(val_type)
+                
+        else:
+            res.types = =[val_type]
+                
+        res.type_or_str_or_value = NoData # consume this
+    
     val_types = list()
     el_types = list()
     k_types = list() # types of keys of a mapping
@@ -1953,8 +2019,8 @@ def parse_descriptor_specification(x:tuple):
     # ndims = list() # acceptable number of array dimensions (for np.ndarrays)
     # axtags = list() # acceptable axistags for vigra arrays
     
-    if len(x) not in range(5,7):
-        raise ValueError(f"Expecting a tuple with 5 or 6 elements; instead got a {len(x)}-tuple")
+    # if len(x) not in range(5,7):
+    #     raise ValueError(f"Expecting a tuple with 5 or 6 elements; instead got a {len(x)}-tuple")
     
     
     if not isinstance(x[0], str):
@@ -1962,11 +2028,12 @@ def parse_descriptor_specification(x:tuple):
     
     attr_name = x[0]
     
-    if isinstance(x[1], type):
-        val_types.append(x[1])
-        
-    elif isinstance(x[1], (tuple, list)) and len(x[1]) and all(isinstance(x_, type) for x_ in x[1]):
-        val_types += list(x[1])
+    if len(x) == 2:
+        if isinstance(x[1], type):
+            val_types.append(x[1])
+            
+        elif isinstance(x[1], (tuple, list)) and len(x[1]) and all(isinstance(x_, type) for x_ in x[1]):
+            val_types += list(x[1])
         
     # NOTE: 2024-07-29 11:21:19 REMEMBER:
     # list, tuple, deque -> collections.abc.Sequence < Collection < Iterable < Container
@@ -1975,6 +2042,8 @@ def parse_descriptor_specification(x:tuple):
     # pd.Series -> collections.abc.Collection (!!!)
     # pd.DataFrame -> collections.abc.Collection (!!!)
     # pf.Index  -> collections.abc.Collection (!!!)
+    
+    # if len(x) == 3:
     
     if any(issubclass(t, collections.abc.Sequence) and not issubclass(t, (str, bytes, bytearray)) for t in val_types):
         if isinstance(x[2], (tuple, list)) and len(x[2]) and all(isinstance(x_, type) for x_ in x[2]):

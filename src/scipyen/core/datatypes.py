@@ -205,6 +205,15 @@ RELATIVE_TOLERANCE = 1e-4
 ABSOLUTE_TOLERANCE = 1e-4
 EQUAL_NAN = True
 
+class NoData():
+    """Empty placeholder class to allow using MISSING & None as data objects.
+    Cannot be instantiated
+    """
+    def __new__(cls):
+        return cls
+    def __repr__(self):
+        return "NoData"
+
 def default_value(x:type):
     if not isinstance(x, type):
         return x

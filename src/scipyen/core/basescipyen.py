@@ -117,9 +117,9 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
                             ("procedure_route",     "NA", (str, type(pd.NA), type(MISSING))),
                             ("procedure_schedule",  neo.Epoch()),
                             ("triggers",            TriggerProtocol(),     (TriggerProtocol, list, type(MISSING))),
-                            ("file_datetime",       datetime),
-                            ("rec_datetime",        datetime),
-                            ("analysis_datetime",   datetime),
+                            ("file_datetime",       datetime.datetime),
+                            ("rec_datetime",        datetime.datetime),
+                            ("analysis_datetime",   datetime.datetime),
                             ("descriptors",         dict)
                         )
     

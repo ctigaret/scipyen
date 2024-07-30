@@ -29,7 +29,7 @@ function show_help ()
     echo -e "<cezar tigaret at gmail com> , <tigaretc at cardiff ac uk>"
     echo -e "\nInstructions:"
     echo -e "============\n"
-    echo -e "Run 'sh instal.sh' without options for a fully automated installation, using built-in defaults.\n"
+    echo -e "Run 'sh install.sh' without options for a fully automated installation, using built-in defaults.\n"
     echo -e "Options:"
     echo -e "========\n"
     echo -e "--install_dir=DIR\tSpecify where the virtual environment will be created (default is ${HOME})\n"

@@ -2,11 +2,12 @@
 """Common widget for meta-information in results
 """
 import os, math, typing, datetime
+from dataclasses import MISSING
 import numpy as np
 import quantities as pq
 from core import quantities as scq
 from core import strutils
-from core.datatypes import UnitTypes, GENOTYPES
+from core.datatypes import UnitTypes, GENOTYPES, NoData
 import pandas as pd
 
 from qtpy import QtCore, QtGui, QtWidgets
