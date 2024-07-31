@@ -217,10 +217,9 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
     # WithDescriptors.setup_descriptor class method
     def __init__(self, name:str, /, *args, **kwargs):
         """
-        args: sequence of objects or unary predicates;
-            objects can be:
-            regular instances
-            types
+        name: `public` name of the descriptor
+    
+        args: tuple of types or unary predicates;
             
             NOTE: unary predicates are functions that expect a Python object as 
                 the first (only) argument and return a bool.
@@ -246,26 +245,27 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 numpy arrays: these are not hashable, hence they will always be
                     compared against their id() which may fail. 
                     
-                    To compare a numpy array value against a 'template', 
-                    use **kwargs as detailed below.
+                    To compare a numpy array against a 'template', use **kwargs
+                    as detailed below.
                     
                 dict: these are not hashable, hence they will always be
                     compared against their id() which may fail. ;
                     
-                    To compare the STRUCTURE of a dict value agains a 'template',
+                    To compare the STRUCTURE of a dict against a 'template',
                     use **kwargs as detailed below.
+    
                     
         kwargs: maps Python types or special strings to additional criteria 
             (NOTE: a Python type is a hashable Python object).
             
-                The additional criteria are ALWAYS dicts, with keys (str) mapped
-                to values of the type indicated in the table below. These mappings
-                are designed to probe additional specific properties of the value.
-                However, these keys as detailed below need not be all present in
-                the criterion dictionary; when absent they will simply be ignored.
-                
-                NOTE: The table below lists the expected criteria for maximal
-                stringency; the last entry in the table sets the most generic case
+            The additional criteria are ALWAYS dicts, with keys (str) mapped
+            to values of the type indicated in the table below. These mappings
+            are designed to probe additional specific properties of the value.
+            However, these keys as detailed below need not be all present in
+            the criterion dictionary; when absent they will simply be ignored.
+            
+            NOTE: The table below lists the expected criteria for maximal
+            stringency; the last entry in the table sets the most generic case
             
         Key:                        Value:
         ------------------------------------------------------------------
@@ -358,16 +358,26 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         self.types = set() # allowed value types
         self.hashables = set() # values for hashables (can be used as keys)
         self.non_hashables = set() # values for non-hashables - referenced by their id()
-        self.dcriteria = dict() # dictionary of criteria as in the above table
-        self._allow_none_ = False
+        # self.dcriteria = dict() # dictionary of criteria:
+                                
+        # NOTE: all of these may be empty
+        self.dict_key_types = set()   # to validate key types
+        self.dict_val_types = set()   # to validate value types
+        self.dist_keys = set()        # to validate against expected keys
         
-        for a in args:
+                                
+        self._allow_none_ = False       # to allow None as descriptor value 
+                                        # irrespective of the criteria above
+        
+        for a in args: # tease these apart
             if inspect.isfunction(a):
                 self.predicates.add(a)
                 
             elif isinstance(a,type):
                 self.types.add(a)
                 
+            # NOTE: 2024-07-31 14:33:37 TODO
+            # move this to kwargs
             elif isinstance(a, dict):
                 if all(isinstance(k, type) for k in a.keys()):
                     self.dcriteria.update(a)
@@ -377,6 +387,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 
             elif isinstance(a, collections.abc.Sequence):
                 if all(isinstance(v, type) for v in a):
+                    # sequence of types
                     self.types |= set(a)
                     
                 else:
@@ -1618,6 +1629,7 @@ def processtimeblock(label):
 # ### END Context managers
 
 def is_hashable(x):
+    """Returns True if x is hashable, i.e. hash(x) succeeds and returns an int"""
     ret = bool(getattr(x, "__hash__", None) is not None)
     if ret:
         try:
@@ -1837,7 +1849,7 @@ def parse_descriptor_specification(x:tuple):
     
     Returns:
     ------------
-    A dictionaary suitable for the `descr_params` parameter to the 
+    A dictionary suitable for the `descr_params` parameter to the 
     `setup_descriptor` class method of `WithDescriptors`.
                         
     
@@ -1993,26 +2005,12 @@ def parse_descriptor_specification(x:tuple):
     
     
     # (name, value or type, type or ndims, ndims or units, units)
-#     ret = dict(
-#         name = None,
-#         default_value = None,
-#         default_value_type = None,
-#         default_element_types = None,
-#         default_value_dtypes = None,
-#         default_item_types = None,
-#         default_value_ndim = None, # not used
-#         default_value_shape = None, # not used
-#         default_value_units = None, # not used
-#         default_array_order = None, # not used
-#         default_axistags    = None, # not used
-#         
-#         )
-    
     res = SimpleNamespace(
         name=NoData,
         type_or_str_or_value=NoData,
         types=NoData,
-        eltypes_or_dtypes=NoData,
+        eltypes=NoData,
+        keyvaltypes=NoData,
         dtypes=NoData,
         default=NoData,
         array_params=NoData
@@ -2037,10 +2035,11 @@ def parse_descriptor_specification(x:tuple):
     
     descriptor_name = res.name
     descriptor_default_value = NoData
-    descriptor_types = NoData
+    descriptor_types = tuple()
     descriptor_element_types = tuple()
-    descriptor_mapping_key_value_types = NoData
-    descriptor_dtypes = NoData
+    descriptor_mapping_key_value_types = tuple()
+    descriptor_dtypes = tuple()
+    descriptor_array_params = dict()
     
     if isinstance(res.type_or_str_or_value, type):
         if isinstance(res.types, list):
@@ -2081,22 +2080,27 @@ def parse_descriptor_specification(x:tuple):
         res.type_or_str_or_value = NoData # consume this
         
     # by now, res.types should have been taken care of
-    descriptor_types = tuple()
+    # descriptor_types = tuple()
     
-    if __check_type__(res.types, (str, bytes, bytearray))
+    # if __check_type__(res.types, (str, bytes, bytearray))
     
     if __check_type__(res.types, collections.abc.Sequence, (str, bytes, bytearray)):
-        # here, res.eltypes_or_dtypes should be a type or tuple of types
-        if res.eltypes_or_dtypes is not NoData:
-            if isinstance(res.eltypes_or_dtypes, type):
-                descriptor_element_types = tuple(res.eltypes_or_dtypes)
-            elif isinstance(res.eltypes_or_dtypes, (tuple, list)) and len(res.eltypes_or_dtypes) and all(isinstance(v_, type) for v_ in res.eltypes_or_dtypes):
-                descriptor_element_types = tuple(res.eltypes_or_dtypes)
+        # here, res.eltypes should be a type or tuple of types
+        if res.eltypes is not NoData:
+            if isinstance(res.eltypes, type):
+                descriptor_element_types = tuple(res.eltypes)
+            elif isinstance(res.eltypes, (tuple, list)) and len(res.eltypes) and all(isinstance(v_, type) for v_ in res.eltypes):
+                descriptor_element_types = tuple(res.eltypes)
                 
             else:
                 descriptor_element_types = tuple()
                 
     elif __check_type__(res.types, collections.abc.Mapping):
+        if res.keyvaltypes is NoData:
+            # use eltypes to set the acceptable value types in a mapping
+            pass
+            
+            
         
     
     # -------
@@ -2481,14 +2485,14 @@ def parse_descriptor_specification(x:tuple):
         if isinstance(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Mapping, collections.abc.Set)):
             type_dict["element_types"] = ret["default_element_types"]
             
-        args.append(type_dict) # NOTE: TODO/FIXME 2024-07-31 10:06:51 should be in kwargs
+        # args.append(type_dict) # NOTE: TODO/FIXME 2024-07-31 10:06:51 should be in kwargs
         
     # NOTE: keys in kwargs can only be str; however, type_dict is mapped to
     # a type or tuple of types, therefore we include the dict enclosing
     # type_dict into the args sequence; the prog.DescriptorGenericValidator will take care
     # of it...
     
-        
+    kwargs = type_dict
         
             
     result = {"name":ret["name"], "value": ret["default_value"], "args":tuple(args), "kwargs": kwargs}
@@ -2587,7 +2591,7 @@ class WithDescriptors(object):
     _descriptor_impl_ = DescriptorGenericValidator
     
     @classmethod
-    def setup_descriptor(cls, descr_params, **kwargs):
+    def setup_descriptor(cls, descr_params:dict, **kwargs):
         """Default method for setting up descriptors based on specific conditions.
         
         This will dynamically generate instances of DescriptorGenericValidator.
@@ -2616,7 +2620,16 @@ class WithDescriptors(object):
         modify other attributes of the instance owner of the descriptor, based 
         on the new value (to be) assigned to the descriptor.
         
+        Parameters:
+        -----------
+        descr_params: a mapping
+        name ↦ str — name of the descriptor
+        value ↦ anything (default None) — the default value of the descriptor
+        args ↦ tuple (default empty) — acceptable value types for the descriptor
+        kwargs ↦ dict (default, empty) — TODO: document this !!!
     
+        these are passed directly to the instance of the Descriptor class, which
+            by default is a DescriptorGenericValidator
         """
         name = descr_params.get("name", "") # the name of the descriptor
         defval = descr_params.get("value", None) # descriptor default value
