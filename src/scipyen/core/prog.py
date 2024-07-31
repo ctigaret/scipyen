@@ -1709,7 +1709,7 @@ def __check_array_attribute__(rt, param):
 
 def __check_type__(attr_type:typing.Union[type, typing.Tuple[type]], 
                    specs:typing.Union[type, typing.Tuple[type]], 
-                   exclspecs:typing.Optional[typing.Union[type, typing.Tupl[type]]] = None) -> bool:
+                   exclspecs:typing.Optional[typing.Union[type, typing.Tuple[type]]] = None) -> bool:
     """Checks if attr_type is a subclass of types in specs.
     Optionally, checks that attr_type it NOT a subclass of types in 
     exclspecs.
@@ -2038,7 +2038,7 @@ def parse_descriptor_specification(x:tuple):
     descriptor_name = res.name
     descriptor_default_value = NoData
     descriptor_types = NoData
-    descriptor_element_types = NoData
+    descriptor_element_types = tuple()
     descriptor_mapping_key_value_types = NoData
     descriptor_dtypes = NoData
     
@@ -2083,12 +2083,21 @@ def parse_descriptor_specification(x:tuple):
     # by now, res.types should have been taken care of
     descriptor_types = tuple()
     
+    if __check_type__(res.types, (str, bytes, bytearray))
+    
     if __check_type__(res.types, collections.abc.Sequence, (str, bytes, bytearray)):
         # here, res.eltypes_or_dtypes should be a type or tuple of types
         if res.eltypes_or_dtypes is not NoData:
             if isinstance(res.eltypes_or_dtypes, type):
+                descriptor_element_types = tuple(res.eltypes_or_dtypes)
+            elif isinstance(res.eltypes_or_dtypes, (tuple, list)) and len(res.eltypes_or_dtypes) and all(isinstance(v_, type) for v_ in res.eltypes_or_dtypes):
+                descriptor_element_types = tuple(res.eltypes_or_dtypes)
+                
+            else:
                 descriptor_element_types = tuple()
                 
+    elif __check_type__(res.types, collections.abc.Mapping):
+        
     
     # -------
     
