@@ -17,6 +17,7 @@ import pprint
 from abc import ABC, abstractmethod
 from importlib import abc as importlib_abc
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
+from types import SimpleNamespace
 import collections
 import importlib, inspect, pathlib, warnings, operator, functools
 from warnings import WarningMessage
@@ -1706,20 +1707,64 @@ def __check_array_attribute__(rt, param):
             rt["default_value_units"] = param
             
 
-def __check_type__(attr_type, specs):
+def __check_type__(attr_type:typing.Union[type, typing.Tuple[type]], 
+                   specs:typing.Union[type, typing.Tuple[type]], 
+                   exclspecs:typing.Optional[typing.Union[type, typing.Tupl[type]]] = None) -> bool:
+    """Checks if attr_type is a subclass of types in specs.
+    Optionally, checks that attr_type it NOT a subclass of types in 
+    exclspecs.
+    
+    Parameters:
+    -----------
+    attr_type: a type or sequence of types (in the latter case, all it elements 
+        will be checked)
+    
+    specs: a type or a tuple of types that must be a superclass of attr_type;
+        It may contain `None` objects.
+        (NOTE: I chose the name `specs` to avoid clashes with the `types` module)
+    
+    
+    exclspecs: type or sequence of types that must NOT be a superclass of attr_type
+    
+    Returns a bool
+    --------------
+    
+    """
     if isinstance(specs, type):
         specs = (specs,)
         
-    elif not isinstance(specs, collections.abc.Sequence) or not all(isinstance(v_, type, ) for v_ in specs if v_ is not None ):
-        raise TypeError("__check_type__ expecting a type or sequence of types as second parameter")
+    elif not isinstance(specs, tuple) or not all(isinstance(v_, type, ) for v_ in specs if v_ is not None ):
+        raise TypeError("__check_type__ expecting a type or tuple of types as second parameter")
     
+    specs = tuple(s for s in specs if s is not None)
+        
+    if exclspecs is None:
+        exclspecs = tuple()
+    
+    if isinstance(exclspecs, type):
+        exclspecs = (exclspecs,)
+        
+    elif isinstance(exclspecs, tuple) and len(exclspecs):
+        if not all(isinstance(e_, type) for e_ in exclspecs):
+            raise TypeError("__check_type__: When a tuple, `exclspecs` must contain only types")
+        
     else:
-        specs = tuple(s for s in specs if s is not None)
-    
-    if isinstance(attr_type, collections.abc.Sequence):
+        raise TypeError(f"__check_type__: `exclspecs` expected to be a type, a tuple of types, or None; got {type(exclspecs).__name__} instead")
+        
+        
+    if isinstance(attr_type, collections.abc.Sequence) and len(attr_type):
+        if isinstance(exclspecs, tuple) and len(exclspecs) and all(isinstance(e_, type) for e_ in exclspecs):
+            return all(isinstance(v_, type) and issubclass(v_, specs) and not issubclass(v_, exclspecs) for v_ in attr_type if v_ is not None )
+        
         return all(isinstance(v_, type) and issubclass(v_, specs) for v_ in attr_type if v_ is not None )
     
-    return isinstance(attr_type, type) and issubclass(attr_type, specs)
+    elif isinstance(attr_type, type):
+        if isinstance(exclspecs, tuple) and len(exclspecs) and all(isinstance(e_, type) for e_ in exclspecs):
+            return isinstance(attr_type, type) and issubclass(attr_type, specs) and not issubclass(attr_type, exclspecs)
+        
+        return isinstance(attr_type, type) and issubclass(attr_type, specs)
+    
+    return False
                 
 # NOTE: 2024-07-29 09:43:00
 # overhauled
@@ -1902,7 +1947,25 @@ def parse_descriptor_specification(x:tuple):
     --------
     The following key ↦ value mapping:
     
-    Key:                  Value type                  Semantic:
+    "name":ret["name"], 
+    "value": ret["default_value"], 
+    "args":tuple(args), 
+    "kwargs": kwargs}
+    
+    where:
+    name    ↦ str: attribute (descriptor) name
+    value   ↦ typing.Any: any Python object — the default descriptor value
+    args    ↦ tuple — acceptable types of the descriptor value, AND a 
+                type dictionary with additional parameters:
+                ndim, dtype (for all numpy arrays)
+                units (for quantities)
+                axistags and order (for vigra arrays)
+                element_types (for collection types and sets)
+                mapping_element_types (for mapping types) -> TODO
+    
+    kwargs  ↦ dict
+    
+        Key:                  Value type                  Semantic:
     ============================================================================
     name                  ↦ str                       Attribute name
     default_value         ↦ object or tuple           Default attribute  value
@@ -1930,43 +1993,54 @@ def parse_descriptor_specification(x:tuple):
     
     
     # (name, value or type, type or ndims, ndims or units, units)
-    ret = dict(
-        name = None,
-        default_value = None,
-        default_value_type = None,
-        default_element_types = None,
-        default_value_dtypes = None,
-        default_item_types = None,
-        default_value_ndim = None, # not used
-        default_value_shape = None, # not used
-        default_value_units = None, # not used
-        default_array_order = None, # not used
-        default_axistags    = None, # not used
-        
-        )
+#     ret = dict(
+#         name = None,
+#         default_value = None,
+#         default_value_type = None,
+#         default_element_types = None,
+#         default_value_dtypes = None,
+#         default_item_types = None,
+#         default_value_ndim = None, # not used
+#         default_value_shape = None, # not used
+#         default_value_units = None, # not used
+#         default_array_order = None, # not used
+#         default_axistags    = None, # not used
+#         
+#         )
     
-    res = DataBag(
+    res = SimpleNamespace(
         name=NoData,
         type_or_str_or_value=NoData,
         types=NoData,
         eltypes_or_dtypes=NoData,
         dtypes=NoData,
         default=NoData,
+        array_params=NoData
         )
     
-    datavars = unpack(x, res.keys())
+    result = dict()
+    
+    datavars = unpack(x, res.__dict__.keys())
     # print(f"datavars = {datavars}")
     
     for dv in datavars:
-        res[dv[0]] = dv[1]
+        setattr(res, dv[0], dv[1])
+        # res[dv[0]] = dv[1]
     
     print(f"res = {res}")
     
     
-    return res
+    # return res
 
     if not isinstance(res.name, str) or len(res.name.strip()) == 0:
         raise ValueError(f"No attribute name was supplied")
+    
+    descriptor_name = res.name
+    descriptor_default_value = NoData
+    descriptor_types = NoData
+    descriptor_element_types = NoData
+    descriptor_mapping_key_value_types = NoData
+    descriptor_dtypes = NoData
     
     if isinstance(res.type_or_str_or_value, type):
         if isinstance(res.types, list):
@@ -1990,7 +2064,6 @@ def parse_descriptor_specification(x:tuple):
                     
             else:
                 res.types = [str]
-                
                     
             res.default = res.type_or_str_or_value
             
@@ -2002,11 +2075,22 @@ def parse_descriptor_specification(x:tuple):
         if isinstance(res.types, list):
             if val_type not in res.types:
                 res.types.append(val_type)
-                
         else:
-            res.types = =[val_type]
+            res.types = [val_type]
                 
         res.type_or_str_or_value = NoData # consume this
+        
+    # by now, res.types should have been taken care of
+    descriptor_types = tuple()
+    
+    if __check_type__(res.types, collections.abc.Sequence, (str, bytes, bytearray)):
+        # here, res.eltypes_or_dtypes should be a type or tuple of types
+        if res.eltypes_or_dtypes is not NoData:
+            if isinstance(res.eltypes_or_dtypes, type):
+                descriptor_element_types = tuple()
+                
+    
+    # -------
     
     val_types = list()
     el_types = list()
@@ -2388,7 +2472,7 @@ def parse_descriptor_specification(x:tuple):
         if isinstance(ret["default_value_type"], (collections.abc.Sequence, collections.abc.Mapping, collections.abc.Set)):
             type_dict["element_types"] = ret["default_element_types"]
             
-        args.append(type_dict)
+        args.append(type_dict) # NOTE: TODO/FIXME 2024-07-31 10:06:51 should be in kwargs
         
     # NOTE: keys in kwargs can only be str; however, type_dict is mapped to
     # a type or tuple of types, therefore we include the dict enclosing

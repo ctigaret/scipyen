@@ -10,7 +10,7 @@ notifications if their contents change.
 
 2020-09-05 14:20:18 Implemented so far: 
 
-DataBag = behaves like a dictionary where its keys are also
+DataBag : behaves like a dictionary where its keys are also
 accessed using attribute syntax.
 
 """
