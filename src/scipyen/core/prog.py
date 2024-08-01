@@ -488,48 +488,56 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 if not functools.reduce(operator.and_, self.predicates, True):
                     raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
                 
-            if is_hashable(value) and len(self.hashables):
-                if value not in self.hashables:
-                    raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
-                    
-            if not is_hashable(value) and len(self.non_hashables):
-                if id(value) not in self.non_hashables:
-                    raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
+            #  NOTE: 2024-08-01 15:14:12 what's this for ?!?
+#             if is_hashable(value) and len(self.hashables):
+#                 if value not in self.hashables:
+#                     raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
+#                     
+#             if not is_hashable(value) and len(self.non_hashables):
+#                 if id(value) not in self.non_hashables:
+#                     raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
                 
             if len(self.dcriteria):
-                values = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
-
-                if len(values) == 0:
-                    raise AttributeError(f"{self.__class__.__name__}: For {self.private_name} a type or subclass of {list(self.dcriteria.keys())} was expected; got {value.__name__ if isinstance(value, type) else type(value).__name__}) instead")
-
-                for val in values:
-                    if isinstance(val, dict):
-                        for k, v in val.items():
-                            if k == "element_types":
-                                if isinstance(value, (collections.abc.Sequence, collections.abc.Set)):
-                                    if not all(isinstance(v_, v) for v_ in value):
-                                        raise AttributeError(f"Expecting a sequence with {(v_.__name__ for v_ in v)} elements")
-                                    
-                                elif isinstance(value, collections.abc.Mapping):
-                                    if not all(isinstance(v_, v) for v_ in value.values()):
-                                        raise AttributeError(f"Expecting a mapping with {(v_.__name__ for v_ in v)} items")
-                            else:
-                                if isinstance(value, dict):
-                                    if k not in value:
-                                        raise KeyError(f"Key {k} not found in value")
-                                    vval = value.get(k)
-                                else:
-                                    if not hasattr(value, k):
-                                        raise AttributeError(f"Attribute {k} not found in value")
-                                    
-                                    vval = getattr(value, k)
-                                    
-                                if isinstance(v, type) or isinstance(v, collections.abc.Sequence) and all(isinstance(v_, type) for v_ in v):
-                                    if not is_type_or_subclass(vval, v):
-                                        raise AttributeError(f"{self.private_name} expected to have {k} with type {v}; got {vval} instead")
-                                
-                                if vval != v:
-                                    raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
+                # check to see if type of value is a key in criteria
+                # value has already passed initial validation by type
+                criteria = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
+                if len(criteria):
+                    for criterion in criteria:
+                        if isinstance(criterion, dict) and len(criterion):
+                    
+#                 values = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
+# 
+#                 # if len(values) == 0:
+#                 #     raise AttributeError(f"{self.__class__.__name__}: For {self.private_name} a type or subclass of {list(self.dcriteria.keys())} was expected; got {value.__name__ if isinstance(value, type) else type(value).__name__}) instead")
+# 
+#                 for val in values:
+#                     if isinstance(val, dict):
+#                         for k, v in val.items():
+#                             if k == "element_types":
+#                                 if isinstance(value, (collections.abc.Sequence, collections.abc.Set)):
+#                                     if not all(isinstance(v_, v) for v_ in value):
+#                                         raise AttributeError(f"Expecting a sequence with {(v_.__name__ for v_ in v)} elements")
+#                                     
+#                                 elif isinstance(value, collections.abc.Mapping):
+#                                     if not all(isinstance(v_, v) for v_ in value.values()):
+#                                         raise AttributeError(f"Expecting a mapping with {(v_.__name__ for v_ in v)} items")
+#                             else:
+#                                 if isinstance(value, dict):
+#                                     if k not in value:
+#                                         raise KeyError(f"Key {k} not found in value")
+#                                     vval = value.get(k)
+#                                 else:
+#                                     if not hasattr(value, k):
+#                                         raise AttributeError(f"Attribute {k} not found in value")
+#                                     
+#                                     vval = getattr(value, k)
+#                                     
+#                                 if isinstance(v, type) or isinstance(v, collections.abc.Sequence) and all(isinstance(v_, type) for v_ in v):
+#                                     if not is_type_or_subclass(vval, v):
+#                                         raise AttributeError(f"{self.private_name} expected to have {k} with type {v}; got {vval} instead")
+#                                 
+#                                 if vval != v:
+#                                     raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
 
 class ContextExecutor(ContextDecorator):
     def __enter__(self):
@@ -1884,19 +1892,7 @@ def parse_descriptor_specification(x:tuple):
     A dictionary suitable for the `descr_params` parameter to the 
     `setup_descriptor` class method of `WithDescriptors`.
     
-    This dictionary maps the following str keys
-    
-    'name'      ↦ str: descriptor name
-    'defval'    ↦ any type: default descriptor value
-    'args'      ↦ tuple of acceptable types
-    'kwargs'    ↦ dict with two keys:
-                    'allow_none'    ↦ bool
-                    'dcriteria'     ↦ dict of additional 
-                        constraints, with the form:
-                        type ↦ mapping of property_name(str) ↦ property_value
-                        
-    
-    
+   
     
     
                         
@@ -2064,7 +2060,15 @@ def parse_descriptor_specification(x:tuple):
         array_params=NoData
         )
     
-    result = dict()
+    result = dict(
+        name = None,
+        value = None,
+        args = tuple(),
+        kwargs = dict(
+            allow_none= True,
+            dcriteria = dict()
+            )
+        )
     
     datavars = unpack(x, res.__dict__.keys())
     # print(f"datavars = {datavars}")
@@ -2081,7 +2085,8 @@ def parse_descriptor_specification(x:tuple):
     if not isinstance(res.name, str) or len(res.name.strip()) == 0:
         raise ValueError(f"No attribute name was supplied")
     
-    descriptor_name = res.name
+    result["name"] = res.name
+    
     descriptor_default_value = NoData
     descriptor_types = tuple()
     descriptor_element_types = tuple()
@@ -2128,6 +2133,7 @@ def parse_descriptor_specification(x:tuple):
         res.type_or_str_or_value = NoData # consume this
         
     # by now, res.types should have been taken care of
+    result["args"] = res.types
     # descriptor_types = tuple()
     
     # if __check_type__(res.types, (str, bytes, bytearray))
@@ -2670,7 +2676,88 @@ class WithDescriptors(object):
         
         Parameters:
         -----------
-        descr_params: a mapping
+        descr_params: a dictionary that maps str keys as follows:
+        
+        'name'      ↦ str: descriptor name
+        'defval'    ↦ any type: default descriptor value
+        'args'      ↦ tuple of acceptable types, or predicates (unary functions)
+        'kwargs'    ↦ dict with EXACTLY two keys:
+                        'allow_none'    ↦ bool — by default this is set to True
+                        'dcriteria'     ↦ dictionary of additional type-specific
+                            constraints (by default, this is set to an empty dict):
+                            type ↦ a mapping of property_name(str) ↦ property_value
+                                    When empty, no additonal constraints are set
+                                    for the specified type (might as well leave out)
+    
+        When 'dcriteria' is empty, then no additional criteria are defined, and 
+        the descriptor value is validated based on 'name' and 'args' and 'allow_none'
+        keyword.
+        
+        Table with type-related properties in the dcriteria dict:
+        key         value is always a nested dict — an empty dict here mean no 
+        (a type)        criteria are defined and the descriptor value is validated
+                        based on 'name' and types or predicates in 'args'
+                    
+        ========================================================================
+                    Nested dict key:str ↦ value; 
+                    default is in <angle brackets>'; 
+                    <> means no default
+        ------------------------------------------------------------------------
+    
+        bytes       'len' ↦ int <NoData>  prescribed length; when NoData, then 
+        bytearray         an object with any length is valid
+        str
+        
+        tuple       'len' ↦ int, <NoData>;  prescribed length; when NoData, then 
+        list        a tuple with any length is valid
+        deque       'types' ↦ tuple, <(,)>;  prescribed element types; when empty,
+                    then a tuple is any element type is valid
+        
+        dict        'len' ↦ int, <NoData>; prescribed length; when NoData, then 
+                    a dict with any length is valid
+    
+                    'types' ↦ tuple, <(,)>;  prescribed value types for the dict 
+                        elements; when empty, then the dict elements can have any
+                        any value type
+    
+                    'key_types' ↦ tuple; <(,)>; prescribed key types for th dict 
+                        elements; when empty, the dict can use any hashable 
+                        object as keys (NOTE: a dict can use any — and only — 
+                        hashable type as keys)
+    
+                    'keys' ↦ tuple of hashable objects, <(,)>; prescribed actual
+                        keys that must be present in the dict (the value they're
+                        mapped to is irrelevant); when empty, then the dict can
+                        contain any key
+                        NOTE: as noted above, these objects MUST be hashable
+    
+                    'mapping' ↦ dict of key:hashable type ↦ type or tuple of types,
+                        <>;
+                        This is the most stringent criterion, where a dict 
+                        descriptor value is valid if it maps specific types of 
+                        keys to specific type or types of values.
+    
+        numpy.ndarray 
+                    'ndims' ↦ int, <NoData>; when NoData, ndms is irrelevant
+                    'shape' ↦ tuple[int], <(,)>; when empty, the array shape is
+                            irrelevant
+                    'dtype' ↦ numpy.dtype, tuple of numpy.dtype, <(,)>; when an 
+                            empty tuple, the dtype is irrelevant
+                    'kind'  ↦ numpy.dtype.kind, tuple of numpy.dtype.kind, <(,)>;
+                            when an empty tuple, this criterion is irrelevant
+    
+        quantities.Quantity — in addition to the criteria for numpy.ndarray:
+                    'units' ↦ pq.Quantity, <NoData>; when NoData, this criterion
+                            is irrelevant; otherwise, the descriptor value (a 
+                            pq.Qyuantity) must be convertibel to what is specified
+                            here)
+    
+        vigra.VigraArray   — in addition to the criteria for numpy.ndarray:
+                    'axistags' ↦ vigra.AxisTags, <NoData>; when NoData, this
+                        criterion is irrelevant
+    
+                    
+        
         name ↦ str — name of the descriptor
         value ↦ anything (default None) — the default value of the descriptor
         args ↦ tuple (default empty) — acceptable value types for the descriptor
@@ -2678,7 +2765,7 @@ class WithDescriptors(object):
     
         these are passed directly to the instance of the Descriptor class, which
             by default is a DescriptorGenericValidator
-        """
+         """
         name = descr_params.get("name", "") # the name of the descriptor
         defval = descr_params.get("value", None) # descriptor default value
         args = descr_params.get("args", tuple()) # the acceptable types
