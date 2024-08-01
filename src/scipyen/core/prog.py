@@ -34,6 +34,7 @@ from traitlets import Bunch
 import numpy as np
 import neo, vigra
 import quantities as pq
+import pandas as pd
 
 import colorama
 
@@ -215,7 +216,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
     # NOTE: 2024-07-29 17:14:57 TODO/FIXME
     # check rehaul of parse_descriptor_specification and of the 
     # WithDescriptors.setup_descriptor class method
-    def __init__(self, name:str, /, *args, **kwargs):
+    def __init__(self, name:str, defval:typing.Any, /, *args, **kwargs):
         """
         name: `public` name of the descriptor
     
@@ -266,6 +267,8 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
             
             NOTE: The table below lists the expected criteria for maximal
             stringency; the last entry in the table sets the most generic case
+    
+            Mapped to self.dcriteria
             
         Key:                        Value:
         ------------------------------------------------------------------
@@ -292,7 +295,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                         
         6.  <any other type, except     dict mapping property name to type of 
             for the special cases       property value, or to a dict as detailed
-            below>                      in this table
+            above>                      in this table
         
         ------------------------------------------------------------------
     
@@ -353,18 +356,19 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         self.public_name = name
         
         # NOTE: predicates must be unary predicates; 
-        # will raise exceptions when called, otherwise
+        # otherwise, they will raise exceptions when called
         self.predicates = set()
         self.types = set() # allowed value types
         self.hashables = set() # values for hashables (can be used as keys)
         self.non_hashables = set() # values for non-hashables - referenced by their id()
-        # self.dcriteria = dict() # dictionary of criteria:
+        self.dcriteria = dict() # dictionary of criteria:
                                 
         # NOTE: all of these may be empty
-        self.dict_key_types = set()   # to validate key types
-        self.dict_val_types = set()   # to validate value types
-        self.dist_keys = set()        # to validate against expected keys
-        
+        # self.dict_key_types = set()     # to validate mapping key types
+        # self.dict_val_types = set()     # to validate mapping value types
+        # self.dist_keys = set()          # to validate against expected keys
+        # self.element_types = set()      # to validate types of sequence elements  
+        # self.array_params = dict()      # to validate array shape, size, etc
                                 
         self._allow_none_ = False       # to allow None as descriptor value 
                                         # irrespective of the criteria above
@@ -379,11 +383,12 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
             # NOTE: 2024-07-31 14:33:37 TODO
             # move this to kwargs
             elif isinstance(a, dict):
-                if all(isinstance(k, type) for k in a.keys()):
-                    self.dcriteria.update(a)
-                    
-                else:
-                    self.non_hashables.add(id(a))
+                self.non_hashables.add(id(a))
+#                 if all(isinstance(k, type) for k in a.keys()):
+#                     self.dcriteria.update(a)
+#                     
+#                 else:
+#                     self.non_hashables.add(id(a))
                 
             elif isinstance(a, collections.abc.Sequence):
                 if all(isinstance(v, type) for v in a):
@@ -397,10 +402,11 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                         self.non_hashables.add(id(a))
                 
             elif isinstance(a, str):
-                try:
-                    self.types.add(import_str(a))
-                except:
-                    self.hashables.add(a)
+                self.hashables.add(a)
+                # try:
+                #     self.types.add(import_str(a))
+                # except:
+                #     self.hashables.add(a)
                     
             elif is_hashable(a):
                 self.hashables.add(a)
@@ -408,23 +414,36 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
             else:
                 self.non_hashables.add(id(a))
                 
-        # NOTE: more complex predicates, where a function or method expecting
-        # an instance also takes additional argument (although these can be 
-        # supplied as partial functions to *args)
-        # FIXME 2021-12-05 10:52:13: ???
-        # The code below does do what the docstring claims it would do! 
-        # Either edit the dosctring or modify the code to fulfill the promise in
-        # the dosctring.
-        for key, val in kwargs.items():
-            # this clause below covers case 6 in the table in docstring
-            # TODO must implement the others as well!
+        self._allow_none_ = kwargs.pop("allow_none", False)
+        
+        dcriteria = kwargs.pop("criteria", dict())
+                
+        if len(dcriteria) and all(isinstance(k, type) and isinstance(v, dict)for k,v in dcriteria.items()):
+            self.dcriteria = dcriteria
+        else:
+            self.dcriteria = dict()
             
-            if isinstance(val, dict) and all(isinstance(k, str) for k in val):
-                try:
-                    typ = import_name(key)
-                    self.dcriteria[typ] = val
-                except:
-                    continue
+        # else:
+        #     scipywarn(f"{self.__class__.__name__}.__init__: Variadic keywords must map types to dictionaries; instead, got {kwargs}")
+            # raise TypeError(f"{self.__class__.__name__}.__init__: Variadic keywords must map types to dictionaries; instead, got {kwargs}")
+                
+#         # NOTE: more complex predicates, where a function or method expecting
+#         # an instance also takes additional argument (although these can be 
+#         # supplied as partial functions to *args)
+#         # FIXME 2021-12-05 10:52:13: ???
+#         # The code below does do what the docstring claims it would do! 
+#         # Either edit the dosctring or modify the code to fulfill the promise in
+#         # the dosctring.
+#         for key, val in kwargs.items():
+#             # this clause below covers case 6 in the table in docstring
+#             # TODO must implement the others as well!
+#             
+#             if isinstance(val, dict) and all(isinstance(k, str) for k in val):
+#                 try:
+#                     typ = import_name(key)
+#                     self.dcriteria[typ] = val
+#                 except:
+#                     continue
                 
         
     @property
@@ -437,6 +456,19 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         
     def validate(self, value):
         """Validate `value` against the criteria set in __init__"""
+        
+        # NOTE: 2024-08-01 10:46:58 Explannation of what is being done here
+        #
+        # 1) check if there are contraints on the range of acceptable object 
+        #   types that the descriptor can accept (self.types); if there are,
+        #   then check that the supplied value is of one of these types (or
+        #   inherits from them)
+        #
+        #    optionally, allow a None to be passed (is self.allow_none)
+        #
+        #    also, if the value to be validate is actually a `type`, then check
+        #    if it inherits from any of the self.types
+        
         if len(self.types):
             comparand = tuple(self.types)
             if self.allow_none:
@@ -444,31 +476,31 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 
             if isinstance(value, type):
                 if not issubclass(value, comparand):
-                    raise AttributeError(f"For {self.private_name} a subclass of: {comparand} was expected; got {value.__name__} instead")
+                    raise AttributeError(f"{self.__class__.__name__}: For {self.private_name} a subclass of: {comparand} was expected; got {value.__name__} instead")
             
             if not isinstance(value, comparand):
-                raise AttributeError(f"For descriptor '{self.public_name}' ('{self.private_name}') one of the types: {comparand} was expected; got {type(value).__name__} instead")
+                raise AttributeError(f"{self.__class__.__name__}: For descriptor '{self.public_name}' ('{self.private_name}') one of the types: {comparand} was expected; got {type(value).__name__} instead")
             
         # NOTE: 2021-11-30 10:42:08
         # it makes sense to validate further, only when allow_none is False
         if not self.allow_none:
             if len(self.predicates):
                 if not functools.reduce(operator.and_, self.predicates, True):
-                    raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+                    raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
                 
             if is_hashable(value) and len(self.hashables):
                 if value not in self.hashables:
-                    raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+                    raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
                     
             if not is_hashable(value) and len(self.non_hashables):
                 if id(value) not in self.non_hashables:
-                    raise AttributeError(f"Unexpected value for {self.private_name}: {value}")
+                    raise AttributeError(f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}")
                 
             if len(self.dcriteria):
                 values = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
 
                 if len(values) == 0:
-                    raise AttributeError(f"For {self.private_name} a type or subclass of {list(self.dcriteria.keys())} was expected; got {value.__name__ if isinstance(value, type) else type(value).__name__}) instead")
+                    raise AttributeError(f"{self.__class__.__name__}: For {self.private_name} a type or subclass of {list(self.dcriteria.keys())} was expected; got {value.__name__ if isinstance(value, type) else type(value).__name__}) instead")
 
                 for val in values:
                     if isinstance(val, dict):
@@ -1756,8 +1788,8 @@ def __check_type__(attr_type:typing.Union[type, typing.Tuple[type]],
     if isinstance(exclspecs, type):
         exclspecs = (exclspecs,)
         
-    elif isinstance(exclspecs, tuple) and len(exclspecs):
-        if not all(isinstance(e_, type) for e_ in exclspecs):
+    elif isinstance(exclspecs, tuple):
+        if len(exclspecs) and not all(isinstance(e_, type) for e_ in exclspecs):
             raise TypeError("__check_type__: When a tuple, `exclspecs` must contain only types")
         
     else:
@@ -1851,6 +1883,22 @@ def parse_descriptor_specification(x:tuple):
     ------------
     A dictionary suitable for the `descr_params` parameter to the 
     `setup_descriptor` class method of `WithDescriptors`.
+    
+    This dictionary maps the following str keys
+    
+    'name'      ↦ str: descriptor name
+    'defval'    ↦ any type: default descriptor value
+    'args'      ↦ tuple of acceptable types
+    'kwargs'    ↦ dict with two keys:
+                    'allow_none'    ↦ bool
+                    'dcriteria'     ↦ dict of additional 
+                        constraints, with the form:
+                        type ↦ mapping of property_name(str) ↦ property_value
+                        
+    
+    
+    
+    
                         
     
                                     
@@ -2635,6 +2683,7 @@ class WithDescriptors(object):
         defval = descr_params.get("value", None) # descriptor default value
         args = descr_params.get("args", tuple()) # the acceptable types
         kw = descr_params.get("kwargs", {})
+        kw["allow_none"] = True
         
         if not isinstance(name, str) or len(name.strip()) == 0:
             return
@@ -2645,7 +2694,7 @@ class WithDescriptors(object):
             desc_impl = DescriptorGenericValidator
         
         descriptor = desc_impl(name, defval, *args, **kw)
-        descriptor.allow_none = True
+        # descriptor.allow_none = True
         setattr(cls, name, descriptor)
         
     @classmethod
