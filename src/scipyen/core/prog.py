@@ -1888,7 +1888,7 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
         element:        type & meaning:
         0               str: the name of the attribute
     
-        1               a type or a possibly empty sequence of types representing
+        1               a type or a (possibly empty) sequence of types representing
                         the acceptable type(s) of the attribute (can be augmented 
                         as below)
     
@@ -1960,6 +1960,9 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
                                     documentation for DescriptorGenericValidator.__init__()
     
     """
+    
+  
+    
     from core.quantities import units_convertible
     from core.datatypes import (
         TypeEnum, is_enum, is_enum_value, default_value, NoData,
@@ -2020,21 +2023,32 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
         # This may be a sequence of types, or a sequence object.
         #
         if all(isinstance(v, type) for v in attrs.type_or_value):
-            # This is a sequence of types, which can be either the acceptable 
+            # This is a collection of types, which can be either the acceptable 
             #   types of the descriptor, or the default value of the descriptor 
-            #   (i.e. we want to set it to a tuple of types).
+            #   (i.e. we want to set it to a collection of types).
             #
-            # The only way to discern is to look ahead on the attrs.types:
-            #   • if attrs.types is undefined (either NoData or an empty sequence),
+            # The only way to discern this is to look ahead at the attrs.types:
+            #
+            #   Case (A): if attrs.types is undefined (either NoData or an empty collection),
             #       then attrs.type_or_value is interpreted as a sequence
             #       of acceptable descriptor types; default values, if any are
             #       taken from attrs.default, if given, or from a default 
             #       constructor with no arguments (if it is defined, otherwise is
             #       set to None)
             #
-            #   • if attrs.types is defined, then attrs.type_or_value can 
+            #   Case (B): if attrs.types is defined, then attrs.type_or_value can 
             #   only be the default descriptor value (a sequence type), and its
             #   elements must all be subclasses of attrs.types
+            #
+            #   In other words, if you want an attribute to be a collection of
+            #   types without restriction on what those types might be, then 
+            #   construct this as ("name", (int, float, str), type).
+            #
+            #   On the other hand, if you want to restrict the types to a limited
+            #   range, then the third element should be a type or tuple of types
+            #   other than "type"
+            
+            #   
             if isinstance(attrs.types, NoData) or (isinstance(attrs.types, (tuple, list)) and len(attrs.types) == 0):
                 # first bullet above; also sets the default value
                 descriptor_types = unique(tuple(attrs.type_or_value))
@@ -2083,7 +2097,10 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
                 
         else:
             # This is a collection of objects (other than types) — it is interpreted
-            # as default value, and the descriptor value type is its type.
+            # as trhe descriptor's default value, and the descriptor value type is its type.
+            #
+            # (see above for the case where the value of the descriptor is itself 
+            #   a type or a collection of types)
             #
             # furthermore, its element types must conform with attrs.types or
             # attrs.eltypes, if specified
@@ -2121,6 +2138,8 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
                             raise DescriptorException(f"Default value {descriptor_default_value} does not follow prescribed types {types}")
                         
     elif isinstance(attrs.type_or_value, type):
+        # apply the same logic as for the cases A and B of a collection of types
+        # TODO 2024-08-02 22:55:12 FIXME,  currently this does something else !!!
         descriptor_types = (attrs.type_or_value,)
         if not isinstance(attrs.default, NoData):
             if not isinstance(attrs.default, descriptor_types):
@@ -2202,7 +2221,14 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
                     raise DescriptorException(f"Default value {descriptor_default_value} does not match prescribed length {length}")
                 dcriteria["len"] = length
             
-            if isinstance(attrs.array_params.get("types"))
+            dict_value_types = attrs.array_params.get("types", None)
+            
+            if isinstance(dict_value_types, tuple) and all(isinstance(t, type) for t in dict_value_types):
+                dcriteria["types"] = dict_value_types
+            elif isinstance(dict_value_types, type):
+                dcriteria["types"] = (dict_value_types, )
+                
+            dict_key_types = 
             
 
     elif __check_type__(attrs.type_or_value, ()):
