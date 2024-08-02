@@ -206,8 +206,10 @@ ABSOLUTE_TOLERANCE = 1e-4
 EQUAL_NAN = True
 
 class NoData():
-    """Empty placeholder class to allow using MISSING & None as data objects.
-    Cannot be instantiated
+    """Empty placeholder class that signifies lack of any data.
+        Used in Descritpr validation, in order to allow the use of None, MISSING,
+        pandas NAType as values in descriptors.
+    Cannot be instantiated.
     """
     def __new__(cls):
         return cls
@@ -402,8 +404,8 @@ def is_uniform_collection(obj):
         return False
     
 def sequence_element_type(s):
-    from utilities import unique
-    return unique((type(e) for e in s))
+    from core.utilities import unique
+    return unique(tuple(type(e) for e in s))
 
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]], 
                      ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],

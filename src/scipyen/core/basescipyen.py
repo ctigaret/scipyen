@@ -85,11 +85,11 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     
     descriptors: dict with any other descriptors
                 
-    NOTE: For many of these attributes the values do not yet follow a standard.
     """
     
     # NOTE: 2021-11-30 16:17:53
     # DESCRIPTOR SPECIFICATIONS:
+    #
     # will be inherited by derived subclasses, which can also add their own
     # (see ScanData) provided they follow the template below:
     #
@@ -99,24 +99,28 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     # see documentation for prog.parse_descriptor_specification for details on how
     # each sequence in the _descriptor_attributes_ tuple is interpreted.
     #
+    # NOTE: 2024-08-02 13:38:58
+    # we follow the neo data model here, rather than Python's dataclass
+    # TODO: contemplate switching to dataclass ?
+    #
     
     _data_children_     = ()
     _data_attributes_ = (
-                            ("sourceID",            "NA", (str, type(pd.NA), type(MISSING))),
-                            ("cell",                "NA", (str, type(pd.NA), type(MISSING))),
-                            ("field",               "NA", (str, type(pd.NA), type(MISSING))),
-                            ("genotype",            "NA", (str, type(pd.NA), type(MISSING))),
-                            ("sex",                 "NA", (str, type(pd.NA), type(MISSING))),
-                            ("age",                 0*pq.s, (pq.Quantity, type(pd.NA), type(MISSING))),
-                            ("biometric_weight",    0*pq.g, (pq.Quantity, type(pd.NA), type(MISSING))), 
-                            ("biometric_height",    0*pq.m, (pq.Quantity, type(pd.NA), type(MISSING))),
+                            ("sourceID",            (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
+                            ("cell",                (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
+                            ("field",               (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
+                            ("genotype",            (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
+                            ("sex",                 (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
+                            ("age",                 (pq.Quantity, type(pd.NA), type(MISSING)),  1,          0*pq.s),
+                            ("biometric_weight",    (pq.Quantity, type(pd.NA), type(MISSING)),  1,          0*pq.g), 
+                            ("biometric_height",    (pq.Quantity, type(pd.NA), type(MISSING)),  1,          0*pq.m),
                             ("procedure",           Procedure),
-                            ("procedure_type",      0, (str, int, ProcedureType, type(pd.NA), type(MISSING))),
-                            ("procedure_name",      "NA", (str, type(pd.NA), type(MISSING))),
-                            ("procedure_dose",      0*pq.g, (pq.Quantity, type(pd.NA), type(MISSING))),
-                            ("procedure_route",     "NA", (str, type(pd.NA), type(MISSING))),
-                            ("procedure_schedule",  neo.Epoch()),
-                            ("triggers",            TriggerProtocol(),     (TriggerProtocol, list, type(MISSING))),
+                            ("procedure_type",      (str, int, ProcedureType, type(pd.NA), type(MISSING)),  0),
+                            ("procedure_name",      (str, type(pd.NA), type(MISSING)),                      "NA"),
+                            ("procedure_dose",      (pq.Quantity, type(pd.NA), type(MISSING)),              0*pq.g),
+                            ("procedure_route",     (str, type(pd.NA), type(MISSING)),                      "NA"),
+                            ("procedure_schedule",  neo.Epoch),
+                            ("triggers",            (TriggerProtocol, list, type(MISSING)),            TriggerProtocol()),
                             ("file_datetime",       datetime),
                             ("rec_datetime",        datetime),
                             ("analysis_datetime",   datetime),

@@ -56,6 +56,9 @@ CALLABLE_TYPES = (types.FunctionType, types.MethodType,
 class ArgumentError(Exception):
     pass
 
+class DescriptorException(Exception):
+    pass
+
 
 class AttributeAdapter(ABC):
     """Abstract Base Class as a callable for pre- and post-validation
@@ -178,7 +181,7 @@ class ImmutableDescriptor(BaseDescriptorValidator):
         
         c = SomeClass()
         c.a = 20 # <- OK
-        c.b = "31" # <- no effectk
+        c.b = "31" # <- no effect
         
     """
     def __init__(self, *, default):
@@ -220,6 +223,8 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         """
         name: `public` name of the descriptor
     
+        defval: default value (may be None if allow_none)
+    
         args: tuple of types or unary predicates;
             
             NOTE: unary predicates are functions that expect a Python object as 
@@ -233,71 +238,107 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 
                 b) functools.partialmethod (for methods)
             
-            Except the special cases below, all other elements of args will be 
-            added to a set of hashables, if the element is hashable, or its 
-            'id' will be added to the set of non_hashables, otherwise.
+        kwargs: currently two keywords are supported:
+            "allow_none": bool (default True) ↦ allow None as a descriptor value
+            "dcriteria": dict (default empty) ↦ speified additional criteria for
+                descriptor values that are collection-like or array-like
+                Use with CAUTION.
             
-            Special cases:
-                dotted names (str) - The validator will first try to import it
-                    as a 'dotted name' to resolve a type by its fully qualified 
-                    name; when that fails, the str will be added to the set of
-                    hashables.
-                    
-                numpy arrays: these are not hashable, hence they will always be
-                    compared against their id() which may fail. 
-                    
-                    To compare a numpy array against a 'template', use **kwargs
-                    as detailed below.
-                    
-                dict: these are not hashable, hence they will always be
-                    compared against their id() which may fail. ;
-                    
-                    To compare the STRUCTURE of a dict against a 'template',
-                    use **kwargs as detailed below.
+        When 'dcriteria' is empty, then no additional criteria are defined, and 
+        the descriptor value is validated based on 'name' and 'args' and the 
+        'allow_none' keyword.
     
-                    
-        kwargs: maps Python types or special strings to additional criteria 
-            (NOTE: a Python type is a hashable Python object).
-            
-            The additional criteria are ALWAYS dicts, with keys (str) mapped
-            to values of the type indicated in the table below. These mappings
-            are designed to probe additional specific properties of the value.
-            However, these keys as detailed below need not be all present in
-            the criterion dictionary; when absent they will simply be ignored.
-            
-            NOTE: The table below lists the expected criteria for maximal
-            stringency; the last entry in the table sets the most generic case
+        WARNING: In relation to data types (and dtypes): the current implementation
+        is not strict, in the sense that it will allow values with types (or dtypes)
+        that inherit from the type(s) or dtype(s) specified in the criteria below.
     
-            Mapped to self.dcriteria
-            
-        Key:                        Value:
-        ------------------------------------------------------------------
-                                        
-        1.  numpy.ndarray               {"ndim": int,
-                                        "shape": tuple,
-                                        "dtype": numpy.dtype,
-                                        "kind": numpy.dtype.kind}
-                                        
-        2.  pytyhon.Quantity            as for numpy.ndarray, plus:
-                                        {"units": python.Quantity}
-                                    
-        3.  vigra.VigraArray            as for numpy.ndarray, plus:
-                                        {"axistags": vigra.AxisTags,
-                                        "order": str}
-                                        
-        4.  vigra.AxisInfo              {"key": str,
-                                         "typeFlags": vigral.AxisType
-                                         "resolution": float,
-                                         "description": str}
-                                        
-        5.  dict                        { (key_name: value_type,)* }
-                                        Where 'value_type' is a type
-                        
-        6.  <any other type, except     dict mapping property name to type of 
-            for the special cases       property value, or to a dict as detailed
-            above>                      in this table
+        Another current limitation is that collection elements that are themselves
+        array-like or collection-like are NOT subject to the validation process,
+        i.e., the validation does NOT recurse to deeper levels beyond the top
+        container of a nested data structure.
+    
+        Table with type-related properties in the dcriteria dict:
+        key         value is always a nested dict — an empty dict here mean no 
+        (a type)        criteria are defined and the descriptor value is validated
+                        based on 'name' and types or predicates in 'args'
+                    
+        ========================================================================
+                    Nested dict key:str ↦ value; 
+                    default is in <angle brackets>'; 
+                    <> means no default
+        ------------------------------------------------------------------------
+    
+        bytes       'len' ↦ int <NoData>  prescribed length; when NoData, then 
+        bytearray         an object with any length is valid
+        str
         
-        ------------------------------------------------------------------
+        tuple       'len' ↦ int, <NoData>;  prescribed length; when NoData, then 
+        list        a tuple with any length is valid
+        deque       'types' ↦ tuple, <(,)>;  prescribed element types; when empty,
+                    then a tuple is any element type is valid. 
+        
+        dict        'len' ↦ int, <NoData>; prescribed length; when NoData, then 
+                    a dict with any length is valid
+    
+                    'types' ↦ tuple, <(,)>;  prescribed value types for the dict 
+                        elements; when empty, then the dict elements can have any
+                        any value type. 
+    
+                    'key_types' ↦ tuple; <(,)>; prescribed key types for the dict 
+                        elements; when empty, the dict can use any hashable 
+                        object as keys (NOTE: a dict can use any — and only — 
+                        hashable type as keys)
+    
+                    'keys' ↦ tuple of hashable objects, <(,)>; prescribed actual
+                        keys that must be present in the dict (the value they're
+                        mapped to is irrelevant); when empty, then the dict can
+                        contain any key
+                        NOTE: as noted above, these objects MUST be hashable
+    
+                    'mapping' ↦ dict of key:hashable type ↦ type or tuple of types,
+                        <>;
+                        This is the most stringent criterion, where a dict 
+                        descriptor value is valid if it maps specific keys to 
+                        to specific type or types of values.
+    
+        numpy.ndarray 
+                    'ndim' ↦ int, <NoData>; when NoData, ndms is irrelevant
+                    'shape' ↦ tuple[int], <(,)>; when empty, the array shape is
+                            irrelevant
+    
+                    CAUTION: Problem is ill-defined: is the criterion enforcing
+                    a specific dtype or does it also accept dtypes that inherit
+                    from the criterion dtype ? Current implementation does the
+                    latter.
+                    
+                    'dtype' ↦ numpy.dtype, tuple of numpy.dtype, <(,)>; when an 
+                            empty tuple, the dtype is irrelevant
+    
+                    WARNING: 2024-08-02 10:38:40 not implemented 
+                    'kind'  ↦ numpy.dtype.kind, tuple of numpy.dtype.kind, <(,)>;
+                            when an empty tuple, this criterion is irrelevant
+    
+        quantities.Quantity — in addition to the criteria for numpy.ndarray:
+                    'units' ↦ pq.Quantity, <NoData>; when NoData, this criterion
+                            is irrelevant; otherwise, the descriptor value (a 
+                            pq.Qyuantity) must be convertibel to what is specified
+                            here)
+    
+        vigra.VigraArray   — in addition to the criteria for numpy.ndarray:
+                    'axistags' ↦ vigra.AxisTags, <NoData>; when NoData, this
+                        criterion is irrelevant
+    
+        pandas.Series       
+                        'shape' ↦ tuple[int] <(,)>
+                        'index_type' ↦ subclass of pandas.Index, <NoData>
+                        'dtype' ↦ numpy.dtype, tuple of numpy.dtype <(,)>
+    
+        pandas.DataFrame
+                        'shape' ↦ tuple[int] <(,)>
+                        'index_type' ↦ subclass of pandas.Index, <NoData>
+                        'columns_type' ↦ subclass of pandas.Index, <NoData>
+    
+
     
         NOTE: Validation is performed in the following order:
         
@@ -359,19 +400,11 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         # otherwise, they will raise exceptions when called
         self.predicates = set()
         self.types = set() # allowed value types
-        self.hashables = set() # values for hashables (can be used as keys)
-        self.non_hashables = set() # values for non-hashables - referenced by their id()
-        self.dcriteria = dict() # dictionary of criteria:
+        # self.hashables = set() # values for hashables (can be used as keys)
+        # self.non_hashables = set() # values for non-hashables - referenced by their id()
+        # self.dcriteria = dict() # dictionary of criteria:
                                 
-        # NOTE: all of these may be empty
-        # self.dict_key_types = set()     # to validate mapping key types
-        # self.dict_val_types = set()     # to validate mapping value types
-        # self.dist_keys = set()          # to validate against expected keys
-        # self.element_types = set()      # to validate types of sequence elements  
-        # self.array_params = dict()      # to validate array shape, size, etc
-                                
-        self._allow_none_ = False       # to allow None as descriptor value 
-                                        # irrespective of the criteria above
+        self._allow_none_ = kwargs.get("allow_none", True)
         
         for a in args: # tease these apart
             if inspect.isfunction(a):
@@ -380,42 +413,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
             elif isinstance(a,type):
                 self.types.add(a)
                 
-            # NOTE: 2024-07-31 14:33:37 TODO
-            # move this to kwargs
-            elif isinstance(a, dict):
-                self.non_hashables.add(id(a))
-#                 if all(isinstance(k, type) for k in a.keys()):
-#                     self.dcriteria.update(a)
-#                     
-#                 else:
-#                     self.non_hashables.add(id(a))
-                
-            elif isinstance(a, collections.abc.Sequence):
-                if all(isinstance(v, type) for v in a):
-                    # sequence of types
-                    self.types |= set(a)
-                    
-                else:
-                    if is_hashable(a):
-                        self.hashables.add(a)
-                    else:
-                        self.non_hashables.add(id(a))
-                
-            elif isinstance(a, str):
-                self.hashables.add(a)
-                # try:
-                #     self.types.add(import_str(a))
-                # except:
-                #     self.hashables.add(a)
-                    
-            elif is_hashable(a):
-                self.hashables.add(a)
-                
-            else:
-                self.non_hashables.add(id(a))
-                
-        self._allow_none_ = kwargs.pop("allow_none", False)
-        
         dcriteria = kwargs.pop("criteria", dict())
                 
         if len(dcriteria) and all(isinstance(k, type) and isinstance(v, dict)for k,v in dcriteria.items()):
@@ -423,29 +420,6 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         else:
             self.dcriteria = dict()
             
-        # else:
-        #     scipywarn(f"{self.__class__.__name__}.__init__: Variadic keywords must map types to dictionaries; instead, got {kwargs}")
-            # raise TypeError(f"{self.__class__.__name__}.__init__: Variadic keywords must map types to dictionaries; instead, got {kwargs}")
-                
-#         # NOTE: more complex predicates, where a function or method expecting
-#         # an instance also takes additional argument (although these can be 
-#         # supplied as partial functions to *args)
-#         # FIXME 2021-12-05 10:52:13: ???
-#         # The code below does do what the docstring claims it would do! 
-#         # Either edit the dosctring or modify the code to fulfill the promise in
-#         # the dosctring.
-#         for key, val in kwargs.items():
-#             # this clause below covers case 6 in the table in docstring
-#             # TODO must implement the others as well!
-#             
-#             if isinstance(val, dict) and all(isinstance(k, str) for k in val):
-#                 try:
-#                     typ = import_name(key)
-#                     self.dcriteria[typ] = val
-#                 except:
-#                     continue
-                
-        
     @property
     def allow_none(self):
         return self._allow_none_
@@ -468,6 +442,8 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         #
         #    also, if the value to be validate is actually a `type`, then check
         #    if it inherits from any of the self.types
+        
+        value_type = type(value)
         
         if len(self.types):
             comparand = tuple(self.types)
@@ -501,43 +477,126 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 # check to see if type of value is a key in criteria
                 # value has already passed initial validation by type
                 criteria = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
-                if len(criteria):
-                    for criterion in criteria:
-                        if isinstance(criterion, dict) and len(criterion):
+                criterion = dict()
+                if len(criteria) and all(isinstance(c, dict) for c in criteria):
+                    for crit in criteria:
+                        criterion.update(crit)
+                        
+                self._check_value_special_criteria_(value, criterion)
+                
+    def _check_value_special_criteria_(self, value, crit:dict):
+        from core.utilities import unique
+        from core.quantities import units_convertible
+        
+        if len(crit) == 0:
+            return
+        
+        if isinstance(value, (str, bytes, bytearray, deque, list, tuple, dict)):
+            c = crit.get("len", NoData)
+            if isinstance(c, int) and c >= 0:
+                if len(value) != c:
+                    raise AttributeError(f"Unexpected length of {type(value).__name__}; expecting {c}, got {len(value)}")
+                
+            if isinstance(value, (deque, list, tuple, dict)):
+                c = crit.get("types", tuple())
+                
+                if isinstance(c, type) or (isinstance(c, tuple) and len(c) and all(isinstance(c_, type) for c_ in c)):
+                    if isinstance(value, (deque, list, tuple)):
+                        if not all(isinstance(e, c) for e in value):
+                            raise AttributeError(f"Collection's elements have unexpected types. Expecting {c}, got {tuple(type(e).__name__ for e in value)}")
                     
-#                 values = tuple(v for k, v in self.dcriteria.items() if is_type_or_subclass(value, k))
-# 
-#                 # if len(values) == 0:
-#                 #     raise AttributeError(f"{self.__class__.__name__}: For {self.private_name} a type or subclass of {list(self.dcriteria.keys())} was expected; got {value.__name__ if isinstance(value, type) else type(value).__name__}) instead")
-# 
-#                 for val in values:
-#                     if isinstance(val, dict):
-#                         for k, v in val.items():
-#                             if k == "element_types":
-#                                 if isinstance(value, (collections.abc.Sequence, collections.abc.Set)):
-#                                     if not all(isinstance(v_, v) for v_ in value):
-#                                         raise AttributeError(f"Expecting a sequence with {(v_.__name__ for v_ in v)} elements")
-#                                     
-#                                 elif isinstance(value, collections.abc.Mapping):
-#                                     if not all(isinstance(v_, v) for v_ in value.values()):
-#                                         raise AttributeError(f"Expecting a mapping with {(v_.__name__ for v_ in v)} items")
-#                             else:
-#                                 if isinstance(value, dict):
-#                                     if k not in value:
-#                                         raise KeyError(f"Key {k} not found in value")
-#                                     vval = value.get(k)
-#                                 else:
-#                                     if not hasattr(value, k):
-#                                         raise AttributeError(f"Attribute {k} not found in value")
-#                                     
-#                                     vval = getattr(value, k)
-#                                     
-#                                 if isinstance(v, type) or isinstance(v, collections.abc.Sequence) and all(isinstance(v_, type) for v_ in v):
-#                                     if not is_type_or_subclass(vval, v):
-#                                         raise AttributeError(f"{self.private_name} expected to have {k} with type {v}; got {vval} instead")
-#                                 
-#                                 if vval != v:
-#                                     raise AttributeError(f"{self.private_name} expected to have {k} with value {v}; got {vval} instead")
+                    if isinstance(value, dict):
+                        if not all(isinstance(v, c) for v in value.values()):
+                            raise AttributeError(f"Mapping's values have unexpected types. Expecting {c}, got {tuple(type(v).__name__ for v in value.values())}")
+
+                if isinstance(value, dict):
+                    c = crit.get("key_types", tuple())
+                    v_keys = unique(tuple(value.keys()))
+                    if isinstance(c, type) or (isinstance(c, tuple) and len(c) and all(isinstance(c_, type) for c_ in c)):
+                        if not all(isinstance(k, c) for k in v_keys):
+                            raise AttributeError(f"Mapping's keys have unexpected types. Expecting {c}, got {tuple(type(v).__name__ for v in v_keys)}")
+                        
+                    c = crit.get("keys", tuple())
+                    if isinstance(c, tuple) and len(c):
+                        c_keys = unique(tuple(c))
+                        if v_keys != c_keys():
+                            raise AttributeError(f"Mapping's keys ({v_keys}) do not match the criterion ({c_keys})")
+                        
+                    c = crit.get("mapping", dict())
+                    if isinstance(c, dict) and len(c):
+                        c_keys = unique(tuple(c.keys()))
+                        if v_keys != c_keys():
+                            raise AttributeError(f"Mapping's keys ({v_keys}) do not match the criterion ({c_keys})")
+                        
+                        for k in v_keys:
+                            if isinstance(c[k], type) or (isinstance(c[k], tuple) and len(c[k]) and all(isinstance(c_, type) for c_ in c[k])):
+                                if not isinstance(value[k], c[k]):
+                                    raise AttributeError(f"Key {k} expected to be mapped to a type in {c[k]}; instead got {type(value[k]).__name__}")
+                        
+                        
+        if isinstance(value, np.ndarray):
+            c = crit.get("ndim", NoData)
+            
+            if isinstance(c, int) and c >= 0:
+                if value.ndim != c:
+                    raise AttributeError(f"Expecting an array with {c} dimensions; instead, got {value.ndim}")
+                
+            c = crit.get("shape", tuple())
+            
+            if isinstance(c, tuple) and len(c) and all(isinstance(c_, int) and c_ >= 0 for c_ in c):
+                if value.shape != c:
+                    raise AttributeError(f"Expecting an array with shape {c}; instead, got {value.shape}")
+                
+            c = crit.get("dtype", tuple())
+            
+            if isinstance(c, np.dtype):
+                if not np.issubdtype(value.dtype, c):
+                    raise AttributeError(f"Expecting an array with dtype inheriting from {c}; got {value.dtype} instead")
+            
+            elif isinstance(c, tuple) and len(c) and all(isinstance(c_, np.dtype)):
+                if not any(np.issubdtype(value.dtype, c_) for c_ in c):
+                    raise AttributeError(f"Expecting an array with dtype inheriting from one of {c}; got {value.dtype} instead")
+                
+            if isinstance(value, pq.Quantity):
+                c = crit.get("units", NoData)
+                
+                if isinstance(c. pq.Quantity):
+                    if not units_convertible(value, c):
+                        raise AttributeError(f"Value units {value.units} are incompatible with {c}")
+                    
+            if isinstance(value, vigra.VigraArray):
+                c = crit.get("axistags", NoData)
+                
+                if isinstance(c, vigra.AxisTags):
+                    if value.AxisTags != c:
+                        raise AttributeError(f"Expecting c{ axistags}; got {value.axistags} instead")
+                
+        if isinstance(value, (pd.Series, pd.DataFrame)):
+            c = crit.get("shape", tuple())
+            
+            if isinstance(c, tuple) and len(c) and all(isinstance(c_, int) and c_ >= 0 for c_ in c):
+                if value.shape != c:
+                    raise AttributeError(f"Expecting {type(value).__name__} with shape {c}; instead, got {value.shape}")
+                
+            c = crit.get("index_type", NoData)
+            if isinstance(c, type) and issubclass(c, pd.Index):
+                if not isinstance(value.index, c):
+                    raise AttributeError(f"Invalid index type ({type(value.index).__name__}); expecting {c}")
+                
+            if isinstance(value, pd.Series):
+                c = crit.get("dtype", tuple())
+                if isinstance(c, np.dtype):
+                    c = (c,)
+                if isinstance(c, tuple) and len(c) and all(isinstance(c, np.dtype)):
+                    if not any(np.issubdtype(value.dtype, d) for d in c):
+                        raise AttributeError(f"Invalid dtype ({value.dtype}); expecting {c}")
+                    
+            if isinstance(value, pd.DataFrame):
+                c = crit.get("columns_type", NoData)
+                if isinstance(c, type) and issubclass(c, pd.Index):
+                    if not isinstance(value.columns, c):
+                        raise AttributeError(f"Invalid columns type ({type(value.columns).__name__}); expecting {c}")
+                
 
 class ContextExecutor(ContextDecorator):
     def __enter__(self):
@@ -1820,7 +1879,7 @@ def __check_type__(attr_type:typing.Union[type, typing.Tuple[type]],
                 
 # NOTE: 2024-07-29 09:43:00
 # overhauled
-def parse_descriptor_specification(x:tuple):
+def parse_descriptor_specification(x:tuple, allow_none:bool=True):
     """
     x: tuple with attribute name, attribute type(s), collection element types, array dtypes, default value
     
@@ -1890,158 +1949,21 @@ def parse_descriptor_specification(x:tuple):
     Returns:
     ------------
     A dictionary suitable for the `descr_params` parameter to the 
-    `setup_descriptor` class method of `WithDescriptors`.
+    `setup_descriptor` class method of `WithDescriptors`:
     
-   
+    'name'      ↦ str: name of the descriptor — mandatory
+    'value'     ↦ object: default value of the descriptor
+    'args'      ↦ tuple: acceptable value types that can be set for the descriptor;
+                    by default, this is empty
+    'kwargs'    ↦   'allow_none' ↦ bool <True>
+                    'dcriteria'  ↦ dict <empty dict> — as detailed in the 
+                                    documentation for DescriptorGenericValidator.__init__()
     
-    
-                        
-    
-                                    
-            (str, instance or type, type or tuple of types, <default value(s)>, )
-    
-### BEGIN    
-#         x[0]: str, name of the attribute
-#         
-#         x[1]: str, type, tuple of types or anyhing else
-#             when a :str: is if first tested for a dotted type name ; if this is
-#                 a dotted type name then it is interpreted as the type of the 
-#                 attribute's value (type name qualified by module); 
-#                 otherwise the attribute type is a str and its default value is x[1];
-#                 
-#             when a type: this is the default value type of the attribute, and 
-#                 the default value is the default constructor if it takes no 
-#                 parameters, else None;
-#                 
-#             when a tuple:
-#                 this can be a tuple of types, or a tuple of instances; 
-#                 * tuple of types: these are the acceptable types of the attribute
-#                 
-#                     - when the first element is a dict, this indicates that the 
-#                     attribute is a dict; the rest of the type objects in the
-#                     tuple indicate acceptable types for the dict's values
-#                 
-#                 * tuple of instances: these are acceptable default values for the
-#                 attribute; their types indicate acceptable types of the attribute
-#                 
-#             antyhing else: this is the default value of the attribute, and its
-#                 type is the type of the attribute
-#                 
-#             NOTE: x[1] is meant to specify the attribute type and/or its 
-#             acceptable default value(s). 
-#             
-#             When x[1] is a single type object, a default value will be 
-#             instantiated with zero arguments, if possible. This attempt will 
-#             fail when either:
-#             
-#             a) the intializer of the specified type requires at leat one
-#             positional-only parameter (which in this case is absent)
-#             
-#             b) the specified type is an abstract :class: (see for example, 
-#             the module 'collections.abc')
-#             
-#             These initialization failures are ignored, and the "default" 
-#             attribute value will NOT be set (i.e. it is left as it is, which is 
-#             None by default).
-#     
-#             This may impact on attribute validators (see prog.BaseDescriptorValidator and 
-#             derived subclasses) used to build dynamic descriptors, UNLESS the
-#             validator's property 'allow_none' is set to True.
-#                 
-#             NOTE: 2023-05-18 08:40:56
-#             The default value type is now determined in core.datatypes.default_value()
-#             and MAY return an actual instance of the specified type, or None
-#             
-#         x[2]: type or tuple of types
-#             a) When a type or tuple of types, this is either:
-#                 a.1) the explicit type(s) expected for the attribute. 
-#                 WARNING: this may overwrite the default value type determined
-#                     from x[1]
-#                 
-#                 a.2) the explicit type(s) of elements of a collection-type attribute
-#                 
-#             b) When attribute type as determined from x[1] is a numpy ndarray, 
-#             or a subclass of numpy array (e.g., Python Quantity, VigraArray, 
-#             neo DataObect) x[2] may also be:
-#             
-#             tuple of np.dtype objects:  allowed array dtypes
-#             
-#             tuple of int:               allowed shape (number of dimensions is 
-#                                         deduced)
-#             int:                        allowed number of dimensions
-#             
-#             dtype:                      allowed array dtype
-#             
-#             pq.Quantity:                allowed units (when attribute type is 
-#                                         python Quantity)
-#                     NOTE: unit matching is based on the convertibility between 
-#                         the expected attribute 'units' property value and the
-#                         specified units
-#                             
-#             str:                        array order (for VigraArrays)
-#             
-#             NOTE: to avoid further confusions, dtypes must be specified directly    
-#                 and a str will not be interpreted as dtype 'kind'
-#                 
-#             NOTE: the size of sequence attributes is NOT checked (i.e., they can
-#             be empty) but, if given in x[2], they can only accept elements of the
-#             specified type
-#             
-#         x[3]-x[7]: as x[2] for numpy arrays
-#             NOTE: duplicate specifications will be ignored
-#             
-#         NOTE: For objects of any type OTHER than numpy ndarray, only the first
-#         three elements are sufficient
-#         
-# 
-#         NOTE: The specification for the first three elements of 'x' is intended 
-#             to cover the case of attribute definitions in BaseNeo objects.
-            
-### END
-        
-    Returns:
-    --------
-    The following key ↦ value mapping:
-    
-    "name":ret["name"], 
-    "value": ret["default_value"], 
-    "args":tuple(args), 
-    "kwargs": kwargs}
-    
-    where:
-    name    ↦ str: attribute (descriptor) name
-    value   ↦ typing.Any: any Python object — the default descriptor value
-    args    ↦ tuple — acceptable types of the descriptor value, AND a 
-                type dictionary with additional parameters:
-                ndim, dtype (for all numpy arrays)
-                units (for quantities)
-                axistags and order (for vigra arrays)
-                element_types (for collection types and sets)
-                mapping_element_types (for mapping types) -> TODO
-    
-    kwargs  ↦ dict
-    
-        Key:                  Value type                  Semantic:
-    ============================================================================
-    name                  ↦ str                       Attribute name
-    default_value         ↦ object or tuple           Default attribute  value
-    default_value_type    ↦ type or tuple of types    Default attribute type
-    default_element_types ↦ type of tuple of types    For sequence or set attributes
-    default_value_dtypes   ↦ dtype or None             Only for ndarray attributes
-    default_item_types    ↦ type or tuple of types    For mapping-type attribute
-    default_value_ndim    ↦ int or None               Only for ndarray attributes
-    default_value_units   ↦ Quantity or None          Only for Python quantities.Quantity
-        
-    NOTE: 
-    default_value is None when either:
-        * it was specified as None (in x[1]) and was NOT overwritten in x[2]
-        * default_value_type is a type that cannot be instantiated without 
-            arguments
-        * default_value_type is a tuple of types
     """
     from core.quantities import units_convertible
     from core.datatypes import (
-        TypeEnum, is_enum, is_enum_value, default_value, NoData)
+        TypeEnum, is_enum, is_enum_value, default_value, NoData,
+        sequence_element_type)
     from core.utilities import unpack
     
     if not isinstance(x, tuple):
@@ -2049,9 +1971,9 @@ def parse_descriptor_specification(x:tuple):
     
     
     # (name, value or type, type or ndims, ndims or units, units)
-    res = SimpleNamespace(
+    attrs = SimpleNamespace(
         name=NoData,
-        type_or_str_or_value=NoData,
+        type_or_value=NoData,
         types=NoData,
         eltypes=NoData,
         keyvaltypes=NoData,
@@ -2065,92 +1987,292 @@ def parse_descriptor_specification(x:tuple):
         value = None,
         args = tuple(),
         kwargs = dict(
-            allow_none= True,
-            dcriteria = dict()
+            allow_none = allow_none,
+            dcriteria  = dict()
             )
         )
     
-    datavars = unpack(x, res.__dict__.keys())
-    # print(f"datavars = {datavars}")
+    unpacked = unpack(x, attrs.__dict__.keys())
+    # print(f"unpacked = {unpacked}")
     
-    for dv in datavars:
-        setattr(res, dv[0], dv[1])
-        # res[dv[0]] = dv[1]
+    for u in unpacked:
+        setattr(attrs, u[0], u[1])
     
-    print(f"res = {res}")
+    print(f"attrs = {attrs}")
+                                        # parameters of Descriptor c'tor:
+    descriptor_name = NoData            # -> name 
+    descriptor_default_value = NoData   # -> defval 
+    descriptor_types = NoData           # -> *args
+    dcriteria = dict()                  # -> "dcriteria" keyword
+    # descriptor_element_types = tuple()
+    # descriptor_mapping_key_value_types = tuple()
+    # descriptor_dtypes = tuple()
+    # descriptor_array_params = tuple()
     
-    
-    # return res
+    # return attrs
 
-    if not isinstance(res.name, str) or len(res.name.strip()) == 0:
-        raise ValueError(f"No attribute name was supplied")
+    if not isinstance(attrs.name, str) or len(attrs.name.strip()) == 0:
+        raise ValueError("A name for the attribute is mandatory")
     
-    result["name"] = res.name
+    descriptor_name = attrs.name
     
-    descriptor_default_value = NoData
-    descriptor_types = tuple()
-    descriptor_element_types = tuple()
-    descriptor_mapping_key_value_types = tuple()
-    descriptor_dtypes = tuple()
-    descriptor_array_params = dict()
-    
-    if isinstance(res.type_or_str_or_value, type):
-        if isinstance(res.types, list):
-            res.types.append(res.type_or_str_or_value)
-        else:
-            res.types = [res.type_or_str_or_value]
-            
-        res.type_or_str_or_value = NoData # consume this
-        
-    elif isinstance(res.type_or_str_or_value, str):
-        try:
-            val_types = [import_item(res.type_or_str_or_value)]
-            if isinstance(res.types, list):
-                res.types.extend(val_types)
-            else:
-                res.types = val_types
-        except:
-            if isinstance(res.types, list):
-                if str not in res.types:
-                    res.types.append(str)
-                    
-            else:
-                res.types = [str]
-                    
-            res.default = res.type_or_str_or_value
-            
-        res.type_or_str_or_value = NoData # consume this
-        
-    elif res.type_or_str_or_value is not NoData:
-        res.default = res.type_or_str_or_value
-        val_type = type(res.default)
-        if isinstance(res.types, list):
-            if val_type not in res.types:
-                res.types.append(val_type)
-        else:
-            res.types = [val_type]
+    if isinstance(attrs.type_or_value, (tuple, list, deque, set)):
+        # This may be a sequence of types, or a sequence object.
+        #
+        if all(isinstance(v, type) for v in attrs.type_or_value):
+            # This is a sequence of types, which can be either the acceptable 
+            #   types of the descriptor, or the default value of the descriptor 
+            #   (i.e. we want to set it to a tuple of types).
+            #
+            # The only way to discern is to look ahead on the attrs.types:
+            #   • if attrs.types is undefined (either NoData or an empty sequence),
+            #       then attrs.type_or_value is interpreted as a sequence
+            #       of acceptable descriptor types; default values, if any are
+            #       taken from attrs.default, if given, or from a default 
+            #       constructor with no arguments (if it is defined, otherwise is
+            #       set to None)
+            #
+            #   • if attrs.types is defined, then attrs.type_or_value can 
+            #   only be the default descriptor value (a sequence type), and its
+            #   elements must all be subclasses of attrs.types
+            if isinstance(attrs.types, NoData) or (isinstance(attrs.types, (tuple, list)) and len(attrs.types) == 0):
+                # first bullet above; also sets the default value
+                descriptor_types = unique(tuple(attrs.type_or_value))
                 
-        res.type_or_str_or_value = NoData # consume this
+                # now try and set a default value
+                if not isinstance(attrs.default, NoData):
+                    if isinstance(attrs.default, descriptor_types):
+                        descriptor_default_value = attrs.default
+                    else:
+                        raise DescriptorException(f"Specified default value {attrs.default} does not match prescribed types {descriptor_types}")
+                    
+                else:
+                    # try to set the default value from the first type in descriptor_types
+                    try:
+                        defval = descriptor_types[0]()
+                    except:
+                        if allow_none:
+                            defval = None
+                        else:
+                            raise DescriptorException(f"A default value cannot be inferred, and must be specified for {descriptor_types[0].__name__}")
+                        
+                    descriptor_default_value = defval
+                
+            elif isinstance(attrs.types, type) or (isinstance(attrs.types, (tuple, list)) and all(isinstance(t, type) for t in attrs.types)):
+                # second bullet above: type_or_value says the descriptor 
+                #  default value is a sequence of types, hence descriptor value 
+                # type is a sequence, and its element types must be all 'type'
+                #
+                # then attrs.types specify acceptable class hierarchy for the types 
+                # in the default value (e.g. accept (tuple, list) but not (tuple, dict))
+                # 
+                # CAUTION: 2024-08-02 13:31:04
+                # if attrs.default is also specified, this is silently ignored;
+                # if attrs.eltypes are also specified, they are silently ignored
+                #
+                descriptor_default_value = attrs.type_or_value
+                descriptor_types = (type(descriptor_default_value),) # a sequence type
+                
+                # element superclasses (also types)
+                checktypes = (attrs.types,) if isinstance(attrs.types, type) else tuple(attrs.types)
+                
+                if not all(issubclass(v, checktypes) for v in descriptor_default_value):
+                    raise DescriptorException("Element type mismatch")
+                
+                dcriteria["types"] = unique(tuple(checktypes))
+                
+        else:
+            # This is a collection of objects (other than types) — it is interpreted
+            # as default value, and the descriptor value type is its type.
+            #
+            # furthermore, its element types must conform with attrs.types or
+            # attrs.eltypes, if specified
+            #
+            # CAUTION: attrs.default will be silently ignored, here
+            #
+            # hence the descriptor_type is a sequence type
+            # and its element types are specified by the attrs.types (attrs.eltypes
+            # are silently ignored)
+            descriptor_default_value = attrs.type_or_value # this may be an empty sequence!
+            descriptor_types = (type(attrs.type_or_value), ) # tuple, or list
+            
+            # now, look ahead to attrs.types and see if element types are specified
+            # if they are, IN THIS PARTICULAR CASE they are taken to be element
+            # types; if, in addition, attrs.eltypes are also given, raise SyntaxError
+            # beacuse of ambiguity
+            if isinstance(attrs.types, type) or (isinstance(attrs.types, (tuple, list)) and all(isinstance(t, type) for t in attrs.types)):
+                if isinstance(attrs.eltypes, type) or (isinstance(attrs.eltype, (tuple, list)) and all(isinstance(t, type) for t in attrs.eltype)):
+                    raise DescriptorException(f"Ambiguous descriptor specification:\n{x}\nelement types appear to have been defined twice")
+                types = (attrs.types,) if isinstance(attrs.types, type) else tuple(attrs.types)
+                dcriteria["types"] = unique(types)
+                
+                if len(descriptor_default_value):
+                    if not all(isinstance(v, types) for v in descriptor_default_value):
+                        raise DescriptorException(f"Default value {descriptor_default_value} does not follw prescribed types {types}")
+
+            else:
+                # if attrs.types are not given, check attrs.eltypes
+                if isinstance(attrs.eltypes, type) or (isinstance(attrs.eltypes, (tuple, list)) and all(isinstance(t, type) for t in attrs.eltypes)):
+                    types = (attrs.eltypes,) if isinstance(attrs.eltypes, type) else tuple(attrs.eltypes)
+                    dcriteria["types"] = unique(types)
+                
+                    if len(descriptor_default_value):
+                        if not all(isinstance(v, types) for v in descriptor_default_value):
+                            raise DescriptorException(f"Default value {descriptor_default_value} does not follow prescribed types {types}")
+                        
+    elif isinstance(attrs.type_or_value, type):
+        descriptor_types = (attrs.type_or_value,)
+        if not isinstance(attrs.default, NoData):
+            if not isinstance(attrs.default, descriptor_types):
+                raise DescriptorException(f"Default value type ({type(attrs.default).__name__}) should be {descriptor_type[0].__name__}")
+            
+            descriptor_default_value = attrs.default
+            
+        else:
+            try:
+                descriptor_default_value = descriptor_types[0]()
+            except:
+                if allow_none:
+                    descriptor_default_value = None
+                else:
+                    raise DescriptorException(f"A default value must be specified for {descriptor_types[0].__name__}")
+                
+        if issubclass(attrs.type_or_value, (tuple, list, deque, set, bytes, bytearray, str, dict)):
+            # check for prescribed element types
+            if isinstance(attrs.types, type) or (isinstance(attrs.types, (tuple, list)) and all(isinstance(t, type) for t in attrs.types)):
+                if isinstance(attrs.eltypes, type) or (isinstance(attrs.eltype, (tuple, list)) and all(isinstance(t, type) for t in attrs.eltype)):
+                    raise DescriptorException(f"Ambiguous descriptor specification:\n{x}\nelement types appear to have been defined twice")
+                
+                types = (attrs.types,) if isinstance(attrs.types, type) else tuple(attrs.types)
+                dcriteria["types"] = unique(types)
+                
+                if len(descriptor_default_value):
+                    if not all(isinstance(v, types) for v in descriptor_default_value):
+                        raise DescriptorException(f"Default value {descriptor_default_value} does not follow prescribed types {types}")
+
+            elif isinstance(attrs.eltypes, type) or (isinstance(attrs.eltypes, (tuple, list)) and all(isinstance(t, type) for t in attrs.eltypes)):
+                types = (attrs.eltypes,) if isinstance(attrs.eltypes, type) else tuple(attrs.eltypes)
+                dcriteria["types"] = unique(types)
+            
+                if len(descriptor_default_value):
+                    if not all(isinstance(v, types) for v in descriptor_default_value):
+                        raise DescriptorException(f"Default value {descriptor_default_value} does not follow prescribed types {types}")
+                    
+            if issubclass(attrs.type_or_value, dict):
+                if isinstance(attrs.keyvaltypes, (tuple, list))
+            
+            if isinstance(attrs.array_params, dict) and isinstance(attrs.array_params.get("len", None), int):
+                length = attrs.array_params["len"]
+                if len(descriptor_default_value) != length:
+                    raise DescriptorException(f"Default value {descriptor_default_value} does not match prescribed length {length}")
+                dcriteria["len"] = length
+                
+    elif isinstance(attrs.type_or_value, (bytes, bytearray, str, set)):
+        descriptor_types = (type(attrs.type_or_value), )
+        if not isinstance(attrs.default, NoData):
+            if isinstance(attrs.default, descriptor_types):
+                descriptor_default_value = attrs.default
+            else:
+                raise DescriptorException(f"Specified default value {attrs.default} does not match prescribed types {descriptor_types}")
+            
+        else:
+            descriptor_default_value = descriptor_types[0]()
+            
+        if isinstance(attrs.array_params, dict) and isinstance(attrs.array_params.get("len", None), int):
+            length = attrs.array_params["len"]
+            if len(descriptor_default_value) != length:
+                raise DescriptorException(f"Default value {descriptor_default_value} does not match prescribed length {length}")
+            dcriteria["len"] = length
+            
+    elif isinstance(attrs.type_or_value, dict):
+        descriptor_types = (type(attrs.type_or_value), )
+        if not isinstance(attrs.default, NoData):
+            if isinstance(attrs.default, descriptor_types):
+                descriptor_default_value = attrs.default
+            else:
+                raise DescriptorException(f"Specified default value {attrs.default} does not match prescribed types {descriptor_types}")
+            
+        else:
+            descriptor_default_value = descriptor_types[0]()
+            
+        if isinstance(attrs.array_params, dict):
+            if isinstance(attrs.array_params.get("len", None), int):
+                length = attrs.array_params["len"]
+                if len(descriptor_default_value) != length:
+                    raise DescriptorException(f"Default value {descriptor_default_value} does not match prescribed length {length}")
+                dcriteria["len"] = length
+            
+            if isinstance(attrs.array_params.get("types"))
+            
+
+    elif __check_type__(attrs.type_or_value, ()):
+        pass
         
-    # by now, res.types should have been taken care of
-    result["args"] = res.types
+    
+    if isinstance(attrs.types, (tuple, list)):
+        descriptor_types = list(attrs.types)
+        
+    else:
+        descriptor_types = list()
+        
+    
+    if isinstance(attrs.type_or_value, type):
+        if isinstance(attrs.types, list):
+            attrs.types.append(attrs.type_or_value)
+        else:
+            attrs.types = [attrs.type_or_value]
+            
+        attrs.type_or_value = NoData # consume this
+        
+    elif isinstance(attrs.type_or_value, str):
+        try:
+            val_types = [import_item(attrs.type_or_value)]
+            if isinstance(attrs.types, list):
+                attrs.types.extend(val_types)
+            else:
+                attrs.types = val_types
+        except:
+            if isinstance(attrs.types, list):
+                if str not in attrs.types:
+                    attrs.types.append(str)
+                    
+            else:
+                attrs.types = [str]
+                    
+            attrs.default = attrs.type_or_value
+            
+        attrs.type_or_value = NoData # consume this
+        
+    elif attrs.type_or_value is not NoData:
+        attrs.default = attrs.type_or_value
+        val_type = type(attrs.default)
+        if isinstance(attrs.types, list):
+            if val_type not in attrs.types:
+                attrs.types.append(val_type)
+        else:
+            attrs.types = [val_type]
+                
+        attrs.type_or_value = NoData # consume this
+        
+    # by now, attrs.types should have been taken care of
+    result["args"] = attrs.types
     # descriptor_types = tuple()
     
-    # if __check_type__(res.types, (str, bytes, bytearray))
+    # if __check_type__(attrs.types, (str, bytes, bytearray))
     
-    if __check_type__(res.types, collections.abc.Sequence, (str, bytes, bytearray)):
-        # here, res.eltypes should be a type or tuple of types
-        if res.eltypes is not NoData:
-            if isinstance(res.eltypes, type):
-                descriptor_element_types = tuple(res.eltypes)
-            elif isinstance(res.eltypes, (tuple, list)) and len(res.eltypes) and all(isinstance(v_, type) for v_ in res.eltypes):
-                descriptor_element_types = tuple(res.eltypes)
+    if __check_type__(attrs.types, collections.abc.Sequence, (str, bytes, bytearray)):
+        # here, attrs.eltypes should be a type or tuple of types
+        if attrs.eltypes is not NoData:
+            if isinstance(attrs.eltypes, type):
+                descriptor_element_types = tuple(attrs.eltypes)
+            elif isinstance(attrs.eltypes, (tuple, list)) and len(attrs.eltypes) and all(isinstance(v_, type) for v_ in attrs.eltypes):
+                descriptor_element_types = tuple(attrs.eltypes)
                 
             else:
                 descriptor_element_types = tuple()
                 
-    elif __check_type__(res.types, collections.abc.Mapping):
-        if res.keyvaltypes is NoData:
+    elif __check_type__(attrs.types, collections.abc.Mapping):
+        if attrs.keyvaltypes is NoData:
             # use eltypes to set the acceptable value types in a mapping
             pass
             
@@ -2648,14 +2770,15 @@ class WithDescriptors(object):
     def setup_descriptor(cls, descr_params:dict, **kwargs):
         """Default method for setting up descriptors based on specific conditions.
         
-        This will dynamically generate instances of DescriptorGenericValidator.
+        This class method dynamically generates instances of DescriptorGenericValidator.
+    
         These objects implement the Python's descriptor protocol - i.e. they
         behave like `property` objects, by providing `__get__()` and `__set__()`
         methods whenever a private attribute is accessed or assigned to, 
-        respectively, in the owner instance of type `cls`.
+        respectively, in the owner (instance of `cls`).
         
-        Derived classes that expect to execute custom code besides the validation
-        iof the new value, inside the  descriptor's __set__() method, need to 
+        Derived classes that execute custom code besides the validation of the
+        new value, (called from the  descriptor's __set__() method) need to 
         define at least one of two dictionary attributes called 
         '_preset_hooks_' and '_postset_hooks_'.
         
@@ -2679,98 +2802,23 @@ class WithDescriptors(object):
         descr_params: a dictionary that maps str keys as follows:
         
         'name'      ↦ str: descriptor name
-        'defval'    ↦ any type: default descriptor value
+        'defval'    ↦ default descriptor value; this can be None if the descriptor
+                        allows it (see below)
         'args'      ↦ tuple of acceptable types, or predicates (unary functions)
-        'kwargs'    ↦ dict with EXACTLY two keys:
+        'kwargs'    ↦ dictionary with EXACTLY two keys:
                         'allow_none'    ↦ bool — by default this is set to True
                         'dcriteria'     ↦ dictionary of additional type-specific
-                            constraints (by default, this is set to an empty dict):
-                            type ↦ a mapping of property_name(str) ↦ property_value
-                                    When empty, no additonal constraints are set
-                                    for the specified type (might as well leave out)
+                            constraints (by default, this is set to an empty dict))
     
-        When 'dcriteria' is empty, then no additional criteria are defined, and 
-        the descriptor value is validated based on 'name' and 'args' and 'allow_none'
-        keyword.
-        
-        Table with type-related properties in the dcriteria dict:
-        key         value is always a nested dict — an empty dict here mean no 
-        (a type)        criteria are defined and the descriptor value is validated
-                        based on 'name' and types or predicates in 'args'
-                    
-        ========================================================================
-                    Nested dict key:str ↦ value; 
-                    default is in <angle brackets>'; 
-                    <> means no default
-        ------------------------------------------------------------------------
-    
-        bytes       'len' ↦ int <NoData>  prescribed length; when NoData, then 
-        bytearray         an object with any length is valid
-        str
-        
-        tuple       'len' ↦ int, <NoData>;  prescribed length; when NoData, then 
-        list        a tuple with any length is valid
-        deque       'types' ↦ tuple, <(,)>;  prescribed element types; when empty,
-                    then a tuple is any element type is valid
-        
-        dict        'len' ↦ int, <NoData>; prescribed length; when NoData, then 
-                    a dict with any length is valid
-    
-                    'types' ↦ tuple, <(,)>;  prescribed value types for the dict 
-                        elements; when empty, then the dict elements can have any
-                        any value type
-    
-                    'key_types' ↦ tuple; <(,)>; prescribed key types for th dict 
-                        elements; when empty, the dict can use any hashable 
-                        object as keys (NOTE: a dict can use any — and only — 
-                        hashable type as keys)
-    
-                    'keys' ↦ tuple of hashable objects, <(,)>; prescribed actual
-                        keys that must be present in the dict (the value they're
-                        mapped to is irrelevant); when empty, then the dict can
-                        contain any key
-                        NOTE: as noted above, these objects MUST be hashable
-    
-                    'mapping' ↦ dict of key:hashable type ↦ type or tuple of types,
-                        <>;
-                        This is the most stringent criterion, where a dict 
-                        descriptor value is valid if it maps specific types of 
-                        keys to specific type or types of values.
-    
-        numpy.ndarray 
-                    'ndims' ↦ int, <NoData>; when NoData, ndms is irrelevant
-                    'shape' ↦ tuple[int], <(,)>; when empty, the array shape is
-                            irrelevant
-                    'dtype' ↦ numpy.dtype, tuple of numpy.dtype, <(,)>; when an 
-                            empty tuple, the dtype is irrelevant
-                    'kind'  ↦ numpy.dtype.kind, tuple of numpy.dtype.kind, <(,)>;
-                            when an empty tuple, this criterion is irrelevant
-    
-        quantities.Quantity — in addition to the criteria for numpy.ndarray:
-                    'units' ↦ pq.Quantity, <NoData>; when NoData, this criterion
-                            is irrelevant; otherwise, the descriptor value (a 
-                            pq.Qyuantity) must be convertibel to what is specified
-                            here)
-    
-        vigra.VigraArray   — in addition to the criteria for numpy.ndarray:
-                    'axistags' ↦ vigra.AxisTags, <NoData>; when NoData, this
-                        criterion is irrelevant
-    
+        For details, see the documentation for DescriptorGenericValidator.__init__
                     
         
-        name ↦ str — name of the descriptor
-        value ↦ anything (default None) — the default value of the descriptor
-        args ↦ tuple (default empty) — acceptable value types for the descriptor
-        kwargs ↦ dict (default, empty) — TODO: document this !!!
-    
-        these are passed directly to the instance of the Descriptor class, which
-            by default is a DescriptorGenericValidator
-         """
+        """
         name = descr_params.get("name", "") # the name of the descriptor
         defval = descr_params.get("value", None) # descriptor default value
         args = descr_params.get("args", tuple()) # the acceptable types
         kw = descr_params.get("kwargs", {})
-        kw["allow_none"] = True
+        # kw["allow_none"] = True
         
         if not isinstance(name, str) or len(name.strip()) == 0:
             return
@@ -2779,8 +2827,18 @@ class WithDescriptors(object):
         
         if desc_impl is None:
             desc_impl = DescriptorGenericValidator
-        
-        descriptor = desc_impl(name, defval, *args, **kw)
+            
+        if isinstance(desc_impl, DescriptorGenericValidator):
+            descriptor = desc_impl(name, defval, *args, **kw)
+            
+        elif isinstance(desc_impl, (DescriptorTypeValidator, OneOf)):
+            descriptor = descl_impl(name, *args)
+            
+        elif isinstance(desc_impl, ImmutableDescriptor):
+            descriptor = desc_impl(default=defval)
+            
+        else:
+            raise TypeError(f"Invalid descriptor validator class — expecting a BaseDescriptorValidator; instead, got {type(desc_impl).__name__}")
         # descriptor.allow_none = True
         setattr(cls, name, descriptor)
         

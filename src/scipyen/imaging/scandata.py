@@ -1502,8 +1502,8 @@ class ScanData(BaseScipyenData):
     #   types) of the elements in the sequence
     #
     _data_children_ = (
-        ("scans",                           (list, tuple),   vigra.VigraArray),
-        ("scene",                           (list, tuple),   vigra.VigraArray),
+        ("scans",                           tuple(), (list, tuple),   vigra.VigraArray),
+        ("scene",                           tuple(), (list, tuple),   vigra.VigraArray),
         ("electrophysiology",               (neo.Block(name="Electrophysiology"), None)),
         )
     
