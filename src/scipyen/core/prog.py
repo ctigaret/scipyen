@@ -27,7 +27,7 @@ from inspect import Parameter, Signature
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
 from contextlib import (contextmanager, ContextDecorator,)
-from dataclasses import MISSING, dataclass
+from dataclasses import MISSING, dataclass, field
 
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
@@ -71,6 +71,13 @@ class AttributeAdapter(ABC):
 @dataclass
 class AttributeSpecification:
     name:str
+    types:tuple = tuple()
+    default = None
+    element_types:tuple = tuple()
+    key_types:tuple = tuple()
+    key_value_mappings:tuple = tuple()
+    
+    
     
     
     
@@ -1883,10 +1890,13 @@ def __check_type__(attr_type:typing.Union[type, typing.Tuple[type]],
         return isinstance(attr_type, type) and issubclass(attr_type, specs)
     
     return False
+
+def parse_descriptor_specification(x:tuple, allow_none:bool=True):
+    pass
                 
 # NOTE: 2024-07-29 09:43:00
 # overhauled
-def parse_descriptor_specification(x:tuple, allow_none:bool=True):
+def parse_descriptor_specification_old(x:tuple, allow_none:bool=True):
     """
     x: tuple with attribute name, attribute type(s), collection element types, array dtypes, default value
     
@@ -2202,18 +2212,18 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
         
         if attrs.default is NoData:
             if not isinstance(attrs.types, type) and not (isinstance(attrs.types, (tuple, list)) and all(isinstance(t, type) for t in attrs.types)):
-            if attrs.types is NoData:
-                descriptor_types = (type(attrs.type_or_value), )
+                if attrs.types is NoData:
+                    descriptor_types = (type(attrs.type_or_value), )
                 
             descriptor_default_value = attrs.type_or_value
             # descriptor_default_value = descriptor_types[0]()
             
         else:
             if attrs.types is NoData:
-            if isinstance(attrs.default, descriptor_types):
-                descriptor_default_value = attrs.default
-            else:
-                raise DescriptorException(f"Specified default value {attrs.default} does not match prescribed types {descriptor_types}")
+                if isinstance(attrs.default, descriptor_types):
+                    descriptor_default_value = attrs.default
+                else:
+                    raise DescriptorException(f"Specified default value {attrs.default} does not match prescribed types {descriptor_types}")
             
         if isinstance(attrs.array_params, dict) and isinstance(attrs.array_params.get("len", None), int):
             length = attrs.array_params["len"]

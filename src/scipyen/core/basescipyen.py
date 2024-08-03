@@ -107,11 +107,11 @@ class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
     
     _data_children_     = ()
     _data_attributes_ = (
-                            ("sourceID",            (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
-                            ("cell",                (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
-                            ("field",               (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
-                            ("genotype",            (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
-                            ("sex",                 (str, type(pd.NA), type(MISSING)),          tuple(),    "NA"),
+                            ("sourceID",            (str, type(pd.NA), type(MISSING)),          "NA"),
+                            ("cell",                (str, type(pd.NA), type(MISSING)),          "NA"),
+                            ("field",               (str, type(pd.NA), type(MISSING)),          "NA"),
+                            ("genotype",            (str, type(pd.NA), type(MISSING)),          "NA"),
+                            ("sex",                 (str, type(pd.NA), type(MISSING)),          "NA"),
                             ("age",                 (pq.Quantity, type(pd.NA), type(MISSING)),  0*pq.s),
                             ("biometric_weight",    (pq.Quantity, type(pd.NA), type(MISSING)),  0*pq.g), 
                             ("biometric_height",    (pq.Quantity, type(pd.NA), type(MISSING)),  0*pq.m),
