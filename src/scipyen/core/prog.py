@@ -27,7 +27,7 @@ from inspect import Parameter, Signature
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
 from contextlib import (contextmanager, ContextDecorator,)
-from dataclasses import MISSING, dataclass, field
+from dataclasses import (MISSING, dataclass, field, KW_ONLY)
 
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
@@ -54,6 +54,17 @@ CALLABLE_TYPES = (types.FunctionType, types.MethodType,
                   types.BuiltinFunctionType, types.BuiltinMethodType,
                   types.MethodDescriptorType, types.ClassMethodDescriptorType)
 
+class NoData():
+    """Empty placeholder class that signifies lack of any data.
+        Used in Descritpr validation, in order to allow the use of None, MISSING,
+        pandas NAType as values in descriptors.
+    Cannot be instantiated.
+    """
+    def __new__(cls):
+        return cls
+    def __repr__(self):
+        return "NoData"
+
 class ArgumentError(Exception):
     pass
 
@@ -70,12 +81,43 @@ class AttributeAdapter(ABC):
     
 @dataclass
 class AttributeSpecification:
-    name:str
-    types:tuple = tuple()
-    default = None
+    """The non-keyword fields are set to match neo attribute specifications"""
+    name:str # decriptor name
+    types:typing.Union[type, typing.Tuple[type], typing.Callable] # descriptor types or predicates
+    ndim:typing.Union[int, dict] = 0 # ndim (neo model), dtype
+    dtype:typing.Union[np.dtype, dict] = field(default_factory = lambda: np.dtype(float))
+    _: KW_ONLY
+    default:typing.Any = NoData
+    length:int = 0
+    shape:tuple = tuple()
+    units:pq.Quantity = pq.dimensionless
     element_types:tuple = tuple()
     key_types:tuple = tuple()
     key_value_mappings:tuple = tuple()
+    
+    allow_none:bool = False
+    
+    def __post_init__(self):
+        print(f"{self.__class__.__name__}.__post_init__:\nself.types: {self.types}")
+        if not (isinstance(self.types, type)) and not (isinstance(self.types, tuple) and all(isinstance(t_, type) for t_ in self.types)):
+                raise DescriptorException(f"Incorrect type specification")
+            
+        if self.default is MISSING:
+            if self._allow_none:
+                self.default = None
+            else:
+                if isinstance(self.types, type):
+                    type_ = self.types
+                elif isinstance(self.types, tuple) and all(isinstance(t_, type) for t_ in self.types):
+                    type_ = self.types[0]
+                    
+                try:
+                    self.default = self.types()
+                except:
+                    scipywarn(f"Cannot construct a default value for type {type_}")
+                    raise
+                        
+                        
     
     
     
@@ -1982,8 +2024,7 @@ def parse_descriptor_specification_old(x:tuple, allow_none:bool=True):
     
     from core.quantities import units_convertible
     from core.datatypes import (
-        TypeEnum, is_enum, is_enum_value, default_value, NoData,
-        sequence_element_type)
+        TypeEnum, is_enum, is_enum_value, default_value, sequence_element_type)
     from core.utilities import (unpack, unique)
     
     if not isinstance(x, tuple):

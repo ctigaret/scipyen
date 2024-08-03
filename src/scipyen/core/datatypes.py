@@ -103,7 +103,7 @@ from core import quantities as scq
 from core import xmlutils
 from core import strutils
 from core.prog import (safeWrapper, is_hashable, is_type_or_subclass, 
-                       ImmutableDescriptor, scipywarn)
+                       ImmutableDescriptor, scipywarn, NoData)
 from core.datazone import DataZone
 from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 
@@ -204,17 +204,6 @@ GENOTYPES = ["NA", "wt", "het", "hom", "+/+", "+/-", "-/-"]
 RELATIVE_TOLERANCE = 1e-4
 ABSOLUTE_TOLERANCE = 1e-4
 EQUAL_NAN = True
-
-class NoData():
-    """Empty placeholder class that signifies lack of any data.
-        Used in Descritpr validation, in order to allow the use of None, MISSING,
-        pandas NAType as values in descriptors.
-    Cannot be instantiated.
-    """
-    def __new__(cls):
-        return cls
-    def __repr__(self):
-        return "NoData"
 
 def default_value(x:type):
     if not isinstance(x, type):

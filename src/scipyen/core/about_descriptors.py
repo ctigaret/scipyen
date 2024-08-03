@@ -12,10 +12,10 @@
     #                    parents or children of the object.
     #
     #
-    # Descriptors that contain POD types (int, str, float, datetime) the specification is:
+    # A) Descriptors that contain POD types (int, str, float, datetime) the specification is:
     #   (str, type) ↔ (name, value type)
     #
-    # Descriptors that contain numpy ndarray types, the specification is as below:
+    # B) Descriptors that contain numpy ndarray types, the specification is as below:
     # 1) pq.Quantity:
     #   (str, <type>¹, int) ↔ (name, pq.Quantity¹, ndim²)
     #
@@ -47,8 +47,11 @@
     #
     #   ⁴ e.g. np.dtype('U'), np.dtype('i') — see 'view.py' example below
     #
+    # All this boils down to:
+    #
+    # (name, type or types, ndim, dtype)
+    #
     # and here are some examples:
-    #   (str, tuple of types, int)
     #
     # from 'baseneo.py':
     # _necessary_attrs = ()
@@ -83,12 +86,23 @@
     #     ("t_start", pq.Quantity, 0),
     # )
     
-    # NOTE: 2024-08-02 22:16:27 
-    # Let's augment this with a fifth element - the default value'
-    
-    # therefore we need to specify:
-    # str: descriptor name
-    # type or tuple of types: descriptor value type
-    # int: ()
 
+    # my model:
+    #  0     1                            2     3                4      5
+    # (name, type or types or predicates, ndim )
+    # (name, type or types or predicates, ndim, dtype or dtypes)
+    # (name, type or types or predicates, ndim, dtype or dtypes, units)
+    # (name, type or types or predicates, ndim, dtype or dtypes, units, default)
   
+    # so, the "floating" terms are as follows (where 'x' is the spec tuple):
+    # len(x) == 2 ⇒ 
+    #   1 -> 5 (default) ← conflicts with (A)
+    # 1 -> is 1 if len(x) == 3
+    #
+    
+    # therefore:
+    #
+    # 0 -> str always
+    # 1 -> type, tuple of types, predicate(s)
+    # 2 -> ndim if (1) indicates np.ndarray
+    #   -> len if (1) indicates str, bytes, bytearray, dict, set, tuple, list
