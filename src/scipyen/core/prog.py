@@ -19,6 +19,7 @@ from importlib import abc as importlib_abc
 import enum, io, os, re, itertools, sys, time, traceback, types, typing
 from types import SimpleNamespace
 import collections
+from collections import deque
 import importlib, inspect, pathlib, warnings, operator, functools
 from warnings import WarningMessage
 from inspect import Parameter, Signature
@@ -26,7 +27,7 @@ from inspect import Parameter, Signature
 from functools import (singledispatch, singledispatchmethod, 
                        update_wrapper, wraps,)
 from contextlib import (contextmanager, ContextDecorator,)
-from dataclasses import MISSING
+from dataclasses import MISSING, dataclass
 
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
@@ -66,6 +67,12 @@ class AttributeAdapter(ABC):
     @abstractmethod
     def __call__(self, obj, value):
         pass
+    
+@dataclass
+class AttributeSpecification:
+    name:str
+    
+    
     
 class BaseDescriptorValidator(ABC):
     """Abstract superclass that implements a Python descriptor with validation.
@@ -1967,7 +1974,7 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
     from core.datatypes import (
         TypeEnum, is_enum, is_enum_value, default_value, NoData,
         sequence_element_type)
-    from core.utilities import unpack
+    from core.utilities import (unpack, unique)
     
     if not isinstance(x, tuple):
         raise TypeError(f"Expecting a tuple, got {type(x).__name__} instead")
@@ -2019,7 +2026,11 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
     
     descriptor_name = attrs.name
     
-    if isinstance(attrs.type_or_value, (tuple, list, deque, set)):
+    if attrs.type_or_value is NoData:
+        descriptor_types = (str,)
+        descriptor_value = ""
+    
+    elif isinstance(attrs.type_or_value, (tuple, list, deque, set)):
         # This may be a sequence of types, or a sequence object.
         #
         if all(isinstance(v, type) for v in attrs.type_or_value):
@@ -2049,18 +2060,12 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
             #   other than "type"
             
             #   
-            if isinstance(attrs.types, NoData) or (isinstance(attrs.types, (tuple, list)) and len(attrs.types) == 0):
+            if (attrs.types is NoData) or (isinstance(attrs.types, (tuple, list)) and len(attrs.types) == 0):
                 # first bullet above; also sets the default value
                 descriptor_types = unique(tuple(attrs.type_or_value))
                 
                 # now try and set a default value
-                if not isinstance(attrs.default, NoData):
-                    if isinstance(attrs.default, descriptor_types):
-                        descriptor_default_value = attrs.default
-                    else:
-                        raise DescriptorException(f"Specified default value {attrs.default} does not match prescribed types {descriptor_types}")
-                    
-                else:
+                if attrs.default is NoData:
                     # try to set the default value from the first type in descriptor_types
                     try:
                         defval = descriptor_types[0]()
@@ -2071,6 +2076,12 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
                             raise DescriptorException(f"A default value cannot be inferred, and must be specified for {descriptor_types[0].__name__}")
                         
                     descriptor_default_value = defval
+                    
+                else:
+                    if isinstance(attrs.default, descriptor_types):
+                        descriptor_default_value = attrs.default
+                    else:
+                        raise DescriptorException(f"Specified default value {attrs.default} does not match prescribed types {descriptor_types}")
                 
             elif isinstance(attrs.types, type) or (isinstance(attrs.types, (tuple, list)) and all(isinstance(t, type) for t in attrs.types)):
                 # second bullet above: type_or_value says the descriptor 
@@ -2141,7 +2152,7 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
         # apply the same logic as for the cases A and B of a collection of types
         # TODO 2024-08-02 22:55:12 FIXME,  currently this does something else !!!
         descriptor_types = (attrs.type_or_value,)
-        if not isinstance(attrs.default, NoData):
+        if attrs.default is not NoData:
             if not isinstance(attrs.default, descriptor_types):
                 raise DescriptorException(f"Default value type ({type(attrs.default).__name__}) should be {descriptor_type[0].__name__}")
             
@@ -2178,7 +2189,8 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
                         raise DescriptorException(f"Default value {descriptor_default_value} does not follow prescribed types {types}")
                     
             if issubclass(attrs.type_or_value, dict):
-                if isinstance(attrs.keyvaltypes, (tuple, list))
+                if isinstance(attrs.keyvaltypes, (tuple, list)):
+                    pass
             
             if isinstance(attrs.array_params, dict) and isinstance(attrs.array_params.get("len", None), int):
                 length = attrs.array_params["len"]
@@ -2187,15 +2199,21 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
                 dcriteria["len"] = length
                 
     elif isinstance(attrs.type_or_value, (bytes, bytearray, str, set)):
-        descriptor_types = (type(attrs.type_or_value), )
-        if not isinstance(attrs.default, NoData):
+        
+        if attrs.default is NoData:
+            if not isinstance(attrs.types, type) and not (isinstance(attrs.types, (tuple, list)) and all(isinstance(t, type) for t in attrs.types)):
+            if attrs.types is NoData:
+                descriptor_types = (type(attrs.type_or_value), )
+                
+            descriptor_default_value = attrs.type_or_value
+            # descriptor_default_value = descriptor_types[0]()
+            
+        else:
+            if attrs.types is NoData:
             if isinstance(attrs.default, descriptor_types):
                 descriptor_default_value = attrs.default
             else:
                 raise DescriptorException(f"Specified default value {attrs.default} does not match prescribed types {descriptor_types}")
-            
-        else:
-            descriptor_default_value = descriptor_types[0]()
             
         if isinstance(attrs.array_params, dict) and isinstance(attrs.array_params.get("len", None), int):
             length = attrs.array_params["len"]
@@ -2228,236 +2246,238 @@ def parse_descriptor_specification(x:tuple, allow_none:bool=True):
             elif isinstance(dict_value_types, type):
                 dcriteria["types"] = (dict_value_types, )
                 
-            dict_key_types = 
+            # dict_key_types = 
             
 
-    elif __check_type__(attrs.type_or_value, ()):
-        pass
-        
-    
-    if isinstance(attrs.types, (tuple, list)):
-        descriptor_types = list(attrs.types)
-        
-    else:
-        descriptor_types = list()
-        
-    
-    if isinstance(attrs.type_or_value, type):
-        if isinstance(attrs.types, list):
-            attrs.types.append(attrs.type_or_value)
-        else:
-            attrs.types = [attrs.type_or_value]
-            
-        attrs.type_or_value = NoData # consume this
-        
-    elif isinstance(attrs.type_or_value, str):
-        try:
-            val_types = [import_item(attrs.type_or_value)]
-            if isinstance(attrs.types, list):
-                attrs.types.extend(val_types)
-            else:
-                attrs.types = val_types
-        except:
-            if isinstance(attrs.types, list):
-                if str not in attrs.types:
-                    attrs.types.append(str)
-                    
-            else:
-                attrs.types = [str]
-                    
-            attrs.default = attrs.type_or_value
-            
-        attrs.type_or_value = NoData # consume this
-        
-    elif attrs.type_or_value is not NoData:
-        attrs.default = attrs.type_or_value
-        val_type = type(attrs.default)
-        if isinstance(attrs.types, list):
-            if val_type not in attrs.types:
-                attrs.types.append(val_type)
-        else:
-            attrs.types = [val_type]
-                
-        attrs.type_or_value = NoData # consume this
+#     elif __check_type__(attrs.type_or_value, ()):
+#         pass
+#         
+#     
+#     if isinstance(attrs.types, (tuple, list)):
+#         descriptor_types = tuple(attrs.types)
+#         
+#     else:
+#         descriptor_types = tuple()
+#         
+#     
+#     if isinstance(attrs.type_or_value, type):
+#         if isinstance(attrs.types, list):
+#             attrs.types.append(attrs.type_or_value)
+#         else:
+#             attrs.types = [attrs.type_or_value]
+#             
+#         attrs.type_or_value = NoData # consume this
+#         
+#     elif isinstance(attrs.type_or_value, str):
+#         try:
+#             val_types = [import_item(attrs.type_or_value)]
+#             if isinstance(attrs.types, list):
+#                 attrs.types.extend(val_types)
+#             else:
+#                 attrs.types = val_types
+#         except:
+#             if isinstance(attrs.types, list):
+#                 if str not in attrs.types:
+#                     attrs.types.append(str)
+#                     
+#             else:
+#                 attrs.types = [str]
+#                     
+#             attrs.default = attrs.type_or_value
+#             
+#         attrs.type_or_value = NoData # consume this
+#         
+#     elif attrs.type_or_value is not NoData:
+#         attrs.default = attrs.type_or_value
+#         val_type = type(attrs.default)
+#         if isinstance(attrs.types, list):
+#             if val_type not in attrs.types:
+#                 attrs.types.append(val_type)
+#         else:
+#             attrs.types = [val_type]
+#                 
+#         attrs.type_or_value = NoData # consume this
         
     # by now, attrs.types should have been taken care of
-    result["args"] = attrs.types
+    result["name"]  = descriptor_name
+    result["value"] = descriptor_default_value
+    result["args"]  = descriptor_types
     # descriptor_types = tuple()
     
     # if __check_type__(attrs.types, (str, bytes, bytearray))
-    
-    if __check_type__(attrs.types, collections.abc.Sequence, (str, bytes, bytearray)):
-        # here, attrs.eltypes should be a type or tuple of types
-        if attrs.eltypes is not NoData:
-            if isinstance(attrs.eltypes, type):
-                descriptor_element_types = tuple(attrs.eltypes)
-            elif isinstance(attrs.eltypes, (tuple, list)) and len(attrs.eltypes) and all(isinstance(v_, type) for v_ in attrs.eltypes):
-                descriptor_element_types = tuple(attrs.eltypes)
-                
-            else:
-                descriptor_element_types = tuple()
-                
-    elif __check_type__(attrs.types, collections.abc.Mapping):
-        if attrs.keyvaltypes is NoData:
-            # use eltypes to set the acceptable value types in a mapping
-            pass
-            
+#     
+#     if __check_type__(attrs.types, collections.abc.Sequence, (str, bytes, bytearray)):
+#         # here, attrs.eltypes should be a type or tuple of types
+#         if attrs.eltypes is not NoData:
+#             if isinstance(attrs.eltypes, type):
+#                 descriptor_element_types = tuple(attrs.eltypes)
+#             elif isinstance(attrs.eltypes, (tuple, list)) and len(attrs.eltypes) and all(isinstance(v_, type) for v_ in attrs.eltypes):
+#                 descriptor_element_types = tuple(attrs.eltypes)
+#                 
+#             else:
+#                 descriptor_element_types = tuple()
+#                 
+#     elif __check_type__(attrs.types, collections.abc.Mapping):
+#         if attrs.keyvaltypes is NoData:
+#             # use eltypes to set the acceptable value types in a mapping
+#             pass
+#             
             
         
     
-    # -------
-    
-    val_types = list()
-    el_types = list()
-    k_types = list() # types of keys of a mapping
-    v_types = list() # types of values in a mapping
-    a_dtypes = list() # accetpable dtypes in a numpy array or pandas Series, DataFrame, Index
-    further_array_params = {"units": MISSING, "ndims": MISSING, "shape": MISSING,
-                            "axistags":MISSING}
-    # units = list() # acceptable Quantities units for a pq.Quantity array
-    # ndims = list() # acceptable number of array dimensions (for np.ndarrays)
-    # axtags = list() # acceptable axistags for vigra arrays
-    
-    # if len(x) not in range(5,7):
-    #     raise ValueError(f"Expecting a tuple with 5 or 6 elements; instead got a {len(x)}-tuple")
-    
-    
-    if not isinstance(x[0], str):
-        raise TypeError(f"First element of a descriptor specification must be a str; got {type(x[0]).__name__} instead")
-    
-    attr_name = x[0]
-    
-    if len(x) == 2:
-        if isinstance(x[1], type):
-            val_types.append(x[1])
-            
-        elif isinstance(x[1], (tuple, list)) and len(x[1]) and all(isinstance(x_, type) for x_ in x[1]):
-            val_types += list(x[1])
-        
-    # NOTE: 2024-07-29 11:21:19 REMEMBER:
-    # list, tuple, deque -> collections.abc.Sequence < Collection < Iterable < Container
-    # dict, OrderedDict -> collections.abc.Mapping < Collection < ...
-    # np.ndarray -> collections.abc.Collection (!!!)
-    # pd.Series -> collections.abc.Collection (!!!)
-    # pd.DataFrame -> collections.abc.Collection (!!!)
-    # pf.Index  -> collections.abc.Collection (!!!)
-    
-    # if len(x) == 3:
-    
-    if any(issubclass(t, collections.abc.Sequence) and not issubclass(t, (str, bytes, bytearray)) for t in val_types):
-        if isinstance(x[2], (tuple, list)) and len(x[2]) and all(isinstance(x_, type) for x_ in x[2]):
-            el_types += list(x[2])
-            
-        elif isinstance(x[2], type):
-            el_types.append(x[2])
-            
-    if any(issubclass(t, collections.abc.Mapping) for t in val_types):
-        if isinstance(x[2], type):
-            v_types.append(x[1])
-            
-        elif isinstance(x[2], (tuple, list)) and len(x[1]) and all(isinstance(x_, type) for x_ in x[2]):
-            v_types += list(x[2])
-            
-        elif isinstance(x[2], dict) and len(x[2]):
-            for key, val in x[2].items():
-                if isinstance(key, type):
-                    k_types.append(key)
-                elif isinstance(key, (tuple, list)) and all(isinstance(k_, type) for k_ in key):
-                    k_types += list(key)
-                    
-                if isinstance(val, type):
-                    v_types.append(val)
-                    
-                elif isinstance(val, (tuple, list)) and all(isinstance(v_, type) for v_ in val):
-                    v_types += list(val)
-                    
-    if any(issubclass(t, (np.ndarray, pd.Series, pd.DataFrame, pd.Index)) for t in val_types):
-        if isinstance(x[3], np.dtype):
-            a_dtypes.append(x[3])
-            
-        elif isinstance(x[3], (tuple, list)) and len(x[3]) and all(isinstance(x_, np.dtype) for x_ in x[3]):
-            a_dtypes += list(x[3])
-            
-        if isinstance(x[4], dict) and any(k in x[4] for k in ("units", "ndim", "shape", "axistags")):
-            if any(issubclass(t, p.Quantity) for t in val_types):
-                if "units" in x[4] and issubclass(x[4]["units"], pq.Quantity):
-                    further_array_params["units"] = x[4]["units"]
-                else:
-                    further_array_params["units"] = pq.dimensionless
-                    
-                
-            if "ndim" in x[4] and isinstance(x[4]["ndim"], int) and x[4]["ndim"] > 0:
-                further_array_params["ndim"] = x[4]["ndim"]
-                
-            if "shape" in x[4] and isinstance(x[4]["shape"], tuple) and all(isinstance(s, int) and s >=0 for s in x[4]["shape"]):
-                shape = x[4]["shape"]
-                
-                ndim = further_array_params.get("ndim", MISSING)
-                
-                if isinstance(ndim, int):
-                    if len(shape) != ndim:
-                        raise ValueError(f"Mismatch between the specified shape: {shape} and the number of dimensions: {ndim}")
-                    
-                else:
-                    further_array_params["ndim"] = len(shape)
-                    
-                further_array_params["shape"] = shape
-                
-            if any(issubclass(t, vigra.VigraArray) for t in val_types):
-                if "axistags" in x[4] and isinstance(x[4]["axistags"], vigra.AxisTags):
-                    axistags = x[4]["axistags"]
-                    shape = further_array_params.get("shape", MISSING)
-                    ndim = further_array_params.get("ndim", MISSING)
-                    
-                    if isinstance(ndim, int):
-                        if len(axistags) != ndim:
-                            raise ValueError(f"Mismatch between the number of axistags ({len(axistags)}) and the specified number of dimensions ({ndim})")
-                    else:
-                        further_array_params["ndim"] = len(axistags)
-                    
-                    
-                    if isinstance(shape, tuple) and all(isinstance(s, int) for s in shape) and len(axistags) != len(shape):
-                        raise ValueError(f"Mismatch between the number of axistags ({len(axistags)}) and dimensions expected from shape ({len(shape)})")
-                    
-                    further_array_params["axistags"] = axistags
-            
-            
-            if len(x) == 6 and x[5]:
-                default_value = x[5]
-                if x[5] is not None: # and x[5] is not MISSING:
-                    assert isinstance(default_value, val_types+[type(None)]), f"Default value type ({type(default_value)} is not an instance of the acceptable types)"
-                    
-                    if isinstance(default_value, (np.ndarray, pd.Index, pd.Series, pd.DataFrame)):
-                        if len(a_dtypes):
-                            assert any(np.issubdtype(default_value, dtype) for dtype in a_dtypes), f"Default value dtype ({default_value.dtype}) is not in any hierachy of specified dtypes ({a_dtypes})"
-                            
-                        if isinstance(further_array_params["ndim"], int):
-                            assert default_value.ndim == further_array_params["ndim"], f"Mismatch between default value dimensions ({default_value.ndim}) and the number of specified dimensions ({further_array_params['ndim']})" 
-
-                        if isinstance(further_array_params["shape"], tuple):
-                            assert default_value.shape == further_array_params["shape"], f"Mismatch between the shape of default value ({default_value.shape}) and the specified dhape ({further_array_params['shape']})"
-
-                        if isinstance(default_value, vigra.VigraArray):
-                            if isinstance(further_array_params["axistags"], vigra.AxisTags):
-                                assert(default_value.axistags == further_array_params["axistags"]), f"Axistags mismatch between default value ({default_value.axistags}) and the specified axistags ({further_array_params['axistags']})"
-            else:
-                default_value = None
-                
-    # args = val_types + [type(None)]
-    args = val_types
-    kwargs = dict()
-    kwargs["element_types"] = tuple(el_types)
-    kwargs["key_types"] = tuple(k_types)
-    kwargs["value_types"] = tuple(v_types)
-    kwargs["dtypes"] = tuple(a_dtypes)
-    kwargs["array_specs"] = further_array_params
-    kwargs["default"] = default_value
-                    
-    result = {"name": attr_name, 
-              "value": default_value, 
-              "args":tuple(args), 
-              "kwargs": kwargs}
-    
+#     # -------
+#     
+#     val_types = list()
+#     el_types = list()
+#     k_types = list() # types of keys of a mapping
+#     v_types = list() # types of values in a mapping
+#     a_dtypes = list() # accetpable dtypes in a numpy array or pandas Series, DataFrame, Index
+#     further_array_params = {"units": MISSING, "ndims": MISSING, "shape": MISSING,
+#                             "axistags":MISSING}
+#     # units = list() # acceptable Quantities units for a pq.Quantity array
+#     # ndims = list() # acceptable number of array dimensions (for np.ndarrays)
+#     # axtags = list() # acceptable axistags for vigra arrays
+#     
+#     # if len(x) not in range(5,7):
+#     #     raise ValueError(f"Expecting a tuple with 5 or 6 elements; instead got a {len(x)}-tuple")
+#     
+#     
+#     if not isinstance(x[0], str):
+#         raise TypeError(f"First element of a descriptor specification must be a str; got {type(x[0]).__name__} instead")
+#     
+#     attr_name = x[0]
+#     
+#     if len(x) == 2:
+#         if isinstance(x[1], type):
+#             val_types.append(x[1])
+#             
+#         elif isinstance(x[1], (tuple, list)) and len(x[1]) and all(isinstance(x_, type) for x_ in x[1]):
+#             val_types += list(x[1])
+#         
+#     # NOTE: 2024-07-29 11:21:19 REMEMBER:
+#     # list, tuple, deque -> collections.abc.Sequence < Collection < Iterable < Container
+#     # dict, OrderedDict -> collections.abc.Mapping < Collection < ...
+#     # np.ndarray -> collections.abc.Collection (!!!)
+#     # pd.Series -> collections.abc.Collection (!!!)
+#     # pd.DataFrame -> collections.abc.Collection (!!!)
+#     # pf.Index  -> collections.abc.Collection (!!!)
+#     
+#     # if len(x) == 3:
+#     
+#     if any(issubclass(t, collections.abc.Sequence) and not issubclass(t, (str, bytes, bytearray)) for t in val_types):
+#         if isinstance(x[2], (tuple, list)) and len(x[2]) and all(isinstance(x_, type) for x_ in x[2]):
+#             el_types += list(x[2])
+#             
+#         elif isinstance(x[2], type):
+#             el_types.append(x[2])
+#             
+#     if any(issubclass(t, collections.abc.Mapping) for t in val_types):
+#         if isinstance(x[2], type):
+#             v_types.append(x[1])
+#             
+#         elif isinstance(x[2], (tuple, list)) and len(x[1]) and all(isinstance(x_, type) for x_ in x[2]):
+#             v_types += list(x[2])
+#             
+#         elif isinstance(x[2], dict) and len(x[2]):
+#             for key, val in x[2].items():
+#                 if isinstance(key, type):
+#                     k_types.append(key)
+#                 elif isinstance(key, (tuple, list)) and all(isinstance(k_, type) for k_ in key):
+#                     k_types += list(key)
+#                     
+#                 if isinstance(val, type):
+#                     v_types.append(val)
+#                     
+#                 elif isinstance(val, (tuple, list)) and all(isinstance(v_, type) for v_ in val):
+#                     v_types += list(val)
+#                     
+#     if any(issubclass(t, (np.ndarray, pd.Series, pd.DataFrame, pd.Index)) for t in val_types):
+#         if isinstance(x[3], np.dtype):
+#             a_dtypes.append(x[3])
+#             
+#         elif isinstance(x[3], (tuple, list)) and len(x[3]) and all(isinstance(x_, np.dtype) for x_ in x[3]):
+#             a_dtypes += list(x[3])
+#             
+#         if isinstance(x[4], dict) and any(k in x[4] for k in ("units", "ndim", "shape", "axistags")):
+#             if any(issubclass(t, p.Quantity) for t in val_types):
+#                 if "units" in x[4] and issubclass(x[4]["units"], pq.Quantity):
+#                     further_array_params["units"] = x[4]["units"]
+#                 else:
+#                     further_array_params["units"] = pq.dimensionless
+#                     
+#                 
+#             if "ndim" in x[4] and isinstance(x[4]["ndim"], int) and x[4]["ndim"] > 0:
+#                 further_array_params["ndim"] = x[4]["ndim"]
+#                 
+#             if "shape" in x[4] and isinstance(x[4]["shape"], tuple) and all(isinstance(s, int) and s >=0 for s in x[4]["shape"]):
+#                 shape = x[4]["shape"]
+#                 
+#                 ndim = further_array_params.get("ndim", MISSING)
+#                 
+#                 if isinstance(ndim, int):
+#                     if len(shape) != ndim:
+#                         raise ValueError(f"Mismatch between the specified shape: {shape} and the number of dimensions: {ndim}")
+#                     
+#                 else:
+#                     further_array_params["ndim"] = len(shape)
+#                     
+#                 further_array_params["shape"] = shape
+#                 
+#             if any(issubclass(t, vigra.VigraArray) for t in val_types):
+#                 if "axistags" in x[4] and isinstance(x[4]["axistags"], vigra.AxisTags):
+#                     axistags = x[4]["axistags"]
+#                     shape = further_array_params.get("shape", MISSING)
+#                     ndim = further_array_params.get("ndim", MISSING)
+#                     
+#                     if isinstance(ndim, int):
+#                         if len(axistags) != ndim:
+#                             raise ValueError(f"Mismatch between the number of axistags ({len(axistags)}) and the specified number of dimensions ({ndim})")
+#                     else:
+#                         further_array_params["ndim"] = len(axistags)
+#                     
+#                     
+#                     if isinstance(shape, tuple) and all(isinstance(s, int) for s in shape) and len(axistags) != len(shape):
+#                         raise ValueError(f"Mismatch between the number of axistags ({len(axistags)}) and dimensions expected from shape ({len(shape)})")
+#                     
+#                     further_array_params["axistags"] = axistags
+#             
+#             
+#             if len(x) == 6 and x[5]:
+#                 default_value = x[5]
+#                 if x[5] is not None: # and x[5] is not MISSING:
+#                     assert isinstance(default_value, val_types+[type(None)]), f"Default value type ({type(default_value)} is not an instance of the acceptable types)"
+#                     
+#                     if isinstance(default_value, (np.ndarray, pd.Index, pd.Series, pd.DataFrame)):
+#                         if len(a_dtypes):
+#                             assert any(np.issubdtype(default_value, dtype) for dtype in a_dtypes), f"Default value dtype ({default_value.dtype}) is not in any hierachy of specified dtypes ({a_dtypes})"
+#                             
+#                         if isinstance(further_array_params["ndim"], int):
+#                             assert default_value.ndim == further_array_params["ndim"], f"Mismatch between default value dimensions ({default_value.ndim}) and the number of specified dimensions ({further_array_params['ndim']})" 
+# 
+#                         if isinstance(further_array_params["shape"], tuple):
+#                             assert default_value.shape == further_array_params["shape"], f"Mismatch between the shape of default value ({default_value.shape}) and the specified dhape ({further_array_params['shape']})"
+# 
+#                         if isinstance(default_value, vigra.VigraArray):
+#                             if isinstance(further_array_params["axistags"], vigra.AxisTags):
+#                                 assert(default_value.axistags == further_array_params["axistags"]), f"Axistags mismatch between default value ({default_value.axistags}) and the specified axistags ({further_array_params['axistags']})"
+#             else:
+#                 default_value = None
+#                 
+#     # args = val_types + [type(None)]
+#     args = val_types
+#     kwargs = dict()
+#     kwargs["element_types"] = tuple(el_types)
+#     kwargs["key_types"] = tuple(k_types)
+#     kwargs["value_types"] = tuple(v_types)
+#     kwargs["dtypes"] = tuple(a_dtypes)
+#     kwargs["array_specs"] = further_array_params
+#     kwargs["default"] = default_value
+#                     
+#     result = {"name": attr_name, 
+#               "value": default_value, 
+#               "args":tuple(args), 
+#               "kwargs": kwargs}
+#     
     return result
     
     

@@ -7,6 +7,7 @@
 """
 import functools, typing
 import collections
+from collections import deque
 from datetime import datetime, date, time, timedelta
 from dataclasses import MISSING
 import numpy as np
