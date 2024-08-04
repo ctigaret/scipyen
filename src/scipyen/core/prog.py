@@ -296,7 +296,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
             
         kwargs: currently two keywords are supported:
             "allow_none": bool (default True) ↦ allow None as a descriptor value
-            "dcriteria": dict (default empty) ↦ speified additional criteria for
+            "dcriteria": dict (default empty) ↦ specified additional criteria for
                 descriptor values that are collection-like or array-like
                 Use with CAUTION.
             
