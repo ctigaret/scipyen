@@ -68,9 +68,9 @@ import quantities as pq
 # import pyqtgraph as pgraph
 from gui.pyqtgraph_patch import pyqtgraph as pgraph
 import neo
-import vigra
+from core.vigra_patches import vigra
 from pandas import NA
-#import vigra.pyqt 
+#from core.vigra_patches import vigra.pyqt 
 import matplotlib as mpl
 
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg

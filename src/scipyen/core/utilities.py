@@ -38,7 +38,7 @@ else:
     NeoObjectList = list # alias for backward compatibility :(
 import pandas as pd
 import quantities as pq
-import vigra
+from core.vigra_patches import vigra
 import pyqtgraph # for their own eq operator
 import matplotlib as mpl
 #import language_tool_python

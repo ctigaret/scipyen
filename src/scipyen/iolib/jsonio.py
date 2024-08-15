@@ -169,7 +169,7 @@ import numpy.ma as ma
 import quantities as pq
 import pandas as pd
 import h5py
-import vigra
+from core.vigra_patches import vigra
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
 from core import quantities as scq

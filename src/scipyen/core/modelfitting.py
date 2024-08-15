@@ -36,7 +36,7 @@ import scipy
 #import sympy.parsing.sympy_parser as symparser
 import quantities as pq
 from scipy import cluster, optimize, signal, integrate #, where
-import vigra
+from core.vigra_patches import vigra
 import neo
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)

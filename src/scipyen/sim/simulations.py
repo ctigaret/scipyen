@@ -6,7 +6,7 @@
 import typing
 from numbers import Number
 import numpy as np
-import vigra
+from core.vigra_patches import vigra
 
 def g_blob(meanX:float = 64., meanY:float = 64., meanZ:typing.Optional[float]=None,
            varX:float = 1.0, varY:float = 1.0, varZ:float = 0., n:int = 128):

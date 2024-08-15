@@ -19,7 +19,7 @@ import numpy as np
 import quantities as pq
 import pandas as pd
 from scipy import cluster, optimize, signal, integrate #, where
-import vigra
+from core.vigra_patches import vigra
 import neo
 #### END 3rd party modules
 

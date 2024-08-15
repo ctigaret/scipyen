@@ -469,7 +469,7 @@ def pythonDataToXMLElement(datakey, datavalue, parentDoc, parentNode, maxElement
     import numpy as np
     import neo
     #from patchneo import neo
-    import vigra
+    from core.vigra_patches import vigra
     import datatypes  
     
     k_attribs = list()

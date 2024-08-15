@@ -51,7 +51,7 @@ from traitlets import (HasTraits, MetaHasTraits, TraitType, All, Any, Bool, CBoo
     #)
 
 import numpy as np
-import vigra
+from core.vigra_patches import vigra
 import pandas as pd
 import neo
 import quantities as pq

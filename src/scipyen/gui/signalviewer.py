@@ -155,7 +155,7 @@ if neo.__version__ >= '0.13.0':
 else:
     NeoObjectList = list # alias for backward compatibility :(
     
-import vigra
+from core.vigra_patches import vigra
 
 
 #### END 3rd party modules

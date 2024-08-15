@@ -22,7 +22,7 @@ import threading
 import numpy as np
 import quantities as pq
 import neo
-import vigra
+from core.vigra_patches import vigra
 from qtpy import (QtCore, QtWidgets, QtGui,)
 from qtpy.QtCore import Signal, Slot
 #from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml

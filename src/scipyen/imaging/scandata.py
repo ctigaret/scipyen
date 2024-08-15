@@ -6,20 +6,21 @@
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
-
+from __future__ import annotations
 import configparser, itertools, functools, inspect, warnings
-import enum, collections, numbers, types, typing
+import enum, collections, numbers, types, typing, dataclasses
+from dataclasses import dataclass
 from traitlets import Bunch
 import numpy as np
 import quantities as pq
 import neo
-import vigra
+from core.vigra_patches import vigra
 import h5py
 import pandas as pd
 
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter)
+from core.prog import (safeWrapper, AttributeAdapter, NoData, BaseDescriptorValidator)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
 from core import quantities as cq
@@ -81,6 +82,15 @@ DEFAULTS["Channels"]["Bleed"]["Ref2Ind"] = 0.
 DEFAULTS["Channels"]["Bleed"]["Ind2Ref"] = 0.
 
             
+class ScanDataType(enum.IntEnum):
+    linescan    = 1
+    timeseries  = 2
+    zseries     = 3
+    
+class ScanDataAnalysisMode(enum.IntEnum):
+    frame       = 1
+    volume      = 2
+        
 class ScanData(BaseScipyenData):
     """Dummy for AnalysisUnit; redefined below
     """
@@ -447,16 +457,18 @@ class AnalysisUnit(BaseScipyenData):
     
     """
     from gui import pictgui as pgui
+    parent:typing.Optional[ScanData] = dataclasses.field(default=None)
+    landmark:typing.Optional[PlanarGraphics] = dataclasses.field(default=None)
+    unit_type:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    unit_name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    # field:typing.Union[str, type(pd.NA)] = pd.NA # inhrited from BaseScipyenData
+    inscene:bool = False
+    frames:typing.Optional[typing.Any] = dataclasses.field(default=None, init=False)
+    protocols:typing.Optional[list[TriggerProtocol]] = dataclasses.field(default_factory = list)
     
-    _descriptor_attributes_ = (("landmark", PlanarGraphics),
-                           ("unit_type", "NA"),
-                           ("unit_name", "NA"),
-                           ("field", "NA"),
-                           ("inscene", False)) + BaseScipyenData._descriptor_attributes_
-    
-    def __init__(self, parent, name=None, description=None, file_origin=None, **kwargs):
-        
-        """AnalysisUnit constructor.
+    # def __init__(self, parent, name=None, description=None, file_origin=None, **kwargs):
+    def __post_init__(self):
+        """AnalysisUnit post-init constructor.
         
         Positional parameters:
         ======================
@@ -466,7 +478,7 @@ class AnalysisUnit(BaseScipyenData):
         
         Named parameters:
         =================
-        name deacriptoin, file_origin - see BaseScipyenData
+        name deacription, file_origin - see BaseScipyenData
         
         landmark: a pictgui.PlanarGraphics object or None
         
@@ -501,14 +513,12 @@ class AnalysisUnit(BaseScipyenData):
         """
         import gui.pictgui as pgui
         
-        super().__init__(name, description, file_origin, **kwargs)
+        # if isinstance(self.parent, AnalysisUnit):
+        #     self = parent.copy()
+        #     return
         
-        if isinstance(self.parent, AnalysisUnit):
-            self = parent.copy()
-            return
-        
-        if not isinstance(parent, ScanData):
-            raise TypeError("parent is expected to be a ScanData object; got %s instead" % type(parent).__name__)
+        # if not isinstance(self.parent, ScanData):
+        #     raise TypeError("parent is expected to be a ScanData object; got %s instead" % type(parent).__name__)
         
         # NOTE that these frames are not necessarily identical to the frames
         # in the protocols, but there should be an overlap between protocol
@@ -517,40 +527,40 @@ class AnalysisUnit(BaseScipyenData):
         #
         # NOTE that the self.frames property returns the intersection between
         # the protocol frames and landmark frames, calculated dynamically
-        
-        if self._landmark_ is None or len(self._landmark_.frameIndices) == 0:
-            if self._inscene_:
-                self._frames_ = range(parent.sceneFrames)
-                
+        if isinstance(self.parent, ScanData):
+            if self.landmark is None or len(self.landmark.frameIndices) == 0:
+                if self.inscene:
+                    self.frames = range(parent.sceneFrames)
+                    
+                else:
+                    self.frames = range(parent.scansFrames)
+                    
             else:
-                self._frames_ = range(parent.scansFrames)
-                
-        else:
-            # get the frames with ladmark states, irrespective of whether this
-            # units is defined in scene or scans
-            self._frames_ = self._landmark_.frameIndices
+                # get the frames with ladmark states, irrespective of whether this
+                # units is defined in scene or scans
+                self.frames = self.landmark.frameIndices
         
-        if isinstance(self._protocols_, TriggerProtocol):
-            self._protocols_ = [self._protocols_]
+        # if isinstance(self._protocols_, TriggerProtocol):
+        #     self._protocols_ = [self._protocols_]
             
-        elif isinstance(self._protocols_, (tuple, list)):
-            if not all([isinstance(t, TriggerProtocol) for t in self._protocols_]):
-                warnings.warn("'protocols' must be a sequence of TriggerProtocol objects")
-                self._protocols_.clear()
-                #raise ValueError("'protocols' must be a sequence of TriggerProtocol objects")
-            names = [t.name for t in self._protocols_]
-            
-            if any([names.count(n)>1 for n in names]):
-                warnings.warn("TriggerProtocol objects must have unique, distinct names; they will be renamed!")
-                for k,p in enumerate(self._protocols_):
-                    p.name = f"protocol_{k}_{p.name}"
-                #raise ValueError("TriggerProtocol objects must have unique, distinct names")
-            
-        else:
-            warnings.warn("'protocols' expected to be a TriggerProtocol object or a sequence of TriggerProtocol objects; got %s instead" % type(self._protocols_).__name__)
-            
-            self._protocols_ = list()
-            #raise TypeError("'protocols' expected to be a TriggerProtocol object or a sequence of TriggerProtocol objects; got %s instead" % type(self._protocols_).__name__)
+#         elif isinstance(self._protocols_, (tuple, list)):
+#             if not all([isinstance(t, TriggerProtocol) for t in self._protocols_]):
+#                 warnings.warn("'protocols' must be a sequence of TriggerProtocol objects")
+#                 self._protocols_.clear()
+#                 #raise ValueError("'protocols' must be a sequence of TriggerProtocol objects")
+#             names = [t.name for t in self._protocols_]
+#             
+#             if any([names.count(n)>1 for n in names]):
+#                 warnings.warn("TriggerProtocol objects must have unique, distinct names; they will be renamed!")
+#                 for k,p in enumerate(self._protocols_):
+#                     p.name = f"protocol_{k}_{p.name}"
+#                 #raise ValueError("TriggerProtocol objects must have unique, distinct names")
+#             
+#         else:
+#             warnings.warn("'protocols' expected to be a TriggerProtocol object or a sequence of TriggerProtocol objects; got %s instead" % type(self._protocols_).__name__)
+#             
+#             self._protocols_ = list()
+#             #raise TypeError("'protocols' expected to be a TriggerProtocol object or a sequence of TriggerProtocol objects; got %s instead" % type(self._protocols_).__name__)
         
         
     def __str__(self):
@@ -784,26 +794,26 @@ class AnalysisUnit(BaseScipyenData):
             
         return result
             
-    @property
-    def parent(self):
-        """A ScanData object that is the parent of this unit.
-        """
-        if not hasattr(self, "_parent_"):
-            self._parent_ = None
-            
-        if hasattr(self, "_parent"):
-            self._parent_ = self._parent
-            del self._parent
-            
-        return self._parent_
-    
-    @parent.setter
-    def parent(self, obj):
-        if not isinstance(obj, ScanData):
-            warnings.warn("Expecting a ScanData object; got %s instead" % type(ob).__name__)
-        
-        
-        self._parent_ = obj
+#     @property
+#     def parent(self):
+#         """A ScanData object that is the parent of this unit.
+#         """
+#         if not hasattr(self, "_parent_"):
+#             self._parent_ = None
+#             
+#         if hasattr(self, "_parent"):
+#             self._parent_ = self._parent
+#             del self._parent
+#             
+#         return self._parent_
+#     
+#     @parent.setter
+#     def parent(self, obj):
+#         if not isinstance(obj, ScanData):
+#             warnings.warn("Expecting a ScanData object; got %s instead" % type(ob).__name__)
+#         
+#         
+#         self._parent_ = obj
             
     @safeWrapper
     def protocol(self, index:typing.Union[str, int]):
@@ -884,37 +894,37 @@ class AnalysisUnit(BaseScipyenData):
         else:
             raise TypeError("A sequence of strings was expected")
         
+#     @property
+#     def protocols(self):
+#         """A list of TriggerProtocol objects (references)
+#         """
+#         if not hasattr(self, "_protocols_"):
+#             self._protocols_  = list()
+#             
+#         if hasattr(self, "_protocols"):
+#             self._protocols_ = self._protocols
+#             del self._protocols
+#             
+#         return self._protocols_
+#     
+#     @protocols.setter
+#     def protocols(self, value):
+#         if isinstance(value, TriggerProtocol):
+#             self.protocols = [value]
+#             
+#         elif isinstance(value, (tuple, list)) and all([isinstance(p, TriggerProtocol) for p in value]):
+#             self._protocols_[:] = value #  a reference !
+#             
+#             self._protocols_.sort(key=lambda x: x.segmentIndices()[0])
+#             
+#         else:
+#             raise TypeError("Expecting a TriggerProtocol, or a sequence of TriggerProtocol objects; got %s instead" % type(value).__name__)
+#         
+#         if hasattr(self, "_protocols"):
+#             del self._protocols_
+            
     @property
-    def protocols(self):
-        """A list of TriggerProtocol objects (references)
-        """
-        if not hasattr(self, "_protocols_"):
-            self._protocols_  = list()
-            
-        if hasattr(self, "_protocols"):
-            self._protocols_ = self._protocols
-            del self._protocols
-            
-        return self._protocols_
-    
-    @protocols.setter
-    def protocols(self, value):
-        if isinstance(value, TriggerProtocol):
-            self._protocols_ = [value]
-            
-        elif isinstance(value, (tuple, list)) and all([isinstance(p, TriggerProtocol) for p in value]):
-            self._protocols_[:] = value #  a reference !
-            
-            self._protocols_.sort(key=lambda x: x.segmentIndices()[0])
-            
-        else:
-            raise TypeError("Expecting a TriggerProtocol, or a sequence of TriggerProtocol objects; got %s instead" % type(value).__name__)
-        
-        if hasattr(self, "_protocols"):
-            del self._protocols_
-            
-    @property
-    def frames(self):
+    def landmarkFrames(self):
         """A list of frame indices where landmark is defined, given the protocols.
         Read-only
         
@@ -995,69 +1005,73 @@ class AnalysisUnit(BaseScipyenData):
         if average is None:
             average = True if self.annotations.get("averaged", None) is True else False
         
-        result = self._parent_.extractAnalysisUnit(self.landmark, 
+        result = self.parent.extractAnalysisUnit(self.landmark, 
                                                    protocol=self.protocols,
                                                    average=average)
         
         return result
     
-    def isSameAs(self, other):
-        if not isinstance(other, AnalysisUnit):
-            raise TypeError("Expecting an AnalysisUnit object; got %s instead" % type(other).__name__)
-        
-        sameName = self.name == other.name
-        
-        sameParent = self.parent == other.parent
-        
-        sameSource = self.inScene == other.inScene
-        
-        sameLandmark = self.landmark == other.landmark
-        
-        sameProtocols = all([p in other.protocols for p in self.protocols])
-        
-        sameType = self.unit_type == other.unit_type
-        
-        sameCell = self.cell == other.cell
-        
-        sameField = self.field == other.field
-        
-        sameDescriptors = self.descriptors == other.descriptors
-        
-        return sameParent and sameName and sameSource and sameLandmark and sameProtocols and sameType and sameCell and sameField and sameDescriptors
+#     def isSameAs(self, other):
+#         if not isinstance(other, AnalysisUnit):
+#             raise TypeError("Expecting an AnalysisUnit object; got %s instead" % type(other).__name__)
+#         
+#         sameName = self.name == other.name
+#         
+#         sameParent = self.parent == other.parent
+#         
+#         sameSource = self.inScene == other.inScene
+#         
+#         sameLandmark = self.landmark == other.landmark
+#         
+#         sameProtocols = all([p in other.protocols for p in self.protocols])
+#         
+#         sameType = self.unit_type == other.unit_type
+#         
+#         sameCell = self.cell == other.cell
+#         
+#         sameField = self.field == other.field
+#         
+#         sameDescriptors = self.descriptors == other.descriptors
+#         
+#         return sameParent and sameName and sameSource and sameLandmark and sameProtocols and sameType and sameCell and sameField and sameDescriptors
+#     
+#     def is_same_as(self, other):
+#         return self.isSameAs(other)
     
-    def is_same_as(self, other):
-        return self.isSameAs(other)
-    
-    def copy(self):
-        """Returns a copy of this object.
-        
-        The result's landmark is a references to the landmark and of this unit.
-        The result's protocols are deep copies of those in this unit.
-        
-        """
-        # NOTE: 2021-11-26 08:42:21
-        # use copy constructor strategy for trigger protocols so that the new 
-        # AnalysisUnit objact is detached from the original data protocols; yet
-        # it retains the reference to the 'parent'
-        
-        kwargs = dict((attr[0], getattr(self, attr[0], None)) for attr in self._descriptor_attributes_ )
-        kwargs["protocols"] = [p.copy() for p in self.protocols]
-        kwargs.update(self.annotations)
-        
-        result = AnalysisUnit(self.parent, **kwargs)
-        
-        return result
+#     def copy(self):
+#         """Returns a copy of this object.
+#         
+#         The result's landmark is a references to the landmark and of this unit.
+#         The result's protocols are deep copies of those in this unit.
+#         
+#         """
+#         # NOTE: 2021-11-26 08:42:21
+#         # use copy constructor strategy for trigger protocols so that the new 
+#         # AnalysisUnit objact is detached from the original data protocols; yet
+#         # it retains the reference to the 'parent'
+#         
+#         kwargs = dict((attr[0], getattr(self, attr[0], None)) for attr in self._attributes_ )
+#         kwargs["protocols"] = [p.copy() for p in self.protocols]
+#         kwargs.update(self.annotations)
+#         
+#         result = AnalysisUnit(self.parent, **kwargs)
+#         
+#         return result
         
 class ScanDataImageParser(AttributeAdapter):
-    def __init__(self, owner=None, fieldname=None):
+    # def __init__(self, owner=None, fieldname=None):
+    def __init__(self, fieldname:str):
         self.fieldname = fieldname
-        self.obj = owner
+        # self.obj = owner
         
-    def __call__(self, obj=None, value=None):
-        self.parseImageData(value)
+    # def setOwner(self, obj:typing.Any) -> None:
+    #     self.obj = obj
         
-    def parseImageData(self, value):
-        """Proposes a layout and calubrarion for VigraArray axes.
+    def __call__(self, obj, value):
+        self.parseImageData(obj, value)
+        
+    def parseImageData(self, obj, value):
+        """Proposes a layout and calibrarion for VigraArray axes.
         Parameters:
         ==========
         value: VigraArray or list of VigraArray objects
@@ -1089,30 +1103,38 @@ class ScanDataImageParser(AttributeAdapter):
         See also: self.imageDataLayout method
             
         """
-        if self.obj is None:
-            return
-        
-        if not hasattr(self.obj, "_data_children_"):
+        if not isinstance(obj, ScanData):
             return
         
         if self.fieldname not in ("scans", "scene"):
             return
-
-        if not hasattr(self.obj, self.fieldname):
-            return
         
-        imageLayout = getattr(self.obj, f"{self.fieldname}Layout", None)
+        # if not hasattr(obj, "_data_children_"):
+        #     return
+        # 
+        # if not hasattr(obj, self.fieldname):
+        #     return
+        
+        imageLayout = getattr(obj, f"{self.fieldname}Layout", None)
         frameAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{self.fieldname}FrameAxis", None)
-        axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
+        axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
         
         data, layout, axesCalibration = self.imageDataLayout(value, 
                                                             frameAxis = frameAxis,
                                                             axescal = axesCalibration)
         
-        setattr(self.obj, f"{self.fieldname}Layout", layout)
-        setattr(self.obj, f"{self.fieldname}AxesCalibration", axesCalibration)
+        layoutfName = f"{self.fieldname}Layout"
+        axcalfName = f"{self.fieldname}AxesCalibration"
         
-        return layout
+        setattr(obj, layoutfName, layout)
+        
+        setattr(obj, axcalfName, axesCalibration)
+        
+        # print(f"{self.__class__.__name__}.parseImageData for field {self.fieldname} of {type(obj).__name__} object:")
+        # print(f"\t{layoutfName} set to {getattr(obj, layoutfName, None)}")
+        # print(f"\t{axcalfName} set to {getattr(obj, axcalfName, None)}")
+        
+        return obj
     
     def imageDataLayout(self,data, 
                     frameAxis:typing.Optional[vigra.AxisInfo]=None, 
@@ -1234,16 +1256,17 @@ class ScanDataImageParser(AttributeAdapter):
             return (list(), None, None)
                 
         return (None, None, None)
-                    
+    
+ImageParser = ScanDataImageParser
+
 class ScanDataFramesMapUpdater(AttributeAdapter):
-    def __init__(self, owner=None, fieldname=None):
+    def __init__(self, fieldname:str):
         self.fieldname = fieldname
-        self.obj = owner
         
-    def __call__(self, obj=None, value=None):
-        self.updateFramesMap(value)
+    def __call__(self, obj, value):
+        self.updateFramesMap(obj, value)
         
-    def updateFramesMap(self, value):
+    def updateFramesMap(self, obj, value):
         """Adapts the frames map to the electrophysiology's segments.
         
         Sets up a default correspondence:
@@ -1272,35 +1295,35 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
         #  NOTE: 2021-12-06 12:42:06 
         # this is a "postset" validator - this means that value has already
         # been assigned to field!
-        if self.obj is None:
+        if not isinstance(obj, ScanData):
             return
         
-        if not hasattr(self.obj, "_data_children_"):
+        if not hasattr(obj, "_data_children_"):
             return
         
-        if self.fieldname not in tuple(c[0] for c in self.obj._data_children_):
+        if self.fieldname not in tuple(c[0] for c in obj._data_children_):
             return
 
-        if not hasattr(self.obj, self.fieldname):
+        if not hasattr(obj, self.fieldname):
             return
         
-        if not hasattr(self.obj, "framesMap"):
+        if not hasattr(obj, "framesMap"):
             return
         
-        framesMap = getattr(self.obj, "framesMap", None)
+        framesMap = getattr(obj, "framesMap", None)
         
-        field = getattr(self.obj, self.fieldname)
+        field = getattr(obj, self.fieldname)
         
         if framesMap is None:
-            field_frames = dict((c[0], 0) for c in self.obj._data_children_)
+            field_frames = dict((c[0], 0) for c in obj._data_children_)
             for c in field_frames:
                 if c in ("scene","scans"):
-                    f = getattr(self.obj, f"{c}Layout", None)
+                    f = getattr(obj, f"{c}Layout", None)
                     nFrames = f.get("nFrames", 0) if isinstance(f, dict) else 0
                     val = nFrames if isinstance(nFrames, int) else np.prod(nFrames)
                     
                 else:
-                    data = getattr(self.obj, c, None)
+                    data = getattr(obj, c, None)
                     val = len(data.segments) if isinstance(data, neo.Block) else 0
             
                 field_frames[c] = val
@@ -1309,20 +1332,24 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
             # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
             framesMap = FrameIndexLookup(field_frames)
             
-            setattr(self.obj, "framesMap", framesMap)
+            setattr(obj, "framesMap", framesMap)
         
         else:
-            nframes = len(framesMap)
+            nframes = len(obj.framesMap)
                 
             if isinstance(field, neo.Block):
                 newframes = len(field.segments)
                 
             elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
-                userFrameAxis = getattr(self.obj, f"{self.fieldname}FrameAxis", None)
-                axesCalibration = getattr(self.obj, f"{self.fieldname}AxesCalibration", None)
-                data, layout, axesCalibration = self.obj.imageDataLayout(field,
-                                                                            frameAxis = userFrameAxis,
-                                                                            axescal = axesCalibration)
+                userFrameAxis = getattr(obj, f"{self.fieldname}FrameAxis", None)
+                axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
+                layout = getattr(obj, f"{self.fieldname}Layout", None)
+                # NOTE: 2024-08-11 21:27:06 FIXME/TODO
+                # possibly duplicated code!
+                # imageDataLayout is also a method of ScanDataImageParser
+                # data, layout, axesCalibration = obj.imageDataLayout(field,
+                #                                                     frameAxis = userFrameAxis,
+                #                                                     axescal = axesCalibration)
                 newframes = layout.nFrames
                 
             else:
@@ -1330,21 +1357,21 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
             
             if newframes == nframes:
                 # assume 1-2-1 correspondence with the index in framesMap
-                self.obj.framesMap[self.fieldname] = range(newframes)
+                obj.framesMap[self.fieldname] = range(newframes)
                 
             elif newframes < nframes:
                 value = list(range(newframes))
-                value.extend([self.obj.framesMap.missingFrameIndex for k in range(newframes, nframes)])
+                value.extend([obj.framesMap.missingFrameIndex for k in range(newframes, nframes)])
                         
-                framesMap[self.fieldname] = value
+                obj.framesMap[self.fieldname] = value
                 
             else: # --> newframes > nframes
                 # concatenate a new frame index lookup
                 dd = dict()
-                for c in self.obj._data_children_:
+                for c in obj._data_children_:
                     name = c[0]
                     if name != self.fieldname:
-                        if np.any(self.obj.framesMap[name].isna()):
+                        if np.any(obj.framesMap[name].isna()):
                             val = None
                         else:
                             val = 0
@@ -1356,14 +1383,105 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                 fil = FrameIndexLookup(dd)
                 fil[self.fieldname] = range(nframes, newframes)
                 
-                newmap = pd.concat([self.obj.framesMap.map, fil.map], ignore_index=True)
+                newmap = pd.concat([obj.framesMap.map, fil.map], ignore_index=True)
                 
-                self.obj.framesMap.map = newmap
+                obj.framesMap.map = newmap
+                
+FramesMapUpdater = ScanDataFramesMapUpdater
 
+class ScanDataMetadataAdapter(AttributeAdapter):
+    def __init__(self, fieldname:str):
+        self.fieldname = fieldname
+        
+    def __call__(self, obj, value):
+        if obj.__class__.__name__ != "ScanData":
+            return
+        self._parse_metadata_(obj, value)
+        
+    @safeWrapper
+    def _parse_metadata_(self, obj, value:DataBag):
+        """Sets up analysis type, parses metadata
+        """
+        from gui import pictgui as pgui
+        from systems.PrairieView import PVSequenceType
+        
+        # NOTE: 2024-08-13 20:23:14
+        # new descriptor validator / attribute adapter mechanism
+        
+        # NOTE: 2017-11-15 12:06:36
+        # TODO adapt this for scanimage metadata as well !
+        #
+        # NOTE: 2018-05-19 12:04:20
+        # there can be only one scene ROI that defines the scans sub-area (or 
+        # scan line trajectory) in the scene, for any given ScanData object
+        # this is stored as the self._scan_region_ attribute!
+        # and is DISTINCT from any of the sceneRois or sceneCursors!
+        
+        # print(f"{self.__class__.__name__}._parse_metadata_:")
+        # print(f"\tmetadata type: {value.type}")
+        if value.type == "PVScan":
+            if value.sequences[0].attributes.sequencetype == PVSequenceType.Linescan:
+                obj.analysisMode = ScanDataAnalysisMode.frame
+                obj.type = ScanDataType.linescan
+
+                roi = pgui.Path(*value.sequences[0].definition.coordinates)
+                
+                if roi.type.name in ("line", "polyline", "arc", "quad", "cubic") or\
+                    (roi.type.name == "path" and not roi.closed): 
+                    roi.name = "scanline"
+                
+                else:
+                    roi.name = "scanregion"
+                    
+                # print(f"\tSetting scanTrajectory for {type(obj).__name__} to {roi}")
+                
+                    
+                obj.scanTrajectory = roi
+                    
+        else: 
+            scipywarn(f"{value.type.name} scan data not yet supported")
+            # raise NotImplementedError("%s data not yet supported" % value.type)
+    
+
+class ScanDataComponentDescriptor(BaseDescriptorValidator):
+    def __init__(self, name:str, default:typing.Any=None, types:typing.Optional[typing.Union[type,tuple]] = None,
+                 preset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
+                 postset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
+                 accept_none:bool=True):
+        super().__init__(name, default, use_private=False, 
+                         preset_hook=preset_hook, 
+                         postset_hook=postset_hook)
+        if isinstance(types, type):
+            self.types = (types, )
+            
+        elif isinstance(type, tuple) and all(isinstance(t, type) for t in types):
+            self.types=types
+            
+        else:
+            self.types = tuple()
+            
+        if self.default is None:
+            self.accept_none = True
+        else:
+            self.accept_none = accept_none
+            
+    def validate(self, value):
+        if value is None:
+            if not self.accept_none:
+                raise ValueError(f"The descriptor for {self.public_name} does not accept None")
+        else:
+            if len(self.types):
+                assert isinstance(value, self.types), f"Expecting an instance of one of {self.types}; instead, got a {type(value).__name__}"
+        
+        
+@dataclass
 class ScanData(BaseScipyenData):
     """Encapsulates data from laser scanning imaging and electrophysiology data.
 
     Work in progress.
+        
+    NOTE: 2024-08-10 21:21:10
+    Switching to dataclass-based design
         
     TODO: 2023-07-17 10:13:17
         contemplate migration of anaysisOptions (dict) to ScanDataOptions
@@ -1474,53 +1592,30 @@ class ScanData(BaseScipyenData):
     
     from gui import pictgui as pgui
     
-    # NOTE: 2022-01-11 13:48:37
-    # to be able to load older pickles:
-    ImageParser = ScanDataImageParser
-    FramesMapUpdater = ScanDataFramesMapUpdater
-    
-    # TODO: provide for volume-mode analysis and ROIS; 
-    class ScanDataType(enum.IntEnum):
-        linescan    = 1
-        timeseries  = 2
-        zseries     = 3
-        
-    class ScanDataAnalysisMode(enum.IntEnum):
-        frame       = 1
-        volume      = 2
-        
-    # NOTE: 2021-11-30 16:07:40
-    # 'triggers' is inherited from BaseScipyenData along with others
-    
-    # NOTE: 2023-05-15 11:05:46
-    # each element is a tuple: 
-    # (attribute name, attribute type (or types), default value)
-    # or
-    # (attribute name, default value)
-    #
-    # when the attrbiute type is a sequence, the third elements is the type (or 
-    #   types) of the elements in the sequence
-    #
-    _data_children_ = (
+    # ### BEGIN class variables
+    # avatars from the old model, kept here because they're still useful
+    # NOTE that I gave up the parsing of neo-style attribute specification
+    # and use dataclass mechanism instead
+    _data_children_:typing.ClassVar = (
         ("scans",                           tuple(), (list, tuple),   vigra.VigraArray),
         ("scene",                           tuple(), (list, tuple),   vigra.VigraArray),
         ("electrophysiology",               (neo.Block(name="Electrophysiology"), None)),
         )
     
-    _derived_data_children_ = (
+    _derived_data_children_:typing.ClassVar = (
         ("scansBlock",                      neo.Block(name="Scans")),
         ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
         ("sceneBlock",                      neo.Block(name="Scene")),
         ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
         )
     
-    _result_data_ = (
+    _result_data_:typing.ClassVar = (
         ("electrophysiologyResult",         pd.DataFrame),
         ("imagingResult",                   pd.DataFrame),
         ("result",                          pd.DataFrame),
         )
     
-    _data_attributes_ = (
+    _data_attributes_:typing.ClassVar = (
         ("sceneAxesCalibration",            list,   AxesCalibration),
         ("scansAxesCalibration",            list,   AxesCalibration),
         ("sceneLayout",                     dict),
@@ -1528,7 +1623,7 @@ class ScanData(BaseScipyenData):
         ("framesMap",                       FrameIndexLookup),
         )
     
-    _graphics_attributes_ = (
+    _graphics_attributes_:typing.ClassVar = (
         ("scansCursors",                    dict, Cursor),
         ("scansRois",                       dict, PlanarGraphics),
         ("scanTrajectory",                  (PlanarGraphics, type(None))),
@@ -1536,19 +1631,130 @@ class ScanData(BaseScipyenData):
         ("sceneRois",                       dict, PlanarGraphics),
         )
     
-    _metadata_attributes_ = (
+    _metadata_attributes_:typing.ClassVar = (
         ("analysisUnits",                   set, AnalysisUnit),
         ("analysisUnit",                    AnalysisUnit),
         ("metadata",                        dict),
         )
     
-    _option_attributes_ = (
+    _option_attributes_:typing.ClassVar = (
         ("analysisOptions",                 dict),
         ("analysisMode",                    ScanDataAnalysisMode.frame),
         ("type",                            ScanDataType.linescan),
         )
     
-    _descriptor_attributes_ = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ + BaseScipyenData._descriptor_attributes_
+    # preset and postset hooks needed by the image data descriptors
+    # _preset_hooks_:typing.ClassVar = {
+    #     "scans": ScanDataImageParser(None, "scans"), # AttributeAdapter, ABC def'ed in prog
+    #     "scene": ScanDataImageParser(None, "scene"), # AttributeAdapter
+    #     }
+    
+    # _postset_hooks:typing.ClassVar = {
+    #         "scans": ScanDataFramesMapUpdater(self, "scans"),
+    #         "scene": ScanDataFramesMapUpdater(self, "scene"),
+    #         "electrophysiology": ScanDataFramesMapUpdater(self, "electrophysiology"),
+    #         "metadata": self._parse_metadata_,
+    #         }
+    
+
+    
+    _attributes_:typing.ClassVar = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ 
+    # ### END class variables
+    
+    # ### BEGIN instance variables 
+    # type of scanning
+    type:ScanDataType = ScanDataType.linescan
+    # scans data (the actual raster scans: line scan, time or Z series, etc)
+    scans:ScanDataComponentDescriptor = ScanDataComponentDescriptor("scans", None, list[vigra.VigraArray],
+                                                            preset_hook=ScanDataImageParser("scans"),
+                                                            postset_hook=ScanDataFramesMapUpdater("scans"))
+    # scans:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
+    
+    # BUG 2024-08-14 21:11:36 FIXME
+    # all attributes derived from the scans/scene image data, and set up by their
+    # corresponding descriptors via preset_hook, are overwritten by the 
+    # defaults below — this involves AxisCalibration and Layout;
+    # on the other hand, NOT specifing them here preserved the attributes as set
+    # by the scan and scene descriptors, but they won't be listed as a field of
+    # ScanData — I need a good fix for this.
+    #
+    # For now, omit them from declared fields and rely on the class attribute
+    # `_attributes_` (a ClassVar) defined above.
+    #
+    # TODO: 2024-08-14 21:34:56 Maybe they should be set up through a postset 
+    # hook like below? Then the question is how to execute more than one 
+    # postset defined in the descriptor?
+    #
+    # NOTE: 2024-08-14 21:28:36 In contrast, attributes set by scans/scene
+    # descriptors via the postset_hook appears immune to the side effect above;
+    # these include framesMap...
+    #
+    # axes calibrations for image data in the scans; initialized/set up by the scans descriptor
+    # scansAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list, init=False)
+    # to document; initialized/set up by the scans descriptor
+    # scansLayout:dict = dataclasses.field(default_factory = dict, init=False) 
+    # signals containing quantitative data measured in the scans (depends on experiment type)
+    scansBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scans"))
+    # signals containing pixel intensities along scans rois (linescans only) 
+    scansProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scans profiles"), init=False)
+    scansCursors:dict = dataclasses.field(default_factory = dict, init=False)
+    scansRois:dict = dataclasses.field(default_factory = dict, init=False)
+    
+    # scanTrajectory:typing.Optional[PlanarGraphics] = None
+    # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
+    scanTrajectory:typing.Optional[PlanarGraphics] = dataclasses.field(default=None, init=False)
+    
+    # scene data — 2D raster scan where the scans above were acquired (and defined); see docstrings
+    # for corresponding attributes in the scans
+    scene:ScanDataComponentDescriptor = ScanDataComponentDescriptor("scene", None, list[vigra.VigraArray],
+                                                            preset_hook=ScanDataImageParser("scene"),
+                                                            postset_hook=ScanDataFramesMapUpdater("scene"))
+    # scene:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
+    #
+    # see BUG 2024-08-14 21:11:36 for why these are commented-out
+    # sceneAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list, init=False)
+    # sceneLayout:dict = dataclasses.field(default_factory = dict, init=False)
+    sceneBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scene"))
+    sceneProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scene profiles"))
+    sceneCursors:dict = dataclasses.field(default_factory = dict)
+    sceneRois:dict = dataclasses.field(default_factory = dict)
+    
+    # associated electrophysiology data
+    electrophysiology:ScanDataComponentDescriptor = ScanDataComponentDescriptor("electrophysiology",
+                                                                                neo.Block(name="Electrophysiology"),
+                                                                                neo.Block,
+                                                                                postset_hook=ScanDataFramesMapUpdater("electrophysiology"))
+    # electrophysiology:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Electrophysiology"))
+    
+    # landmark data
+    landmark:typing.Optional[PlanarGraphics] = dataclasses.field(default=None)
+    
+    # analysis parameters
+    analysisOptions:typing.Optional[dict] = dataclasses.field(default_factory=dict, compare=False)
+    analysisUnits:set[AnalysisUnit] = dataclasses.field(default_factory=set)
+    analysisUnit:typing.Optional[AnalysisUnit] = None
+    analysisMode:ScanDataAnalysisMode = ScanDataAnalysisMode.frame
+    # metadata:typing.Optional[dict] = dataclasses.field(default=None)
+    metadata:ScanDataComponentDescriptor = ScanDataComponentDescriptor("metadata",None, DataBag,
+                                                                       postset_hook=ScanDataMetadataAdapter("metadata"))
+
+    # mapping of imaging frames to electrophysiology sweeps
+    # → initialized/set up by scans and scene desscriptors (postset hook)
+    #
+    # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
+    framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None, init=False)
+    
+    # analysis results data
+    electrophysiologyResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None, init=False)
+    imagingResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None, init=False)
+    result:typing.optional[pd.DataFrame] = dataclasses.field(default=None, init=False)
+    
+    # runtime data
+    modified:bool = dataclasses.field(default=False, init=False, compare=False)
+    processed:bool = dataclasses.field(default=False, init=False, compare=False)
+    availableUnitTypes:list = dataclasses.field(default_factory=lambda: [s for s in UnitTypes.values()], init=False, compare=False)
+    availableGenotypes:list = dataclasses.field(default_factory=lambda: [s for s in GENOTYPES], init=False, compare=False)
+    # ### END instance variables 
     
     def _get_data_child_component_(self, component:str):
         """
@@ -1597,21 +1803,22 @@ class ScanData(BaseScipyenData):
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
             
     def __reduce__(self):
-        kw = dict((d[0], getattr(self, d[0], None)) for d in self._descriptor_attributes_ if d[0] not in ("scene", "scans", "electrophysiology", "metadata"))
+        kw = dict((d[0], getattr(self, d[0], None)) for d in self._attributes_ if d[0] not in ("scene", "scans", "electrophysiology", "metadata"))
         
-        return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
+        return (_new_ScanData, (self.type, self.scans, self.scene, self.electrophysiology, 
                                 self.metadata, kw))
             
     @safeWrapper
-    def __init__(self, scans=None, scene=None, electrophysiology=None, 
-                 metadata:typing.Optional[dict]=None, **kwargs):
+    # def __init__(self, scans=None, scene=None, electrophysiology=None, 
+    #              metadata:typing.Optional[dict]=None, **kwargs):
+    def __post_init__(self):
         """Constructs a ScanData object.
         
         Named parameters:
         =================
         
         For the name and value type of the expected parameters, see
-        ScanData._descriptor_attributes_
+        ScanData._attributes_
         
         The description of the more important ones is given below.
         
@@ -1677,95 +1884,118 @@ class ScanData(BaseScipyenData):
                 
         """
         
-        if isinstance(scans, ScanData):
-            self = scans.copy() # make a deep copy
-            return
+        # if isinstance(scans, ScanData):
+        #     self = scans.copy() # make a deep copy
+        #     return
+        
+        # super_init_fields = [getattr(self, f.name) for f in dataclasses.fields(BaseScipyenData)]
+        
+        # super().__init__(*super_init_fields, neo_attrs)
+        
+#         for attr in neo.core.baseneo.BaseNeo._recommended_attrs:
+#             attr_name = attr[0]
+#             attr_type = attr[1]
+#             if attr_name not in neo_attrs:
+#                 raise ValueError(f"{attr_name} must be supplied")
+#             
+#             attr = neo_attrs[attr_name]
+#             if not isinstance(attr, attr_type):
+#                 raise ValueError(f"{attr_name} expected to be a {attr_type.__name__}; got {type(attr).__name__} instead")
+#             
+#             setattr(self, attr_name, attr)
         
         # self._availableGenotypes_ = [s for s in GENOTYPES]
-        self._availableUnitTypes_ = [s for s in UnitTypes.values()]
-        self._availableUnitTypes_.insert(0, "unknown")
+        # self._availableUnitTypes_ = [s for s in UnitTypes.values()]
+        self.availableUnitTypes.insert(0, "unknown")
         
-        self._metadata_ = None
-        self._modified_ = False
+        # self._metadata_ = None
+        # self._modified_ = False
         
-        self._processed_ = False
+        # self._processed_ = False
         
-        self._scans_parser_ = self.ImageParser(self, "scans")
-        self._scene_parser_ = self.ImageParser(self, "scene")
+        # NOTE: 2024-08-11 15:55:41
+        # AttributeAdapter instances for validating and extracting layout information
+        # from the image data
+        # self._scans_parser_ = ScanDataImageParser(self, "scans") # AttributeAdapter
+        # self._scene_parser_ = ScanDataImageParser(self, "scene") # AttributeAdapter
         
         # parse parameters, check images, frame axes & calibrations, electrophys.
         # and metadata --> populate kwargs and let super().init populate self
         # with everything else
 
-        self._preset_hooks_ = {
-            "scans": self._scans_parser_,
-            "scene": self._scene_parser_,
-            }
+        # self._preset_hooks_ = {
+        #     "scans": ScanDataImageParser(self, "scans"), # AttributeAdapter
+        #     "scene": ScanDataImageParser(self, "scene"), # AttributeAdapter
+        #     }
+        # self._preset_hooks_ = {
+        #     "scans": self._scans_parser_,
+        #     "scene": self._scene_parser_,
+        #     }
             
-        self._postset_hooks_ = {
-            "scans": self.FramesMapUpdater(self, "scans"),
-            "scene": self.FramesMapUpdater(self, "scene"),
-            "electrophysiology": self.FramesMapUpdater(self, "electrophysiology"),
-            "metadata": self._parse_metadata_,
-            }
+        # self._postset_hooks_ = {
+        #     "scans": ScanDataFramesMapUpdater(self, "scans"),
+        #     "scene": ScanDataFramesMapUpdater(self, "scene"),
+        #     "electrophysiology": ScanDataFramesMapUpdater(self, "electrophysiology"),
+        #     "metadata": self._parse_metadata_,
+        #     }
     
-        sceneLayout = kwargs.pop("sceneLayout", None)
-        sceneFrameAxis = None if not isinstance(sceneLayout, dict) else sceneLayout.get("sceneFrameAxis", None)
-        sceneAxesCalibration = kwargs.pop("sceneAxesCalibration", None)
-        
-        scansLayout = kwargs.pop("scansLayout", None)
-        scansFrameAxis = None if not isinstance(scansLayout, dict) else scansLayout.get("scansFrameAxis", None)
-        scansAxesCalibration = kwargs.pop("scansAxesCalibration", None)
-        
-        scene, scene_layout, scene_axes_cal = self._scene_parser_.imageDataLayout(scene, 
-                                                                   frameAxis = sceneFrameAxis, 
-                                                                   axescal = sceneAxesCalibration)
-        
-        scans, scans_layout, scans_axes_cal = self._scans_parser_.imageDataLayout(scans, 
-                                                                   frameAxis = scansFrameAxis, 
-                                                                   axescal = scansAxesCalibration)
-        
-        kwargs["scene"] = scene
-        kwargs["sceneLayout"] = scene_layout if sceneLayout is None else sceneLayout
-        kwargs["sceneAxesCalibration"] = scene_axes_cal if sceneAxesCalibration is None else sceneAxesCalibration
-        
-        kwargs["scans"] = scans
-        kwargs["scansLayout"] = scans_layout if scansLayout is None else scansLayout
-        kwargs["scansAxesCalibration"] = scans_axes_cal if scansAxesCalibration is None else scansAxesCalibration
-        
-        kwargs["electrophysiology"] = electrophysiology
-        kwargs["metadata"] = metadata
-        
-        field_frames = dict((c[0], 0) for c in self._data_children_)
-        for c in field_frames:
-            if c in ("scene","scans"):
-                layout = kwargs.get(f"{c}Layout", None)
-                f = layout.get("nFrames", 0) if isinstance(layout, dict) else 0
-                val = f if isinstance(f, int) else np.prod(f)
-                
-            else:
-                val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else 0
-                
-            field_frames[c] = val
-            
-        # NOTE: 2022-01-04 16:05:12 
-        # FrameIndexLookup ALWAYS in use
-        framesLookup = FrameIndexLookup(field_frames)
-            
-        # the user may have supplied a frame index lookup to the initializer
-        framesMap = kwargs.pop("framesMap", framesLookup)
-        
-        kwargs["framesMap"] = framesMap
+#         sceneLayout = kwargs.pop("sceneLayout", None)
+#         sceneFrameAxis = None if not isinstance(sceneLayout, dict) else sceneLayout.get("sceneFrameAxis", None)
+#         sceneAxesCalibration = kwargs.pop("sceneAxesCalibration", None)
+#         
+#         scansLayout = kwargs.pop("scansLayout", None)
+#         scansFrameAxis = None if not isinstance(scansLayout, dict) else scansLayout.get("scansFrameAxis", None)
+#         scansAxesCalibration = kwargs.pop("scansAxesCalibration", None)
+#         
+#         scene, scene_layout, scene_axes_cal = self._scene_parser_.imageDataLayout(scene, 
+#                                                                    frameAxis = sceneFrameAxis, 
+#                                                                    axescal = sceneAxesCalibration)
+#         
+#         scans, scans_layout, scans_axes_cal = self._scans_parser_.imageDataLayout(scans, 
+#                                                                    frameAxis = scansFrameAxis, 
+#                                                                    axescal = scansAxesCalibration)
+#         
+#         kwargs["scene"] = scene
+#         kwargs["sceneLayout"] = scene_layout if sceneLayout is None else sceneLayout
+#         kwargs["sceneAxesCalibration"] = scene_axes_cal if sceneAxesCalibration is None else sceneAxesCalibration
+#         
+#         kwargs["scans"] = scans
+#         kwargs["scansLayout"] = scans_layout if scansLayout is None else scansLayout
+#         kwargs["scansAxesCalibration"] = scans_axes_cal if scansAxesCalibration is None else scansAxesCalibration
+#         
+#         kwargs["electrophysiology"] = electrophysiology
+#         kwargs["metadata"] = metadata
+#         
+#         field_frames = dict((c[0], 0) for c in self._data_children_)
+#         for c in field_frames:
+#             if c in ("scene","scans"):
+#                 layout = kwargs.get(f"{c}Layout", None)
+#                 f = layout.get("nFrames", 0) if isinstance(layout, dict) else 0
+#                 val = f if isinstance(f, int) else np.prod(f)
+#                 
+#             else:
+#                 val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else 0
+#                 
+#             field_frames[c] = val
+#             
+#         # NOTE: 2022-01-04 16:05:12 
+#         # FrameIndexLookup ALWAYS in use
+#         framesLookup = FrameIndexLookup(field_frames)
+#             
+#         # the user may have supplied a frame index lookup to the initializer
+#         framesMap = kwargs.pop("framesMap", framesLookup)
+#         
+#         kwargs["framesMap"] = framesMap
             
         # NOTE: the following sets up descriptors using the default 
         # setup_descriptor :class: method inherited from prog.WithDescriptors
         # 
-        super().__init__(**kwargs) # BaseScipyenData/WithDescriptors
+        # super().__init__(**kwargs) # BaseScipyenData/WithDescriptors
 
         # NOTE: 2022-01-02 23:22:32
         # metadata now set via the descriptor mechanism (WithDescriptors) in
         # super().__init__(**kwargs) above
-        self._parse_metadata_()
+        # self._parse_metadata_()
         
         self._modified_ = False
         
@@ -1819,8 +2049,6 @@ class ScanData(BaseScipyenData):
             elif self.analysisUnit is not None:
                 p.pretty(self.analysisUnit)
                 
-            
-    
     def __str__(self):
         """
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -1939,68 +2167,6 @@ class ScanData(BaseScipyenData):
             self.scansFrameAxis = scans_frame_axis
             self.scansAxesCalibrations = scans_axes_calibrations
             
-        #if new_scene is not None:
-            #self._scenecursors_.clear()
-            #self._scenerois_.clear()
-            #self._scan_region_ = None
-            #self._scene_ = new_scene
-            #self._scene_frame_axis_ = scene_frame_axis
-            #self._scene_axes_calibrations_ = scene_axes_calibrations
-
-        #if new_scans is not None:
-            #self._scanscursors_.clear()
-            #self._scansrois_.clear()
-            #self._analysis_units_.clear()
-            #self._scans_ = new_scans
-            #self._scans_frame_axis_ = scans_frame_axis
-            #self._scans_axes_calibrations_ = scans_axes_calibrations
-        
-    @safeWrapper
-    def _parse_metadata_(self):
-        """Sets up analysis type
-        """
-        from gui import pictgui as pgui
-        from systems.PrairieView import PVSequenceType
-        # NOTE: 2022-01-04 17:15:31
-        # self.metadata is assigned via the descriptor protocol 
-        # (see ScanData.__init__())
-        if self.metadata is None or len(self.metadata) == 0:
-            return
-        
-        # NOTE: 2017-11-15 12:06:36
-        # TODO adapt this for scanimage metadata as well !
-        #
-        # NOTE: 2018-05-19 12:04:20
-        # there can be only one scene ROI that defines the scans sub-area (or 
-        # scan line trajectory) in the scene, for any given ScanData object
-        # this is stored as the self._scan_region_ attribute!
-        # and is DISTINCT from any of the sceneRois or sceneCursors!
-        
-        value = self.metadata # save some replacing
-        
-        if isinstance(value, DataBag) and hasattr(value, "type"):
-            if value.type == "PVScan":
-                if value.sequences[0].attributes.sequencetype == PVSequenceType.Linescan:
-                    self.analysisMode = ScanData.ScanDataAnalysisMode.frame
-                    self.type = ScanData.ScanDataType.linescan
-
-                    roi = pgui.Path(*value.sequences[0].definition.coordinates)
-                    
-                    if roi.type.name in ("line", "polyline", "arc", "quad", "cubic") or\
-                        (roi.type.name == "path" and not roi.closed): 
-                        roi.name = "scanline"
-                    
-                    else:
-                        roi.name = "scanregion"
-                        
-                    self.scanTrajectory = roi
-                        
-            else: 
-                raise NotImplementedError("%s data not yet supported" % value.type)
-            
-        else:
-            raise TypeError("metadata was expected to be a DataBag or None; got %s instead" % type(self._metadata_).__name__)
-        
     def embedTriggerEvents(self, tp=None, to_imaging=True):
         """
         # NOTE: 2017-12-20 22:06:48
@@ -8225,9 +8391,9 @@ class ScanData(BaseScipyenData):
     # properties
     # ###
     
-    @property
-    def availableUnitTypes(self):
-        return self._availableUnitTypes_
+    # @property
+    # def availableUnitTypes(self):
+    #     return self._availableUnitTypes_
     
     # @property
     # def availableGenotypes(self):
@@ -8267,20 +8433,20 @@ class ScanData(BaseScipyenData):
             #raise TypeError("value expected to be a string or None; got %s instead" % type(value).__name__)
     
     @property
-    def analysisUnits(self):
-        """Returns the set of analysis units nested in this data, as a sorted list.
-        These are/must be defined on landmarks (cursors or ROIs).
-        The list is sorted by the names of the analysis units; it may be empty.
-        
-        NOTE: This property excludes the default analysis unit defined on the data.
-        Instead, the latter is obtained by calling ScanData.getAnalysisUnit() 
-        without parameters, or as the property ScanData.defaultAnalysisUnit
-        
-        See also ScanData.analysisUnit(...) for details.
-        
-        """
-        return sorted([u for u in self._analysis_units_],
-                       key = lambda x: x.name)
+#     def analysisUnits(self):
+#         """Returns the set of analysis units nested in this data, as a sorted list.
+#         These are/must be defined on landmarks (cursors or ROIs).
+#         The list is sorted by the names of the analysis units; it may be empty.
+#         
+#         NOTE: This property excludes the default analysis unit defined on the data.
+#         Instead, the latter is obtained by calling ScanData.getAnalysisUnit() 
+#         without parameters, or as the property ScanData.defaultAnalysisUnit
+#         
+#         See also ScanData.analysisUnit(...) for details.
+#         
+#         """
+#         return sorted([u for u in self._analysis_units_],
+#                        key = lambda x: x.name)
     
     @property
     def analysisUnitNames(self):
@@ -8432,21 +8598,21 @@ class ScanData(BaseScipyenData):
         return {"scenecursors":self.sceneCursors, "scenerois":self.sceneRois,\
                 "scanscursors":self.scansCursors, "scansrois":self.scansRois}
     
-    @property
-    def modified(self):
-        return self._modified_
-    
-    @modified.setter
-    def modified(self, value:bool):
-        if not isinstance(value, bool):
-            raise TypeError("expecting a bool; got %s instead" % type(value).__name__)
-        self._modified_ = value
+#     @property
+#     def modified(self):
+#         return self._modified_
+#     
+#     @modified.setter
+#     def modified(self, value:bool):
+#         if not isinstance(value, bool):
+#             raise TypeError("expecting a bool; got %s instead" % type(value).__name__)
+#         self._modified_ = value
         
-    @property
-    def processed(self):
-        """True if image data has been processed in any way (i.e. filtered)
-        """
-        return self._processed_
+    # @property
+    # def processed(self):
+    #     """True if image data has been processed in any way (i.e. filtered)
+    #     """
+    #     return self._processed_
     
     @property
     def scanRegion(self):
@@ -8455,15 +8621,15 @@ class ScanData(BaseScipyenData):
         """
         return self.scanTrajectory
     
-    @scanRegion.setter
-    def scanRegion(self, value):
-        self.scanTrajectory = value
-    
-    @processed.setter
-    def processed(self, value:bool):
-        if not isinstance(value, bool):
-            raise TypeError("expecting a bool; fgot %s instead" % type(value).__name__)
-        self._processed_ = value
+#     @scanRegion.setter
+#     def scanRegion(self, value):
+#         self.scanTrajectory = value
+#     
+#     @processed.setter
+#     def processed(self, value:bool):
+#         if not isinstance(value, bool):
+#             raise TypeError("expecting a bool; fgot %s instead" % type(value).__name__)
+#         self._processed_ = value
         
     @property
     def electrophysiologySweeps(self):

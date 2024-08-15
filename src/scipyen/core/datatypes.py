@@ -92,7 +92,7 @@ from numpy import ndarray
 import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
-import vigra
+from core.vigra_patches import vigra
 import neo
 from neo.core import (baseneo, basesignal, container,)
 from neo.core.dataobject import (DataObject, ArrayDict,)

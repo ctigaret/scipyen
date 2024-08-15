@@ -22,7 +22,7 @@ import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
 from scipy import optimize, signal, integrate
-import vigra
+from core.vigra_patches import vigra
 import neo
 #### END 3rd party modules
 

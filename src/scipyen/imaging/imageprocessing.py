@@ -19,7 +19,7 @@ import imreg_dft as ird
 import numpy as np
 import quantities as pq
 from scipy import optimize
-import vigra
+from core.vigra_patches import vigra
 import neo
 #### END 3rd party modules
 

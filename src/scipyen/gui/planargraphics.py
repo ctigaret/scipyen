@@ -151,7 +151,7 @@ from copy import copy
 #### END core python modules
 
 #### BEGIN 3rd party modules
-#import vigra.pyqt.quickdialog as quickdialog
+#from core.vigra_patches import vigra.pyqt.quickdialog as quickdialog
 import numpy as np
 from traitlets import Bunch
 from qtpy import QtCore, QtGui, QtWidgets, QtXml

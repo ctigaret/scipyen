@@ -32,7 +32,7 @@ from functools import reduce
 
 #### BEGIN 3rd party modules
 import numpy as np
-import vigra
+from core.vigra_patches import vigra
 #import signalviewer as sv
 #import javabridge
 #import bioformats

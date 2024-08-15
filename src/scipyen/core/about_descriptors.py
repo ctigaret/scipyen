@@ -126,8 +126,9 @@ acceptable_dtypes = NoData
 
 name = x[0]
 # RULES:
-if len(x) == 2:                                                                 # rules family A
-    if isinstance(x[1], type):                                                  # rule A.1
+# Group A: len(x) == 2:
+# A.1 x[1] is a type ⇒ take it as acceptable type, and c'truct default value from
+# its default c'tor if possible
         acceptable_types = (x[1], )
         
         if allow_nodata:

@@ -5,15 +5,15 @@
 
 """Base ancestor of Scipyen's data objects: AnalysisUnit, ScanData
 """
-import functools, typing
+import functools, typing, dataclasses, pathlib
 import collections
 from collections import deque
 from datetime import datetime, date, time, timedelta
-from dataclasses import MISSING
+from dataclasses import (dataclass, field, MISSING, KW_ONLY, InitVar)
 import numpy as np
 import quantities as pq
 import neo
-import vigra
+from core.vigra_patches import vigra
 import pandas as pd
 from traitlets.utils.importstring import import_item
 from core import quantities as cq
@@ -29,158 +29,201 @@ from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRout
                             Procedure, TypeEnum,
                             )
 
-class BaseScipyenData(neo.core.baseneo.BaseNeo, WithDescriptors):
-    """Simple repository for the minimally-required, common attributes.
-    
-    These attributes are : 
-    ----------------------------------------------------------------------------
-    sourceID: str the ID of the entity source of the data (and ID of a culture
-        dish, etc...), 
-        
-    cell: str, the ID of the cell, or "NA" (not available); optional, default is 
-        None (resulting in a "NA value")
-        ""
-    genotype: str, one of "WT, "HET" or "KO", "+/+", "-/-", "+/-" or a more complex
-        and informative genotype notation  
-        default is None 
-        
-    age: scalar python Quantity (with units of time, or convertible to SI time units)
-        optional, default is None)
-            e.g., 15 pq.div or 20 * pq.pnd (postnatal day), or 16 * pq.emd (embryonic day)
-        
-    sex: str: one of "F", "M", "NA"; optional, default is None
-    
-    biometric: dict; optional, default is None; the contents are free-form, but 
-        should have some sort of systematic organization.
+# BaseNeoDC = dataclasses("BaseNeoDC", neo.core.baseneo.BaseNeo._recommended_attrs,
+#                         bases = (neo.core.baseneo.BaseNeo))
 
-        When a dict it may contain:
-            'weight' -> python Quantity of mass units; optional, default is None
-            
-            'height' -> python Quantity of length units; optional, default is None
-            
-            ... any other useful biometric with value that can be stored as a 
-                short litral description, or a python Quantity, if numeric
-            
-    procedure: dict; optional, default is None
-        When a dict it may contain:
-            'type' -> datatypes.ProcedureType or str e.g., "treatment", "surgery", "rotarod", etc informative
-                enough to allow data classification later
-                
-            'name' -> str e.g., the name of the drug, or of the procedure
-            
-            'dose' -> scalar python Quantity with units of substance (or mass, 
-                e.g., g or moles),  density or concentration (i.e. mass/volume)
-                or mass/mass (e/g/, mg/kg, numerically dimensionless after 
-                simplification) - when it makes sense, e.g. for drug treatments, 
-                or None
-            
-            'route'-> str: how the procedure was administrered (when it makes 
-                sense, such as drug treatment, e.g. i.v., i.p., p.o, i.c., 
-                perfusion, etc) - should be informative enough to allow data
-                classification later
-                
-            'schedule' -> neo.Epoch: the schedule of treatment, e.g.
-                times & duration of drug adminstration or procedure application
-                
-    triggers: list of TriggerProtocol (for electrophysiology/imaging data)
+@dataclass
+class BaseScipyenData:
+    name:str = ""
+    description:str =""
+    file_origin:typing.Optional[typing.Union[str, pathlib.Path]] = None
+    sourceID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    cell:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    field:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    genotype:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    sex:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    age:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    biometric_weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA) 
+    biometric_height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    procedure:typing.Optional[Procedure] = None,
+    procedure_type:typing.Union[str, int, ProcedureType, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    procedure_name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    procedure_dose:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    procedure_route:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    procedure_schedule:neo.Epoch = dataclasses.field(default_factory=neo.Epoch)
+    triggers:typing.Union[TriggerProtocol, list] = dataclasses.field(default_factory=TriggerProtocol)
+    file_datetime:datetime = dataclasses.field(default_factory = datetime.now)
+    rec_datetime:datetime = dataclasses.field(default_factory = datetime.now)
+    analysis_datetime:datetime = dataclasses.field(default_factory = datetime.now)
+    # neo_attrs:InitVar[dict] = dataclasses.field(default = dict(map(lambda x: (x[0], x[1]()), neo.core.baseneo.BaseNeo._recommended_attrs)), init=False)
     
-    descriptors: dict with any other descriptors
-                
-    """
+#     def __post_init__(self, neo_attrs:dict):
+#         for attr in neo.core.baseneo.BaseNeo._recommended_attrs:
+#             attr_name = attr[0]
+#             attr_type = attr[1]
+#             if attr_name not in neo_attrs:
+#                 raise ValueError(f"{attr_name} must be supplied")
+#             
+#             attr = neo_attrs[attr_name]
+#             if not isinstance(attr, attr_type):
+#                 raise ValueError(f"{attr_name} expected to be a {attr_type.__name__}; got {type(attr).__name__} instead")
+#             
+#             setattr(self, attr_name, attr)
     
-    # NOTE: 2021-11-30 16:17:53
-    # DESCRIPTOR SPECIFICATIONS:
-    #
-    # will be inherited by derived subclasses, which can also add their own
-    # (see ScanData) provided they follow the template below:
-    #
-    # attr name, type, or default (in whch case type is inferred from default)
-    # when 2nd is a type, the default value is set to None
-    #
-    # see documentation for prog.parse_descriptor_specification for details on how
-    # each sequence in the _descriptor_attributes_ tuple is interpreted.
-    #
-    # NOTE: 2024-08-02 13:38:58
-    # we follow the neo data model here, rather than Python's dataclass
-    # TODO: contemplate switching to dataclass ?
-    #
-    
-    _data_children_     = ()
-    _data_attributes_ = (
-                            ("sourceID",            (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
-                            ("cell",                (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
-                            ("field",               (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
-                            ("genotype",            (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
-                            ("sex",                 (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
-                            ("age",                 (pq.Quantity, type(pd.NA), type(MISSING)),  {"default":0*pq.s}),
-                            ("biometric_weight",    (pq.Quantity, type(pd.NA), type(MISSING)),  {"default":0*pq.g}), 
-                            ("biometric_height",    (pq.Quantity, type(pd.NA), type(MISSING)),  {"default":0*pq.m}),
-                            ("procedure",           Procedure),
-                            ("procedure_type",      (str, int, ProcedureType, type(pd.NA), type(MISSING)),  {"default":0}),
-                            ("procedure_name",      (str, type(pd.NA), type(MISSING)),                      {"default":"NA"}),
-                            ("procedure_dose",      (pq.Quantity, type(pd.NA), type(MISSING)),              {"default":0*pq.g}),
-                            ("procedure_route",     (str, type(pd.NA), type(MISSING)),                      {"default":"NA"}),
-                            ("procedure_schedule",  neo.Epoch),
-                            ("triggers",            (TriggerProtocol, list, type(MISSING)),            {"default":TriggerProtocol()}),
-                            ("file_datetime",       datetime),
-                            ("rec_datetime",        datetime),
-                            ("analysis_datetime",   datetime),
-                            ("descriptors",         dict)
-                        )
-    
-    _descriptor_attributes_ = _data_children_ + _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
-    
-    def __init__(self, name=None, description=None, file_origin=None, **kwargs):
-        WithDescriptors.__init__(self, name=None, description=None, file_origin=None, **kwargs)
-        
-        # so that we don't confuse baseneo._check_annotations in the __init__ 
-        # further below
-        for d in self._descriptor_attributes_:
-            kwargs.pop(d[0], None)
-        
-        super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
-        
-    def __attr_str__(self):
-        result = list()
-        for a in self._descriptor_attributes_:
-            attr = getattr(self, a[0], None)
-            attr_str = type(attr).__name__
-            
-            if isinstance(attr, neo.Block):
-                attr_str += f" with {len(attr.segments)} segments"
-                
-            elif isinstance(attr, np.ndarray):
-                attr_str += f" with shape {attr.shape}"
-                
-            else:
-                attr_str = f"{attr}"
-                
-            result.append(f"{a[0]}: {attr_str}")
-            
-        return result
-        # return "\n".join(result)
-    
-    def _repr_pretty_(self, p, cycle):
-        name = self.name if isinstance(self.name, str) else ""
-        
-        if cycle:
-            p.text(f"{self.__class__.__name__} {name}")
-        else:
-            p.text(f"{self.__class__.__name__} {name}")
-            p.breakable()
-            attr_repr = self.__attr_str__()
-            with p.group(4 ,"(",")"):
-                for t in attr_repr:
-                    p.text(t)
-                    p.breakable()
-                p.text("\n")
-                
-            p.breakable()
-            
-    @property
-    def mandatory_descriptors(self):
-        return dict((a[0], getattr(self, a[0], None)) for a in self._descriptor_attributes_)
-    
-    @property
-    def descriptors(self):
-        return get_descriptors(self)
+#     
+# class BaseScipyenData_old(neo.core.baseneo.BaseNeo, WithDescriptors):
+#     """Simple repository for the minimally-required, common attributes.
+#     
+#     These attributes are : 
+#     ----------------------------------------------------------------------------
+#     sourceID: str the ID of the entity source of the data (and ID of a culture
+#         dish, etc...), 
+#         
+#     cell: str, the ID of the cell, or "NA" (not available); optional, default is 
+#         None (resulting in a "NA value")
+#         ""
+#     genotype: str, one of "WT, "HET" or "KO", "+/+", "-/-", "+/-" or a more complex
+#         and informative genotype notation  
+#         default is None 
+#         
+#     age: scalar python Quantity (with units of time, or convertible to SI time units)
+#         optional, default is None)
+#             e.g., 15 pq.div or 20 * pq.pnd (postnatal day), or 16 * pq.emd (embryonic day)
+#         
+#     sex: str: one of "F", "M", "NA"; optional, default is None
+#     
+#     biometric: dict; optional, default is None; the contents are free-form, but 
+#         should have some sort of systematic organization.
+# 
+#         When a dict it may contain:
+#             'weight' -> python Quantity of mass units; optional, default is None
+#             
+#             'height' -> python Quantity of length units; optional, default is None
+#             
+#             ... any other useful biometric with value that can be stored as a 
+#                 short litral description, or a python Quantity, if numeric
+#             
+#     procedure: dict; optional, default is None
+#         When a dict it may contain:
+#             'type' -> datatypes.ProcedureType or str e.g., "treatment", "surgery", "rotarod", etc informative
+#                 enough to allow data classification later
+#                 
+#             'name' -> str e.g., the name of the drug, or of the procedure
+#             
+#             'dose' -> scalar python Quantity with units of substance (or mass, 
+#                 e.g., g or moles),  density or concentration (i.e. mass/volume)
+#                 or mass/mass (e/g/, mg/kg, numerically dimensionless after 
+#                 simplification) - when it makes sense, e.g. for drug treatments, 
+#                 or None
+#             
+#             'route'-> str: how the procedure was administrered (when it makes 
+#                 sense, such as drug treatment, e.g. i.v., i.p., p.o, i.c., 
+#                 perfusion, etc) - should be informative enough to allow data
+#                 classification later
+#                 
+#             'schedule' -> neo.Epoch: the schedule of treatment, e.g.
+#                 times & duration of drug adminstration or procedure application
+#                 
+#     triggers: list of TriggerProtocol (for electrophysiology/imaging data)
+#     
+#     descriptors: dict with any other descriptors
+#                 
+#     """
+#     
+#     # NOTE: 2021-11-30 16:17:53
+#     # DESCRIPTOR SPECIFICATIONS:
+#     #
+#     # will be inherited by derived subclasses, which can also add their own
+#     # (see ScanData) provided they follow the template below:
+#     #
+#     # attr name, type, or default (in whch case type is inferred from default)
+#     # when 2nd is a type, the default value is set to None
+#     #
+#     # see documentation for prog.parse_descriptor_specification for details on how
+#     # each sequence in the _attributes_ tuple is interpreted.
+#     #
+#     # NOTE: 2024-08-02 13:38:58
+#     # we follow the neo data model here, rather than Python's dataclass
+#     # TODO: contemplate switching to dataclass ?
+#     #
+#     
+#     _data_children_     = ()
+#     _data_attributes_ = (
+#                             ("sourceID",            (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
+#                             ("cell",                (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
+#                             ("field",               (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
+#                             ("genotype",            (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
+#                             ("sex",                 (str, type(pd.NA), type(MISSING)),          {"default":"NA"}),
+#                             ("age",                 (pq.Quantity, type(pd.NA), type(MISSING)),  {"default":0*pq.s}),
+#                             ("biometric_weight",    (pq.Quantity, type(pd.NA), type(MISSING)),  {"default":0*pq.g}), 
+#                             ("biometric_height",    (pq.Quantity, type(pd.NA), type(MISSING)),  {"default":0*pq.m}),
+#                             ("procedure",           Procedure),
+#                             ("procedure_type",      (str, int, ProcedureType, type(pd.NA), type(MISSING)),  {"default":0}),
+#                             ("procedure_name",      (str, type(pd.NA), type(MISSING)),                      {"default":"NA"}),
+#                             ("procedure_dose",      (pq.Quantity, type(pd.NA), type(MISSING)),              {"default":0*pq.g}),
+#                             ("procedure_route",     (str, type(pd.NA), type(MISSING)),                      {"default":"NA"}),
+#                             ("procedure_schedule",  neo.Epoch),
+#                             ("triggers",            (TriggerProtocol, list, type(MISSING)),            {"default":TriggerProtocol()}),
+#                             ("file_datetime",       datetime),
+#                             ("rec_datetime",        datetime),
+#                             ("analysis_datetime",   datetime),
+#                             ("descriptors",         dict)
+#                         )
+#     
+#     _attributes_ = _data_children_ + _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
+#     
+#     def __init__(self, name=None, description=None, file_origin=None, **kwargs):
+#         raise DeprecationWarning("This class is deprecated; we have moved to a dataclass-based design")
+#         WithDescriptors.__init__(self, name=None, description=None, file_origin=None, **kwargs)
+#         
+#         # so that we don't confuse baseneo._check_annotations in the __init__ 
+#         # further below
+#         for d in self._attributes_:
+#             kwargs.pop(d[0], None)
+#         
+#         super().__init__(name=name, description=description, file_origin=file_origin, **kwargs)
+#         
+#     def __attr_str__(self):
+#         result = list()
+#         for a in self._attributes_:
+#             attr = getattr(self, a[0], None)
+#             attr_str = type(attr).__name__
+#             
+#             if isinstance(attr, neo.Block):
+#                 attr_str += f" with {len(attr.segments)} segments"
+#                 
+#             elif isinstance(attr, np.ndarray):
+#                 attr_str += f" with shape {attr.shape}"
+#                 
+#             else:
+#                 attr_str = f"{attr}"
+#                 
+#             result.append(f"{a[0]}: {attr_str}")
+#             
+#         return result
+#         # return "\n".join(result)
+#     
+#     def _repr_pretty_(self, p, cycle):
+#         name = self.name if isinstance(self.name, str) else ""
+#         
+#         if cycle:
+#             p.text(f"{self.__class__.__name__} {name}")
+#         else:
+#             p.text(f"{self.__class__.__name__} {name}")
+#             p.breakable()
+#             attr_repr = self.__attr_str__()
+#             with p.group(4 ,"(",")"):
+#                 for t in attr_repr:
+#                     p.text(t)
+#                     p.breakable()
+#                 p.text("\n")
+#                 
+#             p.breakable()
+#             
+#     @property
+#     def mandatory_descriptors(self):
+#         return dict((a[0], getattr(self, a[0], None)) for a in self._attributes_)
+#     
+#     @property
+#     def descriptors(self):
+#         return get_descriptors(self)

@@ -9,7 +9,7 @@ from collections import deque
 from collections.abc import Sequence
 from pprint import (pprint, pformat)
 import h5py
-import vigra 
+from core.vigra_patches import vigra 
 import numpy as np
 import quantities as pq
 from traitlets import Bunch

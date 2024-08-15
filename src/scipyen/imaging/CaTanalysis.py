@@ -178,7 +178,7 @@ import quantities as pq
 
 import neo
 
-import vigra
+from core.vigra_patches import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -7850,8 +7850,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             self._data_.analysisUnit().type = val
             
-        if val not in self._data_._availableUnitTypes_:
-            self._data_._availableUnitTypes_.append(val)
+        if val not in self._data_.availableUnitTypes:
+            self._data_.availableUnitTypes.append(val)
             
         self._update_report_()
         
@@ -10996,8 +10996,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 if unit_type_index == -1:
                     self.unitTypeComboBox.addItem(self._data_.unitType)
                     self.unitTypeComboBox.setCurrentIndex(self.unitTypeComboBox.count())
-                    if self._data_.unitType not in self._data_._availableUnitTypes_:
-                        self._data_._availableUnitTypes_.append(self._data_.unitType)
+                    if self._data_.unitType not in self._data_.availableUnitTypes:
+                        self._data_.availableUnitTypes.append(self._data_.unitType)
                 
                 else:
                     self.unitTypeComboBox.setCurrentIndex(unit_type_index)
@@ -11100,10 +11100,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
             # self.ageLineEdit.setText("%s" % self._data_.age)
             
-            # unit_types = self._data_._availableUnitTypes_
+            # unit_types = self._data_.availableUnitTypes
             
             self.unitTypeComboBox.clear()
-            self.unitTypeComboBox.addItems(self._data_._availableUnitTypes_)
+            self.unitTypeComboBox.addItems(self._data_.availableUnitTypes)
             
             unit_type = self._data_.analysisUnit.unit_type if isinstance(self._data_.analysisUnit, AnalysisUnit) else "NA"
 
@@ -11503,13 +11503,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 #newdata.analysisOptions["Discrimination"].pop("data_2D", None)
             
             if hasattr(newdata, "cell"):
-                newdata.cell = strutils.str2symbol(newdata.cell)
+                if isinstance(newdata.cell, str):
+                    newdata.cell = strutils.str2symbol(newdata.cell)
                 
             else:
                 newdata.cell = "NA"
                 
             if hasattr(newdata, "field"):
-                newdata.field = strutils.str2symbol(newdata.field)
+                if isinstance(newdata.field, str):
+                    newdata.field = strutils.str2symbol(newdata.field)
                 
             else:
                 newdata.field = "NA"
@@ -12119,7 +12121,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             processing = self._scans_filters_
             #target = self._data_.scans
             #target_chnames = self._data_.scansChannelNames
-            calibrations = self._data_._scans_axis_calibrations_
+            calibrations = self._data_.scansAxesCalibration
             
         if len(source) == 0:
             return

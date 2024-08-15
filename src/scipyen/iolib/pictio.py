@@ -47,7 +47,7 @@ import numpy as np
 import pandas as pd
 #import xarray as xa
 import h5py
-import vigra
+from core.vigra_patches import vigra
 import neo
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList

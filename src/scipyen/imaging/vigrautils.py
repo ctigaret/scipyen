@@ -6,7 +6,7 @@
 import typing
 import collections.abc
 from functools import singledispatch
-import vigra
+from core.vigra_patches import vigra
 import numpy as np
 import quantities as pq
 from .axiscalibration import (AxesCalibration, 

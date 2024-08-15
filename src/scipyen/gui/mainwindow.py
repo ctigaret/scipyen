@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
-
-# -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 """Main window for the Scipyen application
@@ -170,7 +166,7 @@ if neo.__version__ >= '0.13.0':
     
 else:
     NeoObjectList = list # alias for backward compatibility :(
-import vigra
+from core.vigra_patches import vigra
 import h5py
 import xarray as xa
 import quantities as pq

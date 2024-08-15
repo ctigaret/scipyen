@@ -71,7 +71,6 @@ class ArgumentError(Exception):
 class DescriptorException(Exception):
     pass
 
-
 class AttributeAdapter(ABC):
     """Abstract Base Class as a callable for pre- and post-validation
     """
@@ -116,35 +115,19 @@ class AttributeSpecification:
                 except:
                     scipywarn(f"Cannot construct a default value for type {type_}")
                     raise
-                        
-                        
     
-    
-    
-    
-    
-class BaseDescriptorValidator(ABC):
+class DescriptorValidatorABC(ABC):
     """Abstract superclass that implements a Python descriptor with validation.
     
     The descriptor operated on a private attribute of the owner by exposing a
     public name to the user as getter/setter accessor.
     
-    """
-    @staticmethod
-    def get_private_name(name:str) -> str:
-        """Find out what private name this would operate on
-        """
-        return f"_{name}_"
-    
-    def __set_name__(self, owner, name:str) -> None:
-        """Call this in the implementation's __init__
-        """
-        self.private_name = f"_{name}_"
-        self.public_name = name
-        
+    """        
     def __get__(self, obj, objtype=None) -> object:
         """Implements access to a data descriptor value (attribute access).
         """
+        if obj is None:
+            return getattr(self, "default", None)
         return getattr(obj, self.private_name)
     
     def __set__(self, obj, value) -> None:
@@ -155,60 +138,142 @@ class BaseDescriptorValidator(ABC):
         BaseDescriptorValidator. the validated value is then assigned to the 
         private attribute that is wrapped by this descriptor
         
-        If the descriptor owner contains at least one of the dict attributes
-        '_preset_hooks_' and '_postset_hooks_' mapping the descriptor's public
-        name to an AttributeAdapter instance, then the adapter instance will be
-        called BEFORE (respectively, AFTER) assignment of 'value' to descriptor.
+        If an instance inheriting from this class contains at least one of the 
+        attributes 'preset_hook' or 'postset_hook' that are bound to a function, 
+        bound instance method or a callable class, then these will be called 
+        BEFORE (preset_hook) or AFTER (postset_hook) assigning the value to the 
+        owner's attribute managed by this descriptor. 
+        
+        This mechanism allows parsing or otherwise "curating" the attribute
+        value BEFORE assigning it to the attribute (preset_hook), or executing
+        custom code AFTER assigning the value to the attribute (postset_hook).
+     
+        Alternatively, the descriptor's owner may contains one or both of the dict 
+        attributes '_preset_hooks_' and '_postset_hooks_' mapping the descriptor's 
+        public name to a function, bound method, or a callable instance.
         
         """
         # NOTE: 2022-01-03 20:45:48
         # value should be validated BEFORE anything
         self.validate(value)
         
-        if hasattr(obj, "_preset_hooks_") and isinstance(obj._preset_hooks_, dict):
-            preset_func = obj._preset_hooks_.get(self.public_name, None)
-            if isinstance(preset_func, AttributeAdapter):
-                preset_func(obj, value)
+        # NOTE: 2024-08-11 20:04:28
+        # all this gymnastics is to be accomodate flexibly the old and new approach
+        # of defining the preset_hooks and postset_hooks in the owner class, vs
+        # defining them in descriptors inheriting from this class
+        #
+        # step-by-step documentation below:
+        #
+        
+        # 'preset_func' is a callable to be invoked BEFORE the supplied 'value' 
+        # is set by this descriptor to the corresponding attribute of the owner 
+        # ('obj').
+        #
+        # The callable can be a function, a bound method of the owner, or the
+        # instance of a class which defines the special method '__call__'; an 
+        # example of the latter case is the AttributeAdapter class defined in 
+        # this module.
+        #
+        # The function should expect at least one positional parameters:
+        # • the attribute owner ('obj')
+        # • the value of the attribute ('value') - in case the callable uses it
+        # • 'self' (mandatory for bound methods; this includes the __call__ special method)
+        # to 'curate' other attributes of the owner
+        #
+        # If the callable is a bound method or an instance of a callable class, then
+        # the first parameter is always the special object 'self' (a pointer to the 
+        # instance of the object which owns the method); this also applies to the
+        # '__call__' method of the callable object. Therefore, in this case, at least
+        # two positional parameters are expected: 'self', 'obj', and possibly 'value'
+        #
+        # At the moment no other parameters are accepted, but in the future I
+        # might want to expand this.
+        #
+        # Depending on what is needed, the preset_func may (although it shouldn't)
+        # alter 'value' itself.
+        preset_func = None
+        
+        # where/how is preset_func defined:
+        #
+        # a) as the instance attribute 'preset_hook' of this descriptor 
+        # (initialized in the c'tor)
+        if hasattr(self, "preset_hook"):
+            if isinstance(self.preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.preset_hook, "__call__", None)):
+                # above checxk includes a generic way to check for a callable; AttributeAdapter is but one example
+                preset_func = self.preset_hook
+        
+        # OR :
+        # b) as a member of the instance attribute '_preset_hooks_' of the owner ('obj');
+        # When defined, obj._preset_hooks_ is a dict which maps the name of 
+        # the attribute set by this descriptor, to the callable to be invoked
+        # BEFORE actually setting the attribute value to 'value'
+        #
+        # NOTE: this is old code; 
+        elif hasattr(obj, "_preset_hooks_") and isinstance(obj._preset_hooks_, dict):
+            obj_preset_hook = obj._preset_hooks_.get(self.public_name, None)
+            if isinstance(obj_preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_preset_hook, "__call__", None)):
+                preset_func = obj_preset_hook
                 
-            elif isinstance(preset_func, types.MethodType) and inspect.ismethod(getattr(obj, preset_func.__name__, None)):
-                fargs = inspect.getfullargspec(preset_func)
-                if len(fargs.args) == 0:
-                    preset_func(obj)
-                    
-                else:
-                    preset_func(obj, value)
-                
+        if preset_func is not None:
+            # check callable definition to see how many arguments (positional parameters) the callable expects
+            # the invoke the callable
+            if isinstance(preset_func, types.MethodType):
+                args = inspect.getfullargspec(preset_func).args[1:]
             elif isinstance(preset_func, types.FunctionType):
-                fargs = inspect.getfullargspec(preset_func)
-                if len(fargs.args) == 1:
-                    preset_func(obj)
-                elif len(fargs.args) > 1:
-                    preset_func(obj,value)
+                args = inspect.getfullargspec(preset_func).args
+            else:
+                args = inspect.getfullargspec(preset_func.__call__).args[1:]
+            
+            # print(f"{self.__class__.__name__}<DescriptorValidatorABC> preset function for {self.public_name} in {type(obj).__name__}: {preset_func} with {len(args)} parameters")
+            if len(args) == 1: 
+                preset_func(obj)
+            elif len(args) == 2:
+                preset_func(obj, value)
+            else:
+                scipywarn(f"Ignoring the preset function {preset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters")
+                
                 
         setattr(obj, self.private_name, value)
         
         # NOTE: 2021-12-06 12:43:48 
         # call postset hooks ONLY AFTER the descriptor value had been set
         # (last line of code, above)
-        if hasattr(obj, "_postset_hooks_") and isinstance(obj._postset_hooks_, dict):
-            postset_func = obj._postset_hooks_.get(self.public_name, None)
-            if isinstance(postset_func, AttributeAdapter):
-                postset_func(obj, value)
-            elif isinstance(postset_func, types.MethodType) and inspect.ismethod(getattr(obj, postset_func.__name__, None)):
-                fargs = inspect.getfullargspec(postset_func)
-                if len(fargs.args) == 0:
-                    postset_func()
-                else:
-                    postset_func(value)
-                    
-            elif isinstance(postset_func, types.FunctionType):
-                fargs = inspect.getfullargspec(postset_func)
-                if len(fargs.args) == 1:
-                    postset_func(obj)
-                elif len(fargs.args) > 1:
-                    postset_func(obj,value)
-                
         
+        # NOTE: 2024-08-13 14:51:07
+        # see comments above, for preset_hook — here, I apply the same logic
+        # the only difference is that we only take at most one positional 
+        # parameter: 'value' (for bound methods and __call__ this would be the second
+        # poitional parameter, as explained above for preset_func)
+        postset_func = None
+        
+        if hasattr(self, "postset_hook"):
+            if isinstance(self.postset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.postset_hook, "__call__", None)):
+                postset_func = self.postset_hook
+        
+        elif hasattr(obj, "_postset_hooks_") and isinstance(obj._postset_hooks_, dict):
+            obj_postset_hook = obj._postset_hooks_.get(self.public_name, None)
+            if isinstance(obj_postset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_postset_hook, "__call__", None)):
+                postset_func = obj_postset_hook
+        
+        if postset_func is not None:
+            # print(f"postset {postset_func} for {self.public_name}")
+            if isinstance(postset_func, types.MethodType):
+                args = inspect.getfullargspec(postset_func).args[1:]
+            elif isinstance(postset_func, types.FunctionType):
+                args = inspect.getfullargspec(postset_func).args
+            else:
+                args = inspect.getfullargspec(postset_func.__call__).args[1:]
+                
+            if len(args) == 0:
+                postset_func()
+                
+            elif len(args) == 1:
+                postset_func(obj)
+            elif len(args) == 2:
+                postset_func(obj, value)
+            else:
+                scipywarn(f"Ignoring the postset function {postset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters")
+                
     def __delete__(self, obj):
         if hasattr(obj, self.private_name):
             delattr(obj, self.private_name)
@@ -220,6 +285,41 @@ class BaseDescriptorValidator(ABC):
     @abstractmethod
     def validate(self, value):
         pass
+    
+class BaseDescriptorValidator(DescriptorValidatorABC):
+    @staticmethod
+    def make_private_name(name:str) -> str:
+        """Find out what private name this would operate on
+        """
+        return f"_{name}_"
+    
+    def __init__(self, name:str,
+                 default:typing.Optional[typing.Any]=None,
+                 use_private:bool = True, 
+                 preset_hook:typing.Optional[typing.Union[collections.abc.Callable, types.MethodType, types.FunctionType]] = None,
+                 postset_hook:typing.Optional[typing.Union[collections.abc.Callable, types.MethodType, types.FunctionType]] = None,
+                 ):
+        self.use_private = use_private
+        self.private_name = self.make_private_name(name) if use_private else name
+        self.public_name = name
+        self.default=default
+
+        self.preset_hook = None
+        if isinstance(preset_hook, (collections.abc.Callable, types.MethodType, types.FunctionType)):
+            self.preset_hook = preset_hook
+            
+        self.postset_hook = None
+        if isinstance(postset_hook, (collections.abc.Callable, types.MethodType, types.FunctionType)):
+            self.postset_hook = postset_hook
+            
+    def __set_name__(self, owner, name:str) -> None:
+        """Call this in the implementation's __init__
+        """
+        self.private_name = f"_{name}_"
+        self.public_name = name
+        
+    def validate(self, value):
+        pass # validates everything
     
 class ImmutableDescriptor(BaseDescriptorValidator):
     """
@@ -449,13 +549,17 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
         
             
         """
-        self.private_name = f"_{name}_"
-        self.public_name = name
+        preset_hook = kwargs.pop("preset_hook", None)
+        postset_hook = kwargs.pop("postset_hook", None)
+        super().__init__(name, defval, True, preset_hook, postset_hook)
+        # self.private_name = f"_{name}_"
+        # self.public_name = name
         
         # NOTE: predicates must be unary predicates; 
         # otherwise, they will raise exceptions when called
         self.predicates = set()
         self.types = set() # allowed value types
+        # self.default = defval
         # self.hashables = set() # values for hashables (can be used as keys)
         # self.non_hashables = set() # values for non-hashables - referenced by their id()
         # self.dcriteria = dict() # dictionary of criteria:
@@ -1933,7 +2037,177 @@ def __check_type__(attr_type:typing.Union[type, typing.Tuple[type]],
     
     return False
 
-def parse_descriptor_specification(x:tuple, allow_none:bool=True):
+def parse_descriptor_specification(x:tuple, allow_nodata:bool=True):
+    # NOTE: 2024-08-09 22:26:15 TODO URGENTLY
+    # this is getting too unwieldy
+    # must redesign BaseScipyenData based on dataclass!
+    import numpy as np
+    import quantities as pq
+    import pandas as pd
+    from dataclasses import MISSING
+    from core.datatypes import NoData
+    
+    default_value = NoData
+    acceptable_types = NoData
+    acceptable_lengths = noData
+    acceptable_element_types = NoData
+    acceptable_ndims = NoData
+    acceptable_shape = NoData
+    acceptable_units = NoData
+    acceptable_dtypes = NoData
+    
+    name = x[0]
+
+    if len(x) == 2: 
+        # Rules family A
+        # NOTE: 2024-08-09 22:01:30
+        # if the default value _IS_ a type or a tuple of types, then these must
+        # be explicitly stated according to rule 3 i.e.:
+        # • in the first case (a type) pass type as x[1] and the actual type in x[2]
+        # • in the second case pass tuple as x[1] and a tuple of types as x[2]
+        if isinstance(x[1], type):                                              
+            # rule A.1
+            # use this as descriptor value type, try to use its default c'tor
+            # to generate a default value (some types already "provide" a suitable
+            # default value, see below)
+            acceptable_types = (x[1], )
+            
+            if allow_nodata:
+                default_value = None
+            else:
+                if issubclass(x[1], type(MISSING)):
+                    default_value = MISSING
+                elif issubclass(x[1], type(pd.NA)):
+                    default_value = pd.NA
+                elif issubclass(x[1], type(None)):
+                    default_value = None
+                elif issubclass(x[1], pq.Quantity):
+                    # BUG: 2024-08-09 21:51:23 FIXME
+                    # what if we pass here an AnalogSignal?
+                    # TODO: 2024-08-09 21:57:40 need to decide:
+                    # 
+                    if not allow_nodata:
+                        raise DescriptorException(f"Insufficient descriptor parameters for {x[1][0]}: I need at least ndim and a default value")
+                else:
+                    try:
+                        # try default c'tor: constructor with no parameters
+                        default_value = x[1]()
+                    except:
+                        if not allow_nodata:
+                            raise DescriptorException(f"The type {x[1].__name__} does not have a default constructor; a default value must be supplied")
+            
+        elif isinstance(x[1], tuple) and all(isinstance(t, type) for t in x[1]):    
+            # rule A.2
+            # x[1] is a tuple of types: use these as acceptable types - somewhat
+            # contrived situation when all types belong to the same inheritance
+            # hierarchy;
+            # in any case, use the first of these types to supply a default value
+            # as in rule A.1
+            acceptable_types = x[1]
+            if allow_nodata:
+                default_value = None
+            else:
+                if issubclass(x[1][0], type(MISSING)):
+                    default_value = MISSING
+                elif issubclass(x[1][0], type(pd.NA)):
+                    default_value = pd.NA
+                elif issubclass(x[1][0], type(NoneType)):
+                    default_value = None
+                elif issubclass(x[1][0], pq.Quantity):
+                    if not allow_nodata:
+                        raise DescriptorException(f"Insufficient descriptor parameters for {x[1][0]}: I need at least ndim and a default value")
+                else:
+                    try:
+                        default_value = x[1][0]()
+                    except:
+                        if not allow_nodata:
+                            raise DescriptorException(f"The type {x[1][0].__name__} does not have a default constructor; a default value must be supplied")
+            
+        else:                                                                       
+            # rule A.3: x[1] is neither a type nor a tuple of types ⇒ use it as 
+            # default value; acceptable types is its type
+            default_value = x[1]
+            acceptable_types = (type(x[1]), )
+            
+    elif len(x) >= 3:  
+        # Rules family B -> x[1] MUST be a type ;
+        # x[2] is either the default value (or dataclasses.field) or a specific
+        # value as detailed below:
+        # otherwise, x[2] can specify (mutually exclusive) the acceptable:
+        #   default value   → rule B.1
+        #   length          — when x[2] is an int and x[1] in (bytes, bytearray, str, deque, dict, list, tuple, set)
+        #                   → rule B.2
+        #   ndim            — when x[2] is an int and x[1] in (np.ndarray, )
+        #                   → rule B.3
+        #   shape           — when x[2] is a tuple of int and x[1] in (np.ndarray, )
+        #                   → rule B.4
+        #   element types   — when x[2] is a type or tuple of types and x[1] in (deque, dict, list, tuple, set)
+        #                   → rule B.5.a (x[2] is a type) and B.5.b (x[2]is a tuple of types)
+        #   dtype(s)        - when x[2] is a dtype or tuple of dtypes and x[1] is a subclass of np.ndarray
+        #                   → rule B.6.a (dtype) and B.6.b (tuple of dtypes)
+        # when x[1] is a tuple of class names
+
+        if isinstance(x[1], type): 
+            if issubclass(x[1], (str, bytes, bytearray, dict, set, tuple, list, deque)):
+                if isinstance(x[2], int) and x[2] >= 0:
+                    # rule B.2
+                    acceptable_lengths = (x[2], )
+
+                elif issubclass(x[1], (dict, set, tuple, list, deque)): # factoring out
+                    # rules B.5
+                    if isinstance(x[2], type):
+                        # rule B.5.a
+                        acceptable_element_types = (x[2], ) # also used for value types in a dict
+
+                    elif isinstance(x[2], tuple) and all(isinstance(v, type) for v in x[2]):
+                        # rule B.5.b
+                        acceptable_element_types = x[2] # also used for value types in a dict
+
+                elif isinstance(x[2], x[1]):
+                    # rule B.1
+                    default_value = x[2]
+                        
+                elif len(x) < 4 and not allow_nodata:
+                    raise DescriptorException() # mismatch between specified type and default value
+
+            elif issubclass(x[1], np.ndarray): # or derived (pq.Quantity, VigraArray, neo.BaseSignal):
+                # x[2] is either ndim, shape, dtype, or units, 
+                if isinstance(x[2], int) and x[2] >= 0:
+                    # rule B.3
+                    acceptable_ndims = (x[2], ) # ignored for neo.BaseSignal & derived
+
+                elif isinstance(x[2], np.dtype):
+                    # rule B.6.a
+                    acceptable_dtypes = (x[2], )
+                    
+                elif isinstance(x[2], tuple):
+                    if all(isinstance(v, int) and v >=0 for v in x[2]):
+                        # ryle B.4
+                        acceptable_shape = x[2]
+                        
+                    elif all(isinstance(v, np.dtype) for v in x[2]):
+                        # rule B.6.b
+                        acceptable_dtypes = x[2]
+
+            elif isinstance(x[2], x[1]):
+                default_value = x[2]
+
+            elif len(x) < 4 and not allow_nodata:
+                raise DescriptorException()
+
+        else:
+            raise DescriptorException("Second parameter must be a type")
+
+        if len(x) == 4:   
+            # rules family C
+            # fourth element is the default value
+            if not allow_nodata:
+                if not isinstance(x[3], acceptable_types):
+                    raise DescriptorException("Fourth element is not a suitable default value")
+            default_value = x[3]
+            # TODO: 2024-08-10 07:24:45 
+            # implement the used of a functor (like filter does, in dataclasses)
+
     pass
                 
 # NOTE: 2024-07-29 09:43:00
@@ -2779,11 +3053,13 @@ def parse_descriptor_specification_old(x:tuple, allow_none:bool=True):
         
 class WithDescriptors(object):
     """ Base for classes that create their own descriptors.
+    NOTE: 2024-08-11 20:19:08
+    This class is on its way out, to be suoerceded by dataclasse-based mechanism.
     
     A descriptor is specified in the :class: definition as the :class: attribute
-    '_descriptor_attributes_' (a tuple of tuples).
+    '_attributes_' (a tuple of tuples).
     
-    Each elements in the '_descriptor_attributes_' tuple contains at least two 
+    Each elements in the '_attributes_' tuple contains at least two 
     elements, where:
     
     1) the first element is always a str: the public name of the descriptor, 
@@ -2804,7 +3080,7 @@ class WithDescriptors(object):
     contain the attributes '_preset_hooks_' and '_postset_hooks_', respectively.
     
     These are dictionaries that map public descriptor names (as given in 
-    '_descriptor_attributes_') to instances of AttributeAdapter.
+    '_attributes_') to instances of AttributeAdapter.
     
     An AttributeAdapter instance is a callable that performs certain actions on
     the attributes of its owner whenever a descriptor is 'set' to a certain
@@ -2830,7 +3106,7 @@ class WithDescriptors(object):
     """
     # Tuple of attribute public name (str) to attribute specification, see the
     # 'parse_descriptor_specification' function in this module, for details.
-    _descriptor_attributes_ = tuple()
+    _attributes_ = tuple()
     
     # Mapping (attribute name) : str ↦ AttributeAdapter
     # Maps a public attribute name (see above) to an instance of AttributeAdapter.
@@ -2945,7 +3221,7 @@ class WithDescriptors(object):
             delattr(cls, name)
             
     def __init__(self, *args, **kwargs):
-       for attr in self._descriptor_attributes_:
+       for attr in self._attributes_:
             attr_dict = parse_descriptor_specification(attr)
             suggested_value = kwargs.pop(attr[0], attr_dict["value"])
             if isinstance(suggested_value, tuple) and len(suggested_value):
@@ -2981,9 +3257,9 @@ class WithDescriptors(object):
         if desc_impl is None:
             desc_impl = DescriptorGenericValidator
   
-        for attr_spec in self._descriptor_attributes_:
+        for attr_spec in self._attributes_:
             attr_dict = parse_descriptor_specification(attr_spec)
-            attr_name = desc_impl.get_private_name(attr_spec[0])
+            attr_name = desc_impl.make_private_name(attr_spec[0])
             # check if state brings a private attribute wrapped in a descriptor
             # if it does, use it and remove it from state,
             # else use default proposed by parsing
@@ -3005,7 +3281,7 @@ class WithDescriptors(object):
         #
         if isinstance(self, neo.core.baseneo.BaseNeo):
             for attr_spec in self._recommended_attrs:
-                attr_name = desc_impl.get_private_name(attr_spec[0])
+                attr_name = desc_impl.make_private_name(attr_spec[0])
                 attr_dict = parse_descriptor_specification(attr_spec)
                 suggested_value = state.pop(attr_name, attr_dict["value"])
                 if isinstance(suggested_value, tuple) and len(suggested_value):

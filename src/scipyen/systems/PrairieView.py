@@ -19,7 +19,7 @@ import threading
 import numpy as np
 import quantities as pq
 import neo
-import vigra
+from core.vigra_patches import vigra
 from qtpy import (QtCore, QtWidgets, QtGui,)
 from qtpy.QtCore import Signal, Slot
 from qtpy.uic import loadUiType as __loadUiType__ 
@@ -2009,7 +2009,7 @@ class PVScan(object):
         for future in concurrent.futures.as_completed(futures):
             (scans, scene) = future.result()
         
-        #meta = self.metadata()
+        meta = self.metadata()
         
         kw = dict()
         kw["name"] = self.name
@@ -2021,7 +2021,10 @@ class PVScan(object):
         if analysisOptions is not None:
             kw["analysisOptions"] = analysisOptions
             
-        return ScanData(scene=scene, scans=scans, **kw)
+        return ScanData(scene=scene, scans=scans, name=self.name,
+                        electrophysiology=electrophysiology,
+                        analysisOptions=analysisOptions,
+                        metadata=self.metadata())
             
 
         #ret = ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)

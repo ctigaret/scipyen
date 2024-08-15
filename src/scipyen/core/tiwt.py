@@ -7,7 +7,7 @@ from __future__ import print_function
 
 import sys
 # vigra: http://ukoethe.github.io/vigra/doc-release/vigranumpy/index.html
-import vigra
+from core.vigra_patches import vigra
 import numpy as np
 import numpy.matlib as mlib
 

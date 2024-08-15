@@ -38,7 +38,7 @@ import pandas as pd
 import neo
 from scipy import stats
 import quantities as pq
-import vigra
+from core.vigra_patches import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules

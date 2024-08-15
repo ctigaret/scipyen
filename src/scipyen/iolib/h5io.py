@@ -110,7 +110,7 @@ import json, pickle
 import h5py
 import numpy as np
 import nixio as nix 
-import vigra
+from core.vigra_patches import vigra
 import pandas as pd
 import quantities as pq
 import neo

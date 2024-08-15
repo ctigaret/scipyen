@@ -10,7 +10,7 @@ import quantities as pq
 #import xarray as xa
 import numpy as np
 import neo
-import vigra
+from core.vigra_patches import vigra
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Signal, Slot, Property
