@@ -1448,7 +1448,7 @@ class ScanDataComponentDescriptor(BaseDescriptorValidator):
                  preset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
                  postset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
                  accept_none:bool=True):
-        super().__init__(name, default, use_private=False, 
+        super().__init__(name, default, use_private=True, 
                          preset_hook=preset_hook, 
                          postset_hook=postset_hook)
         if isinstance(types, type):
@@ -1642,21 +1642,6 @@ class ScanData(BaseScipyenData):
         ("analysisMode",                    ScanDataAnalysisMode.frame),
         ("type",                            ScanDataType.linescan),
         )
-    
-    # preset and postset hooks needed by the image data descriptors
-    # _preset_hooks_:typing.ClassVar = {
-    #     "scans": ScanDataImageParser(None, "scans"), # AttributeAdapter, ABC def'ed in prog
-    #     "scene": ScanDataImageParser(None, "scene"), # AttributeAdapter
-    #     }
-    
-    # _postset_hooks:typing.ClassVar = {
-    #         "scans": ScanDataFramesMapUpdater(self, "scans"),
-    #         "scene": ScanDataFramesMapUpdater(self, "scene"),
-    #         "electrophysiology": ScanDataFramesMapUpdater(self, "electrophysiology"),
-    #         "metadata": self._parse_metadata_,
-    #         }
-    
-
     
     _attributes_:typing.ClassVar = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ 
     # ### END class variables
@@ -2057,31 +2042,31 @@ class ScanData(BaseScipyenData):
         """
         name = self.name if isinstance(self.name, str) else ""
         result = list()
-        result.append("%s: " % self.__class__.__name__)
-        result.append("Name: %s;" % name)
-        result.append("Type: %s;" % self.scanType.name)
-        result.append("Analysis mode: %s;" % self.analysisMode.name)
-        result.append("Scene channels: %s;" % str(self.sceneChannelNames))
-        result.append("Scene frames: %d;" % self.sceneFrames)
-        result.append("Scene frame axis: %s;" % self.sceneFrameAxis)
-        result.append("Scans channels: %s;" % str(self.scansChannelNames))
-        result.append("Scans frames: %d;" % self.scansFrames)
-        result.append("Scans frame axis: %s;" % self.scansFrameAxis)
+        result.append(f"{self.__class__.__name__}")
+        result.append(f"Name: {name};")
+        result.append(f"Type: {self.type.name};")
+        result.append(f"Analysis mode: {self.analysisMode.name};" )
+        result.append(f"Scene channels: {str(self.sceneChannelNames)};" )
+        result.append(f"Scene frames: {self.sceneFrames};")
+        result.append(f"Scene frame axis: {self.sceneFrameAxis};")
+        result.append(f"Scans channels: {str(self.scansChannelNames)};")
+        result.append(f"Scans frames: {self.scansFrames};")
+        result.append(f"Scans frame axis: {self.scansFrameAxis};" )
         
         if len(self.triggerProtocols):
             protocol_names = [p.name for p in self.triggerProtocols]
-            result.append("Protocols: %s" % (", ".join(protocol_names)))
+            result.append(f"Protocols: {(', '.join(protocol_names))}")
             
-        result.append("Analysis unit (based on entire data):\n%s;" % self.analysisUnit())
+        result.append(f"Analysis unit (based on entire data):\n{self.analysisUnit()};")
         
         if len(self.analysisUnits):
             analysis_units = [a.__repr__() for a in self.analysisUnits]
-            result.append("Nested analysis units: %s;" % "; ".join(analysis_units))
+            result.append(f"Nested analysis units: {'; '.join(analysis_units)};")
             
         result.append("Annotations:")
         
         for k, v in self.annotations.items():
-            result.append("%s: %s" % (str(k), str(v)))
+            result.append(f"{k}: {v}")
             
         return "\n".join(result)
     
@@ -4715,7 +4700,7 @@ class ScanData(BaseScipyenData):
         #
         result = ScanData()
         
-        result._scandatatype_ = self.scanType
+        result._scandatatype_ = self.type
         result._analysismode_ = self.analysisMode
         result.analysisOptions  = deepcopy(self.analysisOptions)
         
@@ -8282,7 +8267,7 @@ class ScanData(BaseScipyenData):
         """
         result = ScanData()
         
-        result._scandatatype_ = self.scanType
+        result._scandatatype_ = self.type
         result._analysismode_ = self.analysisMode
         result.analysisOptions  = deepcopy(self.analysisOptions)
         

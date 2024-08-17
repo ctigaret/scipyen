@@ -7,7 +7,7 @@ import vigra
 # module, but a dunction `divide` is present
 # now, vigra.ufunc.true_divide is called by VigraArray.__truediv__, so 
 # the following monkey patch hopefully solves this
-
-vigra.ufunc.true_divide = vigra.ufunc.divide
+if not hasattr(vigra.ufunc, "true_divide"):
+    vigra.ufunc.true_divide = vigra.ufunc.divide
 
 

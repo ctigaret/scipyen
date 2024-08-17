@@ -252,7 +252,9 @@ from imaging.imageprocessing import *
 
 # NOTE: 2024-05-30 14:25:00 see  NOTE: 2024-05-30 14:16:25
 from imaging import scandata
-from imaging.scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
+from imaging.scandata import (ScanDataType, ScanData, ScanDataAnalysisMode,
+                              ScanDataOptions,
+                              AnalysisUnit, check_apiversion, scanDataOptions)
 from imaging import axisutils
 from imaging.axisutils import dimEnum
 from imaging.axiscalibration import (AxesCalibration, 
@@ -913,10 +915,10 @@ def getProfile(scandata, roi, scene=True):
     
     
     
-    if scandata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+    if scandata.analysisMode != ScanDataAnalysisMode.frame:
         raise NotImplementedError("%s analysis not yet supported" % self.analysisMode)
     
-    if scandata.scanType != ScanData.ScanDataType.linescan:
+    if scandata.scanType != ScanDataType.linescan:
         raise NotImplementedError("%s not yet supported" % self.scanType)
     
 def averageEPSCaTs(scandata, epscatname, frame_index = None):
@@ -1003,11 +1005,11 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     if len(lsdata.scans) == 0:
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
-    if lsdata.scanType != ScanData.ScanDataType.linescan:
-        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name,lsdata.scanType))
+    if lsdata.scanType != ScanDataType.linescan:
+        raise ValueError("%s was expected to be a ScanDataType.linescan experiment; it has %s instead" % (lsdata.name,lsdata.scanType))
         
-    if lsdata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
-        raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
+    if lsdata.analysisMode != ScanDataAnalysisMode.frame:
+        raise ValueError("%s was expected to have a ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
         
     if len(lsdata.analysisOptions) == 0:
         raise ValueError("%s has no analysis options" % lsdata.name)
@@ -1657,11 +1659,11 @@ def analyseFrame(lsdata:ScanData, frame:int, unit=None, indicator_channel_ndx=No
     if len(lsdata.scans) == 0:
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
-    if lsdata.scanType != ScanData.ScanDataType.linescan:
-        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.type))
+    if lsdata.scanType != ScanDataType.linescan:
+        raise ValueError("%s was expected to be a ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.type))
         
-    if lsdata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
-        raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
+    if lsdata.analysisMode != ScanDataAnalysisMode.frame:
+        raise ValueError("%s was expected to have a ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
         
     if len(lsdata.analysisOptions) == 0:
         raise ValueError("%s has no analysis options defined" % lsdata.name)
@@ -9807,7 +9809,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if not check_apiversion(data) and hasattr(data, "_upgrade_API_"):
                 data._upgrade_API_()
                 
-            return data._scandatatype_ == ScanData.ScanDataType.linescan and data._analysismode_ == ScanData.ScanDataAnalysisMode.frame
+            return data._scandatatype_ == ScanDataType.linescan and data._analysismode_ == ScanDataAnalysisMode.frame
         
         except Exception as e:
             traceback.print_exc()
@@ -11885,10 +11887,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+        if self._data_.analysisMode != ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.type != ScanData.ScanDataType.linescan:
+        if self._data_.type != ScanDataType.linescan:
             raise NotImplementedError("%s not yet supported" % self._data_.type)
 
         self.generateScanRregionProfilesFromScans() 
@@ -11910,10 +11912,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+        if self._data_.analysisMode != ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.type != ScanData.ScanDataType.linescan:
+        if self._data_.type != ScanDataType.linescan:
             raise NotImplementedError("%s not yet supported" % self._data_.type)
         
         data = self._data_.scene
@@ -11997,10 +11999,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+        if self._data_.analysisMode != ScanDataAnalysisMode.frame:
             raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
         
-        if self._data_.type != ScanData.ScanDataType.linescan:
+        if self._data_.type != ScanDataType.linescan:
             raise NotImplementedError("%s not yet supported" % self._data_.type)
 
         data = self._data_.scans
@@ -12262,7 +12264,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
             for k in process_channel_ndx:
                 chn_cal = AxesCalibration(source[k].axistags["c"])
-                chn_cal.calibrateAxis(result[k].axistags["c"])
+                chn_cal.calibrateAxes()
+                # chn_cal.calibrateAxis(result[k].axistags["c"])
             
             #target[:] = result[:]
             #target_chnames[:] = process_channel_names

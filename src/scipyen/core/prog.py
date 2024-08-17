@@ -128,7 +128,8 @@ class DescriptorValidatorABC(ABC):
         """
         if obj is None:
             return getattr(self, "default", None)
-        return getattr(obj, self.private_name)
+        # if hasattr(obj, )
+        return getattr(obj, self.private_name, getattr(self, "defult", None))
     
     def __set__(self, obj, value) -> None:
         """Assigns a new value to the private attribute accessed by the descriptor.
@@ -153,6 +154,11 @@ class DescriptorValidatorABC(ABC):
         public name to a function, bound method, or a callable instance.
         
         """
+        
+        # print(f"{self.__class__.__name__}.__set__: setting {self.public_name} ({self.private_name})") 
+        # print(f"{self.__class__.__name__}.__set__: setting {self.public_name} ({self.private_name}) to {value} ") 
+        # print(f"{self.__class__.__name__}.__set__: setting {self.public_name} ({self.private_name}) to {value} for object {obj}") 
+        
         # NOTE: 2022-01-03 20:45:48
         # value should be validated BEFORE anything
         self.validate(value)
@@ -300,8 +306,8 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
                  postset_hook:typing.Optional[typing.Union[collections.abc.Callable, types.MethodType, types.FunctionType]] = None,
                  ):
         self.use_private = use_private
-        self.private_name = self.make_private_name(name) if use_private else name
         self.public_name = name
+        self.private_name = self.make_private_name(name) if self.use_private else name
         self.default=default
 
         self.preset_hook = None
@@ -312,11 +318,13 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
         if isinstance(postset_hook, (collections.abc.Callable, types.MethodType, types.FunctionType)):
             self.postset_hook = postset_hook
             
-    def __set_name__(self, owner, name:str) -> None:
-        """Call this in the implementation's __init__
-        """
-        self.private_name = f"_{name}_"
-        self.public_name = name
+    # def __set_name__(self, owner, name:str) -> None:
+    #     """Call this in the implementation's __init__
+    #     """
+    #     # print(f"{self.__class__.__name__}.__set_name__({name})")
+    #     self.public_name = name
+    #     self.private_name = self.make_private_name(name) if self.use_private else name
+    #     # print(f"\t{self.__class__.__name__}.__set_name__ ⇒ public: {self.public_name} , private: {self.private_name}")
         
     def validate(self, value):
         pass # validates everything
