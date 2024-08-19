@@ -11038,16 +11038,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #print("LSCaTWindow._update_ui_fields_ BEGIN")
         #traceback.print_stack()
         
-        if self._data_ is not None:
+        # print(f"{self.__class__.__name__}._update_ui_fields_:")
+        
+        if isinstance(self._data_, ScanData):
             if self._data_var_name_ is None:
                 if hasattr(self._data_, "name") and self._data_.name is not None:
                     self._data_var_name_ = strutils.str2symbol(self._data_.name)
                     
                 else:
                     self._data_var_name_ = ""
-                    
-            # self.scanDataVarNameLabel.setText(self._data_var_name_)
-            self.baseScipyenDataWidget.dataVarNameLabel.setText(self._data_var_name_)
             
             if self._data_.modified:
                 self.setWindowTitle("%s * \u2014 LSCaT" % (self._data_var_name_))
@@ -11055,54 +11054,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             else:
                 self.setWindowTitle("%s \u2014 LSCaT" % (self._data_var_name_))
             
-            if hasattr(self._data_, "name") and self._data_.name is not None:
-                name = self._data_.name
-                
-            else:
-                name = ""
+#             if hasattr(self._data_, "name") and self._data_.name is not None:
+#                 name = self._data_.name
+#                 
+#             else:
+#                 name = ""
                 
             # ###
             # BEGIN Data tab
             dataWidgetsSignalBockers = [QtCore.QSignalBlocker(widget) for widget in \
                 (self.unitTypeComboBox, )]
-            
-            # dataWidgetsSignalBockers = [QtCore.QSignalBlocker(widget) for widget in \
-            #     (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit, self.genotypeComboBox, self.unitTypeComboBox, self.sexComboBox, self.ageLineEdit)]
-            
-            # self.sourceIDLineEdit.setText(self._data_.sourceID)
-            
-            # self.scanDataNameLineEdit.setText(self._data_.name)
-            # self.cellLineEdit.setText(self._data_.cell)
-            # self.fieldLineEdit.setText(self._data_.field)
-            
-#             genotypes = self._data_._availableGenotypes_
-#             
-#             self.genotypeComboBox.clear()
-#             self.genotypeComboBox.addItems(genotypes)
-            
-            # genotype_index = self.genotypeComboBox.findText(self._data_.genotype)
-            
-#             if genotype_index == -1:
-#                 self.genotypeComboBox.addItem(self._data_.genotype)
-#                 self.genotypeComboBox.setCurrentIndex(self.genotypeComboBox.count())
-#                 if self._data_.genotype not in self._data_._availableGenotypes_:
-#                     self._data_._availableGenotypes_.append(self._data_.genotype)
-#             
-#             else:
-#                 self.genotypeComboBox.setCurrentIndex(genotype_index)
-            
-            # sex_index = self.sexComboBox.findText(self._data_.sex)
-#             
-#             if sex_index == -1:
-#                 self._data_.genotype = "NA"
-#                 self.genotypeComboBox.setCurrentIndex(0)
-#                 
-#             else:
-#                 self.genotypeComboBox.setCurrentIndex(sex_index)
-                
-            # self.ageLineEdit.setText("%s" % self._data_.age)
-            
-            # unit_types = self._data_.availableUnitTypes
             
             self.unitTypeComboBox.clear()
             self.unitTypeComboBox.addItems(self._data_.availableUnitTypes)
@@ -11439,7 +11400,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             
         else:
             self._data_var_name_ = ""
-            self.baseScipyenDataWidget.dataVarNameLabel.setText(self._data_var_name_)
+            # self.baseScipyenDataWidget.dataVarNameLabel.setText(self._data_var_name_)
             # self.scanDataVarNameLabel.setText(self._data_var_name_)
 #             
             
@@ -11457,29 +11418,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         #print("LSCaTWindow._update_ui_fields_ END")
         
-    #@safeWrapper
-    #def _link_window_navigation_(self):
-        #if self._data_ is None:
-            #return
-        
-        #viewers = [w for w in self.sceneviewers] + \
-                  #[w for w in self.scansviewers] + \
-                  #[w for w in self.ephysviewers] + \
-                  #[w for w in self.profileviewers] + \
-                  #[w for w in self.scansblockviewers] + \
-                  #[w for w in self.sceneblockviewers]
-              
-        ##print("LSCaTWindow _link_window_navigation_: %d windows" % len(viewers))
-        ##for w in viewers:
-            ##print(w.windowTitle())
-        
-        #self.linkToViewers(*viewers)
-        
     @safeWrapper
-    def _parsedata_(self, newdata=None, varname=None):
+    def _parsedata_(self, newdata=None):#, varname=None):
         """Parses metainformation and then actually assigns the data to the _data_ attribute
         """
         if isinstance(newdata, ScanData):
+            name = getattr(newdata, "name", None)
+            if name is None or not (isinstance(name, str) and len(name.strip())):
+                name = self.workspaceSymbolForData(newdata)
+                newdata.name = name
+                
+            self.baseScipyenDataWidget.populate(newdata)
+
             #newdata._upgrade_API_()
             #print("LSCaTWindow _parsedata_ %s" % newdata.name)
             default_options = scanDataOptions()
@@ -11504,36 +11454,35 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 #newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["data_2D"]
                 #newdata.analysisOptions["Discrimination"].pop("data_2D", None)
             
-            if hasattr(newdata, "cell"):
-                if isinstance(newdata.cell, str):
-                    newdata.cell = strutils.str2symbol(newdata.cell)
-                
-            else:
-                newdata.cell = "NA"
-                
-            if hasattr(newdata, "field"):
-                if isinstance(newdata.field, str):
-                    newdata.field = strutils.str2symbol(newdata.field)
-                
-            else:
-                newdata.field = "NA"
+#             if hasattr(newdata, "cell"):
+#                 if isinstance(newdata.cell, str):
+#                     newdata.cell = strutils.str2symbol(newdata.cell)
+#                 
+#             else:
+#                 newdata.cell = "NA"
+#                 
+#             if hasattr(newdata, "field"):
+#                 if isinstance(newdata.field, str):
+#                     newdata.field = strutils.str2symbol(newdata.field)
+#                 
+#             else:
+#                 newdata.field = "NA"
                 
             self._selected_analysis_cursor_ = None
             self._selected_analysis_unit_ = None
                 
             self._data_ = newdata
-            
-            if isinstance(varname, str) and len(varname.strip()):
-                self._data_var_name_ = varname
-                
-            else:
-                self._data_var_name_ = newdata.name
+#             if isinstance(varname, str) and len(varname.strip()):
+#                 self._data_var_name_ = varname
+#                 
+#             else:
+#                 self._data_var_name_ = newdata.name
             
         else:
             raise TypeError("Expecting a ScanData object or None; got %s instead" % type(newdata).__name__)
             
-        if self._data_ is None:
-            return
+        # if self._data_ is None:
+        #     return
         
         # check if there are vertical cursors defined for scandata
         # and for each of these, check that they have a linked point
@@ -12374,18 +12323,26 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._clear_contents_()
         
         if isinstance(newdata, ScanData):
-            #print(newdata.name, doc_title)
-            if not isinstance(doc_title, str) or len(doc_title.strip()) == 0:
-                if len(newdata.name.strip()):
-                    doc_title = newdata.name
+            # name = getattr(newdata, "name", None)
+            # if name is None or not (isinstance(name, str) and len(name.strip())):
+            #     name = self.workspaceSymbolForData(newdata)
+            # print(f"{self.__class__.__name__}.setData:\n\tname = {newdata.name}")
+            # if not isinstance(doc_title, str) or len(doc_title.strip()) == 0:
+            #     doc_title = name
+#                 if len(newdata.name.strip()):
+#                     doc_title = newdata.name
+#                     
+#                 elif isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()):
+#                     doc_title = self._data_var_name_
+#                     
+#                 else:
+#                     doc_title = "ScanData"
+            # else:
+            #     doc_title = "ScanData"
                     
-                elif isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()):
-                    doc_title = self._data_var_name_
-                    
-                else:
-                    doc_title = "ScanData"
-                    
-            self._parsedata_(newdata, doc_title)
+            # print(f"{self.__class__.__name__}.setData:\n\tname = {newdata.name};\n\tdoc_title = {doc_title}")
+            
+            self._parsedata_(newdata)#, name)
             
             self._data_modifed_(False)
             
@@ -12398,7 +12355,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             # TODO in _parsedata_: when nothing is passed reset everything
             self._data_ = None
-            self._data_var_name_ = None
+            # self._data_var_name_ = None
             #self._clear_contents_()
             
     @Slot()

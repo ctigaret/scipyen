@@ -126,6 +126,7 @@ class DescriptorValidatorABC(ABC):
     def __get__(self, obj, objtype=None) -> object:
         """Implements access to a data descriptor value (attribute access).
         """
+        # print(f"{self.__class__.__name__}.__get__: {self.private_name} (public name: {self.public_name})")
         if obj is None:
             return getattr(self, "default", None)
         # if hasattr(obj, )

@@ -35,8 +35,8 @@ from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRout
 @dataclass
 class BaseScipyenData:
     name:str = ""
-    description:str =""
-    file_origin:typing.Optional[typing.Union[str, pathlib.Path]] = None
+    description:str = ""
+    file_origin:typing.Union[str, pathlib.Path] = dataclasses.field(default="")
     sourceID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     cell:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     field:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)

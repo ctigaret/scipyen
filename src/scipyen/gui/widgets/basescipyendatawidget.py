@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """Common widget for meta-information in results
 """
-import os, math, typing, datetime
+import os, math, typing, datetime, dataclasses
 from dataclasses import MISSING
 import numpy as np
 import quantities as pq
 from core import quantities as scq
 from core import strutils
 from core.datatypes import UnitTypes, GENOTYPES, NoData
+from core.basescipyen import BaseScipyenData
 import pandas as pd
 
 from qtpy import QtCore, QtGui, QtWidgets
@@ -192,15 +193,19 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
     
     def setValue(self, data:dict):
         if isinstance(data, dict):
-            self.dataVarName = os.path.splitext(os.path.basename(fileName))
-            self.dataName = data.get("Name", self.dataVarName)
-            self.sourceID = data.get("SourceID", pd.NA)
-            self.cell = data.get("Cell", pd.NA)
-            self.field = data.get("Field", pd.NA)
-            self.age = data.get("Age", pd.NA)
-            self.sex = data.get("Sex", pd.NA)
-            self.genotype = data.get("Genotype", pd.NA)
+            self.dataVarName = os.path.splitext(os.path.basename(data.get("file_origin", "")))[0]
+            self.dataName = data.get("name", self.dataVarName)
+            self.sourceID = data.get("sourceID", pd.NA)
+            self.cell = data.get("cell", pd.NA)
+            self.field = data.get("field", pd.NA)
+            self.age = data.get("age", pd.NA)
+            self.sex = data.get("sex", pd.NA)
+            self.genotype = data.get("genotype", pd.NA)
+            self.dataDescription = data.get("description", "")
             
+    def populate(self, data:BaseScipyenData):
+        self.setValue(dataclasses.asdict(data))
+        
     def clear(self):
         self.dataVarName = ""
         self.dataName = ""
@@ -210,6 +215,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
         self.age = pd.NA
         self.sex = pd.NA
         self.genotype = pd.NA
+        self.dataDescription = ""
             
     @Slot()
     def _slot_setDataName(self):

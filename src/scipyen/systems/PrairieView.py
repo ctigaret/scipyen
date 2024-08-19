@@ -814,15 +814,20 @@ class PVFrame(object):
         
         #channelNames = (f["channelName"] for f in self.files)
         
+        # print(f"{self.__class__.__name__}.__call__")
         for k in range(len(mdata["files"])):
+            fileName = self.files[k]['filename']
+            # print(f"\treading {fileName}")
             # NOTE: 2022-01-06 00:10:42
             # fdata: frame data
             # sdata: source data
             if filepath is not None:
-                fdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["filename"]))
+                fdata = pio.loadImageFile(os.path.join(filepath, fileName))
+                # fdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["filename"]))
             
             else:
-                fdata = pio.loadImageFile(self.files[k]["filename"])
+                fdata = pio.loadImageFile(fileName)
+                # fdata = pio.loadImageFile(self.files[k]["filename"])
                 
             if fdata.ndim == 2 and fdata.channelIndex == fdata.ndim:
                 fdata.insertChannelAxis() # make sure there is a channel axis
@@ -927,11 +932,15 @@ class PVFrame(object):
             # the source data is set up using the same blueprint as for frame data
             # ideally we should end up with one source data frame for each scans data frame
             if "source" in self.files[k] and all(self.files[k]["source"]):
+                sourceFileName = self.files[k]["source"]
+                # print(f"\treading source {sourceFileName}")
                 if filepath is not None:
-                    sdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["source"]))
+                    sdata = pio.loadImageFile(os.path.join(filepath, sourceFileName))
+                    # sdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["source"]))
                     
                 else:
-                    sdata = pio.loadImageFile(self.files[k]["source"])
+                    sdata = pio.loadImageFile(sourceFileName)
+                    # sdata = pio.loadImageFile(self.files[k]["source"])
                     
                 if sdata.ndim == 2 and sdata.channelIndex == sdata.ndim:
                     sdata.insertChannelAxis() # make sure there is a channel axis
@@ -1771,6 +1780,7 @@ class PVScan(object):
         return len(self.sequences)
     
     def __call__(self, filepath=None):
+        """Returns a tuple (scans, scene) where each element is a sequence of VigraArray"""
         # NOTE: 2017-10-24 22:47:12
         # get the type of the first sequence; this should be the same for ALL
         # sequences in this scan (otherwise, behaviour is undefined)
@@ -2003,6 +2013,8 @@ class PVScan(object):
         else:
             caller = self.__call__
             
+            
+        # read scans and scene vigra arrays concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(caller)]
             
@@ -2011,32 +2023,17 @@ class PVScan(object):
         
         meta = self.metadata()
         
-        kw = dict()
-        kw["name"] = self.name
-        kw["metadata"] = self.metadata()
-        
-        if isinstance(electrophysiology, neo.Block):
-            kw["electrophysiology"] = electrophysiology
-            
-        if analysisOptions is not None:
-            kw["analysisOptions"] = analysisOptions
+        file_origin = os.path.splitext(os.path.basename(self.filepath))[0]
+        rec_datetime = datetime.datetime.strptime(self.__attributes__["date"],
+                                                  "%d/%m/%Y %H:%M:%S %p")
             
         return ScanData(scene=scene, scans=scans, name=self.name,
                         electrophysiology=electrophysiology,
                         analysisOptions=analysisOptions,
+                        file_origin=file_origin,
+                        rec_datetime=rec_datetime,
                         metadata=self.metadata())
-            
 
-        #ret = ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
-        
-        #if isinstance(electrophysiology, neo.Block):
-            #ret.electrophysiology = electrophysiology
-            
-        #if isinstance(name, str) and len(name) > 0:
-            #ret.name = name
-            
-        #return ret
-    
     def scandata(self, *args, **kwargs):
         return self.scanData(*args, **kwargs)
         
@@ -2401,7 +2398,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.protocolEditorDialog.sig_requestProtocolAdd.connect(self._slot_protocolAddRequest)
         self.protocolEditorDialog.finished.connect(self._slot_protocolEditorFinished)
         
-        self.buttonBox.accepted.connect(self.slot_generateScanData)
+        # self.buttonBox.accepted.connect(self.slot_generateScanData)
         
     @Slot(int)
     def _slot_removeProtocol(self, index):
@@ -2947,6 +2944,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         NOTE: Clients need to connect custom slots to this dialog's accepted(),
         rejected(), or finished(int) signals
         """
+        # print(f"Slot {self.__class__.__name__}.done")
         if value == QtWidgets.QDialog.Accepted:
             self.slot_generateScanData()
             
@@ -2970,6 +2968,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         `scanData`. If self.auto_export is True, the ScanData object is also 
         exported to the Scipyen workspace.
         """
+        # print(f"{self.__class__.__name__}.slot_generateScanData")
         if isinstance(self._pvscan_, PVScan):
             self._scandata_ = self._pvscan_.scandata()
             

@@ -1647,12 +1647,18 @@ class ScanData(BaseScipyenData):
     # ### END class variables
     
     # ### BEGIN instance variables 
-    # type of scanning
-    type:ScanDataType = ScanDataType.linescan
+    # scene data — 2D raster scan where the scans above were acquired (and defined); see docstrings
+    # for corresponding attributes in the scans
+    scene:ScanDataComponentDescriptor = ScanDataComponentDescriptor("scene", None, list[vigra.VigraArray],
+                                                            preset_hook=ScanDataImageParser("scene"),
+                                                            postset_hook=ScanDataFramesMapUpdater("scene"))
+    
     # scans data (the actual raster scans: line scan, time or Z series, etc)
     scans:ScanDataComponentDescriptor = ScanDataComponentDescriptor("scans", None, list[vigra.VigraArray],
                                                             preset_hook=ScanDataImageParser("scans"),
                                                             postset_hook=ScanDataFramesMapUpdater("scans"))
+    # type of scanning
+    type:ScanDataType = dataclasses.field(default=ScanDataType.linescan, init=False)
     # scans:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
     
     # BUG 2024-08-14 21:11:36 FIXME
@@ -1689,11 +1695,6 @@ class ScanData(BaseScipyenData):
     # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
     scanTrajectory:typing.Optional[PlanarGraphics] = dataclasses.field(default=None, init=False)
     
-    # scene data — 2D raster scan where the scans above were acquired (and defined); see docstrings
-    # for corresponding attributes in the scans
-    scene:ScanDataComponentDescriptor = ScanDataComponentDescriptor("scene", None, list[vigra.VigraArray],
-                                                            preset_hook=ScanDataImageParser("scene"),
-                                                            postset_hook=ScanDataFramesMapUpdater("scene"))
     # scene:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
     #
     # see BUG 2024-08-14 21:11:36 for why these are commented-out
@@ -1738,7 +1739,7 @@ class ScanData(BaseScipyenData):
     modified:bool = dataclasses.field(default=False, init=False, compare=False)
     processed:bool = dataclasses.field(default=False, init=False, compare=False)
     availableUnitTypes:list = dataclasses.field(default_factory=lambda: [s for s in UnitTypes.values()], init=False, compare=False)
-    availableGenotypes:list = dataclasses.field(default_factory=lambda: [s for s in GENOTYPES], init=False, compare=False)
+    # availableGenotypes:list = dataclasses.field(default_factory=lambda: [s for s in GENOTYPES], init=False, compare=False)
     # ### END instance variables 
     
     def _get_data_child_component_(self, component:str):
@@ -1796,7 +1797,7 @@ class ScanData(BaseScipyenData):
     @safeWrapper
     # def __init__(self, scans=None, scene=None, electrophysiology=None, 
     #              metadata:typing.Optional[dict]=None, **kwargs):
-    def __post_init__(self):
+    def __post_init__(self, *args, **kwargs):
         """Constructs a ScanData object.
         
         Named parameters:
@@ -1868,6 +1869,8 @@ class ScanData(BaseScipyenData):
             When "auto", try to "parse" TriggerProtocol from ephys neo.Block data.
                 
         """
+        
+        # print(f"{self.__class__.__name__}.__post_init__:\n\targs: {args}\n\tkwrgs: {kwargs}")
         
         # if isinstance(scans, ScanData):
         #     self = scans.copy() # make a deep copy
