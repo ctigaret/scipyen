@@ -80,7 +80,6 @@ from core.quantities import (space_frequency_unit,
 
 
 """Maps vigra.AxisInfo keys (str, lower case) to vigra.AxisType flags
-On its way to DEPRECATION
 """
 standardAxisTypeKeys = Bunch({
     "a": vigra.AxisType.Angle,

@@ -175,14 +175,14 @@ def gaussianFilter1D(image, sigma, window=0.0):
     if not isinstance(image, vigra.VigraArray):
         raise TypeError("Expecting a VigraArray; got %s instead" % type(image).__name__)
     
-    if image.ndim <=3:
+    if image.ndim <= 3:
         if image.axistags.axisTypeCount(vigra.AxisType.NonChannel) != 2:
             raise TypeError("Expecting a VigraArray with two non-channel dimensions")
     
     else:
         raise TypeError("Expecting a VigraArray with two non-channel dimensions")
         
-    flt = vigra.filters.gaussianKernel(scale, window)
+    flt = vigra.filters.gaussianKernel(sigma, window)
     
     # NOTE: 2017-11-17 22:07:24 this operates on non-calibrated pixel values!
     # i.e. does not take into account existing channel axis calibration

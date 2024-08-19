@@ -884,7 +884,7 @@ class VTH(object):
         """Returns a list of specifications for handling `variable`.
 
         If `variable` is a type registered with VTH, or `variable` is an
-        instance of a type registeres wit VTH, returns a 3-tuple:
+        instance of a type registered with VTH, returns a 3-tuple:
         (viewer type, action name, priority), where:
 
             • viewer type is the Scipyen viewer class suitable to view the type

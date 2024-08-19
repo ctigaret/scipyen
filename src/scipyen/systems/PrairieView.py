@@ -2023,7 +2023,7 @@ class PVScan(object):
         
         meta = self.metadata()
         
-        file_origin = os.path.splitext(os.path.basename(self.filepath))[0]
+        file_origin = self.filepath
         rec_datetime = datetime.datetime.strptime(self.__attributes__["date"],
                                                   "%d/%m/%Y %H:%M:%S %p")
             
@@ -2979,6 +2979,11 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             #print("ephys", type(self._ephys_))
             if isinstance(self._ephys_, neo.Block):
                 self._scandata_.electrophysiology = self._ephys_
+                
+                self._scandata_.electrophysiology.name = self._scandata_.name
+                for k, segment in enumerate(self._scandata_.electrophysiology.segments):
+                    if not isinstance(segment.name, str) or len(segment.name.strip()) == 0:
+                        segment.name = f"Sweep {k}"
                 
             if isinstance(self.scanDataOptions, (ScanDataOptions, dict)):
                 self._scandata_.analysisOptions = self.scanDataOptions

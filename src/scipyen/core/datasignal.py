@@ -349,13 +349,18 @@ class DataSignal(BaseSignal):
                 domainargs["sampling_period"] = domainargs["t_start"]
                 domainargs["t_start"] = 0 * quants["domain_units"]
                 
+                
+        anns = annots.get("annotations", dict())
+        
+        if anns is None:
+            anns = dict()
         
 
         DataObject.__init__(self, name=strings["name"], 
                             file_origin=strings["file_origin"], 
                             description=strings["description"], 
                             array_annotations=annots["array_annotations"], 
-                            **annots["annotations"])
+                            **anns)
         
         self._domain_name_ = strings["domain_name"]
         self._origin = domainargs["t_start"]

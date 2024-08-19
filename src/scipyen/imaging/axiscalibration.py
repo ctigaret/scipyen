@@ -35,7 +35,7 @@ from core.utilities import (reverse_mapping_lookup, unique, counter_suffix,
 
 from core.traitcontainers import DataBag
 
-from core.prog import ArgumentError
+from core.prog import (ArgumentError, scipywarn)
 
 from .axisutils import (axisTypeName, 
                         axisTypeSymbol, 
@@ -47,6 +47,7 @@ from .axisutils import (axisTypeName,
                         sortedAxisTypes,
                         isValidAxisType,
                         isSpecificAxisType,
+                        standardAxisTypeKeys,
                         )
 
 AxisCalibrationDataType = typing.TypeVar("AxisCalibrationData")
@@ -1410,7 +1411,8 @@ class AxisCalibrationData(CalibrationData):
         """Dynamically generated vigra.AxisInfo object
         """
         
-        return vigra.AxisInfo(key = vigra.AxisType(self.key), typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
+        return vigra.AxisInfo(key = standardAxisTypeKeys[self.key], typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
+        # return vigra.AxisInfo(key = vigra.AxisType(self.key), typeFlags = self.type, resolution=self.resolution, description=self.calibrationString)
         
     
     def addChannelCalibration(self, val:ChannelCalibrationData, 
@@ -1542,7 +1544,9 @@ class AxisCalibrationData(CalibrationData):
         for (k,c) in self.channels:
             self._data_.pop(k, None)
                 
-    def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None, full:typing.Optional[bool]=False) -> typing.Optional[typing.Union[list, ChannelCalibrationData]]:
+    def getChannelCalibration(self, index:typing.Optional[typing.Union[int, str]]=None, 
+                              full:typing.Optional[bool]=False,
+                              physical:bool=True) -> typing.Optional[typing.Union[list, ChannelCalibrationData]]:
         """ChannelCalibrationData for a single channel.
         
         Parameters:
@@ -1567,6 +1571,17 @@ class AxisCalibrationData(CalibrationData):
             For a virtual channels axis (see below) the name (symbol) is set to 
             "virtual_channel_0"
         
+        physical: bool, optional (default is True)
+            When True (the default) then 'index', when an int, is interpreted as
+            the index of the channel along the dimension of the Channels axis
+            (0-based), a.k.a the 𝑝ℎ𝑦𝑠𝑖𝑐𝑎𝑙 index. WARNING: this may be different
+            from the value assigned to the 'index' attribute of the channel!
+        
+            When False, the 'index', when an int, is taken to represent the 
+            𝑙𝑜𝑔𝑖𝑐𝑎𝑙 index of the channel (i.e. the value of its 'index' attribute).
+            WARNING: This may NOT the the same as the actual channel index along
+            the Channels axis dimension !
+        
         Returns:
         ========
         A ChannelCalibrationData or tuple (str, ChannelCalibrationData) if 'full'
@@ -1581,20 +1596,21 @@ class AxisCalibrationData(CalibrationData):
         was found using the supplied index value.
         
         """
-        if not self.type & vigra.AxisType.Channels:
+        if self.type != vigra.AxisType.Channels:
+            scipywarn("Not a channel axis")
             return
         
         if len(self.channelCalibrations) == 0:
             cal = ChannelCalibrationData()
             cal.name = "virtual_channel_0"
             if full:
-                return (cal.name, cal)
+                return (cal.name, cal) # a tuple (channel name, channel calibration)
             return cal
         
         if index is None:
             if full:
-                return self.channelCalibrations[0]
-            return self.channelCalibrations[0][1]
+                return self.channelCalibrations[0] # a tuple (channel name, channel calibration)
+            return self.channelCalibrations[0][1] # the first available channel calibration
             
         if isinstance(index, int):
             what = "index"
@@ -1607,26 +1623,35 @@ class AxisCalibrationData(CalibrationData):
         
         # NOTE: 2022-01-07 00:12:54
         # 1) search by calibration name or index
-        chcal = list(filter(lambda x: getattr(x[1], what, None) == index, self.channels))
         
-        if len(chcal) == 0:
-            if what == "name":
-                chcal = list(filter(lambda x: x[0]==name, self.channels))
-                
-        if len(chcal) > 1:
-            warnings.warn(f"There is more than one channel with the same {what} ({index}).\nThe calibration for the first one will be returned", 
-                        RuntimeWarning, 
-                        stacklevel=2)
-            chcal = chcal[0]
+        if isinstance(index, int) and physical:
+            chcal = self.channels[index]
+        else:
+            # index is either a logical channel index (int) or a channel name (str)
+            chcals = list(filter(lambda x: getattr(x[1], what, None) == index, self.channels))
             
-        #print(f"AxisCalibrationData.getChannelCalibration: chcal = {chcal}")
+            if len(chcals) == 0:
+                if what == "name":
+                    chcals = list(filter(lambda x: x[0]==name, self.channels))
+                    
+            if len(chcals) > 1:
+                scipywarn(f"There is more than one channel with the same {what} ({index}).\nThe calibration for the first one will be returned", 
+                            RuntimeWarning, 
+                            stacklevel=2)
+            elif len(chcals) == 0:
+                raise ValueError(f"No channel was found for logical index or name '{index}'")
+            
+            chcal = chcals[0]
+                
+            
+        # print(f"AxisCalibrationData.getChannelCalibration: chcal = {chcal}")
             
         if len(chcal):
             if full:
                 return chcal
         
             else:
-                return chcal[0]
+                return chcal[1]
             
     def getChannelIndex(self, name:str) -> typing.Optional[int]:
         """Returns the index of the channel with given name.
@@ -2751,7 +2776,7 @@ def axisChannelName(axisinfo, channel):
     
     channel: int >=0 (0-based index of the channel)
     """
-    return AxesCalibration(axisinfo).getChannelName(channel)
+    return AxisCalibrationData(axisinfo).getChannelName(channel)
 
 def axisName(axisinfo):
     """Returns the axis name stored in the axis description.
@@ -3041,18 +3066,62 @@ def calibrateAxis(axInfo, cal, channel=None, channelname=None):
         
     return axInfo, axcal
 
-def getAxisResolution(axisinfo):
+def getAxisResolution(axisinfo:vigra.AxisInfo, 
+                      channel:typing.Optional[typing.Union[int, str]] = None):
     """Returns the resolution of the axisinfo object as a Python Quantity.
     """
     if not isinstance(axisinfo, vigra.AxisInfo):
         raise TypeError("Expecting a vigra.AxisInfo object; got %s instead" % type(axisinfo).__name__)
     
-    axcal = AxesCalibration(axisinfo)
+    axcal = AxisCalibrationData(axisinfo)
+    
+    if axisinfo.typeFlags & vigra.AxisType.NonChannel == 0:
+        if isinstance(channel, (int, str)):
+            return axcal.getChannelResolution(channel)
+        
+        else:
+            return axcal.getChannelResolution(0)
+        
+    else:
+        return axcal.resolution
+    
+def getCalibratedAxisSize(image, axis):
+    """Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
+    
+    If axisinfo is not calibrated (i.e. does not have a calibration string in its
+    description attribute) then returns the size of the axis in pixel_unit.
+    
+    Parameters:
+    ==========
+    
+    image: vigra.VigraArray
+    
+    axis: vigra.AxisInfo, axis info key string, or an integer; any of these must 
+        point to an existing axis in the image
+    
+    """
+    
+    if isinstance(axis, int):
+        axsize = image.shape[axis]
+        axisinfo = image.axistags[axis]
+        
+    elif isinstance(axis, str):
+        axsize = image.shape[image.axistags.index(axis)]
+        axisinfo = image.axistags[axis]
+
+    elif isinstance(axis, vigra.AxisInfo):
+        axsize = image.shape[image.axistags.index(axis.key)]
+        axisinfo = axis
+
+    else:
+        raise TypeError("axis expected to be an int, str or vigra.AxisInfo; got %s instead" % type(axis).__name__)
+    
+    axcal = AxisCalibrationData(axisinfo)
     
     # FIXME what to do when there are several channels?
     
-    return axcal.getResolution(axisinfo.key)
-    
+    return axcal.calibratedDistance(axsize)
+
 def getAxisOrigin(axisinfo):
     """Returns the axis origin as a Python Quantity
     """
