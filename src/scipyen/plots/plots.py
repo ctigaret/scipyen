@@ -51,7 +51,7 @@ from gui import (scipyen_colormaps, guiutils)
 # import seaborn as sb
 
 # TODO 2019-09-06 13:08:18
-# set up a clever way to offer there plottign functions ans their arguments in 
+# set up a clever way to offer these plotting functions and their arguments in 
 # a gui dialog
 
 mpl_plot_functions = dict()

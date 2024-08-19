@@ -1405,6 +1405,8 @@ class ScanDataMetadataAdapter(AttributeAdapter):
         from gui import pictgui as pgui
         from systems.PrairieView import PVSequenceType
         
+        print(f"{self.__class__.__name__}._parse_metadata_ value = \n{value}")
+        
         # NOTE: 2024-08-13 20:23:14
         # new descriptor validator / attribute adapter mechanism
         
@@ -1657,8 +1659,15 @@ class ScanData(BaseScipyenData):
     scans:ScanDataComponentDescriptor = ScanDataComponentDescriptor("scans", None, list[vigra.VigraArray],
                                                             preset_hook=ScanDataImageParser("scans"),
                                                             postset_hook=ScanDataFramesMapUpdater("scans"))
+    
+    # associated electrophysiology data
+    electrophysiology:ScanDataComponentDescriptor = ScanDataComponentDescriptor("electrophysiology",
+                                                                                neo.Block(name="Electrophysiology"),
+                                                                                neo.Block,
+                                                                                postset_hook=ScanDataFramesMapUpdater("electrophysiology"))
+  
     # type of scanning
-    type:ScanDataType = dataclasses.field(default=ScanDataType.linescan, init=False)
+    type:ScanDataType = dataclasses.field(default=ScanDataType.linescan)
     # scans:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
     
     # BUG 2024-08-14 21:11:36 FIXME
@@ -1687,29 +1696,24 @@ class ScanData(BaseScipyenData):
     # signals containing quantitative data measured in the scans (depends on experiment type)
     scansBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scans"))
     # signals containing pixel intensities along scans rois (linescans only) 
-    scansProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scans profiles"), init=False)
-    scansCursors:dict = dataclasses.field(default_factory = dict, init=False)
-    scansRois:dict = dataclasses.field(default_factory = dict, init=False)
+    scansProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scans profiles"))
+    scansCursors:dict = dataclasses.field(default_factory = dict)
+    scansRois:dict = dataclasses.field(default_factory = dict)
     
     # scanTrajectory:typing.Optional[PlanarGraphics] = None
     # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
-    scanTrajectory:typing.Optional[PlanarGraphics] = dataclasses.field(default=None, init=False)
+    scanTrajectory:typing.Optional[PlanarGraphics] = dataclasses.field(default=None)
     
     # scene:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
     #
     # see BUG 2024-08-14 21:11:36 for why these are commented-out
-    # sceneAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list, init=False)
+    sceneAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list)
     # sceneLayout:dict = dataclasses.field(default_factory = dict, init=False)
     sceneBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scene"))
     sceneProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scene profiles"))
     sceneCursors:dict = dataclasses.field(default_factory = dict)
     sceneRois:dict = dataclasses.field(default_factory = dict)
     
-    # associated electrophysiology data
-    electrophysiology:ScanDataComponentDescriptor = ScanDataComponentDescriptor("electrophysiology",
-                                                                                neo.Block(name="Electrophysiology"),
-                                                                                neo.Block,
-                                                                                postset_hook=ScanDataFramesMapUpdater("electrophysiology"))
     # electrophysiology:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Electrophysiology"))
     
     # landmark data
@@ -1728,17 +1732,17 @@ class ScanData(BaseScipyenData):
     # → initialized/set up by scans and scene desscriptors (postset hook)
     #
     # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
-    framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None, init=False)
+    framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None)
     
     # analysis results data
-    electrophysiologyResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None, init=False)
-    imagingResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None, init=False)
-    result:typing.optional[pd.DataFrame] = dataclasses.field(default=None, init=False)
+    electrophysiologyResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None)
+    imagingResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None)
+    result:typing.optional[pd.DataFrame] = dataclasses.field(default=None)
     
     # runtime data
-    modified:bool = dataclasses.field(default=False, init=False, compare=False)
-    processed:bool = dataclasses.field(default=False, init=False, compare=False)
-    availableUnitTypes:list = dataclasses.field(default_factory=lambda: [s for s in UnitTypes.values()], init=False, compare=False)
+    modified:bool = dataclasses.field(default=False, compare=False)
+    processed:bool = dataclasses.field(default=False, compare=False)
+    availableUnitTypes:list = dataclasses.field(default_factory=lambda: [s for s in UnitTypes.values()], compare=False)
     # availableGenotypes:list = dataclasses.field(default_factory=lambda: [s for s in GENOTYPES], init=False, compare=False)
     # ### END instance variables 
     
@@ -1789,10 +1793,10 @@ class ScanData(BaseScipyenData):
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
             
     def __reduce__(self):
-        kw = dict((d[0], getattr(self, d[0], None)) for d in self._attributes_ if d[0] not in ("scene", "scans", "electrophysiology", "metadata"))
+        kw = dict((d[0], getattr(self, d[0], None)) for d in self._attributes_ if d[0] not in ("scene", "scans", "electrophysiology"))# "metadata"))
         
-        return (_new_ScanData, (self.type, self.scans, self.scene, self.electrophysiology, 
-                                self.metadata, kw))
+        return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
+                                kw))
             
     @safeWrapper
     # def __init__(self, scans=None, scene=None, electrophysiology=None, 
@@ -9313,5 +9317,10 @@ def scanDataOptions(detection_predicate=1.3, roi_width = 10,
     
     return ret
 
-def _new_ScanData(scans, scene, electrophysiology, metadata, kw):
-    return ScanData(scans, scene, electrophysiology, metadata, **kw)
+def _new_ScanData(scans, scene, electrophysiology, kw):
+    ret = ScanData(scans, scene, electrophysiology, **kw)
+        
+    return ret
+
+# def _new_ScanData(*args, *kwargs):
+#     return ScanData(*args, **kwargs)

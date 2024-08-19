@@ -2058,7 +2058,7 @@ def parse_descriptor_specification(x:tuple, allow_nodata:bool=True):
     
     default_value = NoData
     acceptable_types = NoData
-    acceptable_lengths = noData
+    acceptable_lengths = NoData
     acceptable_element_types = NoData
     acceptable_ndims = NoData
     acceptable_shape = NoData
