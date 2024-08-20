@@ -38,7 +38,8 @@ Functions and classes defined somewere else but used here:
 clear_events - core.neoutils
 
 """
-import typing, warnings, traceback
+import typing, warnings, traceback, dataclasses, pathlib
+from dataclasses import dataclass
 from itertools import chain
 from copy import (deepcopy, copy,)
 from datetime import datetime, date, time, timedelta
@@ -55,12 +56,12 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.datatypes import (is_string, 
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
-from core.quantities import check_time_units, units_convertible
+from core.quantities import (check_time_units, units_convertible, QuantityDescriptorValidator)
 from core.neoutils import (get_index_of_named_signal, remove_events, clear_events,
                            is_same_as, get_events)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal, )
-from core.prog import (safeWrapper, WithDescriptors, with_doc)
+from core.prog import (safeWrapper, with_doc)
 from core.triggerevent import (TriggerEvent, TriggerEventType,)
 from core.traitcontainers import DataBag
 from core.signalprocessing import detect_boxcar
@@ -97,39 +98,52 @@ DEFAULTS["ImagingFrameTrigger"]["Name"] = "imaging"
 
 #### END module-level default options
   
-@with_doc((neo.core.baseneo.BaseNeo, WithDescriptors), use_header=True)
-class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
-    """Encapsulates an experimental stimulation protocol (i.e., "triggers").
+@dataclass
+class TriggerProtocol:
+    """Encapsulates an experimental stimulation protocol (a.k.a, "triggers").
     
-    TriggerProtocol objects contain TriggerEvents and indices specifying which 
-    segments (sweep or data frame) the protocol applied to, from a collection 
-    of segments, sweeps or data frames.
+    TriggerProtocol objects contain a combination of TriggerEvent types and the 
+    indices of segments (sweep or data frame)¹ from a collection, where this 
+    combination is appled. By "combination" we mean any association of a
+    'presynaptic', 'postsynaptic', 'photostimulation', and 'imaging' TriggerEvent
+    objects. 
 
-    Here 'data' may be a neo.Block object (containing electrophysiology and/or 
-    1D imaging data) or a ScanData object (itself composed of image stacks and
-    optionally electrophysiology data).
-        
-    A protocol has at least one type of TriggerEvent objects, and is associated
-    is associated with at least one neo.Segment, encapsulating the set of 
-    triggers that ocurred during that particular segment (or "sweep").
-    
-    The same trigger protocol may occur in more than one segment. However, any
-    one segment can be associated with at most one trigger protocol. Data can 
-    associate several TriggerProtocol objects, reflecting the fact that that 
-    different protocols may be applied to distinct data segments or frames.
-    
-    Unlike TriggerEvent, a TriggerProtocol is not currently "embedded" in any of
-    the neo containers. Instead, its component TriggerEvent objects are contained
-    ("embedded") in the "events" attribute of the Segment associated with this protocol.
-    
     Technically a TriggerProtocol obejct has up to three TriggerEvent objects of 
     the following types:
         up to one presynaptic event type
         up to one postsynaptic event type
         up to one photostimulation event type
-        
-    and a list of TriggerEvent objects of imaging_frame, imaging_line, or segment
-    types
+
+    and a possibly empty list of TriggerEvent objects of 'imaging_frame', 
+    'imaging_line', or 'segment' types, collected under the attribute 'acquisition'.
+
+    A TriggerProtocol has at least one type of TriggerEvent objects, and is
+    associated with at least one neo.Segment, encapsulating the TTL triggers
+    delivered during that particular segment (or "sweep").
+    
+    Note that each TriggerEvent may encapsulate a single TTL trigger or a sequence
+    (a train) of TTL triggers. Each TriggerEvent type ('presynaptic',
+    'postsynaptic', 'photostimulation', 'imaging') may occur at most once, in a
+    protocol. Nevertheless, TriggerEvents of different types can be interlaved
+    by an appropriate choice of time stamps for individual TTL triggers in the
+    TriggerEvent objects.
+
+    The same trigger protocol may occur in more than one segment. However, any
+    one segment can be associated with at most one trigger protocol. The data 
+    that owns the segments can associate several TriggerProtocol objects, to 
+    reflecting the fact that that different protocols may be applied to distinct 
+    segments of the data.
+    
+    Unlike TriggerEvent, a TriggerProtocol is not currently "embedded" in any of
+    the neo containers. Instead, its component TriggerEvent objects are contained
+    ("embedded") in the "events" attribute of the neo.Segment associated with this protocol.
+    
+    ¹ These terms are synonyms in a broader sense: a segment is an electrophysiology
+    data 'sweep' and may correspond to a single imaging data frame. In Scipyen,
+    an electrophysiology data sweep is encapsulated in a neo.Segment, and an
+    imaging data frame is encapsulated as a VigraArray. The exception from this
+    rule are the data frames in a neo.ImageSequence, whichh are encapsulated as 
+    numpy arrays.
         
     A TriggerProtocol object has the following attributes:
         
@@ -207,349 +221,107 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
     stimulation, etc).
 
     """
+    # TODO validators for these below -- maybe ?
+    presynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
+    postsynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
+    photostimulation:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
     
-    # TODO: 2022-10-11 10:39:31
-    # migration to WithDescriptors API:
-    # include the properties below into _data_attributes_
+    # TODO a validator for these two
+    acquisition:list[TriggerEvent] = dataclasses.field(default_factory = list)
+    userEvents:list[TriggerEvent] = dataclasses.field(default_factory = list)
     
+    # This is the delay between the start of an electrophysiology segment and 
+    # that of an image acquisition and helps to temporally map the events in 
+    # the electrophysiology to those in the imaging data.
+    # 
+    # For experiments where the electrophysiology DRIVES the imaging (i.e. 
+    # imaging acquisition is triggered by the electrophysiology hardware) 
+    # this property is redundant.
+    # 
+    # However, imagingDelay is necessary in the inverse situation where the
+    # electrophysiology is triggered by an imaging trigger (typically, by an
+    # imaging frame trigger output by the imaging hardware) when the "delay"
+    # cannot be calculated from the trigger waveforms recorded in the 
+    # electrophysiology data.
+    # 
+    # NOTE: imagingDelay is a python Quantity (in time units, typically 's')
+    # and IT IS NOT a TriggerEvent object. For this reason, the imagingDelay
+    # will not have a corresponding event in a data segment's "events" list.
+    #
+    imagingDelay:QuantityDescriptorValidator = QuantityDescriptorValidator("imagingDelay", validator=check_time_units) # 0*pq.s by default
+    
+    # TODO: a validator to check type and contents
+    segments:typing.Union[int, list[int], tuple[int], range, slice] = dataclasses.field(default_factory = list)
+    
+    name:str = dataclasses.field(default="Protocol")
     # these are in addition to the _recommended_attrs inherited from BaseNeo
+    file_origin:typing.Union[str, pathlib.Path] = dataclasses.field(default = "")
+    file_datetime:datetime = dataclasses.field(default = datetime.now())
+    rec_datetime:datetime = dataclasses.field(default = datetime.now())
     
-    _data_attributes_ = (("file_datetime", datetime),
-                         ("rec_datetime", datetime))
+#     _data_attributes_ = (("file_datetime", datetime),
+#                          ("rec_datetime", datetime))
+#     
+#     _decsriptor_attributes_ = _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
     
-    _decsriptor_attributes_ = _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
-    
-    def __init__(self, pre = None, post = None, photo = None, acquisition = None, 
-                 events = None, segment_index = [], imaging_delay = 0 * pq.s, 
-                 name="protocol"):
-        # TODO/FIXME: do you still need the 'events' parameter?
-        """
-        Named parameters:
-        =================
-        
-        pre, post, photo: a TriggerEvent or None
-            In addition, 'pre' may be a TriggerProtocol object; in this case, 
-            all other parameters are ignored ('copy constructor'-like)
-        
-        events: a sequence of TriggerEvent objects, or None
-        
-            When given, it must have up to three TriggerEvent objects, 
-            each of a different type, and the named parameters "pre", "post" or
-            "photo" will only be used to supply a TriggerEvent of a type not found
-            in the events list.
-            
-            NOTE: a protocol is "empty" when it has no such events
-            
-            len(protocol) returns the number of events of any kind
-            
-        
-        segment_index: an int, a sequence of int, a range object or a slice object
-        
-        imaging_delay: a python Quantity in UnitTime units; optional, default is 0 * pq.s
-        
-            - represents the delay between the start of imaging data frame 
-                acquisition an the starts of the corresponding electrophysiology
-                frame (a.k.a "segment" or "sweep") acquisition
-            
-            NOTE: 
-            
-            A POSITIVE delay signifies that imaging frame acquisition started 
-                delay s AFTER the start of the electrophysiology data acquisition.
-                
-                The typical use case is when imaging frame acquisition has been 
-                triggered by the electrophysiology acquisition software; this 
-                MAY be represented by a TriggerEvent of imaging_frame 
-                type  embedded in the "events" list of an electrophysiology sweep
-                (i.e., a neo.Segment)
-                
-                
-            A NEGATIVE delay signifies that the imaging frame acquisition started
-                delay s BEFORE the start of electrophysiology data acquisition.
-                
-                The typical use case is when the electrophysiology recording has
-                been triggered by the imaging software. This MAY be a special
-                if the imaging metadata (dependent on the imaging system).
-                
-            CAUTION: A value of 0 s (default) _MAY_ indicate no delay between the
-                acquisition of image and electrophysiology (e.g. triggered simultaneously)
-                of that there was NO trigger between the two (ie. each were started
-                manually)
-                
-                
-        Passing a non-empty events parameters overwrites the other parameters        
-        
-        """
-        # TODO: 2021-11-24 12:33:57
-        # Consider dumping copy semantics for member events to avoid data 
-        # duplication - events should only be copied when concatenating segments 
-        # or signals (such that the domain base has changed).
-        
-        # HOWEVER, a strong(?) counter-argument I can think of is when a trigger 
-        # protocol refers to semantically identical triggers in signals that 
-        # otherwise have distinct domain base.
-        #
-        # Typical example is that of electrophysiology and 1D signals generated
-        # from linescan data, when there usually is a delay between the acquisition 
-        # of the two types of data sets. This delay is almost guaranteed to
-        # exist when the acquisition of one is triggered by a TTL signal emitted
-        # during the acquisition of the other (see imaging-delay).
-        #
-        # In such cases, one msth trake into account time diffrerences between
-        # events of the same type but with different time stamps in each data set.
-        # Too complicated and prone to errors. See also NOTE: 2021-11-24 12:43:27
-        # below.
-        
-        super(TriggerProtocol, self).__init__()
-        
-        self.__presynaptic__        = None
-        self.__postsynaptic__       = None
-        self.__photostimulation__   = None
-        self.__acquisition__        = None # forTriggerEventTypes imaging_frame, imaging_line, segment
-        self.__segment_index__      = []
-        self.__imaging_delay__      = None #0 * pq.s # NOTE: this IS NOT A TriggerEvent  !!!
-        self.__user_events__        = []
-        self.__protocol_name__      = "protocol"
-        
-        if isinstance(events, (tuple, list)) and 1 <= len(events) <= 3 and all([isinstance(e, TriggerEvent) for e in events]):
-            # NOTE: 2021-11-24 12:43:27
-            # We ALWAYS use copy semantics, with the (small?) price of some data 
-            # duplication. The protocol collects trigger events semantically. By
-            # embedding it into a neo objects hierarchy we inherently create 
-            # duplicate events such that the event times fall "where they need
-            # to be", in relation to the signals' time base, after taking into 
-            # account possible delays between data sets.
-            #
-            # NOT doing so would complicate the time keeping for the embedded 
-            # events. So I take this 'lazy' approach (for now, it works!)
-            #
-            # see also TODO: 2021-11-24 12:33:57
-            #
-            # contructs from a list of TriggerEvent objects passed as "events" argument
-            for e in events:
-                if e.event_type == TriggerEventType.presynaptic:
-                    if self.__presynaptic__ is None:
-                        self.__presynaptic__ = e.copy()
-                        self.__presynaptic__.labels = e.labels
-                        
-                    else:
-                        raise RuntimeError("A presynaptic event has already been specified")
-                    
-                elif e.event_type == TriggerEventType.postsynaptic:
-                    if self.__postsynaptic__ is None:
-                        self.__postsynaptic__ = e.copy()
-                        self.__postsynaptic__.labels = e.labels
-                        
-                    else:
-                        raise RuntimeError("A postsynaptic event has already been specified")
-                    
-                elif e.event_type == TriggerEventType.photostimulation:
-                    if self.__photostimulation__ is None:
-                        self.__photostimulation__ = e.copy()
-                        self.__photostimulation__.labels = e.labels
-                        
-                    else:
-                        raise RuntimeError("A photostimulation event has already been specified")
-                    
-                elif e.event_type & TriggerEventType.acquisition:
-                    e_ = e.copy()
-                    e_.labels = e.labels
-                    self.__acquisition__ = e_ # NOTE: ONE acquisition event only!
-                    
-            overwrite = False
-                    
-        else:
-            if events is not None:
-                warning.warn("'events' parameter specified is invalid and will be disregarded; was expecting a list of 1 to 3 Synaptic Events of different types, or None; got %s instead" % type(events).__name__)
-                
-            overwrite = True
-        
-        if isinstance(pre, TriggerProtocol):
-            # copy c'tor
-            if pre.__presynaptic__ is not None:
-                self.__presynaptic__ = pre.__presynaptic__.copy()
-                self.__presynaptic__.labels = pre.__presynaptic__.labels
-                
-            if pre.__postsynaptic__ is not None:
-                self.__postsynaptic__ = pre.__postsynaptic__.copy()
-                self.__postsynaptic__.labels = pre.__postsynaptic__.labels
-                
-            if pre.__photostimulation__ is not None:
-                self.__photostimulation__ = pre.__photostimulation__.copy()
-                self.__photostimulation__.labels = pre.__photostimulation__.labels
-                
-            self.__imaging_delay__ = pre.__imaging_delay__.copy()
-            
-            # keep this for old API!
-            if isinstance(pre.acquisition, (tuple, list)) and len(pre.acquisition):
-                acq = pre.acquisition[0].copy()
-                self.__acquisition__ = acq
-                
-            elif isinstance(pre.acquisition, TriggerEvent) and pre.acquisition.event_type & TriggerEventType.acquisition:
-                self.__acquisition__ = pre.acquisition.copy()
-                
-            else:
-                self.__acquisition__ = None
-                
-            if isinstance(pre.__segment_index__, slice):
-                self.__segment_index__ = slice(pre.__segment_index__.start, pre.__segment_index__.stop, pre.__segment_index__.step)
-                
-            elif isinstance(pre.__segment_index__, range):
-                self.__segment_index__ = [x for x in pre.__segment_index__]
-                
-            else:
-                self.__segment_index__ = pre.__segment_index__[:]
-                
-            self.__protocol_name__ = pre.name
-            
-            return # stop here when first parameter is a TriggerProtocol
-        
-        elif isinstance(pre, TriggerEvent):
-            if self.__presynaptic__ is None:
-                self.__presynaptic__ = pre
-                self.__presynaptic__.event_type = TriggerEventType.presynaptic
-                
-            else:
-                raise RuntimeError("A presynaptic event has already been specified")
-            
-        elif pre is None:
-            if overwrite:
-                self.__presynaptic__ = None
-            
-        else:
-            raise TypeError("'pre' expected to be a TriggerEvent or None; got %s instead" % type(pre).__name__)
-            
-        if isinstance(post, TriggerEvent):
-            if self.__postsynaptic__ is None:
-                self.__postsynaptic__ = post
-                self.__postsynaptic__.event_type = TriggerEventType.postsynaptic
-                
-            else:
-                raise RuntimeError("A postsynaptic event has already been specified")
-            
-        elif post is None:
-            if overwrite:
-                self.__postsynaptic__ = None
-            
-        else:
-            raise TypeError("'post' expected to be a TriggerEvent or None; got %s instead" % type(post).__name__)
-        
-        if isinstance(photo, TriggerEvent):
-            if self.__photostimulation__ is None:
-                self.__photostimulation__ = photo
-                self.__photostimulation__.event_type = TriggerEventType.photostimulation
-                
-            else:
-                raise RuntimeError("A photostimulation event has already been specified")
-            
-        elif photo is None:
-            if overwrite:
-                self.__photostimulation__ = None
-            
-        else:
-            raise TypeError("'photo' expected to be a TriggerEvent or None; got %s instead" % type(photo).__name__)
-        
-        if isinstance(acquisition, TriggerEvent) and acquisition.event_type & TriggerEventType.acquisition:
-            self.__acquisition__ = acquisition
-            
-        elif isinstance(acquisition, (tuple, list)) and \
-            all([isinstance(a, TriggerEvent) and a.event_type & TriggerEventType.acquisition for a in acquisition]):
-                self.__acquisition__ = acquisition[0]
-                
-        else:
-            self.__acquisition__ = None
-
-        if isinstance(segment_index, int):
-            self.__segment_index__ = [segment_index]
-            
-        elif isinstance(segment_index, (tuple, list)) and (len(segment_index)==0 or all([isinstance(x, int) for x in segment_index])):
-            self.__segment_index__ = segment_index
-            
-        elif isinstance(segment_index, (range, slice)):
-            if segment_index.start is not None and segment_index.start < 0:
-                raise ValueError("Negative start values for range or slice frame indexing are not supported ")
-            
-            if segment_index.step is not None and segment_index.step < 0:
-                raise ValueError("Negative step values for range or slice frame indexing are not supported ")
-            
-            if segment_index.stop < 0 :
-                raise ValueError("Negative stop values for range or slice frame indexing are not supported ")
-                
-            self.__segment_index__ = segment_index
-            
-        else:
-            raise TypeError("'segment_index' expected to be an int, a sequence of int, a range or a slice; got %s instead" % type(segment_index).__name__)
-        
-        if isinstance(name, str) and len(name.strip()):
-            self.__protocol_name__ = name
-            
-        else:
-            raise TypeError("'name' expected to be a str; got %s instead" % type(name).__name__)
-        
-        if isinstance(imaging_delay, pq.Quantity):
-            if imaging_delay.units != pq.s:
-                dim = imaging_delay.units.dimensionality
-                
-                if not isinstance(list(dim.keys())[0], pq.UnitTime):
-                    raise TypeError("Expecting a temporal quantity for imaging_delay; got %s instead" % imaging_delay)
-                
-            self.__imaging_delay__ = imaging_delay
-            
-        else:
-            raise TypeError("Expecting a python Quantity with time units for imaging_delay; got %s instead" % type(imaging_delay).__name__)
-        
     def __len__(self):
         """The number of TriggerEvents, of any type, in this protocol
         """
-        if self.__presynaptic__ is None:
+        if self.presynaptic is None:
             pre = 0
             
         else:
-            pre = self.__presynaptic__.size
+            pre = self.presynaptic.size
             
-        if self.__postsynaptic__ is None:
+        if self.postsynaptic is None:
             post = 0
             
         else:
-            post = self.__postsynaptic__.size
+            post = self.postsynaptic.size
             
-        if self.__photostimulation__ is None:
+        if self.photostimulation is None:
             photo = 0
             
         else:
-            photo = self.__photostimulation__.size
+            photo = self.photostimulation.size
             
-        if self.__acquisition__ is None:
+        if self.acquisition is None:
             imaging = 0
             
-        elif isinstance(self.__acquisition__, (tuple, list)):
-            imaging = self.__acquisition__[0].size
+        elif isinstance(self.acquisition, (tuple, list)):
+            imaging = self.acquisition[0].size
             
-        elif  isinstance(self.__acquisition__, TriggerEvent):
-            imaging = self.__acquisition__.size
+        elif isinstance(self.acquisition, TriggerEvent):
+            imaging = self.acquisition.size
             
-        return pre + post + photo + imaging
+        if isinstance(self.userEvents, (tuple, list)) and all(isinstance(e, (TriggerEvent, neo.Event)) for e in self.userEvents):
+            user = len(self.userEvents)
+        else:
+            user = 0
+            
+        return pre + post + photo + imaging + user
     
     def __str__(self):
-        result = ["%s %s:" % (self.__class__.__name__, self.__protocol_name__)]
+        result = ["%s %s:" % (self.__class__.__name__, self.name)]
         
-        if self.__presynaptic__ is not None:
-            result += ["\tpresynaptic:\n\t%s" % str(self.__presynaptic__)]
+        if self.presynaptic is not None:
+            result += ["\tpresynaptic:\n\t%s" % str(self.presynaptic)]
             
-        if self.__postsynaptic__ is not None:
-            result += ["\tpostsynaptic:\n\t%s" % str(self.__postsynaptic__)]
+        if self.postsynaptic is not None:
+            result += ["\tpostsynaptic:\n\t%s" % str(self.postsynaptic)]
             
-        if self.__photostimulation__ is not None:
-            result += ["\tphotostimulation:\n\t%s" % str(self.__photostimulation__)]
+        if self.photostimulation is not None:
+            result += ["\tphotostimulation:\n\t%s" % str(self.photostimulation)]
             
-        if isinstance(self.__acquisition__, (tuple, list)) and len(self.__acquisition__):
-            result.append("\tacquisition:\n\t%s" % "\n".join([str(a) for a in self.__acquisition__]))
+        if isinstance(self.acquisition, (tuple, list)) and len(self.acquisition):
+            result.append("\tacquisition:\n\t%s" % "\n".join([str(a) for a in self.acquisition]))
             
-        elif isinstance(self.__acquisition__, TriggerEvent):
-            result += ["\tacquisition:\n\t%s" % str(self.__acquisition__)]
+        elif isinstance(self.acquisition, TriggerEvent):
+            result += ["\tacquisition:\n\t%s" % str(self.acquisition)]
             
-        result += ["\timaging delay: %s" % str(self.__imaging_delay__)]
+        result += ["\timaging delay: %s" % str(self.imagingDelay)]
         
-        result += ["\tframe (segment): %s" % str(self.__segment_index__)]
+        result += ["\tframe (segment): %s" % str(self.segments)]
         result += ["\n"]
         
         return "\n".join(result)
@@ -571,21 +343,21 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
             raise TypeError("event_type expected a string, a TriggerEventType or None; got %s instead"% type(event_type).__name__)
         
         if event_type & TriggerEventType.presynaptic:
-            return self.__presynaptic__
+            return self.presynaptic
         
         elif event_type & TriggerEventType.postsynaptic:
-            return self.__postsynaptic__
+            return self.postsynaptic
         
         elif event_type & TriggerEventType.photostimulation:
-            return self.__photostimulation__
+            return self.photostimulation
         
         elif event_type & TriggerEventType.acquisition:
-            if isinstance(self.__acquisition__, (tuple, list)):
-                if len(self.__acquisition__):
-                    return self.__acquisition__[0]
+            if isinstance(self.acquisition, (tuple, list)):
+                if len(self.acquisition):
+                    return self.acquisition[0]
             
-            elif isinstance(self.__acquisition__, TriggerEvent):
-                return self.__acquisition__
+            elif isinstance(self.acquisition, TriggerEvent):
+                return self.acquisition
     
     @property
     def ntriggers(self):
@@ -597,20 +369,20 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
     def events(self):
         ret = list()
         
-        if self.__presynaptic__ is not None:
-            ret.append(self.__presynaptic__)
+        if self.presynaptic is not None:
+            ret.append(self.presynaptic)
             
-        if self.__postsynaptic__ is not None:
-            ret.append(self.__postsynaptic__)
+        if self.postsynaptic is not None:
+            ret.append(self.postsynaptic)
             
-        if self.__photostimulation__ is not None:
-            ret.append(self.__photostimulation__)
+        if self.photostimulation is not None:
+            ret.append(self.photostimulation)
         
-        if isinstance(self.__acquisition__, (tuple, list)) and len(self.__acquisition__):
-            ret.append(self.__acquisition__[0])
+        if isinstance(self.acquisition, (tuple, list)) and len(self.acquisition):
+            ret.append(self.acquisition[0])
             
-        elif isinstance(self.__acquisition__, TriggerEvent):
-            ret.append(self.__acquisition__)
+        elif isinstance(self.acquisition, TriggerEvent):
+            ret.append(self.acquisition)
             
         return sorted(ret, key = lambda x: x.times.flatten()[0])
     
@@ -650,8 +422,8 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         if not isinstance(other, TriggerProtocol):
             raise TypeError("A TriggerProtocol object was expected; got %s instead" % type(other).__name__)
         
-        if not hasattr(self, "__user_events__"):
-            self.__user_events__ = []
+        if not hasattr(self, "userEvents"):
+            self.userEvents = []
         
         pre     = False
         post    = False
@@ -661,53 +433,53 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         
         img_del = False
         
-        if self.__presynaptic__ is None:
-            if other.__presynaptic__ is None:
+        if self.presynaptic is None:
+            if other.presynaptic is None:
                 pre = True
                 
         else:
-            if other.__presynaptic__ is not None:
-                pre = self.__presynaptic__.is_same_as(other.__presynaptic__, 
+            if other.presynaptic is not None:
+                pre = self.presynaptic.is_same_as(other.presynaptic, 
                                                       rtol=rtol, atol=atol, equal_nan=equal_nan)
     
-        if self.__postsynaptic__ is None:
-            if other.__postsynaptic__ is None:
+        if self.postsynaptic is None:
+            if other.postsynaptic is None:
                 post = True
                 
         else:
-            if other.__postsynaptic__ is not None:
-                post = self.__postsynaptic__.is_same_as(other.__postsynaptic__,
+            if other.postsynaptic is not None:
+                post = self.postsynaptic.is_same_as(other.postsynaptic,
                                                         rtol=rtol, atol=atol, equal_nan=equal_nan)
                 
-        if self.__photostimulation__ is None:
-            if other.__photostimulation__ is None:
+        if self.photostimulation is None:
+            if other.photostimulation is None:
                 photo = True
                 
         else:
-            if other.__photostimulation__ is not None:
-                photo = self.__photostimulation__.is_same_as(other.__photostimulation__,
+            if other.photostimulation is not None:
+                photo = self.photostimulation.is_same_as(other.photostimulation,
                                                              rtol=rtol, atol=atol, equal_nan=equal_nan)
                     
-        img_del = self.__imaging_delay__ is not None and other.__imaging_delay__ is not None
+        img_del = self.imagingDelay is not None and other.imagingDelay is not None
         
-        img_del &= self.__imaging_delay__.units == other.__imaging_delay__.units
+        img_del &= self.imagingDelay.units == other.imagingDelay.units
         
-        img_del &= np.all(np.isclose(self.__imaging_delay__.magnitude, other.__imaging_delay__.magnitude,
+        img_del &= np.all(np.isclose(self.imagingDelay.magnitude, other.imagingDelay.magnitude,
                           rtol-rtol, atol=atol, equal_nan=equal_nan))
                 
-        if not hasattr(other, "__user_events__"):
-            if len(self.__user_events__):
+        if not hasattr(other, "userEvents"):
+            if len(self.userEvents):
                 usr = False
                 
             else:
                 usr = True
         else:
-            usr = len(self.__user_events__) == len(other.__user_events__)
+            usr = len(self.userEvents) == len(other.userEvents)
         
-        if usr and hasattr(other, "__user_events__"):
+        if usr and hasattr(other, "userEvents"):
             e_events = list()
             
-            for (e0, e1) in zip(self.__user_events__, other.__user_events__):
+            for (e0, e1) in zip(self.userEvents, other.userEvents):
                 e_usr = e0.is_same_as(e1, rtol=rtol, atol=atol, equal_nan=equal_nan)
                 
                 if withlabels:
@@ -728,8 +500,8 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
                 acq = True
             
         else:
-            if other.acquisition is not None:
-                acq = self.acquisition.is_same_as(other.acquisition)
+            if isinstance(other.acquisition, list) and len(other.acquisition):
+                acq = len(self.acquisition) == len(other.acquisition) and all((all(s.is_same_as(v) for v in other.acquisition) for s in self.acquisition))
                     
         return pre and post and photo and img_del and acq and usr
     
@@ -741,39 +513,8 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         same_events = self.hasSameEvents(other)
         
         return same_events and self.name == other.name and \
-            self.__imaging_delay__ == other.__imaging_delay__
+            self.imagingDelay == other.imagingDelay
     
-    @property
-    def acquisition(self):
-        """The acquisition event
-        Thus is pretty ambiguous: acquisition of what!?
-        """
-        # NOTE: 2020-12-31 17:29:19
-        # TODO: flag for deprecation
-        return self.getEvent(TriggerEventType.acquisition)
-        ## NOTE: 2019-03-15 18:10:19
-        ## upgrade to new API
-        #if isinstance(self.__acquisition__, (tuple, list)):
-            #if len(self.__acquisition__):
-                #self.__acquisition__ = self.__acquisition__[0]
-                
-        #return self.__acquisition__
-    
-    @acquisition.setter
-    def acquisition(self, value):
-        if value is None:
-            self.__acquisition__ = value
-            
-        elif isinstance(value, TriggerEvent):
-            if value.event_type & TriggerEventType.acquisition:
-                self.__acquisition__ = value.copy()
-                
-            else:
-                raise TypeError("Cannot use this event type (%s) for acquisition" % value.event_type)
-                
-        else:
-            raise TypeError("Expecting a TriggerEvent or None; got %s instead" % type(value).__name__)
-        
     def shift(self, value, copy=False):
         """Shifts all events by given value 
         See TriggerEvent shift
@@ -867,16 +608,16 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
                     
             elif value is None:
                 if event_type & TriggerEventType.presynaptic:
-                    self.__presynaptic__ = None
+                    self.presynaptic = None
                     
                 elif event_type & TriggerEventType.postsynaptic:
-                    self.__postsynaptic__ = None
+                    self.postsynaptic = None
                     
                 elif event_type & TriggerEventType.photostimulation:
-                    self.__photostimulation__ = None
+                    self.photostimulation = None
                     
                 elif event_type & TriggerEventType.acquisition:
-                    self.__acquisition__ = None
+                    self.acquisition = None
             
                 return
                 
@@ -895,177 +636,49 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
                     own_even.setLabel(event_label)
             
         if event_type & TriggerEventType.presynaptic:
-            self.__presynaptic__ = own_event
+            self.presynaptic = own_event
             
         elif event_type & TriggerEventType.postsynaptic:
-            self.__postsynaptic__ = own_event
+            self.postsynaptic = own_event
             
         elif event_type & TriggerEventType.photostimulation:
-            self.__photostimulation__ = own_event
+            self.photostimulation = own_event
             
         elif event_type & TriggerEventType.acquisition:
-            self.__acquisition__ = own_event
+            self.acquisition = own_event
             
-    @property
-    def presynaptic(self):
-        return self.getEvent(TriggerEventType.presynaptic)
-
-    @presynaptic.setter
-    def presynaptic(self, value):
-        self.setEvent(TriggerEventType.presynaptic, value)
-        
-    @property
-    def postsynaptic(self):
-        return self.getEvent(TriggerEventType.postsynaptic)
-    
-    @postsynaptic.setter
-    def postsynaptic(self, value):
-        self.setEvent(TriggerEventType.postsynaptic, value)
-
-    @property
-    def photostimulation(self):
-        return self.getEvent(TriggerEventType.photostimulation)
-    
-    @photostimulation.setter
-    def photostimulation(self, value):
-        self.setEvent(TriggerEventType.photostimulation, value)
-        
-    @property
-    def imaging_delay(self):
-        """Alias to self.imagingDelay
-        """
-        return self.imagingDelay
-    
-    @imaging_delay.setter
-    def imaging_delay(self, value):
-        self.imagingDelay = value
-        
-    @property
-    def imagingDelay(self):
-        """
-        This is the delay between the start of an electrophysiology segment and 
-        that of an image acquisition and helps to temporally map the events in 
-        the electrophysiology to those in the imaging data.
-        
-        For experiments where the electrophysiology DRIVES the imaging (i.e. 
-        imaging acquisition is triggered by the electrophysiology hardware) 
-        this property is redundant.
-        
-        However, imagingDelay is necessary in the inverse situation where the
-        electrophysiology is triggered by an imaging trigger (typically, by an
-        imaging frame trigger output by the imaging hardware) when the "delay"
-        cannot be calculated from the trigger waveforms recorded in the 
-        electrophysiology data.
-        
-        NOTE: imagingDelay is a python Quantity (in time units, typically 's')
-        and IT IS NOT a TriggerEvent object. For this reason, the imagingDelay
-        will not have a corresponding event in a data segment's "events" list.
-        
-        """
-        return self.__imaging_delay__
-    
-    @imagingDelay.setter
-    def imagingDelay(self, value):
-        """Allow chaning of imaging delay.
-        
-        """
-        if isinstance(value, pq.Quantity):
-            if value.units != pq.s:
-                dim = value.units.dimensionality
-                
-                if not isinstance(list(dim.keys())[0], pq.UnitTime):
-                    raise TypeError("Expecting a temporal quantity; got %s instead" % value)
-                
-            self.__imaging_delay__ = value
-            
-        elif value is not None:
-            raise TypeError("Expecting a python Quantity with time units, or None; got %s instead" % type(value).__name__)
-            
-        else:
-            self.__imaging_delay__ = None
-        
     @property
     def imagingFrameTrigger(self):
         """Returns an imaging_frame trigger event, if any
         """
-        return self.__acquisition__
+        return self.acquisition
         #return self.__get_acquisition_event__(TriggerEventType.imaging_frame)
         
     @imagingFrameTrigger.setter
     def imagingFrameTrigger(self, value):
         """Pass None to clear acquisition events
         """
-        self.__acquisition__ = value
+        self.acquisition = value
         
     @property
     def imagingLineTrigger(self):
         """Returns an imaging_line trigger event, if any
         """
-        return self.__acquisition__
+        return self.acquisition
     
     @imagingLineTrigger.setter
     def imagingLineTrigger(self, value):
         """Pass None to clear acquisition events
         """
-        self.__acquisition__ = value
+        self.acquisition = value
 
-    @property
-    def sweep(self):
-        """Returns a sweep trigger event, if any
-        """
-        return self.__acquisition__
-        #return self.__get_acquisition_event__(TriggerEventType.sweep)
-    
-    @sweep.setter
-    def sweep(self, value):
-        self.__acquisition__ = value
-        #self.__set_acquisition_event__(value)
-        
-    @property
-    def name(self):
-        return self.__protocol_name__
-    
-    @name.setter
-    def name(self, value):
-        if isinstance(value, (str, type(None))):
-            self.__protocol_name__ = value
-            
-        else:
-            raise TypeError("Expecting a str or None; got %s instead" % type(value).__name__)
-        
-    @property
-    def segmentIndex(self):
-        """The segment indexing object where this protocol applies.
-        
-        CAUTION This can be a list of int, a range object or a slice object
-        """
-        return self.__segment_index__
-    
-    @segmentIndex.setter
-    def segmentIndex(self, index):
-        """The segment indexing object where this protocol applies.
-        
-        CAUTION This can be a list of int, a range object or a slice object
-        """
-        if isinstance(index, int):
-            self.__segment_index__ = [index]
-            
-        elif isinstance(index, (tuple, list)) and (len(index)==0 or all([isinstance(i, int) for i in index])):
-            self.__segment_index__ = [k for k in index]
-            
-        elif isinstance(index, (range, slice)):
-            self.__segment_index__ = index
-            
-        else:
-            raise TypeError("Expecting an int, a possibly empty sequence of int values, a range or a slice; got %s instead" % type(index).__name__)
-            
     @property
     def isempty(self):
         return len(self) == 0
     
-    @safeWrapper
-    def copy(self):
-        return TriggerProtocol(pre = self) # copy constructor
+    # @safeWrapper
+    # def copy(self):
+    #     return TriggerProtocol(pre = self) # copy constructor
         
     @safeWrapper
     def updateSegmentIndex(self, value):
@@ -1077,10 +690,10 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
         # TODO FIXME this is pretty expensive and convoluted - 
         #            why not just decide to keep __segment_index__ as a list?
         
-        if isinstance(self.__segment_index__, (range, slice)):
-            mystart = self.__segment_index__.start
-            mystop = self.__segment_index__.stop
-            mystep = self.__segment_index__.step
+        if isinstance(self.segments, (range, slice)):
+            mystart = self.segments.start
+            mystop = self.segments.stop
+            mystep = self.segments.step
             
             if isinstance(value, (range,slice)):
                 otherstart  = value.start
@@ -1089,7 +702,7 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
                 
                 
                 if mystep != otherstep:
-                    raise TypeError("Cannot update frame indexing %s and from %s" % (self.__segment_index__, value))
+                    raise TypeError("Cannot update frame indexing %s and from %s" % (self.segments, value))
                 
                 if mystart is None or otherstart is None:
                     finalstart = None
@@ -1099,73 +712,73 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
                     
                 finalstop = max(mystop, otherstop)
                 
-                if isinstance(self.__segment_index__, range):
+                if isinstance(self.segments, range):
                     if finalstart is None:
                         finalstart = 0
                         
-                    self.__segment_index__ = range(finalstart, mystep, finalstop)
+                    self.segments = range(finalstart, mystep, finalstop)
                     
                 else:
-                    self.__segment_index__ = slice(finalstart, mystep, finalstop)
+                    self.segments = slice(finalstart, mystep, finalstop)
                 
             elif isinstance(value, (tuple, list)) and all([isinstance(v, int) for v in value]): 
                 # NOTE: 2017-12-14 15:12:06
                 # because the result may contain indices at irregular intervals,
                 # which is not what a range or slice object produces, we need to
-                # coerce self.__segment_index__ to a list if not already a list
+                # coerce self.segments to a list if not already a list
                 #
                 
-                if isinstance(self.__segment_index__, range):
-                    newlist = [f for f in self.__segment_index__]
+                if isinstance(self.segments, range):
+                    newlist = [f for f in self.segments]
                     
-                else: # self.__segment_index__ is a slice; realise its indices on the max index in value
+                else: # self.segments is a slice; realise its indices on the max index in value
                     if mystop is None:
-                        newlist = [f for f in range(self.__segment_index__.indices(max(value)))]
+                        newlist = [f for f in range(self.segments.indices(max(value)))]
                         
                     else:
-                        newlist = [f for f in range(self.__segment_index__.indices(max(mystop, max(value))))]
+                        newlist = [f for f in range(self.segments.indices(max(mystop, max(value))))]
                                                     
                 newlist += (list(value)[:])
                     
                 # NOTE: 2017-12-14 15:09:41#
-                # coerce self.__segment_index__ to a list
-                self.__segment_index__ = sorted(list(set(newlist))) 
+                # coerce self.segments to a list
+                self.segments = sorted(list(set(newlist))) 
                 
-            elif isinstance(value, int):# coerce self.__segment_index__ to a list also
+            elif isinstance(value, int):# coerce self.segments to a list also
                 # NOTE: 2017-12-14 15:12:06
                 # because the result may contain indices at irregular intervals,
                 # which is not what a range or slice object produces, we need to
-                # coerce self.__segment_index__ to a list if not already a list
+                # coerce self.segments to a list if not already a list
                 #
                 
-                if isinstance(self.__segment_index__, range):
-                    newlist = [f for f in self.__segment_index__]
+                if isinstance(self.segments, range):
+                    newlist = [f for f in self.segments]
                     
                 else:
                     if mystop is None:
                         # FIXME
-                        newlist = [f for f in range(self.__segment_index__.indices(value+1))]
+                        newlist = [f for f in range(self.segments.indices(value+1))]
                         
                     else:
                         # FIXME
-                        newlist = [f for f in range(self.__segment_index__.indices(max(mystop, value+1)))]
+                        newlist = [f for f in range(self.segments.indices(max(mystop, value+1)))]
                      
                 newlist.append(value)
                 
-                self.__segment_index__ = sorted(list(set(newlist)))
+                self.segments = sorted(list(set(newlist)))
                 
             else:
-                raise TypeError("Cannot update current frame indexing %s with %s)" % (self.__segment_index__, value))
+                raise TypeError("Cannot update current frame indexing %s with %s)" % (self.segments, value))
             
-        elif isinstance(self.__segment_index__, (tuple, list)):
+        elif isinstance(self.segments, (tuple, list)):
             if isinstance(value, (tuple, list)):
                 # this ensures unique and sorted frame index list
-                self.__segment_index__ = sorted(list(set(list(self.__segment_index__) + list(value))))
+                self.segments = sorted(list(set(list(self.segments) + list(value))))
                 
             elif isinstance(value, int):
-                newlist = list(self.__segment_index__)
+                newlist = list(self.segments)
                 newlist.append(value)
-                self.__segment_index__ = sorted(list(set(newlist)))
+                self.segments = sorted(list(set(newlist)))
                 
             elif isinstance(value, (range, slice)):
                 otherstart  = value.start
@@ -1177,27 +790,26 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
                     
                 else:
                     if otherstop is None:
-                        newlist = [f for f in range(value.indices(max(self.__segment_index__)+1))]
+                        newlist = [f for f in range(value.indices(max(self.segments)+1))]
                         
                     else:
-                        newlist = [f for f in range(value.indices(max(otherstop, max(self.__segment_index__)+1)))]
+                        newlist = [f for f in range(value.indices(max(otherstop, max(self.segments)+1)))]
                         
-                newlist += list(self.__segment_index__)[:]
+                newlist += list(self.segments)[:]
                 
-                self.__segment_index__ = sorted(list(set(newlist)))
+                self.segments = sorted(list(set(newlist)))
                 
             else:
-                raise TypeError("Cannot update frame indexing %s with %s" % (self.__segment_index__, value))
+                raise TypeError("Cannot update frame indexing %s with %s" % (self.segments, value))
                     
-                    
-        elif isinstance(self.__segment_index__, int):
+        elif isinstance(self.segments, int):
             if isinstance(value, int):
-                self.__segment_index__ = sorted([self.__segment_index__, value])
+                self.segments = sorted([self.segments, value])
                 
             elif isinstance(value, (tuple, list)):
-                newlist = [f for f in value] + [self.__segment_index__]
+                newlist = [f for f in value] + [self.segments]
                 
-                self.__segment_index__ = sorted(list(set(newlist)))
+                self.segments = sorted(list(set(newlist)))
                 
             elif isinstance(value, (range, slice)):
                 otherstart  = value.start
@@ -1209,38 +821,41 @@ class TriggerProtocol(neo.core.baseneo.BaseNeo, WithDescriptors):
                     
                 else:
                     if otherstop is None:
-                        newlist = [f for f in range(value.indices(self.__segment_index__+1))]
+                        newlist = [f for f in range(value.indices(self.segments+1))]
                         
                     else:
-                        newlist = [f for f in range(value.indices(max(otherstop, self.__segment_index__+1)))]
+                        newlist = [f for f in range(value.indices(max(otherstop, self.segments+1)))]
                         
-                newlist.append(self.__segment_index__)
+                newlist.append(self.segments)
                 
-                self.__segment_index__ = sorted(list(set(newlist)))
+                self.segments = sorted(list(set(newlist)))
                 
             else:
-                raise TypeError("Cannot update frame indexing %s with %s" % (self.__segment_index__, value))
-        
+                raise TypeError("Cannot update frame indexing %s with %s" % (self.segments, value))
     
     def segmentIndices(self, value=None):
         """Returns a list of segment indices.
         'value' is used only when segmentIndex is a python slice object, and it must be an int
         """
         
-        if isinstance(self.__segment_index__, slice):
+        if isinstance(self.segments, slice):
             if value is None:
-                value = self.__segment_index__.stop
+                value = self.segments.stop
                 
             if not isinstance(value, int):
                 raise TypeError("When segment index is a slice a value of type int is required")
             
-            return [x for x in range(*self.__segment_index__.indices(value))]
+            return [x for x in range(*self.segments.indices(value))]
         
-        elif isinstance(self.__segment_index__, range):
-            return [x for x in self.__segment_index__]
+        elif isinstance(self.segments, range):
+            return [x for x in self.segments]
         
-        elif isinstance(self.__segment_index__, (int, tuple, list)):
-            return self.__segment_index__
+        elif isinstance(self.segments, (tuple, list)):
+            if len(self.segments) == 0 or all(isinstance(v, int) for v in self.segments):
+                return self.segments
+        
+        elif isinstance(self.segments, int):
+            return self.segments
         
     def toHDF5(self, group, name, oname, compression, chunks, track_order, entity_cache):
         import h5py

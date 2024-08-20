@@ -1482,116 +1482,116 @@ class ScanData(BaseScipyenData):
 
     Work in progress.
         
-    NOTE: 2024-08-10 21:21:10
-    Switching to dataclass-based design
-        
-    TODO: 2023-07-17 10:13:17
-        contemplate migration of anaysisOptions (dict) to ScanDataOptions
-    
-    TODO/FIXME 2018-09-14 10:28:13 - place on back-burner...
-    collapse scene and scans data into a multi-channel
-    VigraArray, then adapt all methods to this scenario
-    
-    Difficult task, as I want to retain backward compatibility with 
-    current situation where scene and scans are a list of VigraArrays.
-    
-    Perhaps I should create a new :class: for this (say ScanData2) adopting
-    functionality from ScanData then, phase ScanData out: rename ScanData2 to ScanData
-    and provide a way to convert already pickled (old) ScanData objects 
-    to the new class, on the fly.
-    
-    On the upside, it should make the API less convoluted and more uniform
-    (we will have to bindAxis("c"...) to access individual channels)
-    
-    NOTE: 2021-10-29 10:41:27 About data component frames
-    
-    Ideally there should be a biunivocal relationship between frames across all
-    compoents, i.e.:
-    
-    scans frame K   -> electrophysiology block, segment K
-                    |
-                    -> scene frame K
-                    
-    However, this is not always practical.
-    
-    A frame index mapping algorithm is needed, which maps a frame index in the
-    "primary" data component to frames in the "secondary" data components to
-    allow "unbalanced" cases where a "secondary" data component has a different
-    number of frames than the "primary" data component.
-    
-    In ScanData the "primary" data component is always stored in the "scans"
-    attribute. When this is None or empty, then the primary data component is 
-    "scene".
-    
-    The "scene" attribute is optional. When present, the scene's purpose is to
-    contextualize the scan data (e.g., for line scans, the scene is a 2D raster
-    scan of the field of view where the line scanning trajectory is defined).
-    
-    The table below gives an overview of the different possible acqusition types
-    and their data components. This is currently based on PrairieView acqusition
-    model but the aim is to extend this to ScanImage data as well.
-    
-    Scan data type  Scans           Scene               Electrophysiology
-    (PrairieView)
-    ============================================================================
-    
-    SingleImage     sequence of     None                None
-                    one frame       
-    
-    ZSeries         sequence of     None                None
-                    frames
-                                
-    TSeries         sequence of     None                None, or neo.Block
-                    frames                              (e.g., in conjunction 
-                                                        with photoactivation)
-                                
-    Line scan       sequence of     sequence of         neo.Block
-                    frames          frames 
-                                    (possibly just
-                                    one frame)
-    
-    
-    
-    TODO Class documentation
-    
-    Properties of special interest:
-    
-    scansBlock
-    
-        neo.Block object containing time-varying imaging data derived from
-        the analysis of ROIs or cursors in the scans data subset.
-        
-        NOTE: Referred to as "imaging block" in this documentation
-    
-        Only relevant when this is a linescan data or a time series with raster 
-        scans.
-        
-        _scans_block_.segments
-        
-        Each segment corresponds to a single "trial" or "repetition", or "cycle", 
-        and its "analogsignals" contain the time-varying image parameters
-        measured in ROIs or along Cursors. See neo.Segment and neo.AnalogSignal.
-        
-        For time series, the _scans_block_ contains only one segment.
-        
-        _scans_block_.segments[k].analogsignals:
-        
-    FIXME:2019-03-17 18:28:07 WE NEED SOME SERIOUS DEBUGGING !
-    
-    1) removeAnalysisUnit does not seem to remove all linked cursor frontends
-        when called from LSCaTWindow
-        
-    2) extractAnalysisUnit(..., average=True):
-        scanRegion retains more states than necessary 
-        
-        For example, e.g. extracted & averaged unit data with 9 frames but having
-        a scanRegion with states for 26 frames -- why? The original data had
-        38 frames in this particular example -- see 18l12 CACNA1C152mHET/c01/sp01/ 
-        Where the did the 26 come from?
         
     """
     #  An almost direct translation of my old matlab LSData data structure.
     
+    #     NOTE: 2024-08-10 21:21:10
+    #     Switching to dataclass-based design
+    #         
+    #     TODO: 2023-07-17 10:13:17
+    #         contemplate migration of anaysisOptions (dict) to ScanDataOptions
+    #     
+    #     TODO/FIXME 2018-09-14 10:28:13 - place on back-burner...
+    #     collapse scene and scans data into a multi-channel
+    #     VigraArray, then adapt all methods to this scenario
+    #     
+    #     Difficult task, as I want to retain backward compatibility with 
+    #     current situation where scene and scans are a list of VigraArrays.
+    #     
+    #     Perhaps I should create a new :class: for this (say ScanData2) adopting
+    #     functionality from ScanData then, phase ScanData out: rename ScanData2 to ScanData
+    #     and provide a way to convert already pickled (old) ScanData objects 
+    #     to the new class, on the fly.
+    #     
+    #     On the upside, it should make the API less convoluted and more uniform
+    #     (we will have to bindAxis("c"...) to access individual channels)
+    #     
+    #     NOTE: 2021-10-29 10:41:27 About data component frames
+    #     
+    #     Ideally there should be a biunivocal relationship between frames across all
+    #     compoents, i.e.:
+    #     
+    #     scans frame K   -> electrophysiology block, segment K
+    #                     |
+    #                     -> scene frame K
+    #                     
+    #     However, this is not always practical.
+    #     
+    #     A frame index mapping algorithm is needed, which maps a frame index in the
+    #     "primary" data component to frames in the "secondary" data components to
+    #     allow "unbalanced" cases where a "secondary" data component has a different
+    #     number of frames than the "primary" data component.
+    #     
+    #     In ScanData the "primary" data component is always stored in the "scans"
+    #     attribute. When this is None or empty, then the primary data component is 
+    #     "scene".
+    #     
+    #     The "scene" attribute is optional. When present, the scene's purpose is to
+    #     contextualize the scan data (e.g., for line scans, the scene is a 2D raster
+    #     scan of the field of view where the line scanning trajectory is defined).
+    #     
+    #     The table below gives an overview of the different possible acqusition types
+    #     and their data components. This is currently based on PrairieView acqusition
+    #     model but the aim is to extend this to ScanImage data as well.
+    #     
+    #     Scan data type  Scans           Scene               Electrophysiology
+    #     (PrairieView)
+    #     ============================================================================
+    #     
+    #     SingleImage     sequence of     None                None
+    #                     one frame       
+    #     
+    #     ZSeries         sequence of     None                None
+    #                     frames
+    #                                 
+    #     TSeries         sequence of     None                None, or neo.Block
+    #                     frames                              (e.g., in conjunction 
+    #                                                         with photoactivation)
+    #                                 
+    #     Line scan       sequence of     sequence of         neo.Block
+    #                     frames          frames 
+    #                                     (possibly just
+    #                                     one frame)
+    #     
+    #     
+    #     
+    #     TODO Class documentation
+    #     
+    #     Properties of special interest:
+    #     
+    #     scansBlock
+    #     
+    #         neo.Block object containing time-varying imaging data derived from
+    #         the analysis of ROIs or cursors in the scans data subset.
+    #         
+    #         NOTE: Referred to as "imaging block" in this documentation
+    #     
+    #         Only relevant when this is a linescan data or a time series with raster 
+    #         scans.
+    #         
+    #         _scans_block_.segments
+    #         
+    #         Each segment corresponds to a single "trial" or "repetition", or "cycle", 
+    #         and its "analogsignals" contain the time-varying image parameters
+    #         measured in ROIs or along Cursors. See neo.Segment and neo.AnalogSignal.
+    #         
+    #         For time series, the _scans_block_ contains only one segment.
+    #         
+    #         _scans_block_.segments[k].analogsignals:
+    #         
+    #     FIXME:2019-03-17 18:28:07 WE NEED SOME SERIOUS DEBUGGING !
+    #     
+    #     1) removeAnalysisUnit does not seem to remove all linked cursor frontends
+    #         when called from LSCaTWindow
+    #         
+    #     2) extractAnalysisUnit(..., average=True):
+    #         scanRegion retains more states than necessary 
+    #         
+    #         For example, e.g. extracted & averaged unit data with 9 frames but having
+    #         a scanRegion with states for 26 frames -- why? The original data had
+    #         38 frames in this particular example -- see 18l12 CACNA1C152mHET/c01/sp01/ 
+    #         Where the did the 26 come from?
     from gui import pictgui as pgui
     
     # ### BEGIN class variables
@@ -1618,13 +1618,17 @@ class ScanData(BaseScipyenData):
         )
     
     _data_attributes_:typing.ClassVar = (
-        ("sceneAxesCalibration",            list,   AxesCalibration),
-        ("scansAxesCalibration",            list,   AxesCalibration),
-        ("sceneLayout",                     dict),
-        ("scansLayout",                     dict),
         ("framesMap",                       FrameIndexLookup),
         )
     
+#     _data_attributes_:typing.ClassVar = (
+#         ("sceneAxesCalibration",            list,   AxesCalibration),
+#         ("scansAxesCalibration",            list,   AxesCalibration),
+#         ("sceneLayout",                     dict),
+#         ("scansLayout",                     dict),
+#         ("framesMap",                       FrameIndexLookup),
+#         )
+#     
     _graphics_attributes_:typing.ClassVar = (
         ("scansCursors",                    dict, Cursor),
         ("scansRois",                       dict, PlanarGraphics),
@@ -1690,7 +1694,7 @@ class ScanData(BaseScipyenData):
     # these include framesMap...
     #
     # axes calibrations for image data in the scans; initialized/set up by the scans descriptor
-    # scansAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list, init=False)
+    # scansAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list)
     # to document; initialized/set up by the scans descriptor
     # scansLayout:dict = dataclasses.field(default_factory = dict, init=False) 
     # signals containing quantitative data measured in the scans (depends on experiment type)
@@ -1707,7 +1711,7 @@ class ScanData(BaseScipyenData):
     # scene:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
     #
     # see BUG 2024-08-14 21:11:36 for why these are commented-out
-    sceneAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list)
+    # sceneAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list)
     # sceneLayout:dict = dataclasses.field(default_factory = dict, init=False)
     sceneBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scene"))
     sceneProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scene profiles"))
@@ -1873,122 +1877,7 @@ class ScanData(BaseScipyenData):
             When "auto", try to "parse" TriggerProtocol from ephys neo.Block data.
                 
         """
-        
-        # print(f"{self.__class__.__name__}.__post_init__:\n\targs: {args}\n\tkwrgs: {kwargs}")
-        
-        # if isinstance(scans, ScanData):
-        #     self = scans.copy() # make a deep copy
-        #     return
-        
-        # super_init_fields = [getattr(self, f.name) for f in dataclasses.fields(BaseScipyenData)]
-        
-        # super().__init__(*super_init_fields, neo_attrs)
-        
-#         for attr in neo.core.baseneo.BaseNeo._recommended_attrs:
-#             attr_name = attr[0]
-#             attr_type = attr[1]
-#             if attr_name not in neo_attrs:
-#                 raise ValueError(f"{attr_name} must be supplied")
-#             
-#             attr = neo_attrs[attr_name]
-#             if not isinstance(attr, attr_type):
-#                 raise ValueError(f"{attr_name} expected to be a {attr_type.__name__}; got {type(attr).__name__} instead")
-#             
-#             setattr(self, attr_name, attr)
-        
-        # self._availableGenotypes_ = [s for s in GENOTYPES]
-        # self._availableUnitTypes_ = [s for s in UnitTypes.values()]
         self.availableUnitTypes.insert(0, "unknown")
-        
-        # self._metadata_ = None
-        # self._modified_ = False
-        
-        # self._processed_ = False
-        
-        # NOTE: 2024-08-11 15:55:41
-        # AttributeAdapter instances for validating and extracting layout information
-        # from the image data
-        # self._scans_parser_ = ScanDataImageParser(self, "scans") # AttributeAdapter
-        # self._scene_parser_ = ScanDataImageParser(self, "scene") # AttributeAdapter
-        
-        # parse parameters, check images, frame axes & calibrations, electrophys.
-        # and metadata --> populate kwargs and let super().init populate self
-        # with everything else
-
-        # self._preset_hooks_ = {
-        #     "scans": ScanDataImageParser(self, "scans"), # AttributeAdapter
-        #     "scene": ScanDataImageParser(self, "scene"), # AttributeAdapter
-        #     }
-        # self._preset_hooks_ = {
-        #     "scans": self._scans_parser_,
-        #     "scene": self._scene_parser_,
-        #     }
-            
-        # self._postset_hooks_ = {
-        #     "scans": ScanDataFramesMapUpdater(self, "scans"),
-        #     "scene": ScanDataFramesMapUpdater(self, "scene"),
-        #     "electrophysiology": ScanDataFramesMapUpdater(self, "electrophysiology"),
-        #     "metadata": self._parse_metadata_,
-        #     }
-    
-#         sceneLayout = kwargs.pop("sceneLayout", None)
-#         sceneFrameAxis = None if not isinstance(sceneLayout, dict) else sceneLayout.get("sceneFrameAxis", None)
-#         sceneAxesCalibration = kwargs.pop("sceneAxesCalibration", None)
-#         
-#         scansLayout = kwargs.pop("scansLayout", None)
-#         scansFrameAxis = None if not isinstance(scansLayout, dict) else scansLayout.get("scansFrameAxis", None)
-#         scansAxesCalibration = kwargs.pop("scansAxesCalibration", None)
-#         
-#         scene, scene_layout, scene_axes_cal = self._scene_parser_.imageDataLayout(scene, 
-#                                                                    frameAxis = sceneFrameAxis, 
-#                                                                    axescal = sceneAxesCalibration)
-#         
-#         scans, scans_layout, scans_axes_cal = self._scans_parser_.imageDataLayout(scans, 
-#                                                                    frameAxis = scansFrameAxis, 
-#                                                                    axescal = scansAxesCalibration)
-#         
-#         kwargs["scene"] = scene
-#         kwargs["sceneLayout"] = scene_layout if sceneLayout is None else sceneLayout
-#         kwargs["sceneAxesCalibration"] = scene_axes_cal if sceneAxesCalibration is None else sceneAxesCalibration
-#         
-#         kwargs["scans"] = scans
-#         kwargs["scansLayout"] = scans_layout if scansLayout is None else scansLayout
-#         kwargs["scansAxesCalibration"] = scans_axes_cal if scansAxesCalibration is None else scansAxesCalibration
-#         
-#         kwargs["electrophysiology"] = electrophysiology
-#         kwargs["metadata"] = metadata
-#         
-#         field_frames = dict((c[0], 0) for c in self._data_children_)
-#         for c in field_frames:
-#             if c in ("scene","scans"):
-#                 layout = kwargs.get(f"{c}Layout", None)
-#                 f = layout.get("nFrames", 0) if isinstance(layout, dict) else 0
-#                 val = f if isinstance(f, int) else np.prod(f)
-#                 
-#             else:
-#                 val = len(kwargs[c].segments) if isinstance(kwargs[c], neo.Block) else 0
-#                 
-#             field_frames[c] = val
-#             
-#         # NOTE: 2022-01-04 16:05:12 
-#         # FrameIndexLookup ALWAYS in use
-#         framesLookup = FrameIndexLookup(field_frames)
-#             
-#         # the user may have supplied a frame index lookup to the initializer
-#         framesMap = kwargs.pop("framesMap", framesLookup)
-#         
-#         kwargs["framesMap"] = framesMap
-            
-        # NOTE: the following sets up descriptors using the default 
-        # setup_descriptor :class: method inherited from prog.WithDescriptors
-        # 
-        # super().__init__(**kwargs) # BaseScipyenData/WithDescriptors
-
-        # NOTE: 2022-01-02 23:22:32
-        # metadata now set via the descriptor mechanism (WithDescriptors) in
-        # super().__init__(**kwargs) above
-        # self._parse_metadata_()
-        
         self._modified_ = False
         
     def _repr_pretty_(self, p, cycle):

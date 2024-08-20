@@ -12,8 +12,7 @@ from inspect import (getmembers, getattr_static)
 import numpy as np
 import pandas as pd
 from core.datatypes import is_unavailable
-from core.prog import (ArgumentError,  WithDescriptors, 
-                       get_descriptors, signature2Dict)
+from core.prog import ArgumentError
 from core.utilities import (nth, normalized_index, sp_set_loc, sp_get_loc)
 from core.basescipyen import BaseScipyenData
 

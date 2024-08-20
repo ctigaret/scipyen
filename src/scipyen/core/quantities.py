@@ -23,7 +23,7 @@ pq.constants.e
 pq.constants.Avogadro_constant
 
 """
-import inspect, typing, traceback, warnings
+import inspect, typing, traceback, warnings, types, dataclasses
 from math import (log, inf, nan)
 from pandas import NA
 from numpy import log10
@@ -35,6 +35,7 @@ from functools import (reduce, partial, cache)
 
 from core import unicode_symbols
 from core.unicode_symbols import uchar
+from core.prog import BaseDescriptorValidator
 
 _pqpfx = sorted(inspect.getmembers(pq.prefixes, lambda x: isinstance(x, (float, int))) + [("deca", pq.prefixes.deka)], key = lambda x: x[1])
 
@@ -984,3 +985,142 @@ def nSamples(t:pq.Quantity, s:pq.Quantity) -> int:
     assert isinstance(s, pq.Quantity) and check_time_units(1./s), f"sampling rate {s} is not a frequency quantity"
     return int(t.rescale(pq.s) * s.rescale(pq.Hz))
     
+class QuantityDescriptorValidator(BaseDescriptorValidator):
+    """Descriptor validator for Python quantities, to be used in dataclass types"""
+    def __init__(self, name:str, default = dataclasses.MISSING,
+                 default_factory = dataclasses.MISSING, 
+                 validator:typing.Optional[types.FunctionType]=None):
+        # NOTE: 2024-08-20 11:20:48 Strategy
+        #
+        # Since dataclasses CANNOT do not accept mutable types as fields, 
+        # this Descriptor will either:
+        # a) generate a factory function based on the supplied 'default' (when default is not MISSING), OR
+        # b) use the default 0-argument function supplied as 'default_factory'
+        #
+        # Therefore we emulate the behaviour of 'dataclasses.field' function to 
+        # ensure that 'default' and 'default_factory' are NOT both supplied at 
+        # the same time (but either can have their default values here, of dataclasses.MISSING)
+        
+        # I then use a custom __get__ method (see below) so that the dataclass 
+        # parsing "sees" the factory function and not the atual default value 
+        # (which is mutable, and therefore not acceptable as a dataclass field.
+        
+        # ATTENTION 2024-08-20 11:47:59 The down side of this is that the __set__
+        # (called by the dataclass mechanism) and therefore self.validate() must 
+        # also accept a factory function as above.
+        #
+        # I guess I can live with that...
+        
+        # NOTE: 2024-08-20 11:17:25
+        # Adopt behaviour of dataclasses.field(…)
+        if default is not dataclasses.MISSING and default_factory is not dataclasses.MISSING:
+            raise ValueError(f"At least one of default and default_factory must be dataclasses.MISSING; instead, got default: {type(default).__name__} and default_factory: {type(default_factory).__name__}")
+        
+        if isinstance(default, pq.Quantity):
+            # a default is supplied -- verify is the right thing
+            if not check_time_units(default):
+                raise TypeError(f"Expecting a time quantity")
+            
+            # then use it to construct a NEW quantity, so that new instances of 
+            # this descriptor don't point to the same default!
+            my_default_factory = lambda: pq.Quantity(default.magnitude * default.units)
+            default = dataclasses.MISSING # override default for super().__init__() below
+            
+        elif default is dataclasses.MISSING:
+            if inspect.isfunction(default_factory):
+                argspec = inspect.getfullargspec(default_factory)
+                if len(argspec.args):
+                    raise TypeError(f"Expecting 'default_factory to 0 arguments")
+                
+                if len(argspec.kwonlyargs):
+                    raise TypeError(f"Expecting a factory without keyword arguments")
+                
+                if any(v is not None for v in (argspec.varargs, argspec.varkw, argspec.defaults, argspec.kwonlydefaults)):
+                    raise TypeError("Expecting default_factory to be a 0-argument function or dataclasses.MISSING")
+                
+                d = default_factory()
+
+                if not isinstance(d, pq.Quantity):
+                    raise TypeError(f"Expecting the 'default_factory' to be a python Quantity factory function; instead, got a factory for {type(d).__name__}")
+                
+                if not check_time_units(d):
+                    raise TypeError(f"Expecting the 'default_factory' to be a factory for time quantity; instead it generates {d.units} units")
+                
+                my_default_factory = default_factory
+                
+            elif default_factory is dataclasses.MISSING: 
+                my_default_factory = lambda: 0*pq.s
+            else:
+                raise TypeError("Expecting default_factory to be a 0-argument function or dataclasses.MISSING")
+            
+        else:
+            raise TypeError(f"'default expected to be a python Quantity or dataclasses,.MISSING; instead, got {type(default).__name__}")
+        
+        super().__init__(name, default, use_private=True)
+        
+        self.default_factory = my_default_factory
+        if inspect.isfunction(validator):
+            fargs = inspect.getfullargspec(validator)
+            if len(fargs.args) != 1:
+                raise TypeError("'validator' function must accept exactly one positional argument")
+            self.validator = validator
+        else:
+            self.validator = dataclasses.MISSING
+            
+    def __get__(self, obj, objtype=None) -> object:
+        """Implements access to a data descriptor value (attribute access).
+        Customized to resolve to a default factory function for the Python's
+        dataclass mechanism.
+        
+        """
+        # print(f"{self.__class__.__name__}.__get__: {self.private_name} (public name: {self.public_name}) for {type(obj).__name__} object")
+        if obj is None:
+            # NOTE: 2024-08-20 11:15:23
+            # this gets checked by the dataclasse parsing mechanism so we need to 
+            # return the factory here, instead of the mutable Quantity
+            ret = self.default_factory 
+        else:
+            # NOTE: 2024-08-20 11:14:54
+            # THAT's the way to do it
+            # here, we actually need a puython quantity instance, which may be a
+            # realization of the default factory
+            ret = getattr(obj, self.private_name, self.default_factory)
+
+            # WARNING: the setter may have assigned a quantity, so we need to check this
+            if inspect.isfunction(ret):
+                ret = ret()
+            
+        return ret
+        
+    def validate(self, value):
+        """"""
+        # NOTE: 2024-08-20 11:51:01
+        # see ATTENTION 2024-08-20 11:47:59 for why this also accepts a factory
+        # function
+        if isinstance(value, pq.Quantity):
+            if inspect.isfunction(self.validator):
+                if not self.validator(value):
+                    raise TypeError(f"'value' has wrong units: {value.units}")
+            
+        elif inspect.isfunction(value):
+            argspec = inspect.getfullargspec(value)
+            if len(argspec.args):
+                raise TypeError("Expecting a factory without arguments")
+            
+            if len(argspec.kwonlyargs):
+                raise TypeError("Expecting a factory without keyword arguments")
+            
+            if any(v is not None for v in (argspec.varargs, argspec.varkw, argspec.defaults, argspec.kwonlydefaults)):
+                raise TypeError("Expecting a factory with no arguments at all")
+            
+            d = value()
+
+            if not isinstance(d, pq.Quantity):
+                raise TypeError(f"Expecting a python Quantity factory function; instead, got a factory for {type(d).__name__}")
+            
+            if inspect.isfunction(self.validator):
+                if not self.validator(d):
+                    raise TypeError(f"th factory generates a quantity with wrong units {d.units}")
+         
+        else:
+            raise TypeError(f"Expecting a python Quantity or a Quantity functor; instead, got {type(value).__name__}")
