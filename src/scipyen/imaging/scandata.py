@@ -1405,7 +1405,7 @@ class ScanDataMetadataAdapter(AttributeAdapter):
         from gui import pictgui as pgui
         from systems.PrairieView import PVSequenceType
         
-        print(f"{self.__class__.__name__}._parse_metadata_ value = \n{value}")
+        # print(f"{self.__class__.__name__}._parse_metadata_ value = \n{value}")
         
         # NOTE: 2024-08-13 20:23:14
         # new descriptor validator / attribute adapter mechanism
@@ -9207,7 +9207,7 @@ def scanDataOptions(detection_predicate=1.3, roi_width = 10,
     return ret
 
 def _new_ScanData(scans, scene, electrophysiology, kw):
-    ret = ScanData(scans, scene, electrophysiology, **kw)
+    ret = ScanData(scans=scans, scene=scene, electrophysiology=electrophysiology, **kw)
         
     return ret
 

@@ -285,17 +285,16 @@ class TriggerProtocol:
         else:
             photo = self.photostimulation.size
             
-        if self.acquisition is None:
+        if isinstance(self.acquisition, (tuple, list)) and len(self.acquisition) and all(isinstance(e, TriggerEvent) for e in self.acquisition):
+            imaging = sum(e.size for e in self.acquisition)
+        else:
             imaging = 0
             
-        elif isinstance(self.acquisition, (tuple, list)):
-            imaging = self.acquisition[0].size
+        # elif isinstance(self.acquisition, TriggerEvent):
+        #     imaging = self.acquisition.size
             
-        elif isinstance(self.acquisition, TriggerEvent):
-            imaging = self.acquisition.size
-            
-        if isinstance(self.userEvents, (tuple, list)) and all(isinstance(e, (TriggerEvent, neo.Event)) for e in self.userEvents):
-            user = len(self.userEvents)
+        if isinstance(self.userEvents, (tuple, list)) and len(self.userEvents) and all(isinstance(e, (TriggerEvent, neo.Event)) for e in self.userEvents):
+            user = sum(e.size for e in self.userEvents)
         else:
             user = 0
             
