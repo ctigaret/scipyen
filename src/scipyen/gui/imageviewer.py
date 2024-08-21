@@ -1979,7 +1979,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     #### BEGIN public methods
     
     @safeWrapper
-    def roi(self, value:typing.Optional[typing.Any]=None, attribute:str="name", predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, **kwargs):
+    def roi(self, value:typing.Optional[typing.Any]=None, attribute:str="name", 
+            predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
+            **kwargs):
         """Iterates through ROIs with specific attributes.
         
         ROIs are selected by comparing the value of a specific ROI attribute
@@ -2035,7 +2037,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         """
         
-        if len(**kwargs):
+        if len(kwargs):
             ret = list()
             for n,f in kwargs.items():
                 if isinstance(f, function):

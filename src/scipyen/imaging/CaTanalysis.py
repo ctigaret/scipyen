@@ -209,7 +209,7 @@ from core.utilities import (get_nested_value, set_nested_value, counter_suffix,
                             yyMdd,
                             NestedFinder)
 
-from core.prog import (safeWrapper, safeGUIWrapper, )
+from core.prog import (safeWrapper, safeGUIWrapper, scipywarn)
 #import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
@@ -4620,7 +4620,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     % self._data_.analysisOptions["Channels"]["Indicator"])
                 return
             
-        #### BEGIN unthreaded execution - for debugging
+        #### BEGIN unthreaded execution - for debugging WARNING/ATTENTION/CAUTION DO NOT DELETE
         # make sure to comment out the other one
         #if scene and len(self._data_.scene) > 0:
             #self._scene_processing_idle_ = True
@@ -4655,7 +4655,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.displayFrame()
         #self.statusBar().showMessage("Done!")
         
-        #### END unthreaded execution
+        #### END unthreaded execution - for debugging WARNING/ATTENTION/CAUTION DO NOT DELETE
         
         #### BEGIN Threaded execution - this should be used by default;
         # make sure you comment out the unthreaded bit above
@@ -4713,13 +4713,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             print("slot_sceneProcessingDone no data")
             return
+        
         self._scene_processing_idle_= True
+        
         for k in range(len(result)):
             #print("scene[%d]" %k)
             self._data_.scene[k][:] = result[k]
             
-        #self._data_.sceneChannelNames = result[1]
-        
         for win in self.sceneviewers:
             win.displayFrame()
             
@@ -4731,13 +4731,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             print("slot_scansProcessingDone no data")
             return
+        
         self._scans_processing_idle_ = True
+        
         for k in range(len(result)):
             #print("scans[%d]" % k)
             self._data_.scans[k][:] = result[k]
-        #self._data_.scansChannelNames = result[1]
+            
         for win in self.scansviewers:
             win.displayFrame()
+            
         self.slot_processingDone()
         
     @Slot()
@@ -11433,6 +11436,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
 
             #newdata._upgrade_API_()
             #print("LSCaTWindow _parsedata_ %s" % newdata.name)
+            
+            # keep uptodate with analysisOptions (maye have changed across pickling)
             default_options = scanDataOptions()
             
             try: # old pickles don't have analysisOptions descriptors!
@@ -11455,35 +11460,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 #newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["data_2D"]
                 #newdata.analysisOptions["Discrimination"].pop("data_2D", None)
             
-#             if hasattr(newdata, "cell"):
-#                 if isinstance(newdata.cell, str):
-#                     newdata.cell = strutils.str2symbol(newdata.cell)
-#                 
-#             else:
-#                 newdata.cell = "NA"
-#                 
-#             if hasattr(newdata, "field"):
-#                 if isinstance(newdata.field, str):
-#                     newdata.field = strutils.str2symbol(newdata.field)
-#                 
-#             else:
-#                 newdata.field = "NA"
-                
             self._selected_analysis_cursor_ = None
             self._selected_analysis_unit_ = None
                 
             self._data_ = newdata
-#             if isinstance(varname, str) and len(varname.strip()):
-#                 self._data_var_name_ = varname
-#                 
-#             else:
-#                 self._data_var_name_ = newdata.name
             
         else:
             raise TypeError("Expecting a ScanData object or None; got %s instead" % type(newdata).__name__)
             
-        # if self._data_ is None:
-        #     return
         
         # check if there are vertical cursors defined for scandata
         # and for each of these, check that they have a linked point
@@ -11502,6 +11486,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                         if obj.type == pgui.GraphicsObjectType.vertical_cursor:
                             if len(obj.linkedObjects) == 0:
                                 self._link_scans_vcursor_to_scene_pcursor_(obj)
+                                
+                                
+        self.generateScanRegionProfiles()
                                 
         
     @safeWrapper
@@ -11838,10 +11825,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         
         if self._data_.analysisMode != ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
+            scipywarn(f"{self._data_.analysisMode} analysis not yet supported")
+            return
         
         if self._data_.type != ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.type)
+            scipywarn(f"{self._data_.type} not yet supported")
+            return
+
 
         self.generateScanRegionProfilesFromScans() 
         self.generateScanRegionProfilesFromScene() 
@@ -11863,11 +11853,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         
         if self._data_.analysisMode != ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
+            scipywarn(f"{self._data_.analysisMode} analysis not yet supported")
+            return
         
         if self._data_.type != ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.type)
-        
+            scipywarn(f"{self._data_.type} not yet supported")
+            return
+
         data = self._data_.scene
         target = self._data_.sceneProfiles
         sigprefix = "Scene"
@@ -11950,10 +11942,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         
         if self._data_.analysisMode != ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
+            scipywarn(f"{self._data_.analysisMode} analysis not yet supported")
+            return
         
         if self._data_.type != ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.type)
+            scipywarn(f"{self._data_.type} not yet supported")
+            return
 
         data = self._data_.scans
         target = self._data_.sceneProfiles
@@ -12319,52 +12313,28 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @safeWrapper
     def setData(self, newdata = None, doc_title=None, **kwargs):
         """When newdata is None this resets everything to their defaults"""
-        uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
         
-        if uiParamsPrompt:
-            # TODO 2023-01-18 08:48:13
-            pass
-            # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
+#         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
+#         
+#         if uiParamsPrompt:
+#             # TODO 2023-01-18 08:48:13
+#             pass
+#             # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
             
         # NOTE: 2021-07-08 13:40:23
         # called by ScyipenViewer superclass
         self._clear_contents_()
         
         if isinstance(newdata, ScanData):
-            # name = getattr(newdata, "name", None)
-            # if name is None or not (isinstance(name, str) and len(name.strip())):
-            #     name = self.workspaceSymbolForData(newdata)
-            # print(f"{self.__class__.__name__}.setData:\n\tname = {newdata.name}")
-            # if not isinstance(doc_title, str) or len(doc_title.strip()) == 0:
-            #     doc_title = name
-#                 if len(newdata.name.strip()):
-#                     doc_title = newdata.name
-#                     
-#                 elif isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()):
-#                     doc_title = self._data_var_name_
-#                     
-#                 else:
-#                     doc_title = "ScanData"
-            # else:
-            #     doc_title = "ScanData"
-                    
-            # print(f"{self.__class__.__name__}.setData:\n\tname = {newdata.name};\n\tdoc_title = {doc_title}")
-            
             self._parsedata_(newdata)#, name)
-            
             self._data_modifed_(False)
-            
             self.generateFilters()
-            
             self._init_viewers_() # this MAY modify data (if scan region scene profile is enabled)
-            
             self.displayFrame()
             
         else:
             # TODO in _parsedata_: when nothing is passed reset everything
             self._data_ = None
-            # self._data_var_name_ = None
-            #self._clear_contents_()
             
     @Slot()
     @safeWrapper
