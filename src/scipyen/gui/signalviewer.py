@@ -2578,7 +2578,7 @@ anything else       anything else       ❌
         obj_signal_axes = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in obj.segments)
         if obj_signal_axes != self._n_signal_axes_:
             self._n_signal_axes_ = max(self._n_signal_axes_, obj_signal_axes)
-            self._setup_axes_()
+            self._setup_axes_(self._n_signal_axes_)
         
         new_frame_meta_index = np.recarray((len(obj.segments),1),
                                            dtype = [('block', int), ('segment', int)])
@@ -2661,7 +2661,7 @@ anything else       anything else       ❌
         if obj_signal_axes != self._n_signal_axes_:
             self._n_signal_axes_ = max(self._n_signal_axes_, obj_signal_axes)
             
-            self._setup_axes_()
+            self._setup_axes_(self._n_signal_axes_)
                 
         if self.observed_vars.get("yData", None) is not None:
             self.observed_vars["yData"] = None
@@ -9151,7 +9151,10 @@ signals in the signal collection.
         if len(analog) + len(irregs) == 0:
             return None, None
         
-        assert len(self.signalAxes) >= len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
+        # if len(self.signalAxes) != len(analog) + len(irregs):
+        #     scipywarn(f"{len(self.signalAxes)} signal axes for {len(analog)} analog signals + {len(irregs)} irregularly sampled signals = {len(analog)+len(irregs)}")
+        
+        assert len(self.signalAxes) >= len(analog) + len(irregs), "Mismatch between number of signal axes and available signals"
 
         # NOTE: 2023-01-12 16:45:48
         # by convention, analog signals are plotted in order, BEFORE the 

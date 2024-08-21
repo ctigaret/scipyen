@@ -9437,10 +9437,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self._display_graphics_objects_(rois=True,  scene=True) 
                     
             if len(self._data_.scansProfiles.segments) == 0:
-                self._data_.generateScanlineProfilesFromScans()
+                self.generateScanRegionProfilesFromScans()
                 
             if len(self._data_.sceneProfiles.segments) == 0:
-                self._data_.generateScanlineProfilesFromScene()
+                self.generateScanRegionProfilesFromScene()
                 
             self._display_scanline_profiles_()
                 
@@ -9453,6 +9453,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if len(self.profileviewers) > 0:
                 self.profileviewers[0].clear()
                 self.profileviewers[0].close()
+                
+            self.profileviewers.clear()
                 
         self._update_ui_fields_()
                 
@@ -10147,10 +10149,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not neoutils.is_empty(self._data_.sceneProfiles):
             sceneProfiles  = self._data_.sceneProfiles
             
-        if not neoutils.is_empty(elf._data_.sceneProfiles):
+        if not neoutils.is_empty(self._data_.sceneProfiles):
             scansProfiles  = self._data_.scansProfiles
             
-        if all((s is None for s in (sceneProfiles, scanProfiles))):
+        if all((s is None for s in (sceneProfiles, scansProfiles))):
             return
         
         if len(self.profileviewers):
@@ -10206,7 +10208,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             elif isinstance(self._frame_selector_, int):
                 self.profileviewers[0].currentFrame = self._frame_selector_
                 
-        self.profileviewers[0].setWindowTitle("%s %s" % ("Scanline profiles", self._data_.name))
+        self.profileviewers[0].setWindowTitle(f"Scanline profiles {self._data_.name}")
         
     @safeWrapper
     def _display_ephys_(self):
