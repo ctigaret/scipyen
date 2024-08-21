@@ -9299,12 +9299,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        if len(self._data_var_name_) == 0:
-            bname = "scandata"
-            
-        else:
-            bname = self._data_var_name_
-            
+#         if len(self._data_var_name_) == 0:
+#             bname = "scandata"
+#             
+#         else:
+#             bname = self._data_var_name_
+#             
         #targetDir = self._scipyenWindow_.recentDirectories[0]
         targetDir = self._scipyenWindow_.currentDir
         

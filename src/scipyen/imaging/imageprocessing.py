@@ -73,6 +73,26 @@ def getProfile(img, coordinates, order=3):
             # BUG: 2024-08-21 16:34:54 FIXME
             # the below could return only two points -- we need to interpolate
             # the coordinates!
+            
+            # NOTE: 2024-08-21 21:37:42
+            # here, `coordinates` may be a line (two points) or a polyline (> 2 points)
+            #
+            # we want to interpolate BETWEEN these points; to keep things simple,
+            # we use linear interpolation
+            #
+            # this produces two numpy arrays, respectively, with the x and y cordinates
+            # of the roi's points
+            roi_x, roi_y = map(lambda x: np.array(x), zip(*[(p.x, p.y) for p in coordinates]))
+            
+            # the total length (in pixels) of the line or polyline is the sum of
+            # the length of each segment; in turn the length of each segment is the Euclidean
+            # distance between its end points
+            #
+            # ATTENTION: do NOT confuse with the Euclidean distance between roi_x, roi_y
+            # vectors !!! That one applies to 𝑵-dimensional vectors, which roi_x, roi_y are NOT!
+            
+            
+            
             return np.array([spl(p.x, p.y) for p in coordinates])
         
         else:

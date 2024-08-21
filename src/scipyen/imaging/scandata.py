@@ -8510,9 +8510,9 @@ class ScanData(BaseScipyenData):
         """
         return self.scanTrajectory
     
-#     @scanRegion.setter
-#     def scanRegion(self, value):
-#         self.scanTrajectory = value
+    @scanRegion.setter
+    def scanRegion(self, value):
+        self.scanTrajectory = value
 #     
 #     @processed.setter
 #     def processed(self, value:bool):

@@ -1872,7 +1872,7 @@ class PlanarGraphics():
         
         The returned Path is composed of Move and Line elements only.
         
-        Path objects and special graphics primitives (e.g., ArcTo, ArcMoveTo, 
+        Path objects and special graphics primitives (e.g., ArcTo, ArcMove, 
         Ellipse, Rect, Cubic, Quad, etc) should override this function.
         
         """
@@ -3395,27 +3395,37 @@ class PlanarGraphics():
         else:
             return 0
                 
-    def curveLength(self, prev=None):
+    def curveLength(self, prev=None, full:bool=False):
         """Calculates the length of the curve represented by this PlanarGraphics
-        TODO: implement for Rect, Ellipse, and Arc but with winding rule !
-        
         Parameters:
         ==========
-        prev: a PlanarGraphics or None (default): the PlanarGraphics point
-            relative to which the curve length is calculated.
+        prev: a PlanarGraphics or None (default): the PlanarGraphics point (NOT
+            a Path, Elipse, or Rect) relative to which the curve length is
+            calculated. This is because PlanarGraphics primitives like Arc, ArcMove,
+            Line, Cubic and Quad are specified using destination points (or 
+            bounding rectangles); not used for closed primitves like Rect or Ellipse.
             
             Ignored for Path PlanarGraphics, but mandatory for the other supported
             PlanarGraphics subclasses (currently, Move, Line, Cubic, Quad).
             
-            When None, the curveLength will be calculated relative to a 
-                Move(0., 0.) instead.
+            For PlanarGraphics except Path, Rect, Ellipse, when `prev` is None, 
+                the curveLength will be calculated relative to a Move(0., 0.).
+        
+        full: bool, default is False; when True, also returns the Encildean distance
+            of the `prev`, but only for Line objects (FIXME - do we need this at all 
+            and if so, why just for Lines?)
         
         Returns:
         =======
-        For Move: 0
+        A scalar (when full is False, the default) or a scalar and an array 
+        (when full is True and this object is a Line):
+        
+        For Move: 0 or the distance from `prev` (when move begins a subpath)
+            FIXME: this means the we include the distance between subpaths, which 
+            is likely incorrect.
         
         For Line: the Euclidean distance between this element's (x,y) coordinates
-                and those of the previous element in "prev"
+                and (if `full` is True) those of the previous element in "prev"
                     
         For Cubic, Quad: scalar float:  the length of the rectified form of the 
             curve i.e., a straight line segment with the same length as the 
@@ -3443,13 +3453,15 @@ class PlanarGraphics():
         from scipy import interpolate, spatial
         
         if isinstance(self, Move):
-            if prev is None:
-                return 0 # Move has 0 length
-            
-            else:
-                # for Move that begins a subpath
-                return spatial.distance.euclidean([self.x, self.y],
-                                                  [prev.x, prev.y])
+            return 0.
+        
+#             if prev is None:
+#                 return 0 # Move has 0 length
+#             
+#             else:
+#                 # for Move that begins a subpath BUG/FIXME/TODO 2024-08-21 22:37:19
+#                 return spatial.distance.euclidean([self.x, self.y],
+#                                                   [prev.x, prev.y])
         
         elif isinstance(self, Path):
             if all([isinstance(e, (Move, Line, Cubic, Quad)) for e in self]):
@@ -3460,7 +3472,11 @@ class PlanarGraphics():
                 
                 element_curve_lengths += [p.curveLength(path[k-1]) for k, p in enumerate(path) if k > 0]
                 
-                return np.sum(element_curve_lengths), element_curve_lengths
+                return np.sum(element_curve_lengths)
+                # if full:
+                #     return np.sum(element_curve_lengths), element_curve_lengths # when do we ever need these?
+                # else:
+                #     return np.sum(element_curve_lengths)
                 
             else:
                 raise NotImplementedError("Function accepts Path containing only Move, Line, Cubic, and Quad elements")
@@ -3473,6 +3489,8 @@ class PlanarGraphics():
                 prev = Move(0., 0.)
         
             if isinstance(self, Line):
+                if prev is None:
+                    prev = Move(0., 0.)
                 return spatial.distance.euclidean([self.x, self.y], 
                                                   [prev.x, prev.y])
             
@@ -3481,7 +3499,7 @@ class PlanarGraphics():
                 self_xy = np.array([self.x, self.y])
                 prev_xy = np.array([prev.x, prev.y])
                 
-                dx_dy = self_xy - prev_xy                      # prepare to "shift" the rectified spline
+                dx_dy = self_xy - prev_xy                       # prepare to "shift" the rectified spline
                                                                 # so that it starts at the previous point
                 
                 t = np.zeros((8,))
@@ -3524,7 +3542,7 @@ class PlanarGraphics():
                 self_xy = np.array([self.x, self.y])
                 prev_xy = np.array([prev.x, prev.y])
 
-                dx_dy = self_xy - prev_xy                      # prepare to "shift" the rectified spline
+                dx_dy = self_xy - prev_xy                       # prepare to "shift" the rectified spline
                                                                 # so that it starts at the previous point
                 
                 t = np.zeros((6,))
@@ -3553,6 +3571,31 @@ class PlanarGraphics():
                 rectified_xy = defintegral_xy + dx_dy
                 
                 return spatial.distance.euclidean(prev_xy, rectified_xy)
+            
+            elif isinstance(self, Rect):
+                return 2*self.w + 2*self.h
+            
+            elif isinstance(self, Ellipse):
+                # approximates circumference using the ellipe function
+                # (complete elliptic integral of the 2ⁿᵈ kind)
+                a = self.w/2
+                b = self.h/2
+                
+                a,b = max(a,b), min(a,b)    # just to avoid e_sq < 0, not that it would make a diference, numerically
+                
+                e_sq = 1. - b**2 / a**2     # eccentricity squared
+                
+                return 4 & a * scipy.special.ellipe(e_sq)
+            
+            elif isinstance(self, Arc):
+                # BUG 2024-08-21 23:10:24 FIXME
+                # incorrect x and y for Arc
+                pr = spatial.distance.euclidean([self.x, self.y], [prev.x, prev.y])
+                return self.l + pr # sweep length parameter for QPainterPath.arcTo()
+                
+            elif isinstance(self, ArcMove):
+                return 0    # (as for Move)
+                
             
             else:
                 raise NotImplementedError("Function is not implemented for %s PlanarGraphics" % self.type)
@@ -4430,7 +4473,8 @@ class PointCursor(Cursor):
         return path
         
 class Arc(PlanarGraphics):
-    """Encapsulates parameters for QPainterPath.arcTo() function
+    """Encapsulates parameters for QPainterPath.arcTo() function.
+        This is not an arc of a circle unless the bounding rectangle is a square.
     
     x, y, w, h: the bounding rectangle;
     
@@ -4601,7 +4645,10 @@ class Arc(PlanarGraphics):
         self.updateFrontends()
         
 class ArcMove(PlanarGraphics):
-    """Encapsulates parameters for QPainterPath.arcMoveTo() function
+    """Encapsulates parameters for QPainterPath.arcMoveTo() function.
+        NOTE: This does NOT create an arc curve, only "jumps" a point along an arc
+        defined by the parameters below.
+        Therefore, by defintion,  its curveLength is 0
 
     x, y, w, h, specify the bounding rectangle;
     a specifies the start angle.
@@ -6428,6 +6475,8 @@ class Path(PlanarGraphics):
         Together with "y" property, this defines the position of the entire
         path, in the current descriptor state
         """
+        # BUG 2024-08-21 23:10:24 FIXME
+        # this is NOT correct for Arc, ArcMove, Cubic, Quad!
         if len(self._objects_):
             states = self.getState(self.currentFrame, visible=True)
             #states = self.objectForFrame(self.currentFrame, visible=True)
