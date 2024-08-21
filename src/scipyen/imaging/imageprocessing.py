@@ -40,7 +40,7 @@ from imaging.axiscalibration import (AxesCalibration,
 #### END pict.core modules
 
 def getProfile(img, coordinates, order=3):
-    import pictgui as pgui
+    from gui import pictgui as pgui
     if not isinstance(img, vigra.VigraArray):
         raise TypeError("Expecting a 2D VigraArray; got %s instead" % (type(img).__name__))
     
@@ -70,6 +70,9 @@ def getProfile(img, coordinates, order=3):
             
         elif all([isinstance(c, (pgui.Move, pgui.Line)) for c in coordinates]):
             # NOTE: pgui.Path inherits from list so this checks True for pgui.Path objects, too
+            # BUG: 2024-08-21 16:34:54 FIXME
+            # the below could return only two points -- we need to interpolate
+            # the coordinates!
             return np.array([spl(p.x, p.y) for p in coordinates])
         
         else:

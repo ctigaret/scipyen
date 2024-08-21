@@ -652,8 +652,34 @@ def hasChannelAxis(data):
     else:
         raise TypeError("Expected a VigraArray or AxisTags object; instead, I've got a %s" % type(data).__name__)
     
-def dimIter(data, key):
+def dimIter(data:vigra.VigraArray, key:typing.Union[str, int, vigra.AxisInfo]):
     """Iterator along the dimension of the given axis key for Vigra arrays.
+    
+    Parameters:
+    ----------
+    data: a vigra.VigraArray
+    key: indicates the axis along which the data is iterated (iteration axis); 
+        'key' can be:
+    
+        • a vigra.AxisInfo object - it MUST exist in the 'axistags' attribute of the
+            'data' array;
+    
+        • a str (AxisInfo key) - it not found in data.axistags the iterator will 
+            point to the entire array in 'data'
+            CAUTION: A convention in VIGRA libraries, which is somewhat 
+            counter-intuitive, is that querying for the index of a non-existent 
+            axis key returns the number of dimensions of the array ('ndim'). For
+            example, data.axistags.index(key) where 'key' does NOT exist in the 
+            axistags. The utility becomes evident in the case of vigra arrays
+            that lack an explicit channel axis. In these arrays the data 
+            occupies the only 'channel' — hence the array is considered to have 
+            an implicit singleton "channel" axis which is therefore allocated to 
+            data.ndim + 1 (the next higher, virtual, dimension).
+    
+        • an int - the index of the iteration axis; it MUST be >= 0, but can be 
+            larger than data.ndim (see above); when key >= data.ndim the iterator
+            points to the entire array in 'data', in keeping with the convention 
+            explained above.
     
     Rationale:
     ==========
@@ -671,11 +697,13 @@ def dimIter(data, key):
     On the other hand, except for channel axes, vigranumpy does not restrict
     the number of axes that an array can have.
     
-    For example an array might have two time axes. For example, in linescan experiments
+    For example, an array might have two time axes. For example, in linescan experiments
     that collect dynamic fluorescence data, one linescan series generates an image
     where 1st axis has AxisType.Space and the second axis has AxisType.Time.
     Several such linescans can be collected as a higher dimension array, where
-    the third axis would alsobe a temporal axis (AxisType.Time).
+    the third axis would alsobe a temporal axis (AxisType.Time). In such cases, 
+    the timeIter method is limited to the first time axis (the one with the lowest
+    dimension index).
     
     It would be helpful to have an iterator along the second time axis (i.e. across
     individual linescan images in the data set), but timeIter() would automatically
@@ -683,15 +711,15 @@ def dimIter(data, key):
     
     The present function aims to fill this gap in functionality by generating an 
     iterator along any axis specified by its key, irrespective of its AxisType flag,
-    and irrespective of how many such axes are present in the array.
+    and irrespective axes of this type are present in the array.
     
     """
     
     if not isinstance(data, vigra.VigraArray):
-        raise TypeError("First parameter expected to be a VigraArray; got %s instead" % (type(data).__name__))
+        raise TypeError(f"First parameter expected to be a VigraArray; instead, got {type(data).__name__}")
     
-    if not isinstance(key, str):
-        raise TypeError("Second parameter expected to be a str; got %s instead" % (type(key).__name__))
+    if not isinstance(key, (str, int, vigra.AxisInfo)):
+        raise TypeError(f"Second parameter expected to be a str, and in or a vigra.AxisInfo; instead, got {type(key).__name__}")
     
     # NOTE: 2017-11-15 11:55:41
     # almost a direct copy of VigraArray.sliceIter(), but without restriction to
@@ -700,12 +728,14 @@ def dimIter(data, key):
     if isinstance(key, str):
         i = data.axistags.index(key)
         
+    elif isinstance(key, int):
+        if key < 0:
+            raise ValueError(f"Invalid binding axis index ({key})")
+        i = key
+        
     elif isinstance(key, vigra.AxisInfo):
         i = data.axistags.index(key.key)
         
-    else:
-        raise TypeError("Expecting a vigra.AxisInfo object or a str with a vigra.AxisInfo key; got %s instead" % (type(key).__name__))
-    
     if i < data.ndim: # axis found
         for k in range(data.shape[i]):
             yield data.bindAxis(i,k)
@@ -719,20 +749,24 @@ def dimEnum(data, key):
     See dimIter for more details.
     """
     if not isinstance(data, vigra.VigraArray):
-        raise TypeError("First parameter expected to be a VigraArray; got %s instead" % (type(data).__name__))
+        raise TypeError(f"First parameter expected to be a VigraArray; instead, got {type(data).__name__}")
     
-    if not isinstance(key, str):
-        raise TypeError("Second parameter expected to be a str; got %s instead" % (type(key).__name__))
+    if not isinstance(key, (str, int, vigra.AxisInfo)):
+        raise TypeError(f"Second parameter expected to be a str, int or a vigra.AxisInfo; instead, got {type(key).__name__}")
     
     if isinstance(key, str):
         i = data.axistags.index(key)
+        
+    elif isinstance(key, int):
+        if key < 0:
+            raise ValueError(f"Invalid binding axis index ({key})")
+        i = key
     
     elif isinstance(key, vigra.AxisInfo):
+        if key not in data.axistags:
+            raise ValueError(f"Binding axis info with key {key} is not found in this image axis tags ({repr(data.axistags)})")
         i = data.axistags.index(key.key)
         
-    else:
-        raise TypeError("Expecting a vigra.AxisInfo object or a str with a vigra.AxisInfo key; got %s instead" % (type(key).__name__))
-    
     if i < data.ndim: # axis found
         for k in range(data.shape[i]):
             yield (k, data.bindAxis(i,k))

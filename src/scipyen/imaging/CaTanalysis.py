@@ -914,8 +914,6 @@ def getProfile(scandata, roi, scene=True):
     if isinstance(roi, pgui.PlanarGraphics) and roi.type % pgui.GraphicsObjectType.allCursors:
         raise TypeError("Second parameter was expected ot be a shaped PlanarGraphics; got %s instead" % roi.type)
     
-    
-    
     if scandata.analysisMode != ScanDataAnalysisMode.frame:
         raise NotImplementedError("%s analysis not yet supported" % self.analysisMode)
     
@@ -11867,9 +11865,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         target = self._data_.sceneProfiles
         sigprefix = "Scene"
     
-        # CAUTION the target is a neo.Block and its segments have all been initialized (as empty)
-        # in _parse_image_arrays_
-        
         # ATTENTION: the scans frames must ALL have an "x" axistag (the first non-temporal axis)
         # which si also the ONLY non-temporal axis in the case of linescans
         
@@ -11908,7 +11903,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 else: 
                     # NOTE: multiple channels stored separately as single-band arrays
                     # ATTENTION: they only have a singleton channel axis, but they must 
-                    # ALL have the same number of frames -- checked in _parse_image_arrays_
+                    # ALL have the same number of frames
                     #
                     
                     if len(self._data_.analysisOptions) == 0 or \
@@ -11937,7 +11932,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                             target.segments[k].name = f"Sweep {k}"
                 
     @safeWrapper
-    def generateScanRegionProfilesFromScans(self): 
+    def generateScanRegionProfilesFromScans(self):
         """Generates scanline profiles from the linescans X axis average.
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -11964,9 +11959,6 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         target = self._data_.scansProfiles
         sigprefix = "Scans"
     
-        # CAUTION: the target is a neo.Block and its segments have all been initialized (as empty)
-        # in _parse_image_arrays_
-        
         # ATTENTION: the scans frames must ALL have an "x" axistag (the first non-temporal axis)
         # which si also the ONLY non-temporal axis in the case of linescans
         
@@ -11994,7 +11986,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             else: 
                 # NOTE: multiple channels stored separately as single-band arrays
                 # ATTENTION: they only have a singleton channel axis, but they must 
-                # ALL have the same number of frames -- checked in _parse_image_arrays_
+                # ALL have the same number of frames
                 #
                 if len(self._data_.analysisOptions) == 0 or \
                     "Channels" not in self._data_.analysisOptions or \

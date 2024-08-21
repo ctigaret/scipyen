@@ -9154,7 +9154,7 @@ signals in the signal collection.
         # if len(self.signalAxes) != len(analog) + len(irregs):
         #     scipywarn(f"{len(self.signalAxes)} signal axes for {len(analog)} analog signals + {len(irregs)} irregularly sampled signals = {len(analog)+len(irregs)}")
         
-        assert len(self.signalAxes) >= len(analog) + len(irregs), "Mismatch between number of signal axes and available signals"
+        assert len(self.signalAxes) >= len(analog) + len(irregs), f"Mismatch between number of signal axes ({len(self.signalAxes)}) and available signals (analog {len(analog)} + irregs {len(irregs)} = {len(analog) + len(irregs)})"
 
         # NOTE: 2023-01-12 16:45:48
         # by convention, analog signals are plotted in order, BEFORE the 
