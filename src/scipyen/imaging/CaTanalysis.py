@@ -261,7 +261,8 @@ from imaging.axiscalibration import (AxesCalibration,
                               AxisCalibrationData, 
                               ChannelCalibrationData,
                               CalibrationData,  
-                              calibration, axisChannelName, getAxisResolution)
+                              calibration, axisChannelName, getAxisResolution,
+                              getAxisUnits)
 #### END imaging modules
 
 #### BEGIN pict.iolib modules
@@ -11887,17 +11888,22 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     # the following conditions are met:
                     # len(profiles) == number of frames >>> True
                     # len(profiles[k]) == number of channels for k in range(number of frames) >>> all True
-                    profiles = [[DataSignal(getProfile(img, self._data_.scanRegion.objectForFrame(k)), \
-                                                sampling_period=getAxisResolution(img.axistags["x"]), \
-                                                name="%s" % axisChannelName(subarray.axistags["c"], j), \
+                    profiles = [[DataSignal(getProfile(img, self._data_.scanRegion.objectForFrame(k)), 
+                                                sampling_period = getAxisResolution(img.axistags["x"]), 
+                                                name = f"{sigprefix} {axisChannelName(subarray.axistags['c'], j)}", 
+                                                domain_units = getAxisUnits(img.axistags['x']),
+                                                units = getAxisUnits(subarray.axistags['c'], j),
                                                 index = j) \
-                                            for j, img in dimEnum(subarray, "c")] \
-                                    for k, subarray in dimEnum(data[0], self._data_.sceneFrameAxis)] \
+                                            for j, img in dimEnum(subarray, "c")] for k, subarray in dimEnum(data[0], self._data_.sceneFrameAxis)]
                     
-                    # NOTE: we want all channels from same frame to go into segment
-                    # corresponding to frame
+                    # NOTE: we want all channels from same frame to go into the
+                    # segment corresponding to that frame
                     for k in range(data[0].shape[data[0].axistags.index(self._data_.sceneFrameAxis)]):
+                        if k >= len(target.segments):
+                            target.segments.append(neo.Segment(name=f"Sweep {k}"))
                         target.segments[k].analogsignals[:] = profiles[k]
+                        if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
+                            target.segments[k].name = f"Sweep {k}"
 
                 else: 
                     # NOTE: multiple channels stored separately as single-band arrays
@@ -11915,17 +11921,20 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
                     profiles = list()
                     
-                    profiles = [[DataSignal(getProfile(subarray.bindAxis(self._data_.sceneFrameAxis, k), self._data_.scanRegion.objectForFrame(k)), \
-                                                sampling_period=getAxisResolution(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]), \
-                                                name="%s" % axisChannelName(subarray.axistags["c"], 0), index = j) \
-                                            for j, subarray in enumerate(data)] \
-                                    for k in range(self._data_.sceneFrames)]
+                    profiles = [[DataSignal(getProfile(subarray.bindAxis(self._data_.sceneFrameAxis, k), self._data_.scanRegion.objectForFrame(k)), 
+                                                sampling_period=getAxisResolution(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]), 
+                                                name = f"{sigprefix} {axisChannelName(subarray.axistags['c'], 0)}", 
+                                                domain_units = getAxisUnits(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]),
+                                                units = getAxisUnits(subarray.axistags['c'], 0), 
+                                                index = j) \
+                                            for j, subarray in enumerate(data)] for k in range(self._data_.sceneFrames)]
                     
                     for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.sceneFrameAxis)]):
+                        if k >= len(target.segments):
+                            target.segments.append(neo.Segment(name=f"Sweep {k}"))
                         target.segments[k].analogsignals[:] = profiles[k]
-                    
-        #else:
-            #warnings.warn("Data contains no scene!")
+                        if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
+                            target.segments[k].name = f"Sweep {k}"
                 
     @safeWrapper
     def generateScanRegionProfilesFromScans(self): 
@@ -11952,7 +11961,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
 
         data = self._data_.scans
-        target = self._data_.sceneProfiles
+        target = self._data_.scansProfiles
         sigprefix = "Scans"
     
         # CAUTION: the target is a neo.Block and its segments have all been initialized (as empty)
@@ -11967,17 +11976,20 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if len(data) == 1: 
                 # single array, either single-band or multi-band
                 # SEE ALSO comments in self.generateScanRegionProfilesFromScene()
-                profiles = [[DataSignal(np.array(img.mean(axis=1)), \
-                                        sampling_period = getAxisResolution(img.axistags["x"]), \
-                                        name="%s" % axisChannelName(subarray.axistags["c"], j), \
+                profiles = [[DataSignal(np.array(img.mean(axis=1)),
+                                        sampling_period = getAxisResolution(img.axistags["x"]), 
+                                        name = f"{sigprefix} {axisChannelName(subarray.axistags['c'], j)}", 
+                                        domain_units = getAxisUnits(img.axistags['x']),
+                                        units = getAxisUnits(subarray.axistags['c'], j),
                                         index = j) \
-                                    for j, img in dimEnum(subarray, "c")] \
-                                for k, subarray in dimEnum(data[0], self._data_.scansFrameAxis)]
+                                    for j, img in dimEnum(subarray, "c")] for k, subarray in dimEnum(data[0], self._data_.scansFrameAxis)]
 
                 for k in range(data[0].shape[data[0].axistags.index(self._data_.scansFrameAxis)]):
                     if k >= len(target.segments):
-                        target.segments.append(neo.Segment())
+                        target.segments.append(neo.Segment(name=f"Sweep {k}"))
                     target.segments[k].analogsignals[:] = profiles[k]
+                    if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
+                        target.segments[k].name = f"Sweep {k}"
                 
             else: 
                 # NOTE: multiple channels stored separately as single-band arrays
@@ -11994,9 +12006,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
                 frames = data[chNdx].shape[self._data_.scansFrameAxis] if isinstance(self._data_.scansFrameAxis, int) else data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)]
                 
-                profiles = [[DataSignal(np.array(subarray.bindAxis(self._data_.scansFrameAxis, k).mean(axis=1)), \
-                                        sampling_period = getAxisResolution(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]), \
-                                        name="%s" % axisChannelName(subarray.axistags["c"], 0), \
+                profiles = [[DataSignal(np.array(subarray.bindAxis(self._data_.scansFrameAxis, k).mean(axis=1)), 
+                                        sampling_period = getAxisResolution(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]), 
+                                        name=f"{sigprefix} {axisChannelName(subarray.axistags['c'], 0)}", 
+                                        domain_units = getAxisUnits(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]),
+                                        units = getAxisUnits(subarray.axistags['c'], 0),
                                         index = j) \
                                     for j, subarray in enumerate(data)] for k in range(frames)]
                                 # for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)])]
@@ -12004,8 +12018,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 # for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)]):
                 for k in range(frames):
                     if k >= len(target.segments):
-                        target.segments.append(neo.Segment())
+                        target.segments.append(neo.Segment(name=f"Sweep {k}"))
                     target.segments[k].analogsignals[:] = profiles[k]
+                    if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
+                        target.segment[k].name = f"Sweep {k}"
                 
         else:
             warnings.warn("Data contains no scans!")

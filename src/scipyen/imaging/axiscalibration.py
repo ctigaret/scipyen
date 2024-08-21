@@ -3085,6 +3085,23 @@ def getAxisResolution(axisinfo:vigra.AxisInfo,
     else:
         return axcal.resolution
     
+def getAxisUnits(axisinfo:vigra.AxisInfo,
+                 channel:typing.Optional[typing.Union[int,str]] = None) -> pq.Quantity:
+    if not isinstance(axisinfo, vigra.AxisInfo):
+        raise TypeError("Expecting a vigra.AxisInfo object; got %s instead" % type(axisinfo).__name__)
+    axcal = AxisCalibrationData(axisinfo)
+    
+    if axisinfo.typeFlags & vigra.AxisType.NonChannel == 0:
+        if isinstance(channel, (int, str)):
+            return axcal.getChannelUnits(channel)
+        
+        else:
+            return axcal.getChannelUnits(0)
+        
+    else:
+        return axcal.units
+    
+    
 def getCalibratedAxisSize(image, axis):
     """Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
     
