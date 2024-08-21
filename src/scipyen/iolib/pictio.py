@@ -1159,6 +1159,8 @@ def savePickleFile(val, fileName, protocol=None):
     
     if len(extn)==0 or extn != ".pkl":
         fileName += ".pkl"
+
+    # print(f"pickling {type(val).__name__}")
         
     with open(fileName, mode="wb") as fileDest:
         #print("Writing %s" % fileName)

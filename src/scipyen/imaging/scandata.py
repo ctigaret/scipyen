@@ -1797,14 +1797,22 @@ class ScanData(BaseScipyenData):
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
             
     def __reduce__(self):
-        kw = dict((d[0], getattr(self, d[0], None)) for d in self._attributes_ if d[0] not in ("scene", "scans", "electrophysiology"))# "metadata"))
+        # kw = dict((d[0], getattr(self, d[0], None)) for d in self._attributes_ if d[0] not in ("scene", "scans", "electrophysiology"))# "metadata"))
+        
+        
+        # print(f"{self.__class__.__name__}.__reduce__:\n{list(kw.keys())}")
+        
+        # return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
+        #                         kw))
+            
+        kw = dict((f.name, getattr(self, f.name)) for f in dataclasses.fields(self) if f.name not in ("scene", "scans", "electrophysiology"))
+        # kw = dict((f.name, getattr(self, f.name)) for f in dataclasses.fields(self))
         
         return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
                                 kw))
-            
+        # return (_new_ScanData, (kw, ))
+        
     @safeWrapper
-    # def __init__(self, scans=None, scene=None, electrophysiology=None, 
-    #              metadata:typing.Optional[dict]=None, **kwargs):
     def __post_init__(self, *args, **kwargs):
         """Constructs a ScanData object.
         
@@ -9211,5 +9219,5 @@ def _new_ScanData(scans, scene, electrophysiology, kw):
         
     return ret
 
-# def _new_ScanData(*args, *kwargs):
+# def _new_ScanData(*args, **kwargs):
 #     return ScanData(*args, **kwargs)
