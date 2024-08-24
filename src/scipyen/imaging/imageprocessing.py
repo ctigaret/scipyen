@@ -12,6 +12,7 @@ Module for image processing routines
 #### BEGIN core python modules
 import os, sys, traceback, warnings, numbers
 import typing
+from collections import deque
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -25,6 +26,8 @@ import neo
 
 #### BEGIN pict.core modules
 from core import (tiwt, datatypes  , strutils, curvefitting as crvf,)
+from gui import pictgui as pgui
+from gui import planargraphics as pgr
 
 from imaging.axisutils import (axisTypeFromString,
                                axisTypeName, 
@@ -36,11 +39,25 @@ from imaging.axiscalibration import (AxesCalibration,
                                      ChannelCalibrationData, 
                                      CalibrationData)
 
+from core.datasignal import DataSignal
+
 #from .patchneo import neo
 #### END pict.core modules
 
-def getProfile(img, coordinates, order=3):
-    from gui import pictgui as pgui
+def getProfile(img, coordinates:typing.Optional[typing.Union[pgui.PlanarGraphics, typing.Sequence[typing.Sequence]]]=None, 
+               order:int=1) -> DataSignal:
+    """Retrieves interpolated pixel values at a collection of (X,Y coordinates.
+
+    The (X,Y) coordinates (in the image dimension space) are floating point values, 
+    and do not necesarily fall on a pixel coordinates pairs. For this reason, 
+    the function uses a spline interpolation (in the image data domain) to get
+    an interpolated pixel VALUE at any given coordinates pair.
+
+    The spline interpolation is calculated uwing vigra.SplineImageView family of
+    functors, which supports a spline order from 1 to 5.
+
+
+    """
     if not isinstance(img, vigra.VigraArray):
         raise TypeError("Expecting a 2D VigraArray; got %s instead" % (type(img).__name__))
     
@@ -64,44 +81,67 @@ def getProfile(img, coordinates, order=3):
     
     spl = interpolators[order](img)
     
-    if isinstance(coordinates, (tuple, list, pgui.Path)):
-        if all([isinstance(c, (tuple, list)) and len(c)==2 for c in coordinates]):
-            return np.array([spl(c[0], c[1]) for c in coordinates])
-            
-        elif all([isinstance(c, (pgui.Move, pgui.Line)) for c in coordinates]):
-            # NOTE: pgui.Path inherits from list so this checks True for pgui.Path objects, too
-            # BUG: 2024-08-21 16:34:54 FIXME
-            # the below could return only two points -- we need to interpolate
-            # the coordinates!
-            
-            # NOTE: 2024-08-21 21:37:42
-            # here, `coordinates` may be a line (two points) or a polyline (> 2 points)
-            #
-            # we want to interpolate BETWEEN these points; to keep things simple,
-            # we use linear interpolation
-            #
-            # this produces two numpy arrays, respectively, with the x and y cordinates
-            # of the roi's points
-            roi_x, roi_y = map(lambda x: np.array(x), zip(*[(p.x, p.y) for p in coordinates]))
-            
-            # the total length (in pixels) of the line or polyline is the sum of
-            # the length of each segment; in turn the length of each segment is the Euclidean
-            # distance between its end points
-            #
-            # ATTENTION: do NOT confuse with the Euclidean distance between roi_x, roi_y
-            # vectors !!! That one applies to 𝑵-dimensional vectors, which roi_x, roi_y are NOT!
-            
-            
-            
-            return np.array([spl(p.x, p.y) for p in coordinates])
+    if isinstance(coordinates, pgui.PlanarGraphics):
+        # NOTE: 2024-08-22 09:37:53 new algorithm:
+        # 1) treat the object as a 1D function y = f(x)
+        # 2) for linear and curve planargraphics call their curveLength() method
+        #   (which implictly uses the approach stated at point (1) above)
+        # 3) for path objects (most cases)
+        # 3.1) composed entirely of linear elements (move, line):
+        #   these MIGHT need interpolation: e.g. a line (path) is composed of two 
+        #       elements (Move and Line) therefore I need a set of intermediate 
+        #       coordinates between these points — I apply the principle stated
+        #       at point (1) above, and use linear interpolation
+        #   the potential problem is with a polyline path where the number of 
+        #   segments is very large —
         
-        else:
-            if any(isinstance(c, pgui.CurveElements) for c in coordinates):
-                raise TypeError("Curvilinear path elements are not supported")
+        if isinstance(coordinates, pgui.Path):
+            if all([isinstance(c, pgr.LinearElements) for c in coordinates]):
+                # NOTE: pgui.Path inherits from list so this checks True for pgui.Path objects, too
+                # BUG: 2024-08-21 16:34:54 FIXME
+                # the below could return only two points -- we need to interpolate
+                # the coordinates!
+                
+                # NOTE: 2024-08-21 21:37:42
+                # here, `coordinates` may be a line (two points) or a polyline (> 2 points)
+                #
+                # we want to interpolate BETWEEN these points; to keep things simple,
+                # we use linear interpolation
+                #
+                # this produces two numpy arrays, respectively, with the x and y cordinates
+                # of the roi's points
+                # roi_x, roi_y = map(lambda x: np.array(x), zip(*[(p.x, p.y) for p in coordinates]))
+                
+                # the total length (in pixels) of the line or polyline is the sum of
+                # the length of each segment; in turn the length of each segment is the Euclidean
+                # distance between its end points
+                #
+                # ATTENTION: do NOT confuse with the Euclidean distance between roi_x, roi_y
+                # vectors !!! That one applies to 𝑵-dimensional vectors, which roi_x, roi_y are NOT!
+                
+                density = coordinates.density
+                
+                if np.isclose(density, 1., atol=1e-1):
+                    # there are approximately as many points as "pixels" in the Path obj
+                    # ⇒ no need to interpolate
+                    domain, values = map(lambda x: np.array(x), zip(*[(p.x, spl(p.x, p.y)) for p in coordinates]))
+                
+                else:
+                    if density < 1:
+                        # need linear interpolation across the points
+                        pass
+                
             
             else:
-                raise TypeError("Unexpected coordinates type (%s)" % (type(coordinates).__name__))
-            
+                if any(isinstance(c, pgui.CurveElements) for c in coordinates):
+                    raise TypeError("Curvilinear path elements are not supported")
+                
+                else:
+                    raise TypeError("Unexpected coordinates type (%s)" % (type(coordinates).__name__))
+                
+    elif isinstance(coordinates, (list, tuple, deque)) and all([isinstance(c, (tuple, list)) and len(c)==2 for c in coordinates]):
+        return np.array([spl(c[0], c[1]) for c in coordinates])
+
     elif coordinates is None:
         return np.full((1,1), np.nan)
         

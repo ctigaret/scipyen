@@ -153,6 +153,7 @@ from copy import copy
 #### BEGIN 3rd party modules
 #from core.vigra_patches import vigra.pyqt.quickdialog as quickdialog
 import numpy as np
+import scipy
 from traitlets import Bunch
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
 from qtpy.QtCore import Signal, Slot, Property
@@ -173,7 +174,8 @@ from core.workspacefunctions import debug_scipyen
 
 #### BEGIN other gui stuff
 from .painting_shared import (standardQtGradientTypes, standardQtGradientPresets,
-                              g2l, g2c, g2r, gradientCoordinates)
+                              g2l, g2c, g2r, gradientCoordinates, 
+                              qPathElementCoordinates)
 
 import gui.scipyen_colormaps as colormaps
 
@@ -1166,7 +1168,7 @@ class PlanarGraphics():
             self._linked_objects_.update(linked_objects)
             
     def _repr_pretty_(self, p, cycle):
-        p.text(f"{self.__class__.__name__}:")
+        p.text(f"{self.__class__.__name__}: '{self.name}'")
         p.breakable()
         p.pretty(self._states_)
         p.text("\n")
@@ -1237,7 +1239,10 @@ class PlanarGraphics():
     def __repr__(self):
         return " ".join([self.__class__.__name__, ", type:", getattr(self._planar_graphics_type_, "name", "None"), ", name:", self._ID_])
 
-    def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None, connected:typing.Optional[bool]=False):
+    def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
+                 frame:typing.Optional[int]=None, 
+                 closed:typing.Optional[bool]=None, 
+                 connected:typing.Optional[bool]=False):
         """Returns a QtGui.QPainterPath object. 
         
         QPainterPath composition methods used here depend on the subclass of
@@ -1274,6 +1279,8 @@ class PlanarGraphics():
         if not isinstance(frame, int):
             frame = self.currentFrame
             
+        # shapeDescriptors = self.shapeDescriptors
+        
         state = self.getState(frame)
         
         if state: # is None: # or len(state) == 0:
@@ -1282,6 +1289,12 @@ class PlanarGraphics():
                 
             else:
                 s = [self._qt_path_composition_call_+"("]
+                
+            # if isinstance(self, Cubic):
+            #     # because 'x' and 'y' are the destination point!
+            #     shapeDescriptors = shapeDescriptors[1:]
+            # elif isinstance(self, Quad):
+            #     shapeDescriptors = shapeDescriptors[]
             
             s += [",".join(["%f" % state[a] for a in self.shapeDescriptors])]
 
@@ -2171,6 +2184,7 @@ class PlanarGraphics():
                     
                     if type(f.parentwidget).__name__ == "ImageViewer":
                         viewer = f.parentwidget.viewerWidget
+                        
                     elif type(f.parentwidget).__name__ == "GraphicsImageViewerWidget":
                         viewer = f.parentwidget
                         
@@ -3288,7 +3302,8 @@ class PlanarGraphics():
     def getCurveLength(obj, prev=None):
         """Static version of PlanarGraphics.curveLength()
         Useful to apply it to a state, or a sequence of states (instead of PlanarGraphics)
-        
+        TODO/FIXME 2024-08-22 10:08:40
+        Rewrite to harmonize with the instance method curveLength()
         Parameters:
         ==========
         obj: 
@@ -3394,9 +3409,10 @@ class PlanarGraphics():
         
         else:
             return 0
-                
+        
     def curveLength(self, prev=None, full:bool=False):
-        """Calculates the length of the curve represented by this PlanarGraphics
+        """Calculates the length of the curve represented by this PlanarGraphics.
+        Here, 'curve' has the general meaning of a 1D function y = f(x)
         Parameters:
         ==========
         prev: a PlanarGraphics or None (default): the PlanarGraphics point (NOT
@@ -3453,37 +3469,30 @@ class PlanarGraphics():
         from scipy import interpolate, spatial
         
         if isinstance(self, Move):
-            return 0.
+            return 0
         
 #             if prev is None:
 #                 return 0 # Move has 0 length
 #             
 #             else:
 #                 # for Move that begins a subpath BUG/FIXME/TODO 2024-08-21 22:37:19
+#                 # will include the distance between subpaths - is this what was intended?
 #                 return spatial.distance.euclidean([self.x, self.y],
 #                                                   [prev.x, prev.y])
         
         elif isinstance(self, Path):
-            if all([isinstance(e, (Move, Line, Cubic, Quad)) for e in self]):
-                # get a copy for the current frame
-                path = self.objectForFrame(self.currentFrame)
-                
-                element_curve_lengths = [path[0].curveLength()]
-                
-                element_curve_lengths += [p.curveLength(path[k-1]) for k, p in enumerate(path) if k > 0]
-                
-                return np.sum(element_curve_lengths)
-                # if full:
-                #     return np.sum(element_curve_lengths), element_curve_lengths # when do we ever need these?
-                # else:
-                #     return np.sum(element_curve_lengths)
-                
-            else:
-                raise NotImplementedError("Function accepts Path containing only Move, Line, Cubic, and Quad elements")
+            path = self.objectForFrame(self.currentFrame)
             
+            # NOTE: a Path always starts with a Move, which has curveLength 0
+            element_curve_lengths = [path[0].curveLength()]
+            
+            element_curve_lengths += [p.curveLength(path[k-1]) for k, p in enumerate(path) if k > 0]
+            
+            return np.sum(element_curve_lengths)
+        
         else:
-            if not isinstance(prev, PlanarGraphics):
-                raise TypeError("prev expected to be a PlanarGraphics for this element type (%s)" % self.type)
+            # if not isinstance(prev, PlanarGraphics):
+            #     raise TypeError("prev expected to be a PlanarGraphics for this element type (%s)" % self.type)
             
             if prev is None:
                 prev = Move(0., 0.)
@@ -3504,6 +3513,12 @@ class PlanarGraphics():
                 
                 t = np.zeros((8,))
                 t[4:] = 1.
+                
+                # NOTE: in Qt a cubic is a Bezier with 4 control points:
+                # `start` (here this is `prev`)
+                # cp 1
+                # cp 2
+                # `end` (here is the point at self.x, self.y)
                 
                 c = np.array([[prev.x, prev.y],
                               [self.c1x, self.c1y],
@@ -3585,7 +3600,7 @@ class PlanarGraphics():
                 
                 e_sq = 1. - b**2 / a**2     # eccentricity squared
                 
-                return 4 & a * scipy.special.ellipe(e_sq)
+                return 4 * a * scipy.special.ellipe(e_sq)
             
             elif isinstance(self, Arc):
                 # BUG 2024-08-21 23:10:24 FIXME
@@ -3599,6 +3614,71 @@ class PlanarGraphics():
             
             else:
                 raise NotImplementedError("Function is not implemented for %s PlanarGraphics" % self.type)
+            
+    def interpolate(self, n:int, prev=None):
+        """Interpolated coordinates for n points on the 'curve' of this object
+        """
+        
+        if not isinstance(n, int):
+            raise TypeError(f"Number of points must be an int; instead, got {type(n).__name__}")
+        
+        if n <= 1:
+            raise ValueError(f"Cannot interpolate for less than two points ({n})!")
+        
+        if isinstance(self, Move):
+            # does not make sense; just return the coordinates
+            return self.x, self.y
+        
+        elif isinstance(self, Line):
+            if prev is None:
+                prev = Move(0., 0.)
+                
+            x = [prev.x, self.x]
+            y = [prev.y, self.y]
+            
+            newX = np.linspace(x[0], x[-1], n)
+            newY = np.interp(newX, x, y)
+            
+            return newX, newY
+        
+        elif isinstance(self, Cubic):
+            # NOTE: 2024-08-22 13:18:33
+            # self.x, self.y are the coordnates of the destination (last) point 
+            # on the cubic, NOT its start; the start is prev.x prev.y!
+            if prev is None:
+                prev = Move(0., 0.)
+            self_xy = np.array([self.x, self.y])
+            prev_xy = np.array([prev.x, prev.y])
+
+            t = np.zeros((8,))
+            t[4:] = 1.
+            
+            c = np.array([[prev.x, prev.y],
+                            [self.c1x, self.c1y],
+                            [self.c2x, self.c2y], 
+                            [self.x, self.y]])
+            
+            spline = interpolate.BSpline(t, c, 3, extrapolate=True)
+            
+            #  NOTE: 2024-08-22 13:53:16
+            # interpolation on splines is done on NORMALIZED x coordinates where
+            # 0 → `start` of the curve
+            # 1 → `end` of the curve 
+            # ⟹ an interpolating base [0..1] includes both curve ends
+            
+            
+        elif isinstance(self, Quad):
+            scipywarn("Quads do not suport interpolation yet")
+            return self.x, self.y
+        
+        elif isinstance(self, (Ellipse, Rect, Arc, ArcMove)):
+            scipywarn(f"{type(self).__name__} does not support interpolation yet")
+            return self.x, self.y
+        
+        elif isinstance(self, Path):
+            pass
+            
+            
 
     @property
     def isLinked(self):
@@ -4970,21 +5050,11 @@ Point = Move
 class Cubic(PlanarGraphics):
     """A cubic curve path segment
     
-    Coordinates are,respectively, for the:
-    first control point: x, y;
-    second control point: x1, y1; 
-    end point (destination): x2, y2.
-    
     Corresponds to the triplet:
     (QPainterPath.CurveToElement, QPainterPath.CurveToDataElement, QPainterPath.CurveToDataElement).
     
-    When present at the beginning of a path, it ALWAYS starts at (0.0, 0.0). 
-    
-    Otherwise, its origin is the previous PlanarGraphics
-    object (Move, Line, CubicCurve or QuadCurve element).
-    
     """
-    _planar_descriptors_ = ("x", "y", "c1x", "c1y", "c2x","c2y")
+    _planar_descriptors_ = ("c0x", "c0y", "c1x", "c1y", "c2x","c2y", "c3x", "c3y")
     
     _planar_graphics_type_ = PlanarGraphicsType.cubic
     
@@ -4992,19 +5062,65 @@ class Cubic(PlanarGraphics):
 
     _default_label_ = "c"
 
-    #"def" __init__(self, x, y, c1x, c1y, c2x, c2y, name=None, frameindex=[], currentframe=0):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None,
                  closed=False,
                  linked_objects=dict()):
         """
         Parameters:
-        x,y = cubic curve destination coordinates
+        c0x, c0y = start point coordinates
         c1x, c1y = first control point coordinates
         c2x, c2y = second control point coordinates
+        c3x, c3y = cubic curve destination coordinates
+        
         """
         super().__init__(*args, name=name, frameindex=frameindex, currentframe=currentframe,
                          graphicstype=PlanarGraphicsType.cubic, closed=closed,
                          linked_objects=linked_objects)
+        
+    def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
+                 frame:typing.Optional[int]=None, 
+                 closed:typing.Optional[bool]=None, 
+                 connected:typing.Optional[bool]=False):
+        
+        if path is None:
+            path = QtGui.QPainterPath()
+            
+        if closed is None:
+            closePath = self.closed
+            
+        elif isinstance(closed, bool):
+            closePath = closed
+            
+        else:
+            raise TypeError("closed expected to be a boolean or None; got %s instead" % type(closed).__name__)
+        
+        if not isinstance(frame, int):
+            frame = self.currentFrame
+            
+        state = self.getState(frame)
+        
+        if state:
+            if connected:
+                s0 = f"lineTo({state.c0x},{state.c0y})"
+            else:
+                s0 = f"moveTo({state.c0x},{state.c0y})"
+                
+            s = [self._qt_path_composition_call_+"("]
+            
+            s += [",".join(["%f" % state[a] for a in self.shapeDescriptors[2:]])]
+            
+            s+=[")"]
+            
+            # print(f"{self.__class__.__name__}.__call__: {''.join(s)}")
+                
+            eval(f"path.{s0}")
+            eval(f"path.{''.join(s)}")
+            # eval("path."+"".join(s))
+            
+            if closePath:
+                path.lineTo(state.c0x, state.c0y) # x & y always in planar descriptors
+        
+        return path
         
     def controlPoints(self, frame=None):
         if frame is None:
@@ -5016,7 +5132,8 @@ class Cubic(PlanarGraphics):
         if state is None: # or len(state) == 0:
             return tuple()
         
-        return ((state.x, state.y), (state.c1x, state.c1y), (state.c2x, state.c2y))
+        return ((state.c0x, state.c0y), (state.c1x, state.c1y), 
+                (state.c2x, state.c2y), (state.c3x, state.c3y) )
     
     def controlPath(self, frame=None):
         ret = Path()
@@ -5030,20 +5147,33 @@ class Cubic(PlanarGraphics):
             else:
                 ret.append(Line(p[0], p[1]))
             
-            
         return ret
     
     def fromControlPath(self, path, frame=None):
-        if not isinstance(path, Path):
-            raise TypeError("path expected ot be a pictgui.Path; got %s instead" % type(path).__name__)
+        """Updates from a control path.
+        A control path is a polyline Path object containing 3 or 4 control 
+        points (cp):
+        cp0 (optional:) - the first control point — this is typically a "virtual"
+            point (not supplied to the constructor) to accomodate the general case
+            where the point is actually the last one on the previous PlanarGraphics
+            in a Path
+        cp1, cp2 cp3 - the control points as per the constructor
         
-        if len(path) != 3:
-            raise ValueError("path expected to have four elements; got %d instead" % len(path))
+        NOTE: that Cubic.controlPath always supplied a path composed of four points.
+        However, paths generated elsewhere can have only three points (cp1, cp2 and cp3)
+        as long as the caller is aware that hose three points are as stated here.
+        
+    """
+        if not isinstance(path, Path):
+            raise TypeError(f"'path' expected to be a pictgui.Path; got {type(path).__name__} instead")
+        
+        if len(path) != 4:
+            raise ValueError(f"'path' expected to have four elements; got {len(path)} elements instead")
         
         control_state = path.currentState
         
         if control_state is None or len(control_state) == 0:
-            raise ValueError("path argument has undefined state")
+            raise ValueError("'path' argument has undefined state")
         
         if frame is None:
             state = self.currentState
@@ -5054,8 +5184,8 @@ class Cubic(PlanarGraphics):
         if state is None: # or len(state) == 0:
             return
         
-        state.x = path[0].x
-        state.y = path[0].y
+        state.c0x = path[0].x
+        state.c0y = path[0].y
         
         state.c1x = path[1].x
         state.c1y = path[1].y
@@ -5063,7 +5193,29 @@ class Cubic(PlanarGraphics):
         state.c2x = path[2].x
         state.c2y = path[2].y
     
+        state.c3x = path[3].x
+        state.c3y = path[3].y
+        
         self.updateFrontends()
+        
+    @property
+    def x(self) -> numbers.Number:
+        return self().boundingRect().x()
+    
+    @x.setter
+    def x(self, val:numbers.Number):
+        dx = val - self().boundingRect().x()
+        self.translate(dx, type(dx)(0))
+        
+    @property
+    def y(self) -> numbers.Number:
+        return self().boundingRect().y()
+        
+    @y.setter
+    def y(self, val:numbers.Number):
+        dy = val - self().boundingRect().y()
+        self.translate(type(dy)(0), dy)
+        
         
     #def controlQPoints(self, frame=None):
         #cp = self.controlPoints(frame)
@@ -5076,16 +5228,17 @@ class Cubic(PlanarGraphics):
         
         ##else:
             ##return list()
-        
+            
     def translate(self, dx, dy):
-        self.x += dx
-        self.y += dy
+        print(f"{self.__class__.__name__}.translate({dx}, {dy})")
         self.c1x += dx
         self.c1y += dy
         self.c2x += dx
         self.c2y += dy
+        self.c3x += dx
+        self.c3y += dy
         
-    def makeBSpline(self, xy, extrapolate=True):
+    def makeBSpline(self, xy:typing.Optional[typing.Union[typing.Sequence[numbers.Number], Move, Point, Line]]=None, extrapolate=True):
         """Creates a cubic BSpline object with origin at "xy"
         
         Parameters:
@@ -5100,9 +5253,20 @@ class Cubic(PlanarGraphics):
         t = np.zeros((8,))
         t[4:] = 1.
         
-        c = np.array([[xy[0], xy[1]], [self.c1x, self.c1y], [self.c2x, self.c2y], [self.x, self.y]])
+        if isinstance(xy, typing.Sequence) and len(xy) == 2 and all(isinstance(v, numbers.Number) for v in xy):
+            cp0 = list(xy)
+        elif isinstance(xy, (Move, Line, Point)):
+            cp0 = [xy.x, xy.y]
+        elif xy is None:
+            cp0 = [0., 0.]
+        else:
+            raise TypeError(f"'xy' expected a Point, Move, Line, or a 2-sequence of numbers")
+            
+        c = np.array([cp0, [self.c1x, self.c1y], [self.c2x, self.c2y], [self.c3x, self.c3y]])
         
         return BSpline(t, c, 3, extrapolate=extrapolate)
+    
+    
         
         
     #"def" qGraphicsItem(self, pointSize=0, frame = None):
@@ -5128,12 +5292,8 @@ class Quad(PlanarGraphics):
     Corresponds to the tuple:
     (QPainterPath.CurveToElement, QPainterPath.CurveToDataElement).
     
-    When present at the beginning of a path, it ALWAYS starts at (0.0, 0.0). 
-    
-    Otherwise, its origin is the previous PlanarGraphics
-    object (Move, Line, CubicCurve or QuadCurve element).
     """
-    _planar_descriptors_ = ("x", "y", "cx", "cy")
+    _planar_descriptors_ = ("c0x", "c0y", "c1x", "c1y", "c2x","c2y")
     
     _planar_graphics_type_ = PlanarGraphicsType.quad
     
@@ -5146,8 +5306,9 @@ class Quad(PlanarGraphics):
                  linked_objects=dict()):
         """
         Parameters:
-        x,y = quad curve to point coordinates
-        c11x, c1y = control point coordinates
+        c0x, c0y = first point coordinates
+        c1x, c1y = control point coordinates
+        c2x, c2y = last point coordinates
         """
         super().__init__(*args, name=name, frameindex=frameindex, currentframe=currentframe, 
                          graphicstype=PlanarGraphicsType.quad, closed=closed,
@@ -5181,10 +5342,10 @@ class Quad(PlanarGraphics):
     
     def fromControlPath(self, path, frame=None):
         if not isinstance(path, Path):
-            raise TypeError("path expected ot be a pictgui.Path; got %s instead" % type(path).__name__)
+            raise TypeError(f"path expected to be a pictgui.Path; got {type(path).__name__} instead" )
         
-        if len(path) != 2:
-            raise ValueError("path expected to have four elements; got %d instead" % len(path))
+        if len(path) != 3:
+            raise ValueError(f"path expected to have three elements; got {len(path)} elements instead")
         
         control_state = path.currentState
         
@@ -5200,19 +5361,24 @@ class Quad(PlanarGraphics):
         if state is None or len(state) == 0:
             return
         
-        state.x = path[0].x
-        state.y = path[0].y
+        state.c0x = path[0].x
+        state.c0y = path[0].y
         
-        state.cx = path[1].x
-        state.cy = path[1].y
+        state.c1x = path[1].x
+        state.c1y = path[1].y
+        
+        state.c2x = path[1].x
+        state.c2y = path[1].y
         
         self.updateFrontends()
         
     def translate(self, dx, dy):
-        self.x += dx
-        self.y += dy
-        self.cx += dx
-        self.cy += dy
+        self.c0x += dx
+        self.c0y += dy
+        self.c1x += dx
+        self.c1y += dy
+        self.c2x += dx
+        self.c2y += dy
         
     def qPoints(self, frame=None):
         cp = self.controlPoints(frame)
@@ -6432,6 +6598,30 @@ class Path(PlanarGraphics):
         Being a list, is not immutable!
         """
         return self._objects_
+    
+    @property
+    def density(self):
+        """The density of elements in this path.
+        This is defined as the ratio :
+        len(path)/int(path.curveLength())
+        
+        An empty path has density 0 by definition; for numerical rasons,
+        a path with curveLength() == 0 will also return 0 (so a path
+        composed entirely of Move points will have density 0 because
+        the 'curve' is not defined between Move points)
+        
+        NOTE: the above formula includes Move elements in the path
+        
+        WARNING: It only makes sense for paths composed of LinearElements
+        TODO: 2024-08-22 10:14:28
+        adapt for paths composed of all primitives
+        """
+        cLen = int(self.curveLength())
+        
+        if cLen == 0:
+            return 0
+        
+        return len(self)/cLen
     
     @property
     def elements(self):
@@ -8276,8 +8466,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
         return paths
     
-        # NOTE: 2017-08-10 15:20:50
-
     @safeWrapper
     def __updateCachedPathFromBackend__(self):
         """No mapping transformations here, as the cached path is a copy of the
@@ -8285,40 +8473,8 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         """
         if isinstance(self._backend_, (Cursor, type(None))):
             return
-        
         self._cachedPath_ = self._backend_.controlPath()
         
-        #sc = self.scene()
-            
-        #if self.scene() is None:
-            #try:
-                #sc = self._parentWidget_.scene
-            #except:
-                #return
-        
-        #if sc is None:
-            #return
-            
-        #pad = self._pointSize
-        #left = pad
-        #right = sc.width() - pad
-        #top = pad
-        #bottom =sc.height() - pad
-        
-        
-        #if isinstance(self._backend_, (Ellipse, Rect)):
-            #self._cachedPath_ = self._backend_.controlPath()
-            ##self._cachedPath_ = Path(Move(self._backend_.x, 
-                                            ##self._backend_.y),
-                                       ##Line(self._backend_.x + self._backend_.w,
-                                            ##self._backend_.y + self._backend_.h))
-                                    
-        #elif isinstance(self._backend_, Path):
-            #self._cachedPath_ = self._backend_.objectForFrame()
-                
-        #else:
-            #self._cachedPath_ = self._backend_.objectForFrame()
-            
     def show(self):
         self.setVisible(True)
         
@@ -8705,7 +8861,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # NOTE: 2021-03-07 18:30:02
         # to time the painter, uncomment "self.timed_paint(...)" below and comment
         # out the line after it ("self.__paint__(...)")
-        # When times, the duration of one executino of __paint__ is printed on
+        # When times, the duration of one execution of __paint__ is printed on
         # stdout - CAUTION generates large output
         #self.timed_paint(painter, styleOption, widget)
         self.__paint__(painter, styleOption, widget)
@@ -10273,13 +10429,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 #f.redraw()
                 f.update()
 
-    #@property
-    #"def" shapedItem(self):
-        #"""Returns the underlying QAbstractGraphicsShapeItem or None if this is a cursor.
-         #Same as self.graphicsItem()
-        #"""
-        #return self._graphicsShapedItem
-
     @property
     def x(self):
         """The x coordinate
@@ -10294,13 +10443,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         for f in self._backend_.frontends:
             if f != self:
                 f.update()
-        #for c in self._linkedGraphicsObjects:
-            #if c != self._backend_:
-                #c.x = val
-                
-                #for f in c.frontends:
-                    #if f != self:
-                        #f.redraw()
                     
     @property
     def horizontalWindow(self):
@@ -10361,14 +10503,6 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         for f in self._backend_.frontends:
             if f != self:
                 f.update()
-        #if len(self._linkedGraphicsObjects):
-            #for c in self._linkedGraphicsObjects:
-                #if c != self._backend_:
-                    #c.y = val
-                    
-                    #for f in c.frontends:
-                        #if f != self:
-                            #f.redraw()
                     
     @property
     def verticalWindow(self):

@@ -907,7 +907,6 @@ def getProfile(scandata, roi, scene=True):
     if not isinstance(scandata, ScanData):
         raise TypeError("First parameter was expected to be a datatypes.ScanData; got %s instead" % type(scandata).__name__)
     
-    
     if not isinstance(roi, (pgui.PlanarGraphics, vigra.AxisInfo)):
         raise TypeError("Second parameter was expected to be a pictgui.PlanarGraphics object or a vigra.AxisInfo object None; got %s instead" % type(roi).__name__)
     

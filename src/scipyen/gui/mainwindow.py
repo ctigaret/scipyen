@@ -2275,9 +2275,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if win not in listedWindows:
                 win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
             
-            win.winTitle = win_title
-            win.ID = counter_suffix
             workspace_win_varname = strutils.str2symbol(win_title)
+            workspace_win_varname = workspace_win_varname[0].lower()+workspace_win_varname[1:]
+            
+            win.ID = counter_suffix
+            win.winTitle = workspace_win_varname
 
         self.registerWindow(win)  # required !
         # self.workspace[workspace_win_varname] = win

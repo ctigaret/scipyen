@@ -1472,6 +1472,12 @@ def printPoints(points:typing.Union[QtGui.QPolygonF, QtGui.QPolygon, typing.Sequ
     else:
         return ret
         
+def qPathElementCoordinates(x:QtGui.QPainterPath):
+    if x.isEmpty():
+        yield
+    
+    return ((x.elementAt(k).x, x.elementAt(k).y) for k in range(x.elementCount()))
+        
 class ColorGradient():
     """Encapsulates the appearance of a conical, linear or radial Qt gradient.
     
@@ -2322,7 +2328,6 @@ class Pen(Bunch):
             
         pen.setCosmetic(self.cosmetic)
         return pen
-        
         
         
         

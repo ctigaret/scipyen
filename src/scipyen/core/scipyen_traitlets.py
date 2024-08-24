@@ -873,7 +873,10 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
                     silent = bool(new_value.shape == old_value.shape)
                 
             if silent:
-                silent = bool(np.all(new_value == old_value))
+                try:
+                    silent = bool(np.all(new_value == old_value))
+                except:
+                    silent = True
                 
             obj._trait_values[self.name] = new_value
             

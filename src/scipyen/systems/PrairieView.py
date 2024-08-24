@@ -7,7 +7,8 @@
 """Import routines for PrairieView data
 """
 #### BEGIN core python modules
-import os, sys, traceback, warnings, datetime, time, mimetypes, io, typing
+import os, sys, traceback, warnings, mimetypes, io, typing
+import  datetime, time, dateutil
 from enum import Enum, IntEnum #, unique
 from collections import OrderedDict
 import concurrent.futures
@@ -2024,8 +2025,14 @@ class PVScan(object):
         meta = self.metadata()
         
         file_origin = self.filepath
-        rec_datetime = datetime.datetime.strptime(self.__attributes__["date"],
-                                                  "%d/%m/%Y %H:%M:%S %p")
+        try:
+            rec_datetime = dateutil.parser.parse(self.__attributes__["date"])
+            # rec_datetime = datetime.datetime.strptime(self.__attributes__["date"],
+            #                                         "%d/%m/%Y %H:%M:%S %p")
+        except:
+            traceback.print_exc()
+            scipywarn(f"Due to the above caught exception, rec_datetime will be set to `datetime.now()`")
+            rec_datetime = datetime.datetime.now()
             
         return ScanData(scene=scene, scans=scans, name=self.name,
                         electrophysiology=electrophysiology,
