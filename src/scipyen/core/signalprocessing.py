@@ -34,7 +34,6 @@ def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
         column 0 has x coordinates, column 1 has y coordinates)
         
     max_points: int (default 5) or None
-    
         When an int: this indicates the maximum number of adjacent points in xy
             having with non-identical coordinates. 
         

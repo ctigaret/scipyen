@@ -9503,7 +9503,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             r_ = self.mapRectFromScene(self._backend_.x - pointSize,
                                                        self._backend_.y - pointSize,
                                                        pointSize * 2.,
-                                                       pointsize * 2.)
+                                                       pointSize * 2.)
                             
                             painter.drawPoint(p_)
                             painter.drawEllipse(r_)
