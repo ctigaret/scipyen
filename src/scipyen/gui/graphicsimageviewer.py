@@ -1368,11 +1368,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @Slot()
     @safeWrapper
     def slot_removeCursor(self):
-        if len([o for o in self.graphicsCursors]) == 0:
-            return
-        
-        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
-            self.slot_removeCursorByName(self._cursorContextMenuSourceId)
+        names = iter_attribute(self.graphicsCursors, "name")
+        if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in names:
+            self._removePlanarGraphics(_cursorContextMenuSourceId)
         
     @Slot(str)
     @safeWrapper
@@ -1407,11 +1405,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     @Slot()
     @safeWrapper
     def slot_removeRoi(self):
-        if len(self.__rois__) == 0:
-            return
-        
-        if self._roiContextMenuSourceId is not None and self._roiContextMenuSourceId in self.__rois__.keys():
-            self.slot_removeRoiByName(self._roiContextMenuSourceId)
+        roiIDs = iter_attribute(self.rois, "name")
+        if self._roiContextMenuSourceId is not None and self._roiContextMenuSourceId in roiIDs:
+            self._removePlanarGraphics(self._roiContextMenuSourceId)
         
 
    #### BEGIN properties

@@ -2233,11 +2233,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             else:
                 raise ValueError(f"Unexpected viewer class name {wClass}")
 
-        # elif not isinstance(winClass, (type)):
-        #     raise TypeError(f"Expecting a type or sip.wrappertype; got {type(winClass).__name__} instead")
-#         
-#          and (has_sip and not isinstance(winClass, sip.wrappertype))
-
         else:
             if winClass not in self.viewers:# or winClass != mpl.figure.Figure or not issubclass(winClass, QtWidgets.QMainWindow):
                 raise ValueError(f"Unexpected viewer class {winClass.__name__}")
@@ -2256,24 +2251,39 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         else:
             win_title = kwargs.pop("win_title", winClass.__name__)
-            # print(f"{self.__class__.__name__} win_title = {win_title}, counter_suffix = {counter_suffix}")
+            # print(f"{self.__class__.__name__}.newViewer: win_title = {win_title}, counter_suffix = {counter_suffix}")
+            if win_title[0].isupper():
+                wt = win_title[0].lower()
+                if len(win_title) > 1:
+                    wt += win_title[1:]
+                win_title = wt
 
+            # print(f"{self.__class__.__name__}.newViewer for win_title = {win_title}")
+            
             # kwargs["win_title"] = win_title
             if "parent" not in kwargs:
                 kwargs["parent"] = self # needed on X11 platform, but not on Wayland,
                                         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
                 
             win = winClass(*args, **kwargs)
+            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} win = {win}")
 
             variables = dict([item for item in self.shell.user_ns.items(
                 ) if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
 
+            # NOTE: 2024-08-25 16:20:55 FIXME ?
+            # not sure why all these lines of code below are needed, especially
+            # the condition on listedWindows...
             varnames = reverse_mapping_lookup(variables, win)
+            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} varnames = {varnames}")
             
-            listedWindows = [self.workspace[n] for n in varnames if type(self.workspace[n]) == winType]
+            listedWindows = [self.workspace[n] for n in varnames if isinstance(self.workspace[n], winClass)]
+            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} listedWindows = {listedWindows}")
 
             if win not in listedWindows:
                 win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
+                
+            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} win_title = {win_title}")
             
             workspace_win_varname = strutils.str2symbol(win_title)
             workspace_win_varname = workspace_win_varname[0].lower()+workspace_win_varname[1:]
@@ -2282,9 +2292,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             win.winTitle = workspace_win_varname
 
         self.registerWindow(win)  # required !
-        # self.workspace[workspace_win_varname] = win
-        # self.workspaceModel.update()
-        # print(f"{self.__class__.__name__}.newViewer workspace_win_varname = {workspace_win_varname}")
         self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)
 
         return win

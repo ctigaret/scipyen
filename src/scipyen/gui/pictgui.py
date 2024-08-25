@@ -76,7 +76,7 @@ from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, P
                            PlanarGraphicsType, GraphicsObjectType, GraphicsObject, 
                            __new_planar_graphic__, printQPainterPath,
                            PathElements, LinearElements, CurveElements,
-                           Tier2PathElements)
+                           Tier2PathElements, simplifyPath)
 
 #### END pict.gui modules
 

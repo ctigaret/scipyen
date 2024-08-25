@@ -1228,7 +1228,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @Slot()
     @safeWrapper
     def slot_removeSelectedCursor(self):
-        self.viewerWidget.slot_removeSelectedCursor()
+        self.viewerWidget._removeSelectedPlanarGraphics(True)
+        # self.viewerWidget.slot_removeSelectedCursor()
     
     @Slot()
     @safeWrapper
@@ -1238,12 +1239,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     @Slot(str)
     @safeWrapper
     def slot_removeRoi(self, roiId):
-        self.viewerWidget.slot_removeRoiByName(roiId)
+        self.removeRoi(roiId)
+        # self.viewerWidget.slot_removeRoiByName(roiId)
 
     @Slot()
     @safeWrapper
     def slot_removeSelectedRoi(self):
-        self.viewerWidget.slot_removeSelectedRoi()
+        self.viewerWidget._removeSelectedPlanarGraphics(False)
+        # self.viewerWidget.slot_removeSelectedRoi()
     
     @Slot()
     @safeWrapper

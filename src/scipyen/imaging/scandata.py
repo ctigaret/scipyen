@@ -1428,6 +1428,9 @@ class ScanDataMetadataAdapter(AttributeAdapter):
 
                 roi = pgui.Path(*value.sequences[0].definition.coordinates)
                 
+                if len(roi) > 10 and all(isinstance(p, (pgui.Move, pgui.Line)) for p in roi):
+                    roi = pgui.simplifyPath(roi)
+                
                 if roi.type.name in ("line", "polyline", "arc", "quad", "cubic") or\
                     (roi.type.name == "path" and not roi.closed): 
                     roi.name = "scanline"

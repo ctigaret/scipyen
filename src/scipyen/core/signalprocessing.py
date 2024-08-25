@@ -108,6 +108,8 @@ def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
     
     from scipy import interpolate
     
+    # print(f"simplify_2d_shape: xy.shape = {xy.shape}")
+    
     # 0) get the indices of ALMOST ALL points with unique x & y
     xd = np.diff(xy, axis = 0)
     
