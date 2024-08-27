@@ -53,33 +53,33 @@ from shapely import (Geometry,
                      LinearRing,
                     )
 
-@dataclass
-class PlanarShape(object):
-    geom:InitVar[Geometry|None]
-    states:list[Bunch] = dataclasses.field(init=False, default_factory = list)
-    frames:typing.Optional[typing.Union[tuple[int], range, list[int]]] = dataclasses.field(default_factory = list)
-    
-    def __post_init__(self, geom:Geometry):
-        if not isinstance(geom, Geometry):
-            raise TypeError(f"Expecting a shapely.Geometry; instead, got {type(shape).__module__}.{type(shape).__name__}")
-        if isinstance(self.frames, (tuple, list) and all(isinstance(f, int) for f in self.frames)):
-            for f in self.frames:
-                shape_ = geom.force_3d(f)
-            
-                
-                
-                
-            shape = shapely.force_2d(shape)
-            
-        elif isinstance(z_frame, int):
-            if z_frame >= 0:
-                shape = shapely.force_3d(shape, z_frame)
-            
-        self.state = Bunch({"shape": shape, "z_frame": z_frame})
-        if frames is None:
-            shapely.force_2d(shape)
-            
-        # elif isinstance(frames, )
-    
+# @dataclass
+# class PlanarShape(object):
+#     geom:InitVar[Geometry|None]
+#     states:list[Bunch] = dataclasses.field(init=False, default_factory = list)
+#     frames:typing.Optional[typing.Union[tuple[int], range, list[int]]] = dataclasses.field(default_factory = list)
+#     
+#     def __post_init__(self, geom:Geometry):
+#         if not isinstance(geom, Geometry):
+#             raise TypeError(f"Expecting a shapely.Geometry; instead, got {type(shape).__module__}.{type(shape).__name__}")
+#         if isinstance(self.frames, (tuple, list) and all(isinstance(f, int) for f in self.frames)):
+#             for f in self.frames:
+#                 shape_ = geom.force_3d(f)
+#             
+#                 
+#                 
+#                 
+#             shape = shapely.force_2d(shape)
+#             
+#         elif isinstance(z_frame, int):
+#             if z_frame >= 0:
+#                 shape = shapely.force_3d(shape, z_frame)
+#             
+#         self.state = Bunch({"shape": shape, "z_frame": z_frame})
+#         if frames is None:
+#             shapely.force_2d(shape)
+#             
+#         # elif isinstance(frames, )
+#     
     
     

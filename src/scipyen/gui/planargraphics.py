@@ -76,15 +76,22 @@ values are actually brought only to the states renderable in the current frame.
 
 # NOTE: 2024-08-27 16:48:24 
 # A brief incursion into shapely API — a bullet-list of library features,
-# useful (✓) and not useful (❌):
+# useful (✔), potentially useful (✓) and not useful (❌):
 #
-# fast (✓)
-# geometries are immutable (❌)
-# support of 2.5 D — potentially ✓ but copies data
-# support for geometry operations (distance, interpolation etc) (✓✓) -> 
+# (✔) fast
+# (❌) geometries are immutable
+# (✓) support of 2.5 D — somwehat awkward, requires copying the data for each specified frame
+# (❌) no support for curves (cubic/quad), ellipse, or cursors as defined here
+# (✔) support for geometry operations and lear referencinh methods (distance, interpolation etc) -> 
 #   this is the most useful, but not enough to replace PlanarGraphics; however, 
-# I could use shapely objects as temporary intermediate objects to perform more
-# advanced functions.
+#   I could use shapely objects as temporary intermediate objects to perform more
+#   advanced functions.
+# (✓) support for more types (LineString, LinearRing, Collections) -> potential
+#   correspondence with Path objects defined here
+#
+# This library is clearly optimized for fast geometrical computations on linear
+# graphical primitives and collections of such, but less so for interactive plotting
+# and/or editing.
 
 # NOTE: 2024-08-25 19:58:34
 # the comment below is obsolete
@@ -167,9 +174,6 @@ import scipy
 from traitlets import Bunch
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
 from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 #### END 3rd party modules
 
 #### BEGIN core modules
@@ -190,6 +194,13 @@ from .painting_shared import (standardQtGradientTypes, standardQtGradientPresets
 import gui.scipyen_colormaps as colormaps
 
 from .scipyen_colormaps import ColorPalette
+# WARNING do NOT import individual classes directly from shapely as they may be 
+# overwritten in this module (e.g. Point)
+# on the other hand, the individual shapely classes need imported individually in
+# order for them to be registered (and theyr C/C++ library to be initialized)
+# hence we use the shapes module as a wrapper to expose those classes w/o clashes 
+# below
+from gui import shapes 
 #### END other gui stuff
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -302,7 +313,6 @@ def __constrain_square__(p0, p1):
 
 class PlanarGraphicsType(TypeEnum):
     """Enumeration of all supported graphical object types.
-    DEPRECATED but kept for backward compatibility with old data.
     Type name             type value  QGraphicsItem               Planar Descriptors
     ===============================================================================
     vertical_cursor     = 1                                     x, y, width, height, xWin, yWin, radius
@@ -4912,6 +4922,10 @@ class Arc(PlanarGraphics):
         if obj:
             path = self(frame=frame)
             return QtWidgets.QGraphicsPathItem(path)
+        
+    def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
+        """Returns an empty point"""
+        return shapes.Point()
             
         
 class ArcMove(PlanarGraphics):
@@ -5086,6 +5100,11 @@ class ArcMove(PlanarGraphics):
         if obj:
             path = self(frame=frame)
             return QtWidgets.QGraphicsPathItem(path)
+
+    def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
+        """Returns an empty point"""
+        return shapes.Point()
+            
             
 class Line(PlanarGraphics):
     """A linear path segment, with coordinates x and y (float type).
@@ -5115,16 +5134,10 @@ class Line(PlanarGraphics):
                          graphicstype=PlanarGraphicsType.line, closed=closed,
                          linked_objects=linked_objects)
         
-#         super().__init__(*args, name=name, frameindex=frameindex, currentframe=currentframe, 
-#                          graphicstype=PlanarGraphicsType.point, closed=closed,
-#                          linked_objects=linked_objects)
-#         
-
     def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
                  frame:typing.Optional[int]=None, 
                  closed:typing.Optional[bool]=None, 
                  connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
-        
         if closed is None:
             closePath = self.closed
             
@@ -5148,13 +5161,15 @@ class Line(PlanarGraphics):
             path.lineTo(state.x1, state.y1)
                 
         return path
-        
 
     def qGraphicsItem(self, frame:typing.Optional[int] = None) -> typing.Optional[QtWidgets.QGraphicsItem]:
         """Call this only for a object that is visible in the specified frame"""
         qp = self.qPoints(frame)
         if len(qp) >= 2:
             return QtWidgets.QGraphicsLineItem(QtCore.QLineF(qp[0],qp[1]))
+        
+    def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
+        return shapes.LineString(self.controlPoints(frame, False))
         
 class Move(PlanarGraphics):
     """Starting path point with coordinates x and y (float type).

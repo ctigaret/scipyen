@@ -198,6 +198,7 @@ scikit-image
 scikit-learn
 scipy
 seaborn
+shapely
 slytherin
 smart-open
 smmap
