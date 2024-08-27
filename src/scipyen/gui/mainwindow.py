@@ -242,7 +242,7 @@ import researchpy as rp  # for use with DataFrames & stats
 import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python
 import sklearn as sk  # machine learning, also nice plot_* functionality
 import seaborn as sb  # statistical data visualization
-
+from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
 # print("mainwindow.py __name__ =", __name__)
 # BEGIN matplotlib modules
 import matplotlib as mpl
