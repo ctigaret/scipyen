@@ -73,6 +73,19 @@ values are actually brought only to the states renderable in the current frame.
 
 
 """
+
+# NOTE: 2024-08-27 16:48:24 
+# A brief incursion into shapely API — a bullet-list of library features,
+# useful (✓) and not useful (❌):
+#
+# fast (✓)
+# geometries are immutable (❌)
+# support of 2.5 D — potentially ✓ but copies data
+# support for geometry operations (distance, interpolation etc) (✓✓) -> 
+#   this is the most useful, but not enough to replace PlanarGraphics; however, 
+# I could use shapely objects as temporary intermediate objects to perform more
+# advanced functions.
+
 # NOTE: 2024-08-25 19:58:34
 # the comment below is obsolete
 # NOTE: 2017-08-12 21:45:26

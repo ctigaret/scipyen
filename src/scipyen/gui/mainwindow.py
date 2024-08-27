@@ -160,6 +160,7 @@ from qtpy.uic import loadUiType
 #                           QEnum, Q_FLAGS, Property,)
 # from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from jupyter_core.paths import jupyter_runtime_dir
+import shapely
 import neo
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
