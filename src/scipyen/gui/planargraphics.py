@@ -471,7 +471,7 @@ class PlanarGraphics():
     concrete values of their planar descriptors are allowed to vary from frame 
     to frame by collecting them in so-called planar graphics "states".
     
-    The 'state' is an object with attributes named after the planar descriptors 
+    The 'state' is an mapping with attributes named after the planar descriptors 
     specific for the actual shape (or cursor). They can be accessed and their 
     values modified using either attribute access ('dot' syntax), or "indexed" 
     access:
@@ -483,15 +483,23 @@ class PlanarGraphics():
     or
                 state["x"] = 10     # indexed access
                 
-    In addition, a state object contains a 'z_frame' attribute indicating the
-    index of the frame, if any, where that specific 'state' is visible, as per
-    the following rules:
+    In addition, a state object contains a 'z_frame' and an 'angle' attribute.
     
-    * when z_frame is None, the state is visible in all frames avaliable in the
+    The 'angle' attribute is related to the angle of rotation of the PlanarGraphics
+    relative to the 2D Cartesian system of axes (x — horizontal, y — vertical).
+    It is given as a float scalar, multiplier of math.pi, and can take any
+    value between -2.0 and 2.0 (inclusive) with positive values representing a
+    counter-clockwise rotation.
+    
+    The 'z_frame' attribute indicates the index of the notional frame of data¹, 
+    if any, where that specific 'state' is visible. By default, this is None.
+    'z_frame' emulates a "2.5D" geometry² as explained below:
+    
+    • when z_frame is None, the state is visible in all frames avaliable in the
       data
     
-    * when z_frame is an int (or a float): 
-        if z_frame >= 0 the state is visible ONLY in the frame with 
+    • when z_frame is an int (or a float, which will be truncated to an int): 
+        ∘ if z_frame >= 0 the state is visible ONLY in the frame with 
             index == z_frame, if that frame exists; for example, if z_frame == 3 
             and data has only three frames then the state will not be visible at
             all!
@@ -499,23 +507,23 @@ class PlanarGraphics():
             Therefore, unless the data contains at least z_frame + 1 frames, the
             state will not be visible.
             
-        if z_frame  < 0 the state applies to all frames EXCEPT the frame with
+        ∘ if z_frame  < 0 the state applies to all frames EXCEPT the frame with
             index ==  -1 * z_frame - 1
     
     It follows that a PlanarGraphics 'state' object can be:
     
     (a) ubiquitous: 
         -----------
-        * z_frame is None, and the state is visible in any data frame
+        • z_frame is None, and the state is visible in any data frame
         
     (b) frame-avoiding: 
         ---------------
-        * z_frame < 0: the state is visible in all frames EXCEPT the one which
-            has index equal to -1 * z_frame - 1 (if it exists)
+        • z_frame < 0: the state is visible in all frames EXCEPT the one which
+            has index equal to -1 × z_frame - 1 (if it exists)
         
     (c) single-frame: 
         -------------
-        * z_frame >= 0: the state is visible ONLY in the frame which has
+        • z_frame >= 0: the state is visible ONLY in the frame which has
             index == z_frame (if it exists)
         
     The co-existence of states in a PlanarGraphics object is governed by the
@@ -529,12 +537,12 @@ class PlanarGraphics():
     --------------------------
     An ubiquitous state is the ONLY state of a PlanarGraphics object.
     
-        Corollaries:
-        
-        * the PlanarGraphics object can have only one ubiquitous state, and
-        
-        * the PlanarGraphics object can have only one state when that state is
-            ubiquitous
+    Corollaries:
+    
+    II.1) the PlanarGraphics object can have only one ubiquitous state, and
+    
+    II.2) the PlanarGraphics object can have only one state when that state is
+        ubiquitous
         
     Rule III. Frame-avoiding states
     -------------------------------
@@ -543,37 +551,43 @@ class PlanarGraphics():
     
         fa_state.z_frame == -1 * sf_state.z_frame - 1
         
-        i.e., the frame where the fa_state is invisible is the same frame as
-        the one where the singl-frame state is visible.
+    i.e., the frame where the fa_state is invisible is the same frame as
+    the one where the singl-frame state is visible.
         
-        This situation allows the PlanarGraphics object to have one state visible
-        everywhere EXCEPT the frame which associates a specific 'state' object,
-        possibly with distinct descriptor values.
+    This situation allows the PlanarGraphics object to have one state visible
+    everywhere EXCEPT the frame which associates a specific 'state' object,
+    possibly with distinct descriptor values.
         
-        Corollaries:
+    Corollaries:
     
-        * there can be only one frame-avoiding state in a PlanarGraphics object;
+    III.1) there can be only one frame-avoiding state in a PlanarGraphics object;
+    
+    III.2) a PlanarGraphics with a frame-avoding state can have at most two
+        states, with the other state being a single-frame state;
         
-        * a PlanarGraphics with a frame-avoding state can have at most two
-            states, with the other state being a single-frame state;
-            
-        * the single-frame state is drawn in the frame "avoided" by the 
-            frame-avoding state;
+    III.3) the single-frame state is drawn in the frame "avoided" by the 
+        frame-avoding state;
             
     Rule IV. Single-frame states
     ----------------------------
     There can be any number of single-frame states.
     
-        Corollary:
-        
-        * A PlanarGraphics object with more than two states can have ONLY
-            single-frame states.
-            
-        * By Rule I, all single_frame states have unique z_frame values
+    Corollaries:
     
-    By associating a "state" with data frames, a PlanarGraphics object can take
+    IV.1) A PlanarGraphics object with more than two states can have ONLY
+        single-frame states.
+        
+    IV.2) By Rule I, all single_frame states have unique z_frame values
+    
+    NOTES: 
+    ¹The natural domain of the PlanarGraphics is a 2D data set in a Cartesian
+    coordinate system. For data that can be considered as being composed of 
+    several 2D 'frames', each frame may associate the same planargraphics, or
+    a slightly modified version of it.
+    ²By associating a "state" with data frames, a PlanarGraphics object can take
     different values of its planar descriptors in distinct data frames (this is
-    somewhat similar to the "ROIs" in Image/J).
+    somewhat similar to the "ROIs" in Image/J). 
+    See also https://en.wikipedia.org/wiki/2.5D
     
     Paths
     =====
@@ -706,23 +720,26 @@ class PlanarGraphics():
         #print("PlanarGraphics (%s) validateState(%s: %s)" % (cls.__name__, value.__class__.__name__, value))
         #print("PlanarGraphics (%s) _planar_descriptors_: %s" % (cls.__name__, cls._planar_descriptors_))
         
-        if not isinstance(value, (DataBag, Bunch)):
+        if not isinstance(value, Bunch):
             raise TypeError(f"Expecting a Bunch; got {type(value).__name__} instead")
         
-        if isinstance(value, DataBag):
-            value = Bunch(dict(value).copy())
+        # if isinstance(value, DataBag):
+        #     value = Bunch(dict(value).copy())
             
         all_keys = all([a in value.keys() for a in cls._planar_descriptors_])
         
         if all_keys:
             valid_descriptors = all([isinstance(value[d], (numbers.Number, str)) for d in cls._planar_descriptors_])
-            #valid_descriptors = all([isinstance(value[d], (numbers.Number, str, type(None))) for d in cls._planar_descriptors_])
-            
+
             # NOTE: 2021-04-30 16:45:56
             # z_frame IS NOT a planar descriptor but is required in the state data bag
             valid_z_frame = hasattr(value, "z_frame") and isinstance(value.z_frame, (int, type(None)))
             
-            return valid_descriptors and valid_z_frame
+            # NOTE: 2024-08-27 23:32:20
+            # introducing 'angle'; by default this is 0
+            valid_angle = hasattr(value, "angle") and isinstance(value.angle, float) and value.angle >= -2.0 and value.angle <= 2.0
+            
+            return valid_descriptors and valid_z_frame and valid_angle
         
         return all_keys
         
@@ -760,6 +777,7 @@ class PlanarGraphics():
         # the object is visible in any frame
         state = Bunch(dict(zip(cls._planar_descriptors_, [0]*len(cls._planar_descriptors_))))
         state.z_frame = None
+        state.angle = 0. # × math.pi
         return state
     
     @classmethod
@@ -780,8 +798,11 @@ class PlanarGraphics():
         ret = Bunch(dict((str(k), v) for k, v in src.items() if k in cls._planar_descriptors_))
         
         # now make sure it has a z_frame attribute
-        if not hasattr(ret, "z_frame"):
+        if not hasattr(ret, "z_frame") or not isinstance(ret.z_frame, (int, type(None))):
             ret.z_frame = None
+            
+        if not hasattr(ret, "angle") or not isinstance(ret.angle, float) or ret.angle < -2.0 or ret.angle > 2.0:
+            ret.angle = 0.0
             
         # NOTE: 2020-11-01 14:25:30
         # finally check that all mandatory descriptors are present in src
@@ -803,7 +824,7 @@ class PlanarGraphics():
                     
         # now remove any extra predictors that have nothing to do with this type
         # NOTE: now we DO need to take z_frame into account
-        extra_keys = [k for k in ret if k not in list(cls._planar_descriptors_) + ["z_frame"]]
+        extra_keys = [k for k in ret if k not in list(cls._planar_descriptors_) + ["z_frame", "angle"]]
         
         for key in extra_keys:
             ret.__delitem__(key)
@@ -812,6 +833,11 @@ class PlanarGraphics():
             ret.z_frame = src.z_frame
         else:
             ret.z_frame = None
+            
+        if hasattr(src, "angle"):
+            ret.angle = src.angle
+        else:
+            src.angle = 0.0
             
         return ret
     
@@ -843,6 +869,7 @@ class PlanarGraphics():
         self._states_ = [Bunch(dict(zip(self.__class__._planar_descriptors_, args)))]
 
         self._states_[0].z_frame = None
+        self._states_[0].angle = 0.0
         
         self._applyFrameIndex_(frameindex)
         
@@ -5464,6 +5491,11 @@ class Cubic(PlanarGraphics):
     #     self.c3y += dy
     #     # print(f"\n → {self}")
         
+    def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
+        """Returns an empty point"""
+        scipywarn("shapely does not support cubic splines")
+        return shapes.Point()
+    
     def makeBSpline(self, xy:typing.Optional[typing.Union[typing.Sequence[numbers.Number], Move, Point, Line]]=None, extrapolate=True):
         """Creates a cubic BSpline object with origin at "xy"
         
@@ -5861,6 +5893,51 @@ class Ellipse(PlanarGraphics):
         
         self.updateFrontends()
         
+    def eccentricity(self, frame:typing.Optional[int] = None) -> float:
+        if frame is None:
+            state = self.currentState
+            
+        else:
+            state = self.getState(frame)
+            
+        if state is None: # or len(state) == 0:
+            return math.nan
+        
+        # calculate the center of the ellipse
+        c0 = (state.x + state.w/2, state.y + state.h/2) 
+        
+        # FIXME: 2024-08-27 23:04:40
+        # but what if the ellipse has been rotated?
+        # answer: the orignal defining bounding rect in the statehas also been rotated!
+        majorAxis, minorAxis = max(state.w, state.h), min(state.w, state.h)
+        a = majorAxis/2
+        b = minorAxis/2
+        c = math.sqrt(a ** 2 - b ** 2)
+        
+        return c/a
+    
+        
+    def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
+        """Returns an empty point"""
+        if frame is None:
+            state = self.currentState
+            
+        else:
+            state = self.getState(frame)
+            
+        if state is None: # or len(state) == 0:
+            return shapes.Point() # empty shape
+        
+        # calculate the center of the ellipse
+        c0 = (state.x + state.w/2, state.y + state.h/2) 
+        majorAxis, minorAxis = max(state.w, state.h), min(state.w, state.h)
+        a = majorAxis/2
+        b = minorAxis/2
+        c = math.sqrt(a ** 2 - b ** 2)
+        
+        scipywarn("shapely does not directly support ellipses")
+        return shapes.Point()
+    
         
     def qPoints(self, frame = None):
         """Returns the points (vertices) of the enclosing rectangle.
