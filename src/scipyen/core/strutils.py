@@ -535,6 +535,9 @@ def isnumber(s:str) -> bool:
     except:
         return False
     
+def parse_version_string(s:str):
+    parts = s.split('.')
+    
     # ### BEGIN fool around, do NOT delete
 #     # split the string in parts separated by the current locale decimal point,
 #     # or by "e" (scientific notation)

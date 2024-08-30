@@ -376,8 +376,8 @@ class PVLaser(object):
 
 class PVSystemConfiguration(object):
     def __init__(self, node, parent=None):
-        if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "SystemConfiguration":
-            raise ValueError("Expecting an element node named 'SystemConfiguration'")
+        if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("SystemConfiguration", "Environment"):
+            raise ValueError("Expecting an element node named 'SystemConfiguration' or 'Environment")
 
         self.__parent__ = None
         
@@ -395,8 +395,13 @@ class PVSystemConfiguration(object):
             self.__attributes__ = DataBag()
         
         lasers = node.getElementsByTagName("Laser")
-        
-        self.lasers = [PVLaser(l) for l in lasers]
+        if len(lasers) == 0 or self.__version__[1] > 0:
+            lasers = node.getElementsByTagName("PVLasers")
+        if len(lasers):
+            self.lasers = [PVLaser(l) for l in lasers]
+            
+        self.data = xmlutils.elementToDict(node)
+        self.name = node.nodeName
         
     @property
     def parent(self):
@@ -1727,10 +1732,33 @@ class PVScan(object):
         # storing attributed in __dict__ will result in infinite recursions in __str__()
         # at various places in the code, unless you write code to manage it.
         # -- too work for little benefit
+        self.__version__ = tuple() # major, minor, micro, dot
+        self.__rec_datetime__ = datetime.datetime.now()
+        
         if doc.documentElement.attributes is not None:
             self.__attributes__ = DataBag(xmlutils.attributesToDict(doc.documentElement))
+            v = self.__attributes__.get("version", None)
+            if isinstance(v, str) and len(v.strip()):
+                try:
+                    self.__version__ = tuple(map(lambda x: eval(x), v.split('.')))
+                except:
+                    scipywarn(f"Could not parse the Prairie version data {v})")
+            
+            d = self.__attributes__.get("date", None)
+            if isinstance(d, str) and len(d.strip()):
+                try:
+                    self.__rec_datetime__ = dateutil.parser.parse(d)
+                except:
+                    traceback.print_exc()
+                    scipywarn(f"Due to the above caught exception, rec_datetime will be set to `datetime.now()`")
+            else:
+                scipywarn(f"No suitable date string found; rec_datetime will be set to `datetime.now()")
+                    
+                
         else:
             self.__attributes__ = DataBag(dict())
+            
+        # print(f"{self.__class__.__name__} attributes: {self.__attributes__}")
             
         # query its children
         if not doc.documentElement.hasChildNodes():
@@ -1747,20 +1775,14 @@ class PVScan(object):
         
         # READ THE "about PVScan" file; go and fetch element nodes by their name
         
-        # NOTE: 2017-08-03 09:22:43
-        # there should be only ONE SystemConfiguration element node
-        self.__systemConfiguration__ = PVSystemConfiguration(doc.documentElement.getElementsByTagName("SystemConfiguration")[0], \
-                                        parent=self)
-
-        self.sequences = [PVSequence(n, parent=self) for n in doc.documentElement.getElementsByTagName("Sequence")]
-        
         try:
             self.__path__ = doc.documentElement.getElementsByTagName("DocPath")[0].childNodes[0].nodeValue
-            
+            # self.__dirname__ = os.path.dirname(self.__path__)
         except Exception as e:
             traceback.print_exc()
-            warnings.warn("PVScan object path will be set to None")
+            scipywarn("Invalid DocPath element. PVScan object path will be set to None")
             self.__path__ = None
+            # self.__dirname__ = None
             
         try:
             self.__filename__ = doc.documentElement.getElementsByTagName("DocFileName")[0].childNodes[0].nodeValue
@@ -1768,6 +1790,9 @@ class PVScan(object):
         except Exception as e:
             traceback.print_exc()
             warnings.warn("PVScan object filename will be set to None")
+            # if isinstance(self.__path__, str) and len(self.__path__.strip()):
+            #     self.__dirname__ = os.path.dirname(self.__path___)
+            #     self.__filename__ = os.path.basename(self.__path__)
             self.__filename__ = None
             
         if isinstance(name, str):
@@ -1776,6 +1801,27 @@ class PVScan(object):
         else:
             if self.__filename__ is not None:
                 self.__name__ = os.path.splitext(self.__filename__)[0]
+                
+        # NOTE: 2017-08-03 09:22:43
+        # there should be only ONE SystemConfiguration element node
+        # NOTE: 2024-08-28 09:07:55
+        # this was removed around PV version 5.5; instead there is a *.env file
+        # with a single node "Envronment" node
+        sysconfig = doc.documentElement.getElementsByTagName("SystemConfiguration")
+        if len(sysconfig):
+            self.__systemConfiguration__ = PVSystemConfiguration(sysconfig[0], parent=self)
+        else:
+            if os.path.isdir(self.__path__) and os.path.isfile(self.__filename__):
+                print(f"dirname: {self.__path__}, filename: {self.__filename__}")
+                base = os.path.splitext(self.__filename__)[0]
+                env_filename = os.path.join(self.__path__, base+".env")
+                envDoc = pio.loadXMLFile(env_filename)
+                pvEnviron = envDoc.documentElement.getElementsByTagName("Environment")
+                if len(pvEnviron):
+                    self.__systemConfiguration__ = PVSystemConfiguration(pvEnviron[0], parent=self)
+
+        self.sequences = [PVSequence(n, parent=self) for n in doc.documentElement.getElementsByTagName("Sequence")]
+        
             
     def __len__(self):
         return len(self.sequences)
@@ -2025,14 +2071,7 @@ class PVScan(object):
         meta = self.metadata()
         
         file_origin = self.filepath
-        try:
-            rec_datetime = dateutil.parser.parse(self.__attributes__["date"])
-            # rec_datetime = datetime.datetime.strptime(self.__attributes__["date"],
-            #                                         "%d/%m/%Y %H:%M:%S %p")
-        except:
-            traceback.print_exc()
-            scipywarn(f"Due to the above caught exception, rec_datetime will be set to `datetime.now()`")
-            rec_datetime = datetime.datetime.now()
+        rec_datetime = self.__rec_datetime__
             
         return ScanData(scene=scene, scans=scans, name=self.name,
                         electrophysiology=electrophysiology,
