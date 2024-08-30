@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
+
 '''
 Various utilities
 '''
@@ -25,9 +31,14 @@ import numpy as np
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
 import pandas as pd
 import quantities as pq
-import vigra
+from core.vigra_patches import vigra
 import pyqtgraph # for their own eq operator
 import matplotlib as mpl
 #import language_tool_python
@@ -75,7 +86,7 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Object Type","Data Type (DType)", 
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
-                                "Icon"]
+                                "Address", "Icon"]
 
 GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]
 """Generic index type, used with normalized_indexed and similar functions"""
@@ -2871,6 +2882,9 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     ordertip= ""
     memsz = ""
     memsztip = ""
+    obj_address = id(obj)
+    address = f"{obj_address}"
+    hexaddress = f"{hex(obj_address)}"
 
     try:
         if isinstance(obj, type):
@@ -2919,7 +2933,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif isinstance(obj, str):
+        elif isinstance(obj, (str, bytes, bytearray)):
             sz = str(len(obj))
             sizetip = "size: "
             
@@ -3062,6 +3076,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         result["Axes"]          = {"display": axes,         "tooltip" : "%s%s" % (axestip, axes)}
         result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
+        result["Address"]       = {"display": hexaddress,   "tooltip" : f"Memory address in hex (decimal):\n{hexaddress} ({address})"}
         result["Icon"]          = icon
         
         # NOTE: 2021-06-12 12:22:38
@@ -3195,6 +3210,20 @@ def yyMdd(now=None):
     #day = time.strftime("%d", tuple(now))
     
     return "%s%s%s" % (time.strftime("%y", tuple(now)), string.ascii_lowercase[now.tm_mon-1], time.strftime("%d", tuple(now)))
+
+def unpack(x:typing.Union[list, tuple, deque], varnames:typing.Sequence[str]):
+    """Unpacks a sequence x of len(x) <= len(varnames) into len(varnames) variables"""
+    import keyword
+    from core.datatypes import NoData
+    
+    if len(x) > len(varnames):
+        raise ValueError(f"`varnames` has fewer elements ({len(varnames)}) than the tuple in `x`({len(x)})")
+    
+    if not all(isinstance(v, str) and not keyword.iskeyword(v) for v in varnames):
+        raise TypeError(f"All elements in varnames must be valid non-keyword strings")
+    
+    return list(itertools.zip_longest(varnames, x, fillvalue=NoData()))
+    
 
 
 def make_file_filter_string(extList, genericName):
@@ -3973,7 +4002,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         data_len = data
         data = None
         
-    elif isinstance(data, collections.abc.Sequence):
+    elif isinstance(data, (collections.abc.Sequence, NeoObjectList)):
         data_len = len(data)
         
     elif isinstance(data, (pd.Series, pd.DataFrame)):

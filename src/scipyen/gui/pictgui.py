@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
     This module contains various generic GUI utilities: mostly dialogues
 """
@@ -69,7 +74,9 @@ from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, P
                            PlanarGraphics, Point, Quad, Rect, Text, VerticalCursor,
                            HorizontalCursor, CrosshairCursor, PointCursor,
                            PlanarGraphicsType, GraphicsObjectType, GraphicsObject, 
-                           __new_planar_graphic__, printQPainterPath)
+                           __new_planar_graphic__, printQPainterPath,
+                           PathElements, LinearElements, CurveElements,
+                           Tier2PathElements, simplifyPath)
 
 #### END pict.gui modules
 

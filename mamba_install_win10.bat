@@ -1,10 +1,15 @@
+rem  # -*- coding: utf-8 -*-
+rem  # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+rem  # SPDX-License-Identifier: GPL-3.0-or-later
+rem  # SPDX-License-Identifier: LGPL-2.1-or-later
+rem  
 echo This script requires mambaforge installed from https://github.com/conda-forge/miniforge#mambaforge
 echo and must be run from a mamba (Microforge) prompt launched as administrator
 @echo off
 rem  setlocal enabledelayedexpansion enableextensions
 set mypath=%0
 set mydir=%~dp0
-set conda_reqs=%mydir%\install\conda_requirements_win.txt
+rem  set conda_reqs=%mydir%\install\conda_requirements_win.txt
 set pip_reqs=%mydir%\install\pip_requirements_win.txt
 set default_env_name="c:\scipyenv"
 set /P env_name="Enter the full path name of the new environment (no spaces, please, default is: %default_env_name%): "

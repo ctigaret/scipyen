@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Main window for the Scipyen application
 
 CHANGELOG:
@@ -70,6 +74,7 @@ from imaging import axisutils, vigrautils
 from imaging import (imageprocessing as imgp, imgsim,)
 from systems import *
 from ephys import (ephys, membrane)
+# from ephys import (ephys,)
 from .workspacemodel import WorkspaceModel
 from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
 from .triggerdetectgui import guiDetectTriggers
@@ -155,13 +160,14 @@ from qtpy.uic import loadUiType
 #                           QEnum, Q_FLAGS, Property,)
 # from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from jupyter_core.paths import jupyter_runtime_dir
+import shapely
 import neo
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
     
 else:
     NeoObjectList = list # alias for backward compatibility :(
-import vigra
+from core.vigra_patches import vigra
 import h5py
 import xarray as xa
 import quantities as pq
@@ -237,7 +243,7 @@ import researchpy as rp  # for use with DataFrames & stats
 import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python
 import sklearn as sk  # machine learning, also nice plot_* functionality
 import seaborn as sb  # statistical data visualization
-
+from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
 # print("mainwindow.py __name__ =", __name__)
 # BEGIN matplotlib modules
 import matplotlib as mpl
@@ -879,7 +885,7 @@ class VTH(object):
         """Returns a list of specifications for handling `variable`.
 
         If `variable` is a type registered with VTH, or `variable` is an
-        instance of a type registeres wit VTH, returns a 3-tuple:
+        instance of a type registered with VTH, returns a 3-tuple:
         (viewer type, action name, priority), where:
 
             • viewer type is the Scipyen viewer class suitable to view the type
@@ -1538,6 +1544,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2024-05-29 14:04:11
         # plugin modules already have this injected by slot_loadPlugins
         ws_aware_modules = (membrane,pgui, sigp, imgp, crvf, plots)
+        # ws_aware_modules = (pgui, sigp, imgp, crvf, plots)
 
         for m in ws_aware_modules:
             # NOTE: 2022-12-23 10:47:39
@@ -2211,14 +2218,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # print(f"{self.__class__.__name__}.newViewer winClass = {winClass} (arg type = {type(winClass).__name__})")
         # print("WindowManager.newViewer **kwargs", **kwargs)
+        # print(f"{self.__class__.__name__}: newViewer({winClass})")
         if isinstance(winClass, str) and len(winClass.replace("&", "").strip()):
             wClass = winClass.replace("&", "")
+            
 
             if wClass not in list(v.__name__ for v in self.viewers):
                 raise ValueError(f"Unexpected viewer class name{wClass}")
 
-            win_classes = list(
-                filter(lambda x: x.__name__ == wClass, self.viewers))
+            win_classes = list(filter(lambda x: x.__name__ == wClass, self.viewers))
 
             if len(win_classes):
                 winClass = win_classes[0]
@@ -2226,11 +2234,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             else:
                 raise ValueError(f"Unexpected viewer class name {wClass}")
 
-        elif not isinstance(winClass, (type)) and (has_sip and not isinstance(winClass, sip.wrappertype)):
-            raise TypeError(f"Expecting a type or sip.wrappertype; got {type(winClass).__name__} instead")
-
         else:
-            if winClass not in self.viewers or not issubclass(winClass, QtWidgets.QMainWindow):
+            if winClass not in self.viewers:# or winClass != mpl.figure.Figure or not issubclass(winClass, QtWidgets.QMainWindow):
                 raise ValueError(f"Unexpected viewer class {winClass.__name__}")
 
         if winClass is mpl.figure.Figure:
@@ -2247,33 +2252,47 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         else:
             win_title = kwargs.pop("win_title", winClass.__name__)
-            # print(f"{self.__class__.__name__} win_title = {win_title}, counter_suffix = {counter_suffix}")
+            # print(f"{self.__class__.__name__}.newViewer: win_title = {win_title}, counter_suffix = {counter_suffix}")
+            if win_title[0].isupper():
+                wt = win_title[0].lower()
+                if len(win_title) > 1:
+                    wt += win_title[1:]
+                win_title = wt
 
+            # print(f"{self.__class__.__name__}.newViewer for win_title = {win_title}")
+            
             # kwargs["win_title"] = win_title
             if "parent" not in kwargs:
                 kwargs["parent"] = self # needed on X11 platform, but not on Wayland,
                                         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
                 
             win = winClass(*args, **kwargs)
+            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} win = {win}")
 
             variables = dict([item for item in self.shell.user_ns.items(
                 ) if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
 
+            # NOTE: 2024-08-25 16:20:55 FIXME ?
+            # not sure why all these lines of code below are needed, especially
+            # the condition on listedWindows...
             varnames = reverse_mapping_lookup(variables, win)
+            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} varnames = {varnames}")
             
-            listedWindows = [self.workspace[n] for n in varnames if type(self.workspace[n]) == winType]
+            listedWindows = [self.workspace[n] for n in varnames if isinstance(self.workspace[n], winClass)]
+            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} listedWindows = {listedWindows}")
 
             if win not in listedWindows:
                 win_title, counter_suffix = validate_varname(win_title, self.workspace, return_counter=True)
+                
+            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} win_title = {win_title}")
             
-            win.winTitle = win_title
-            win.ID = counter_suffix
             workspace_win_varname = strutils.str2symbol(win_title)
+            workspace_win_varname = workspace_win_varname[0].lower()+workspace_win_varname[1:]
+            
+            win.ID = counter_suffix
+            win.winTitle = workspace_win_varname
 
         self.registerWindow(win)  # required !
-        # self.workspace[workspace_win_varname] = win
-        # self.workspaceModel.update()
-        # print(f"{self.__class__.__name__}.newViewer workspace_win_varname = {workspace_win_varname}")
         self.workspaceModel.bindObjectInNamespace(workspace_win_varname, win)
 
         return win
@@ -2288,6 +2307,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """
         if not isinstance(fig, mpl.figure.Figure):
             return
+        
+        backend_mod = None
+        backend_super_class = mpl.backend_bases._Backend
         # NOTE: 2023-01-29 16:14:04
         # for mpl figures created manually
         # add a manager backend to the figure - we FORCE the use of the
@@ -2296,10 +2318,36 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #
         # print(f"{self.__class__.__name__}._adopt_mpl_figure ({fig}, number {fig.number})")
         import matplotlib.cbook as cbook
-        backend_mod = importlib.import_module(cbook._backend_module_name(mpl.rcParams["backend"]))
-        # backend_mod = importlib.import_module(cbook._backend_module_name("Qt5Agg"))
-        
-        class backend_mod(mpl.backend_bases._Backend):
+        # NOTE: 2024-06-03 13:41:00
+        # with mpl api change cbook has lost _backend_module_name
+        # the condition below I think is correct
+        if hasattr(mpl, "_version") and hasattr(mpl._version, "version") and int(mpl._version.version.split('.')[1]) < 9:
+            backend_mod = importlib.import_module(cbook._backend_module_name(mpl.rcParams["backend"]))
+            # backend_mod = importlib.import_module(cbook._backend_module_name("Qt5Agg"))
+            # backend_class = mpl.backend_bases._Backend
+            # class backend_mod(mpl.backend_bases._Backend):
+            #     locals().update(vars(backend_mod))
+                
+        else: # assume the latest mpl and keep fingers crossed
+            backend_name = mpl.get_backend()
+            
+            candidate_backend_module_names = list(filter(lambda x: backend_name.lower() in x, mpl.backends.__dict__.keys()))
+            
+            if len(candidate_backend_module_names):
+                backend_mod = mpl.backends.__dict__.get(candidate_backend_module_names[0], None)
+                
+            
+        if backend_mod is None:
+            scipywarn(f"{self.__class__.__name__}._adopt_mpl_figure - cannot establish the backend used")
+            return
+
+#                 backend_class = getattr(backend_mod, f"_Backend{backend_name}", getattr(backend_mod, "_Backend", None))
+#                     
+#                 if backend_class is None:
+#                     scipywarn(f"{self.__class__.__name__}._adopt_mpl_figure - cannot establish the backend used")
+            
+            
+        class backend_mod(backend_super_class):
             locals().update(vars(backend_mod))
             
         if getattr(fig.canvas, "manager", None) is None:
@@ -3855,14 +3903,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 exportCSVAction.hovered.connect(
                     self._slot_showActionStatusMessage_)
 
-        saveVars = cm.addAction("Save as HDF5")
+        saveVars = cm.addAction("Save")
         saveVars.setToolTip("Save selected variables as HDF5 files")
         saveVars.setStatusTip("Save selected variables as HDF5 files")
         saveVars.setWhatsThis("Save selected variables as HDF5 files")
         saveVars.triggered.connect(self.slot_saveSelectedVariables)
         saveVars.hovered.connect(self._slot_showActionStatusMessage_)
 
-        pickleVars = cm.addAction("Save as Pickle")
+        pickleVars = cm.addAction("Pickle")
         pickleVars.setToolTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
         pickleVars.setStatusTip("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
         pickleVars.setWhatsThis("Save selected variables as Pickle files.\nWARNING: Do not use pickle for long-term data storage!")
@@ -4491,6 +4539,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         plt.close("all")
 
         self.saveSettings()
+        
+        openWindows =list(filter(lambda x: isinstance(x, QtWidgets.QMainWindow) and x not in (self, self.console), 
+                                 self.workspace.values()))
+        
+        for w in openWindows:
+            w.close()
 
         # open_windows = ((name, obj) for (name, obj) in self.workspace.items() if isinstance(obj, QtWidgets.QWidget))
         # for win in open_windows:
@@ -4498,57 +4552,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         #         win[1].close()
 
         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
-        # if sys.platform == "win32" or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
-        #     QtWidgets.QApplication.closeAllWindows()
-        QtWidgets.QApplication.closeAllWindows()
+        if sys.platform == "win32" or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+            QtWidgets.QApplication.closeAllWindows()
+        # QtWidgets.QApplication.closeAllWindows()
             
         evt.accept()
 
     def saveWindowSettings(self):
         gname, pfx = saveWindowSettings(
             self.qsettings, self, group_name=self.__class__.__name__)
-
-        # ### BEGIN TODO/FIXME/BUG 2022-12-26 22:44:59
-#         #### NOTE: user-defined gui handlers (viewers) for variable types, or
-#         # user-changed configuration of gui handlers
-#         # FIXME 2021-07-17 22:55:17
-#         # Not written to Scipyen.conf -- WHY ??? because nested groups aren't
-#         # supported by QSettings
-#         self.qsettings.beginGroup("Custom_GUI_Handlers")
-#         for viewerClass in VTH.gui_handlers.keys():
-#             pfx = viewerClass.__name__
-#
-#             if viewerClass not in VTH.default_handlers.keys():
-#                 # store user-defines handlers
-#                 self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
-#
-#                 if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
-#                     type_names = [VTH.gui_handlers[viewerClass]["types"]._name__]
-#
-#                 else:
-#                     type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]]
-#
-#                 self.qsettings.setValue("%s_types" % pfx, type_names)
-#
-#             else:
-#                 # store customizations for built-in handlers:
-#                 default_action_name = VTH.default_handlers[viewerClass]["action"]
-#                 default_types = VTH.default_handlers[viewerClass]["types"]
-#
-#                 if VTH.gui_handlers[viewerClass]["types"] != default_types:
-#                     if isinstance(VTH.gui_handlers[viewerClass]["types"], type):
-#                         type_names = [VTH.gui_handlers[viewerClass]["types"].__name__]
-#
-#                     else:
-#                         type_names = [t.__name__ for t in VTH.gui_handlers[viewerClass]["types"]]
-#
-#                     self.qsettings.setValue("%s_types" % pfx, VTH.gui_handlers[viewerClass]["types"])
-#
-#                 if VTH.gui_handlers[viewerClass]["action"] is not default_action_name:
-#                     self.qsettings.setValue("%s_action" % pfx, VTH.gui_handlers[viewerClass]["action"])
-#
-#         self.qsettings.endGroup()
-        # ### END TODO/FIXME/BUG 2022-12-26 22:44:59
 
     # @processtimefunc
     def loadSettings(self):
@@ -4671,12 +4683,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self.actionOpen.triggered.connect(self.slot_openFiles)
         self.actionView_Data.triggered.connect(self.slot_viewSelectedVar)
-        self.actionView_Data_New_Window.triggered.connect(
-            self.slot_viewSelectedVarInNewWindow)
+        self.actionView_Data_New_Window.triggered.connect(self.slot_viewSelectedVarInNewWindow)
         self.actionReload_Plugins.triggered.connect(self.slot_reloadPlugins)
         self.actionSave.triggered.connect(self.slot_saveFile)
-        self.actionChange_Working_Directory.triggered.connect(
-            self.slot_selectWorkDir)
+        self.actionChange_Working_Directory.triggered.connect(self.slot_selectWorkDir)
         # self.actionSave_pickle.triggered.connect(self.slot_saveSelectedVariables)
 
         # NOTE: 2017-07-07 22:14:40
@@ -4731,6 +4741,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.workspaceView.setSortingEnabled(True)
         self.workspaceView.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.workspaceView.horizontalHeader().setStretchLastSection(False)
+        # TODO 2024-07-21 23:30:05
+        # make this configurable (and locale-dependent?)
+        self.workspaceView.horizontalHeader().setDefaultAlignment(QtCore.Qt.AlignLeft)
 
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         
@@ -4755,21 +4768,18 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.menuViewers.addMenu(self.newViewersMenu)
 
         # add new viewers menu as toolbar action, too
-        self.newViewersAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("window-new"), "New Viewer")
+        self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        self.consolesAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
+        # self.newViewersActionTB = [w for w in self.newViewersAction.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        # self.newViewersActionTB.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
+        self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
         # this one is defined in the ui file mainwindow.ui
         self.consolesAction.setMenu(self.menuConsoles)
-        self.scriptsAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
+        self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
-        self.applicationsAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("homerun"), "Applications")
+        self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.applicationsMenu)
-        self.refreshViewAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
+        self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
         
         # NOTE: 2024-06-01 18:08:54
@@ -4824,16 +4834,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.slot_fileSystemContextMenuRequest)
         self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.fileSystemTreeView.setRootIsDecorated(True)
-        self.fileSystemTreeView.setHorizontalScrollBarPolicy(
-            QtCore.Qt.ScrollBarAsNeeded)        
+        self.fileSystemTreeView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)        
         # self.fileSystemTreeView.setHorizontalScrollBarPolicy(
         #     QtCore.Qt.ScrollBarAlwaysOn)        
 
-        self.fileSystemModel.directoryLoaded[str].connect(
-            self.slot_resizeFileTreeColumnForPath)
+        self.fileSystemModel.directoryLoaded[str].connect(self.slot_resizeFileTreeColumnForPath)
         
-        self.fileSystemModel.rootPathChanged[str].connect(
-            self.slot_rootPathChanged)
+        self.fileSystemModel.rootPathChanged[str].connect(self.slot_rootPathChanged)
         
         self.fileSystemModel.dataChanged[QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>"].connect(self.slot_fileSystemDataChanged)
 
@@ -5071,7 +5078,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
             if item not in recFNames:
                 if len(self._recentFiles) == self._maxRecentFiles:
-                    self._recentFiles.pop(recFNames[-1], None)
+                    self._recentFiles.pop(recFNames[-1][0], None)
 
                 self._recentFiles[item] = {"loader":loader, "timestamp":datetime.datetime.now()}
 
@@ -5726,7 +5733,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         else:
             # add Newdir,
-            if len(self.recentDirectories) == self._maxRecentDirectories:
+            if len(self.recentDirectories) > self._maxRecentDirectories:
                 self.recentDirectories.pop()
 
             self.recentDirectories.appendleft(newDir)

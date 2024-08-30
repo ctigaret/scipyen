@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
 # WARNING: some of the packages listed below may have already been installed, or 
 # are available from your Linux distribution. Therefore by installing them INSIDE
 # the virtual environment they will overshadow the packages in the system-wide
@@ -39,6 +44,7 @@ MarkupSafe
 Pillow
 PyLEMS
 qtpy
+pywayland ; sys_platform == "linux"
 # required to build PyQt5/6 locally using the host's Qt stack
 PyQt-builder ; sys_platform == 'linux'
 # required to build PyQt5 locally using the host's Qt stack
@@ -94,6 +100,7 @@ gitdb
 gnuplot_kernel
 graphviz
 h5py
+hdf5view
 huggingface-hub
 idna
 imageio
@@ -150,6 +157,7 @@ nodejs
 nose            
 notebook
 notebook_shim
+nuitka
 numpy           
 octave_kernel
 pandas
@@ -190,6 +198,7 @@ scikit-image
 scikit-learn
 scipy
 seaborn
+shapely
 slytherin
 smart-open
 smmap

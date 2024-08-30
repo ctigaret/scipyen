@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Various string utilties
 """
 
@@ -33,6 +37,7 @@ __output_cache_regexp__ = _re.compile("^(_o)|(_+)(h|\d*)$")
 __input_cache_regexp__ = _re.compile("^_i+(h|\d*)$")
 
 import errno, os
+
 def is_sequence(s:str) -> bool:
     """Return True if the s is a string representation of a tuple or list"""
     if not isinstance(s, str):
@@ -94,7 +99,7 @@ def ordinalToLetters(x:int, upperCase:bool=True):
     ¹⁾ Either upper (default) or lower case, depending on the value of the 
     `upperCase` parameter.
 
-"""
+    """
     if x < 0:
         return '?'
     
@@ -284,7 +289,8 @@ def get_int_sfx(s:str, sep:str = "_", use_re:bool=False) -> typing.Tuple[str, in
     
     """
     if not isinstance(sep, str) or len(sep) == 0 or use_re:
-        regexp = _re.compile("^(\D+)*(\d*)$")
+        # regexp = _re.compile("^(\D+)*(\d*)$")
+        regexp = _re.compile("(.*?)??(\d*)$")
         re_match = regexp.match(s)
         if re_match is not None and len(re_match.groups()) > 1:
             try:
@@ -469,6 +475,9 @@ def numbers2str(value:typing.Optional[typing.Union[Number, np.ndarray, tuple, li
         values.
     
     """
+    
+    from core.quantities import quantity2str
+    
     if value is None:
         return ""
     # TODO 2020-12-28 11:41:33
@@ -525,6 +534,9 @@ def isnumber(s:str) -> bool:
         
     except:
         return False
+    
+def parse_version_string(s:str):
+    parts = s.split('.')
     
     # ### BEGIN fool around, do NOT delete
 #     # split the string in parts separated by the current locale decimal point,

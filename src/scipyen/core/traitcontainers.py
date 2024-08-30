@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 Traitlets-aware containers
 An attempt to supplement traitlets package with container traits that can trigger
@@ -6,7 +10,7 @@ notifications if their contents change.
 
 2020-09-05 14:20:18 Implemented so far: 
 
-DataBag = behaves like a dictionary where its keys are also
+DataBag : behaves like a dictionary where its keys are also
 accessed using attribute syntax.
 
 """

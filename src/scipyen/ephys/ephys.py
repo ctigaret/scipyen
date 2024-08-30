@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """ Classes and functions for electrophysiology data.
 
 NOTATIONS USED BELOW:
@@ -160,6 +165,8 @@ import functools
 from functools import singledispatch
 import warnings
 import typing, types
+import difflib
+import re as _re
 from enum import Enum, IntEnum
 from abc import ABC
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
@@ -175,6 +182,8 @@ from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 import numpy as np
 import quantities as pq
 import neo
+import h5py
+import pandas as pd
 # import pyabf
 import matplotlib as mpl
 # import pyqtgraph as pg
@@ -200,6 +209,7 @@ from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
+from core import strutils
 
 from core.utilities import (safeWrapper, 
                             reverse_mapping_lookup, 
@@ -215,6 +225,7 @@ from core.quantities import (units_convertible, check_time_units,
                              check_electrical_current_units, 
                              check_electrical_potential_units,
                              check_rescale)
+import core.pyabfbridge as pab 
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
@@ -324,6 +335,53 @@ class SynapticStimulus(__BaseSynStim__):
                     
         return super().__new__(cls, **new_args)
     
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Dataset:
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name": self.name, "channel": self.channel, "dig": self.dig}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_dataset(name, data = h5py.Empty("f"),
+                                      track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Dataset, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        channel = attrs["channel"]
+        
+        if isinstance(channel, np.int64):
+            channel = int(channel)
+            
+        dig = attrs["dig"]
+        if isinstance(dig, np.bool_):
+            dig = bool(dig)
+        
+        return cls(name, channel, dig)
+    
 SynapticStimulus.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
 SynapticStimulus.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
 SynapticStimulus.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
@@ -414,6 +472,51 @@ class AuxiliaryInput(__BaseAuxInput__):
                     new_args[k] = v
                     
         return super().__new__(cls, **new_args)
+    
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Dataset:
+        
+
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name":self.name, "adc":self.adc, "cmd":self.cmd}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity= group.create_dataset(target_name, h5py.Empty("f"), 
+                                     track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Dataset, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name=attrs["name"]
+        adc =attrs["adc"]
+        cmd =attrs["cmd"]
+        
+        return cls(name, adc, cmd)
+
 
 AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux_in'"
 AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
@@ -506,6 +609,49 @@ class AuxiliaryOutput(__BaseAuxOutput__):
                     
         return super().__new__(cls, **new_args)
     
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Dataset:
+    
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name":self.name, "channel":self.channel, "digttl":self.digttl}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity= group.create_dataset(target_name, h5py.Empty("f"), 
+                                     track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Dataset, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name=attrs["name"]
+        channel =attrs["channel"]
+        digttl =attrs["digttl"]
+        
+        return cls(name, channel, digttl)
+
 AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification; default is 'aux_out'"
 AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
 AuxiliaryOutput.digttl.__doc__ = "bool, or None: flag to indicate if the output is used to send out triggers via a DIG (True), emulated via a DAC (False) or other waveforms (None); default is None"
@@ -617,6 +763,67 @@ class RecordingSource(__BaseSource__):
                    "",
                    ])
     
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name":self.name, "adc":self.adc, "dac":self.dac}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.toHDF5(self.syn, entity, name="syn", oname="syn",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.toHDF5(self.auxin, entity, name="auxin", oname="auxin",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.toHDF5(self.auxout, entity, name="auxout", oname="auxout",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+    
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        adc  = attrs["adc"]
+        dac  = attrs["dac"]
+        
+        syn = h5io.fromHDF5(entity["syn"], cache=cache)
+        auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
+        auxout = h5io.fromHDF5(entity["auxout"], cache=cache)
+        
+        return cls(name=name, adc=adc, dac=dac, syn=syn, auxin=auxin, auxout=auxout)
+        
     @property
     def clamped(self) -> bool:
         """Returns True when a primary DAC is defined.
@@ -951,6 +1158,32 @@ class RecordingEpisode(Episode):
 
     All sweeps in the episode must have been recorded using the same recording
     protocol (an ElectrophysiologyProtocol object).
+    
+    The sweeps in an episode may belong to either:
+    
+    1) a single neo.Block — in this case the attributes 'beginFrame' and 'endFrame' 
+    indicate the limits of the segment sub-range in the Block) - this allows for
+    the possibility that subsets of segments in the Block have been recorded under
+    different conditions (and hence they would belong to distinct episodes), 
+    even if data was acquired using the same electrophysiology protocol.
+    
+    Normally, the segments of a Block are — by definition — recorded during the
+    same experimental conditions (protocol, drug, etc). However, during some 
+    analyses, several of these blocks may be concatenated into a larger one —
+    subject to being recorded using the same electrophysiology protocol — which 
+    leads to the situation where contiguous subsets of segments (or sweeps) 
+    recorded under distinct conditions are stored in the same Block object, a 
+    possibility covered by this contigency.
+    
+    2) a collection of neo.Block objects — in this case, the 'beginFrame' and 'endFrame' 
+    attributes cover the entire collection of segments ranges across the blocks. 
+    This is because several blocks are supposed to have been recorded during the SAME
+    experimental conditions, such that an "episode" can be greaded as a standalone 
+    data "unit" (unlike the contigency described above).
+    
+    In this contigency, all the data Blocks must have been acquired using the 
+    same electrophysiology protocol.
+    
         
     Examples:
     =========
@@ -973,11 +1206,14 @@ class RecordingEpisode(Episode):
     The sweeps in RecordingEpisode are a sequence of neo.Segment objects, where
     objects where each synaptic pathway has contributed data for a neo.Segment
     inside the Block.
+    
+    3) No segments are included in the episode - the episode is just a light-weight
+    data grouping by protocol.
 
     Fields (constructor parameters):
     ================================
         
-    • protocol: ElectrophysiologyProtocol
+    • protocols: sequence of ElectrophysiologyProtocol objects
         Currently, only pyabfbridge.ABFProtocol objects are supported. The ABFProtocol
         is a subclass of ElectrophysiologyProtocol defined in this module.
 
@@ -1034,12 +1270,10 @@ class RecordingEpisode(Episode):
     # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
     def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name: typing.Optional[str] = None,
-                 protocol: typing.Optional[ElectrophysiologyProtocol]=None, 
-                 # sources: typing.Sequence[RecordingSource] = list(), ## → defined in pathways
-                 # segments: typing.Optional[GeneralIndexType] = None, ## → defined in superclass beginFrame endFrame
+                 blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
+                 protocols: typing.Sequence[ElectrophysiologyProtocol] = list(), 
                  pathways: typing.Sequence[SynapticPathway] = list(),
-                 xtalk: typing.Optional[tuple] = None ,
-                 # triggers: typing.Sequence[TriggerEvent] = list(),
+                 xtalk: typing.Optional[typing.Union[dict, tuple, list]] = None ,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1051,7 +1285,7 @@ class RecordingEpisode(Episode):
         name:str - the name of this episode (optional, default is None)
             When None, it is up to the user of this object to give an appropriate
             name
-        protocol: the electrophysiology recording protocol object, or None
+        protocols: the electrophysiology recording protocol object, or obejcts, or None
             WARNING: As of 2024-02-18 11:09:55 Scipyen only supports 
             pyabfbridge.ABFProtocol objects.
 
@@ -1060,8 +1294,64 @@ class RecordingEpisode(Episode):
         pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
             Optional; default is None.
 
-        xtalk: dict of segment index (int) ↦ tuple of int (indexes of pathways)
-            or None.
+        xtalk: dict, tuple, or list — configuration of pathway cross-stimulation
+            (for testing pathway cross-talk, or independence)
+
+            • when a dict it contains key ↦ value mappings
+                ∘ values are tuples of int indices of pathways, and their ORDER
+                    indicates the order in which the pathways are cross-stimulated;
+
+                    in theory, there can be any number of pathways, but in practice
+                    the tuple contains only two pathways tested for cross-talk
+
+                    For example, a tuple (0,1) indicates that the pathways are
+                    given each a single stimulus (pathwya 0 first, then pathway 1).
+
+                    To be useful these stimulations must occur with the same 
+                    inter-stimulus interval (ISI) as the one used for paired-
+                    pulse stimulation of a single pathway (so that pathway 
+                    independence can be assessed based on response facilitation
+                    or lack thereof)
+                    
+                ∘ the keys are either:
+                    □ an int: the index of the segment¹ where the cross-stimulation
+                        of the pathways, indicated in the tuple, has occurred
+
+                        Example: a dictionary with the following structure
+
+                        0 ↦ (0,1)
+                        1 ↦ (1,0)
+
+                        indicates a cross-stimulationof two pathwyas in the 
+                        order 0 → 1 in the first segment, and in the order 1 → 0
+                        in the second segment
+
+                    □ a tuple of two int (x,y) where `x` is the index of the 
+                        first segment where cross-stimulation is applied, and 
+                        `y` is the number of segments skipped.
+
+                        Example: a dictionary with the following structure
+
+                        (0,2) ↦ (0,1)
+                        (1,2) ↦ (1,0)
+
+                        indicates cross-stimulation of two pathways in the 
+                        order 0 → 1 in every other segment, starting with the
+                        first (segment index 0)² i.e., on `even-numbered` segments, 
+                        and in the order 1 → 0 in every other segment, starting
+                        with the second (segment index 1) i.e., on `odd-numbered`
+                        segments
+
+            • when a tuple or list, it indicates the pathway indices and the 
+                order in which they are stimulated, througout the episode
+                
+            By default the `xtalk` attribute of a recording episode is an empty
+            tuple.
+
+            ¹ Here a `segment` has the same meaning as a `sweep`; we use `segment`
+            to also indicate that this refers to a neo.Segment object.
+
+            ² Python uses 0-based indexing of elements in a collection.
 
             Indicates the order of the stimulated pathways in a cross-talk contingency,
             were each pathway is stimulated in turn, in a paired-pulse stimulation
@@ -1079,17 +1369,70 @@ class RecordingEpisode(Episode):
         if not isinstance(name, str):
             name = self._type_.name
             
-        super().__init__(name, **kwargs)
-
-        self.protocol = protocol
         
+        self._begin_ = datetime.datetime.now()
+        self._end_ = datetime.datetime.now()
+        self._beginFrame_ = 0
+        self._endFrame_ = 0
+        
+        self._protocols_ = list()
+        
+        self._blocks_ = list()
+        self._pathways_ = list()
+        
+        super().__init__(name=name)#, **kwargs)
+        
+        if isinstance(blocks, (tuple, list, collections.deque)) and all(isinstance(v, neo.Block) for v in blocks):
+            self._blocks_[:] = sorted(list(blocks), key = lambda x: x.rec_datetime)
+            self._setup_from_blocks_() # also sets up protocols
+            
+        begin = kwargs.pop("begin", None)
+        end = kwargs.pop("end", None)
+        beginFrame = kwargs.pop("beginFrame", None)
+        endFrame = kwargs.pop("endFrame", None)
+        if isinstance(begin, datetime.datetime):
+            self.begin = begin
+        if isinstance(end, datetime.datetime):
+            self.end = end
+            
+        if isinstance(beginFrame, int):
+            if beginFrame < 0:
+                raise ValueError(f"Invalid 'beginFrame': {beginFrame}")
+            
+            if isinstance(endFrame, int):
+                if endFrame < beginFrame:
+                    raise ValueError(f"Invalid 'endFrame': {endFrame} must be larger than {beginFrame}")
+                
+                if len(self._blocks_):
+                    nframes = self.nFrames # cache that:)
+                    if endFrame >= nFrames:
+                        raise ValueError(f"Invalid 'endFrame': {endFrame} must be smaller than {nFrames}  frames")
+            
+            self.beginFrame = beginFrame
+            
+        if isinstance(endFrame, int):
+            self.endFrame = endFrame
+            
+        # TODO 2024-06-18 11:30:48 FIXME
+        # check that all blocks follow the same protocol
+        # self.protocols = list() # set up from blocks, if any
+        if isinstance(protocols, ElectrophysiologyProtocol):
+            if len(self._protocols_) == 0:
+                self._protocols_.append(protocols)
+                
+            else:
+                scipywarn("protocols already set up by the blocks; 'protocol' argument will be ignored")
+                
+        elif isinstance(protocols, (tuple, list, collections.deque)) and all (isinstance(p, ElectrophysiologyProtocol) for p in protocols):
+            self._protocols_.extend(protocols)
+            
         if isinstance(pathways, (tuple, list)):
             if len(pathways):
                 if not all(isinstance(v, SynapticPathway) for v in pathways):
                     raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
             self._pathways_ = pathways
-        else:
-            self._pathways_ = []
+        # else:
+        #     self._pathways_ = []
         
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
@@ -1133,17 +1476,29 @@ class RecordingEpisode(Episode):
                 
             self.xtalk = xtalk
             
-        elif xtalk is None:
-            self.xtalk = tuple()
+        # elif xtalk is None:
+        #     self.xtalk = tuple()
+        
+        elif isinstance(xtalk, (tuple, list)):
+            if len(xtalk) and not all(isinstance(v, int) for v in xtalk):
+                raise TypeError("When a tuple, 'xtalk' must contain only integers")
+            
+            self.xtalk = tuple(xtalk)
             
         else:
-            raise ValueError(f"Invalid xtalk specification ({xtalk})")
+            self.xtalk = tuple()
+            # raise ValueError(f"Invalid xtalk specification ({xtalk})")
         
         # self._data_ = None
         
     def __repr__(self):
         ret = list()
-        ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}, begin={self.begin}, end={self.end}, beginFrame={self.beginFrame}, endFrame={self.endFrame}), with:")
+        ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
+        ret.append(f"\tBlocks: {self.nBlocks}")
+        ret.append(f"\tFrames: {self.nFrames}")
+        ret.append(f"\tbegin={self.begin}, end={self.end}")
+        ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
+            
         if len(self._pathways_) == 0:
             ret.append(f"\tPathways: []")
         else:
@@ -1152,6 +1507,9 @@ class RecordingEpisode(Episode):
                 ret.append(f"\t{p}")
 
         ret.append(f"\txtalk: {self.xtalk}")
+        
+        ret.append(f"\tprotocols:")
+        ret += unique([f"\t\t{p.name}" for p in self.protocols])
         
         return "\n".join(ret)
         
@@ -1165,10 +1523,13 @@ class RecordingEpisode(Episode):
             p.breakable()
             attr_repr = [" "]
             attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
-                                                                                "protocol",
                                                                                 "electrodeMode",
                                                                                 "clampMode",
                                                                                 )]
+            
+            attr_repr.append("Protocols:")
+            
+            attr_repr += unique([f"\t\t{p.name}" for p in getattr(self, "protocols", list())])
             
             # with p.group(4 ,"(",")"):
             with p.group(4 ,"",""):
@@ -1177,7 +1538,7 @@ class RecordingEpisode(Episode):
                     p.breakable()
                 p.text("\n")
                 
-            p.text("\n")
+            # p.text("\n")
                 
             p.text("Pathways:")
             p.breakable()
@@ -1202,6 +1563,80 @@ class RecordingEpisode(Episode):
                 
             p.breakable()
             
+
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Group:
+        """Overrides datatypes.Episode.toHDF5"""
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "xtalk", "type"))
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        # entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.toHDF5(self.blocks, entity, name="blocks", oname="blocks",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.toHDF5(self.protocols, entity, name="protocols", oname="protocols",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        blocks = h5io.fromHDF5(entity["blocks"], cache=cache)
+        protocols = h5io.fromHDF5(entity["protocols"], cache=cache)
+        pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
+        
+        name=attrs["name"]
+        begin=attrs["begin"]
+        end=attrs["end"]
+        beginFrame=attrs["beginFrame"]
+        endFrame=attrs["endFrame"]
+        xtalk=attrs["xtalk"]
+        episodeType=attrs["type"]
+        
+        return cls(name=name, episodeType=episodeType, begin=begin, end=end,
+                beginframe=beginFrame,endFrame=endFrame,
+                protocols=protocols,
+                blocks = blocks,
+                pathways=pathways,
+                xtalk=xtalk)
+        
+        
     @property
     def pathways(self) -> list:
         return self._pathways_
@@ -1221,7 +1656,193 @@ class RecordingEpisode(Episode):
         else:
             raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
             
+    @property
+    def blocks(self) -> list:
+        return self._blocks_
+    
+    @blocks.setter
+    def blocks(self, val:typing.Sequence[neo.Block]):
+        """Assign new blocks to the episode.
+        If val is an empty sequence, the blocks will be cleared.
+        """
+        if not isinstance(val, (tuple, list, collections.deque)):
+            raise TypeError(f"Expecting a sequence of neo.Block objects; instead got {type(val).__name__}")
+        
+        if len(val):
+            if not all(isinstance(v, neo.Block) for v in val):
+                raise TypeError("All elements of the sequence must be neo.Block obejcts")
             
+            self._blocks_[:] = sorted(list(val), key = lambda x: x.rec_datetime)
+            
+        else:
+            self._blocks_.clear()
+            
+        self._setup_from_blocks_()
+            
+    def _setup_from_blocks_(self):
+        if len(self._blocks_) == 0:
+            return
+        
+        self.begin = self._blocks_[0].rec_datetime
+        self.end = self._blocks_[-1].rec_datetime + datetime.timedelta(seconds = float(neoutils.block_duration(self._blocks_[-1])))
+        
+        self.beginFrame = 0
+        self.endFrame = sum([len(b.segments) for b in self._blocks_]) - 1
+        
+        block_protocols = list()
+        
+        try:
+            block_protocols = unique(list(filter(lambda x: isinstance(x, ElectrophysiologyProtocol), map(lambda x: getProtocol(x), self._blocks_))), idcheck=False)
+        except:
+            scipywarn("Cannot parse protocols from the Block objects")
+            traceback.print_exc()
+            
+        if len(block_protocols):
+            if len(self._protocols_):
+                protocols = self._protocols_ + block_protocols
+                self._protocols_ = unique(protocols, idcheck=False)
+            else:
+                self._protocols_[:] = block_protocols
+    
+    def addBlock(self, x:neo.Block):
+        """Adds a new block; blocks will be reordered by rec_datetime if necessary"""
+        if not isinstance(x, neo.Block):
+            raise TypeError(f"Expecting a neo.Block; instead, got {type().__name__}")
+        
+        protocol = getProtocol(x)
+        if isinstance(protocol, ElectrophysiologyProtocol):
+            if len(self._protocols_):
+                if protocol not in self.protocols:
+                    scipywarn("The block was acquired with a different protocol")
+            self._protocols_.append(protocol)
+            
+        blocks = self._blocks_ + [x]
+        self.blocks = blocks
+        
+    def removeBlock(self, index:typing.Union[int, str]):
+        """Removes a block by name or by its index in the episode blocks"""
+        if isinstance(index, str):
+            blocknames = [b.name for b in self._blocks_]
+            if index not in blocknames:
+                raise ValueError(f"Block name {index} not found in this episode")
+            
+            x = blocknames.index(index)
+            
+        elif isinstance(index, int):
+            if index>= len(self._blocks_):
+                raise ValueError(f"Invalid block index {index} for {len(self._blocks_)} blocks")
+            
+        else:
+            raise TypeError("")
+        
+        block = self._blocks_[index]
+        
+        del self._blocks_[index]
+        
+        protocol = getProtocol(block)
+        if isinstance(protocol, ElectrophysiologyProtocol):
+            if protocol in self._protocols_:
+                ndx = self._protocols_.index(protocol)
+                del self._protocols_[ndx]
+            
+        self._setup_from_blocks_() # will also update the protocols, 
+        # but best deal with these now
+        
+    def setFrameLimits(self, begin:int, end:int):
+        if abs(end-begin) != self.nFrames-1:
+            raise ValueError(f"Mismatch between number of frames {self.nFrames} and begin / end ({begin} / {end})")
+        
+        begin, end = min(begin, end), max(begin, end)
+        
+        self._beginFrame_ = begin
+        self._endFrame_ = end
+            
+    @property
+    def protocols(self) -> list:
+        return self._protocols_
+    
+    @property
+    def begin(self) -> datetime.datetime:
+        return self._begin_
+    
+    @begin.setter
+    def begin(self, val:datetime.datetime):
+        if not isinstance(val, datetime.datetime):
+            raise TypeError(f"Expecting a datetime.datetime; got {type(val).__name__} instead")
+        
+        if val > self.end:
+            scipywarn(f"Setting 'begin' ({val}) to be later than 'end' ({self.end})")
+            
+        self._begin_ = val
+    
+    @property
+    def end(self) -> datetime.datetime:
+        return self._end_
+    
+    @end.setter
+    def end(self, val:datetime.datetime):
+        if not isinstance(val, datetime.datetime):
+            raise TypeError(f"Expecting a datetime.datetime; got {type(val).__name__} instead")
+        
+        if val < self.begin:
+            scipywarn(f"Setting 'end' ({val}) to be earlier than 'begin' ({self.begin})")
+            
+        self._end_ = val
+    
+    @property
+    def beginFrame(self) -> int:
+        return self._beginFrame_
+    
+    @beginFrame.setter
+    def beginFrame(self, val:int):
+        if not isinstance(val, int):
+            raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
+        
+        if val < 0:
+            raise ValueError(f"Cannot set beginFrame to < 0 ({val})")
+        
+        if val > self.endFrame:
+            scipywarn(f"Setting 'beginFrame' ({val}) to a value larger than 'endFrame' ({self.endFrame})")
+            
+        self._beginFrame_ = val
+    
+    @property
+    def endFrame(self) -> int:
+        return self._endFrame_
+    
+    @endFrame.setter
+    def endFrame(self, val:int):
+        if not isinstance(val, int):
+            raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
+        
+        # nFrames = sum([len(b.segments) for b in self._blocks_])
+        
+        if len(self._blocks_) and val >= self.beginFrame + self.nFrames:
+            raise ValueError(f"'endFrame' ({val}) must be less than {self.nFrames} available frames")
+        
+        if val < 0:
+            raise ValueError(f"'endFrame' cannot be < 0; got {val} instead")
+        
+        if val < self.beginFrame:
+            scipywarn(f"Setting 'endFrame' ({val}) to a value less than 'beginFrame' ({self.beginFrame})")
+            
+        self._endFrame_ = val
+    
+    @property
+    def nFrames(self) -> int:
+        """Number of frames in this episode; """
+        if len(self._blocks_) == 0:
+            return 0
+        
+        # if len(self._blocks_) == 1:
+        #     return len(self._blocks_[0].segments)
+            # return self._endFrame_ - self._beginFrame_ + 1
+        
+        return sum([len(b.segments) for b in self._blocks_])
+    
+    @property
+    def nBlocks(self) -> int:
+        return len(self._blocks_)
             
     @property
     def type(self) -> RecordingEpisodeType:
@@ -1236,9 +1857,33 @@ class RecordingEpisode(Episode):
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
+    def __init__(self, name: typing.Optional[str] = None, **kwargs):
+        super().__init__(name, **kwargs)
+        
+    def __repr__(self):
+        ret = list()
+        ret.append(f"{self.__class__.__name__}(name='{self.name}'), with {len(self.episodes)} episodes:")
+        for k,e in enumerate(self.episodes):
+            ret.append(f"{k}: {e}")
+            
+        return "\n".join(ret)
+        
+    @property
+    def nFrames(self) -> int:
+        return sum([e.nFrames for e in self.episodes])
+        
     @property
     def pathways(self):
         return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
+        
+    @property
+    def blocks(self) -> typing.List[neo.Block]:
+        ret = list()
+        
+        for episode in self.episodes:
+            ret += episode.blocks
+            
+        return ret
         
     def addEpisode(self, episode: RecordingEpisode):
         if not isinstance(episode, RecordingEpisode):
@@ -1251,7 +1896,64 @@ class RecordingSchedule(Schedule):
                 raise TypeError("Expecting a sequence of Recording Episode objects")
             
             super().addEpisodes(episodes)
+            
+    def updateEpisodeFrames(self):
+        currentFrame = 0
+        for k, episode in enumerate(self.episodes):
+            episode.setFrameLimits(currentFrame, currentFrame + episode.nFrames - 1)
+            # episode.endFrame = currentFrame + episode.nFrames - 1
+            # episode.beginFrame = currentFrame
+            currentFrame = episode.endFrame + 1
+            
+            
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        # NOTE: 2024-07-20 18:48:45 
+        # although it inherits toHDF5 and fromHDF5 from 
+        # datatypes.Schedule, that method encodes datatype.Episode as h5py.Datasets
+        # whereas here we need to encode RecordingEpisodes as h5py.Group
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
         
+        attrs = {"name": getattr(self, "name")}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        h5io.toHDF5(self.episodes, entity, name="episodes", 
+                            oname="episodes", compression=compression,
+                            chunks=chunks, track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Dataset,
+                             attrs:typing.Optional[dict]=None, cache:dict={}):
+        
+        # NOTE: 2024-07-21 10:05:58 see NOTE: 2024-07-20 18:48:45 
+    
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        
+        episodes = h5io.fromHDF5(entity["episodes"], cache)
+        
+        return cls(name, episodes=episodes)
         
 class SynapticPathwayType(TypeEnum):
     """
@@ -1319,6 +2021,78 @@ class SynapticPathway:
     schedule: typing.Optional[RecordingSchedule] = None
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name": self.name,
+                 "pathwayType": self.pathwayType,
+                 "electrodeMode": self.electrodeMode,
+                 "clampMode": self.clampMode}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        h5io.toHDF5(self.stimulus, entity, name="stimulus", oname="stimulus",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.toHDF5(self.schedule, entity, name="schedule", oname="schedule",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.toHDF5(self.measurements, entity, name="measurements", oname="measurements",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.toHDF5(self.source, entity, name="source", oname="source",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        name = attrs["name"]
+        pathwayType = attrs["pathwayType"]
+        electrodeMode = attrs["electrodeMode"]
+        clampMode = attrs["clampMode"]
+        schedule = h5io.fromHDF5(entity["schedule"], cache=cache)
+        stimulus = h5io.fromHDF5(entity["stimulus"], cache=cache)
+        source = h5io.fromHDF5(entity["source"], cache=cache)
+        measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
+        
+        return cls(name=name, pathwayType=pathwayType, stimulus=stimulus,
+                   electrodeMode=electrodeMode, clampMode=clampMode,
+                   schedule=schedule, measurements=measurements, source=source)
+        
+        
+        
         
 @dataclass
 class LocationMeasure:
@@ -1817,7 +2591,6 @@ def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal],
     
     if isinstance(upward, (tuple, list)) and not all(upward[0] == v for v in upward):
         raise RuntimeError("All boxcars must be in the same direction")
-    
     if any(v.size > 1 for v in (d,u)): # more than one boxcar detected
         if boxduration is None:
             raise RuntimeError("More than one transition between levels has been detected and no constraints on boxcar width were specified ('boxduration')")
@@ -4638,6 +5411,10 @@ command signal.
         
 
 """
+    # should also pass an abf object; 
+    # find out adc names and units ⇒ recorded signal
+    # then for the DAC: dacNames, dacUnits ⇒ "command signal"
+
     recordsCurrent = False
     recordsPotential = False
     commandIsCurrent = False
@@ -4675,6 +5452,112 @@ command signal.
     
     return ClampMode.NoClamp
     
-# should also pass an abf object; 
-# find out adc names and units ⇒ recorded signal
-# then for the DAC: dacNames, dacUnits ⇒ "command signal"
+
+def trials_sequence_info(*args, return_sorted:bool=False):
+    """Reveals the temporal order of trials represented by neo.Block objects.
+
+    Returns:
+    • DataFrame with the following columns:
+        "name" - the Block `name` attribute
+        "time" - the Block `rec_datetime` attribute
+        "deltaMinutes" - the lapsed time, in minutes, from the start of the first Block
+        in `args`
+
+        This information is stored in ascending order of the `rec_datetime` values.
+    
+        Drug "incubation" periods may be inferred from the first difference of 
+        the "deltaMinutes" values.
+
+    • (optionally, and when `return_sorted` is True) a sequence with the 
+        neo.Block objects ordered by `rec_datetime`
+
+
+    """
+    if len(args) == 0:
+        return
+    
+    if isinstance(args, (tuple, list, collections.deque)) and len(args) == 1:
+        args = args[0]
+    
+    if not all(isinstance(v, neo.Block) for v in args):
+        raise TypeError("Expecting a sequence of neo.Block objects")
+    
+    sorted_blocks = sorted(args, key = lambda x: x.rec_datetime)
+    
+    trial_names_times = list(map(lambda x: (x.name, x.rec_datetime), sorted_blocks))
+    
+    deltaMinutes = list(map(lambda x: (x[1] - trial_names_times[0][1]).seconds/60, trial_names_times))
+    
+    ret = dict()
+    ret["name"], ret["time"] = zip(*trial_names_times)
+    ret["deltaMinutes"] = deltaMinutes
+    
+    if return_sorted:
+        return pd.DataFrame(ret), sorted_blocks
+    
+    return pd.DataFrame(ret)
+
+def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule:
+    """WARNING: Based on the naming of the trials (neo.Block objects).
+    
+    The names of the blocks must follow the format: aaa_<bbb_>*<xxxx>
+    
+    where a, b are any word character (a-zA-Z0-9_) and x is any digit.
+    
+    These names must be the values of the `name` attribute of the neo.Block
+    objects (and it is useful if these sme  names would also be the symbols bound
+    to these objects, in the workspace). 
+
+    Usually, this is achieved by applying the naming format AT ACQUISITION (e.g.,
+    in Clampex) so that the naming of the stored files is taken up by the neo
+    Block(s) created upon reading the files (and also assigned to tyhe workspace
+    symbol).
+    
+    The `aaa_<bbb_>*<xxxx>` format folows the rule in Clampex (hence operating 
+    with ABF files) but should be easily implemented in other aquisition software
+    such as Signal 5.
+    
+    Returns a RecordingSchedule.
+    
+
+    
+    """
+    if len(args) == 0:
+        return
+    
+    if isinstance(args, (tuple, list, collections.deque)) and len(args) == 1:
+        args = args[0]
+    
+    if not all(isinstance(v, neo.Block) for v in args):
+        raise TypeError("Expecting a sequence of neo.Block objects")
+
+    trials_seq , ordered_trials = trials_sequence_info(*args, return_sorted=True)
+    # this below: tuple (running index of trial, trial basename, trial suffix index)
+    # unique based on trial basename
+    episode_names_ndx = unique(list(map(lambda x: (x[0], *(strutils.get_int_sfx(x[1]))), enumerate(trials_seq.name))),
+                           key = lambda v: v[1])
+    
+    trials_ndx = list(map(lambda n: list(trials_seq.index[list(map(lambda x: n[1] in x, trials_seq.name))]), episode_names_ndx))
+    
+    episodes = list(map(lambda x: RecordingEpisode(name=x[0][1], blocks = [ordered_trials[k] for k in x[1]]),
+                        zip(episode_names_ndx, trials_ndx)))
+    
+    schedule = RecordingSchedule(episodes=episodes)
+        
+    return schedule
+    # return episodes
+    
+def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]):
+    if not isinstance(x, (neo.Block, pab.pyabf.ABF)):
+        raise TypeError(f"Expecting a neo.Block or a pyabf.ABF object; mstead, got {type(x).__name__}")
+    
+    if isinstance(x, neo.Block) and not pab.sourcedFromABF(x):
+        raise NotImplementedError("Only ABF protocols are supported for the moment")
+    
+    if isinstance(x, neo.Block) and getattr(x, "annotations", None) is None or getattr(x, "annotations", {}).get("abf_version", None) is None:
+        scipywarn(f"{type(x).__name__} object does not appear to have been created from an ABF file; cannot parse a protocol")
+        return 
+    return pab.ABFProtocol(x)
+    
+    
+    

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Synthetic imaging data (image simulations)
 """
 #### BEGIN core python modules
@@ -17,7 +22,7 @@ import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
 from scipy import optimize, signal, integrate
-import vigra
+from core.vigra_patches import vigra
 import neo
 #### END 3rd party modules
 

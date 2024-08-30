@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 '''
 Code for parsing and inspecting XML data.
 
@@ -6,6 +12,34 @@ Copyright (C) 2013 Riverbank Computing Limited,
 Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
 
 2016-08-13 09:29:11 - file created
+
+NOTE: here are the values of the different node types in xml.dom:
+
+xml.dom.Node.ELEMENT_NODE                   1
+
+xml.dom.Node.ATTRIBUTE_NODE                 2
+
+xml.dom.Node.TEXT_NODE                      3
+
+xml.dom.Node.CDATA_SECTION_NODE             4
+
+xml.dom.Node.ENTITY_REFERENCE_NODE          5
+
+xml.dom.Node.ENTITY_NODE                    6
+
+xml.dom.Node.PROCESSING_INSTRUCTION_NODE    7
+
+xml.dom.Node.COMMENT_NODE                   8
+
+xml.dom.Node.DOCUMENT_NODE                  9
+
+xml.dom.Node.DOCUMENT_TYPE_NODE            10
+
+xml.dom.Node.DOCUMENT_FRAGMENT_NODE        11
+
+xml.dom.Node.NOTATION_NODE                 12
+
+
 '''
 
 # 2016-11-09 21:44:49
@@ -13,6 +47,7 @@ Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
 from __future__ import print_function
 
 import sys, os, traceback, inspect, numbers
+import typing
 from collections import (namedtuple, OrderedDict, )
 
 import xml.parsers.expat
@@ -151,11 +186,26 @@ class XmlSyntaxHighlighter(QtGui.QSyntaxHighlighter):
             else:
                 break
             
-def getChildren(element):
+def getChildren(element, eltype:int=1) -> typing.Generator:
     """Compensate for the loss of xlm.etree.Element.getchildren() in Python 3.9.7
     """
-    chiter = element.iter()
-    return (c for c in next(chiter))
+    if eltype not in range(1,13):
+        raise ValueError(f"'eltype' expected to be an int in the range 1⋯13; instead, got {eltype}")
+    
+    children = element.childNodes
+    if len(children):
+        yield from (c for c in children if c.nodeType == eltype)
+        # return (c for c in children if c.nodeType == eltype)
+    # chiter = element.iter()
+    # return (c for c in next(chiter))
+    
+def elementToDict(node, eltype:int = 1):
+    if eltype not in range(1,13):
+        raise ValueError(f"'eltype' expected to be an int in the range 1⋯13; instead, got {eltype}")
+    ret = dict()
+    ret["__attributes__"] = attributesToDict(node)
+    ret.update(dict(map(lambda x: (x.nodeName, elementToDict(x)), getChildren(node, eltype))))
+    return ret
 
 def attributesToDict(node):
     """Returns a dictionary with the attributes names/values
@@ -463,7 +513,7 @@ def pythonDataToXMLElement(datakey, datavalue, parentDoc, parentNode, maxElement
     import numpy as np
     import neo
     #from patchneo import neo
-    import vigra
+    from core.vigra_patches import vigra
     import datatypes  
     
     k_attribs = list()

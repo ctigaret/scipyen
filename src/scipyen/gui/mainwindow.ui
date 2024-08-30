@@ -47,7 +47,7 @@
      <x>0</x>
      <y>0</y>
      <width>1159</width>
-     <height>30</height>
+     <height>28</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -65,7 +65,8 @@
       <string>&amp;Import</string>
      </property>
      <property name="icon">
-      <iconset theme="document-import"/>
+      <iconset theme="document-import">
+       <normaloff>.</normaloff>.</iconset>
      </property>
      <addaction name="actionImport_PrairieView_data"/>
     </widget>
@@ -92,7 +93,8 @@
       <string>&amp;Selected Variable</string>
      </property>
      <property name="icon">
-      <iconset theme="object"/>
+      <iconset theme="object">
+       <normaloff>.</normaloff>.</iconset>
      </property>
      <addaction name="actionView_Data_New_Window"/>
      <addaction name="actionView_Data"/>
@@ -113,7 +115,8 @@
       <string>Code editor</string>
      </property>
      <property name="icon">
-      <iconset theme="editor"/>
+      <iconset theme="editor">
+       <normaloff>.</normaloff>.</iconset>
      </property>
      <addaction name="actionChoose_code_editor"/>
      <addaction name="actionUse_system_s_default_code_editor"/>
@@ -531,7 +534,8 @@ NOTE: you can click anywhere in the row to select</string>
           <string>&amp;Select working directory</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open-folder"/>
+          <iconset theme="document-open-folder">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -599,7 +603,8 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Open System Terminal</string>
          </property>
          <property name="icon">
-          <iconset theme="scriptnew"/>
+          <iconset theme="scriptnew">
+           <normaloff>.</normaloff>.</iconset>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -863,7 +868,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>&amp;Save ...</string>
    </property>
    <property name="toolTip">
-    <string>Save (export data)</string>
+    <string>Save</string>
    </property>
    <property name="statusTip">
     <string>Save (export data)</string>
@@ -906,7 +911,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionImport_PrairieView_data">
    <property name="icon">
-    <iconset theme="document-import"/>
+    <iconset theme="document-import">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>PrairieView data</string>
@@ -956,7 +962,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionReload_Plugins">
    <property name="icon">
-    <iconset theme="plugins"/>
+    <iconset theme="plugins">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>&amp;Reload Plugins</string>
@@ -1139,7 +1146,8 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionOpen_System_Terminal">
    <property name="icon">
-    <iconset theme="scriptnew"/>
+    <iconset theme="scriptnew">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>Open System Terminal</string>

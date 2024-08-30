@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """ Various utilities for handling objects and data structures in the neo package.
 NOTE: 2020-10-07 09:45:08
 Code split and redistributed in core.neoutils, ephys.ephys and core.triggerprotocols
@@ -159,6 +164,7 @@ import numpy as np
 import scipy
 import quantities as pq
 import neo
+import pandas as pd
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
     
@@ -269,7 +275,6 @@ def copy_to_segment(obj:neo.core.dataobject.DataObject, new_seg:neo.Segment):
 def sweep_duration(data:neo.Segment):
     return max(s.duration for s in data.analogsignals + data.irregularlysampledsignals + list(st for st in data.spiketrains))
     
-    
 def segment_start(data:neo.Segment):
     """Returns the minimum of t_start for all signals and spiketrains in a segment.
     
@@ -284,6 +289,16 @@ def segment_start(data:neo.Segment):
     return min([s.t_start for s in data.analogsignals] + 
                [s.t_start for s in data.spiketrains] +
                [min(s.times) for s in data.irregularlysampledsignals])
+
+def block_duration(x:neo.Block):
+    """Returns the duration of a neo.Block. 
+    This is the relative time between the start of the first and last sweep in 
+    the trial, plus the duration of the last trial.
+    
+    NOTE: This is calculated based on the data stored inthe neo.Block, 
+    irrespective of the protocol.
+    """
+    return segment_start(x.segments[-1]) - segment_start(x.segments[0]) + sweep_duration(x.segments[-1])
 
 @singledispatch
 def get_domain_name(obj):
@@ -310,7 +325,7 @@ def _(obj):
 
 @singledispatch
 def set_relative_time_start(data, t = 0):
-    # TODO: dispatch for neo.ImageSequence; neo.Group; neo.ChannelView, SpikeTrainList
+    # TODO: dispatch for neo.ImageSequence; neo.Group; neo.ChannelView
     raise NotImplementedError
 
 @set_relative_time_start.register(neo.Epoch)
@@ -436,6 +451,8 @@ def _(data, t = 0):
     
     ret.spiketrains = SpikeTrainList(items = spiketrains)
     
+    return ret
+    
 @set_relative_time_start.register(neo.Block)
 def _(data, t = 0):
     """Set the components in each segment to the same t_start.
@@ -452,7 +469,11 @@ def _(data, t = 0):
     
     """
     ret = make_neo_object(data)
-    ret.segments = [set_relative_time_start(s, t) for s in data.segments]
+    
+    # NOTE: 2024-07-27 23:38:18
+    # new neo API ⌢
+    # ret.segments = [set_relative_time_start(s, t) for s in data.segments]
+    ret.segments.extend([set_relative_time_start(s, t) for s in data.segments])
     return ret
 
 @set_relative_time_start.register(tuple)
@@ -581,9 +602,17 @@ def _(obj,/,**kwargs):
     factory_params.update(factory_kwarg_params)
     
     
-    factory = partial(type(obj), *factory_pos_params, **factory_params)
+    # factory = partial(type(obj), *factory_pos_params, **factory_params)
+    # return factory()
+
+    # NOTE: 2024-06-18 08:52:02
+    # more recent verison of neo library enforce against the use of int as annotations keys
     
-    return factory()
+    factory = partial(type(obj), *factory_pos_params)
+    
+    ret = factory()
+    ret.annotations.update(**factory_params)
+    return ret
 
 @make_neo_object.register(neo.core.spiketrainlist.SpikeTrainList)
 def _(obj,/,**kwargs):

@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 """Plot utitilies
 Functions for plotting with matplotlib and seaborn
 """
@@ -33,7 +38,7 @@ import pandas as pd
 import neo
 from scipy import stats
 import quantities as pq
-import vigra
+from core.vigra_patches import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -46,7 +51,7 @@ from gui import (scipyen_colormaps, guiutils)
 # import seaborn as sb
 
 # TODO 2019-09-06 13:08:18
-# set up a clever way to offer there plottign functions ans their arguments in 
+# set up a clever way to offer these plotting functions and their arguments in 
 # a gui dialog
 
 mpl_plot_functions = dict()

@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 """Provides two IPython (Jupyter) Qt-based consoles for the Scipyen application.
 
 1) An "internal" Jupyter qt console, running an in-process IPython kernel for 
@@ -70,6 +75,8 @@ from jupyter_client.localinterfaces import is_local_ip
 from jupyter_client.consoleapp import (
         JupyterConsoleApp, app_aliases, app_flags,
     )
+
+from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
 
 from tornado import ioloop
 from tornado.queues import Queue
@@ -325,7 +332,13 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         # self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
         self.reset_shortcut.activated.connect(self.slot_resetConsole)
         
+        self.kind = "plain"
         self.custom_page_control = QtWidgets.QPlainTextEdit()
+        # self.kind = "rich"
+        # self.custom_page_control = QtWidgets.QTextEdit()
+        
+        if not hasattr(self, "_name_to_svg_map"):
+            self._name_to_svg_map = dict()
 
         ScipyenConfigurable.__init__(self)
         

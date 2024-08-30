@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """ Scipyen configuration module to manage and store GUI- and non-GUI-related 
 configuration data (a.k.a "settings") specific to Scipyen, beyond the lifetime
 of a running Scipyen session.
@@ -111,7 +115,7 @@ from traitlets.utils.bunch import Bunch
 import traitlets.config
 from .traitcontainers import DataBag
 from core import (traitutils, strutils)
-from core.prog import safeWrapper
+from core.prog import (safeWrapper, printStyled)
 from core.workspacefunctions import user_workspace
 from core.quantities import(quantity2str, str2quantity)
 from iolib.jsonio import (object2JSON, json2python)
@@ -611,7 +615,8 @@ def qSettingsGroupPfx(win:typing.Union[QMainWindow, QWidget, Figure]):
 def saveQSettingsKey(qsettings:QSettings, gname:str, pfx:str, key:str, val:typing.Any):
     if len(gname.strip()) == 0:
         gname = "General"
-    key_name = "%s%s" % (pfx, key)
+    # key_name = "%s%s" % (pfx, key)
+    key_name = f"{pfx}{key}"
     # print(f"saveQSettingsKey group: {gname}, key: {key}, value: {val} ({type(val).__name__})")
     qsettings.beginGroup(gname)
     qsettings.setValue(key_name, val)
@@ -855,6 +860,8 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
         qtcfg.update(getattr(win, "_ownqtcfg", Bunch()))
     
     # print(f"\tsyncQtSettings {win.__class__.__name__}, {win.windowTitle()}:\n\t{qtcfg}")
+    # if save:
+    #     print(f"\n\tsyncQtSettings {win.__class__.__name__}, {win.windowTitle()}:")
 
     for confname, getset in qtcfg.items():
         # NOTE: 2021-08-28 21:59:43
@@ -864,7 +871,8 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
         # a function or method, with a '__call__' attribute!)
         #print("\tconfname = %s" % confname)
         gettername = getset.get("getter", None)
-        #print("\t\tgettername = %s" % gettername)
+        # if save: 
+        #     print(f"\t\tgettername = {gettername}")
 
         if not isinstance(gettername, str) or len(gettername.strip()) == 0:
             continue

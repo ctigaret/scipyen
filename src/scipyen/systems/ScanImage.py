@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 #
 # TODO Code linking to ScanImage ?!?
 
@@ -17,7 +22,7 @@ import threading
 import numpy as np
 import quantities as pq
 import neo
-import vigra
+from core.vigra_patches import vigra
 from qtpy import (QtCore, QtWidgets, QtGui,)
 from qtpy.QtCore import Signal, Slot
 #from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml

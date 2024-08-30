@@ -1,0 +1,4009 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>LSCaTWindow</class>
+ <widget class="QMainWindow" name="LSCaTWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>834</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>LSCaT</string>
+  </property>
+  <property name="dockOptions">
+   <set>QMainWindow::AllowNestedDocks|QMainWindow::AllowTabbedDocks|QMainWindow::AnimatedDocks|QMainWindow::VerticalTabs</set>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QGridLayout" name="gridLayout_20">
+    <item row="0" column="0">
+     <layout class="QVBoxLayout" name="verticalLayout_12">
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_5">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_8">
+          <item>
+           <widget class="QLabel" name="scanDataVarNameLabel">
+            <property name="toolTip">
+             <string>Name of the variable in the workspace</string>
+            </property>
+            <property name="frameShape">
+             <enum>QFrame::NoFrame</enum>
+            </property>
+            <property name="frameShadow">
+             <enum>QFrame::Plain</enum>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+            <property name="textInteractionFlags">
+             <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer_4">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_9">
+          <item>
+           <widget class="QLabel" name="label_60">
+            <property name="text">
+             <string>Name:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="scanDataNameLineEdit">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>10</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="toolTip">
+             <string>Data name</string>
+            </property>
+            <property name="statusTip">
+             <string>Data name</string>
+            </property>
+            <property name="whatsThis">
+             <string>Data name</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_10">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_24">
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_22">
+            <item>
+             <widget class="QLabel" name="sourceIDLabel">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>Source:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="sourceIDLineEdit">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <horstretch>10</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="clearButtonEnabled">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_20">
+            <item>
+             <widget class="QLabel" name="label_56">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>Cell:</string>
+              </property>
+              <property name="buddy">
+               <cstring>cellLineEdit</cstring>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="cellLineEdit">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="toolTip">
+               <string>Cell name</string>
+              </property>
+              <property name="statusTip">
+               <string>Cell name</string>
+              </property>
+              <property name="whatsThis">
+               <string>Cell name</string>
+              </property>
+              <property name="clearButtonEnabled">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_21">
+            <item>
+             <widget class="QLabel" name="label_57">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>Field:</string>
+              </property>
+              <property name="buddy">
+               <cstring>fieldLineEdit</cstring>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="fieldLineEdit">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="toolTip">
+               <string>Field name</string>
+              </property>
+              <property name="statusTip">
+               <string>Field name</string>
+              </property>
+              <property name="whatsThis">
+               <string>Field name</string>
+              </property>
+              <property name="clearButtonEnabled">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_25">
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_23">
+            <item>
+             <widget class="QLabel" name="label_62">
+              <property name="text">
+               <string>Age:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="ageLineEdit">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_18">
+            <item>
+             <widget class="QLabel" name="label_61">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="text">
+               <string>Sex:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="sexComboBox">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>80</width>
+                <height>0</height>
+               </size>
+              </property>
+              <property name="currentText">
+               <string/>
+              </property>
+              <property name="maxVisibleItems">
+               <number>3</number>
+              </property>
+              <property name="maxCount">
+               <number>3</number>
+              </property>
+              <property name="insertPolicy">
+               <enum>QComboBox::NoInsert</enum>
+              </property>
+              <property name="minimumContentsLength">
+               <number>3</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_19">
+              <item>
+               <widget class="QLabel" name="genotypeLabel">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="text">
+                 <string>Genotype:</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QComboBox" name="genotypeComboBox">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>80</width>
+                  <height>0</height>
+                 </size>
+                </property>
+                <property name="editable">
+                 <bool>true</bool>
+                </property>
+                <property name="maxVisibleItems">
+                 <number>50</number>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer_2">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item row="1" column="0">
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="ScanDataTab">
+       <attribute name="title">
+        <string>Data</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout_7">
+        <item row="0" column="0">
+         <layout class="QHBoxLayout" name="horizontalLayout_27">
+          <item>
+           <layout class="QVBoxLayout" name="verticalLayout_11">
+            <item>
+             <widget class="QGroupBox" name="sceneGroupBox">
+              <property name="title">
+               <string>Scene</string>
+              </property>
+              <layout class="QGridLayout" name="gridLayout_6">
+               <item row="0" column="0">
+                <layout class="QGridLayout" name="gridLayout_2">
+                 <item row="0" column="0">
+                  <widget class="QCheckBox" name="sceneContourCheckBox">
+                   <property name="toolTip">
+                    <string>Calculate &amp; show structure contour</string>
+                   </property>
+                   <property name="text">
+                    <string>Contour:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QDoubleSpinBox" name="contourThresholdDoubleSpinBox">
+                   <property name="toolTip">
+                    <string>Contour threshold</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QCheckBox" name="showScanlineCheckBox">
+                   <property name="toolTip">
+                    <string>Show scan line trajectory</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>Show scan line trajectory in the scene and generates scanline profile from scene data.</string>
+                   </property>
+                   <property name="text">
+                    <string>Scanline profiles</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="1" column="0">
+                <layout class="QHBoxLayout" name="horizontalLayout_26">
+                 <item>
+                  <widget class="QLabel" name="label">
+                   <property name="text">
+                    <string>Channel(s):</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QComboBox" name="sceneDisplayChannelComboBox">
+                   <property name="toolTip">
+                    <string>Select scene channel for display</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select channels to be displayed in separate windows, &lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;unless&lt;/span&gt; scene is a multi-band image. ROI calculations are peformed &lt;span style=&quot; font-weight:600;&quot;&gt;only&lt;/span&gt; in the channel selected above.&lt;/p&gt;&lt;p&gt;This has no effect for multi-band scene images.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="framesGroupBox">
+              <property name="title">
+               <string>Frames</string>
+              </property>
+              <layout class="QGridLayout" name="gridLayout_32">
+               <item row="0" column="0">
+                <layout class="QHBoxLayout" name="horizontalLayout">
+                 <property name="spacing">
+                  <number>0</number>
+                 </property>
+                 <item>
+                  <widget class="QToolButton" name="insertFramesBtn">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
+                   </property>
+                   <property name="toolTip">
+                    <string>Insert data frame(s)</string>
+                   </property>
+                   <property name="text">
+                    <string/>
+                   </property>
+                   <property name="icon">
+                    <iconset theme="document-import">
+                     <normaloff>.</normaloff>.</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="exportFramesBtn">
+                   <property name="enabled">
+                    <bool>false</bool>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
+                   </property>
+                   <property name="toolTip">
+                    <string>Export frames</string>
+                   </property>
+                   <property name="text">
+                    <string/>
+                   </property>
+                   <property name="icon">
+                    <iconset theme="document-export">
+                     <normaloff>.</normaloff>.</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="removeCurrentFrameBtn">
+                   <property name="enabled">
+                    <bool>true</bool>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
+                   </property>
+                   <property name="toolTip">
+                    <string>Remove current data frame</string>
+                   </property>
+                   <property name="text">
+                    <string/>
+                   </property>
+                   <property name="icon">
+                    <iconset theme="remove">
+                     <normaloff>.</normaloff>.</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QToolButton" name="removeFramesBtn">
+                   <property name="enabled">
+                    <bool>true</bool>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>24</width>
+                     <height>24</height>
+                    </size>
+                   </property>
+                   <property name="toolTip">
+                    <string>Remove specified data frames</string>
+                   </property>
+                   <property name="text">
+                    <string/>
+                   </property>
+                   <property name="icon">
+                    <iconset theme="edit-delete">
+                     <normaloff>.</normaloff>.</iconset>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+               <item row="1" column="0">
+                <layout class="QGridLayout" name="gridLayout">
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="label_2">
+                   <property name="text">
+                    <string>Channel(s)</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QComboBox" name="scanDisplayChannelCombobox">
+                   <property name="toolTip">
+                    <string>Select frame channels for display</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This selects frame channels for display, &lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;unless&lt;/span&gt; frames are multi-band images. Calcium transients computation is still performed on data ROIs defined in the channels as selected in the &amp;quot;EPSCaT&amp;quot; tab.&lt;/p&gt;&lt;p&gt;This has no effect on multi-band frame images.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="label_3">
+                   <property name="text">
+                    <string>Protocol:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QComboBox" name="protocolSelectionComboBox">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                     <horstretch>1</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="toolTip">
+                    <string>Filter frames by protocol</string>
+                   </property>
+                   <property name="whatsThis">
+                    <string>Show only frames with the same protocol name.</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="analysisUnitsGroupBox">
+            <property name="title">
+             <string>Cursors and Analysis Units</string>
+            </property>
+            <property name="flat">
+             <bool>false</bool>
+            </property>
+            <property name="checkable">
+             <bool>false</bool>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_5">
+             <item row="0" column="0">
+              <layout class="QHBoxLayout" name="horizontalLayout_4">
+               <item>
+                <widget class="QLabel" name="label_36">
+                 <property name="text">
+                  <string>C&amp;ursor #:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>selectCursorSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QSpinBox" name="selectCursorSpinBox">
+                 <property name="toolTip">
+                  <string>Current Cursor index</string>
+                 </property>
+                 <property name="wrapping">
+                  <bool>true</bool>
+                 </property>
+                 <property name="frame">
+                  <bool>true</bool>
+                 </property>
+                 <property name="specialValueText">
+                  <string comment="No landmark" extracomment="No landmark selected">none</string>
+                 </property>
+                 <property name="correctionMode">
+                  <enum>QAbstractSpinBox::CorrectToPreviousValue</enum>
+                 </property>
+                 <property name="minimum">
+                  <number>-1</number>
+                 </property>
+                 <property name="maximum">
+                  <number>1000</number>
+                 </property>
+                 <property name="value">
+                  <number>-1</number>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="label_58">
+                 <property name="text">
+                  <string>Name:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="analysisUnitNameLineEdit">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>64</width>
+                   <height>0</height>
+                  </size>
+                 </property>
+                 <property name="tabletTracking">
+                  <bool>true</bool>
+                 </property>
+                 <property name="toolTip">
+                  <string>Name of current ROI</string>
+                 </property>
+                 <property name="clearButtonEnabled">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="defineAnalysisUnitCheckBox">
+                 <property name="toolTip">
+                  <string>Cursor associates an Analysis Unit</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Associate currently selected cursor with an Analysis Unit</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Toggle: &lt;/p&gt;&lt;p&gt;ON to associate an Analysis Unit with the currently selected verticalcursor in Scans&lt;/p&gt;&lt;p&gt;OFF to break this association and remove the Analysis Unit.&lt;/p&gt;&lt;p&gt;NOTE: This check box does not affect the association between data and the &amp;quot;default&amp;quot; analysis unit, defined on the entire image.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>Unit</string>
+                 </property>
+                 <property name="checkable">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="1" column="0">
+              <layout class="QHBoxLayout" name="horizontalLayout_11">
+               <item>
+                <widget class="QLabel" name="label_51">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="text">
+                  <string>&amp;x:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>cursorXposDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="cursorXposDoubleSpinBox">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="toolTip">
+                  <string>X</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Cursors X coordinate</string>
+                 </property>
+                 <property name="accelerated">
+                  <bool>true</bool>
+                 </property>
+                 <property name="correctionMode">
+                  <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
+                 </property>
+                 <property name="maximum">
+                  <double>100000000000.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="label_53">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="text">
+                  <string>x wi&amp;ndow:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>cursorXwindow</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="cursorXwindow">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="toolTip">
+                  <string>X window</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Cursor X window</string>
+                 </property>
+                 <property name="accelerated">
+                  <bool>true</bool>
+                 </property>
+                 <property name="correctionMode">
+                  <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
+                 </property>
+                 <property name="maximum">
+                  <double>100000000000.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QComboBox" name="unitTypeComboBox">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>10</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="toolTip">
+                  <string>Unit type</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Unit type</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Unit ype</string>
+                 </property>
+                 <property name="editable">
+                  <bool>true</bool>
+                 </property>
+                 <property name="maxVisibleItems">
+                  <number>50</number>
+                 </property>
+                 <property name="insertPolicy">
+                  <enum>QComboBox::InsertAlphabetically</enum>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="2" column="0">
+              <layout class="QHBoxLayout" name="horizontalLayout_12">
+               <item>
+                <widget class="QLabel" name="label_52">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="text">
+                  <string>&amp;y:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>cursorYposDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="cursorYposDoubleSpinBox">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="toolTip">
+                  <string>Y</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Cursor Y coordinate</string>
+                 </property>
+                 <property name="accelerated">
+                  <bool>true</bool>
+                 </property>
+                 <property name="correctionMode">
+                  <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
+                 </property>
+                 <property name="maximum">
+                  <double>100000000000.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLabel" name="label_54">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="text">
+                  <string>&amp;y window:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>cursorYwindow</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="cursorYwindow">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="toolTip">
+                  <string>Y window</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Cursor Y window</string>
+                 </property>
+                 <property name="accelerated">
+                  <bool>true</bool>
+                 </property>
+                 <property name="correctionMode">
+                  <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
+                 </property>
+                 <property name="maximum">
+                  <double>100000000000.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="descriptorsEditorBtn">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                   <horstretch>10</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="toolTip">
+                  <string>Edit Analysis Unit descriptors</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Edit Analysis Unit descriptors</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Edit Analysis Unit descriptors</string>
+                 </property>
+                 <property name="text">
+                  <string>Descriptors</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="3" column="0">
+              <layout class="QHBoxLayout" name="horizontalLayout_13">
+               <item>
+                <widget class="QGroupBox" name="groupBox_2">
+                 <property name="title">
+                  <string>Export</string>
+                 </property>
+                 <layout class="QGridLayout" name="gridLayout_3">
+                  <item row="0" column="0">
+                   <layout class="QHBoxLayout" name="horizontalLayout_5">
+                    <item>
+                     <widget class="QPushButton" name="extractUnitsButton">
+                      <property name="sizePolicy">
+                       <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                        <horstretch>0</horstretch>
+                        <verstretch>0</verstretch>
+                       </sizepolicy>
+                      </property>
+                      <property name="toolTip">
+                       <string>Export all analysis units</string>
+                      </property>
+                      <property name="statusTip">
+                       <string>Export all analysis units</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Export all analysis units.&lt;/p&gt;&lt;p&gt;If &amp;quot;Average by protocol&amp;quot; in ON, all frames with the same protocol will be averaged&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="text">
+                       <string>All Units</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="extractCurrentUnitButton">
+                      <property name="toolTip">
+                       <string>Export analysis unit data as a ScanData object</string>
+                      </property>
+                      <property name="statusTip">
+                       <string>Export selected analysis unit as a ScanData object.</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Export selected analysis unit as a ScanData object.&lt;/p&gt;&lt;p&gt;The selected analysis unit must be associated with a landmark (i.e., a vertical cursor in the scans image).&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;The default data-wide AnalysisUnit need NOT be exported (as it is the same as the entire ScanData object).&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="text">
+                       <string>Selected Unit</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QCheckBox" name="averageUnitsCheckBox">
+                      <property name="toolTip">
+                       <string>Average unit data frames by protocol</string>
+                      </property>
+                      <property name="statusTip">
+                       <string>Average unit data frames by protocol</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Average unit data frames by protocol.&lt;/p&gt;&lt;p&gt;When checked, unit data are averaged across all frames with the same protocol.&lt;/p&gt;&lt;p&gt;This applies both to exporting AnalysisUnits and to Reporting analysis results.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="text">
+                       <string>Average</string>
+                      </property>
+                      <property name="checked">
+                       <bool>true</bool>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QCheckBox" name="includeFailuresCheckBox">
+                      <property name="toolTip">
+                       <string>Include failures</string>
+                      </property>
+                      <property name="statusTip">
+                       <string>When checked, frames containing EPSCaT failures are included in the average</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string extracomment="When checked, failures are included from the average. Otherwise, average includes all trials.">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When checked, frames containing EPSCaT failures are included in the average.&lt;/p&gt;&lt;p&gt;For compound EPSCaTs, the adjacent dropbox (combo box) sets which EPSCaT component failure will result in this frame's exclusion.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="text">
+                       <string>Failures</string>
+                      </property>
+                      <property name="checked">
+                       <bool>true</bool>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                  <item row="1" column="0">
+                   <layout class="QHBoxLayout" name="horizontalLayout_10">
+                    <item>
+                     <widget class="QLabel" name="label_59">
+                      <property name="text">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;Fail/Success&lt;br&gt;Conditions:&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QComboBox" name="selectFailureTestComponentComboBox">
+                      <property name="toolTip">
+                       <string extracomment="EPSCaT component where Failure/Success choice applies">EPSCaT component where Failure/Success choice applies</string>
+                      </property>
+                      <property name="statusTip">
+                       <string>EPSCaT component where Failure/Success choice applies</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select which EPSCaT component flagged as &amp;quot;fail&amp;quot; will cause the frame to be rejected from average, when &amp;quot;Average&amp;quot; is ON and Failures is OFF.&lt;/p&gt;&lt;p&gt;There are three options:&lt;/p&gt;&lt;p&gt;1. &amp;quot;any&amp;quot;: the frame will be rejected in any component in a compound EPSCaT is flagged as a &amp;quot;fail&amp;quot;.&lt;/p&gt;&lt;p&gt;2.  &amp;quot;all&amp;quot;: the frame will be rejected if all components in the compound EPSCaT are flagged as &amp;quot;fail&amp;quot;&lt;/p&gt;&lt;p&gt;3. &amp;quot;index&amp;quot;: the frame will be rejected if the EPSCaT components with indices input below are flagged as &amp;quot;fail&amp;quot;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QLineEdit" name="testEPSCaTComponentInputLineEdit">
+                      <property name="toolTip">
+                       <string notr="true">Index of EPSCaT components used to test for frame exclusion from average.</string>
+                      </property>
+                      <property name="statusTip">
+                       <string>Index of EPSCaT components used to test for frame exclusion from average.</string>
+                      </property>
+                      <property name="whatsThis">
+                       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Index (or indices) of EPSCaT components used to test for frame exclusion from average.&lt;/p&gt;&lt;p&gt;Enter one or several unique integers separated by semi-colon. The integers must be &amp;gt;=0 and must resolve to valid EPSCaT component indices (zero-based, i.e. first component has index 0).&lt;/p&gt;&lt;p&gt;The values are used when &amp;quot;index&amp;quot; is selected in the combo box above.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                      </property>
+                      <property name="clearButtonEnabled">
+                       <bool>true</bool>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QGroupBox" name="groupBox">
+                 <property name="title">
+                  <string>Analyse</string>
+                 </property>
+                 <layout class="QVBoxLayout" name="verticalLayout_9">
+                  <item>
+                   <widget class="QPushButton" name="analyseRoiBtn">
+                    <property name="toolTip">
+                     <string>Analyse current Unit in current frame</string>
+                    </property>
+                    <property name="statusTip">
+                     <string>Analyse current Unit in current frame</string>
+                    </property>
+                    <property name="whatsThis">
+                     <string>Analyse current Unit in current frame</string>
+                    </property>
+                    <property name="text">
+                     <string>This Frame</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QPushButton" name="analyseRoiInSpecifedFrames">
+                    <property name="toolTip">
+                     <string>Analyse current Unit in frames selected by protocol</string>
+                    </property>
+                    <property name="statusTip">
+                     <string>Analyse current Unit in frames selected by protocol</string>
+                    </property>
+                    <property name="whatsThis">
+                     <string>Analyse current Unit in frames selected by protocol</string>
+                    </property>
+                    <property name="text">
+                     <string>Selected Frames</string>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="protocolsTab">
+       <attribute name="title">
+        <string>Protocols</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout_12">
+        <item row="0" column="0">
+         <layout class="QVBoxLayout" name="verticalLayout_13">
+          <item>
+           <widget class="QTableWidget" name="protocolTableWidget">
+            <property name="toolTip">
+             <string>Trigger protocols</string>
+            </property>
+            <property name="statusTip">
+             <string>Trigger protocols</string>
+            </property>
+            <property name="whatsThis">
+             <string>Trigger protocols</string>
+            </property>
+            <property name="alternatingRowColors">
+             <bool>true</bool>
+            </property>
+            <property name="gridStyle">
+             <enum>Qt::NoPen</enum>
+            </property>
+            <property name="columnCount">
+             <number>6</number>
+            </property>
+            <attribute name="horizontalHeaderCascadingSectionResizes">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="horizontalHeaderMinimumSectionSize">
+             <number>100</number>
+            </attribute>
+            <attribute name="horizontalHeaderDefaultSectionSize">
+             <number>100</number>
+            </attribute>
+            <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="verticalHeaderMinimumSectionSize">
+             <number>15</number>
+            </attribute>
+            <attribute name="verticalHeaderDefaultSectionSize">
+             <number>20</number>
+            </attribute>
+            <column>
+             <property name="text">
+              <string>Name</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Presynaptic</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Postsynaptic</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Photostimulation</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Imaging delay</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>Frames</string>
+             </property>
+            </column>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_29">
+            <item>
+             <widget class="QPushButton" name="detectProtocolsPushButton">
+              <property name="toolTip">
+               <string>Detect protocols</string>
+              </property>
+              <property name="statusTip">
+               <string>Detect protocols</string>
+              </property>
+              <property name="whatsThis">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Detect triggers from TTL-like signals embedded in the electrophysiology data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="text">
+               <string>Detect</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="importProtocolsPushButton">
+              <property name="toolTip">
+               <string>Import from another ScanData object</string>
+              </property>
+              <property name="statusTip">
+               <string>Import from another ScanData object</string>
+              </property>
+              <property name="whatsThis">
+               <string>Import from another ScanData object</string>
+              </property>
+              <property name="text">
+               <string>Import</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="clearProtocolsPushButton">
+              <property name="toolTip">
+               <string>Clear protocols</string>
+              </property>
+              <property name="statusTip">
+               <string>Clear protocols</string>
+              </property>
+              <property name="whatsThis">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes all Trigger Protocols and Trigger Events embedded in the data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              </property>
+              <property name="text">
+               <string>Clear</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_3">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="filterOptionsPage">
+       <attribute name="title">
+        <string>Filters</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout_4">
+        <item row="0" column="0">
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>Sca&amp;n line interpolator</string>
+            </property>
+            <property name="buddy">
+             <cstring>scanLineIterpOrderSpinBox</cstring>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="scanLineIterpOrderSpinBox">
+            <property name="toolTip">
+             <string>Order of the scan line spline iterpolator</string>
+            </property>
+            <property name="whatsThis">
+             <string>Specifies the order of the spline interpolator used to calculate the profile of the scan line in the scene. 
+Integral values are in the interval [0,5]
+ </string>
+            </property>
+            <property name="maximum">
+             <number>5</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="horizontalSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_63">
+            <property name="toolTip">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="statusTip">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="whatsThis">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="text">
+             <string>Uncaging artifact size:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="uncagingArtifactWidth_spinBox">
+            <property name="toolTip">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="statusTip">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="whatsThis">
+             <string>Uncaging artifact size (pixels)</string>
+            </property>
+            <property name="maximum">
+             <number>10</number>
+            </property>
+            <property name="value">
+             <number>2</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_64">
+            <property name="text">
+             <string>Background begin/end:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="artifactBackgroundBeginDoubleSpinBox"/>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="artifactBackgroundEndDoubleSpinBox">
+            <property name="singleStep">
+             <double>0.010000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.050000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="blankUncagingArtifactBtn">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove uncaging artifact.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600; font-style:italic; text-decoration: underline;&quot;&gt;WARNING&lt;/span&gt;  Use for single-frame data only&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="statusTip">
+             <string>Remove uncaging artifact</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove uncaging artifact.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600; font-style:italic; text-decoration: underline;&quot;&gt;WARNING&lt;/span&gt;  Use for single-frame data only&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Remove</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="1" column="0">
+         <layout class="QHBoxLayout" name="horizontalLayout_16">
+          <item>
+           <widget class="QGroupBox" name="sceneFiltersGroupBox">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="title">
+             <string>Scene filters</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_18">
+             <item row="0" column="0">
+              <widget class="QComboBox" name="sceneFiltersComboBox"/>
+             </item>
+             <item row="1" column="0">
+              <widget class="QStackedWidget" name="sceneFiltersConfigStackedWidget">
+               <property name="currentIndex">
+                <number>2</number>
+               </property>
+               <widget class="QWidget" name="pureletScenePage">
+                <layout class="QGridLayout" name="gridLayout_9">
+                 <item row="0" column="0">
+                  <layout class="QGridLayout" name="gridLayout_8">
+                   <property name="leftMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="topMargin">
+                    <number>10</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>10</number>
+                   </property>
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <item row="0" column="1">
+                    <widget class="QLabel" name="label_7">
+                     <property name="text">
+                      <string>Reference</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="2">
+                    <widget class="QLabel" name="label_8">
+                     <property name="text">
+                      <string>Indicator</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="label_9">
+                     <property name="text">
+                      <string>alpha</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <widget class="QDoubleSpinBox" name="pureletAlphaSceneRefDoubleSpinBox"/>
+                   </item>
+                   <item row="1" column="2">
+                    <widget class="QDoubleSpinBox" name="pureletAlphaSceneIndDoubleSpinBox"/>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="label_10">
+                     <property name="text">
+                      <string>beta</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QDoubleSpinBox" name="pureletBetaSceneRefDoubleSpinBox"/>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QDoubleSpinBox" name="pureletBetaSceneIndDoubleSpinBox"/>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="label_11">
+                     <property name="text">
+                      <string>sigma</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <widget class="QDoubleSpinBox" name="pureletSigmaSceneRefDoubleSpinBox"/>
+                   </item>
+                   <item row="3" column="2">
+                    <widget class="QDoubleSpinBox" name="pureletSigmaSceneIndDoubleSpinBox"/>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="label_12">
+                     <property name="text">
+                      <string>levels</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <widget class="QSpinBox" name="pureletJSceneRefSpinBox"/>
+                   </item>
+                   <item row="4" column="2">
+                    <widget class="QSpinBox" name="pureletJSceneIndSpinBox"/>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QLabel" name="label_13">
+                     <property name="text">
+                      <string>threshold</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="1">
+                    <widget class="QSpinBox" name="pureletTSceneRefSpinBox"/>
+                   </item>
+                   <item row="5" column="2">
+                    <widget class="QSpinBox" name="pureletTSceneIndSpinBox"/>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="1" column="0">
+                  <spacer name="verticalSpacer_6">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>215</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+               <widget class="QWidget" name="gaussianFilterScenePage">
+                <layout class="QGridLayout" name="gridLayout_16">
+                 <item row="0" column="0">
+                  <layout class="QGridLayout" name="gridLayout_14">
+                   <property name="topMargin">
+                    <number>10</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>10</number>
+                   </property>
+                   <item row="0" column="1">
+                    <widget class="QLabel" name="label_23">
+                     <property name="text">
+                      <string>Reference</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="2">
+                    <widget class="QLabel" name="label_22">
+                     <property name="text">
+                      <string>Indicator</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="label_21">
+                     <property name="text">
+                      <string>Size</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="2">
+                    <widget class="QSpinBox" name="gaussianSizeSceneIndSpinBox"/>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="label_26">
+                     <property name="text">
+                      <string>Sigma</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QDoubleSpinBox" name="gaussianSigmaSceneRefDoubleSpinBox"/>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QDoubleSpinBox" name="gaussianSigmaSceneIndDoubleSpinBox"/>
+                   </item>
+                   <item row="3" column="1">
+                    <widget class="QPushButton" name="previewGaussianSceneRefBtn">
+                     <property name="text">
+                      <string>Preview</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="2">
+                    <widget class="QPushButton" name="previewGaussianSceneIndBtn">
+                     <property name="text">
+                      <string>Preview</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <widget class="QSpinBox" name="gaussianSizeSceneRefSpinBox"/>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="1" column="0">
+                  <spacer name="verticalSpacer_2">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>68</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+               <widget class="QWidget" name="binomialFilterPageScene">
+                <layout class="QGridLayout" name="gridLayout_23">
+                 <item row="0" column="0">
+                  <layout class="QGridLayout" name="gridLayout_21">
+                   <property name="topMargin">
+                    <number>10</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>10</number>
+                   </property>
+                   <item row="0" column="1">
+                    <widget class="QLabel" name="label_31">
+                     <property name="text">
+                      <string>Reference</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="2">
+                    <widget class="QLabel" name="label_30">
+                     <property name="text">
+                      <string>Indicator</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="label_29">
+                     <property name="text">
+                      <string>Radius</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <widget class="QSpinBox" name="binomialOrderSceneRefSpinBox"/>
+                   </item>
+                   <item row="1" column="2">
+                    <widget class="QSpinBox" name="binomialOrderSceneIndSpinBox"/>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QPushButton" name="previewBinomialSceneRefBtn">
+                     <property name="text">
+                      <string>Preview</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QPushButton" name="previewBinomialSceneIndBtn">
+                     <property name="text">
+                      <string>Preview</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="1" column="0">
+                  <spacer name="verticalSpacer_4">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>321</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="linescanFiltersGroupBox">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="title">
+             <string>Scan filters</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_19">
+             <item row="1" column="0">
+              <widget class="QStackedWidget" name="scanFiltersConfigStackedWidget">
+               <property name="currentIndex">
+                <number>1</number>
+               </property>
+               <widget class="QWidget" name="pureletScanPage">
+                <layout class="QGridLayout" name="gridLayout_13">
+                 <item row="0" column="0">
+                  <layout class="QGridLayout" name="gridLayout_10">
+                   <property name="topMargin">
+                    <number>10</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>10</number>
+                   </property>
+                   <item row="0" column="1">
+                    <widget class="QLabel" name="label_19">
+                     <property name="text">
+                      <string>Reference</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="2">
+                    <widget class="QLabel" name="label_17">
+                     <property name="text">
+                      <string>Indicator</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="label_14">
+                     <property name="text">
+                      <string>alpha</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <widget class="QDoubleSpinBox" name="pureletAlphaScansRefDoubleSpinBox"/>
+                   </item>
+                   <item row="1" column="2">
+                    <widget class="QDoubleSpinBox" name="pureletAlphaScansIndDoubleSpinBox"/>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="label_15">
+                     <property name="text">
+                      <string>beta</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QDoubleSpinBox" name="pureletBetaScansRefDoubleSpinBox"/>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QDoubleSpinBox" name="pureletBetaScansIndDoubleSpinBox"/>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="label_18">
+                     <property name="text">
+                      <string>sigma</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <widget class="QDoubleSpinBox" name="pureletSigmaScansRefDoubleSpinBox"/>
+                   </item>
+                   <item row="3" column="2">
+                    <widget class="QDoubleSpinBox" name="pureletSigmaScansIndDoubleSpinBox"/>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="label_16">
+                     <property name="text">
+                      <string>levels</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <widget class="QSpinBox" name="pureletJScansRefSpinBox"/>
+                   </item>
+                   <item row="4" column="2">
+                    <widget class="QSpinBox" name="pureletJScansIndSpinBox"/>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QLabel" name="label_20">
+                     <property name="text">
+                      <string>threshold</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="1">
+                    <widget class="QSpinBox" name="pureletTScansRefSpinBox"/>
+                   </item>
+                   <item row="5" column="2">
+                    <widget class="QSpinBox" name="pureletTScansIndSpinBox"/>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="1" column="0">
+                  <spacer name="verticalSpacer_7">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>215</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+               <widget class="QWidget" name="gaussianFilterScansPage">
+                <layout class="QGridLayout" name="gridLayout_17">
+                 <item row="0" column="0">
+                  <layout class="QGridLayout" name="gridLayout_15">
+                   <property name="topMargin">
+                    <number>10</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>10</number>
+                   </property>
+                   <item row="0" column="1">
+                    <widget class="QLabel" name="label_25">
+                     <property name="text">
+                      <string>Reference</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="2">
+                    <widget class="QLabel" name="label_24">
+                     <property name="text">
+                      <string>Indicator</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="label_27">
+                     <property name="text">
+                      <string>Size</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <widget class="QSpinBox" name="gaussianSizeScansRefSpinBox"/>
+                   </item>
+                   <item row="1" column="2">
+                    <widget class="QSpinBox" name="gaussianSizeScansIndSpinBox"/>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="label_28">
+                     <property name="text">
+                      <string>Sigma</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QDoubleSpinBox" name="gaussianSigmaScansRefDoubleSpinBox"/>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QDoubleSpinBox" name="gaussianSigmaScansIndDoubleSpinBox"/>
+                   </item>
+                   <item row="3" column="1">
+                    <widget class="QPushButton" name="previewGaussianScansRefBtn">
+                     <property name="text">
+                      <string>Preview</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="2">
+                    <widget class="QPushButton" name="previewGaussianScansIndBtn">
+                     <property name="text">
+                      <string>Preview</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="1" column="0">
+                  <spacer name="verticalSpacer_3">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>68</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+               <widget class="QWidget" name="binomialFilterPageScans">
+                <layout class="QGridLayout" name="gridLayout_24">
+                 <item row="0" column="0">
+                  <layout class="QGridLayout" name="gridLayout_22">
+                   <property name="topMargin">
+                    <number>10</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>10</number>
+                   </property>
+                   <item row="0" column="1">
+                    <widget class="QLabel" name="label_32">
+                     <property name="text">
+                      <string>Reference</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="2">
+                    <widget class="QLabel" name="label_33">
+                     <property name="text">
+                      <string>Indicator</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="label_34">
+                     <property name="text">
+                      <string>Radius</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <widget class="QSpinBox" name="binomialOrderScansRefSpinBox"/>
+                   </item>
+                   <item row="1" column="2">
+                    <widget class="QSpinBox" name="binomialOrderScansIndSpinBox"/>
+                   </item>
+                   <item row="2" column="1">
+                    <widget class="QPushButton" name="previewBinomialScansRefBtn">
+                     <property name="text">
+                      <string>Preview</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="2">
+                    <widget class="QPushButton" name="previewBinomialScansIndBtn">
+                     <property name="text">
+                      <string>Preview</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </item>
+                 <item row="1" column="0">
+                  <spacer name="verticalSpacer_5">
+                   <property name="orientation">
+                    <enum>Qt::Vertical</enum>
+                   </property>
+                   <property name="sizeHint" stdset="0">
+                    <size>
+                     <width>20</width>
+                     <height>104</height>
+                    </size>
+                   </property>
+                  </spacer>
+                 </item>
+                </layout>
+               </widget>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QComboBox" name="scanFiltersComboBox"/>
+             </item>
+            </layout>
+            <zorder>scanFiltersComboBox</zorder>
+            <zorder>scanFiltersConfigStackedWidget</zorder>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="epscatOptionsPage">
+       <attribute name="title">
+        <string>EPSCaT</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout_26">
+        <item row="0" column="0">
+         <layout class="QHBoxLayout" name="horizontalLayout_3">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QGroupBox" name="epscatChannelsGroupBox">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="title">
+             <string>Channels and calibration</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_11">
+             <item row="0" column="0">
+              <layout class="QFormLayout" name="formLayout_2">
+               <item row="0" column="0">
+                <widget class="QLabel" name="label_5">
+                 <property name="maximumSize">
+                  <size>
+                   <width>50</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>Ind.</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QComboBox" name="indicatorChannelComboBox">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="label_40">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>50</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>&amp;Name:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>indicatorNameLineEdit</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QLineEdit" name="indicatorNameLineEdit">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="toolTip">
+                  <string>Indicator name</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Indicator name</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Indicator name</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="label_41">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>50</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>&amp;Kd:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>indicatorKdDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <widget class="QDoubleSpinBox" name="indicatorKdDoubleSpinBox">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="toolTip">
+                  <string>Indicator Kd</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Indicator Kd</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Indicator Kd</string>
+                 </property>
+                 <property name="minimum">
+                  <double>-1.000000000000000</double>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                 <property name="value">
+                  <double>-1.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="0">
+                <widget class="QLabel" name="label_42">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>50</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>Fmin:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>indicatorFminDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="1">
+                <widget class="QDoubleSpinBox" name="indicatorFminDoubleSpinBox">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="toolTip">
+                  <string>Indicator &quot;zero&quot;</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Indicator &quot;zero&quot;</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Indicator &quot;zero&quot;</string>
+                 </property>
+                 <property name="minimum">
+                  <double>-1.000000000000000</double>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                 <property name="value">
+                  <double>-1.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="4" column="0">
+                <widget class="QLabel" name="label_43">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>50</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>Fma&amp;x:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>indicatorFmaxDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item row="4" column="1">
+                <widget class="QDoubleSpinBox" name="indicatorFmaxDoubleSpinBox">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                   <horstretch>0</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="toolTip">
+                  <string>Indicator &quot;saturation&quot;</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Indicator &quot;saturation&quot;</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Indicator &quot;saturation&quot;</string>
+                 </property>
+                 <property name="minimum">
+                  <double>-1.000000000000000</double>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                 <property name="value">
+                  <double>-1.000000000000000</double>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="0" column="1">
+              <layout class="QFormLayout" name="formLayout">
+               <item row="0" column="0">
+                <widget class="QLabel" name="label_6">
+                 <property name="maximumSize">
+                  <size>
+                   <width>50</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>Ref.</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QComboBox" name="referenceChannelComboBox">
+                 <property name="sizePolicy">
+                  <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                   <horstretch>1</horstretch>
+                   <verstretch>0</verstretch>
+                  </sizepolicy>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0" colspan="2">
+                <widget class="QLabel" name="label_37">
+                 <property name="maximumSize">
+                  <size>
+                   <width>70</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>Ind -&gt; Ref:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>ind2refBleedDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0" colspan="2">
+                <widget class="QDoubleSpinBox" name="ind2refBleedDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="toolTip">
+                  <string>Indicator bleed into reference channel.</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Indicator bleed into reference channel.</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Indicator bleed into reference channel.</string>
+                 </property>
+                 <property name="maximum">
+                  <double>1.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="0" colspan="2">
+                <widget class="QLabel" name="label_38">
+                 <property name="maximumSize">
+                  <size>
+                   <width>70</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="text">
+                  <string>&amp;Ref -&gt; Ind:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>ref2indBleedDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item row="4" column="0" colspan="2">
+                <widget class="QDoubleSpinBox" name="ref2indBleedDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="toolTip">
+                  <string>Reference bleed into indicator channel.</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Reference bleed into indicator channel.</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Reference bleed into indicator channel.</string>
+                 </property>
+                 <property name="maximum">
+                  <double>1.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="epscatDetectionGroupBox">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="title">
+             <string>Detection</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_25">
+             <item row="0" column="0">
+              <layout class="QVBoxLayout" name="verticalLayout_4">
+               <property name="spacing">
+                <number>0</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="label_48">
+                 <property name="text">
+                  <string>Width</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>epscatCursorWindowSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QSpinBox" name="epscatCursorWindowSpinBox">
+                 <property name="toolTip">
+                  <string>Cursor window for EPSCaT calculation (pixels)</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Cursor window for EPSCaT calculation (pixels)</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string extracomment="Cursor window for EPSCaT calculation (pixels)">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Cursor window for EPSCaT calculation (pixels).&lt;/p&gt;&lt;p&gt;EPSCaT is calculated on a region of the line scan image centered around a vertical cursor and bounded by a defined horizontal window. This field sets the default window size for new cursors added automatically.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="0" column="1">
+              <layout class="QVBoxLayout" name="verticalLayout_6">
+               <property name="spacing">
+                <number>0</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="label_39">
+                 <property name="text">
+                  <string>F/S:</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>fs_DiscriminantDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="fs_DiscriminantDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>100</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="toolTip">
+                  <string>Failure/Success (F/S) discriminator</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Failure/Success (F/S) discriminator</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string extracomment="Failure/Success (F/S) discriminator">Failure/Success (F/S) discriminator</string>
+                 </property>
+                 <property name="correctionMode">
+                  <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="0" column="2">
+              <layout class="QVBoxLayout" name="verticalLayout">
+               <item>
+                <widget class="QLabel" name="label_55">
+                 <property name="text">
+                  <string>Min R2</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="minR2SpinBox">
+                 <property name="accelerated">
+                  <bool>true</bool>
+                 </property>
+                 <property name="correctionMode">
+                  <enum>QAbstractSpinBox::CorrectToNearestValue</enum>
+                 </property>
+                 <property name="showGroupSeparator" stdset="0">
+                  <bool>false</bool>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="1" column="0" colspan="2">
+              <layout class="QVBoxLayout" name="verticalLayout_7">
+               <property name="spacing">
+                <number>0</number>
+               </property>
+               <item>
+                <widget class="QRadioButton" name="useIntervalsRadioButton">
+                 <property name="toolTip">
+                  <string>Use EPSCaT delay values for F/S discrimination</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Use EPSCaT delay values for F/S discrimination</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use EPSCaT delay values as boundaries between Ca&lt;span style=&quot; vertical-align:super;&quot;&gt;2+&lt;/span&gt; transient base and peak epochs in F/S discrimination.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;:/images/F_S_Discrimination.png&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>Dela&amp;y</string>
+                 </property>
+                 <property name="checked">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QRadioButton" name="useTriggersRadioButton">
+                 <property name="toolTip">
+                  <string>Use event triggers for F/S discrimination</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Use event triggers for F/S discrimination</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use event triggers for time boundary between Ca&lt;span style=&quot; vertical-align:super;&quot;&gt;2+&lt;/span&gt; transient base and peak epochs in F/S discrimination.&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;:/images/F_S_Discrimination.png&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>Tri&amp;ggers</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QRadioButton" name="useCursorsForDiscriminationRadioButton">
+                 <property name="toolTip">
+                  <string>Use horizontal cursors for F/S discrimination</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Use horizontal cursors for F/S discrimination</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Use a separate horizontal cursor each for Ca&lt;span style=&quot; vertical-align:super;&quot;&gt;2+&lt;/span&gt; transient base and peak epochs in F/S discrimination.&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;:/images/F_S_Discrimination.png&quot;/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>C&amp;ursors</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="1" column="2">
+              <layout class="QVBoxLayout" name="verticalLayout_8">
+               <property name="spacing">
+                <number>0</number>
+               </property>
+               <item>
+                <widget class="QCheckBox" name="firstTriggerOnlyCheckBox">
+                 <property name="toolTip">
+                  <string>Use only the earliest trigger or EPSCaT delay for F/S discrimination</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Use only the earliest trigger or EPSCaT delay for F/S discrimination</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;For compound EPSCaTs, use only the earliest trigger or delay for F/S discrimination.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>First</string>
+                 </property>
+                 <property name="checked">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="discriminate2DCheckBox">
+                 <property name="toolTip">
+                  <string>Apply F/S discrimination on 2D data</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Apply F/S discrimination on 2D data</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Calculate F/S discrimination on 2D data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                 <property name="text">
+                  <string>2D</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="2" column="0" colspan="2">
+              <layout class="QVBoxLayout" name="verticalLayout_2">
+               <property name="spacing">
+                <number>0</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="label_45">
+                 <property name="text">
+                  <string>Base</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>baseDiscriminationWindowDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="baseDiscriminationWindowDoubleSpinBox">
+                 <property name="toolTip">
+                  <string>Discrimination window (s) for base epoch</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Discrimination window (s) for base epoch</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Discrimination window (in &amp;quot;s&amp;quot;) when Delay or Triggers are used as boundary between base and peak epochs of the Ca&lt;span style=&quot; vertical-align:super;&quot;&gt;2+&lt;/span&gt; transient in F/S discrimination.&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;:/images/F_S_Discrimination.png&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="2" column="2">
+              <layout class="QVBoxLayout" name="verticalLayout_3">
+               <property name="spacing">
+                <number>0</number>
+               </property>
+               <item>
+                <widget class="QLabel" name="label_50">
+                 <property name="text">
+                  <string>Peak</string>
+                 </property>
+                 <property name="buddy">
+                  <cstring>peakDiscriminationWindowDoubleSpinBox</cstring>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QDoubleSpinBox" name="peakDiscriminationWindowDoubleSpinBox">
+                 <property name="toolTip">
+                  <string>Discrimination window (s) for peak epoch</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Discrimination window (s) for peak epoch</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Discrimination window (in &amp;quot;s&amp;quot;) when Delay or Triggers are used as boundary between base and peak epochs of the Ca&lt;span style=&quot; vertical-align:super;&quot;&gt;2+&lt;/span&gt; transient in F/S discrimination.&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;:/images/F_S_Discrimination.png&quot;/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="3" column="0">
+              <spacer name="verticalSpacer_8">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="epscatIntervalsGroupBox">
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="toolTip">
+             <string>Make sure values are corrected for imaging delay</string>
+            </property>
+            <property name="statusTip">
+             <string>Make sure values are corrected for imaging delay</string>
+            </property>
+            <property name="whatsThis">
+             <string>Make sure values are corrected for imaging delay</string>
+            </property>
+            <property name="title">
+             <string>Intervals (s)</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_31">
+             <item row="0" column="0">
+              <layout class="QGridLayout" name="gridLayout_30">
+               <property name="spacing">
+                <number>0</number>
+               </property>
+               <item row="0" column="0">
+                <widget class="QLabel" name="label_49">
+                 <property name="text">
+                  <string>Dark:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QDoubleSpinBox" name="epscatDarkCurrentBeginDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="2">
+                <widget class="QDoubleSpinBox" name="epscatDarkCurrentEndDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="label_44">
+                 <property name="text">
+                  <string>F0:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QDoubleSpinBox" name="epscatF0BeginDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="2">
+                <widget class="QDoubleSpinBox" name="epscatF0EndDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="label_46">
+                 <property name="text">
+                  <string>Fit:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <widget class="QDoubleSpinBox" name="epscatFitBeginDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="2">
+                <widget class="QDoubleSpinBox" name="epscatFitEndDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="0">
+                <widget class="QLabel" name="label_47">
+                 <property name="text">
+                  <string>Int.:</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="1">
+                <widget class="QDoubleSpinBox" name="epscatIntegralBeginDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="2">
+                <widget class="QDoubleSpinBox" name="epscatIntegralEndDoubleSpinBox">
+                 <property name="maximumSize">
+                  <size>
+                   <width>80</width>
+                   <height>16777215</height>
+                  </size>
+                 </property>
+                 <property name="maximum">
+                  <double>10000000.000000000000000</double>
+                 </property>
+                 <property name="singleStep">
+                  <double>0.010000000000000</double>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="1" column="0">
+              <layout class="QHBoxLayout" name="horizontalLayout_6">
+               <item>
+                <widget class="QCheckBox" name="detrendEPSCaTsCheckBox">
+                 <property name="text">
+                  <string>Detrend</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QCheckBox" name="doFitCheckBox">
+                 <property name="toolTip">
+                  <string>Fit the EPSCaT waveform</string>
+                 </property>
+                 <property name="statusTip">
+                  <string>Fit the EPSCaT waveform</string>
+                 </property>
+                 <property name="whatsThis">
+                  <string>Fit the EPSCaT waveform</string>
+                 </property>
+                 <property name="text">
+                  <string>Fit EPSCaT</string>
+                 </property>
+                 <property name="checked">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="2" column="0">
+              <spacer name="verticalSpacer_10">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>20</width>
+                 <height>40</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="1" column="0">
+         <widget class="QTableWidget" name="epscatComponentsTableWidget">
+          <property name="contextMenuPolicy">
+           <enum>Qt::ActionsContextMenu</enum>
+          </property>
+          <property name="toolTip">
+           <string>EPSCaT Model Parameters</string>
+          </property>
+          <property name="statusTip">
+           <string>Make sure delay values are corrected for imaging delay</string>
+          </property>
+          <property name="whatsThis">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;For each EPSCaT component, enter:&lt;/p&gt;&lt;p&gt;1) initial parameter values in 1&lt;span style=&quot; vertical-align:super;&quot;&gt;st&lt;/span&gt; row&lt;/p&gt;&lt;p&gt;2) lower bounds in 2&lt;span style=&quot; vertical-align:super;&quot;&gt;nd&lt;/span&gt; row&lt;/p&gt;&lt;p&gt;3) upper bounds in 3&lt;span style=&quot; vertical-align:super;&quot;&gt;rd&lt;/span&gt; row&lt;/p&gt;&lt;p&gt;ATTENTION: Make sure delay values are corrected for imaging delay.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <attribute name="horizontalHeaderCascadingSectionResizes">
+           <bool>true</bool>
+          </attribute>
+          <attribute name="horizontalHeaderDefaultSectionSize">
+           <number>50</number>
+          </attribute>
+          <attribute name="verticalHeaderMinimumSectionSize">
+           <number>20</number>
+          </attribute>
+          <attribute name="verticalHeaderDefaultSectionSize">
+           <number>20</number>
+          </attribute>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <layout class="QHBoxLayout" name="horizontalLayout_15">
+      <item>
+       <widget class="QGroupBox" name="processScansGroupBox">
+        <property name="title">
+         <string>De-noising</string>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_14">
+         <item>
+          <widget class="QPushButton" name="processDataBtn">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Process frames (either all, current, or selected by protocol)</string>
+           </property>
+           <property name="text">
+            <string>Data</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="processSceneBtn">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Process scene data</string>
+           </property>
+           <property name="text">
+            <string>Scene</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="processScanBtn">
+           <property name="maximumSize">
+            <size>
+             <width>1677215</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Process current scan frame</string>
+           </property>
+           <property name="text">
+            <string>Scans</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="analysisGroupBox">
+        <property name="title">
+         <string>Analyse</string>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_7">
+         <item>
+          <widget class="QPushButton" name="analyseDataBtn">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Analyse entire data set</string>
+           </property>
+           <property name="statusTip">
+            <string>Analyse entire data set</string>
+           </property>
+           <property name="whatsThis">
+            <string>Analyse entire data set</string>
+           </property>
+           <property name="text">
+            <string>Data</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="analyseFrameBtn">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Analyse current frame</string>
+           </property>
+           <property name="statusTip">
+            <string>Analyse current frame</string>
+           </property>
+           <property name="whatsThis">
+            <string>Analyse current frame</string>
+           </property>
+           <property name="text">
+            <string>Frame</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="reportGroupBox">
+        <property name="title">
+         <string>Report</string>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_17">
+         <item>
+          <widget class="QPushButton" name="viewReportBtn">
+           <property name="minimumSize">
+            <size>
+             <width>78</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>View analysis report</string>
+           </property>
+           <property name="statusTip">
+            <string>View analysis report</string>
+           </property>
+           <property name="whatsThis">
+            <string>View analysis report</string>
+           </property>
+           <property name="text">
+            <string>View</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="saveReportBtn">
+           <property name="minimumSize">
+            <size>
+             <width>78</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Export analysis result to workspace</string>
+           </property>
+           <property name="statusTip">
+            <string>Export analysis result to workspace</string>
+           </property>
+           <property name="whatsThis">
+            <string>Export analysis result to workspace as a pandas DataFrame object</string>
+           </property>
+           <property name="text">
+            <string>Export</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="3" column="0">
+     <layout class="QHBoxLayout" name="horizontalLayout_28">
+      <item>
+       <widget class="QLabel" name="label_35">
+        <property name="text">
+         <string>Frame:</string>
+        </property>
+        <property name="buddy">
+         <cstring>framesQSpinBox</cstring>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="framesQSpinBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>20</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="mouseTracking">
+         <bool>true</bool>
+        </property>
+        <property name="keyboardTracking">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="totalFramesCountLabel">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string>of: 0</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSlider" name="frameQSlider">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="mouseTracking">
+         <bool>true</bool>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QMenuBar" name="mainMenuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>834</width>
+     <height>28</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="fileMenu">
+    <property name="title">
+     <string>Fi&amp;le</string>
+    </property>
+    <widget class="QMenu" name="importMenu">
+     <property name="toolTip">
+      <string>Import data acquired by third party software</string>
+     </property>
+     <property name="statusTip">
+      <string>Import data acquired by third party software</string>
+     </property>
+     <property name="whatsThis">
+      <string>Import data acquired by third party software</string>
+     </property>
+     <property name="title">
+      <string>&amp;Import</string>
+     </property>
+     <addaction name="actionImportPrairieView"/>
+    </widget>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
+    <addaction name="importMenu"/>
+    <addaction name="separator"/>
+    <addaction name="actionQuit"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Hel&amp;p</string>
+    </property>
+    <addaction name="whatsThisAction"/>
+   </widget>
+   <widget class="QMenu" name="dataMenu">
+    <property name="title">
+     <string>&amp;Data</string>
+    </property>
+    <widget class="QMenu" name="menu_Add_replace_Electrophysiology">
+     <property name="toolTip">
+      <string>Add/replace electorphysiology data</string>
+     </property>
+     <property name="statusTip">
+      <string>Add/replace electorphysiology data</string>
+     </property>
+     <property name="whatsThis">
+      <string>Add/replace electorphysiology data</string>
+     </property>
+     <property name="title">
+      <string>Elect&amp;rophysiology</string>
+     </property>
+     <widget class="QMenu" name="menuAdd_or_replace">
+      <property name="title">
+       <string>&amp;Add or replace</string>
+      </property>
+      <addaction name="actionEphysFrom_file"/>
+      <addaction name="actionEphysFrom_workspace"/>
+     </widget>
+     <addaction name="menuAdd_or_replace"/>
+     <addaction name="actionReorder_ephys_segments"/>
+    </widget>
+    <addaction name="actionLoadFromWorkspace"/>
+    <addaction name="actionCopy_to_workspace"/>
+    <addaction name="actionUpdate"/>
+    <addaction name="actionAppend_LSData"/>
+    <addaction name="separator"/>
+    <addaction name="actionConcatenate"/>
+    <addaction name="actionCollect"/>
+    <addaction name="separator"/>
+    <addaction name="menu_Add_replace_Electrophysiology"/>
+   </widget>
+   <widget class="QMenu" name="viewMenu">
+    <property name="title">
+     <string>V&amp;iew</string>
+    </property>
+    <addaction name="actionResults_window"/>
+    <addaction name="actionRefresh"/>
+    <addaction name="actionOpaque_cursor_labels"/>
+   </widget>
+   <widget class="QMenu" name="analysisMenu">
+    <property name="title">
+     <string>A&amp;nalysis</string>
+    </property>
+    <widget class="QMenu" name="analysisOptionsMenu">
+     <property name="toolTip">
+      <string>Manage analysis options</string>
+     </property>
+     <property name="statusTip">
+      <string>Manage analysis options</string>
+     </property>
+     <property name="whatsThis">
+      <string>Manage analysis options</string>
+     </property>
+     <property name="title">
+      <string>&amp;Options</string>
+     </property>
+     <addaction name="actionAdopt_options"/>
+     <addaction name="actionExport_analysis_options_to_file"/>
+     <addaction name="actionLoad_options_file"/>
+    </widget>
+    <widget class="QMenu" name="unitsMenu">
+     <property name="toolTip">
+      <string>Manage analysis units</string>
+     </property>
+     <property name="statusTip">
+      <string>Manage analysis units</string>
+     </property>
+     <property name="whatsThis">
+      <string>Manage analysis units</string>
+     </property>
+     <property name="title">
+      <string>&amp;Units</string>
+     </property>
+     <addaction name="actionAdopt_units"/>
+    </widget>
+    <widget class="QMenu" name="reportingMenu">
+     <property name="toolTip">
+      <string>Manage analysis report</string>
+     </property>
+     <property name="statusTip">
+      <string>Manage analysis report</string>
+     </property>
+     <property name="whatsThis">
+      <string>Manage analysis report</string>
+     </property>
+     <property name="title">
+      <string>&amp;Report</string>
+     </property>
+     <addaction name="actionReport"/>
+     <addaction name="actionBatch_extract_and_write"/>
+     <addaction name="actionCollate_reports"/>
+    </widget>
+    <addaction name="analysisOptionsMenu"/>
+    <addaction name="unitsMenu"/>
+    <addaction name="reportingMenu"/>
+    <addaction name="actionImport_Data_wide_Descriptors"/>
+   </widget>
+   <widget class="QMenu" name="protocolsMenu">
+    <property name="toolTip">
+     <string>Manage stimulation protocols (triggers)</string>
+    </property>
+    <property name="statusTip">
+     <string>Manage stimulation protocols (triggers)</string>
+    </property>
+    <property name="whatsThis">
+     <string>Manage stimulation protocols (triggers)</string>
+    </property>
+    <property name="title">
+     <string>Proto&amp;cols</string>
+    </property>
+    <addaction name="actionDetect_triggers"/>
+    <addaction name="actionAdopt_protocols"/>
+    <addaction name="actionRemove_all_protocols"/>
+   </widget>
+   <widget class="QMenu" name="optionsMenu">
+    <property name="title">
+     <string>Options</string>
+    </property>
+    <addaction name="actionLink_vertical_scan_cursors_to_scene_point_cursors"/>
+    <addaction name="actionPlot_long_fits"/>
+    <addaction name="actionDisplay_colorbars"/>
+    <addaction name="actionDisplay_scale_bars"/>
+   </widget>
+   <addaction name="fileMenu"/>
+   <addaction name="dataMenu"/>
+   <addaction name="protocolsMenu"/>
+   <addaction name="analysisMenu"/>
+   <addaction name="viewMenu"/>
+   <addaction name="optionsMenu"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="QToolBar" name="unitsToolbar">
+   <property name="windowTitle">
+    <string>Units</string>
+   </property>
+   <property name="toolTip">
+    <string>Analysis Units Toolbar</string>
+   </property>
+   <property name="statusTip">
+    <string>Analysis Units Toolbar</string>
+   </property>
+   <property name="whatsThis">
+    <string>Analysis Units Toolbar</string>
+   </property>
+   <property name="movable">
+    <bool>true</bool>
+   </property>
+   <property name="floatable">
+    <bool>true</bool>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionSetup_Vertical_Cursors_In_Frame"/>
+   <addaction name="actionSetup_Vertical_Cursors_in_All_Frames"/>
+   <addaction name="actionAdd_unit"/>
+   <addaction name="actionImportUnits"/>
+   <addaction name="actionRemove_unit"/>
+   <addaction name="actionDeleteAllAnalysisUnits"/>
+   <addaction name="actionRemoveSpecifiedUnits"/>
+  </widget>
+  <widget class="QToolBar" name="fileToolbar">
+   <property name="windowTitle">
+    <string>File</string>
+   </property>
+   <property name="toolTip">
+    <string>File toolbar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionToolbarOpenFile"/>
+   <addaction name="actionToolbarSaveData"/>
+   <addaction name="actionToolbarDataLoad"/>
+   <addaction name="actionToolbarCopyToWorkspace"/>
+  </widget>
+  <action name="actionLoadFromWorkspace">
+   <property name="text">
+    <string>&amp;Load from Workspace...</string>
+   </property>
+   <property name="toolTip">
+    <string>Load ScanData from workspace</string>
+   </property>
+   <property name="statusTip">
+    <string>Load ScanData from workspace</string>
+   </property>
+   <property name="whatsThis">
+    <string>Load ScanData from workspace</string>
+   </property>
+  </action>
+  <action name="whatsThisAction">
+   <property name="text">
+    <string>&amp;What's this?</string>
+   </property>
+   <property name="statusTip">
+    <string>Invoke detailed help</string>
+   </property>
+   <property name="whatsThis">
+    <string>Invoke detailed help</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="text">
+    <string>&amp;Save</string>
+   </property>
+   <property name="toolTip">
+    <string>Save ScanData to pickle file</string>
+   </property>
+   <property name="statusTip">
+    <string>Save ScanData to pickle file</string>
+   </property>
+   <property name="whatsThis">
+    <string>Save ScanData to pickle file</string>
+   </property>
+  </action>
+  <action name="actionUpdate">
+   <property name="text">
+    <string>&amp;Update</string>
+   </property>
+   <property name="toolTip">
+    <string>Update current ScanData</string>
+   </property>
+   <property name="statusTip">
+    <string>Update current ScanData</string>
+   </property>
+   <property name="whatsThis">
+    <string>Update current ScanData</string>
+   </property>
+  </action>
+  <action name="actionImportPrairieView">
+   <property name="text">
+    <string>&amp;PrairieView</string>
+   </property>
+   <property name="toolTip">
+    <string>Import from PrairieView</string>
+   </property>
+   <property name="statusTip">
+    <string>Import from PrairieView</string>
+   </property>
+   <property name="whatsThis">
+    <string>Import from PrairieView</string>
+   </property>
+  </action>
+  <action name="actionOpen">
+   <property name="text">
+    <string>&amp;Open</string>
+   </property>
+   <property name="toolTip">
+    <string>Open ScanData from pickle file</string>
+   </property>
+   <property name="statusTip">
+    <string>Open ScanData from pickle file</string>
+   </property>
+   <property name="whatsThis">
+    <string>Open ScanData from pickle file</string>
+   </property>
+  </action>
+  <action name="actionCopy_to_workspace">
+   <property name="text">
+    <string>&amp;Export to Workspace</string>
+   </property>
+   <property name="toolTip">
+    <string>Copy current ScanData to workspace, under a new name</string>
+   </property>
+   <property name="statusTip">
+    <string>Copy current ScanData to workspace, under a new name</string>
+   </property>
+   <property name="whatsThis">
+    <string>Copy current ScanData to workspace, under a new name</string>
+   </property>
+  </action>
+  <action name="actionQuit">
+   <property name="text">
+    <string>&amp;Quit</string>
+   </property>
+   <property name="toolTip">
+    <string>Quit LSCaT</string>
+   </property>
+   <property name="statusTip">
+    <string>Quit LSCaT</string>
+   </property>
+   <property name="whatsThis">
+    <string>Quit LSCaT</string>
+   </property>
+  </action>
+  <action name="actionResults_window">
+   <property name="text">
+    <string>&amp;Results window</string>
+   </property>
+   <property name="toolTip">
+    <string>Show results window</string>
+   </property>
+   <property name="statusTip">
+    <string>Show results window</string>
+   </property>
+   <property name="whatsThis">
+    <string>Show results window</string>
+   </property>
+  </action>
+  <action name="actionCollect">
+   <property name="text">
+    <string>Coll&amp;ect Units...</string>
+   </property>
+   <property name="toolTip">
+    <string>Collect analysis units from several ScanData objects in the workspace</string>
+   </property>
+   <property name="statusTip">
+    <string>Collect analysis units from several ScanData objects in the workspace</string>
+   </property>
+   <property name="whatsThis">
+    <string>Collect analysis units from several ScanData objects in the workspace</string>
+   </property>
+  </action>
+  <action name="actionReport">
+   <property name="text">
+    <string>&amp;Generate Report</string>
+   </property>
+   <property name="iconText">
+    <string>Export report</string>
+   </property>
+   <property name="toolTip">
+    <string>Export report to workspace</string>
+   </property>
+   <property name="statusTip">
+    <string>Export report to workspace</string>
+   </property>
+   <property name="whatsThis">
+    <string>Export report to workspace</string>
+   </property>
+  </action>
+  <action name="actionAdopt_options">
+   <property name="text">
+    <string>&amp;Import</string>
+   </property>
+   <property name="toolTip">
+    <string>Import analysis options from ScanData</string>
+   </property>
+   <property name="statusTip">
+    <string>Import analysis options from ScanData</string>
+   </property>
+   <property name="whatsThis">
+    <string>Import analysis options from ScanData</string>
+   </property>
+  </action>
+  <action name="actionAdopt_units">
+   <property name="text">
+    <string>&amp;Import</string>
+   </property>
+   <property name="iconText">
+    <string>Import</string>
+   </property>
+   <property name="toolTip">
+    <string>Import units from ScanData</string>
+   </property>
+   <property name="statusTip">
+    <string>Import units from ScanData</string>
+   </property>
+   <property name="whatsThis">
+    <string>Import units from ScanData</string>
+   </property>
+  </action>
+  <action name="actionAdopt_protocols">
+   <property name="text">
+    <string>&amp;Import...</string>
+   </property>
+   <property name="toolTip">
+    <string>Import  protocols from ScanData in the workspace</string>
+   </property>
+   <property name="statusTip">
+    <string>Import  protocols from ScanData in the workspace</string>
+   </property>
+   <property name="whatsThis">
+    <string>Import  protocols from ScanData in the workspace</string>
+   </property>
+  </action>
+  <action name="actionProtocols_from_imaging">
+   <property name="text">
+    <string>Imaging protocols</string>
+   </property>
+  </action>
+  <action name="actionDetect_triggers">
+   <property name="text">
+    <string>&amp;Detect triggers</string>
+   </property>
+   <property name="toolTip">
+    <string>Detect triggers and set up protocols automatically</string>
+   </property>
+   <property name="statusTip">
+    <string>Detect triggers and set up protocols automatically</string>
+   </property>
+   <property name="whatsThis">
+    <string>Detect triggers and set up protocols automatically</string>
+   </property>
+  </action>
+  <action name="actionRefresh">
+   <property name="text">
+    <string>R&amp;efresh</string>
+   </property>
+   <property name="toolTip">
+    <string>Refresh UI fields</string>
+   </property>
+   <property name="statusTip">
+    <string>Refresh UI fields</string>
+   </property>
+   <property name="whatsThis">
+    <string>Refresh UI fields</string>
+   </property>
+  </action>
+  <action name="actionRemove_all_protocols">
+   <property name="text">
+    <string>&amp;Clear</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove all protocols</string>
+   </property>
+   <property name="statusTip">
+    <string>Remove all protocols</string>
+   </property>
+   <property name="whatsThis">
+    <string>Remove all protocols</string>
+   </property>
+  </action>
+  <action name="actionExport_analysis_options_to_file">
+   <property name="text">
+    <string>&amp;Save...</string>
+   </property>
+   <property name="toolTip">
+    <string>Save analysis options to pickle file</string>
+   </property>
+   <property name="statusTip">
+    <string>Save analysis options to pickle file</string>
+   </property>
+   <property name="whatsThis">
+    <string>Save analysis options to pickle file</string>
+   </property>
+  </action>
+  <action name="actionLoad_options_file">
+   <property name="text">
+    <string>&amp;Load...</string>
+   </property>
+   <property name="toolTip">
+    <string>Load analysis options from pickle file</string>
+   </property>
+   <property name="statusTip">
+    <string>Load analysis options from pickle file</string>
+   </property>
+   <property name="whatsThis">
+    <string>Load analysis options from pickle file</string>
+   </property>
+  </action>
+  <action name="actionConcatenate">
+   <property name="text">
+    <string>C&amp;oncatenate...</string>
+   </property>
+   <property name="toolTip">
+    <string>Concatenate several ScanData in workspace to a new ScanData object</string>
+   </property>
+   <property name="statusTip">
+    <string>Concatenate several ScanData in workspace to a new ScanData object</string>
+   </property>
+   <property name="whatsThis">
+    <string>Concatenate several ScanData in workspace to a new ScanData object</string>
+   </property>
+  </action>
+  <action name="actionAppend_LSData">
+   <property name="text">
+    <string>A&amp;ppend...</string>
+   </property>
+   <property name="iconText">
+    <string>Append...</string>
+   </property>
+   <property name="toolTip">
+    <string>Append ScanData frames to current data</string>
+   </property>
+   <property name="statusTip">
+    <string>Append ScanData frames to current data</string>
+   </property>
+   <property name="whatsThis">
+    <string>Append ScanData frames to current data</string>
+   </property>
+  </action>
+  <action name="actionOpaque_cursor_labels">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Opaque labels</string>
+   </property>
+   <property name="toolTip">
+    <string>Set opaque labels for cursors</string>
+   </property>
+   <property name="statusTip">
+    <string>Set opaque labels for cursors</string>
+   </property>
+   <property name="whatsThis">
+    <string>Set opaque labels for cursors</string>
+   </property>
+  </action>
+  <action name="actionCollate_reports">
+   <property name="text">
+    <string>&amp;Collate Reports...</string>
+   </property>
+   <property name="iconText">
+    <string>Collate Reports...</string>
+   </property>
+   <property name="toolTip">
+    <string>Collate results form several batches</string>
+   </property>
+   <property name="statusTip">
+    <string>Collate results form several batches</string>
+   </property>
+   <property name="whatsThis">
+    <string>Collate results form several batches</string>
+   </property>
+  </action>
+  <action name="actionWrite_results_from_workspace">
+   <property name="text">
+    <string>&amp;Export</string>
+   </property>
+   <property name="toolTip">
+    <string>Write results from workspace</string>
+   </property>
+   <property name="statusTip">
+    <string>Write results from workspace</string>
+   </property>
+   <property name="whatsThis">
+    <string>Write results from workspace</string>
+   </property>
+  </action>
+  <action name="actionEphysFrom_file">
+   <property name="text">
+    <string>&amp;From file...</string>
+   </property>
+   <property name="toolTip">
+    <string>Add/replace electrophysiology with data in pickle files</string>
+   </property>
+   <property name="statusTip">
+    <string>Add/replace electrophysiology with data in pickle files</string>
+   </property>
+   <property name="whatsThis">
+    <string>Add/replace electrophysiology with data in pickle files</string>
+   </property>
+  </action>
+  <action name="actionEphysFrom_workspace">
+   <property name="text">
+    <string>From &amp;workspace...</string>
+   </property>
+   <property name="toolTip">
+    <string>Add/replace electrophysiology with data in workspace</string>
+   </property>
+   <property name="statusTip">
+    <string>Add/replace electrophysiology with data in workspace</string>
+   </property>
+   <property name="whatsThis">
+    <string>Add/replace electrophysiology with data in workspace</string>
+   </property>
+  </action>
+  <action name="actionImportUnits">
+   <property name="icon">
+    <iconset theme="document-import">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Import Units</string>
+   </property>
+   <property name="toolTip">
+    <string>Import Units</string>
+   </property>
+  </action>
+  <action name="actionAdd_unit">
+   <property name="icon">
+    <iconset theme="cursor-cross">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Add unit</string>
+   </property>
+   <property name="toolTip">
+    <string>Add Unit</string>
+   </property>
+  </action>
+  <action name="actionRemove_unit">
+   <property name="icon">
+    <iconset theme="list-remove">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Remove unit</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove unit</string>
+   </property>
+  </action>
+  <action name="actionBatch_extract_and_write">
+   <property name="icon">
+    <iconset theme="document-export">
+     <normaloff>:/images/document-export_multiple.svg</normaloff>:/images/document-export_multiple.svg</iconset>
+   </property>
+   <property name="text">
+    <string>&amp;Batch Reports...</string>
+   </property>
+  </action>
+  <action name="actionDeleteAllAnalysisUnits">
+   <property name="icon">
+    <iconset theme="edit-delete">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>DeleteAllAnalysisUnits</string>
+   </property>
+   <property name="toolTip">
+    <string>Delete all analysis units</string>
+   </property>
+  </action>
+  <action name="actionRemoveSpecifiedUnits">
+   <property name="icon">
+    <iconset theme="edit-delete-remove">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>RemoveSpecifiedUnits</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove specified units</string>
+   </property>
+  </action>
+  <action name="actionSetup_Vertical_Cursors_In_Frame">
+   <property name="icon">
+    <iconset theme="tools-wizard">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Setup</string>
+   </property>
+   <property name="toolTip">
+    <string>Setup vertical cursors in frame</string>
+   </property>
+  </action>
+  <action name="actionSetup_Vertical_Cursors_in_All_Frames">
+   <property name="icon">
+    <iconset theme="tools-wizard">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Setup In Specific Frames</string>
+   </property>
+   <property name="toolTip">
+    <string>Setup Vertical Cursors in All Frames</string>
+   </property>
+  </action>
+  <action name="actionToolbarOpenFile">
+   <property name="icon">
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Open</string>
+   </property>
+   <property name="toolTip">
+    <string>Open ScanData File</string>
+   </property>
+  </action>
+  <action name="actionToolbarDataLoad">
+   <property name="icon">
+    <iconset theme="document-import">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Load</string>
+   </property>
+   <property name="toolTip">
+    <string>Load data from workspace</string>
+   </property>
+  </action>
+  <action name="actionToolbarSaveData">
+   <property name="icon">
+    <iconset theme="document-save-as">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Save</string>
+   </property>
+   <property name="toolTip">
+    <string>Save</string>
+   </property>
+  </action>
+  <action name="actionToolbarCopyToWorkspace">
+   <property name="icon">
+    <iconset theme="document-export">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>Copy to workspace</string>
+   </property>
+  </action>
+  <action name="actionReorder_ephys_segments">
+   <property name="text">
+    <string>&amp;Reorder segments</string>
+   </property>
+  </action>
+  <action name="actionDetrendOption">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Detrend EPSCaTs</string>
+   </property>
+  </action>
+  <action name="actionImport_Data_wide_Descriptors">
+   <property name="text">
+    <string>&amp;Import Data-wide Descriptors</string>
+   </property>
+   <property name="toolTip">
+    <string>Import Data-wide Descriptors from Another ScanData</string>
+   </property>
+   <property name="statusTip">
+    <string>Import Data-wide Descriptors from Another ScanData</string>
+   </property>
+   <property name="whatsThis">
+    <string>Import Data-wide Descriptors from Another ScanData:
+
+This will import data-wide attributes: 
+SourceID, 
+Cell, 
+Field, 
+Age, 
+Sex, 
+Genotype
+
+and also the data-wide analysis unit descriptors (Distance from soma, etc...)</string>
+   </property>
+  </action>
+  <action name="actionLink_vertical_scan_cursors_to_scene_point_cursors">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Link vertical scan cursors to scene point cursors</string>
+   </property>
+  </action>
+  <action name="actionPlot_long_fits">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Plot long fits</string>
+   </property>
+  </action>
+  <action name="actionDisplay_colorbars">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Display colorbars</string>
+   </property>
+  </action>
+  <action name="actionDisplay_scale_bars">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Display &amp;scale bars</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

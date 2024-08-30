@@ -1,4 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 NOTE: 2023-06-26 17:25:32
 This is for the developer, NOT the final user:
@@ -47,12 +50,21 @@ bash script
 
 """
 import io, os, sys, subprocess, shutil, tempfile, typing, pathlib, traceback
+import argparse
 import string, datetime, importlib, inspect, itertools, time
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
                                      collect_all)
 from PyInstaller.building.datastruct import Tree
 
 start_time = time.perf_counter()
+
+parser = argparse.ArgumentParser()
+# parser.add_argument("-d", "--debug")
+parser.add_argument("--debug", action="store_true")
+compile_options = parser.parse_args()
+
+# print(f"compile_options: ", compile_options)
+
 
 hasNeuron=False
 try:
@@ -82,6 +94,7 @@ internal_plugins = list()
 # NOTE: 2024-05-15 09:03:24
 # looks like we do have to define DEFAULT_DISTPATH
 DEFAULT_DISTPATH = "./dist"
+
 
 if "--distpath" in sys.orig_argv:
     ndx = sys.orig_argv.index("--distpath")
@@ -385,11 +398,11 @@ tempdir = ""
 desktoptempdir=""
 # origin_fn = None
 # origin_file = None
-namesfx = ""
+gitsfx = ""
 final_exe_file_name = "scipyen.app"
 
 # NOTE: 2023-07-14 15:19:48
-# this gets the name of the scipyen git branch we are packaging ⇒ namesfx
+# this gets the name of the scipyen git branch we are packaging ⇒ gitsfx
 if os.path.isdir(os.path.join(mydir, ".git")):
     gitout = subprocess.run(["git", "-C", mydir, "branch", "--show-current"],
                             capture_output=True)
@@ -397,7 +410,8 @@ if os.path.isdir(os.path.join(mydir, ".git")):
     if gitout.returncode == 0 and len(gitout.stdout):
         gitbranch = gitout.stdout.decode().split("\n")[0]
         if gitbranch != "master":
-            namesfx = f"_{gitbranch}"
+            gitsfx=gitbranch
+            # gitsfx = f"_{gitbranch}"
             
         if len(gitbranch):
             gitout = subprocess.run(["git", "-C", mydir, "status", "--short", "--branch"],
@@ -406,7 +420,7 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                 branch_status = gitout.stdout.decode().split("\n")
                 branch_status.insert(0, f"Bundled from '{gitbranch}' git branch with status:")
                 
-                print(f"branch_status = {branch_status}")
+                # print(f"branch_status = {branch_status}")
                 
                 if len(branch_status):
                     tempdir = tempfile.mkdtemp()
@@ -417,7 +431,21 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                         
                     datas.append((origin_file_name, '.'))
                         
+host_name=""
 platform = sys.platform
+if platform == "win32":
+    datas.append((os.path.join(scipyen_dir, "install", "make_app_link.ps1"), "."))
+    datas.append((os.path.join(scipyen_dir, "install", "pythonbackend.ico"), "."))
+else:
+    uname = subprocess.run(["uname", "-ms"], encoding="utf-8", capture_output=True)
+    if uname.returncode==0:
+        platform = uname.stdout.strip("\n").replace(" ", "_")
+    pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
+    if pout.returncode == 0:
+        host_name = pout.stdout.strip("\n")
+
+# print(f"host_name = {host_name}; platform = {platform}")
+
 now = datetime.datetime.now()
 year = f"{now.year}"[-2:]
 month = f"{string.ascii_lowercase[now.month-1]}"
@@ -426,8 +454,12 @@ hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
 build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
-product = f"scipyen{namesfx}_{platform}_{build_sfx}"
-# product = f"scipyen{namesfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
+
+debug_sfx = "debug" if compile_options.debug else "_"
+
+product = "_".join(["scipyen", gitsfx, platform, host_name, debug_sfx, build_sfx])
+# product = f"scipyen{gitsfx}_{platform}_{host_name}{debug_sfx}"
+# product = f"scipyen{gitsfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
 
 bundlepath = os.path.join(distpath, product)
 
@@ -442,7 +474,7 @@ bundlepath = os.path.join(distpath, product)
 # if sys.platform == "linux":
 #     # add a system-wide installation script
 #     desktoptempdir = tempfile.mkdtemp()
-#     desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{namesfx}.desktop")
+#     desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{gitsfx}.desktop")
 #     # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
 #     desktop_icon_file = "pythonbackend.svg"
 #     exec_file = os.path.join(bundlepath, "scipyen")
@@ -476,7 +508,7 @@ bundlepath = os.path.join(distpath, product)
 #                         "whereami=`realpath ${mydir}`",
 #                         # "chown -R root:root ${whereami}",
 #                         "sudo ln -s -b ${whereami}/scipyen /usr/local/bin/",
-#                         "sudo ln -s -b ${whereami}/Scipyen_app" + f"{namesfx}.desktop /usr/share/applications/"]
+#                         "sudo ln -s -b ${whereami}/Scipyen_app" + f"{gitsfx}.desktop /usr/share/applications/"]
 # 
 #     install_script_tempdir = tempfile.mkdtemp()
 #     dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
@@ -600,7 +632,7 @@ a = Analysis(
     runtime_hooks=[os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_typeguard.py'),
                    # os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_gui.py'), # these just added manually to hiddenimports, above
                    ],
-    excludes=["OpenGL"],
+    excludes=["OpenGL", "torch", "nuitka"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -620,7 +652,7 @@ if sys.platform == "win32":
         [],
         exclude_binaries=True,
         name=final_exe_file_name, # name of the final executable
-        debug=False,
+        debug=compile_options.debug,
         bootloader_ignore_signals=False,
         strip=False,
         upx=True,
@@ -640,10 +672,10 @@ else:
         [],
         exclude_binaries=True,
         name=final_exe_file_name, # name of the final executable
-        debug=False,
+        debug=compile_options.debug,
         bootloader_ignore_signals=False,
         strip=False,
-        upx=True,
+        upx=False,
         console=True,
         disable_windowed_traceback=False,
         argv_emulation=False,

@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 import os, typing
 from numbers import (Number, Real,)
 from itertools import chain
@@ -60,7 +65,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
                  postsyn:typing.Optional[typing.Union[dict, tuple, list]]=None,
                  photo:typing.Optional[typing.Union[dict, tuple, list]]=None,
                  imaging:typing.Optional[typing.Union[dict, tuple, list]]=None,  
-                 clear:bool=False, parent:typing.Optional[QtWidgets.QWidget]=None):
+                 clear:bool=False, reltimes:bool=True,
+                 parent:typing.Optional[QtWidgets.QWidget]=None):
         """
         Named parameters:
         -----------------
@@ -86,6 +92,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         self._sig_start_  = ephys_start
         self._sig_stop_   = ephys_end
         self._n_channels_ = n_channels
+        self._reltimes_   = reltimes
+        
         
         self._configureUI_()
         
@@ -112,6 +120,8 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         
         self.imagingNameLineEdit.redoAvailable=True
         self.imagingNameLineEdit.undoAvailable=True
+        
+        self.reltimesCheckBox.setChecked(self._reltimes_)
         
         self._update_channel_ranges_()
         self._update_time_ranges_()
@@ -291,6 +301,16 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         return self.imagingGroupBox.isChecked()
     
     @property
+    def relTimes(self) -> bool:
+        return self._reltimes_
+    
+    @relTimes.setter
+    def relTimes(self, val:bool):
+        sigBlock = QtCore.QSignalBlocker(self.reltimesCheckBox)
+        self._reltimes_ = val==True
+        self.reltimesCheckBox.setChecked(self._reltimes_)
+    
+    @property
     def presyn(self):
         """Tuple: ( signal index, label, (t_start, t_stop) )
         """
@@ -427,6 +447,10 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
             raise TypeError("Unexpected %s value: %s" % (what, value))
             
         return value
+    
+    @Slot(int)
+    def _slot_reltimesCheckBoxStateChanged(self, val:int):
+        self._reltimes_ = val != QtCore.Qt.CheckState.Unchecked
     
     def _update_time_ranges_(self):
         widgets = (self.presynStartDoubleSpinBox,
@@ -628,7 +652,8 @@ class TriggerDetectDialog(qd.QuickDialog):
         
     @Slot(int)
     def _slot_ephysFrameChanged(self, value):
-        self._update_trigger_detect_ranges_(value)
+        if not self.eventDetectionWidget.relTimes:
+            self._update_trigger_detect_ranges_(value)
         
     @Slot()
     def slot_detect(self):
@@ -726,7 +751,7 @@ class TriggerDetectDialog(qd.QuickDialog):
                                         photostimulation = self.photo,
                                         imaging = self.imaging,
                                         clear = clear_flag,
-                                        protocols=True)
+                                        protocols=True, reltimes=True)
             
             self.triggerProtocols[:] = tp[:]
             
@@ -739,6 +764,11 @@ class TriggerDetectDialog(qd.QuickDialog):
                 self.detected = True
                 
             nEvents = len(get_trigger_events(self.ephysdata, flat=True))
+            
+            cFrame = self._ephysViewer_.currentFrame
+            
+            self._ephysViewer_.plot(self._ephys_)
+            # self._ephysViewer_.currentFrame = cFrame
             
             self.statusBar.showMessage("%d trigger events detected" % nEvents)
         
@@ -776,9 +806,12 @@ class TriggerDetectDialog(qd.QuickDialog):
             nChannels = max([len(seg.analogsignals) + len(seg.irregularlysampledsignals) for seg in self._ephys_.segments])
             self.eventDetectionWidget.nChannels = nChannels
             #self.eventDetectionWidget.nChannels = len(segment.analogsignals)
-            
-            self.eventDetectionWidget.signalStart = float(min([sig.t_start for sig in segment.analogsignals]).magnitude)
-            self.eventDetectionWidget.sgnalStop = float(max([sig.t_stop for sig in segment.analogsignals]).magnitude)
+            if self.eventDetectionWidget.relTimes:
+                self.eventDetectionWidget.signalStart = 0.00
+                self.eventDetectionWidget.signalStop = float(min([sig.t_stop - sig.t_start for sig in segment.analogsignals]).magnitude)
+            else:
+                self.eventDetectionWidget.signalStart = float(min([sig.t_start for sig in segment.analogsignals]).magnitude)
+                self.eventDetectionWidget.signalStop = float(max([sig.t_stop for sig in segment.analogsignals]).magnitude)
         
         
 def guiDetectTriggers(data:Block):

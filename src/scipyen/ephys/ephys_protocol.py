@@ -1,9 +1,22 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 from abc import ABC
 class ElectrophysiologyProtocol(ABC):
     """Abstract base class for electrophysiology data acquisition protocols
     
     """
-    pass
+    def __init__(self, **kwargs):
+        pass
+        # self._nADCChannels_ = kwargs.get("nADCChannels",0)
+        # self._nDACChannels_ = kwargs.get("nDACChannels",0)
+        # self._nDigitalOutputs_ = kwargs.get("nDigitalOutputs", 0)
+        # self._nTotalDigitalOutputs_ = kwargs.get("nTotalDigitalOutputs",0)
+        # self._activeDACChannel_= kwargs.get("activeDACChannel", 0)
+        # self._hasAltDacOutState_ = kwargs.get("altDACOutState",False)
+        
     # TODO 2023-10-15 21:10:06 on backburner for now.
     # write subclasses for:
     # • CED Signal protocols ("configuration")

@@ -1,7 +1,7 @@
 
 # Writing objects to HDF5 entities: 
 ```python
-makeHDF5Entity(obj, group, name, oname, compression, chunks, track_order, entity_cache)
+toHDF5(obj, group, name, oname, compression, chunks, track_order, entity_cache)
 ```
 where: 
 * `obj`: the Python object to be stored in the HDF5 entity
@@ -13,7 +13,7 @@ where:
 * `track_order`: flag whether to track the order in which new entities are inserted (`bool`); default is `True`
 * `entity_cache`: dictionary with previously created entities; default is `dict()`; this will avoid data duplications; cached entities are stored as "soft" links
 
-**NOTE:** The last four arguments are passed down the call chain to the various entity creation functions called by `makeHDF5Entity`.
+**NOTE:** The last four arguments are passed down the call chain to the various entity creation functions called by `toHDF5`.
 
 Creates a HDF5 Group (`h5py.Group`) or Dataset (`h5py.Dataset`) as shown in Table 1.
 
@@ -55,7 +55,7 @@ where:
 * `oname` is the object's desired name (as will be stored in the `attrs`); 
 
 Returns:
-* `target_name`: `name` attribute of the entity; this gives the name of the newly create entity (e.g in `makeHDF5Entity`); it may be overwritten in the caller
+* `target_name`: `name` attribute of the entity; this gives the name of the newly create entity (e.g in `toHDF5`); it may be overwritten in the caller
 * `obj_attrs`: dictionary that maps relevant object attribute name to their *JSON-encoded* values and can be stored as `attrs` property of the HDF5 entity.
 
 A set of relevant object properties are stored in the `attrs` property of the 

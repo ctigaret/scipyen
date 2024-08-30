@@ -1,12 +1,18 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 import typing
 import collections.abc
 from functools import singledispatch
-import vigra
+from core.vigra_patches import vigra
 import numpy as np
 import quantities as pq
 from .axiscalibration import (AxesCalibration, 
                               AxisCalibrationData,
-                              ChannelCalibrationData,)
+                              ChannelCalibrationData,
+                              getCalibratedAxisSize)
 from imaging import axisutils
 from imaging.axisutils import STANDARD_AXIS_TAGS_KEYS
 from traitlets import Bunch
@@ -1968,42 +1974,42 @@ def kernelfromarray(x):
         raise TypeError(f"Expecting a tuple or numpy array; got {type(x).__name__} instead")
         
 
-def getCalibratedAxisSize(image, axis):
-    """Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
-    
-    If axisinfo is not calibrated (i.e. does not have a calibration string in its
-    description attribute) then returns the size of the axis in pixel_unit.
-    
-    Parameters:
-    ==========
-    
-    image: vigra.VigraArray
-    
-    axis: vigra.AxisInfo, axis info key string, or an integer; any of these must 
-        point to an existing axis in the image
-    
-    """
-    
-    if isinstance(axis, int):
-        axsize = image.shape[axis]
-        axisinfo = image.axistags[axis]
-        
-    elif isinstance(axis, str):
-        axsize = image.shape[image.axistags.index(axis)]
-        axisinfo = image.axistags[axis]
-
-    elif isinstance(axis, vigra.AxisInfo):
-        axsize = image.shape[image.axistags.index(axis.key)]
-        axisinfo = axis
-
-    else:
-        raise TypeError("axis expected to be an int, str or vigra.AxisInfo; got %s instead" % type(axis).__name__)
-    
-    axcal = AxisCalibrationData(axisinfo)
-    
-    # FIXME what to do when there are several channels?
-    
-    return axcal.calibratedDistance(axsize)
+# def getCalibratedAxisSize(image, axis):
+#     """Returns a calibrated length for "axis" in "image" VigraArray, as a python Quantity
+#     
+#     If axisinfo is not calibrated (i.e. does not have a calibration string in its
+#     description attribute) then returns the size of the axis in pixel_unit.
+#     
+#     Parameters:
+#     ==========
+#     
+#     image: vigra.VigraArray
+#     
+#     axis: vigra.AxisInfo, axis info key string, or an integer; any of these must 
+#         point to an existing axis in the image
+#     
+#     """
+#     
+#     if isinstance(axis, int):
+#         axsize = image.shape[axis]
+#         axisinfo = image.axistags[axis]
+#         
+#     elif isinstance(axis, str):
+#         axsize = image.shape[image.axistags.index(axis)]
+#         axisinfo = image.axistags[axis]
+# 
+#     elif isinstance(axis, vigra.AxisInfo):
+#         axsize = image.shape[image.axistags.index(axis.key)]
+#         axisinfo = axis
+# 
+#     else:
+#         raise TypeError("axis expected to be an int, str or vigra.AxisInfo; got %s instead" % type(axis).__name__)
+#     
+#     axcal = AxisCalibrationData(axisinfo)
+#     
+#     # FIXME what to do when there are several channels?
+#     
+#     return axcal.calibratedDistance(axsize)
 
 def nFrames(x:vigra.VigraArray, 
             frameAxis:typing.Optional[typing.Union[vigra.AxisInfo, str, int, collections.abc.Sequence[typing.Union[vigra.AxisInfo, str, int]]]]=None):

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 import os, typing, types, math
 from functools import partial, partialmethod
 from dataclasses import MISSING
@@ -7,8 +12,7 @@ from inspect import (getmembers, getattr_static)
 import numpy as np
 import pandas as pd
 from core.datatypes import is_unavailable
-from core.prog import (ArgumentError,  WithDescriptors, 
-                       get_descriptors, signature2Dict)
+from core.prog import ArgumentError
 from core.utilities import (nth, normalized_index, sp_set_loc, sp_get_loc)
 from core.basescipyen import BaseScipyenData
 

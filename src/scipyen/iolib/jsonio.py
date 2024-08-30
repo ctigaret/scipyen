@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """ JSON codecs
 
     General schema:
@@ -164,7 +169,7 @@ import numpy.ma as ma
 import quantities as pq
 import pandas as pd
 import h5py
-import vigra
+from core.vigra_patches import vigra
 from traitlets.utils.importstring import import_item
 from traitlets import Bunch
 from core import quantities as scq

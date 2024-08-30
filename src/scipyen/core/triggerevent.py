@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """TriggerEvent class
 
 Changelog:
@@ -7,6 +10,7 @@ Changelog:
 
 """
 import warnings
+import typing
 #from enum import IntEnum
 from numbers import (Number, Real,)
 from copy import (deepcopy, copy,)
@@ -17,12 +21,13 @@ import neo
 from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.datatypes import (is_string, TypeEnum,
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
+from core.prog import scipywarn
 from core.quantities import check_time_units
 #from core.utilities import unique
 
 def _new_DataMark(cls, places = None, labels=None, units=None, name=None, 
                   file_origin=None, description=None, mark_type=None,
-                  segment=None, array_annotations=None, annotations={}):
+                  segment=None, relative=None, array_annotations=None, annotations={}):
     if not isinstance(annotations, dict):
         if annotations is None:
             annotations = dict()
@@ -34,7 +39,8 @@ def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
                 
     e = cls(places=places, labels=labels, units=units, name=name, 
             mark_type=mark_type, file_origin=file_origin, 
-            description=description, array_annotations=array_annotations,
+            description=description, relative=relative, 
+            array_annotations=array_annotations,
             **annotations)
     
     e.segment=segment
@@ -43,7 +49,7 @@ def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
 
 def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 
                description=None, file_origin=None, event_type=None,
-               segment=None, array_annotations=None, annotations={}):
+               segment=None, relative=None, array_annotations=None, annotations={}):
     """Keep for old pickles
     """
     if not isinstance(annotations, dict):
@@ -57,7 +63,8 @@ def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
                 
     e = TriggerEvent(times=times, labels=labels, units=units, name=name,
                       description=description, file_origin=file_origin, 
-                      event_type=event_type, array_annotations=array_annotations,
+                      event_type=event_type, relative=relative, 
+                      array_annotations=array_annotations,
                       **annotations)
     
     e.segment=segment
@@ -132,13 +139,14 @@ class DataMark(neo.Event):
     _quantity_attr = ('places', 'times',)
     _necessary_attrs = (('places', pq.Quantity, 1), 
                         ('times', pq.Quantity, 1),
-                        ('labels', np.ndarray, 1, np.dtype('U')))
+                        ('labels', np.ndarray, 1, np.dtype('U')),
+                        ('relative', bool, 1, False))
     
     _parent_attrs = ("segment", )
 
     #@staticmethod
     @classmethod
-    def parseValues(cls, value, units=None):
+    def parseValues(cls, value, units:typing.Optional[pq.Quantity]=None) -> pq.Quantity:
         """ Parses values to an array of quantities suitable for a TriggerEvent
         
         Parameters:
@@ -179,7 +187,8 @@ class DataMark(neo.Event):
         
             units = units.units
         
-        if not check_time_units(units):
+        # if cls.__name__ == "TriggerEvent" and not check_time_units(units):
+        if cls is TriggerEvent and not check_time_units(units):
             raise TypeError("expecting a time unit; got %s instead" % units)
             
         if isinstance(value, (tuple, list)):
@@ -264,7 +273,9 @@ class DataMark(neo.Event):
             
         return times
 
-    def __new__(cls, places=None, times=None, labels=None, units=None, name=None, description=None, file_origin=None, mark_type=None, event_type=None, array_annotations=None, **annotations):
+    def __new__(cls, places=None, times=None, labels=None, units=None, name=None, 
+                description=None, file_origin=None, mark_type=None, event_type=None, 
+                relative=None, array_annotations=None, **annotations):
         
         if places is None:
             if times is None:
@@ -299,6 +310,7 @@ class DataMark(neo.Event):
             places = evt.times.flatten() * units
             labels = evt.labels
             name = evt.name
+            relative = getattr(evt, "relative", False)
             description = evt.description
             file_origin = evt.file_origin
             annotations = evt.annotations
@@ -365,6 +377,10 @@ class DataMark(neo.Event):
             if isinstance(event_type, (int, TriggerEventType)):
                 mark_type = event_type
                 
+                
+        if not isinstance(relative, bool):
+            relative = False
+                
         # NOTE: 2021-11-11 09:39:49
         # ONLY for TriggerEvent
         # check to make sure the units are time
@@ -380,12 +396,15 @@ class DataMark(neo.Event):
             
         obj = pq.Quantity(places, units=dim).view(cls)
         obj._labels = labels
+        obj._relative = relative
         obj.segment = None
         # obj.name = name
         return obj
 
     
-    def __init__(self, places=None, times=None, labels=None, units=None, name=None, description=None, file_origin=None, mark_type=None, array_annotations=None, **annotations):
+    def __init__(self, places=None, times=None, labels=None, units=None, name=None, 
+                 description=None, file_origin=None, mark_type=None, 
+                 relative = None, array_annotations=None, **annotations):
         """Constructs a DataMark.
         
         For DataMark objects, event_type is by default MarkType.place
@@ -400,6 +419,7 @@ class DataMark(neo.Event):
             annotations = dict()
         
         self.annotations = annotations
+        self._relative = relative
         
         # NOTE: see NOTE: 2021-11-11 09:39:49
         
@@ -461,6 +481,7 @@ class DataMark(neo.Event):
         self.__mark_type__ = getattr(obj, "__mark_type__", MarkType.place)
         
         self._labels = getattr(obj, 'labels', None)
+        self._relative = getattr(obj, "relative", False)
         self.annotations = getattr(obj, 'annotations', None)
         self.name = getattr(obj, 'name', None)
         self.file_origin = getattr(obj, 'file_origin', None)
@@ -795,8 +816,8 @@ class DataMark(neo.Event):
     
     def region_slice(self, t_start, t_stop):
         '''
-        Creates a new :class:`TriggerEvent` corresponding to the time slice of
-        the original :class:`TriggerEvent` between (and including) times
+        Creates a new :class:`DataMark` corresponding to the time slice of
+        the original :class:`DataMark` between (and including) times
         :attr:`t_start` and :attr:`t_stop`. Either parameter can also be None
         to use infinite endpoints for the time interval.
         '''
@@ -816,6 +837,7 @@ class DataMark(neo.Event):
                                  units=self.units, name=self.name,
                                  description=self.description,
                                  file_origin=self.file_origin,
+                                 relative=self.relative,
                                  array_annotations=self.array_annotations,
                                  **self.annotations)
         
@@ -911,10 +933,13 @@ class DataMark(neo.Event):
             
         if result:
             result &= other.name == self.name
+            
+        if result:
+            result = getattr(other, "relative", False) == getattr(self, "relative", False)
         
         return result
             
-    def to_epoch(self, pairwise=False, durations=None):
+    def to_zone(self, pairwise=False, durations=None, to_epoch:bool=False):
         """
         Returns a new Epoch object based on the times and labels in the TriggerEvent object.
 
@@ -943,6 +968,7 @@ class DataMark(neo.Event):
         If `durations` is not given, then the event labels A and B bounding
         the epoch are used to set the labels of the epochs in the form 'A-B'.
         """
+        from core.datazone import DataZone
 
         if pairwise:
             # Mode 2
@@ -966,11 +992,22 @@ class DataMark(neo.Event):
             # Mode 3
             times = self.times
             labels = self.labels
-            
-        return neo.Epoch(times=times, durations=durations, labels=labels)
+        
+        relative = getattr(self, "relative", False)
+        if to_epoch:
+            if relative:
+                scipywarn(f"{self.__class__.__name__}: Creating a neo.Epoch while domain coordinates are relative! neo.Epoch only supports absolute coordinates")
+            return neo.Epoch(times=times, durations=durations, labels=labels)
+        else:
+            return DataZone(times=times, durations=durations, labels=labels, relative=relative)
+        
 
+    def to_epoch(self, pairwise=False, durations=None):
+        return self.to_zone(pairwise=pairwise, durations=durations, to_epoch=True)
+            
     labels = property(get_labels, set_labels)
     
+            
     @property
     def places(self):
         return pq.Quantity(self)
@@ -978,6 +1015,16 @@ class DataMark(neo.Event):
     @property
     def times(self):
         return self.places
+    
+    @property
+    def relative(self) -> bool:
+        """Indicates if the domain value is relative to the start of the signal.
+        """
+        return getattr(self, "_relative", False)
+    
+    @relative.setter
+    def relative(self, val:bool):
+        self._relative = val == True
     
     @property
     def name(self):
@@ -1119,7 +1166,8 @@ class TriggerEvent(DataMark):
     parseTimeValues = DataMark.parseValues
     
     def __new__(cls, times=None, labels=None, units=None, name=None, description=None,
-                file_origin=None, event_type=None, array_annotations=None, **annotations):
+                file_origin=None, event_type=None, relative=None,
+                array_annotations=None, **annotations):
         # BUG: 2023-10-03 17:57:30 FIXME
         # when labels are passed as a string the counter is not taken into account
         if times is None:
@@ -1135,6 +1183,7 @@ class TriggerEvent(DataMark):
             labels = evt.labels
             units = evt.units
             name = evt.name
+            relative = getattr(evt, "relative", False)
             description = evt.description
             file_origin = evt.file_origin
             annotations = evt.annotations
@@ -1201,22 +1250,29 @@ class TriggerEvent(DataMark):
         if (len(dim) != 1 or list(dim.values())[0] != 1 or not isinstance(list(dim.keys())[0],
                                                                           pq.UnitTime)):
             ValueError("Unit {} has dimensions {}, not [time]".format(units, dim.simplified))
+            
+        if not isinstance(relative, bool):
+            relative = False
+            
 
         obj = pq.Quantity(times, units=dim).view(cls)
         obj._labels = labels
+        obj._relative = relative
         obj.segment = None
         return obj
 
     
     def __init__(self, times=None, labels=None, units=None, name=None, description=None,
-                file_origin=None, event_type=None, array_annotations=None, **annotations):
+                file_origin=None, event_type=None, relative=None,
+                array_annotations=None, **annotations):
         """Constructs a TriggerEvent.
         
         By default its __mark_type__ is TriggerEventType.presynaptic
         """
         super().__init__(times=times, labels=labels, units=units, name=name,
                          description=description, file_origin=file_origin, 
-                         mark_type=event_type, array_annotations=array_annotations,
+                         mark_type=event_type, relative=relative,
+                         array_annotations=array_annotations,
                          **annotations)
         
     def __array_finalize__(self, obj):
@@ -1225,6 +1281,7 @@ class TriggerEvent(DataMark):
         self.__mark_type__ = getattr(obj, "__mark_type__", TriggerEventType.presynaptic)
         
         self._labels = getattr(obj, '_labels', None)
+        self._relative = getattr(obj, "relative", False)
         self.annotations = getattr(obj, 'annotations', None)
         self.name = getattr(obj, 'name', None)
         self.file_origin = getattr(obj, 'file_origin', None)
@@ -1271,7 +1328,7 @@ class TriggerEvent(DataMark):
         """
         return self.append_marks(value) # inherited from DataMark
 
-    def to_epoch(self, pairwise=False, durations=None):
+    def to_zone(self, pairwise=False, durations=None, to_epoch:bool=False):
         """
         Returns a new Epoch object based on the times and labels in the TriggerEvent object.
 
@@ -1300,6 +1357,7 @@ class TriggerEvent(DataMark):
         If `durations` is not given, then the event labels A and B bounding
         the epoch are used to set the labels of the epochs in the form 'A-B'.
         """
+        from core.datazone import DataZone
 
         if pairwise:
             # Mode 2
@@ -1323,7 +1381,19 @@ class TriggerEvent(DataMark):
             # Mode 3
             times = self.times
             labels = self.labels
-        return neo.Epoch(times=times, durations=durations, labels=labels)
+            
+        relativ = getattr(self, "relative", False)
+        
+        if to_epoch:
+            if relative:
+                scipywarn(f"{self.__class__.__name__}: Creating a neo.Epoch while domain coordinates are relative! neo.Epoch only supports absolute coordinates")
+            return neo.Epoch(times=times, durations=durations, labels=labels)
+        else:
+            return DataZone(times=times, durations=durations, labels=labels, relative=relative)
+            
+    
+    def to_epoch(self, pairwise=False, durations=None):
+        return self.to_zone(pairwise=pairwise, durations=durations, to_epoch=True)
 
     @property
     def event_type(self):

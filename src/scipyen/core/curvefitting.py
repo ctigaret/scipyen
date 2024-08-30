@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """
 Wrappers around scipy.optimize
 
@@ -15,7 +19,7 @@ import numpy as np
 import quantities as pq
 import pandas as pd
 from scipy import cluster, optimize, signal, integrate #, where
-import vigra
+from core.vigra_patches import vigra
 import neo
 #### END 3rd party modules
 

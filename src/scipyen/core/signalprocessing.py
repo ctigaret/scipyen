@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """Functions for processing generic 1D signals (numpy array).
 For signal processing on elecctorphysiology signal types (e.g. neo.AnalogSignals or datatypes.DataSignal)
 please use the "ephys" module.
@@ -30,7 +34,6 @@ def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
         column 0 has x coordinates, column 1 has y coordinates)
         
     max_points: int (default 5) or None
-    
         When an int: this indicates the maximum number of adjacent points in xy
             having with non-identical coordinates. 
         
@@ -103,6 +106,8 @@ def simplify_2d_shape(xy:np.ndarray, max_points:int = 5, k:int = 3):
     """
     
     from scipy import interpolate
+    
+    # print(f"simplify_2d_shape: xy.shape = {xy.shape}")
     
     # 0) get the indices of ALMOST ALL points with unique x & y
     xd = np.diff(xy, axis = 0)
@@ -2662,7 +2667,13 @@ NOTES:
     # Currently this function does almost the same thing as parse_step_waveform_signal.
     # TODO 2023-06-18 22:10:21 merge codes into one function !
     from scipy import (cluster, signal)
-    from scipy.signal import boxcar
+    from scipy.signal.windows import boxcar
+    # try:
+    #     from scipy.signal import boxcar
+    # except:
+    #     from scipy.signal.windows import boxcar
+    # finally:
+    #     raise
 
     if not isinstance(x, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % type(x).__name__)

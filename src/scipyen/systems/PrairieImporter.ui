@@ -6,15 +6,442 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>478</width>
-    <height>254</height>
+    <width>442</width>
+    <height>494</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Import PrairieView</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout_2">
+  <layout class="QGridLayout" name="gridLayout_3">
+   <item row="0" column="0">
+    <widget class="QGroupBox" name="dataFilesGroupBox">
+     <property name="title">
+      <string>Data files</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_5">
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QLabel" name="label">
+            <property name="text">
+             <string>PrairieView Scan file</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="pvScanFileChooserToolButton">
+            <property name="toolTip">
+             <string>Open PrairieView Scan file</string>
+            </property>
+            <property name="statusTip">
+             <string>Open PrairieView Scan file</string>
+            </property>
+            <property name="whatsThis">
+             <string>Open PrairieView Scan file</string>
+            </property>
+            <property name="text">
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset theme="document-open">
+              <normaloff>.</normaloff>.</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="pvScanImportFromWorkspaceToolButton">
+            <property name="toolTip">
+             <string>Import PrairieView Scan object</string>
+            </property>
+            <property name="statusTip">
+             <string>Import PrairieView Scan object</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;justify&quot;&gt;Import PVScan object from  workspace, or create and import a PVScan  from an appropriate XML DOM document in the workspace,&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset theme="document-import">
+              <normaloff>.</normaloff>.</iconset>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="pvScanFileNameLineEdit">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>1</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="toolTip">
+           <string>PV Scan XML file name</string>
+          </property>
+          <property name="statusTip">
+           <string>PV Scan XML file name</string>
+          </property>
+          <property name="whatsThis">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;XML file output by PrairieView, which contains PVScan information&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="clearButtonEnabled">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <widget class="QLabel" name="label_3">
+            <property name="toolTip">
+             <string>Electrophysiology files</string>
+            </property>
+            <property name="statusTip">
+             <string>Electrophysiology files</string>
+            </property>
+            <property name="whatsThis">
+             <string>One or more electrophysiology files recorded during the PrairieeView files</string>
+            </property>
+            <property name="text">
+             <string>Electrophysiology file(s)</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="ephysFileChooserToolButton">
+            <property name="toolTip">
+             <string>Open electrophysiology file(s)</string>
+            </property>
+            <property name="statusTip">
+             <string>Open electrophysiology file(s)</string>
+            </property>
+            <property name="whatsThis">
+             <string>Open electrophysiology file(s)</string>
+            </property>
+            <property name="text">
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset theme="document-open">
+              <normaloff>.</normaloff>.</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="ephysImportFromWorkspaceToolButon">
+            <property name="toolTip">
+             <string>Import electrophysiology</string>
+            </property>
+            <property name="statusTip">
+             <string>Import electrophysiology</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Import electrophysiology from an workspace object: a neo.Block or ScanData.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset theme="document-import">
+              <normaloff>.</normaloff>.</iconset>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="ephysFileNameLineEdit">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>1</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="toolTip">
+           <string>Electrophysiology file name(s) separated by OS-specific path separator (':' on Linux and MacOS, ';' on Windows)</string>
+          </property>
+          <property name="statusTip">
+           <string>Electrophysiology file name(s) separated by OS-specific path separator (':' on Linux and MacOS, ';' on Windows)</string>
+          </property>
+          <property name="whatsThis">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Names of electrophysiolopgy file(s). These can be axon binary files, or a pickle file with the electrophysiology data.&lt;/p&gt;&lt;p&gt;These MUST be separated by the OS-specific path separator, for example&lt;/p&gt;&lt;p&gt; &amp;quot;:&amp;quot; on POSIX OSes such as, Linux, MacOS X&lt;/p&gt;&lt;p&gt;&amp;quot;;&amp;quot; on Windows&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
    <item row="1" column="0">
+    <widget class="QGroupBox" name="scanDataGroupBox">
+     <property name="title">
+      <string>ScanData</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2">
+      <item row="0" column="0">
+       <widget class="QGroupBox" name="protocolsGroupBox">
+        <property name="title">
+         <string>Trigger Protocols</string>
+        </property>
+        <layout class="QGridLayout" name="gridLayout">
+         <item row="0" column="0">
+          <layout class="QVBoxLayout" name="verticalLayout">
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_3">
+             <item>
+              <widget class="QToolButton" name="detectTriggersToolButton">
+               <property name="toolTip">
+                <string>Detect triggers from electrophysiology</string>
+               </property>
+               <property name="statusTip">
+                <string>Detect triggers from electrophysiology</string>
+               </property>
+               <property name="whatsThis">
+                <string>Detect triggers from electrophysiology</string>
+               </property>
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset theme="tools-wizard">
+                 <normaloff>.</normaloff>.</iconset>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="editTriggerProtocolsToolButton">
+               <property name="toolTip">
+                <string>Edit trigger protocols</string>
+               </property>
+               <property name="statusTip">
+                <string>Edit trigger protocols</string>
+               </property>
+               <property name="whatsThis">
+                <string>Edit trigger protocols</string>
+               </property>
+               <property name="text">
+                <string>Edit Protocols</string>
+               </property>
+               <property name="icon">
+                <iconset theme="document-edit">
+                 <normaloff>.</normaloff>.</iconset>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="triggerProtocolFileChooserToolButton">
+               <property name="toolTip">
+                <string>Open protocol file</string>
+               </property>
+               <property name="statusTip">
+                <string>Open protocol file</string>
+               </property>
+               <property name="whatsThis">
+                <string>Open protocol file</string>
+               </property>
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset theme="document-open">
+                 <normaloff>.</normaloff>.</iconset>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="protocolsImportToolButton">
+               <property name="toolTip">
+                <string>Import trigger protocols</string>
+               </property>
+               <property name="statusTip">
+                <string>Import trigger protocols</string>
+               </property>
+               <property name="whatsThis">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Import trigger protocols from a workspace object: a TriggerProtocol, a neo.Block, or ScanData.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset theme="document-import">
+                 <normaloff>.</normaloff>.</iconset>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_3">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="triggerProtocolFileNameLineEdit">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>1</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>Trigger protocols file name</string>
+             </property>
+             <property name="statusTip">
+              <string>Trigger protocols file name</string>
+             </property>
+             <property name="whatsThis">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pickle file containing trigger protocols.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <layout class="QVBoxLayout" name="verticalLayout_3">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <item>
+           <widget class="QLabel" name="label_2">
+            <property name="toolTip">
+             <string>ScanData analysis options</string>
+            </property>
+            <property name="text">
+             <string>Options</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="optionsFileNameLineEdit">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>1</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="toolTip">
+             <string>Options file name</string>
+            </property>
+            <property name="statusTip">
+             <string>Options file name</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pickle file with EPSCaT options&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="clearButtonEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="optionsFileChooserToolButton">
+            <property name="toolTip">
+             <string>Open options file</string>
+            </property>
+            <property name="statusTip">
+             <string>Open options file</string>
+            </property>
+            <property name="whatsThis">
+             <string>Open options file</string>
+            </property>
+            <property name="text">
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset theme="document-open">
+              <normaloff>.</normaloff>.</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="optionsImportToolButton">
+            <property name="toolTip">
+             <string>Import options</string>
+            </property>
+            <property name="statusTip">
+             <string>Import options</string>
+            </property>
+            <property name="whatsThis">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Import EPSCaT Options from an object in the workspace, which  can be a dict, a DataBag, or another ScanData object.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset theme="document-import">
+              <normaloff>.</normaloff>.</iconset>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_5">
+          <item>
+           <widget class="QLabel" name="label_5">
+            <property name="toolTip">
+             <string>Name of the resulting ScanData object</string>
+            </property>
+            <property name="text">
+             <string>Name  </string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="dataNameLineEdit"/>
+          </item>
+          <item>
+           <widget class="QToolButton" name="buildScandataToolButton">
+            <property name="toolTip">
+             <string>Build Scandata</string>
+            </property>
+            <property name="statusTip">
+             <string>Build Scandata</string>
+            </property>
+            <property name="whatsThis">
+             <string>Build Scandata</string>
+            </property>
+            <property name="text">
+             <string>Build</string>
+            </property>
+            <property name="icon">
+             <iconset theme="run-build">
+              <normaloff>.</normaloff>.</iconset>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="2" column="0">
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
@@ -23,373 +450,6 @@
       <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
      </property>
     </widget>
-   </item>
-   <item row="0" column="0">
-    <layout class="QGridLayout" name="gridLayout">
-     <item row="0" column="0">
-      <layout class="QHBoxLayout" name="horizontalLayout">
-       <item>
-        <widget class="QLabel" name="label_5">
-         <property name="text">
-          <string>Name  </string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="dataNameLineEdit"/>
-       </item>
-       <item>
-        <widget class="QToolButton" name="buildScandataToolButton">
-         <property name="toolTip">
-          <string>Build Scandata</string>
-         </property>
-         <property name="statusTip">
-          <string>Build Scandata</string>
-         </property>
-         <property name="whatsThis">
-          <string>Build Scandata</string>
-         </property>
-         <property name="text">
-          <string>Build</string>
-         </property>
-         <property name="icon">
-          <iconset theme="run-build">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item row="3" column="0">
-      <layout class="QHBoxLayout" name="horizontalLayout_4">
-       <item>
-        <widget class="QLabel" name="label_3">
-         <property name="text">
-          <string>Electrophysiology</string>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="ephysFileNameLineEdit">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>1</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Electrophysiology file name(s) separated by OS-specific path separator (':' on Linux and MacOS, ';' on Windows)</string>
-         </property>
-         <property name="statusTip">
-          <string>Electrophysiology file name(s) separated by OS-specific path separator (':' on Linux and MacOS, ';' on Windows)</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Names of electrophysiolopgy file(s). These can be axon binary files, or a pickle file with the electrophysiology data.&lt;/p&gt;&lt;p&gt;These MUST be separated by the OS-specific path separator, for example&lt;/p&gt;&lt;p&gt; &amp;quot;:&amp;quot; on POSIX OSes such as, Linux, MacOS X&lt;/p&gt;&lt;p&gt;&amp;quot;;&amp;quot; on Windows&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="ephysFileChooserToolButton">
-         <property name="toolTip">
-          <string>Open electrophysiology file(s)</string>
-         </property>
-         <property name="statusTip">
-          <string>Open electrophysiology file(s)</string>
-         </property>
-         <property name="whatsThis">
-          <string>Open electrophysiology file(s)</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-open">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="ephysImportFromWorkspaceToolButon">
-         <property name="toolTip">
-          <string>Import electrophysiology</string>
-         </property>
-         <property name="statusTip">
-          <string>Import electrophysiology</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Import electrophysiology from an workspace object: a neo.Block or ScanData.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-import">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item row="5" column="0">
-      <layout class="QHBoxLayout" name="horizontalLayout_5">
-       <item>
-        <widget class="QLabel" name="label_4">
-         <property name="text">
-          <string>Protocols</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="triggerProtocolFileNameLineEdit">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>1</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Trigger protocols file name</string>
-         </property>
-         <property name="statusTip">
-          <string>Trigger protocols file name</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pickle file containing trigger protocols.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="detectTriggersToolButton">
-         <property name="toolTip">
-          <string>Detect triggers from electrophysiology</string>
-         </property>
-         <property name="statusTip">
-          <string>Detect triggers from electrophysiology</string>
-         </property>
-         <property name="whatsThis">
-          <string>Detect triggers from electrophysiology</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="tools-wizard">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="editTriggerProtocolsToolButton">
-         <property name="toolTip">
-          <string>Edit trigger protocols</string>
-         </property>
-         <property name="statusTip">
-          <string>Edit trigger protocols</string>
-         </property>
-         <property name="whatsThis">
-          <string>Edit trigger protocols</string>
-         </property>
-         <property name="text">
-          <string>Edit Protocols</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-edit">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="triggerProtocolFileChooserToolButton">
-         <property name="toolTip">
-          <string>Open protocol file</string>
-         </property>
-         <property name="statusTip">
-          <string>Open protocol file</string>
-         </property>
-         <property name="whatsThis">
-          <string>Open protocol file</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-open">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="protocolsImportToolButton">
-         <property name="toolTip">
-          <string>Import trigger protocols</string>
-         </property>
-         <property name="statusTip">
-          <string>Import trigger protocols</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Import trigger protocols from a workspace object: a TriggerProtocol, a neo.Block, or ScanData.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-import">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item row="1" column="0">
-      <layout class="QHBoxLayout" name="horizontalLayout_2">
-       <item>
-        <widget class="QLabel" name="label">
-         <property name="text">
-          <string>PVScan</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="pvScanFileNameLineEdit">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>1</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>PV Scan XML file name</string>
-         </property>
-         <property name="statusTip">
-          <string>PV Scan XML file name</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;XML file output by PrairieView, which contains PVScan information&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="clearButtonEnabled">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="pvScanFileChooserToolButton">
-         <property name="toolTip">
-          <string>Open PrairieView Scan file</string>
-         </property>
-         <property name="statusTip">
-          <string>Open PrairieView Scan file</string>
-         </property>
-         <property name="whatsThis">
-          <string>Open PrairieView Scan file</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-open">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="pvScanImportFromWorkspaceToolButton">
-         <property name="toolTip">
-          <string>Import PrairieView Scan object</string>
-         </property>
-         <property name="statusTip">
-          <string>Import PrairieView Scan object</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;justify&quot;&gt;Import PVScan object from  workspace, or create and import a PVScan  from an appropriate XML DOM document in the workspace,&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-import">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item row="6" column="0">
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
-       <item>
-        <widget class="QLabel" name="label_2">
-         <property name="text">
-          <string>Options</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="optionsFileNameLineEdit">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>1</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Options file name</string>
-         </property>
-         <property name="statusTip">
-          <string>Options file name</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pickle file with EPSCaT options&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="clearButtonEnabled">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="optionsFileChooserToolButton">
-         <property name="toolTip">
-          <string>Open options file</string>
-         </property>
-         <property name="statusTip">
-          <string>Open options file</string>
-         </property>
-         <property name="whatsThis">
-          <string>Open options file</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-open">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="optionsImportToolButton">
-         <property name="toolTip">
-          <string>Import options</string>
-         </property>
-         <property name="statusTip">
-          <string>Import options</string>
-         </property>
-         <property name="whatsThis">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Import EPSCaT Options from an object in the workspace, which  can be a dict, a DataBag, or another ScanData object.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-import">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-    </layout>
    </item>
   </layout>
  </widget>
@@ -411,6 +471,7 @@
   <tabstop>optionsFileChooserToolButton</tabstop>
   <tabstop>optionsImportToolButton</tabstop>
  </tabstops>
+ <resources/>
  <connections>
   <connection>
    <sender>buttonBox</sender>

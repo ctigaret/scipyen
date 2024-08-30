@@ -1,4 +1,9 @@
 #!/bin/bash
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 
 function show_help ()
 {
@@ -38,10 +43,17 @@ fi
 
 destination=${HOME}/scipyen_app 
 
+debug=0
+
 for i in "$@" ; do
+#     echo $i
     case $i in 
-        --install_dir)
+        --install_dir=*)
         destination="${i#*=}"
+        shift
+        ;;
+        --debug)
+        debug=1
         shift
         ;;
         -h|-?|--help)
@@ -61,13 +73,22 @@ for i in "$@" ; do
 done
 
 if [ -d ${destination} ] ; then
-    mkdir $destination
+    mkdir -p $destination
 fi
 
 workdir=${destination}/build
 distdir=${destination}/dist
 
-pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec
+echo $0: $"debug: "$debug
+
+export PYTHONHASHSEED=1
+
+if [[ $debug -gt 0 ]] ;  then
+pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec -- --debug
+else
+pyinstaller --distpath ${distdir} --workpath ${workdir} --clean --noconfirm ./scipyen.spec 
+fi
+
 
 if [[ $? -ne 0 ]] ; then
 echo -e "Compilation of frozen Scipyen application failed"

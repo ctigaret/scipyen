@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 import numbers, os, typing, inspect, traceback
 from enum import IntEnum, auto
 from pprint import pprint
@@ -1467,6 +1472,12 @@ def printPoints(points:typing.Union[QtGui.QPolygonF, QtGui.QPolygon, typing.Sequ
     else:
         return ret
         
+def qPathElementCoordinates(x:QtGui.QPainterPath):
+    if x.isEmpty():
+        yield
+    
+    return ((x.elementAt(k).x, x.elementAt(k).y) for k in range(x.elementCount()))
+        
 class ColorGradient():
     """Encapsulates the appearance of a conical, linear or radial Qt gradient.
     
@@ -2317,7 +2328,6 @@ class Pen(Bunch):
             
         pen.setCosmetic(self.cosmetic)
         return pen
-        
         
         
         

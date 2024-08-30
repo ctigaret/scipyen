@@ -1,4 +1,11 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+# nuitka-project: --standalone
+# nuitka-project: --enable-plugin=pyqt5
+
 '''Main module for the Scipyen application '''
 
 
@@ -19,7 +26,13 @@ os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
 # restore window sizes and positions from Scipyen.conf (Wayland does not allow
 # an application 'client' to control window position)
 if sys.platform == "linux":
-    os.environ["QT_QPA_PLATFORM"]="xcb"
+    if os.getenv("XDG_SESSION_TYPE", None) == "wayland":
+        # print("In a wayland session")
+        os.environ["QT_QPA_PLATFORM"]="xcb"
+        # import pywayland
+        
+    
+    # os.environ["QT_QPA_PLATFORM"]="xcb"
 
 if len(sys.argv) > 1:
     if "pyqt6" in sys.argv:
@@ -112,7 +125,8 @@ except:
 #
 mpath = pathlib.Path(__module_path__)
 
-iconsdir = mpath / "gui" / "resources" / "icons"
+# iconsdir = mpath / "gui" / "resources" / "icons"
+iconsdir = mpath / "gui" / "resources" 
 
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
@@ -221,7 +235,7 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
 
 def main():
     import gui.mainwindow as mainwindow
-    print(f"Using {os.environ['QT_API']} for GUI and {os.environ['PYQTGRAPH_QT_LIB']} for PyQtGraph\n")
+    # print(f"Using {os.environ['QT_API']} for GUI and {os.environ['PYQTGRAPH_QT_LIB']} for PyQtGraph\n")
     faulthandler.enable()
     
     # NOTE: 2021-08-17 10:02:20

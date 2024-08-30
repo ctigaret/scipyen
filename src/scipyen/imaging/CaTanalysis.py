@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 """
 Module for analysis of Ca2+ transients (CaTs)
 
@@ -173,7 +178,7 @@ import quantities as pq
 
 import neo
 
-import vigra
+from core.vigra_patches import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -190,8 +195,21 @@ from core.quantities import (arbitrary_unit, check_time_units, units_convertible
                             unit_quantity_from_name_or_symbol, )
 from core.datatypes import UnitTypes
 from core.workspacefunctions import validate_varname
-from core.utilities import (get_nested_value, set_nested_value, counter_suffix, )
-from core.prog import (safeWrapper, safeGUIWrapper, )
+from core.utilities import (get_nested_value, set_nested_value, counter_suffix, 
+                            reverse_mapping_lookup, 
+                            get_index_for_seq, 
+                            safe_identity_test,
+                            eq,
+                            sp_set_loc,
+                            normalized_index,
+                            unique,
+                            duplicates,
+                            GeneralIndexType,
+                            counter_suffix,
+                            yyMdd,
+                            NestedFinder)
+
+from core.prog import (safeWrapper, safeGUIWrapper, scipywarn)
 #import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import DataZone
@@ -234,14 +252,17 @@ from imaging.imageprocessing import *
 
 # NOTE: 2024-05-30 14:25:00 see  NOTE: 2024-05-30 14:16:25
 from imaging import scandata
-from imaging.scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
+from imaging.scandata import (ScanDataType, ScanData, ScanDataAnalysisMode,
+                              ScanDataOptions,
+                              AnalysisUnit, check_apiversion, scanDataOptions)
 from imaging import axisutils
 from imaging.axisutils import dimEnum
 from imaging.axiscalibration import (AxesCalibration, 
                               AxisCalibrationData, 
                               ChannelCalibrationData,
                               CalibrationData,  
-                              calibration, axisChannelName, getAxisResolution)
+                              calibration, axisChannelName, getAxisResolution,
+                              getAxisUnits)
 #### END imaging modules
 
 #### BEGIN pict.iolib modules
@@ -886,19 +907,16 @@ def getProfile(scandata, roi, scene=True):
     if not isinstance(scandata, ScanData):
         raise TypeError("First parameter was expected to be a datatypes.ScanData; got %s instead" % type(scandata).__name__)
     
-    
     if not isinstance(roi, (pgui.PlanarGraphics, vigra.AxisInfo)):
         raise TypeError("Second parameter was expected to be a pictgui.PlanarGraphics object or a vigra.AxisInfo object None; got %s instead" % type(roi).__name__)
     
     if isinstance(roi, pgui.PlanarGraphics) and roi.type % pgui.GraphicsObjectType.allCursors:
         raise TypeError("Second parameter was expected ot be a shaped PlanarGraphics; got %s instead" % roi.type)
     
-    
-    
-    if scandata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
+    if scandata.analysisMode != ScanDataAnalysisMode.frame:
         raise NotImplementedError("%s analysis not yet supported" % self.analysisMode)
     
-    if scandata.scanType != ScanData.ScanDataType.linescan:
+    if scandata.scanType != ScanDataType.linescan:
         raise NotImplementedError("%s not yet supported" % self.scanType)
     
 def averageEPSCaTs(scandata, epscatname, frame_index = None):
@@ -985,11 +1003,11 @@ def analyseEPSCaT(lsdata, frame, indicator_channel_ndx,
     if len(lsdata.scans) == 0:
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
-    if lsdata.scanType != ScanData.ScanDataType.linescan:
-        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name,lsdata.scanType))
+    if lsdata.scanType != ScanDataType.linescan:
+        raise ValueError("%s was expected to be a ScanDataType.linescan experiment; it has %s instead" % (lsdata.name,lsdata.scanType))
         
-    if lsdata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
-        raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
+    if lsdata.analysisMode != ScanDataAnalysisMode.frame:
+        raise ValueError("%s was expected to have a ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
         
     if len(lsdata.analysisOptions) == 0:
         raise ValueError("%s has no analysis options" % lsdata.name)
@@ -1639,11 +1657,11 @@ def analyseFrame(lsdata:ScanData, frame:int, unit=None, indicator_channel_ndx=No
     if len(lsdata.scans) == 0:
         raise ValueError("no linescan data was found in %s" % lsdata.name)
     
-    if lsdata.scanType != ScanData.ScanDataType.linescan:
-        raise ValueError("%s was expected to be a ScanData.ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.type))
+    if lsdata.scanType != ScanDataType.linescan:
+        raise ValueError("%s was expected to be a ScanDataType.linescan experiment; it has %s instead" % (lsdata.name, lsdata.type))
         
-    if lsdata.analysisMode != ScanData.ScanDataAnalysisMode.frame:
-        raise ValueError("%s was expected to have a ScanData.ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
+    if lsdata.analysisMode != ScanDataAnalysisMode.frame:
+        raise ValueError("%s was expected to have a ScanDataAnalysisMode.frame analysis mode; it has %s instead" % (lsdata.name, lsdata.analysisMode))
         
     if len(lsdata.analysisOptions) == 0:
         raise ValueError("%s has no analysis options defined" % lsdata.name)
@@ -3458,9 +3476,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     #
     # On the other hand, the settings for LSCaT and its client viewers are ALL
     # SAVED when LSCaTWindow is closed (see self.slot_Quit() PyQt slot)
-    viewer_for_types = (ScanData,)
+    viewer_for_types = {ScanData:99}
     
-    view_action_name = "Launch LSCaT"
+    view_action_name = "LSCaT Window"
     
     default_scanline_spline_order = 3
     
@@ -3956,14 +3974,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 [self.actionImport_Data_wide_Descriptors.triggered,     self.slot_import_data_wide_descriptors, QtCore.Qt.QueuedConnection]
             ]
         
-        self._common_data_fields_gui_signal_slots_ = [
-                [self.scanDataNameLineEdit.editingFinished,             self.slot_setDataName,              QtCore.Qt.QueuedConnection],
-                [self.sourceIDLineEdit.editingFinished,                 self.slot_gui_changed_source_ID,    QtCore.Qt.QueuedConnection],
-                [self.cellLineEdit.editingFinished,                     self.slot_gui_changed_cell_name,    QtCore.Qt.QueuedConnection],
-                [self.fieldLineEdit.editingFinished,                    self.slot_gui_changed_field_name,   QtCore.Qt.QueuedConnection],
-                [self.genotypeComboBox.currentTextChanged[str],         self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
-                [self.sexComboBox.currentIndexChanged[str],             self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
-                [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
+        # self._common_data_fields_gui_signal_slots_ = [
+        #         [self.scanDataNameLineEdit.editingFinished,             self.slot_setDataName,              QtCore.Qt.QueuedConnection],
+        #         [self.sourceIDLineEdit.editingFinished,                 self.slot_gui_changed_source_ID,    QtCore.Qt.QueuedConnection],
+        #         [self.cellLineEdit.editingFinished,                     self.slot_gui_changed_cell_name,    QtCore.Qt.QueuedConnection],
+        #         [self.fieldLineEdit.editingFinished,                    self.slot_gui_changed_field_name,   QtCore.Qt.QueuedConnection],
+        #         [self.genotypeComboBox.currentTextChanged[str],         self.slot_gui_changed_genotype,     QtCore.Qt.QueuedConnection],
+        #         [self.sexComboBox.currentIndexChanged[str],             self.slot_gui_changed_sex,       QtCore.Qt.QueuedConnection],
+        #         [self.ageLineEdit.editingFinished,                      self.slot_gui_age_changed,          QtCore.Qt.QueuedConnection]
+        #     ]
+        
+        self._base_scipyen_data_gui_signal_slots_ = [
+            [self.baseScipyenDataWidget.sig_valueChanged, self.slot_baseScipyenDataChanged, QtCore.Qt.QueuedConnection],
             ]
         
         # NOTE: 2022-01-16 11:45:41
@@ -4099,10 +4121,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         # END Menu actions
         ####
-        # BEGIN common widgets
-        self.scanDataNameLineEdit.setClearButtonEnabled(True)
-        self.scanDataNameLineEdit.undoAvailable = True
-        self.scanDataNameLineEdit.redoAvailable = True
+        # # BEGIN common widgets
+        # self.scanDataNameLineEdit.setClearButtonEnabled(True)
+        # self.scanDataNameLineEdit.undoAvailable = True
+        # self.scanDataNameLineEdit.redoAvailable = True
         #self.scanDataNameLineEdit.setValidator(strutils.QNameValidator())
         
         self.framesQSpinBox.setKeyboardTracking(False)
@@ -4147,19 +4169,19 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         # NOTE: 2019-01-15 11:40:35
         # implements source ID field in ScanData
         # where by source one means cell culture, animal, patient
-        self.sourceIDLineEdit.setClearButtonEnabled(True)
-        self.sourceIDLineEdit.redoAvailable = True
-        self.sourceIDLineEdit.undoAvailable = True
+        # self.sourceIDLineEdit.setClearButtonEnabled(True)
+        # self.sourceIDLineEdit.redoAvailable = True
+        # self.sourceIDLineEdit.undoAvailable = True
         
          
-        self.cellLineEdit.setClearButtonEnabled(True)
-        self.cellLineEdit.redoAvailable = True
-        self.cellLineEdit.undoAvailable = True
+        # self.cellLineEdit.setClearButtonEnabled(True)
+        # self.cellLineEdit.redoAvailable = True
+        # self.cellLineEdit.undoAvailable = True
         #self.cellLineEdit.setValidator(strutils.QRNameValidator())
         
-        self.fieldLineEdit.setClearButtonEnabled(True)
-        self.fieldLineEdit.redoAvailable = True
-        self.fieldLineEdit.undoAvailable = True
+        # self.fieldLineEdit.setClearButtonEnabled(True)
+        # self.fieldLineEdit.redoAvailable = True
+        # self.fieldLineEdit.undoAvailable = True
         #self.fieldLineEdit.setValidator(strutils.QRNameValidator())
         
         unit_types = sorted([v for v in UnitTypes.values()])
@@ -4174,23 +4196,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         genotypes = ["NA", "wt", "het", "hom"]
         
-        self.genotypeComboBox.setEditable(True)
-        self.genotypeComboBox.lineEdit().setClearButtonEnabled(True)
-        self.genotypeComboBox.lineEdit().redoAvailable = True
-        self.genotypeComboBox.lineEdit().undoAvailable = True
-        self.genotypeComboBox.addItems(genotypes)
-        self.genotypeComboBox.setCurrentIndex(0)
+        # self.genotypeComboBox.setEditable(True)
+        # self.genotypeComboBox.lineEdit().setClearButtonEnabled(True)
+        # self.genotypeComboBox.lineEdit().redoAvailable = True
+        # self.genotypeComboBox.lineEdit().undoAvailable = True
+        # self.genotypeComboBox.addItems(genotypes)
+        # self.genotypeComboBox.setCurrentIndex(0)
         
         sex = ["NA", "F", "M"]
         
-        self.sexComboBox.setEditable(False)
-        self.sexComboBox.addItems(sex)
-        self.sexComboBox.setCurrentIndex(0)
-        
-        self.ageLineEdit.setText("NA")
-        self.ageLineEdit.setClearButtonEnabled(True)
-        self.ageLineEdit.redoAvailable = True
-        self.ageLineEdit.undoAvailable = True
+#         self.sexComboBox.setEditable(False)
+#         self.sexComboBox.addItems(sex)
+#         self.sexComboBox.setCurrentIndex(0)
+#         
+#         self.ageLineEdit.setText("NA")
+#         self.ageLineEdit.setClearButtonEnabled(True)
+#         self.ageLineEdit.redoAvailable = True
+#         self.ageLineEdit.undoAvailable = True
         
         epscatComponentSuccessSelect = ["any", "all", "index"]
         self.selectFailureTestComponentComboBox.addItems(epscatComponentSuccessSelect)
@@ -4479,7 +4501,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @safeWrapper
     def _connect_slots_(self):
         self._connect_gui_slots_(self._menu_actions_gui_slots_)
-        self._connect_gui_slots_(self._common_data_fields_gui_signal_slots_)
+        # self._connect_gui_slots_(self._common_data_fields_gui_signal_slots_)
+        self._connect_gui_slots_(self._base_scipyen_data_gui_signal_slots_)
         self._connect_gui_slots_(self._navigation_gui_signal_slots_)
         self._connect_gui_slots_(self._scene_gui_signal_slots_)
         self._connect_gui_slots_(self._frames_gui_signal_slots_)
@@ -4595,7 +4618,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     % self._data_.analysisOptions["Channels"]["Indicator"])
                 return
             
-        #### BEGIN unthreaded execution - for debugging
+        #### BEGIN unthreaded execution - for debugging WARNING/ATTENTION/CAUTION DO NOT DELETE
         # make sure to comment out the other one
         #if scene and len(self._data_.scene) > 0:
             #self._scene_processing_idle_ = True
@@ -4630,7 +4653,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.displayFrame()
         #self.statusBar().showMessage("Done!")
         
-        #### END unthreaded execution
+        #### END unthreaded execution - for debugging WARNING/ATTENTION/CAUTION DO NOT DELETE
         
         #### BEGIN Threaded execution - this should be used by default;
         # make sure you comment out the unthreaded bit above
@@ -4688,13 +4711,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             print("slot_sceneProcessingDone no data")
             return
+        
         self._scene_processing_idle_= True
+        
         for k in range(len(result)):
             #print("scene[%d]" %k)
             self._data_.scene[k][:] = result[k]
             
-        #self._data_.sceneChannelNames = result[1]
-        
         for win in self.sceneviewers:
             win.displayFrame()
             
@@ -4706,13 +4729,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             print("slot_scansProcessingDone no data")
             return
+        
         self._scans_processing_idle_ = True
+        
         for k in range(len(result)):
             #print("scans[%d]" % k)
             self._data_.scans[k][:] = result[k]
-        #self._data_.scansChannelNames = result[1]
+            
         for win in self.scansviewers:
             win.displayFrame()
+            
         self.slot_processingDone()
         
     @Slot()
@@ -4816,29 +4842,33 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         # NOTE: 2022-01-12 09:30:49
         # update currentFrame for PlanarGraphics
-        if isinstance(self._data_.scanRegion, pgui.PlanarGraphics):
-            self._data_.scanRegion.currentFrame = self._current_frame_index_
+        # if isinstance(self._data_.scanRegion, pgui.PlanarGraphics):
+        #     self._data_.scanRegion.currentFrame = self._current_frame_index_
         
-        for obj in self._data_.scansRois.values():
-            obj.currentFrame = self._current_frame_index_
-            obj.updateLinkedObjects()
-            obj.updateFrontends()
+        if isinstance(self._data_.scansRois, dict):
+            for obj in self._data_.scansRois.values():
+                obj.currentFrame = self._current_frame_index_
+                obj.updateLinkedObjects()
+                obj.updateFrontends()
             
-        for obj in self._data_.scansCursors.values():
-            obj.currentFrame = self._current_frame_index_
-            obj.updateLinkedObjects()
-            obj.updateFrontends()
+        if isinstance(self._data_.scansCursors, dict):
+            for obj in self._data_.scansCursors.values():
+                obj.currentFrame = self._current_frame_index_
+                obj.updateLinkedObjects()
+                obj.updateFrontends()
             
         
-        for obj in self._data_.sceneRois.values():
-            obj.currentFrame = self._current_frame_index_
-            obj.updateLinkedObjects()
-            obj.updateFrontends()
-            
-        for obj in self._data_.sceneCursors.values():
-            obj.currentFrame = self._current_frame_index_
-            obj.updateLinkedObjects()
-            obj.updateFrontends()
+        if isinstance(self._data_.sceneRois, dict):
+            for obj in self._data_.sceneRois.values():
+                obj.currentFrame = self._current_frame_index_
+                obj.updateLinkedObjects()
+                obj.updateFrontends()
+                
+        if isinstance(self._data_.sceneCursors, dict):
+            for obj in self._data_.sceneCursors.values():
+                obj.currentFrame = self._current_frame_index_
+                obj.updateLinkedObjects()
+                obj.updateFrontends()
             
         if isinstance(self._data_.scanRegion, pgui.Path) and len(self._data_.scanRegion):
             self._data_.scanRegion.currentFrame = self._current_frame_index_
@@ -7823,8 +7853,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         else:
             self._data_.analysisUnit().type = val
             
-        if val not in self._data_._availableUnitTypes_:
-            self._data_._availableUnitTypes_.append(val)
+        if val not in self._data_.availableUnitTypes:
+            self._data_.availableUnitTypes.append(val)
             
         self._update_report_()
         
@@ -9268,12 +9298,12 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        if len(self._data_var_name_) == 0:
-            bname = "scandata"
-            
-        else:
-            bname = self._data_var_name_
-            
+#         if len(self._data_var_name_) == 0:
+#             bname = "scandata"
+#             
+#         else:
+#             bname = self._data_var_name_
+#             
         #targetDir = self._scipyenWindow_.recentDirectories[0]
         targetDir = self._scipyenWindow_.currentDir
         
@@ -9329,11 +9359,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        if len(self._data_var_name_) == 0:
+        if len(self._data_.name.strip()) == 0:
             bname = "scandata"
             
         else:
-            bname = self._data_var_name_
+            bname = self._data_.name
             
         newVarName = validate_varname(bname, self._scipyenWindow_.workspace)
         
@@ -9404,11 +9434,11 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if val > 0:
             self._display_graphics_objects_(rois=True,  scene=True) 
                     
-            if len(self._data_.scanRegionScansProfiles.segments) == 0:
-                self._data_.generateScanlineProfilesFromScans()
+            if len(self._data_.scansProfiles.segments) == 0:
+                self.generateScanRegionProfilesFromScans()
                 
-            if len(self._data_.scanRegionSceneProfiles.segments) == 0:
-                self._data_.generateScanlineProfilesFromScene()
+            if len(self._data_.sceneProfiles.segments) == 0:
+                self.generateScanRegionProfilesFromScene()
                 
             self._display_scanline_profiles_()
                 
@@ -9421,6 +9451,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if len(self.profileviewers) > 0:
                 self.profileviewers[0].clear()
                 self.profileviewers[0].close()
+                
+            self.profileviewers.clear()
                 
         self._update_ui_fields_()
                 
@@ -9599,7 +9631,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_ is None:
             return
         
-        if len(self._data_.scanRegionScansProfiles.segments) == self._data_.scansFrames:
+        if len(self._data_.scansProfiles.segments) == self._data_.scansFrames:
             for frame in range(self._data_.scansFrames):
                 self.autoSetupLinescanCursorsInFrame(frame, displayFrame=False)
         
@@ -9709,10 +9741,42 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.setData(newdata = lsdata, doc_title = lsdata_varname)
         
     @Slot()
-    @safeWrapper
-    def slot_setDataName(self):
+    def slot_baseScipyenDataChanged(self):
         if self._data_ is None:
             return
+        
+        if not eq(self._data_.name, self.baseScipyenDataWidget.dataName):
+            self._data_.name = self.baseScipyenDataWidget.dataName
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.sourceID, self.baseScipyenDataWidget.sourceID):
+            # avoid pitfalls of pandas NAType
+            self._data_.sourceID = self.baseScipyenDataWidget.sourceID
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.cell, self.baseScipyenDataWidget.cell):
+            self._data_.cell = self.baseScipyenDataWidget.cell
+            self._data_modifed_(True)
+            
+        if not eq (self._data_.field, self.baseScipyenDataWidget.field):
+            self._data_.field = self.baseScipyenDataWidget.field
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.genotype, self.baseScipyenDataWidget.genotype):
+            self._data_.genotype = self.baseScipyenDataWidget.genotype
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.sex, self.baseScipyenDataWidget.sex):
+            self._data_.sex = self.baseScipyenDataWidget.sex
+            self._data_modifed_(True)
+            
+        if not eq(self._data_.age, self.baseScipyenDataWidget.age):
+            self._data_.age = self.baseScipyenDataWidget.age
+            self._data_modifed_(True)
+
+    @Slot()
+    @safeWrapper
+    def slot_setDataName(self):
         
         value = strutils.str2symbol(self.scanDataNameLineEdit.text())
         
@@ -9725,13 +9789,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if self._data_.name != value:
             self._data_.name = value
             self._data_.modified = True
-            self.scanDataVarNameLabel.setText(self._data_var_name_)
+            self.scanDataVarNameLabel.setText(self._data_.name)
             
             if self._data_.modified:
-                self.setWindowTitle("%s * \u2014 LSCaT" % (self._data_var_name_))
+                self.setWindowTitle("%s * \u2014 LSCaT" % (self._data_.name))
                 
             else:
-                self.setWindowTitle("%s \u2014 LSCaT" % (self._data_var_name_))
+                self.setWindowTitle("%s \u2014 LSCaT" % (self._data_.name))
                 
             
             #self.scanDataNameLineEdit.editingFinished.disconnect(self.slot_setDataName)
@@ -9748,7 +9812,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if not check_apiversion(data) and hasattr(data, "_upgrade_API_"):
                 data._upgrade_API_()
                 
-            return data._scandatatype_ == ScanData.ScanDataType.linescan and data._analysismode_ == ScanData.ScanDataAnalysisMode.frame
+            return data._scandatatype_ == ScanDataType.linescan and data._analysismode_ == ScanDataAnalysisMode.frame
         
         except Exception as e:
             traceback.print_exc()
@@ -9822,7 +9886,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             for k in range(len(data)):
                 winTag = f"{section}_{self._data_.scansChannelNames[k]}"
                 winTitle = f"{wname} {self._data_.scansChannelNames[k]}"
-                docTitle = f"{self._data_var_name_}"
+                docTitle = f"{self._data_.name}"
                 if k >= len(viewers):
                     # create new image viewer as needed
                     win = self._init_viewer_(winFactory, winTag, winSetup, winTitle, docTitle, nFrames)
@@ -9842,7 +9906,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             #print(f"{self.__class__.__name__}._init_data_viewers_ {section}")
             winTag = f"{section}"
             winTitle = f"{wname}"
-            docTitle = f"{self._data_var_name_}"
+            docTitle = f"{self._data_.name}"
+            # docTitle = f"{self._data_var_name_}"
             if len(viewers):
                 viewers = viewers[0:1]
                 win = viewers[0]
@@ -9997,10 +10062,10 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self._data_.modified = value
         
         if self._data_.modified:
-            self.setWindowTitle("%s * \u2014 LSCaT" % (self._data_var_name_))
+            self.setWindowTitle("%s * \u2014 LSCaT" % (self._data_.name))
             
         else:
-            self.setWindowTitle("%s \u2014 LSCaT" % (self._data_var_name_))
+            self.setWindowTitle("%s \u2014 LSCaT" % (self._data_.name))
         
     @safeWrapper
     def _display_scene_(self):
@@ -10068,7 +10133,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         self.scansblockviewers[0].view(self._data_.scansBlock)
         self.scansblockviewers[0].currentFrame = self.currentFrame
             
-        self.scansblockviewers[0].setWindowTitle("%s - %s" % ("Scan Data", self._data_var_name_))
+        self.scansblockviewers[0].setWindowTitle("%s - %s" % ("Scan Data", self._data_.name))
     
     @safeWrapper
     def _display_scanline_profiles_(self):
@@ -10079,13 +10144,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         sceneProfiles = None
         scansProfiles = None
         
-        if not neoutils.is_empty(self._data_.scanRegionSceneProfiles):
-            sceneProfiles  = self._data_.scanRegionSceneProfiles
+        if not neoutils.is_empty(self._data_.sceneProfiles):
+            sceneProfiles  = self._data_.sceneProfiles
             
-        if not neoutils.is_empty(elf._data_.scanRegionSceneProfiles):
-            scansProfiles  = self._data_.scanRegionScansProfiles
+        if not neoutils.is_empty(self._data_.sceneProfiles):
+            scansProfiles  = self._data_.scansProfiles
             
-        if all((s is None for s in (sceneProfiles, scanProfiles))):
+        if all((s is None for s in (sceneProfiles, scansProfiles))):
             return
         
         if len(self.profileviewers):
@@ -10141,7 +10206,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             elif isinstance(self._frame_selector_, int):
                 self.profileviewers[0].currentFrame = self._frame_selector_
                 
-        self.profileviewers[0].setWindowTitle("%s %s" % ("Scanline profiles", self._data_.name))
+        self.profileviewers[0].setWindowTitle(f"Scanline profiles {self._data_.name}")
         
     @safeWrapper
     def _display_ephys_(self):
@@ -10150,7 +10215,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         wname, viewers, winFactory, winSetup = self._get_viewers_for_data_section("ephys")
         winTitle = f"{wname}"
         winTag = "ephys"
-        docTitle = f"{self._data_var_name_}"
+        docTitle = f"{self._data_.name}"
         nFrames = self._get_data_section_frames_("ephys")
         
         if len(self.ephysviewers):
@@ -10705,22 +10770,24 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
             else:
                 graphicsObjects    = self._data_.scansCursors
-                if isinstance(self._data_.scans, (tuple, list)) and len(self._data_.scans):
-                    cursor_span = self._data_.scans[0].shape[0]
-                    
-                elif isinstance(self._data_.scans, vigra.VigraArray):
-                    cursor_span = self._data_scans.shape[0]
-                    
-                for c in graphicsObjects.values():
-                    c.width = cursor_span
-                    
-                # see NOTE: 2018-09-25 22:19:58
-                sigBlock = QtCore.QSignalBlocker(self.selectCursorSpinBox)
-                self.selectCursorSpinBox.setMaximum(len(self._data_.scansCursors)-1)
+                
+                if isinstance(graphicsObjects, dict) and len(graphicsObjects):
+                    if isinstance(self._data_.scans, (tuple, list)) and len(self._data_.scans):
+                        cursor_span = self._data_.scans[0].shape[0]
+                        
+                    elif isinstance(self._data_.scans, vigra.VigraArray):
+                        cursor_span = self._data_scans.shape[0]
+                        
+                    for c in graphicsObjects.values():
+                        c.width = cursor_span
+                        
+                    # see NOTE: 2018-09-25 22:19:58
+                    sigBlock = QtCore.QSignalBlocker(self.selectCursorSpinBox)
+                    self.selectCursorSpinBox.setMaximum(len(self._data_.scansCursors)-1)
                 
                 
         if len(data) > 0 and len(windows) > 0:
-            if len(graphicsObjects):
+            if isinstance(graphicsObjects, dict) and len(graphicsObjects):
                 transparent_label = not self.actionOpaque_cursor_labels.isChecked()
                 # see NOTE: 2018-09-25 22:19:58
                 
@@ -10806,6 +10873,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         
         if self._data_ is None:
+            return
+        
+        if not isinstance(self._data_.scansCursors, dict) or len(self._data_.scansCursors) == 0:
             return
         
         # see NOTE: 2018-09-25 22:19:58
@@ -10932,8 +11002,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 if unit_type_index == -1:
                     self.unitTypeComboBox.addItem(self._data_.unitType)
                     self.unitTypeComboBox.setCurrentIndex(self.unitTypeComboBox.count())
-                    if self._data_.unitType not in self._data_._availableUnitTypes_:
-                        self._data_._availableUnitTypes_.append(self._data_.unitType)
+                    if self._data_.unitType not in self._data_.availableUnitTypes:
+                        self._data_.availableUnitTypes.append(self._data_.unitType)
                 
                 else:
                     self.unitTypeComboBox.setCurrentIndex(unit_type_index)
@@ -10972,70 +11042,35 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #print("LSCaTWindow._update_ui_fields_ BEGIN")
         #traceback.print_stack()
         
-        if self._data_ is not None:
-            if self._data_var_name_ is None:
-                if hasattr(self._data_, "name") and self._data_.name is not None:
-                    self._data_var_name_ = strutils.str2symbol(self._data_.name)
-                    
-                else:
-                    self._data_var_name_ = ""
-                    
-            self.scanDataVarNameLabel.setText(self._data_var_name_)
+        # print(f"{self.__class__.__name__}._update_ui_fields_:")
+        
+        if isinstance(self._data_, ScanData):
+#             if self._data_var_name_ is None:
+#                 if hasattr(self._data_, "name") and self._data_.name is not None:
+#                     self._data_var_name_ = strutils.str2symbol(self._data_.name)
+#                     
+#                 else:
+#                     self._data_var_name_ = ""
             
             if self._data_.modified:
-                self.setWindowTitle("%s * \u2014 LSCaT" % (self._data_var_name_))
+                self.setWindowTitle("%s * \u2014 LSCaT" % (self._data_.name))
                 
             else:
-                self.setWindowTitle("%s \u2014 LSCaT" % (self._data_var_name_))
+                self.setWindowTitle("%s \u2014 LSCaT" % (self._data_.name))
             
-            if hasattr(self._data_, "name") and self._data_.name is not None:
-                name = self._data_.name
-                
-            else:
-                name = ""
+#             if hasattr(self._data_, "name") and self._data_.name is not None:
+#                 name = self._data_.name
+#                 
+#             else:
+#                 name = ""
                 
             # ###
             # BEGIN Data tab
             dataWidgetsSignalBockers = [QtCore.QSignalBlocker(widget) for widget in \
-                (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit, self.genotypeComboBox, self.unitTypeComboBox, self.sexComboBox, self.ageLineEdit)]
-            
-            self.sourceIDLineEdit.setText(self._data_.sourceID)
-            
-            self.scanDataNameLineEdit.setText(self._data_.name)
-            self.cellLineEdit.setText(self._data_.cell)
-            self.fieldLineEdit.setText(self._data_.field)
-            
-            genotypes = self._data_._availableGenotypes_
-            
-            self.genotypeComboBox.clear()
-            self.genotypeComboBox.addItems(genotypes)
-            
-            genotype_index = self.genotypeComboBox.findText(self._data_.genotype)
-            
-            if genotype_index == -1:
-                self.genotypeComboBox.addItem(self._data_.genotype)
-                self.genotypeComboBox.setCurrentIndex(self.genotypeComboBox.count())
-                if self._data_.genotype not in self._data_._availableGenotypes_:
-                    self._data_._availableGenotypes_.append(self._data_.genotype)
-            
-            else:
-                self.genotypeComboBox.setCurrentIndex(genotype_index)
-            
-            sex_index = self.sexComboBox.findText(self._data_.sex)
-            
-            if sex_index == -1:
-                self._data_.genotype = "NA"
-                self.genotypeComboBox.setCurrentIndex(0)
-                
-            else:
-                self.genotypeComboBox.setCurrentIndex(sex_index)
-                
-            self.ageLineEdit.setText("%s" % self._data_.age)
-            
-            unit_types = self._data_._availableUnitTypes_
+                (self.unitTypeComboBox, )]
             
             self.unitTypeComboBox.clear()
-            self.unitTypeComboBox.addItems(self._data_._availableUnitTypes_)
+            self.unitTypeComboBox.addItems(self._data_.availableUnitTypes)
             
             unit_type = self._data_.analysisUnit.unit_type if isinstance(self._data_.analysisUnit, AnalysisUnit) else "NA"
 
@@ -11075,7 +11110,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                  self.epscatIntegralBeginDoubleSpinBox, self.epscatIntegralEndDoubleSpinBox,
                  self.doFitCheckBox, self.epscatComponentsTableWidget)]
             
-            if len(self._data_.analysisOptions):
+            if isinstance(self._data_.analysisOptions, dict) and len(self._data_.analysisOptions):
                 # Channels groupbox
                 val = get_nested_value(self._data_.analysisOptions, ["Channels", "Indicator"])
                 
@@ -11367,15 +11402,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             # END epscat tab
             # ####
             
-        else:
-            self._data_var_name_ = ""
-            self.scanDataVarNameLabel.setText(self._data_var_name_)
-            
+        # else:
+        #     self._data_var_name_ = ""
+            # self.baseScipyenDataWidget.dataVarNameLabel.setText(self._data_var_name_)
+            # self.scanDataVarNameLabel.setText(self._data_var_name_)
+#             
             
         # NOTE: 2017-11-14 12:10:15
         # this edits the name attribute of lsdata, which is NOT 
         # the variable's name in the user workspace
-        self.scanDataNameLineEdit.setText(name) 
+        # self.scanDataNameLineEdit.setText(name) 
             
         self.framesQSpinBox.setMinimum(0)
         self.framesQSpinBox.setMaximum(self._data_.scansFrames-1)
@@ -11386,31 +11422,22 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         #print("LSCaTWindow._update_ui_fields_ END")
         
-    #@safeWrapper
-    #def _link_window_navigation_(self):
-        #if self._data_ is None:
-            #return
-        
-        #viewers = [w for w in self.sceneviewers] + \
-                  #[w for w in self.scansviewers] + \
-                  #[w for w in self.ephysviewers] + \
-                  #[w for w in self.profileviewers] + \
-                  #[w for w in self.scansblockviewers] + \
-                  #[w for w in self.sceneblockviewers]
-              
-        ##print("LSCaTWindow _link_window_navigation_: %d windows" % len(viewers))
-        ##for w in viewers:
-            ##print(w.windowTitle())
-        
-        #self.linkToViewers(*viewers)
-        
     @safeWrapper
-    def _parsedata_(self, newdata=None, varname=None):
+    def _parsedata_(self, newdata=None):#, varname=None):
         """Parses metainformation and then actually assigns the data to the _data_ attribute
         """
         if isinstance(newdata, ScanData):
+            name = getattr(newdata, "name", None)
+            if name is None or not (isinstance(name, str) and len(name.strip())):
+                name = self.workspaceSymbolForData(newdata)
+                newdata.name = name
+                
+            self.baseScipyenDataWidget.populate(newdata)
+
             #newdata._upgrade_API_()
             #print("LSCaTWindow _parsedata_ %s" % newdata.name)
+            
+            # keep uptodate with analysisOptions (maye have changed across pickling)
             default_options = scanDataOptions()
             
             try: # old pickles don't have analysisOptions descriptors!
@@ -11433,34 +11460,14 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 #newdata.analysisOptions["Discrimination"]["Discr_2D"] = newdata.analysisOptions["Discrimination"]["data_2D"]
                 #newdata.analysisOptions["Discrimination"].pop("data_2D", None)
             
-            if hasattr(newdata, "cell"):
-                newdata.cell = strutils.str2symbol(newdata.cell)
-                
-            else:
-                newdata.cell = "NA"
-                
-            if hasattr(newdata, "field"):
-                newdata.field = strutils.str2symbol(newdata.field)
-                
-            else:
-                newdata.field = "NA"
-                
             self._selected_analysis_cursor_ = None
             self._selected_analysis_unit_ = None
                 
             self._data_ = newdata
             
-            if isinstance(varname, str) and len(varname.strip()):
-                self._data_var_name_ = varname
-                
-            else:
-                self._data_var_name_ = newdata.name
-            
         else:
             raise TypeError("Expecting a ScanData object or None; got %s instead" % type(newdata).__name__)
             
-        if self._data_ is None:
-            return
         
         # check if there are vertical cursors defined for scandata
         # and for each of these, check that they have a linked point
@@ -11480,6 +11487,9 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                             if len(obj.linkedObjects) == 0:
                                 self._link_scans_vcursor_to_scene_pcursor_(obj)
                                 
+                                
+        self.generateScanRegionProfiles()
+                                
         
     @safeWrapper
     def autoSetupLinescanCursorsInFrame(self, frame, displayFrame=True):
@@ -11492,13 +11502,13 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         
         defaultRoiWidth = self._data_.analysisOptions["Roi"]["width"]
         
-        profiles = self._data_.scanRegionScansProfiles
+        profiles = self._data_.scansProfiles
         
         #if self.showScanRawDataCheckBox.checkState() == QtCore.Qt.Unchecked:
             #profiles = self._data_.scanlineFilteredScansProfiles
             
             #if any([len(s.analogsignals) == 0 for s in profiles.segments]):
-                #profiles = self._data_.scanRegionScansProfiles
+                #profiles = self._data_.scansProfiles
                 
         if any([len(s.analogsignals) == 0 for s in profiles.segments]):
             warnings.warn("Scanline profiles should have been generated for all frames")
@@ -11726,7 +11736,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if len(self._data_.analysisOptions) == 0:
+        if not isinstance(self._data_.analysisOptions, dict) or len(self._data_.analysisOptions) == 0:
             return
         
         if "Channels" not in self._data_.analysisOptions.keys():
@@ -11814,13 +11824,16 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
+        if self._data_.analysisMode != ScanDataAnalysisMode.frame:
+            scipywarn(f"{self._data_.analysisMode} analysis not yet supported")
+            return
         
-        if self._data_.type != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.type)
+        if self._data_.type != ScanDataType.linescan:
+            scipywarn(f"{self._data_.type} not yet supported")
+            return
 
-        self.generateScanRregionProfilesFromScans() 
+
+        self.generateScanRegionProfilesFromScans() 
         self.generateScanRegionProfilesFromScene() 
 
     @safeWrapper
@@ -11839,19 +11852,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
+        if self._data_.analysisMode != ScanDataAnalysisMode.frame:
+            scipywarn(f"{self._data_.analysisMode} analysis not yet supported")
+            return
         
-        if self._data_.type != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.type)
-        
+        if self._data_.type != ScanDataType.linescan:
+            scipywarn(f"{self._data_.type} not yet supported")
+            return
+
         data = self._data_.scene
-        target = self._data_.scanRegionSceneProfiles
+        target = self._data_.sceneProfiles
         sigprefix = "Scene"
     
-        # CAUTION the target is a neo.Block and its segments have all been initialized (as empty)
-        # in _parse_image_arrays_
-        
         # ATTENTION: the scans frames must ALL have an "x" axistag (the first non-temporal axis)
         # which si also the ONLY non-temporal axis in the case of linescans
         
@@ -11870,22 +11882,27 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     # the following conditions are met:
                     # len(profiles) == number of frames >>> True
                     # len(profiles[k]) == number of channels for k in range(number of frames) >>> all True
-                    profiles = [[DataSignal(getProfile(img, self._data_.scanRegion.objectForFrame(k)), \
-                                                sampling_period=getAxisResolution(img.axistags["x"]), \
-                                                name="%s" % axisChannelName(subarray.axistags["c"], j), \
+                    profiles = [[DataSignal(getProfile(img, self._data_.scanRegion.objectForFrame(k)), 
+                                                sampling_period = getAxisResolution(img.axistags["x"]), 
+                                                name = f"{sigprefix} {axisChannelName(subarray.axistags['c'], j)}", 
+                                                domain_units = getAxisUnits(img.axistags['x']),
+                                                units = getAxisUnits(subarray.axistags['c'], j),
                                                 index = j) \
-                                            for j, img in dimEnum(subarray, "c")] \
-                                    for k, subarray in dimEnum(data[0], self._data_.sceneFrameAxis)] \
+                                            for j, img in dimEnum(subarray, "c")] for k, subarray in dimEnum(data[0], self._data_.sceneFrameAxis)]
                     
-                    # NOTE: we want all channels from same frame to go into segment
-                    # corresponding to frame
+                    # NOTE: we want all channels from same frame to go into the
+                    # segment corresponding to that frame
                     for k in range(data[0].shape[data[0].axistags.index(self._data_.sceneFrameAxis)]):
+                        if k >= len(target.segments):
+                            target.segments.append(neo.Segment(name=f"Sweep {k}"))
                         target.segments[k].analogsignals[:] = profiles[k]
+                        if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
+                            target.segments[k].name = f"Sweep {k}"
 
                 else: 
                     # NOTE: multiple channels stored separately as single-band arrays
                     # ATTENTION: they only have a singleton channel axis, but they must 
-                    # ALL have the same number of frames -- checked in _parse_image_arrays_
+                    # ALL have the same number of frames
                     #
                     
                     if len(self._data_.analysisOptions) == 0 or \
@@ -11898,20 +11915,23 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
                     profiles = list()
                     
-                    profiles = [[DataSignal(getProfile(subarray.bindAxis(self._data_.sceneFrameAxis, k), self._data_.scanRegion.objectForFrame(k)), \
-                                                sampling_period=getAxisResolution(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]), \
-                                                name="%s" % axisChannelName(subarray.axistags["c"], 0), index = j) \
-                                            for j, subarray in enumerate(data)] \
-                                    for k in range(self._data_.sceneFrames)]
+                    profiles = [[DataSignal(getProfile(subarray.bindAxis(self._data_.sceneFrameAxis, k), self._data_.scanRegion.objectForFrame(k)), 
+                                                sampling_period=getAxisResolution(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]), 
+                                                name = f"{sigprefix} {axisChannelName(subarray.axistags['c'], 0)}", 
+                                                domain_units = getAxisUnits(subarray.bindAxis(self._data_.sceneFrameAxis, k).axistags["x"]),
+                                                units = getAxisUnits(subarray.axistags['c'], 0), 
+                                                index = j) \
+                                            for j, subarray in enumerate(data)] for k in range(self._data_.sceneFrames)]
                     
                     for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.sceneFrameAxis)]):
+                        if k >= len(target.segments):
+                            target.segments.append(neo.Segment(name=f"Sweep {k}"))
                         target.segments[k].analogsignals[:] = profiles[k]
-                    
-        #else:
-            #warnings.warn("Data contains no scene!")
+                        if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
+                            target.segments[k].name = f"Sweep {k}"
                 
     @safeWrapper
-    def generateScanRregionProfilesFromScans(self): 
+    def generateScanRegionProfilesFromScans(self):
         """Generates scanline profiles from the linescans X axis average.
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -11926,19 +11946,18 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         if not isinstance(self._data_, ScanData):
             return
         
-        if self._data_.analysisMode != ScanData.ScanDataAnalysisMode.frame:
-            raise NotImplementedError("%s analysis not yet supported" % self._data_.analysisMode)
+        if self._data_.analysisMode != ScanDataAnalysisMode.frame:
+            scipywarn(f"{self._data_.analysisMode} analysis not yet supported")
+            return
         
-        if self._data_.type != ScanData.ScanDataType.linescan:
-            raise NotImplementedError("%s not yet supported" % self._data_.type)
+        if self._data_.type != ScanDataType.linescan:
+            scipywarn(f"{self._data_.type} not yet supported")
+            return
 
         data = self._data_.scans
-        target = self._data_.scanRegionSceneProfiles
+        target = self._data_.scansProfiles
         sigprefix = "Scans"
     
-        # CAUTION: the target is a neo.Block and its segments have all been initialized (as empty)
-        # in _parse_image_arrays_
-        
         # ATTENTION: the scans frames must ALL have an "x" axistag (the first non-temporal axis)
         # which si also the ONLY non-temporal axis in the case of linescans
         
@@ -11948,20 +11967,25 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             if len(data) == 1: 
                 # single array, either single-band or multi-band
                 # SEE ALSO comments in self.generateScanRegionProfilesFromScene()
-                profiles = [[DataSignal(np.array(img.mean(axis=1)), \
-                                        sampling_period = getAxisResolution(img.axistags["x"]), \
-                                        name="%s" % axisChannelName(subarray.axistags["c"], j), \
+                profiles = [[DataSignal(np.array(img.mean(axis=1)),
+                                        sampling_period = getAxisResolution(img.axistags["x"]), 
+                                        name = f"{sigprefix} {axisChannelName(subarray.axistags['c'], j)}", 
+                                        domain_units = getAxisUnits(img.axistags['x']),
+                                        units = getAxisUnits(subarray.axistags['c'], j),
                                         index = j) \
-                                    for j, img in dimEnum(subarray, "c")] \
-                                for k, subarray in dimEnum(data[0], self._data_.scansFrameAxis)]
+                                    for j, img in dimEnum(subarray, "c")] for k, subarray in dimEnum(data[0], self._data_.scansFrameAxis)]
 
                 for k in range(data[0].shape[data[0].axistags.index(self._data_.scansFrameAxis)]):
+                    if k >= len(target.segments):
+                        target.segments.append(neo.Segment(name=f"Sweep {k}"))
                     target.segments[k].analogsignals[:] = profiles[k]
+                    if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
+                        target.segments[k].name = f"Sweep {k}"
                 
             else: 
                 # NOTE: multiple channels stored separately as single-band arrays
                 # ATTENTION: they only have a singleton channel axis, but they must 
-                # ALL have the same number of frames -- checked in _parse_image_arrays_
+                # ALL have the same number of frames
                 #
                 if len(self._data_.analysisOptions) == 0 or \
                     "Channels" not in self._data_.analysisOptions or \
@@ -11971,15 +11995,24 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                 
                 chNdx = self._data_.scansChannelNames.index(self._data_.analysisOptions["Channels"]["Reference"])
                 
-                profiles = [[DataSignal(np.array(subarray.bindAxis(self._data_.scansFrameAxis, k).mean(axis=1)), \
-                                        sampling_period = getAxisResolution(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]), \
-                                        name="%s" % axisChannelName(subarray.axistags["c"],0), \
-                                        index = j) \
-                                    for j, subarray in enumerate(data)] \
-                                for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)])]
+                frames = data[chNdx].shape[self._data_.scansFrameAxis] if isinstance(self._data_.scansFrameAxis, int) else data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)]
                 
-                for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)]):
+                profiles = [[DataSignal(np.array(subarray.bindAxis(self._data_.scansFrameAxis, k).mean(axis=1)), 
+                                        sampling_period = getAxisResolution(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]), 
+                                        name=f"{sigprefix} {axisChannelName(subarray.axistags['c'], 0)}", 
+                                        domain_units = getAxisUnits(subarray.bindAxis(self._data_.scansFrameAxis, k).axistags["x"]),
+                                        units = getAxisUnits(subarray.axistags['c'], 0),
+                                        index = j) \
+                                    for j, subarray in enumerate(data)] for k in range(frames)]
+                                # for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)])]
+                
+                # for k in range(data[chNdx].shape[data[chNdx].axistags.index(self._data_.scansFrameAxis)]):
+                for k in range(frames):
+                    if k >= len(target.segments):
+                        target.segments.append(neo.Segment(name=f"Sweep {k}"))
                     target.segments[k].analogsignals[:] = profiles[k]
+                    if not isinstance(target.segments[k].name, str) or len(target.segments[k].name.strip()) == 0:
+                        target.segment[k].name = f"Sweep {k}"
                 
         else:
             warnings.warn("Data contains no scans!")
@@ -12050,7 +12083,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             processing = self._scans_filters_
             #target = self._data_.scans
             #target_chnames = self._data_.scansChannelNames
-            calibrations = self._data_._scans_axis_calibrations_
+            calibrations = self._data_.scansAxesCalibration
             
         if len(source) == 0:
             return
@@ -12191,7 +12224,8 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
                     
             for k in process_channel_ndx:
                 chn_cal = AxesCalibration(source[k].axistags["c"])
-                chn_cal.calibrateAxis(result[k].axistags["c"])
+                chn_cal.calibrateAxes()
+                # chn_cal.calibrateAxis(result[k].axistags["c"])
             
             #target[:] = result[:]
             #target_chnames[:] = process_channel_names
@@ -12288,44 +12322,28 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     @safeWrapper
     def setData(self, newdata = None, doc_title=None, **kwargs):
         """When newdata is None this resets everything to their defaults"""
-        uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
         
-        if uiParamsPrompt:
-            # TODO 2023-01-18 08:48:13
-            pass
-            # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
+#         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
+#         
+#         if uiParamsPrompt:
+#             # TODO 2023-01-18 08:48:13
+#             pass
+#             # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
             
         # NOTE: 2021-07-08 13:40:23
         # called by ScyipenViewer superclass
         self._clear_contents_()
         
         if isinstance(newdata, ScanData):
-            #print(newdata.name, doc_title)
-            if not isinstance(doc_title, str) or len(doc_title.strip()) == 0:
-                if len(newdata.name.strip()):
-                    doc_title = newdata.name
-                    
-                elif isinstance(self._data_var_name_, str) and len(self._data_var_name_.strip()):
-                    doc_title = self._data_var_name_
-                    
-                else:
-                    doc_title = "ScanData"
-                    
-            self._parsedata_(newdata, doc_title)
-            
+            self._parsedata_(newdata)#, name)
             self._data_modifed_(False)
-            
             self.generateFilters()
-            
             self._init_viewers_() # this MAY modify data (if scan region scene profile is enabled)
-            
             self.displayFrame()
             
         else:
             # TODO in _parsedata_: when nothing is passed reset everything
             self._data_ = None
-            self._data_var_name_ = None
-            #self._clear_contents_()
             
     @Slot()
     @safeWrapper
@@ -12422,12 +12440,17 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             return
         # see NOTE: 2018-09-25 22:19:58
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
-            (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit,
-             self.selectCursorSpinBox, self.analysisUnitNameLineEdit, 
+            (self.selectCursorSpinBox, self.analysisUnitNameLineEdit, 
              self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox, 
              self.cursorXwindow, self.cursorYwindow, 
-             self.unitTypeComboBox, self.genotypeComboBox,
-             self.sexComboBox, self.defineAnalysisUnitCheckBox)]
+             self.unitTypeComboBox, self.defineAnalysisUnitCheckBox)]
+        # signalBlockers = [QtCore.QSignalBlocker(widget) for widget in \
+        #     (self.scanDataNameLineEdit, self.cellLineEdit, self.fieldLineEdit,
+        #      self.selectCursorSpinBox, self.analysisUnitNameLineEdit, 
+        #      self.cursorXposDoubleSpinBox, self.cursorYposDoubleSpinBox, 
+        #      self.cursorXwindow, self.cursorYwindow, 
+        #      self.unitTypeComboBox, self.genotypeComboBox,
+        #      self.sexComboBox, self.defineAnalysisUnitCheckBox)]
 
         #self.scanDataNameLineEdit.editingFinished.disconnect(self.slot_setDataName)
         #self.cellLineEdit.editingFinished.disconnect(self.slot_gui_changed_cell_name)
@@ -12442,18 +12465,22 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
         #self.unitTypeComboBox.currentIndexChanged[str].disconnect(self.slot_gui_changed_unit_type_string)
         #self.defineAnalysisUnitCheckBox.stateChanged[int].disconnect(self.slot_change_analysis_unit_state)
 
-        for r in self._data_.sceneRois.values():
-            r.frontends.clear()
+        if isinstance(self._data_.sceneRois, dict):
+            for r in self._data_.sceneRois.values():
+                r.frontends.clear()
             
-        for c in self._data_.sceneCursors.values():
-            c.frontends.clear()
+        if isinstance(self._data_.sceneCursors, dict):
+            for c in self._data_.sceneCursors.values():
+                c.frontends.clear()
         
-        for r in self._data_.scansRois.values():
-            r.frontends.clear()
+        if isinstance(self._data_.scansRois, dict):
+            for r in self._data_.scansRois.values():
+                r.frontends.clear()
             
-        for c in self._data_.scansCursors.values():
-            c.frontends.clear()
-            
+        if isinstance(self._data_.scansCursors, dict):
+            for c in self._data_.scansCursors.values():
+                c.frontends.clear()
+                
         if hasattr(self._data_, "scanRegion") and isinstance(self._data_.scanRegion, pgui.PlanarGraphics):
             self._data_.scanRegion.frontends.clear()
             
@@ -12481,15 +12508,15 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
             self.reportWindow.clear()
             
         
-        self.scanDataVarNameLabel.clear()
-        self.scanDataNameLineEdit.clear()
-        self.cellLineEdit.clear()
-        self.fieldLineEdit.clear()
+        # self.scanDataVarNameLabel.clear()
+        # self.scanDataNameLineEdit.clear()
+        # self.cellLineEdit.clear()
+        # self.fieldLineEdit.clear()
         self.analysisUnitNameLineEdit.clear()
         self.selectCursorSpinBox.setValue(-1)
         self.unitTypeComboBox.setCurrentIndex(0)
-        self.genotypeComboBox.setCurrentIndex(0)
-        self.sexComboBox.setCurrentIndex(0)
+        # self.genotypeComboBox.setCurrentIndex(0)
+        # self.sexComboBox.setCurrentIndex(0)
         
         self.protocolTableWidget.clearContents()
         self.protocolTableWidget.setRowCount(0)

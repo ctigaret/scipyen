@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 '''
 special input/output
 
@@ -43,7 +47,7 @@ import numpy as np
 import pandas as pd
 #import xarray as xa
 import h5py
-import vigra
+from core.vigra_patches import vigra
 import neo
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
@@ -208,15 +212,13 @@ def concatPaths(path1:str, path2:str):
         return path1 + path2
         
 def loadHDF5File(fName:str):
-    """FIXME/TODO 2021-12-08 12:19:08
     """
-    # raise NotImplementedError("Not yet...")
+    """
     with h5py.File(fName) as h5file:
         try:
             ret = h5io.read_hdf5(h5file)
         except:
             traceback.print_exc()
-    # print(f"pictio.loadHDF5File {fName} ⇒ {ret}")
     return ret
         
     
@@ -1157,6 +1159,8 @@ def savePickleFile(val, fileName, protocol=None):
     
     if len(extn)==0 or extn != ".pkl":
         fileName += ".pkl"
+
+    # print(f"pickling {type(val).__name__}")
         
     with open(fileName, mode="wb") as fileDest:
         #print("Writing %s" % fileName)
@@ -1823,7 +1827,7 @@ def saveHDF5(data, fileName):
         fileName += ".h5"
         
     with h5py.File(fileName, mode="w") as h5file:
-        h5io.makeHDF5Entity(data, h5file, name=os.path.basename(name))
+        h5io.toHDF5(data, h5file, name=os.path.basename(name))
     
 @safeWrapper
 def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):

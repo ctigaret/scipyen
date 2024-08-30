@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 """
 Qt5-based viewer window for dict and subclasses
 """
@@ -134,7 +139,7 @@ class DataViewer(ScipyenViewer):
                         np.ndarray:0,
                         AnalysisUnit:0,
                         AxesCalibration:0,
-                        neo.core.baseneo.BaseNeo:0,
+                        # neo.core.baseneo.BaseNeo:0,
                         ScanData:0, 
                         TriggerProtocol:0}
     
@@ -766,7 +771,10 @@ class DataViewer(ScipyenViewer):
             #print("name", name)
             src = self._obj_cache_[self._cache_index_][1]
             if self.treeWidget.has_dynamic_private:
-                objs = [getattr(src,path[-1], None)]
+                if isinstance(src, (tuple, list, deque)) and isinstance(path[-1], int):
+                    objs = src[path-1]
+                else:
+                    objs = [getattr(src, str(path[-1]), None)]
             else:
                 # objs = NestedFinder.getvalue(self._data_, path, single=True)
                 objs = NestedFinder.getvalue(src, path, single=True)

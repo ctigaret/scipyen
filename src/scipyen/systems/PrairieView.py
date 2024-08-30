@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 """Import routines for PrairieView data
 """
 #### BEGIN core python modules
-import os, sys, traceback, warnings, datetime, time, mimetypes, io, typing
+import os, sys, traceback, warnings, mimetypes, io, typing
+import  datetime, time, dateutil
 from enum import Enum, IntEnum #, unique
 from collections import OrderedDict
 import concurrent.futures
@@ -14,7 +20,7 @@ import threading
 import numpy as np
 import quantities as pq
 import neo
-import vigra
+from core.vigra_patches import vigra
 from qtpy import (QtCore, QtWidgets, QtGui,)
 from qtpy.QtCore import Signal, Slot
 from qtpy.uic import loadUiType as __loadUiType__ 
@@ -36,7 +42,7 @@ from core.triggerprotocols import (TriggerProtocol,
                                    remove_trigger_protocol,
                                    parse_trigger_protocols)
 
-from core.neoutils import (concatenate_blocks, concatenate_signals,)
+from core.neoutils import (concatenate_blocks, concatenate_signals,set_relative_time_start)
 
 import core.xmlutils as xmlutils
 import core.strutils as strutils
@@ -370,8 +376,8 @@ class PVLaser(object):
 
 class PVSystemConfiguration(object):
     def __init__(self, node, parent=None):
-        if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName != "SystemConfiguration":
-            raise ValueError("Expecting an element node named 'SystemConfiguration'")
+        if node.nodeType != xmlutils.xml.dom.Node.ELEMENT_NODE or node.nodeName not in ("SystemConfiguration", "Environment"):
+            raise ValueError("Expecting an element node named 'SystemConfiguration' or 'Environment")
 
         self.__parent__ = None
         
@@ -389,8 +395,13 @@ class PVSystemConfiguration(object):
             self.__attributes__ = DataBag()
         
         lasers = node.getElementsByTagName("Laser")
-        
-        self.lasers = [PVLaser(l) for l in lasers]
+        if len(lasers) == 0 or self.__version__[1] > 0:
+            lasers = node.getElementsByTagName("PVLasers")
+        if len(lasers):
+            self.lasers = [PVLaser(l) for l in lasers]
+            
+        self.data = xmlutils.elementToDict(node)
+        self.name = node.nodeName
         
     @property
     def parent(self):
@@ -809,15 +820,20 @@ class PVFrame(object):
         
         #channelNames = (f["channelName"] for f in self.files)
         
+        # print(f"{self.__class__.__name__}.__call__")
         for k in range(len(mdata["files"])):
+            fileName = self.files[k]['filename']
+            # print(f"\treading {fileName}")
             # NOTE: 2022-01-06 00:10:42
             # fdata: frame data
             # sdata: source data
             if filepath is not None:
-                fdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["filename"]))
+                fdata = pio.loadImageFile(os.path.join(filepath, fileName))
+                # fdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["filename"]))
             
             else:
-                fdata = pio.loadImageFile(self.files[k]["filename"])
+                fdata = pio.loadImageFile(fileName)
+                # fdata = pio.loadImageFile(self.files[k]["filename"])
                 
             if fdata.ndim == 2 and fdata.channelIndex == fdata.ndim:
                 fdata.insertChannelAxis() # make sure there is a channel axis
@@ -922,11 +938,15 @@ class PVFrame(object):
             # the source data is set up using the same blueprint as for frame data
             # ideally we should end up with one source data frame for each scans data frame
             if "source" in self.files[k] and all(self.files[k]["source"]):
+                sourceFileName = self.files[k]["source"]
+                # print(f"\treading source {sourceFileName}")
                 if filepath is not None:
-                    sdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["source"]))
+                    sdata = pio.loadImageFile(os.path.join(filepath, sourceFileName))
+                    # sdata = pio.loadImageFile(os.path.join(filepath, self.files[k]["source"]))
                     
                 else:
-                    sdata = pio.loadImageFile(self.files[k]["source"])
+                    sdata = pio.loadImageFile(sourceFileName)
+                    # sdata = pio.loadImageFile(self.files[k]["source"])
                     
                 if sdata.ndim == 2 and sdata.channelIndex == sdata.ndim:
                     sdata.insertChannelAxis() # make sure there is a channel axis
@@ -1712,10 +1732,33 @@ class PVScan(object):
         # storing attributed in __dict__ will result in infinite recursions in __str__()
         # at various places in the code, unless you write code to manage it.
         # -- too work for little benefit
+        self.__version__ = tuple() # major, minor, micro, dot
+        self.__rec_datetime__ = datetime.datetime.now()
+        
         if doc.documentElement.attributes is not None:
             self.__attributes__ = DataBag(xmlutils.attributesToDict(doc.documentElement))
+            v = self.__attributes__.get("version", None)
+            if isinstance(v, str) and len(v.strip()):
+                try:
+                    self.__version__ = tuple(map(lambda x: eval(x), v.split('.')))
+                except:
+                    scipywarn(f"Could not parse the Prairie version data {v})")
+            
+            d = self.__attributes__.get("date", None)
+            if isinstance(d, str) and len(d.strip()):
+                try:
+                    self.__rec_datetime__ = dateutil.parser.parse(d)
+                except:
+                    traceback.print_exc()
+                    scipywarn(f"Due to the above caught exception, rec_datetime will be set to `datetime.now()`")
+            else:
+                scipywarn(f"No suitable date string found; rec_datetime will be set to `datetime.now()")
+                    
+                
         else:
             self.__attributes__ = DataBag(dict())
+            
+        # print(f"{self.__class__.__name__} attributes: {self.__attributes__}")
             
         # query its children
         if not doc.documentElement.hasChildNodes():
@@ -1732,20 +1775,14 @@ class PVScan(object):
         
         # READ THE "about PVScan" file; go and fetch element nodes by their name
         
-        # NOTE: 2017-08-03 09:22:43
-        # there should be only ONE SystemConfiguration element node
-        self.__systemConfiguration__ = PVSystemConfiguration(doc.documentElement.getElementsByTagName("SystemConfiguration")[0], \
-                                        parent=self)
-
-        self.sequences = [PVSequence(n, parent=self) for n in doc.documentElement.getElementsByTagName("Sequence")]
-        
         try:
             self.__path__ = doc.documentElement.getElementsByTagName("DocPath")[0].childNodes[0].nodeValue
-            
+            # self.__dirname__ = os.path.dirname(self.__path__)
         except Exception as e:
             traceback.print_exc()
-            warnings.warn("PVScan object path will be set to None")
+            scipywarn("Invalid DocPath element. PVScan object path will be set to None")
             self.__path__ = None
+            # self.__dirname__ = None
             
         try:
             self.__filename__ = doc.documentElement.getElementsByTagName("DocFileName")[0].childNodes[0].nodeValue
@@ -1753,6 +1790,9 @@ class PVScan(object):
         except Exception as e:
             traceback.print_exc()
             warnings.warn("PVScan object filename will be set to None")
+            # if isinstance(self.__path__, str) and len(self.__path__.strip()):
+            #     self.__dirname__ = os.path.dirname(self.__path___)
+            #     self.__filename__ = os.path.basename(self.__path__)
             self.__filename__ = None
             
         if isinstance(name, str):
@@ -1761,11 +1801,33 @@ class PVScan(object):
         else:
             if self.__filename__ is not None:
                 self.__name__ = os.path.splitext(self.__filename__)[0]
+                
+        # NOTE: 2017-08-03 09:22:43
+        # there should be only ONE SystemConfiguration element node
+        # NOTE: 2024-08-28 09:07:55
+        # this was removed around PV version 5.5; instead there is a *.env file
+        # with a single node "Envronment" node
+        sysconfig = doc.documentElement.getElementsByTagName("SystemConfiguration")
+        if len(sysconfig):
+            self.__systemConfiguration__ = PVSystemConfiguration(sysconfig[0], parent=self)
+        else:
+            if os.path.isdir(self.__path__) and os.path.isfile(self.__filename__):
+                print(f"dirname: {self.__path__}, filename: {self.__filename__}")
+                base = os.path.splitext(self.__filename__)[0]
+                env_filename = os.path.join(self.__path__, base+".env")
+                envDoc = pio.loadXMLFile(env_filename)
+                pvEnviron = envDoc.documentElement.getElementsByTagName("Environment")
+                if len(pvEnviron):
+                    self.__systemConfiguration__ = PVSystemConfiguration(pvEnviron[0], parent=self)
+
+        self.sequences = [PVSequence(n, parent=self) for n in doc.documentElement.getElementsByTagName("Sequence")]
+        
             
     def __len__(self):
         return len(self.sequences)
     
     def __call__(self, filepath=None):
+        """Returns a tuple (scans, scene) where each element is a sequence of VigraArray"""
         # NOTE: 2017-10-24 22:47:12
         # get the type of the first sequence; this should be the same for ALL
         # sequences in this scan (otherwise, behaviour is undefined)
@@ -1998,37 +2060,26 @@ class PVScan(object):
         else:
             caller = self.__call__
             
+            
+        # read scans and scene vigra arrays concurrently
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(caller)]
             
         for future in concurrent.futures.as_completed(futures):
             (scans, scene) = future.result()
         
-        #meta = self.metadata()
+        meta = self.metadata()
         
-        kw = dict()
-        kw["name"] = self.name
-        kw["metadata"] = self.metadata()
-        
-        if isinstance(electrophysiology, neo.Block):
-            kw["electrophysiology"] = electrophysiology
+        file_origin = self.filepath
+        rec_datetime = self.__rec_datetime__
             
-        if analysisOptions is not None:
-            kw["analysisOptions"] = analysisOptions
-            
-        return ScanData(scene=scene, scans=scans, **kw)
-            
+        return ScanData(scene=scene, scans=scans, name=self.name,
+                        electrophysiology=electrophysiology,
+                        analysisOptions=analysisOptions,
+                        file_origin=file_origin,
+                        rec_datetime=rec_datetime,
+                        metadata=self.metadata())
 
-        #ret = ScanData(scene=scene, scans=scans, metadata=meta, name=self.name)
-        
-        #if isinstance(electrophysiology, neo.Block):
-            #ret.electrophysiology = electrophysiology
-            
-        #if isinstance(name, str) and len(name) > 0:
-            #ret.name = name
-            
-        #return ret
-    
     def scandata(self, *args, **kwargs):
         return self.scanData(*args, **kwargs)
         
@@ -2263,7 +2314,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         
         self.ephysFileNames = list() 
         
-        self.scanDataOptions = None # ScanDataOptions object - to be assigned to lsdata
+        self.scanDataOptions = ScanDataOptions.default() # ScanDataOptions object - to be assigned to lsdata
         
         self._ephys_ = None # a neo.Block with electrophysiology recordings associated
                             # with lsdata
@@ -2393,7 +2444,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         self.protocolEditorDialog.sig_requestProtocolAdd.connect(self._slot_protocolAddRequest)
         self.protocolEditorDialog.finished.connect(self._slot_protocolEditorFinished)
         
-        self.buttonBox.accepted.connect(self.slot_generateScanData)
+        # self.buttonBox.accepted.connect(self.slot_generateScanData)
         
     @Slot(int)
     def _slot_removeProtocol(self, index):
@@ -2555,11 +2606,14 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             ret = self.loadOptions(self.optionsFileName) 
             if not ret:
                 self.optionsFileName = ""
-                self.scanDataOptions = None
+                # NOTE: 2024-07-28 10:06:23
+                # this may overwrite prev options, so chuck it 
+                # self.scanDataOptions = ScanDataOptions.default()
                 
         else:
             self.optionsFileName = ""
-            self.scanDataOptions = None
+            # see NOTE: 2024-07-28 10:06:23
+            # self.scanDataOptions = ScanDataOptions.default()
 
     @Slot()
     @safeWrapper
@@ -2567,7 +2621,8 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
         caption = "Open ScanData Options file for %s" % self.scanDataVarName if (isinstance(self.scanDataVarName, str) and len(self.scanDataVarName.strip())) else "Open EPSCaT Options file"
         
-        self.optionsFileName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
+        self.optionsFileName, _ = self.chooseFile(caption=caption, fileFilter="HDF5 Files (*.h5)")
+        # self.optionsFileName, _ = self.chooseFile(caption=caption, fileFilter="Pickle Files (*.pkl)")
         
         if len(self.optionsFileName.strip()):
             if self.loadOptions(self.optionsFileName):
@@ -2801,11 +2856,11 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             if "xml" in mime_type:
                 self._pvscan_ = PVScan(pio.loadXMLFile(fileName))
                 
-            elif "pickle" in mime_type:
-                self._pvscan_ = pio.loadPickleFile(fileName)
+            # elif "pickle" in mime_type:
+            #     self._pvscan_ = pio.loadPickleFile(fileName)
                 
             else:
-                self.errorMessage("PrairieView Import - Prairiew View Scan file", "%s is not an XML or Pickle file" % self.pvScanFileName)
+                self.errorMessage("PrairieView Import - Prairiew View Scan file", "%s is not an XML file" % self.pvScanFileName)
                 return False
             
             tempDataVarName = os.path.splitext(os.path.basename(fileName))[0]
@@ -2829,7 +2884,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         return False
     
     @safeWrapper
-    def loadEphys(self, fileNamesList):
+    def loadEphys(self, fileNamesList): # TODO 2024-07-28 09:49:36 streamline
         if len(fileNamesList):
             fileNamesList = [f for f in fileNamesList if len(f.strip())]
             if len(fileNamesList) == 0:
@@ -2861,7 +2916,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                     
             if len(blocks):
                 if all([isinstance(b, neo.Block) for b in blocks]):
-                    self._ephys_ = concatenate_blocks(*blocks)
+                    self._ephys_ = set_relative_time_start(concatenate_blocks(*blocks))
                     self.cachedEvents = [s.events for s in self._ephys_.segments]
                     return True
                     
@@ -2876,24 +2931,32 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
                     self.errorMessage("PrairieView Importer", "Electrophysiology files must contain neo.Blocks or individual neo.Segments")
                     return False
                 
+                # WARNING 2024-07-27 09:42:55
+                # concatenate_blocks does not reset the signals start time to 0
+                # anymore - this is because the correct times are needed for 
+                # establishing the correct temporal succession of the records in
+                # post hoc analyses
+                #
+                # This MUST be taken into account in scandata analysis, downstream.
+                
         else:
             return False
     
     @safeWrapper
-    def loadOptions(self, fileName):
-        if len(fileName) and os.path.isfile(fileName) and "pickle" in pio.getMimeAndFileType(fileName)[0]:
-            self.scanDataOptions = pio.loadPickleFile(fileName)
-            
-            if fileName != self.optionsFileName:
-                signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
-                self.optionsFileName = fileName
-                self.optionsFileNameLineEdit.setText(self.optionsFileName)
-                
-            return True
-        
-        else:
-            self.errorMessage("PrairieView Importer", "Load options from file:\n%s is not an XML or Pickle file" % self.pvScanFileName)
+    def loadOptions(self, fileName): # TODO 2024-07-28 09:49:36 streamline
+        # if len(fileName) and os.path.isfile(fileName) and "pickle" in pio.getMimeAndFileType(fileName)[0]:
+        if len(fileName) == 0 or not os.path.isfile(fileName) or pio.getMimeAndFileType(fileName)[0] != "application/x-hdf":
+            self.errorMessage("PrairieView Importer", f"Load options from file:\n{fileName} is not a suitable file" )
             return False
+            
+        self.scanDataOptions = pio.loadHDF5File(fileName)
+        
+        if fileName != self.optionsFileName:
+            signalblockers = [QtCore.QSignalBlocker(w) for w in (self.optionsFileNameLineEdit,)]
+            self.optionsFileName = fileName
+            self.optionsFileNameLineEdit.setText(self.optionsFileName)
+            
+        return True
         
     @safeWrapper
     def loadProtocols(self, fileName):
@@ -2927,6 +2990,7 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
         NOTE: Clients need to connect custom slots to this dialog's accepted(),
         rejected(), or finished(int) signals
         """
+        # print(f"Slot {self.__class__.__name__}.done")
         if value == QtWidgets.QDialog.Accepted:
             self.slot_generateScanData()
             
@@ -2945,8 +3009,12 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
     @Slot()
     @safeWrapper
     def slot_generateScanData(self):
-        """If sel.auto_export is True, it also export the result to workspace.
+        """Creates a ScanData object based on the loaded data files.
+        The created ScanData object is available as the property `scandata` or 
+        `scanData`. If self.auto_export is True, the ScanData object is also 
+        exported to the Scipyen workspace.
         """
+        # print(f"{self.__class__.__name__}.slot_generateScanData")
         if isinstance(self._pvscan_, PVScan):
             self._scandata_ = self._pvscan_.scandata()
             
@@ -2957,6 +3025,11 @@ class PrairieViewImporter(WorkspaceGuiMixin, __QDialog__, __UI_PrairieImporter, 
             #print("ephys", type(self._ephys_))
             if isinstance(self._ephys_, neo.Block):
                 self._scandata_.electrophysiology = self._ephys_
+                
+                self._scandata_.electrophysiology.name = self._scandata_.name
+                for k, segment in enumerate(self._scandata_.electrophysiology.segments):
+                    if not isinstance(segment.name, str) or len(segment.name.strip()) == 0:
+                        segment.name = f"Sweep {k}"
                 
             if isinstance(self.scanDataOptions, (ScanDataOptions, dict)):
                 self._scandata_.analysisOptions = self.scanDataOptions

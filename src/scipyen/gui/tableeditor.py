@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
 """
 @author Cezar M. Tigaret
     Code solutions inspired from qtpandas (Matthias Ludwig - Datalyze Solutions) and 
@@ -19,7 +24,7 @@ import quantities as pq
 #import xarray as xa
 import numpy as np
 import neo
-import vigra
+from core.vigra_patches import vigra
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Signal, Slot, Property

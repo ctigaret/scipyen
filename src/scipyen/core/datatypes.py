@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 ''' Utilities for generic and numpy array-based data types such as quantities
 Changelog:
 2021-01-06 14:35:30 gained module-level constants:
@@ -6,6 +10,52 @@ RELATIVE_TOLERANCE
 ABSOLUTE_TOLERANCE
 EQUALS_NAN
 
+NOTE 2024-07-20 17:32:21
+About Treatment class:
+
+    Not really sure about the utility of this class. 
+
+    A drug treatment associates:
+    • a DOSE
+    • an administration time or times
+    • a unique administration route
+    
+    So, this can be represented as a signal-like Quantity array (this includes
+        a scalar quantity, by the way). 
+
+    When a signal, it implicitly includes administration times, or durations,
+    in the "domain" or "times" attribute of the signal object.
+    
+    Such signal implicitly indicates whether the drug is given once
+    a unique dose, continuously (a constant or varying dose) or at discrete times 
+    (same or different doses) and therefore objects of this type are far more 
+    usable.
+    
+    The administration route (an Enum) can be stored in the signal's 'annotations'
+    attribute.
+    
+    Furthermore, this should be independent of a Schedule, Episode, or Procedure.
+    
+    In this respect I see the following possible scenarios:
+    
+    1. "treatment" during electrophysiology experiments: e.g. drug on a slice, or 
+        injected during in vivo recording.
+        • the experiment will have distinct episodes (vehicle, antagonist 1 at
+            dose 1, etc, ...) → the compound name and dose can be stored directly
+            in the annotations of the electrophysiological data of the corresponding 
+            episode.
+        • the drug concentration varies DURING the recording (i.e. within the 
+            same "episode") → the drug concentration is measured/sampled with:
+            a) the same sampling rate as the physiological signal, so it can be
+            stored together with the physiology signal in the same neo.Segment
+            b) a different (lower) sampling rate therefore storable in a separate 
+            neo.Segment/neo.Block (similar to the Ca2+ transient signals in ScanData)
+    
+    2. "treatment" during a behavioural task — usually the same dose given at
+        either repeated times, or several dosages at discrete time points
+        - best stored as an irregularly sampled signal associated with some (as
+        yet, unwritten) data type for behavioural experiments.
+    
 '''
 
 from __future__ import print_function
@@ -29,6 +79,7 @@ import typing
 import types
 import warnings
 import weakref
+import h5py
 from copy import (deepcopy, copy,)
 
 #### END core python modules
@@ -41,7 +92,7 @@ from numpy import ndarray
 import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
-import vigra
+from core.vigra_patches import vigra
 import neo
 from neo.core import (baseneo, basesignal, container,)
 from neo.core.dataobject import (DataObject, ArrayDict,)
@@ -52,7 +103,7 @@ from core import quantities as scq
 from core import xmlutils
 from core import strutils
 from core.prog import (safeWrapper, is_hashable, is_type_or_subclass, 
-                       ImmutableDescriptor, scipywarn)
+                       ImmutableDescriptor, scipywarn, NoData)
 from core.datazone import DataZone
 from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 
@@ -143,7 +194,10 @@ UnitTypes = collections.defaultdict(lambda: "NA",
                                      "m":"microglia", "n":"interneuron", 
                                      "s":"spine", "t":"terminal",
                                      "y":"astrocyte"})
-                                    
+
+# NOTE: 2024-07-28 15:46:49 
+# these are utterly generic; almost surely you'd want to write your own
+# e.g. Cacna1c+/-, etc...
 GENOTYPES = ["NA", "wt", "het", "hom", "+/+", "+/-", "-/-"]
 
 
@@ -339,8 +393,8 @@ def is_uniform_collection(obj):
         return False
     
 def sequence_element_type(s):
-    from utilities import unique
-    return unique((type(e) for e in s))
+    from core.utilities import unique
+    return unique(tuple(type(e) for e in s))
 
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]], 
                      ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
@@ -1079,13 +1133,101 @@ class Episode:
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
     endFrame:int = 0
+    # procedure:Procedure = field(default_factory = lambda: Procedure())
+    # procedure:Procedure  = field(default_factory = Procedure)
     
-            
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Dataset:
+        """Encodes an episode as an empty hdf5 dataset"""
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame"))
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
+        # entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Dataset,
+                             attrs:typing.Optional[dict]=None, cache:dict={}):
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        begin = attrs["begin"]
+        end = attrs["end"]
+        beginFrame = attrs["beginFrame"]
+        endFrame = attrs["endFrame"]
+        
+        return cls(name, begin=begin, end=end, beginFrame=beginFrame, endFrame=endFrame)
+        
 @dataclass
 class Schedule:
+    """Logical grouping of a sequence of episodes"""
     name:str = ""
     _:KW_ONLY
     episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
+    
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+        
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        attrs = {"name": getattr(self, "name")}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        h5io.toHDF5(self.episodes, entity, name="episodes", 
+                            oname="episodes", compression=compression,
+                            chunks=chunks, track_order=track_order,
+                            entity_cache=entity_cache)
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group,
+                             attrs:typing.Optional[dict] = None, cache:dict={}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        
+        episodes = h5io.fromHDF5(entity["episodes"], cache)
+        
+        return cls(name, episodes=episodes)
     
     @singledispatchmethod
     def episode(self, ndx):
@@ -1167,17 +1309,86 @@ class AdministrationRoute(TypeEnum):
 
 @dataclass
 class Procedure:
+    """A procedure associates a Schedule with a category of actions.
+    The action categories are instances of ProcedureType.
+    """
     name:str = ""
     _:KW_ONLY
     procedureType:ProcedureType = ProcedureType.null
-    schedule:Schedule = field(default_factory = Schedule())
+    schedule:Schedule = field(default_factory = Schedule)
+    # OR:
+    # schedule:Schedule = field(default_factory = lambda: Schedule())
+    
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Group:
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        attrs = {"name": self.name, "procedureType": self.procedureType}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        h5io.toHDF5(self.schedule, entity, name="schedule", 
+                            oname="schedule", compression=compression,
+                            chunks=chunks, track_order=track_order,
+                            entity_cache=entity_cache)
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict] = None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        procedureType = attrs["procedureType"]
+        
+        schedule = h5io.fromHDF5(entity["schedule"], cache)
+        
+        return cls(name, procedureType=procedureType, schedule=schedule)
+        
     
 @dataclass
-class TreatmentProcedure(Procedure):
+class Treatment:
+    """
+    Encapsulates the administration of a dose of compound via a specified route.
+    
+    name: treatment name (typically, the compound's name)
+    dose: a pq.Quantity. This can be:
+        • a scalar quantity - unique dose administered just once during this 
+            treatment
+        • a signal-like object:
+            ∘ neo.AnalogSignal - a "continuously" time-varying dose, sampled at
+                regular time intervals
+            ∘ neo.IrregularlySampledSignal - different doses administered at 
+                discrete, possibly irregular, times
+    
+    WARNING: Do not use. See NOTE 2024-07-20 17:32:21 in the docstring for this
+    module (near top of the file).
+    
+    
+    """
+    name:str = "Vehicle"
     _:KW_ONLY
     dose:pq.Quantity = field(default_factory=lambda : math.nan * pq.g)
     route:AdministrationRoute = AdministrationRoute.null
-    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
+    # procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
     
     def __post_init__(self):
         super().__init__(name=self.name, episodes = self.episodes)
@@ -1190,3 +1401,67 @@ class TreatmentProcedure(Procedure):
         if unitFamily not in acceptableUnitFamilies:
             raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
         
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+
+        # NOTE: 2024-07-20 15:03:37
+        # We only support storing scalar Quantities as HDF5 attributes. Hence,
+        # if we used this approach, we'd have to enforce a unique, constant dose
+        # for the procedure. 
+        #
+        # In reality, a dose can also be a scalar Quantity, or a signal-like 
+        # object that inherits from pq.Quantity (neo AnalogSignal, 
+        # IrregularlySampledSignal, or our own DataSignal or 
+        # IrregularlySampledDataSignal).
+        #
+        # Therefore, "dose" is best stored as a HDF5 Dataset
+        
+        attrs = {"name": getattr(self, "name"), "route": getattr(self, "route")}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        # NOTE: 2024-07-20 15:16:44 see NOTE: 2024-07-20 15:03:37
+        # stores the "dose" Quantity as a dataset
+        h5io.toHDF5(self.dose, entity, name="dose", oname="dose",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order, entity_cache=entity_cache)
+        
+        h5io.toHDF5(self.schedule, entity, name="schedule", 
+                            oname="schedule", compression=compression,
+                            chunks=chunks, track_order=track_order,
+                            entity_cache=entity_cache)
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+        
+        
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict] = None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        
+        schedule = h5io.fromHDF5(entity["schedule"], cache)
+        
+        dose = h5io.fromHDF5(entity["dose"], cache)
+        
+        return cls(name, dose=dose, schedule=schedule)

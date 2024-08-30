@@ -1,4 +1,30 @@
 # -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+# TODO: 2024-07-27 22:46:05
+# implement plotting of landmarks with domain coordinates given as values relative
+# to a signal's domain start; currently, these are DataZone, DataMark and
+# TriggerEvent (this feature has been implemented on 2024-07-27 22:49:52). However,
+# the default behaviour of these landmakrs is to have absolute values (therefore
+# compatible to old API) so plotting them should work as usual. The new attribute
+# "relative" of these classes indicates whether the domain coordinate is relative
+# to the "start" of aotional signal, or not. What needs implementing here is
+# correctly plotting landmarks where the "relative" attribute is True (currently,
+# the plotting mechanism ignores this attribute).
+#
+# NOTE: this is quite tricky, as it means postponing the plotting of landmarks
+# until after all signals in the corresponding frame have been plotted (or, at 
+# least, parsed). In addition, to support plotting of standalone landmarks with
+# "relative" attribute set to True (i.e., plot them without any reference signals)
+# should assume a notional signal domain "start" at 0 (i.e., treat the landmarks
+# as if "relative" was False, in such cases).
+# 
+
 '''Signal viewer: enhanced signal plotter
 
 Plots a multi-frame 1D signal (i.e. a matrix where each column is a `frame'), one frame at a time. 
@@ -129,7 +155,7 @@ if neo.__version__ >= '0.13.0':
 else:
     NeoObjectList = list # alias for backward compatibility :(
     
-import vigra
+from core.vigra_patches import vigra
 
 
 #### END 3rd party modules
@@ -433,7 +459,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         neo.Event: 99,
                         neo.Epoch: 99, 
                         neo.core.spiketrainlist.SpikeTrainList:99,
-                        neo.core.baseneo.BaseNeo: 99,
+                        # neo.core.baseneo.BaseNeo: 99,
                         TriggerEvent: 99,
                         TriggerProtocol: 99,
                         vigra.filters.Kernel1D: 99, 
@@ -1769,11 +1795,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             else:
                 if isinstance(y, vigra.VigraArray):
                     if isinstance(signalChannelAxis, str) and signalChannelAxis.lower().strip() != "c":
-                            warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
+                            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Channel axis index is specificed by non-canonical axis key {signalChannelAxis}")
                             
                     elif isinstance(signalChannelAxis, vigra.AxisInfo):
                         if signalChannelAxis.key.lower().strip() != "c":
-                            warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
+                            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Channel axis index is specificed by non-canonical axis key {signalChannelAxis}")
                             
                 signalChannelAxis = normalized_axis_index(y, signalChannelAxis)
                 
@@ -2000,7 +2026,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                             symbolStyle,
                                             **labelStyle)
                 
-            elif all(isinstance(v, DataMark) for v in entities_list):
+            elif all(isinstance(v, (DataMark, TriggerEvent)) for v in entities_list):
                 xdimstr = scq.shortSymbol(entities_list[0].times.units.dimensionality)
                 if len(xdimstr):
                     xLabel = f"{get_domain_name(entities_list[0])} ({xdimstr})"
@@ -2536,11 +2562,11 @@ anything else       anything else       ❌
                 newData.append(obj)
                 
             else:
-                warnings.warn(f"Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
                 return
             
         else:
-            warnings.warn(f"Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
+            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
             return
             
         self._data_frames_ += len(obj.segments)
@@ -2552,7 +2578,7 @@ anything else       anything else       ❌
         obj_signal_axes = max(len(s.analogsignals) + len(s.irregularlysampledsignals) for s in obj.segments)
         if obj_signal_axes != self._n_signal_axes_:
             self._n_signal_axes_ = max(self._n_signal_axes_, obj_signal_axes)
-            self._setup_axes_()
+            self._setup_axes_(self._n_signal_axes_)
         
         new_frame_meta_index = np.recarray((len(obj.segments),1),
                                            dtype = [('block', int), ('segment', int)])
@@ -2612,11 +2638,11 @@ anything else       anything else       ❌
                     newData.append(obj)
                     
                 else:
-                    warnings.warn(f"Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot append {type(obj).__name__} to a sequence of {type(self.yData[0]).__name__}")
                     return
                 
             else:
-                warnings.warn(f"Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Cannot add frame {type(obj).__name__} data to {type(self.yData).__name__}")
                 return
             
             self.frameIndex = range(len(newData))
@@ -2635,7 +2661,7 @@ anything else       anything else       ❌
         if obj_signal_axes != self._n_signal_axes_:
             self._n_signal_axes_ = max(self._n_signal_axes_, obj_signal_axes)
             
-            self._setup_axes_()
+            self._setup_axes_(self._n_signal_axes_)
                 
         if self.observed_vars.get("yData", None) is not None:
             self.observed_vars["yData"] = None
@@ -3760,7 +3786,7 @@ anything else       anything else       ❌
             
             if len(self.signalsLayout.items) == 0:
                 # there is no axis (plotitem) - never executed, see NOTE: 2023-01-14 23:23:06
-                # warnings.warn("There is no axis in the viewer; have you plotted anything yet?\nThe cursor's coordinates will be reset when plotting")
+                # warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: There is no axis in the viewer; have you plotted anything yet?\nThe cursor's coordinates will be reset when plotting")
                 
                 scene_rect = self.signalsLayout.scene().sceneRect()
                 
@@ -4689,7 +4715,7 @@ anything else       anything else       ❌
             selEpoch = [e for e in epochs if e.name == selItem]
             
             if len(selEpoch) == 0:
-                warnings.warn(f"There's no epoch named {selItem}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: There's no epoch named {selItem}")
                 return
             
             selEpoch = selEpoch[0]
@@ -4745,7 +4771,7 @@ anything else       anything else       ❌
             selEpoch = [e for e in epochs if e.name == selItem]
             
             if len(selEpoch) == 0:
-                warnings.warn(f"There's no epoch named {selItem}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: There's no epoch named {selItem}")
                 return
             
             selEpoch = selEpoch[0]
@@ -5479,7 +5505,7 @@ anything else       anything else       ❌
         if embed:
             if isinstance(self._yData_, neo.Block):
                 if len(self._yData_.segments) == 0:
-                    warnings.warn("Plotted data is a neo.Block without segments")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Plotted data is a neo.Block without segments")
                     #return epoch
                 
                 elif len(self._yData_.segments) == 1:
@@ -5505,7 +5531,7 @@ anything else       anything else       ❌
                             
             elif isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_]):
                 if len(self._yData_) == 0:
-                    warnings.warn("Plotted data is an empty sequence!")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Plotted data is an empty sequence!")
                 
                 elif len(self._yData_) == 1:
                     if overwrite:
@@ -5543,7 +5569,7 @@ anything else       anything else       ❌
                         self._yData_.segment.epocha.append(epoch)
                         
             else:
-                warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
                 
             self.displayFrame()
                 
@@ -5686,7 +5712,7 @@ anything else       anything else       ❌
         if embed:
             if isinstance(self._yData_, neo.Block):
                 if len(self._yData_.segments) == 0:
-                    warnings.warn("Plotted data is a neo.Block without segments")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Plotted data is a neo.Block without segments")
                     #return epoch
                 
                 elif len(self._yData_.segments) == 1:
@@ -5712,7 +5738,7 @@ anything else       anything else       ❌
                             
             elif isinstance(self._yData_, (tuple, list)) and all([isinstance(s, neo.Segment) for s in self._yData_]):
                 if len(self._yData_) == 0:
-                    warnings.warn("Plotted data is an empty sequence!")
+                    warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Plotted data is an empty sequence!")
                 
                 elif len(self._yData_) == 1:
                     if overwrite:
@@ -5750,7 +5776,7 @@ anything else       anything else       ❌
                         self._yData_.segment.epocha.append(epoch)
                         
             else:
-                warnings.warn("Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Epochs can only be embeded in neo.Segment objects (either stand-alone, collected in a tuple or list, or inside a neo.Block)")
                 
             self.displayFrame()
                 
@@ -6234,11 +6260,11 @@ anything else       anything else       ❌
                 else:
                     if isinstance(y, vigra.VigraArray):
                         if isinstance(signalChannelAxis, str) and signalChannelAxis.lower().strip() != "c":
-                                warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
+                                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Channel axis index is specificed by non-canonical axis key {signalChannelAxis}")
                                 
                         elif isinstance(signalChannelAxis, vigra.AxisInfo):
                             if signalChannelAxis.key.lower().strip() != "c":
-                                warnings.warn("Channel axis index is specificed by non-canonical axis key %s" % signalChannelAxis)
+                                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Channel axis index is specificed by non-canonical axis key {signalChannelAxis}")
                                 
                     signalChannelAxis = normalized_axis_index(y, signalChannelAxis)
                     
@@ -6851,7 +6877,7 @@ Does the behind the scene work of self.setData(...)
                 self.frameChanged.emit(self._current_frame_index_)
                 
             else:
-                warnings.warn(f"Could not parse the data x: {x}, y: {y}")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Could not parse the data x: {x}, y: {y}")
                 return
             
 
@@ -7382,7 +7408,7 @@ signals in the signal collection.
         
         if isinstance(index, int):
             if index not in range(len(plotitems)):
-                warnings.warn(f"Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
                 return
                 # raise TypeError(f"Expecting an int between 0 and {len(plotitems)}; got a {index}  instead")
             
@@ -7601,13 +7627,13 @@ signals in the signal collection.
             
         crsId = cursor.ID
         if crsId in cursorDict:
-            warnings.warn(f"A {cursor.cursorType.name} cursor named {crsId} already exists")
+            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: A {cursor.cursorType.name} cursor named {crsId} already exists")
             return
         
         if cursor in cursorDict.values():
             ndx = list(cursorDict.values()).index(cursor)
             existing = list(cursorDict.keys())[ndx]
-            warnings.warn(f"This {cursor.cursorType.name} cursor is already registered as {existing} ")
+            warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: This {cursor.cursorType.name} cursor is already registered as {existing} ")
             return
             
         pen = kwargs.get("pen", None)
@@ -8386,19 +8412,34 @@ signals in the signal collection.
         # events_dict = self._prep_entity_dict_(events, (neo.Event, DataMark))
         
 
-    def _plot_epoch_data_(self, epoch:neo.Epoch, **kwargs):
+    def _plot_epoch_data_(self, epoch:typing.Union[neo.Epoch, DataZone], **kwargs):
         """ Plots the time intervals defined in a single neo.Epoch or DataZone """
         brush = kwargs.pop("brush", self.epoch_plot_options["epoch_brush"])
+        
+        # relative = getattr(epoch, "relative", False)
         
         x0 = epoch.times.flatten().magnitude
         x1 = x0 + epoch.durations.flatten().magnitude
         
         # brush = next(brushes)
         
+        
         for k in range(len(self.axes)):
             self.axes[k].update() # to update its viewRange()
             
-            regions = [v for v in zip(x0,x1)]
+            # NOTE: 2024-07-27 23:00:23
+            # see TODO: 2024-07-27 22:46:05
+#             if relative:
+#                 sig_start = min([i.xData[0] for i in list(filter(lambda v: isinstance(v, pg.PlotDataItem), self.axes[k].items))])
+#                 x0_ = x0 + sig_start
+#                 x1_ = x1 + sig_start
+#             else:
+#                 x0_ = x0
+#                 x1_ = x1
+ 
+            regions = [v for v in zip(x0_, x1_)]
+            
+            regions = [v for v in zip(x0, x1)]
             
             lris = [pg.LinearRegionItem(values=value, 
                                         brush=brush, 
@@ -8458,7 +8499,7 @@ signals in the signal collection.
                 brushes = cycle([epoch_brush])
                 
             else:
-                warnings.warn("Invalid brush specification %s" % epoch_brush)
+                warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Invalid brush specification {epoch_brush}")
                 brushes = cycle([None])
                 
         for epoch in args:
@@ -8756,6 +8797,7 @@ signals in the signal collection.
         
     @_plot_data_.register(neo.Event)
     @_plot_data_.register(DataMark)
+    @_plot_data_.register(TriggerEvent)
     def _(self, obj:typing.Union[neo.Event, DataMark],
           *args, **kwargs):
         """Plot stand-alone events"""
@@ -8914,7 +8956,7 @@ signals in the signal collection.
                     brushes = cycle([epoch_brush])
                     
                 else:
-                    # warnings.warn("Invalid brush specification %s" % epoch_brush)
+                    # warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: Invalid brush specification {epoch_brush}")
                     brushes = cycle([QtGui.QBrush(QtGui.QColor(*c)) for c in self.epoch_plot_options["epochs_color_set"]])
                     
             for epoch in obj:
@@ -9109,7 +9151,10 @@ signals in the signal collection.
         if len(analog) + len(irregs) == 0:
             return None, None
         
-        assert len(self.signalAxes) >= len(analog) + len(irregs), "Mistmatch between number of signal axes and available signals"
+        # if len(self.signalAxes) != len(analog) + len(irregs):
+        #     scipywarn(f"{len(self.signalAxes)} signal axes for {len(analog)} analog signals + {len(irregs)} irregularly sampled signals = {len(analog)+len(irregs)}")
+        
+        assert len(self.signalAxes) >= len(analog) + len(irregs), f"Mismatch between number of signal axes ({len(self.signalAxes)}) and available signals (analog {len(analog)} + irregs {len(irregs)} = {len(analog) + len(irregs)})"
 
         # NOTE: 2023-01-12 16:45:48
         # by convention, analog signals are plotted in order, BEFORE the 
@@ -9543,6 +9588,10 @@ signals in the signal collection.
             
         yy = list()
         
+        # NOTE: 2024-07-27 23:00:57
+        # see TODO: 2024-07-27 22:46:05
+        # sig_start = min([min([i.xData[0] for i in list(filter(lambda v: isinstance(v, pg.PlotDataItem), ax.items))]) for ax in self.signalAxes])
+        
         for k_event, event in enumerate(entities_list):
             if hasattr(event, "type"):
                 data_name = event.type.name
@@ -9569,7 +9618,7 @@ signals in the signal collection.
             if len(event.times):
                 xx[k_event][:,:len(event.times)] = np.atleast_2d(event.times)[:]
                 yy.append(np.full(xx[k_event].shape, height_interval * k_event + height_interval/2))
-                
+
         xx_ = np.concatenate(xx).T
         yy_ = np.concatenate(yy).T
         

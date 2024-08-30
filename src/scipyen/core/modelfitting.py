@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 """ Steps towards a unified frameworks for model fitting.
 
 TODO/FIXME: This module is intended to supersede the models.py module (hopefully
@@ -31,7 +36,7 @@ import scipy
 #import sympy.parsing.sympy_parser as symparser
 import quantities as pq
 from scipy import cluster, optimize, signal, integrate #, where
-import vigra
+from core.vigra_patches import vigra
 import neo
 from core.traitcontainers import DataBag
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
