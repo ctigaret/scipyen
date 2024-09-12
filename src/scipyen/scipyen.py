@@ -11,7 +11,7 @@
 
 #### BEGIN core python modules
 
-import sys, os, platform, pathlib
+import sys, os, platform, pathlib, subprocess
 
 import atexit, re, inspect, gc, io, traceback
 import faulthandler, warnings
@@ -33,6 +33,12 @@ if sys.platform == "linux":
         
     
     # os.environ["QT_QPA_PLATFORM"]="xcb"
+    
+# TODO 2024-09-11 23:56:17
+# use qtpaths or qtpaths6 to figure out where the platform QT5/6 is installed
+# if at all
+# then add the corresponding plugins dir to QT_PLUGINS_PATH
+# so we won't have to build qt locally anymore, by the installer
 
 if len(sys.argv) > 1:
     if "pyqt6" in sys.argv:
@@ -51,7 +57,6 @@ if len(sys.argv) > 1:
         os.environ["QT_API"] = "pyqt5"
         os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
         
-
 
 #import cProfile
 __version__ = "0.0.1"
@@ -92,20 +97,54 @@ if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
     has_sip = True
 else:
     has_sip = False
-    
-# import sip
-
 
 # NOTE: 2024-05-02 09:46:11
 # you still need the QT_API in the environment
 from qtpy import (QtCore, QtWidgets, QtGui, )
 # from PyQt5 import (QtCore, QtWidgets, QtGui, )
+print(f"Scipyen is using Qt version {QtCore._qt_version}\n")
+
+from core.prog import scipywarn
+
+if os.environ["QT_API"] == "pyside2":
+    scipywarn("PySide2 support is not fully implemented; expect trouble")
+
 hasQDarkTheme = False
 try:
     import qdarktheme
     hasQDarkTheme = True
 except:
     pass
+
+platform_qt_env = dict()
+
+# NOTE: 2024-09-12 08:28:49
+# for qt5 (pyqt5) in linux, augument path to qt plugins, with the ones on the 
+# system platform for pyqt5
+# if sys.platform == "linux":
+#     print(f"QT_PLUGIN_PATH = {os.environ.get('QT_PLUGIN_PATH', None)}")
+#     print(f"QT_QPA_PLATFORM_THEME = {os.environ.get('QT_QPA_PLATFORM_THEME', None)}")
+#     platform_qmake = None
+#     if os.environ["QT_API"] == "pyqt5":
+#         pout = subprocess.run(("which", "qmake"), capture_output=True)
+#         if pout.returncode==1:
+#             pout = subprocess.run(("which", "qmake-qt5"), capture_output=True)
+#             if pout.returncode==0:
+#                 platform_qmake = pout.stdout.decode().strip("\n")
+#                 
+#     if isinstance(platform_qmake, str) and len(platform_qmake.strip()):
+#         platform_qmake_test = subprocess.run((platform_qmake, "-query"), capture_output=True)
+#         if platform_qmake_test.returncode==0:
+#             platform_qt_env = dict(map(lambda x: tuple(x.split(":")), filter(lambda x: len(x.strip())> 0, platform_qmake_test.stdout.decode().split("\n"))))
+#             
+#     if len(platform_qt_env):
+#         platform_qt_plugins = platform_qt_env.get("QT_INSTALL_PLUGINS", "")
+        
+        # if os.environ["QT_API"] == "pyqt5":
+        #     try:
+        #         os.environ["QT_PLUGIN_PATH"]=f"{os.path.join(os.environ['VIRTUAL_ENV'], 'lib64/PyQt5/Qt5/plugins')}:{platform_qt_plugins}"
+        #     except:
+        #         traceback.print_exc()
 
 # if hasattr(QtCore.Qt, "AA_EnableHighDpiScaling"):
 #     QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
@@ -197,10 +236,6 @@ elif sys.platform == "darwin":
 from core import scipyen_config
 #### END Scipyen modules
 
-
-# else:
-#     print('Running in a normal Python process\n\n')
-    
 # NOTE: 2021-01-10 13:19:20
 # the same Configuration object holds/merges both the user options and the 
 # package defaults (therefore there is no need for two Configuration objects)

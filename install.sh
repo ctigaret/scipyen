@@ -244,7 +244,8 @@ function installpipreqs ()
         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
         
 #         ${python_executable} -m pip install dummy_test
-        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements.txt
+#         ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements.txt
+        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements2.txt
 #         python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
         
         if [[ $? -ne 0 ]] ; then
@@ -909,14 +910,15 @@ SECONDS=0
 get_pyver
 
 # virtual_env="testenv"
-virtual_env_pfx="scipyenv" #.$pyver"
+# virtual_env_pfx="scipyenv" #.$pyver"
+virtual_env_pfx="scipyenv_test" #.$pyver"
 # install_dir=$HOME
 # pyqt5_version=5.15.9
 # pyqt5_repo=https://files.pythonhosted.org/packages/source/P/PyQt5/
 # pyqt5_src=PyQt5-$pyqt5_version.tar.gz
 # NOTE: figure out is /where is dbus-python.h
 # pcgconf (pkg-config) must be installed
-# pkgconf --liat-all  | grep dbus => list of dbus-* packages including dbus-python
+# pkgconf --list-all  | grep dbus => list of dbus-* packages including dbus-python
 # qdbus_python_dir=
 
 
@@ -1225,7 +1227,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     fi
     
 #     build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-    dopyqt5
+#     dopyqt5
     
 #     dopyqt6 # NOTE: 2024-05-29 10:45:15 not yet ...
     
@@ -1266,6 +1268,7 @@ t=$(( t % 60))
 seconds=$(( t ))
 
 echo "Execution time was $days days, $hours hours, $minutes minutes and $seconds seconds"
+echo "Before using Scipyen, either restart the terminal, or call 'source ~/.scipyenrc'"
 
 
 

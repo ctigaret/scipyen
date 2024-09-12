@@ -1,0 +1,241 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# WARNING: some of the packages listed below may have already been installed, or 
+# are available from your Linux distribution. Therefore by installing them INSIDE
+# the virtual environment they will overshadow the packages in the system-wide
+# site-packages directory. This has consequences ONLY IF the virtual environment 
+# was created with the --system-site-packages option .
+#
+# ATTENTION: ONLY USE THIS FILE INSIDE A VIRTUAL PYTHON ENVIRONMENT (see INSTALL
+# for details).
+#
+# You may manually check this list against the python packages installed on 
+# your machine (either locally as "user", see $HOME/local/lib/pythonX.Y/site-packages,
+# or system-wide, see /usr/lib64/PythonX.Y.site-packages) and comment out, below,
+# the ones already installed on your system. Otherwise, the packages installed 
+# here will take precedence over those available.
+#
+#
+# NOTE: Not all packages here are used/needed by Scipyen in its current version
+# (some are installed for experimentation, e.g. the extra jupyter kernel packages,
+# and others). 
+
+
+
+# NOTE as of 2021-10-12 11:59:52 might have to compile from source if using Python >= 3.9.7
+# also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
+# linguistics
+# packages already listed above
+
+# CHANGELOG
+# 2024-05-02 08:45:19
+# accommodate installaiton of PyQt6
+
+distlib
+pickleshare
+pyinstaller
+Babel
+GitPython
+Jinja2
+MarkupSafe
+Pillow
+PyLEMS
+qtpy
+pywayland ; sys_platform == "linux"
+# required to build PyQt5/6 locally using the host's Qt stack
+PyQt-builder ; sys_platform == 'linux'
+# required to build PyQt5 locally using the host's Qt stack
+Pyqt5-sip ; sys_platform == 'linux'
+PyQt5 ; #sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+# required to build PyQt6 locally using the host's Qt stack
+Pyqt6-sip #; sys_platform == 'linux'
+PyQt6 #; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+pyside2
+pyside6
+qdarkstyle ; sys_platform == 'win32'
+qasync
+aiohttp
+pyqtdarktheme
+PyWavelets
+# QtPy # already insatlled by jupyter
+SecretStorage
+airspeed
+anyio
+asttokens
+attrs
+base32hex
+bleach
+blis ; sys_platform == 'linux'
+bokeh
+cachetools
+catalogue
+certifi
+cffi
+chardet
+chronometry
+click
+cmasher
+cmocean
+colorama
+colouration
+confection
+confuse
+cryptography
+cymem
+cython
+debugpy
+descartes
+dill
+editdistance
+exceptiongroup
+executing
+filelock
+fonttools
+func-timeout
+fuzzywuzzy
+geographiclib
+geopy
+gitdb
+gnuplot_kernel
+graphviz
+h5py
+hdf5view
+huggingface-hub
+idna
+imageio
+imagesize
+importlib-metadata
+imreg-dft
+inflect
+ipyparallel
+ipython
+ipywidgets
+isodate
+jaraco.classes
+jeepney
+joblib
+#jsonlib
+jsonschema
+jupyter
+jupyter_cms
+jupyter_qtconsole_colorschemes
+jupyterlab
+jupyterlab-pygments
+jupyterlab-server
+jupyterlab-widgets
+jupyterthemes
+qtconsole
+keyring
+kiwisolver
+langcodes
+language_tool_python
+lazy_loader
+lesscpy
+libNeuroML
+linguistics
+lxml
+matlab_kernel
+matplotlib
+matplotlib-inline
+metakernel
+modelspec
+more-itertools
+myst_parser
+murmurhash
+nbclassic
+nbclient
+nbconvert
+nbsphinx
+neo
+nest-asyncio
+networkx
+# neuron; sys_platform == "win32" # NOTE: does NOT work on windows; on linux, see install.sh for the option to build locally
+neuromllite
+nibabel
+nixio
+nodejs
+nose            
+notebook
+notebook_shim
+nuitka
+numpy           
+octave_kernel
+pandas
+pandas-flavor
+pathy
+patsy
+pingouin
+pkginfo
+platformdirs
+plotly
+plotnine
+preshed; sys_platform == "linux"
+prometheus-client
+prompt-toolkit
+psutil
+pyabf
+pylmeasure      # optional
+pymongo
+pyneuroml       # optional
+pyparsing
+#pyqt5-tools ; sys_platform == 'win32'
+pyqtgraph
+pyserial
+pytest
+python-magic
+pytz
+pywin32 ; sys_platform == 'win32'
+pyxdg
+qimage2ndarray
+ravenclaw
+rdflib
+readme-renderer
+recommonmark
+regex
+requests-toolbelt
+researchpy
+scikit-image
+scikit-learn
+scipy
+seaborn
+shapely
+slytherin
+smart-open
+smmap
+sniffio
+spacy
+spacy-legacy
+spacy-loggers
+sphinx          
+sphinx_rtd_theme
+srsly
+stack-data
+statsmodels
+sympy
+tables ; python_version >= '3.9.7'
+tabulate
+tenacity
+termcolor
+terminado
+testpath
+thinc
+tiffile
+termcolor
+termcolor2
+tokenizers
+traitlets
+transformers
+twine
+txt
+typing_extensions
+viscm
+wasabi
+websocket-client
+widgetsnbextension
+winshell ; sys_platform == 'win32'
+xarray
+xyzservices
+zipp

@@ -8,7 +8,14 @@
 import os, sys, subprocess, shutil, platform, pathlib
 from shutil import which
 
-from qtpy import (QtCore, QtWidgets, QtGui, QtDBus)
+from qtpy import (QtCore, QtWidgets, QtGui)
+has_qtdbus = False
+try:
+    from qtpy import QtDBus
+    has_qtdbus = False
+except:
+    pass
+
 from qtpy.QtCore import (Signal, Slot, Property,)
 # from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
 # from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
@@ -89,6 +96,10 @@ def get_dbus_service_names(what:str="session"):
     """
     what: one of "session", "system"
     """
+    if not has_qtdbus:
+        scipywarn("No QtDBus on this platform")
+        return
+    
     if platform.system() != "Linux":
         return
     
