@@ -116,41 +116,6 @@ try:
 except:
     pass
 
-platform_qt_env = dict()
-
-# NOTE: 2024-09-12 08:28:49
-# for qt5 (pyqt5) in linux, augument path to qt plugins, with the ones on the 
-# system platform for pyqt5
-# if sys.platform == "linux":
-#     print(f"QT_PLUGIN_PATH = {os.environ.get('QT_PLUGIN_PATH', None)}")
-#     print(f"QT_QPA_PLATFORM_THEME = {os.environ.get('QT_QPA_PLATFORM_THEME', None)}")
-#     platform_qmake = None
-#     if os.environ["QT_API"] == "pyqt5":
-#         pout = subprocess.run(("which", "qmake"), capture_output=True)
-#         if pout.returncode==1:
-#             pout = subprocess.run(("which", "qmake-qt5"), capture_output=True)
-#             if pout.returncode==0:
-#                 platform_qmake = pout.stdout.decode().strip("\n")
-#                 
-#     if isinstance(platform_qmake, str) and len(platform_qmake.strip()):
-#         platform_qmake_test = subprocess.run((platform_qmake, "-query"), capture_output=True)
-#         if platform_qmake_test.returncode==0:
-#             platform_qt_env = dict(map(lambda x: tuple(x.split(":")), filter(lambda x: len(x.strip())> 0, platform_qmake_test.stdout.decode().split("\n"))))
-#             
-#     if len(platform_qt_env):
-#         platform_qt_plugins = platform_qt_env.get("QT_INSTALL_PLUGINS", "")
-        
-        # if os.environ["QT_API"] == "pyqt5":
-        #     try:
-        #         os.environ["QT_PLUGIN_PATH"]=f"{os.path.join(os.environ['VIRTUAL_ENV'], 'lib64/PyQt5/Qt5/plugins')}:{platform_qt_plugins}"
-        #     except:
-        #         traceback.print_exc()
-
-# if hasattr(QtCore.Qt, "AA_EnableHighDpiScaling"):
-#     QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-# if hasattr(QtCore.Qt, "AA_UseHighDpiPixmaps"):
-#     QtGui.QGuiApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
-
 
 # NOTE: 2023-09-28 22:12:25 
 # this does the trick on windows -  now my local breeze icons are available
