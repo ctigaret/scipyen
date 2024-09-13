@@ -395,7 +395,7 @@ class PVSystemConfiguration(object):
             self.__attributes__ = DataBag()
         
         lasers = node.getElementsByTagName("Laser")
-        if len(lasers) == 0 or self.__version__[1] > 0:
+        if len(lasers) == 0 or hasattr(self, "__version__") and self.__version__[1] > 0:
             lasers = node.getElementsByTagName("PVLasers")
         if len(lasers):
             self.lasers = [PVLaser(l) for l in lasers]

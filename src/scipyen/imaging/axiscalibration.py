@@ -1456,11 +1456,17 @@ class AxisCalibrationData(CalibrationData):
         if name in self.parameters:
             name = f"channel_{name}"
             
-        if name in self and isinstance(self[name], ChannelCalibrationData):
-            raise ArgumentError(f"This {self.__class__.__name__} instance already contains a Channel calibration data mapped to {name}")
-
-        if index in self:
-            raise ArgumentError(f"This {self.__class__.__name__} instance already contains a Channel calibration data with index {index}")
+        # print(f"name: {name}; index: {index}")
+            
+        # if name in self and isinstance(self[name], ChannelCalibrationData):
+        #     oldCal = self.getChannelCalibration(name)
+        #     scipywarn(f"Overwriting the channel calibration data mapped to {name} in this {self.__class__.__name__} instance ({oldCal}) with {val}")
+        #     # raise ArgumentError(f"This {self.__class__.__name__} instance already contains a Channel calibration data mapped to {name}")
+        # 
+        # if index in self:
+        #     oldCal = self.getChannelCalibration(index)
+        #     scipywarn(f"Overwriting the channel calibration data with index {index} in this {self.__class__.__name__} instance ({oldCal}) with {val}")
+            # raise ArgumentError(f"This {self.__class__.__name__} instance already contains a Channel calibration data with index {index}")
         
         if index != val.index:
             val.index = index

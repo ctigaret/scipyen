@@ -56,6 +56,8 @@ import xml.etree.ElementTree as ET # the default parsers in here are from xml.pa
                                    # see documentation for xml.etree.ElementTree.XMLParser
 import xml.dom
 import xml.dom.minidom
+
+from functools import singledispatch
 #import abc
 
 # 2016-09-25 21:28:37 
@@ -186,15 +188,24 @@ class XmlSyntaxHighlighter(QtGui.QSyntaxHighlighter):
             else:
                 break
             
+@singledispatch
 def getChildren(element, eltype:int=1) -> typing.Generator:
-    """Compensate for the loss of xlm.etree.Element.getchildren() in Python 3.9.7
-    """
+    raise NotImplementedError(f"Fucntion does not support {type(element)} objects")
+
+@getChildren.register(xml.dom.minidom.Element)
+def _(element:xml.dom.minidom.Element, eltype:int=1) -> typing.Generator:
+    """"""
     if eltype not in range(1,13):
         raise ValueError(f"'eltype' expected to be an int in the range 1⋯13; instead, got {eltype}")
-    
     children = element.childNodes
     if len(children):
         yield from (c for c in children if c.nodeType == eltype)
+    
+@getChildren.register(ET.Element)
+def _(element:ET.Element, eltype:int=None) -> typing.Generator:
+    """"""
+    yield from (c for c in element.iter())
+        
         # return (c for c in children if c.nodeType == eltype)
     # chiter = element.iter()
     # return (c for c in next(chiter))
