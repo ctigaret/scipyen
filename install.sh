@@ -232,21 +232,9 @@ function installpipreqs ()
         # For details please see https://pypi.org/project/sklearn/
         export SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL=True 
         
-        # NOTE: 2023-06-25 10:56:34 
-        # when we are root, make sure to use the virtual environment's python 
-        # executable here
-#         if [[ `id -u` -eq 0 ]] ; then
-#             py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-#         else
-#             py_exec=${python_exec}
-#         fi
-        
         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
         
-#         ${python_executable} -m pip install dummy_test
-#         ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements.txt
         ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements2.txt
-#         python3 -m pip install -r "$installscriptdir"/pip_requirements.txt
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
@@ -265,7 +253,7 @@ function dopyqt5 ()
         exit 1
     fi
     
-    if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] || [[ $reinstall_pyqt5 -gt 0 ]]; then
+    if [ ! -r ${VIRTUAL_ENV}/.pyqt5done ] || [[ $reinstall_pyqt5 -gt 0 ]] || [[ $build_pyqt5 -gt 0 ]] ; then
         mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
         
         findqmake
@@ -332,12 +320,9 @@ function dopyqt5 ()
         # • remove the --jobs option altogether
         if [[ $njobs -gt 0 ]] ; then
             ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#             sip-wheel --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
         else
             ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-#             sip-wheel --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
         fi
-#         sip-wheel --qmake=${qmake_binary} --confirm-license --jobs 8 --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
 
         if [[ $? -ne 0 ]] ; then
             echo -e "sip Cannot build a PyQt5 wheel. Bailing out. Goodbye!\n"
@@ -365,12 +350,11 @@ function dopyqt5 ()
             else
                 echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5done
                 echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
-                
-#                 echo -e "\n\n Installing PyQtDataVisualization\n\n"
-#                 # NOTE: WARNING: 2023-07-19 00:12:27 avoid this !!!! 
-#                 pip install PyQtDataVisualization
             fi
         fi
+    
+    else 
+        pip install pyqt5
     fi
 }
 
@@ -490,8 +474,12 @@ function dopyqt6 ()
 #                 pip install PyQtDataVisualization
             fi
         fi
+    else
+        pip install pyqt6
     fi
 }
+
+
 
 function dovigra ()
 {
@@ -910,8 +898,8 @@ SECONDS=0
 get_pyver
 
 # virtual_env="testenv"
-# virtual_env_pfx="scipyenv" #.$pyver"
-virtual_env_pfx="scipyenv_test" #.$pyver"
+virtual_env_pfx="scipyenv" #.$pyver"
+# virtual_env_pfx="scipyenv_test" #.$pyver"
 # install_dir=$HOME
 # pyqt5_version=5.15.9
 # pyqt5_repo=https://files.pythonhosted.org/packages/source/P/PyQt5/
@@ -936,6 +924,7 @@ using_python=""
 install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
+build_pyqt5=0
 install_fenicsx=0
 njobs=4
 reinstall_pyqt5=0
@@ -978,6 +967,10 @@ for i in "$@" ; do
         use_pypi_neuron=0
         shift
         ;;
+        --build-pyqt5)
+        build_pyqt5=1
+        shift
+        ;;
         --with_coreneuron)
         use_core_neuron=1
         shift
@@ -1008,9 +1001,11 @@ for i in "$@" ; do
         case $reinstall in
             pyqt5)
             reinstall_pyqt5=1
+            build_pyqt5=1
             ;;
             PyQt5)
             reinstall_pyqt5=1
+            build_pyqt5=1
             ;;
             pyqt6)
             reinstall_pyqt6=1
@@ -1055,9 +1050,11 @@ for i in "$@" ; do
         case $reinstall in
             pyqt5)
             reinstall_pyqt5=1
+            build_pyqt5=1
             ;;
             PyQt5)
             reinstall_pyqt5=1
+            build_pyqt5=1
             ;;
             pyqt6)
             reinstall_pyqt6=1
@@ -1226,8 +1223,8 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
         exit 1
     fi
     
-#     build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
-#     dopyqt5
+    build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    dopyqt5
     
 #     dopyqt6 # NOTE: 2024-05-29 10:45:15 not yet ...
     
