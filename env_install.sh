@@ -968,7 +968,7 @@ for i in "$@" ; do
         use_pypi_neuron=0
         shift
         ;;
-        --build-pyqt5)
+        --build_pyqt5)
         build_pyqt5=1
         shift
         ;;
