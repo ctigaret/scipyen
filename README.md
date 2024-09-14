@@ -33,13 +33,60 @@ Before using Scipyen, follow these steps:
     ```
     git clone github.com/ctigaret/scipyen.git
     ```
-2. Create a virtual python environment, see [`doc/install/INSTALL.md`](doc/install/INSTALL.md) for details.
+2. Create a virtual python environment.
 
-3. Activate the virtual environment then simply run the `scipyen.py` script located
-in the top `scipyen` directory, e.g.:
-```python
-python ~/scipyen/scipyen.py
-```
+        
+    2.1 In a terminal window navigate to the top directory of the cloned repository
+    and launch the environment installation script (NOTE: I assume you cloned
+    scipyen in your home directory; make sure you adjust the paths correctly):
+        
+    * Linux:
+        
+    ```bash
+    cd ~/scipyen
+    sh ./env_install.sh
+    ```
+    
+    * MacOS:
+        
+    ```bash
+    cd ~/scipyen
+    sh ./mamba_env_install_macos.sh
+    ```
+    
+    * Windows
+    
+    ```dos
+    cd c:\users\<my user name>\scipyen
+    mamba_env_install_windows.bat
+    ```
+
+3. Launch Scipyen:
+    
+    3.1. Linux/MacOS:
+        
+    * The environment installation script creates an executable shell script ~/bin/scipyen.
+    Make sure ~/bin is in your PATH environment variable then call this script in a terminal window.
+    
+    * To activate the virtual environment in order to change/upgrade installed python packages, 
+    call the command "scipyact" in a terminal window (NOTE: This is sourced from the file "~/.scipyenrc"
+    created by the environment installation script).
+    
+    * To launch scipyen manually, in a terminal window activate the environment as above, 
+    navigate to the source directory inside the local git repository, e.g.
+    ```bash
+    cd ~/scipyen/src/scipyen 
+    ```
+    
+    then launch Scipyen with:
+    
+    ```bash
+    python scipyen.py
+    ```
+    
+    3.2 Windows:
+        
+    * Use the desktop shortcut that was created by the environment installation script.
 
 
 ## Author:

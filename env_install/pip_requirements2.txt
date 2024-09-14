@@ -51,14 +51,16 @@ PyQt-builder ; sys_platform == 'linux'
 Pyqt5-sip ; sys_platform == 'linux'
 PyQt5 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
 # required to build PyQt6 locally using the host's Qt stack
-#Pyqt6-sip ; sys_platform == 'linux'
-#PyQt6 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+Pyqt6-sip ; sys_platform == 'linux'
+PyQt6 ; sys_platform == 'win32'         # on Windows run 'pip install PyQt5'; on Unix must build  - see INSTALL file
+#pyside2
+#pyside6
 qdarkstyle ; sys_platform == 'win32'
 qasync
 aiohttp
 pyqtdarktheme
 PyWavelets
-# QtPy
+# QtPy # already insatlled by jupyter
 SecretStorage
 airspeed
 anyio
@@ -125,6 +127,7 @@ jupyterlab-pygments
 jupyterlab-server
 jupyterlab-widgets
 jupyterthemes
+qtconsole
 keyring
 kiwisolver
 langcodes

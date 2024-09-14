@@ -234,7 +234,7 @@ function installpipreqs ()
         
         echo -e "Using ${python_executable} as `whoami` to install PyPI packages\n"
         
-        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements2.txt
+        ${python_executable} -m pip install -r "$installscriptdir"/pip_requirements.txt
         
         if [[ $? -ne 0 ]] ; then
             echo -e "Cannot install required packages from PyPI. Bailing out. Goodbye!\n"
