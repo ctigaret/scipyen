@@ -8438,7 +8438,7 @@ signals in the signal collection.
 #                 x0_ = x0
 #                 x1_ = x1
  
-            regions = [v for v in zip(x0_, x1_)]
+            # regions = [v for v in zip(x0_, x1_)]
             
             regions = [v for v in zip(x0, x1)]
             
