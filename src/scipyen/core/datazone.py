@@ -16,7 +16,7 @@ import pyqtgraph as pg
 
 from core import quantities as cq
 from core.quantities import check_time_units
-from core.utilities import counter_suffix
+# from core.utilities import counter_suffix
 from .prog import (safeWrapper, with_doc)
 from qtpy import QtWidgets
 # from PyQt5 import QtWidgets
@@ -608,6 +608,7 @@ def intervals2epoch(*args, **kwargs):
         is the name of the gerenated neo.Epoch or DataZone object
 
 """
+    from core.utilities import counter_suffix
     def __make_unique_label__(label, collection):
         if label in collection:
             label = counter_suffix(label, collection)
