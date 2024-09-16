@@ -526,6 +526,8 @@ Changelog:
             name = self.__class__.__name__
 
         super().__init__()
+        self.t0 = t0
+        self.t1 = t1
         
     @classmethod
     def from_epoch(cls:type, epoch: typing.Union[neo.Epoch, DataZone],  
