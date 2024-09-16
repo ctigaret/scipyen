@@ -16,6 +16,7 @@ import pyqtgraph as pg
 
 from core import quantities as cq
 from core.quantities import check_time_units
+from core.utilities import counter_suffix
 from .prog import (safeWrapper, with_doc)
 from qtpy import QtWidgets
 # from PyQt5 import QtWidgets
