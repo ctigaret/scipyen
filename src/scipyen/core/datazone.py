@@ -629,7 +629,8 @@ def intervals2epoch(*args, **kwargs):
     # takes care of getting durations right, for "true" intervals, and also
     # checks interval labels uniqueness
     interval_labels = [] # used in the comprehension below,via __make_unique_label__
-    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (min(x.t0, x.t1), abs(x.t1-x.t0), __make_unique_label__(x.name, interval_labels)), args))
+    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_unique_label__(x.name, interval_labels)), args))
+    # epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (min(x.t0, x.t1), abs(x.t1-x.t0), __make_unique_label__(x.name, interval_labels)), args))
 
     # cache the units, because conversion from a list to a numpy array 'slices'
     # them out
