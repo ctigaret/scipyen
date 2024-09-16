@@ -5472,7 +5472,8 @@ anything else       anything else       ❌
                     epochs.append(seg_epoch)
                     if embed:
                         if overwrite:
-                            seg.epochs = [seg_epoch]
+                            seg.epochs.clear()
+                            seg.epochs.append(seg_epoch)
                         else:
                             seg.epochs.append(seg_epoch)
                             
