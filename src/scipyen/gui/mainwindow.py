@@ -3131,9 +3131,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.console.consoleWidget.set_pygment(
             self.console.consoleWidget._console_pygment)
         
-        qtverstr = f"'Scipyen is using Qt {QtCore._qt_version}'"
+        verstr = f"'Scipyen is using Qt {QtCore._qt_version}, neo {neo.__version__}, VIGRA {vigra.version}'"
         
-        self.console.execute(f"print({qtverstr})", hidden=True)
+        self.console.execute(f"print({verstr})", hidden=True)
 
     # NOTE: 2016-03-20 21:18:32
     # to run code inside the console and use the console as stdout,
