@@ -64,6 +64,7 @@ from core.scipyen_config import (markConfigurable, confuse,
                                  saveWindowSettings, loadWindowSettings, )
 from core.workspacefunctions import *
 from core import scipyen_plugin_loader
+from core.scipyen_plugin_loader import reload
 
 from imaging.scandata import (AnalysisUnit, ScanData,)
 from imaging.axiscalibration import (AxesCalibration,
@@ -209,7 +210,7 @@ from copy import copy, deepcopy
 import collections
 from collections import deque
 # from collections import ChainMap
-from importlib import reload  # I use this all too often !
+# from importlib import reload  # I use this all too often ! - trying scipyen_plugin_loader.reload, above
 # END core python modules
 
 # BEGIN 3rd party modules

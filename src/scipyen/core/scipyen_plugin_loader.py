@@ -419,6 +419,21 @@ def check_load_module(spec, verb:bool=False):
         print(f"check_load_module: spec = {spec}")
         
     module = prog.get_loaded_module(spec)
+    
+#     # NOTE: 2024-09-17 22:43:33
+#     # cannot importlib.reload(…) a plugin module, because, when aliased, its 
+#     # alias doesn't appear in sys.modules
+#     #
+#     if not isinstance(module, types.ModuleType):
+#         try:
+#             module = importlib.util.module_from_spec(spec)
+#         except:
+#             traceback.print_exc()
+#             
+#     spec.loader.exec_module(module)
+#     sys.modules[spec.name] = module
+#     loaded_plugins[spec.name] = module
+    
     # print(f"check_load_module get_loaded_module module {module}")
     if isinstance(module, types.ModuleType): # module found, no beef here
         reloaded_module = importlib.reload(module) # reload plugin to reflect changes
@@ -433,4 +448,20 @@ def check_load_module(spec, verb:bool=False):
             loaded_plugins[spec.name] = module
         except:
             traceback.print_exc()
+            
+
+def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
+    spec = importlib.util.find_spec(obj.__name__)
+    spec.loader.exec_module(obj)
+    sys.modules[spec.name] = obj
+    loaded_plugins[spec.name] = obj
+    return obj
+
+
+def reload(obj:types.ModuleType) -> types.ModuleType:
+    try:
+        return importlib.reload(obj)
+    except:
+        return reload_plugin(obj)
+    
     
