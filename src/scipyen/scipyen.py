@@ -102,7 +102,7 @@ else:
 # you still need the QT_API in the environment
 from qtpy import (QtCore, QtWidgets, QtGui, )
 # from PyQt5 import (QtCore, QtWidgets, QtGui, )
-print(f"Scipyen is using Qt version {QtCore._qt_version}\n")
+# print(f"Scipyen is using Qt version {QtCore._qt_version}\n")
 
 from core.prog import scipywarn
 
