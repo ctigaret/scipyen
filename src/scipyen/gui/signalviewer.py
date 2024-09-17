@@ -5360,7 +5360,7 @@ anything else       anything else       ❌
             If that is not the case, yet "embed" is True, then the functions 
             issues a warning. The epoch is still generated and is returned by the 
             function.
-            
+        
         all_segments: bool, default is True. This parameter is used only when
             "embed" is True and the plotted data support embedding of neo.Epoch 
             objects (see above).
@@ -5422,14 +5422,6 @@ anything else       anything else       ❌
                 name = "Epoch"
             
         if all_segments and relative_to_segment_start:
-            # NOTE: 2022-10-22 22:02:50 - NO WE DON'T !!!'
-            # we need this to figure out the units of the cursor's x coordinate, 
-            # taken ad the units of the signal plotted in the cursor's host axis 
-            # (PlotItem)
-            #
-            # For multi-axes cursors, we use the currently-selected axis !!!
-            # cursor_axes = [self.axes.index(c.hostItem) if isinstance(c.hostItem, pg.PlotItem) else self.axes.index(self.currentAxis) for c in cursors]
-            
             # NOTE 2022-10-21 23:13:36
             # when calculating segment t_start we use the minimum of `t_start` 
             # of signals and spiketrains ONLY, to avoid any existing events or
@@ -5455,19 +5447,38 @@ anything else       anything else       ❌
             if len(segments) == 0:
                 return
                 
+            # NOTE: 2024-09-17 14:55:56 possible BUG / FIXME / TODO:
+            # THIS here is problematic because assumes all signals in a segment
+            # have the same t_start (the neoutils.segment_start function returns 
+            # the minimum t_start of all the signals contained in the segment)
+            # However, these is no guarantee that ALL signals in the segment have
+            # the same t_start, therefore we risk pointing before the start of a 
+            # signal
             seg_starts = [segment_start(s) for s in segments]
             
+            # NOTE: 2024-09-17 14:46:52
+            # because the cursor X coordinate is relative to the segment's 
+            # signals t_start, we must readjust the coordinates WITHOUT
+            # affecting the cursors' `x` coordinate
+            #
+            # therefore we go create an epoch VIA Interval objects instantiated
+            # on the adjusted `x` coordinate, rather than directly from these cursors
+            #
             if not all(ss == seg_starts[0] for ss in seg_starts):
                 epochs = list()
+                
                 current_seg_start = segment_start(segments[self.currentFrame])
                 
                 rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
                 
                 # print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
                 for k, seg in enumerate(segments):
-                    s_start = seg_starts[k]
-                    epoch_tuples = [(s_start + rel_starts[i], cursors[i].xwindow*s_start.units, cursors[i].name) for i in range(len(cursors))]
-                    intervals = [Interval(s_start + rel_starts[i] - cursors[i].xwindow*s_start.units/2, s_start + rel_starts[i] + cursors[i].xwindow*s_start.units/2, cursors[i].name, True) for i in range(len(cursors))]
+                    # NOTE: 2024-09-17 15:31:30
+                    # see datazone cursors2epochs for logic
+                    tdls = [(seg_starts[k] + rel_starts[i] - 0.5 * cursors[i].xwindow * seg_starts[k].units, cursors[i].xwindow * seg_starts[k].units, cursors[i].name) for i in range(len(cursors))]
+                    
+                    intervals = [Interval(*v, True) for v in tdls]
+                    # intervals = [Interval(s_start + rel_starts[i] - cursors[i].xwindow*s_start.units/2, s_start + rel_starts[i] + cursors[i].xwindow*s_start.units/2, cursors[i].name, True) for i in range(len(cursors))]
                     seg_epoch = intervals2epoch(*intervals, name=name)
                     epochs.append(seg_epoch)
                     if embed:

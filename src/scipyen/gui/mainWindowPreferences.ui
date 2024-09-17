@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>306</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Dialog</string>
+  </property>
+  <property name="windowIcon">
+   <iconset theme="settings-configure"/>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>User plugins directory</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QLineEdit" name="userPluginsDirectoryLineEdit"/>
+       </item>
+       <item>
+        <widget class="QToolButton" name="userPluginsDirectoryToolButton">
+         <property name="toolTip">
+          <string>Select directory containing user plugins</string>
+         </property>
+         <property name="statusTip">
+          <string>Select directory containing user plugins</string>
+         </property>
+         <property name="whatsThis">
+          <string>Select directory containing user plugins</string>
+         </property>
+         <property name="text">
+          <string>Select directory</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-open-folder"/>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item row="1" column="0">
+    <layout class="QVBoxLayout" name="verticalLayout_2">
+     <item>
+      <widget class="QLabel" name="label_2">
+       <property name="text">
+        <string>Code editor</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="codeEditorLineEdit">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
+&lt;p&gt;Program to use as code editor.
+&lt;/p&gt;This can be:
+&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The name of an executable binary or script. e.g.: kate, nedit. The program must be located in a directory in your $PATH enviornment variable&lt;li&gt;
+&lt;li&gt;The full path to an executable, e.g. /usr/bin/kate&lt;/li&gt;
+&lt;/ul&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="statusTip">
+        <string>Program to use as code editor.</string>
+       </property>
+       <property name="whatsThis">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;
+&lt;p&gt;Program to use as code editor.
+&lt;/p&gt;This can be:
+&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The name of an executable binary or script. e.g.: kate, nedit. The program must be located in a directory in your $PATH enviornment variable&lt;li&gt;
+&lt;li&gt;The full path to an executable, e.g. /usr/bin/kate&lt;/li&gt;
+&lt;/ul&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="useSystemCodeEditorCheckBox">
+       <property name="text">
+        <string>Use System-defined Code Editor</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="2" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_4">
+     <item>
+      <widget class="QCheckBox" name="autoLaunchScriptManagerCheckBox">
+       <property name="text">
+        <string>Launch Script Manager at Startup</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item row="3" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_3">
+     <item>
+      <widget class="QCheckBox" name="deleteClosedViewersCheckBox">
+       <property name="toolTip">
+        <string>Delete viewer instances when their window is closed</string>
+       </property>
+       <property name="statusTip">
+        <string>Delete viewer instances when their window is closed</string>
+       </property>
+       <property name="whatsThis">
+        <string>Delete viewer instances when their window is closed</string>
+       </property>
+       <property name="text">
+        <string>Delete Closed Viewers</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item row="4" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>GUI Style</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="currentGUIStyleLabel">
+       <property name="text">
+        <string>TextLabel</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="chooseGUIStyletoolButton">
+       <property name="toolTip">
+        <string>Select Widget Style (Qt)</string>
+       </property>
+       <property name="statusTip">
+        <string>Select Widget Style (Qt)</string>
+       </property>
+       <property name="whatsThis">
+        <string>Select Widget Style (Qt)</string>
+       </property>
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="icon">
+        <iconset theme="edit-paste-style"/>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_3">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item row="5" column="0">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>Dialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>248</x>
+     <y>254</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>157</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>Dialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>316</x>
+     <y>260</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>286</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

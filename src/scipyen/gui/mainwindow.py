@@ -1405,7 +1405,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.external_console = None
 
         self._maxRecentFiles = 10  # TODO: make this user-configurable
-        self._maxRecentDirectories = 100  # TODO: make this user-configurable
+        self._maxRecentDirectories = 10  # TODO: make this user-configurable
 
         # export the code editor to the pyqtgraph framework
         pg.setConfigOptions(editorCommand=self._scipyenEditor)
@@ -1833,8 +1833,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @markConfigurable("MaxRecentDirectories", "Qt", default=10)
     @maxRecentDirectories.setter
     def maxRecentDirectories(self, val: int):
+        # NOTE: _recentDirectories stores them as most recent first !
         if isinstance(val, int) and val >= 0:
             self._maxRecentDirectories = val
+            
+        if len(self._recentDirectories) > self._maxRecentDirectories:
+            keep = list(self._recentDirectories)[:self._maxRecentDirectories]
+            self._recentDirectories.clear()
+            self._recentDirectories.extend(keep)
+            self._refreshRecentDirectoriesMenu_()
+            self._refreshRecentDirsComboBox_()
+            
 
     @property
     def recentFiles(self):

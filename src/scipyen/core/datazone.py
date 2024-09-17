@@ -495,7 +495,6 @@ Changelog:
     2024-02-09 09:53:36 this is now mutable
         
 """
-    # __slots__ = ()
     t0: typing.Union[numbers.Number, pq.Quantity]
     t1: typing.Union[numbers.Number, pq.Quantity]
     name: str = "Interval"
@@ -526,9 +525,11 @@ Changelog:
         if not isinstance(name, str) or len(name.strip()) == 0:
             name = self.__class__.__name__
 
-        super().__init__()
+        # super().__init__()
         self.t0 = t0
         self.t1 = t1
+        self.name = name
+        self.extent = extent
         
     @classmethod
     def from_epoch(cls:type, epoch: typing.Union[neo.Epoch, DataZone],  
@@ -575,7 +576,7 @@ def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = 
     
 @safeWrapper
 def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch or DataZone from a sequence of intervals.
+    """Construct a neo.Epoch or DataZone from a sequence of Interval objects.
     All numeric values in the intervals must be python Quantities.
     
     TODO: 2023-06-13 23:48:09
@@ -583,7 +584,7 @@ def intervals2epoch(*args, **kwargs):
     Var-positional parameters:
     --------------------------
     
-    datatypes.Interval objects
+    Interval objects
     
     NOTE: When args contains only one element, this can sequence of interval
     tuples as above.
@@ -620,16 +621,24 @@ def intervals2epoch(*args, **kwargs):
     zone = kwargs.pop("zone", False)
     prefix = kwargs.pop("prefix", "interval")
     
-    if len(args) == 1 and isinstance(args[0], (tuple, list)) and not isinstance(args[0], Interval):
-        args = args[0]
+    # print(len(args))
     
-    if not all(isinstance(a, Interval) for a in args):
+    if len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(a, Interval) for a in args[0]):
+        intervals = args[0]
+        
+    else:
+        intervals = args
+    
+    
+    # print(f"intervals2epoch intervals: {[(i, type(i)) for i in intervals]}")
+    
+    if not all(isinstance(a, Interval) for a in intervals):
         raise TypeError(f"Expecting a sequence of Interval objects")
     
     # takes care of getting durations right, for "true" intervals, and also
     # checks interval labels uniqueness
-    interval_labels = [] # used in the comprehension below,via __make_unique_label__
-    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_unique_label__(x.name, interval_labels)), args))
+    interval_labels = [] # used in the comprehension below, via __make_unique_label__
+    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_unique_label__(x.name, interval_labels)), intervals))
     # epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (min(x.t0, x.t1), abs(x.t1-x.t0), __make_unique_label__(x.name, interval_labels)), args))
 
     # cache the units, because conversion from a list to a numpy array 'slices'
@@ -819,13 +828,25 @@ def intervals2cursors(*args,
     keep_units = kwargs.pop("keep_units", False)
     cursor_type = kwargs.pop("cursor_type", "vertical")
     
+    if len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(a, Interval) for a in args[0]):
+        intervals = args[0]
+        
+    else:
+        intervals = args
+    
+    
+    # print(f"intervals2epoch intervals: {[(i, type(i)) for i in intervals]}")
+    
+    if not all(isinstance(a, Interval) for a in intervals):
+        raise TypeError(f"Expecting a sequence of Interval objects")
+
     if not isinstance(keep_units, bool):
         keep_units = False
         
     def __strip_units__(v):
         return float(v.magnitude) if (isinstance(v, pq.Quantity) and not keep_units) else v
         
-    ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip__units__(i.t0 + (i.t1 - i.t0)/2), __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0), i.name) for i in args]
+    ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip_units__(i.t0 + (i.t1 - i.t0)/2), __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0), i.name) for i in intervals]
 
     signal_viewer = kwargs.pop("signal_viewer", None)
     
