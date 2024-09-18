@@ -163,7 +163,7 @@
     <string>Scipyen's workspace table</string>
    </property>
    <property name="whatsThis">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A table view with user's variables in Scipyen's workspace.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;CAUTION:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Not all variables are visible. Notable hidden variables are:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;_&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;__&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Objects created at start up (modules etc).&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;To see all variables in the workspace at any time, execute the command `dir` in Scipyen's console.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A table view with user's variables in Scipyen's workspace.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;CAUTION:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Not all variables are visible. Notable hidden variables are: `_`, `__`, and objects created at start up (imported modules, functions and variables which are NOT necessarily global). &lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;To see all the contents of the workspace at any time, execute `dir()` in Scipyen's console.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
@@ -305,7 +305,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>History of console commands &amp; statements</string>
    </property>
    <property name="whatsThis">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The history of commands and statements executed at Scipyen's console.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;These are grouped by session, with start and end times of each session.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Sessions without an end time are those where Scipyen was suddenly aborted.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;You can copy these lines to a file, to the Scipyen's console, or execute them again (directly) by double-clicking.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The history of commands and statements executed at Scipyen's console, and grouped by session, (start and end times shown).&lt;/p&gt;&lt;p&gt;Sessions without an end time are those where Scipyen was suddenly aborted.&lt;/p&gt;&lt;p&gt;You can copy these lines to a file, to the Scipyen's console, or execute them again (directly) by double-clicking.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
@@ -432,7 +432,7 @@ NOTE: you can click anywhere in the row to select</string>
     <string>Scipyen's (read-only) view of the file system</string>
    </property>
    <property name="whatsThis">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's (read-only) view of the current (working) directory in the file system.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;By design Scipyen does not allow generic file system operations (file or directory creation, removal, duplication or relocation). These operations should be enacted through the host tools (file manager, terminal etc).&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Data can be written to files in the current directory using Save or Export actions from the &lt;/p&gt;&lt;p&gt;context menu of the symbols (variables) in Scipyen's workspace table.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's (read-only) view of the current (working) directory in the file system.&lt;/p&gt;&lt;p&gt;By design Scipyen does not allow generic file system operations (file or directory creation, removal, duplication or relocation). These operations should be enacted through the host tools (file manager, terminal etc).&lt;/p&gt;&lt;p&gt;Data can be written to files in the current directory using Save or Export actions from the context menu of the symbols (variables) in Scipyen's workspace table.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>

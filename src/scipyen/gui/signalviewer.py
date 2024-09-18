@@ -4278,7 +4278,7 @@ anything else       anything else       ❌
                 return
             
             for (x,w,l) in zip(coords, windows, labels):
-                self.addCursor(SignalCursorTypes.vertical, x=x, window=w, label=l)
+                self.addCursor(SignalCursorTypes.vertical, x=x, xwindow=w, label=l)
         
     @Slot()
     @safeWrapper
