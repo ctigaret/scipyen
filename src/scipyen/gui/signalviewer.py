@@ -957,6 +957,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionVerticalCursorsFromEpochInCurrentAxis.triggered.connect(self._slot_makeVerticalCursorsFromEpoch)
         self.actionMultiAxisVerticalCursorsFromEpoch.triggered.connect(self._slot_makeMultiAxisVerticalCursorsFromEpoch)
         self.actionMultiAxisVerticalCursorsFromEpoch.setEnabled(False)# BUG/FIXME 2023-06-19 12:21:54
+        
+        # NOTE: 2024-09-18 10:43:04
+        # useful for LTP analysis, etc
+        self.actionVertical_cursor_series.triggered.connect(self.slot_addVerticalCursors)
         #### END Cursor actions
         
         #### BEGIN Epoch actions
@@ -4219,6 +4223,62 @@ anything else       anything else       ❌
                         newVarName = validate_varname(name, self._scipyenWindow_.workspace)
                         self._scipyenWindow_.assignToWorkspace(newVarName, value, check_name=False)
         
+    @Slot()
+    def slot_addVerticalCursors(self):
+        d = qd.QuickDialog(self, "Add vertical cursors in active axis")
+        instructions = "In the fields below, enter the variable names (symbols)\ncontaining the data described in the labels"
+        d.addLabel(instructions)
+        d.coordinatesPrompt = qd.StringInput(d, "Coordinates:")
+        d.coordinatesPrompt.setValue("cursor_coords")
+        d.windowsPrompt = qd.StringInput(d, "Windows:")
+        d.windowsPrompt.setValue("cursor_windows")
+        d.labelsPrompt = qd.StringInput(d, "Labels:")
+        d.labelsPrompt.setValue("cursor_labels")
+        
+        if d.exec() == QtWidgets.QDialog.Accepted:
+            coords_var = d.coordinatesPrompt.text()
+            if coords_var not in self.scipyenWindow.workspace:
+                self.criticalMessage("Variable not found", f"The specified cursors coordinates variable '{coords_var}' is not present in the workspace")
+                return
+            coords = self.scipyenWindow.workspace[coords_var]
+            if not isinstance(coords, (tuple, list)):
+                self.criticalMessage("Wrong variable type", f"Cursors coordinates expected to be a list or tuple, got {type(coords).__name__} instead")
+                return
+            
+            if not all(isinstance(v, numbers.Number) for v in coords):
+                self.criticalMessage("Wrong elements type", "Cursors coordinates expected to be scalars")
+                return
+            
+            windows_var = d.windowsPrompt.text()
+            if windows_var not in self.scipyenWindow.workspace:
+                self.criticalMessage("Variable not found", f"The specified cursors windows variable '{windows_var}' is not present in the workspace")
+                return
+            windows = self.scipyenWindow.workspace[windows_var]
+            if not isinstance(windows, (tuple, list)):
+                self.criticalMessage("Wrong variable type", f"Cursors windows expected to be a list or tuple, got {type(windows).__name__} instead")
+                return
+            if not all(isinstance(v, numbers.Number) for v in windows):
+                self.criticalMessage("Wrong elements type", "Cursors windows expected to be scalars")
+                return
+            
+            labels_var = d.labelsPrompt.text()
+            if labels_var not in self.scipyenWindow.workspace:
+                self.criticalMessage("Variable not found", f"The specified cursors labels variable '{labels_var}' is not present in the workspace")
+                return
+            labels = self.scipyenWindow.workspace[labels_var]
+            if not isinstance(labels, (tuple, list)):
+                self.criticalMessage("Wrong variable type", f"Cursors labels expected to be a list or tuple, got {type(labels).__name__} instead")
+                return
+            if not all(isinstance(v, str) for v in labels):
+                self.criticalMessage("Wrong elements type", "Cursors labels expected to be strings")
+                return
+            
+            if not all(len(v) == len(coords) for v in(windows, labels)):
+                self.criticalMessage("Sequence length mismatch", "Expecting to have as many windows and labels as coordinates")
+                return
+            
+            for (x,w,l) in zip(coords, windows, labels):
+                self.addCursor(SignalCursorTypes.vertical, x=x, window=w, label=l)
         
     @Slot()
     @safeWrapper

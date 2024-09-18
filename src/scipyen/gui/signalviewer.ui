@@ -201,6 +201,8 @@
      <addaction name="addDynamicVerticalCursorAction"/>
      <addaction name="addDynamicHorizontalCursorAction"/>
      <addaction name="addDynamicCrosshairCursorAction"/>
+     <addaction name="separator"/>
+     <addaction name="actionVertical_cursor_series"/>
     </widget>
     <widget class="QMenu" name="editCursorsMenu">
      <property name="title">
@@ -704,6 +706,11 @@
    </property>
    <property name="text">
     <string>Signal Selectors</string>
+   </property>
+  </action>
+  <action name="actionVertical_cursor_series">
+   <property name="text">
+    <string>Vertical cursor series</string>
    </property>
   </action>
  </widget>

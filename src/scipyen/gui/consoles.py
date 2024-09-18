@@ -333,10 +333,10 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         # self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
         self.reset_shortcut.activated.connect(self.slot_resetConsole)
         
-        # self.kind = "plain"
-        # self.custom_page_control = QtWidgets.QPlainTextEdit()
-        self.kind = "rich"
-        self.custom_page_control = QtWidgets.QTextEdit()
+        self.kind = "plain"
+        self.custom_page_control = QtWidgets.QPlainTextEdit()
+        # self.kind = "rich"
+        # self.custom_page_control = QtWidgets.QTextEdit()
         
         if not hasattr(self, "_name_to_svg_map"):
             self._name_to_svg_map = dict()

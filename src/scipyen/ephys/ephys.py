@@ -1285,7 +1285,8 @@ class RecordingEpisode(Episode):
         name:str - the name of this episode (optional, default is None)
             When None, it is up to the user of this object to give an appropriate
             name
-        protocols: the electrophysiology recording protocol object, or obejcts, or None
+        protocols: the electrophysiology recording protocol object, or objects, 
+            or None
             WARNING: As of 2024-02-18 11:09:55 Scipyen only supports 
             pyabfbridge.ABFProtocol objects.
 
@@ -1522,10 +1523,10 @@ class RecordingEpisode(Episode):
             p.text(supertxt)
             p.breakable()
             attr_repr = [" "]
-            attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
-                                                                                "electrodeMode",
-                                                                                "clampMode",
-                                                                                )]
+            # attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
+            #                                                                     "electrodeMode",
+            #                                                                     "clampMode",
+            #                                                                     )]
             
             attr_repr.append("Protocols:")
             
