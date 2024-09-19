@@ -68,4 +68,4 @@ class KeplerDark(Style):
         # Error:              '#a61717'
     }
 
-pstyles.STYLES[KeplerDark.name] = (KeplerDark.__module__, KeplerDark.__name__, ())
+# pstyles.STYLES[KeplerDark.name] = (KeplerDark.__module__, KeplerDark.__name__, ())

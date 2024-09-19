@@ -118,7 +118,9 @@ from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
                                  saveWindowSettings, loadWindowSettings,)
 
 from gui.workspacegui import WorkspaceGuiMixin
-from gui.kepler_dark_console_pygment_style import KeplerDark
+from gui import console_styles
+from gui.console_styles import *
+# from gui.kepler_dark_console_pygment_style import KeplerDark
 
 from gui.guiutils import (get_font_style, get_font_weight,)
 
@@ -176,6 +178,10 @@ aliases.update(qt_aliases)
 qt_aliases = set(qt_aliases.keys())
 qt_flags = set(qt_flags.keys())
 
+JUPYTER_PYGMENT_STYLES = list(pstyles.get_all_styles())
+
+PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES + StyleNames)
+
 def available_pygments():
     # NOTE: 2020-12-22 21:35:30
     # jupyter_qtconsole_colorschemes has entry points in pygments.styles
@@ -209,9 +215,7 @@ def get_style_colors(stylename:str) -> dict:
     
     else:
         return pstyles.get_colors(stylename)
-        
-
-PYGMENT_STYLES = sorted(list(pstyles.get_all_styles()) + ["KeplerDark"])
+    
 
 #current_syntax_styles = get_available_syntax_styles()
 
@@ -791,10 +795,19 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         """
         import pkg_resources
         #print("console.set_pygment scheme:", scheme, "colors:", colors)
-        if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
+        if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0) \
+            or scheme not in PYGMENT_STYLES:
             self.set_default_style()
             #self._control.style = self._initial_style
             #self.style_sheet = self._initial_style_sheet
+            return
+        
+        if scheme in StyleNames:
+            mystyle = getattr(console_styles, scheme)
+            if styles.dark_color(mystyle).background_color:
+                style_sheet_template = styles.default_dark_style_template
+            else:
+                style_sheet_template = styles.default_light_style_template
             return
         
         # NOTE: 2020-12-23 11:15:50
