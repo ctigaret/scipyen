@@ -87,6 +87,7 @@ import zmq
 # import sip
 
 from pygments import styles as pstyles
+from pygments.token import Token
 
 from qtconsole import styles as styles
 from qtconsole import __version__
@@ -117,6 +118,7 @@ from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
                                  saveWindowSettings, loadWindowSettings,)
 
 from gui.workspacegui import WorkspaceGuiMixin
+from gui.kepler_dark_console_pygment_style import KeplerDark
 
 from gui.guiutils import (get_font_style, get_font_weight,)
 
@@ -181,6 +183,35 @@ def available_pygments():
 
 def get_available_syntax_styles():
     return sorted(list(pstyles.get_all_styles()))
+
+def get_style_colors(stylename:str) -> dict:
+    if stylename == "KeplerDark":
+        # use my own
+        # TODO: 2024-09-19 15:24:37 
+        # give possibility of 
+        # future additional custom schemes to be packaged with Scipyen
+        style = KeplerDark
+        fgcolor = style.style_for_token(Token.Text)['color'] or ''
+        if len(fgcolor) in (3,6):
+            # could be 'abcdef' or 'ace' hex, which needs '#' prefix
+            try:
+                int(fgcolor, 16)
+            except TypeError:
+                pass
+            else:
+                fgcolor = "#"+fgcolor
+
+        return dict(
+            bgcolor = style.background_color,
+            select = style.highlight_color,
+            fgcolor = fgcolor
+        )
+    
+    else:
+        return pstyles.get_colors(stylename)
+        
+
+PYGMENT_STYLES = sorted(list(pstyles.get_all_styles()) + ["KeplerDark"])
 
 #current_syntax_styles = get_available_syntax_styles()
 
@@ -332,11 +363,11 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.ALT | QtCore.Qt.Key_K), self)
         # self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
         self.reset_shortcut.activated.connect(self.slot_resetConsole)
-        
-        self.kind = "plain"
-        self.custom_page_control = QtWidgets.QPlainTextEdit()
-        # self.kind = "rich"
-        # self.custom_page_control = QtWidgets.QTextEdit()
+#         
+#         self.kind = "plain"
+#         self.custom_page_control = QtWidgets.QPlainTextEdit()
+        self.kind = "rich"
+        self.custom_page_control = QtWidgets.QTextEdit()
         
         if not hasattr(self, "_name_to_svg_map"):
             self._name_to_svg_map = dict()
@@ -582,12 +613,12 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         ## located in $HOME/.config/Scipyen/Scipyen.conf
         #gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
 
-    def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
+    def set_pygment_new(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
         """Sets up style sheet for console colors and syntax highlighting style.
         
         The console widget (a RichJupyterWidget) takes:
         a) a style specified in a style sheet - used for the general appearance of the console 
-        (background and ormopt colors, etc)
+        (background and Prmopt colors, etc)
         b) a color syntax highlight scheme - used for syntax highlighting
         
         
@@ -625,8 +656,141 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         #   system -> check out _create_page_control in qtconsole/console_widget.py
         # might have to look at the page and console submodules in IPython/jupyter
         # but requires deep digging into their code
-        import pkg_resources
+        # import pkg_resources
         #print("ConsoleWidget.set_pygment scheme:", scheme, "colors:", colors)
+        if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
+            self.set_default_style()
+            #self._control.style = self._initial_style
+            #self.style_sheet = self._initial_style_sheet
+            return
+        
+        # NOTE: 2020-12-23 11:15:50
+        # code below is modified from qtconsoleapp module, plus my comments;
+        # find the value for colors: there are three color sets for prompts:
+        # 1. light or lightbg (i.e. colors suitable for schemes with light background)
+        # 2. dark or linux (i.e colors suitable for schemes with dark background)
+        # 3. nocolor - for black and white scheme
+        #else:
+            #colors=None
+            
+        sheet = None
+        
+        # NOTE: 2024-09-19 16:21:02 temporary FIX
+        if scheme == "KeplerDark":
+            scheme = "native"
+            
+        # if scheme in available_pygments():
+        if scheme in PYGMENT_STYLES:
+            #print("found %s scheme" % scheme)
+            # rules of thumb:
+            #
+            # 1. the syntax highlighting scheme is set by setting the console 
+            # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
+            #
+            # 2. the style sheet gives the widget colors ("style") - so we always 
+            #   need a style sheet, and we "pygment" the console by setting its
+            #   'style_sheet' attribute. NOTE that schemes do not always provide
+            #   prompt styling colors, therefore we need to set up a style sheet 
+            #   dynamically based on the colors guessed according to whether the
+            #   scheme is a "dark" one or not.
+            #
+            # NOTE: the approach described above is the one used in qtconsole
+            #
+            if scheme == "KeplerDark":
+                # use my own - TODO: 2024-09-19 15:24:37 give possibility of 
+                # future additional custom schemes to be packaged with Scipyen
+                stylecolors = get_style_colors(scheme)
+                sheet = styles.default_dark_style_template%stylecolors
+                colors = "linux"
+                
+            else:
+                if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
+                    colors=colors.lower()
+                    if colors in ('lightbg', 'light'):
+                        colors='lightbg'
+                    elif colors in ('dark', 'linux'):
+                        colors='linux'
+                    else:
+                        colors='nocolor'
+                
+                else: # (colors is "" or anything else)
+                    # make an informed choice of colors, according to whether the scheme
+                    # is bright (light) or dark
+                    if scheme=='bw':
+                        colors='nocolor'
+                    elif styles.dark_style(scheme):
+                        colors='linux'
+                    else:
+                        colors='lightbg'
+                try:
+                    sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
+                    if os.path.isfile(sheetfile):
+                        with open(sheetfile) as f:
+                            sheet = f.read()
+                except:
+                    # revert to built-in schemes
+                    sheet = styles.sheet_from_template(scheme, colors)
+                      
+            if sheet:
+                # also need to call notifiers - this is the order in which they
+                # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
+                # not sure whether it makes a difference but stick to it for now
+                self.syntax_style = scheme
+                self.style_sheet = sheet
+                self._syntax_style_changed()
+                self._style_sheet_changed()
+                
+                # remember these changes - to save them in _save_settings_()
+                self._console_pygment = scheme
+                self._console_colors = colors
+                
+                if self.kernel_client:
+                    self._execute(f"colors {colors}", True)
+                            #self.reset(clear=True)
+                            #self.kernel_client.execute("colors %s"% colors, True)
+                        
+                        # NOTE: 2021-01-08 14:23:14
+                        # These two will affect all Jupyter console apps in Scipyen that
+                        # will be launched AFTER the internal console has been initiated. 
+                        # These include the ExternalIPython.
+                        #JupyterWidget.style_sheet = sheet
+                        #JupyterWidget.syntax_style = scheme
+                        
+
+    def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
+        """Sets up style sheet for console colors and syntax highlighting style.
+        
+        The console widget (a RichJupyterWidget) takes:
+        a) a style specified in a style sheet - used for the general appearance of the console 
+        (background and ormopt colors, etc)
+        b) a color syntax highlight scheme - used for syntax highlighting
+        
+        
+        This allows bypassing any style/colors specified in 
+        ~./jupyter/jupyter_qtconsole_config.py
+        
+        Parameter:
+        -------------
+        
+        scheme: str (optional, default is the empty string) - name of available 
+                syntax style (pygment).
+                
+                For a list of available pygment names, see
+                
+                available_pygments() in this module
+                
+                When empty or None, reverts to the defaults as set by the jupyter 
+                configuration file.
+                
+        colors: str (optional, default is None) console color set. 
+            There are, by defult, three color sets:
+            'light' or 'lightbg', 
+            'dark' or 'linux',
+            'nocolor'
+            
+        """
+        import pkg_resources
+        #print("console.set_pygment scheme:", scheme, "colors:", colors)
         if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
             self.set_default_style()
             #self._control.style = self._initial_style
@@ -682,24 +846,26 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                         sheet = f.read()
                         
                 else:
+                    #print("no style sheet found for %s" % scheme)
                     sheet = styles.sheet_from_template(scheme, colors)
+                    #if colors:
+                        #sheet = styles.sheet_from_template(scheme, colors)
+                    #else:
+                        #sheet = styles.sheet_from_template(scheme)
                     
+                self.style_sheet = sheet
+                self.syntax_style = scheme
                 # also need to call notifiers - this is the order in which they
                 # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
                 # not sure whether it makes a difference but stick to it for now
-                self.syntax_style = scheme
-                self.style_sheet = sheet
                 self._syntax_style_changed()
                 self._style_sheet_changed()
                 
                 # remember these changes - to save them in _save_settings_()
                 self._console_pygment = scheme
                 self._console_colors = colors
-                
-                if self.kernel_client:
-                    self._execute("%colors linux", True)
-                    #self.reset(clear=True)
-                    #self.kernel_client.execute("colors %s"% colors, True)
+                #self._custom_style_sheet = sheet
+                #self._custom_syntax_scheme = scheme
                 
                 # NOTE: 2021-01-08 14:23:14
                 # These two will affect all Jupyter console apps in Scipyen that
@@ -710,7 +876,20 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                 
             except:
                 traceback.print_exc()
-
+                #pass
+            
+            # not needed (for now)
+            #style = pstyles.get_style_by_name(scheme)
+            #try:
+                ##self.syntax_style=scheme
+                #self._control.style = style
+                #self._highlighter.set_style (scheme)
+                #self._custom_syntax_style = style
+                #self._syntax_style_changed()
+            #except:
+                #traceback.print_exc()
+                #pass
+ 
 class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     """Inherits qtconsole.mainwindow.MainWindow with a few added perks.
     """
@@ -3356,138 +3535,281 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 
         return text
 
-    def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
-        """Sets up style sheet for console colors and syntax highlighting style.
-        
-        The console widget (a RichJupyterWidget) takes:
-        a) a style specified in a style sheet - used for the general appearance of the console 
-        (background and ormopt colors, etc)
-        b) a color syntax highlight scheme - used for syntax highlighting
-        
-        
-        This allows bypassing any style/colors specified in 
-        ~./jupyter/jupyter_qtconsole_config.py
-        
-        Parameter:
-        -------------
-        
-        scheme: str (optional, default is the empty string) - name of available 
-                syntax style (pygment).
-                
-                For a list of available pygment names, see
-                
-                available_pygments() in this module
-                
-                When empty or None, reverts to the defaults as set by the jupyter 
-                configuration file.
-                
-        colors: str (optional, default is None) console color set. 
-            There are, by defult, three color sets:
-            'light' or 'lightbg', 
-            'dark' or 'linux',
-            'nocolor'
-            
-        """
-        import pkg_resources
-        #print("console.set_pygment scheme:", scheme, "colors:", colors)
-        if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
-            self.set_default_style()
-            #self._control.style = self._initial_style
-            #self.style_sheet = self._initial_style_sheet
-            return
-        
-        # NOTE: 2020-12-23 11:15:50
-        # code below is modified from qtconsoleapp module, plus my comments;
-        # find the value for colors: there are three color sets for prompts:
-        # 1. light or lightbg (i.e. colors suitable for schemes with light background)
-        # 2. dark or linux (i.e colors suitable for schemes with dark background)
-        # 3. nocolor - for black and white scheme
-        if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
-            colors=colors.lower()
-            if colors in ('lightbg', 'light'):
-                colors='lightbg'
-            elif colors in ('dark', 'linux'):
-                colors='linux'
-            else:
-                colors='nocolor'
-        
-        else: # (colors is "" or anything else)
-            # make an informed choice of colors, according to whether the scheme
-            # is bright (light) or dark
-            if scheme=='bw':
-                colors='nocolor'
-            elif styles.dark_style(scheme):
-                colors='linux'
-            else:
-                colors='lightbg'
-        #else:
-            #colors=None
-            
-        if scheme in available_pygments():
-            #print("found %s scheme" % scheme)
-            # rules of thumb:
-            #
-            # 1. the syntax highlighting scheme is set by setting the console 
-            # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
-            #
-            # 2. the style sheet gives the widget colors ("style") - so we always 
-            #   need a style sheet, and we "pygment" the console by setting its
-            #   'style_sheet' attribute. NOTE that schemes do not always provide
-            #   prompt styling colors, therefore we need to set up a style sheet 
-            #   dynamically based on the colors guessed according to whether the
-            #   scheme is a "dark" one or not.
-            #
-            try:
-                sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
-                
-                if os.path.isfile(sheetfile):
-                    with open(sheetfile) as f:
-                        sheet = f.read()
+#     def set_pygment_new(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
+#         """Sets up style sheet for console colors and syntax highlighting style.
+#         
+#         The console widget (a RichJupyterWidget) takes:
+#         a) a style specified in a style sheet - used for the general appearance of the console 
+#         (background and Prmopt colors, etc)
+#         b) a color syntax highlight scheme - used for syntax highlighting
+#         
+#         
+#         This allows bypassing any style/colors specified in 
+#         $HOME/.jupyter/jupyter_qtconsole_config.py
+#         
+#         and usually retrieved by the app's method config()
+#         
+#         Parameter:
+#         -------------
+#         
+#         scheme: str (optional, default is the empty string) - name of available 
+#                 syntax style (pygment).
+#                 
+#                 For a list of available pygment names, see
+#                 
+#                 available_pygments() in this module
+#                 
+#                 When empty or None, reverts to the defaults as set by the jupyter 
+#                 configuration file.
+#                 
+#         colors: str (optional, default is None) console color set. 
+#             There are, by defult, three color sets:
+#             'light' or 'lightbg', 
+#             'dark' or 'linux',
+#             'nocolor'
+#             
+#         """
+#         # TODO/FIXME: 2023-06-04 10:23:24
+#         # figure out how the ?/?? system works, and apply better terminal colors
+#         #   for dark backgrounds, to it; in fact, apply the curren terminal colors
+#         #   to the displayed help text as well 
+#         #   also, figure out how to alter the placement
+#         #   of the scrollbar when the console is showing the message from ?/??
+#         #   system -> check out _create_page_control in qtconsole/console_widget.py
+#         # might have to look at the page and console submodules in IPython/jupyter
+#         # but requires deep digging into their code
+#         # import pkg_resources
+#         #print("ConsoleWidget.set_pygment scheme:", scheme, "colors:", colors)
+#         if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
+#             self.set_default_style()
+#             #self._control.style = self._initial_style
+#             #self.style_sheet = self._initial_style_sheet
+#             return
+#         
+#         # NOTE: 2020-12-23 11:15:50
+#         # code below is modified from qtconsoleapp module, plus my comments;
+#         # find the value for colors: there are three color sets for prompts:
+#         # 1. light or lightbg (i.e. colors suitable for schemes with light background)
+#         # 2. dark or linux (i.e colors suitable for schemes with dark background)
+#         # 3. nocolor - for black and white scheme
+#         #else:
+#             #colors=None
+#             
+#         sheet = None
+#         
+#         # NOTE: 2024-09-19 16:21:02 temporary FIX
+#         if scheme == "KeplerDark":
+#             scheme = "native"
+#             
+#         # if scheme in available_pygments():
+#         if scheme in PYGMENT_STYLES:
+#             #print("found %s scheme" % scheme)
+#             # rules of thumb:
+#             #
+#             # 1. the syntax highlighting scheme is set by setting the console 
+#             # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
+#             #
+#             # 2. the style sheet gives the widget colors ("style") - so we always 
+#             #   need a style sheet, and we "pygment" the console by setting its
+#             #   'style_sheet' attribute. NOTE that schemes do not always provide
+#             #   prompt styling colors, therefore we need to set up a style sheet 
+#             #   dynamically based on the colors guessed according to whether the
+#             #   scheme is a "dark" one or not.
+#             #
+#             # NOTE: the approach described above is the one used in qtconsole
+#             #
+#             if scheme == "KeplerDark":
+#                 # use my own - TODO: 2024-09-19 15:24:37 give possibility of 
+#                 # future additional custom schemes to be packaged with Scipyen
+#                 stylecolors = get_style_colors(scheme)
+#                 sheet = styles.default_dark_style_template%stylecolors
+#                 colors = "linux"
+#                 
+#             else:
+#                 if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
+#                     colors=colors.lower()
+#                     if colors in ('lightbg', 'light'):
+#                         colors='lightbg'
+#                     elif colors in ('dark', 'linux'):
+#                         colors='linux'
+#                     else:
+#                         colors='nocolor'
+#                 
+#                 else: # (colors is "" or anything else)
+#                     # make an informed choice of colors, according to whether the scheme
+#                     # is bright (light) or dark
+#                     if scheme=='bw':
+#                         colors='nocolor'
+#                     elif styles.dark_style(scheme):
+#                         colors='linux'
+#                     else:
+#                         colors='lightbg'
+#                 try:
+#                     sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
+#                     if os.path.isfile(sheetfile):
+#                         with open(sheetfile) as f:
+#                             sheet = f.read()
+#                 except:
+#                     # revert to built-in schemes
+#                     sheet = styles.sheet_from_template(scheme, colors)
+#                       
+#             if sheet:
+#                 # also need to call notifiers - this is the order in which they
+#                 # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
+#                 # not sure whether it makes a difference but stick to it for now
+#                 self.syntax_style = scheme
+#                 self.style_sheet = sheet
+#                 self._syntax_style_changed()
+#                 self._style_sheet_changed()
+#                 
+#                 # remember these changes - to save them in _save_settings_()
+#                 self._console_pygment = scheme
+#                 self._console_colors = colors
+#                 
+#                 if self.kernel_client:
+#                     self._execute(f"colors {colors}", True)
+#                             #self.reset(clear=True)
+#                             #self.kernel_client.execute("colors %s"% colors, True)
+#                         
+#                         # NOTE: 2021-01-08 14:23:14
+#                         # These two will affect all Jupyter console apps in Scipyen that
+#                         # will be launched AFTER the internal console has been initiated. 
+#                         # These include the ExternalIPython.
+#                         #JupyterWidget.style_sheet = sheet
+#                         #JupyterWidget.syntax_style = scheme
                         
-                else:
-                    #print("no style sheet found for %s" % scheme)
-                    sheet = styles.sheet_from_template(scheme, colors)
-                    #if colors:
-                        #sheet = styles.sheet_from_template(scheme, colors)
-                    #else:
-                        #sheet = styles.sheet_from_template(scheme)
-                    
-                self.style_sheet = sheet
-                self.syntax_style = scheme
-                # also need to call notifiers - this is the order in which they
-                # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
-                # not sure whether it makes a difference but stick to it for now
-                self._syntax_style_changed()
-                self._style_sheet_changed()
-                
-                # remember these changes - to save them in _save_settings_()
-                self._console_pygment = scheme
-                self._console_colors = colors
-                #self._custom_style_sheet = sheet
-                #self._custom_syntax_scheme = scheme
-                
-                # NOTE: 2021-01-08 14:23:14
-                # These two will affect all Jupyter console apps in Scipyen that
-                # will be launched AFTER the internal console has been initiated. 
-                # These include the ExternalIPython.
-                #JupyterWidget.style_sheet = sheet
-                #JupyterWidget.syntax_style = scheme
-                
-            except:
-                traceback.print_exc()
-                #pass
-            
-            # not needed (for now)
-            #style = pstyles.get_style_by_name(scheme)
-            #try:
-                ##self.syntax_style=scheme
-                #self._control.style = style
-                #self._highlighter.set_style (scheme)
-                #self._custom_syntax_style = style
-                #self._syntax_style_changed()
-            #except:
-                #traceback.print_exc()
-                #pass
+#     def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
+#         """Sets up style sheet for console colors and syntax highlighting style.
+#         
+#         The console widget (a RichJupyterWidget) takes:
+#         a) a style specified in a style sheet - used for the general appearance of the console 
+#         (background and ormopt colors, etc)
+#         b) a color syntax highlight scheme - used for syntax highlighting
+#         
+#         
+#         This allows bypassing any style/colors specified in 
+#         ~./jupyter/jupyter_qtconsole_config.py
+#         
+#         Parameter:
+#         -------------
+#         
+#         scheme: str (optional, default is the empty string) - name of available 
+#                 syntax style (pygment).
+#                 
+#                 For a list of available pygment names, see
+#                 
+#                 available_pygments() in this module
+#                 
+#                 When empty or None, reverts to the defaults as set by the jupyter 
+#                 configuration file.
+#                 
+#         colors: str (optional, default is None) console color set. 
+#             There are, by defult, three color sets:
+#             'light' or 'lightbg', 
+#             'dark' or 'linux',
+#             'nocolor'
+#             
+#         """
+#         import pkg_resources
+#         #print("console.set_pygment scheme:", scheme, "colors:", colors)
+#         if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
+#             self.set_default_style()
+#             #self._control.style = self._initial_style
+#             #self.style_sheet = self._initial_style_sheet
+#             return
+#         
+#         # NOTE: 2020-12-23 11:15:50
+#         # code below is modified from qtconsoleapp module, plus my comments;
+#         # find the value for colors: there are three color sets for prompts:
+#         # 1. light or lightbg (i.e. colors suitable for schemes with light background)
+#         # 2. dark or linux (i.e colors suitable for schemes with dark background)
+#         # 3. nocolor - for black and white scheme
+#         if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
+#             colors=colors.lower()
+#             if colors in ('lightbg', 'light'):
+#                 colors='lightbg'
+#             elif colors in ('dark', 'linux'):
+#                 colors='linux'
+#             else:
+#                 colors='nocolor'
+#         
+#         else: # (colors is "" or anything else)
+#             # make an informed choice of colors, according to whether the scheme
+#             # is bright (light) or dark
+#             if scheme=='bw':
+#                 colors='nocolor'
+#             elif styles.dark_style(scheme):
+#                 colors='linux'
+#             else:
+#                 colors='lightbg'
+#         #else:
+#             #colors=None
+#             
+#         if scheme in available_pygments():
+#             #print("found %s scheme" % scheme)
+#             # rules of thumb:
+#             #
+#             # 1. the syntax highlighting scheme is set by setting the console 
+#             # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
+#             #
+#             # 2. the style sheet gives the widget colors ("style") - so we always 
+#             #   need a style sheet, and we "pygment" the console by setting its
+#             #   'style_sheet' attribute. NOTE that schemes do not always provide
+#             #   prompt styling colors, therefore we need to set up a style sheet 
+#             #   dynamically based on the colors guessed according to whether the
+#             #   scheme is a "dark" one or not.
+#             #
+#             try:
+#                 sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
+#                 
+#                 if os.path.isfile(sheetfile):
+#                     with open(sheetfile) as f:
+#                         sheet = f.read()
+#                         
+#                 else:
+#                     #print("no style sheet found for %s" % scheme)
+#                     sheet = styles.sheet_from_template(scheme, colors)
+#                     #if colors:
+#                         #sheet = styles.sheet_from_template(scheme, colors)
+#                     #else:
+#                         #sheet = styles.sheet_from_template(scheme)
+#                     
+#                 self.style_sheet = sheet
+#                 self.syntax_style = scheme
+#                 # also need to call notifiers - this is the order in which they
+#                 # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
+#                 # not sure whether it makes a difference but stick to it for now
+#                 self._syntax_style_changed()
+#                 self._style_sheet_changed()
+#                 
+#                 # remember these changes - to save them in _save_settings_()
+#                 self._console_pygment = scheme
+#                 self._console_colors = colors
+#                 #self._custom_style_sheet = sheet
+#                 #self._custom_syntax_scheme = scheme
+#                 
+#                 # NOTE: 2021-01-08 14:23:14
+#                 # These two will affect all Jupyter console apps in Scipyen that
+#                 # will be launched AFTER the internal console has been initiated. 
+#                 # These include the ExternalIPython.
+#                 #JupyterWidget.style_sheet = sheet
+#                 #JupyterWidget.syntax_style = scheme
+#                 
+#             except:
+#                 traceback.print_exc()
+#                 #pass
+#             
+#             # not needed (for now)
+#             #style = pstyles.get_style_by_name(scheme)
+#             #try:
+#                 ##self.syntax_style=scheme
+#                 #self._control.style = style
+#                 #self._highlighter.set_style (scheme)
+#                 #self._custom_syntax_style = style
+#                 #self._syntax_style_changed()
+#             #except:
+#                 #traceback.print_exc()
+#                 #pass
             
 class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     # NOTE: 2023-09-27 12:55:24 TODO
@@ -3554,7 +3876,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self.saveRawSelectionToFile.triggered.connect(self._slot_saveRawSelectionToFile)
         
-        self.settings_menu = menuBar.addMenu("Settings")
+        self.settings_menu = menuBar.addMenu(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
         
         self.listMagicsAction = self.file_menu.addAction(QtGui.QIcon.fromTheme("view-list-text"),"List magics")
 
@@ -3562,11 +3884,13 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         available_syntax_styles = get_available_syntax_styles() # defined in this module
         
-        if len(available_syntax_styles):
+        # if len(available_syntax_styles):
+        if len(PYGMENT_STYLES):
             self.syntax_style_menu = self.settings_menu.addMenu("Syntax Style")
             
             style_group = QtWidgets.QActionGroup(self)
-            for style in available_syntax_styles:
+            # for style in available_syntax_styles:
+            for style in PYGMENT_STYLES:
                 action = QtWidgets.QAction("{}".format(style), self,
                                        triggered=lambda v,
                                        syntax_style=style:
