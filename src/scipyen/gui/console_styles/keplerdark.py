@@ -63,9 +63,9 @@ class KeplerDark(Style):
         Generic.Output:     '#eeeeee',
         Generic.Traceback:  '#ff3a3a',
 
-        Error:              'bg:#2d1e1e #a61717'
+        # Error:              'bg:#2d1e1e #a61717'
         # Error:              'bg:#e3d2d2 #a61717'
-        # Error:              '#a61717'
+        Error:              '#a61717'
     }
 
 # pstyles.STYLES[KeplerDark.name] = (KeplerDark.__module__, KeplerDark.__name__, ())

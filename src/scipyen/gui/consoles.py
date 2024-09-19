@@ -178,43 +178,43 @@ aliases.update(qt_aliases)
 qt_aliases = set(qt_aliases.keys())
 qt_flags = set(qt_flags.keys())
 
-JUPYTER_PYGMENT_STYLES = list(pstyles.get_all_styles())
+# JUPYTER_PYGMENT_STYLES = list(pstyles.get_all_styles())
+# 
+# PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES + StyleNames)
 
-PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES + StyleNames)
-
-def available_pygments():
-    # NOTE: 2020-12-22 21:35:30
-    # jupyter_qtconsole_colorschemes has entry points in pygments.styles
-    return list(pstyles.get_all_styles())
-
-def get_available_syntax_styles():
-    return sorted(list(pstyles.get_all_styles()))
-
-def get_style_colors(stylename:str) -> dict:
-    if stylename == "KeplerDark":
-        # use my own
-        # TODO: 2024-09-19 15:24:37 
-        # give possibility of 
-        # future additional custom schemes to be packaged with Scipyen
-        style = KeplerDark
-        fgcolor = style.style_for_token(Token.Text)['color'] or ''
-        if len(fgcolor) in (3,6):
-            # could be 'abcdef' or 'ace' hex, which needs '#' prefix
-            try:
-                int(fgcolor, 16)
-            except TypeError:
-                pass
-            else:
-                fgcolor = "#"+fgcolor
-
-        return dict(
-            bgcolor = style.background_color,
-            select = style.highlight_color,
-            fgcolor = fgcolor
-        )
-    
-    else:
-        return pstyles.get_colors(stylename)
+# def available_pygments():
+#     # NOTE: 2020-12-22 21:35:30
+#     # jupyter_qtconsole_colorschemes has entry points in pygments.styles
+#     return list(pstyles.get_all_styles())
+# 
+# def get_available_syntax_styles():
+#     return sorted(list(pstyles.get_all_styles()))
+# 
+# def get_style_colors(stylename:str) -> dict:
+#     if stylename == "KeplerDark":
+#         # use my own
+#         # TODO: 2024-09-19 15:24:37 
+#         # give possibility of 
+#         # future additional custom schemes to be packaged with Scipyen
+#         style = KeplerDark
+#         fgcolor = style.style_for_token(Token.Text)['color'] or ''
+#         if len(fgcolor) in (3,6):
+#             # could be 'abcdef' or 'ace' hex, which needs '#' prefix
+#             try:
+#                 int(fgcolor, 16)
+#             except TypeError:
+#                 pass
+#             else:
+#                 fgcolor = "#"+fgcolor
+# 
+#         return dict(
+#             bgcolor = style.background_color,
+#             select = style.highlight_color,
+#             fgcolor = fgcolor
+#         )
+#     
+#     else:
+#         return pstyles.get_colors(stylename)
     
 
 #current_syntax_styles = get_available_syntax_styles()
@@ -804,10 +804,29 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         
         if scheme in StyleNames:
             mystyle = getattr(console_styles, scheme)
-            if styles.dark_color(mystyle).background_color:
+            if styles.dark_color(mystyle.background_color):
                 style_sheet_template = styles.default_dark_style_template
+                self.syntax_style = "native"
             else:
                 style_sheet_template = styles.default_light_style_template
+                self.syntax_style = styles.default_light_syntax_style
+                
+            style_sheet = style_sheet_template%console_styles.get_style_colors(mystyle.name)
+            
+            self.style_sheet = style_sheet
+            self.setStyleSheet(self.style_sheet)
+            if self._control is not None:
+                self._control.document().setDefaultStyleSheet(self.style_sheet)
+                
+            if self._page_control is not None:
+                self._page_control.document().setDefaultStyleSheet(self.style_sheet)
+                
+            if self._highlighter is not None:
+                if self.syntax_style:
+                    self._highlighter.set_style(mystyle)
+                    self._ansi_processor.set_background_color(self.syntax_style)
+                else:
+                    self._highlighter.set_style_sheet(self.style_sheet)
             return
         
         # NOTE: 2020-12-23 11:15:50
@@ -837,7 +856,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         #else:
             #colors=None
             
-        if scheme in available_pygments():
+        if scheme in console_styles.available_pygments():
             #print("found %s scheme" % scheme)
             # rules of thumb:
             #
@@ -3895,7 +3914,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         self.listMagicsAction.triggered.connect(self._slot_listMagics)
         
-        available_syntax_styles = get_available_syntax_styles() # defined in this module
+        available_syntax_styles = console_styles.get_available_syntax_styles() # defined in this module
         
         # if len(available_syntax_styles):
         if len(PYGMENT_STYLES):
