@@ -19,7 +19,6 @@ from core.quantities import check_time_units
 # from core.utilities import counter_suffix
 from .prog import (safeWrapper, with_doc)
 from qtpy import QtWidgets
-# from PyQt5 import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,
@@ -718,7 +717,6 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
     from qtpy import QtGui, QtCore
-    # from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
@@ -823,7 +821,6 @@ def intervals2cursors(*args,
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
     from qtpy import QtGui, QtCore
-    # from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     cursor_type = kwargs.pop("cursor_type", "vertical")

@@ -59,13 +59,6 @@ from core.datatypes import TypeEnum
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Signal, Slot
-# from PyQt5 import QtCore, QtGui, QtWidgets
-# from PyQt5.QtCore import Signal, Slot
-
-# NOTE: 2024-05-02 11:02:14
-# shouldn't be needed any more (QT_API in os.environ)
-# also taken care of, in mainwindow
-# mpl.use("Qt5Agg")
 
 
 class WorkspaceVarChange(TypeEnum):
@@ -635,7 +628,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             removed_symbols = ns["current"] - initial
             # print("\tremoved_symbols", removed_symbols)
             for vname in removed_symbols:
-                self.removeRowForVariable2(vname, ns=ns_name)
+                self.removeRowForVariable2(ns, vname, ns_name)
                 # self.removeRowForVariable(vname, ns=ns_name)
                 # self.removeRowForVariable(vname, ns = ns_name.replace("_", " "))
 

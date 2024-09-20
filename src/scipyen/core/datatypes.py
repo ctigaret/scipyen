@@ -85,7 +85,6 @@ from copy import (deepcopy, copy,)
 #### END core python modules
 
 #### BEGIN 3rd party modules
-# from PyQt5 import (QtGui, QtCore, QtWidgets,)
 from qtpy import (QtGui, QtCore, QtWidgets,)
 import numpy as np
 from numpy import ndarray

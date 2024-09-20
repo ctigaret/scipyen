@@ -20,15 +20,8 @@ import math
 #### BEGIN 3rd party modules
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from qtpy.uic import loadUiType as __loadUiType__
-
-# from PyQt5 import QtCore, QtGui, QtWidgets
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
-# # from PyQt5.uic import loadUiType as __loadUiType__
 
 from pyqtgraph import (DataTreeWidget, TableWidget, )
-#from pyqtgraph.widgets.TableWidget import _defersort
 
 import neo
 import quantities as pq

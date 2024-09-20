@@ -32,8 +32,6 @@ import xml.dom.minidom
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5 ?!
 from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
 from qtpy.QtCore import (Signal, Slot, )
-# from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
-# from PyQt5.QtCore import (Signal, Slot, )
 
 
 #### END 3rd party modules
@@ -45,8 +43,6 @@ import core.xmlutils as xmlutils
 #### BEGIN pict.gui modules
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
-# from . import resources_rc
-# from . import icons_rc
 #### END pict.gui modules
 
 

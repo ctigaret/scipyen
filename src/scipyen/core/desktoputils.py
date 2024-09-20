@@ -54,9 +54,6 @@ from functools import (singledispatch, singledispatchmethod)
 
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
-# from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
-# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
 
 # desktop integration - according to freedesktop.org (XDG)
 # ATTENTION: DO NOT install xdg as it will mess up pyxdg

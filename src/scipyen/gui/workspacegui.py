@@ -1061,7 +1061,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         is responsible for managng these viewers.
         
         A Scipyen "application" is any facility that runs its own GUI inside
-        Scipyen (e.g., LSCaT) - this is NOT a stand-alone PyQt5 application with
+        Scipyen (e.g., LSCaT) - this is NOT a stand-alone Qt application with
         which Scipyen communicates.
         
         """

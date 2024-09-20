@@ -52,11 +52,6 @@ import qtpy.QtCore as QtCore
 import qtpy.QtGui as QtGui
 import qtpy.QtWidgets as QtWidgets
 from qtpy.QtCore import QObject, Signal, Slot
-# import numpy as np
-# import PyQt5.QtCore as QtCore
-# import PyQt5.QtGui as QtGui
-# import PyQt5.QtWidgets as QtWidgets
-# from PyQt5.QtCore import QObject, Signal, Slot
 
 from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
 

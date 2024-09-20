@@ -75,7 +75,6 @@ from matplotlib import cm as cm
 from matplotlib import colors as colors
 from traitlets import Bunch
 from qtpy import QtCore, QtGui
-# from PyQt5 import QtCore, QtGui
 
 try:
     import cmocean # some cool palettes/luts

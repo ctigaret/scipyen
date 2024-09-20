@@ -56,8 +56,6 @@ from warnings import warn
 
 from qtpy import (QtCore, QtGui, QtWidgets, )
 from qtpy.QtCore import (Signal, Slot, )
-# from PyQt5 import (QtCore, QtGui, QtWidgets, )
-# from PyQt5.QtCore import (Signal, Slot, )
 
 #### BEGIN ipython/jupyter modules
 from traitlets.config.application import boolean_flag

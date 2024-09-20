@@ -166,9 +166,6 @@ from traitlets import Bunch
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
 from qtpy.QtCore import Signal, Slot
 from qtpy.uic import loadUiType as __loadUiType__ 
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-# from PyQt5.QtCore import Signal, Slot
-# from PyQt5.uic import loadUiType as __loadUiType__ 
 
 import numpy as np
 import pandas as pd
@@ -184,7 +181,6 @@ from core.vigra_patches import vigra
 #### BEGIN pict.core modules
 import core.tiwt as tiwt
 import core.datatypes  
-#from core.patchneo import neo
 import core.strutils as strutils
 import core.curvefitting as crvf
 import core.models as models

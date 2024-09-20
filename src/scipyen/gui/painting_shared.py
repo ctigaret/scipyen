@@ -13,11 +13,6 @@ import numpy as np
 
 from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
 from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from qtpy.uic import loadUiType as __loadUiType__
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
-# # from PyQt5.uic import loadUiType as __loadUiType__
 
 # for sip.cast:
 has_sip = False
@@ -60,10 +55,6 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 #
 # BrushStyleType._subs_tree():
 # (typing.Union, 
-#  int,
-#  PyQt5.QtGui.QGradient,
-#  PyQt5.QtGui.QPixmap,
-#  PyQt5.QtGui.QImage)
 #
 # PenStyleType._subs_tree():
 #  (typing.Union, tuple, list, int)

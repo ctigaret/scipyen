@@ -22,9 +22,6 @@ except:
     has_qdbus = False
     
 from qtpy.QtCore import (Signal, Slot, Property,)
-# from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
-# from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
-# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
 
 from core.utilities import safeWrapper
 # from core import workspacefunctions as wfunc

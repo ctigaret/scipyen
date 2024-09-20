@@ -11,11 +11,6 @@ from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
 from qtpy import (QtCore, QtGui, QtWidgets,) 
 from qtpy.QtCore import (Signal, Slot, )
-# from PyQt5 import (QtCore, QtGui, QtWidgets,) 
-# from PyQt5.QtCore import (Signal, Slot, )
-
-# import pyqtgraph as pg
-# pg.Qt.lib = "PyQt5"
 from gui.pyqtgraph_patch import pyqtgraph as pg
 from gui import guiutils as guiutils
 

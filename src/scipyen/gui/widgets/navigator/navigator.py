@@ -11,11 +11,7 @@ except:
 from traitlets.utils.bunch import Bunch
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
 from qtpy.QtCore import (Signal, Slot, Property,)
-# from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
 from qtpy.uic import loadUiType
-# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg, sip)
-# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
-# from PyQt5.uic import loadUiType
 
 from core import desktoputils as dutils
 from core.desktoputils import PlacesModel

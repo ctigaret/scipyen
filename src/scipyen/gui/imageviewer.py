@@ -9,7 +9,6 @@ Based on GraphicsView Qt framework
 Supports cursors defined in pictgui module.
 Dependencies:
 python >= 3.4
-PyQt5
 vigra built python 3)
 boost C++ libraries built against python 3 (for building vigra against python3)
 numpy (for python 3)
@@ -3420,7 +3419,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         ==================
         returnGraphics:bool, optional, default is False
             When True, returns the newly-created gui.planargraphics.GraphicsObject
-            ( a PyQt5.QtWidgets.QGraphicsItem); otherwise, returns the 
+            ( a Qt5 QtWidgets.QGraphicsItem); otherwise, returns the 
             PlanarGraphics objects passed as 'item'
         
         The following are optional (default values shownn in parantheses) and

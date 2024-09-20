@@ -57,8 +57,6 @@ else:
     
 import confuse # for programmatic read/write of non-gui settings
 
-# from qtpy import QtCore, QtGui, QtWidgets
-# from PyQt5 import QtCore, QtGui, QtWidgets
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -74,15 +72,9 @@ from core.monkey import (check_neo_patch,
 from core.workspacefunctions import (user_workspace, assignin, debug_scipyen,
                                      get_symbol_in_namespace,)
 
-# from imaging import (axisutils, axiscalibration, scandata, )
-# from imaging.axisutils import *
 from iolib import h5io
 
 #### END pict.core modules
-
-#import signalviewer as sv
-#import javabridge
-#import bioformats
 
 
 # NOTE: 2019-04-21 18:14:23 using pyxdg introduced in pict

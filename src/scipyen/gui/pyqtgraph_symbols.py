@@ -5,7 +5,6 @@
 
 from gui.pyqtgraph_patch import pyqtgraph as pg
 from qtpy import (QtCore, QtWidgets, QtGui)
-# from PyQt5 import (QtCore, QtWidgets, QtGui)
 
 # each spike is a small vertical line centered at 0.0, height of 1
 spike_Symbol = QtGui.QPainterPath(QtCore.QPointF(0.0, -0.5))

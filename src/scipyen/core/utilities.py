@@ -44,11 +44,6 @@ import matplotlib as mpl
 #import language_tool_python
 
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-# try:
-#     from pyqtgraph import eq # not sure is needed
-# except:
-#     from operator import eq
 
 from core import prog
 from .prog import safeWrapper, deprecation, with_doc, is_hashable

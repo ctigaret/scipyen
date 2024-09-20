@@ -9,15 +9,11 @@ import os, typing, warnings, math
 import numpy as np
 from core.utilities import get_least_pwr10
 from qtpy import (QtCore, QtWidgets, QtGui)
-# from PyQt5 import (QtCore, QtWidgets, QtGui)
 from gui.painting_shared import (FontStyleType, standardQtFontStyles, 
                                  FontWeightType, standardQtFontWeights)
 
 import quantities as pq
 from gui.pyqtgraph_patch import pyqtgraph as pg
-# from gui.pyqtgraph_symbols import (spike_Symbol, 
-#                                     event_Symbol, event_dn_Symbol, 
-#                                     event2_Symbol, event2_dn_Symbol)
 
 from core import strutils
 

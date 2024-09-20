@@ -156,10 +156,6 @@ from IPython.core.history import HistoryAccessor
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
-# from PyQt5.uic import loadUiType
-# from PyQt5.QtCore import (Signal, Slot,
-#                           QEnum, Q_FLAGS, Property,)
-# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
 from jupyter_core.paths import jupyter_runtime_dir
 import shapely
 import neo
@@ -268,18 +264,7 @@ plt.ion()
 
 # END configure matplotlib
 
-# END matplotlib modules
-
-# BEGIN migration to pyqtgraph -- setup global parameters
-# NOTE: 2019-01-24 21:40:45
-# import pyqtgraph as pg # used throughout - based on Qt5
-# pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5 # NOTE: 2024-05-02 12:42:42 not anymore
-# # TODO make this peristent  user-modifiable configuration
-# #pg.setConfigOptions(background="w", foreground="k", editorCommand="kwrite")
-# pg.setConfigOptions(background="w", foreground="k", editorCommand="kate")
-# #pg.setConfigOptions(editorCommand="kwrite")
 from gui.pyqtgraph_patch import pyqtgraph as pg
-# END migration to pyqtgraph -- setup global parameters
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
@@ -288,9 +273,6 @@ from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
 # BEGIN jupyter
 # END jupyter
-
-# BEGIN PyQt5 modules
-# END PyQt5 modules
 
 # BEGIN pyqtdarktheme - recommended for Windows
 hasQDarkTheme = False
@@ -1249,8 +1231,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         Defines a new slot for plugins functionality.
         Connected to the `triggered` signal of dynamic QActions for plugins.
         '''
-        # from PyQt5.QtCore import Slot
-
         # NOTE: 2016-04-17 16:16:52 moved to _installPluginFunction_
         # NOTE:2016-04-17 15:39:03 in python 3 use inspect.getfullargspec(f)
         # argSpec = inspect.getfullargspec(f)
@@ -1279,7 +1259,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         Parameters:
         ===========
-        app: QtWidgets.QApplication. The PyQt5 application instance. 
+        app: QtWidgets.QApplication. The Qt application instance. 
             This instance runs the main GUI event loop and therefore there can 
             be only one throughout a Scipyen session (i.e., is a 'singleton').
 
@@ -1538,7 +1518,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.cwd = os.getcwd()
 
         # NOTE: 2016-03-20 14:49:05
-        # Quit the PyQt5 app when Scipyen main window is closed
+        # Quit the Qt app when Scipyen main window is closed
         self.app.destroyed.connect(self.slot_Quit)
 
         # finally, inject references to self and the workspace into relevant
@@ -2816,7 +2796,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """Starts an interactive IPython shell with a QtConsole frontend.
 
         The shell runs an embedded ("InProcess") IPython kernel with an event 
-        loop run by the Scipyen QApplication instance (PyQt5).
+        loop run by the Scipyen QApplication instance.
 
         The shell's namespace becomes the user's workspace where the user data
         is temporarily assigned to symbols, and its contents are listed
@@ -2891,7 +2871,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # At any time there can be only ONE master event loop,
         #
-        # In this case, that's the QApplication event loop (PyQt5)
+        # In this case, that's the QApplication event loop
 
         # Also, all free (user) variables are stored in this kernel's namespace
         # which is also referenced as instance variable 'self.workspace' of ScipyenWindow
@@ -5643,7 +5623,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 targetDir = str(self.sender().text())
 
         if isinstance(targetDir, str) and "&" in targetDir:
-            # NOTE: 2017-03-04 16:08:17 because for whatever reason PyQt5 also
+            # NOTE: 2017-03-04 16:08:17 because for whatever reason Qt also
             # returns the shortcut indicator character '&'
             targetDir = targetDir.replace('&', '')
 
@@ -6090,7 +6070,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if len(fileName) > 0:
             if isinstance(fileName, tuple):
-                # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+                # NOTE: QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
                 fileName = fileName[0]
 
             if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
@@ -6141,7 +6121,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         if len(fileName) > 0:
             if isinstance(fileName, tuple):
-                # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+                # NOTE: QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
                 fileName = fileName[0]
 
             if isinstance(fileName, str) and len(fileName) > 0 and os.path.isfile(fileName):
@@ -6567,7 +6547,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if len(fileName) > 0:
 
             if isinstance(fileName, tuple):
-                # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+                # NOTE: QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
                 fileName = fileName[0]
 
             # print("fileName: ", fileName)
@@ -6607,7 +6587,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         # if len(fileName) > 0:
             # if isinstance(fileName, tuple):
-                # fileName = fileName[0] # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
+                # fileName = fileName[0] # NOTE: QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
 
             # if isinstance(fileName, str) and len(fileName) > 0:
                 # if self.loadDiskFile(fileName, True):

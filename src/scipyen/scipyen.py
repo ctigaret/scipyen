@@ -18,6 +18,7 @@ import faulthandler, warnings
 
 # NOTE: 2024-05-02 10:22:39
 # optional use of Qt6 as PyQt5/6 or PySide2/6
+# but currently, force Qt5 (for now)
 os.environ["QT_API"] = "pyqt5"
 os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
 

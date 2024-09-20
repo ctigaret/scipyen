@@ -6,15 +6,9 @@
 """A collection of functions to prompt user input using GUI
 """
 import typing, collections, dataclasses
-# import pyqtgraph as pg # used throughout - based on Qt5 
-# pg.Qt.lib = "PyQt5" # pre-empt the use of PyQt5
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
-# from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
 from qtpy.uic import loadUiType
-# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
-# from PyQt5.uic import loadUiType
 from . import quickdialog as qd
 from .itemslistdialog import ItemsListDialog
 

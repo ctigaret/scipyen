@@ -190,8 +190,6 @@ import matplotlib as mpl
 from gui.pyqtgraph_patch import pyqtgraph as pg
 from qtpy import (QtGui, QtCore, QtWidgets)
 from qtpy.QtCore import (Signal, Slot, )
-# from PyQt5 import (QtGui, QtCore, QtWidgets)
-# from PyQt5.QtCore import (Signal, Slot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules

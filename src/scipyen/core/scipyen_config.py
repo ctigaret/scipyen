@@ -104,9 +104,6 @@ from matplotlib.figure import Figure
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtWidgets import (QWidget, QMainWindow)
 from qtpy.QtCore import QSettings # NOTE: 2024-05-03 09:26:33 QVariant not available in PySide
-# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-# from PyQt5.QtWidgets import (QWidget, QMainWindow)
-# from PyQt5.QtCore import (QSettings, QVariant)
 
 from IPython.lib.pretty import pprint
 

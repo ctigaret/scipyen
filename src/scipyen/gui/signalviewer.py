@@ -128,9 +128,6 @@ from traitlets import Bunch
 from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 from qtpy.QtCore import Signal, Slot
 from qtpy.uic import loadUiType as __loadUiType__
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
-# from PyQt5.QtCore import Signal, Slot
-# from PyQt5.uic import loadUiType as __loadUiType__
 
 import math
 import numpy as np
@@ -208,7 +205,6 @@ from ephys import ephys as ephys
 
 #### BEGIN gui modules
 #from . import imageviewer as iv
-# pg.Qt.lib = "PyQt5"
 from gui.pyqtgraph_patch import pyqtgraph as pg
 from gui import guiutils as guiutils
 from gui import pictgui as pgui

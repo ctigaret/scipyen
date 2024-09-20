@@ -17,9 +17,6 @@ except:
     pass
 
 from qtpy.QtCore import (Signal, Slot, Property,)
-# from qtpy.QtCore import (Signal, Slot, QEnum, Property,)
-# from PyQt5 import (QtCore, QtWidgets, QtGui, QtDBus)
-# from PyQt5.QtCore import (Signal, Slot, QEnum, Q_FLAGS, Property,)
 
 def get_wm():
     """Retrieves the name of the window manager, on Linux platforms.

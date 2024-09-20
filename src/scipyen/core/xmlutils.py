@@ -67,12 +67,6 @@ from functools import singledispatch
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5
 from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
 from qtpy.QtCore import (Signal, Slot, )
-# from qtpy.uic import loadUiType as __loadUiType__
-
-# from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
-# from PyQt5.QtCore import (Signal, Slot, )
-# from PyQt5.uic import loadUiType as __loadUiType__
-#from datatypes import DataBag
 # NOTE: use Python re instead of QRegExp
 import re
 

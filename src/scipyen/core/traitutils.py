@@ -25,15 +25,6 @@ from collections import deque
 from functools import (partial, partialmethod)
 
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-# import six
-# 
-# 
-# 
-# try:
-#     from traitlets import (class_of, repr_type, add_article,)
-# except:
-#     from traitlets.utils.descriptions import (class_of, repr_type, add_article,)
     
 import traitlets
 

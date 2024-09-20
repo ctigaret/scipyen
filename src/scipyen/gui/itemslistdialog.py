@@ -7,11 +7,7 @@ import os, sys
 import numpy as np
 from qtpy import QtCore, QtGui, QtWidgets, QtXml
 from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
 from qtpy.uic import loadUiType as __loadUiType__
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
-# from PyQt5.uic import loadUiType as __loadUiType__
 
 # NOTE: 2023-07-14 16:32:06
 # necessary to adapt to the situation where Scipyen is bundled
