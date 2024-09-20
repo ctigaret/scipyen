@@ -70,9 +70,14 @@ messaging API.
 # easily abused by importing into the remote namespace functions and modules 
 # that end up only being used by the client, in the local namespace.
 
-import os, sys, pickle, inspect, typing
+import os, sys, pickle, inspect, traceback, types, typing
 from functools import wraps
 from core.traitcontainers import DataBag
+from core.prog import safeWrapper
+import qtpy
+
+qtPackages = tuple(p for p in qtpy.__dict__.keys() if p.startswith("Qt") and isinstance(qtpy.__dict__[p], types.ModuleType))
+
 #from contextlib import contextmanager
 #print(sys.path)
 
@@ -82,14 +87,6 @@ __scipyen_path__ =  os.path.dirname(__module_path__)
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-#__virtual_env_dir__ = os.environ.get("VIRTUAL_ENV", None)
-
-#if isinstance(__virtual_env_dir__, str) and len(__virtual_env_dir__.strip()):
-    #__virtual_site_packages__ = os.path.join(__virtual_env_dir__, "lib", "python%i.%i" % sys.version_info[0:2], "site-packages")
-    
-#else:
-    #__virtual_site_packages__ = None
-    
 # initialization script for ALL available external IPython consoles
 # private: call indirectly via init_commands!
 _ext_ipython_initialization_file = os.path.join(__module_path__, "extipy_init.py")
@@ -140,6 +137,7 @@ init_commands.extend(
     "import seaborn as sb",
     "from importlib import reload",
     "from pprint import pprint",
+    f"from QtPy import {tuple(qtPackages)}",
     "import matplotlib as mpl",
     "mpl.rcParams['savefig.format'] = 'svg'",
     "mpl.rcParams['xtick.direction'] = 'in'",
@@ -147,7 +145,6 @@ init_commands.extend(
     "from matplotlib import pyplot as plt",
     "from matplotlib import cm",
     "import matplotlib.mlab as mlb",
-    #"mpl.use('Qt5Agg')",
     "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
     "from core import extipyutils_host as hostutils",
     "from core.workspacefunctions import *",
@@ -176,30 +173,6 @@ init_commands.extend(
     "from iolib import h5io, jsonio",
     "print('To use matplotlib run %matplotlib magic')"
     ])
-    
-#init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
-                 #"import traceback, keyword, inspect, itertools, functools, collections",
-                 #"import signal, pickle, json, csv",
-                 #"import numpy as np",
-                 #"import scipy",
-                 #"import pandas as pd",
-                 #"import seaborn as sb",
-                 #"from importlib import reload",
-                 #"from pprint import pprint",
-                 #"import matplotlib as mpl",
-                 #"mpl.rcParams['savefig.format'] = 'svg'",
-                 #"mpl.rcParams['xtick.direction'] = 'in'",
-                 #"mpl.rcParams['ytick.direction'] = 'in'",
-                 #"from matplotlib import pyplot as plt",
-                 #"from matplotlib import cm",
-                 #"import matplotlib.mlab as mlb",
-                 #"".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
-                 #"from core import extipyutils_host as hostutils",
-                 
-                 ##"from IPython.lib.deepreload import reload as dreload",
-                 ##"sys.path=['" + sys.path[0] +"'] + sys.path",
-                 #]
-
 
 
 class ForeignCall(DataBag):
@@ -726,7 +699,7 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
     
 #### END call generators
 
-
+@safeWrapper
 def unpack_shell_channel_data(msg:dict) -> dict:
     """Extracts data shuttled from the remote kernel via " execute_reply" message.
     
@@ -777,6 +750,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     # peel-off layers one by one so we can always be clear of what this does
     msg_status = msg["content"]["status"]
     usr_expr = msg["content"].get("user_expressions", {})
+    # print(f"unpack_shell_channel_data: usr_expr = {usr_expr}")
     if msg_status == "ok":
         for key, value in usr_expr.items():
             value_status = value["status"]
@@ -786,27 +760,14 @@ def unpack_shell_channel_data(msg:dict) -> dict:
                     data_dict = pickle.loads(eval(data_str))
                     
                 else:
-                    data_dict = {key:eval(data_str)}
+                    try:
+                        data_dict = {key:eval(data_str)}
+                    except:
+                        print(f"unpack_shell_channel_data: data_str = {data_str}")
+                        traceback.print_exc()
                     
                 ret.update(data_dict)
-                
-            
-            #elif value_status == "error":
-                #ret.update({"error_%s_%s" % (key, msg["workspace_name"]): {"ename":value["ename"],
-                                               #"evalue": value["evalue"],
-                                               #"traceback": value["traceback"]}})
-                
-            #else:
-                #ret.update({"%s_%s_%s" % (value_status, key, msg["workspace_name"]): value_status})
-                    
-    #elif msg_status == "error":
-        #ret.update({"error_%s_%s" % (msg["msg_type"], msg["workspace_name"]): {"ename": msg["content"]["ename"],
-                                                   #"evalue": msg["content"]["evalue"],
-                                                   #"traceback": msg["content"]["traceback"]}})
-        
-    #else:
-        #ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["workspace_name"]): msg_status})
-    
+
     return ret
 
 def execute(client, *args, **kwargs):
