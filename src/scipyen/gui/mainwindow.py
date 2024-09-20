@@ -6840,8 +6840,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                              cmd_foreign_shell_ns_listing,
                                              )
 
-        print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd")
-        print("\ttab:", msg["workspace_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
+        # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd")
+        # print("\ttab:", msg["workspace_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
         # print("\tuser_expressions:", msg["content"].get("user_expressions", {}))
 
         if self.external_console.window.tab_widget.count() == 0:
@@ -6865,6 +6865,20 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # if self.external_console.window.connections[msg["connection_file"]]["master"] is None:
             # print("external kernel via %s" % msg["connection_file"])
             # print("\t", msg)
+            
+        ns_name = msg["workspace_name"]
+
+        connections = list(filter(lambda x: x[1]["name"] == ns_name, self.external_console.window.connections.items()))
+        
+        if len(connections) < 1:
+            return
+        
+        connection = connections[0]
+        connection_file = connection[0]
+        
+        self.workspaceModel.updateForeignNamespace(ns_name, connection_file, tuple())
+        # if ns_name not in self.workspaceModel.foreign_namespaces:
+        #     self.workspaceModel.foreign_namespaces[ns_name] = dict()
 
         if msg["msg_type"] == "execute_reply":
             # print("\n\t** execute_reply from %s" % msg["workspace_name"])

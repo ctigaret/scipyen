@@ -563,7 +563,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         """
         # print("WorkspaceModel.updateForeignNamespace ns_name = ",ns_name, " val =", val)
-        # print("WorkspaceModel.updateForeignNamespace ns_name %s" % ns_name)
+        # print(f"{self.__class__.__name__}.updateForeignNamespace ns_name = {ns_name}, cfile = {cfile}")
         initial = set()
         current = set()
 
@@ -590,8 +590,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # check to see if there is a snapshot of a currently live kernel
             # to retrieve live symbols from there
             if os.path.isfile(cfile):  # make sure connection is alive
-                externalConsole = self.shell.user_ns.get(
-                    "external_console", None)
+                externalConsole = self.shell.user_ns.get("external_console", None)
                 if externalConsole:
                     cdict = externalConsole.window.connections.get(cfile, None)
                     if isinstance(cdict, dict) and "master" in cdict and cdict["master"] is None:
@@ -1873,15 +1872,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     #         self.removeRow(row)
 
     @Slot(dict, str, str)
-    def removeRowForVariable2(self, ns: dict, 
-                              dataname: str, 
-                              ns_name: str = "Internal"):
-        # if isinstance(ns_name, str):
-        #     if len(ns_name.strip()) == 0:
-        #         ns_name = "Internal"
-        # 
-        # else:
-        #     ns_name = "Internal"
+    def removeRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
 
         # print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns_name)
