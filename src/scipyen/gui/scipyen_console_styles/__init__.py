@@ -54,6 +54,7 @@ def get_style_colors(stylename:str) -> dict:
     
 JUPYTER_PYGMENT_STYLES = list(pstyles.get_all_styles())
 
-PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES + StyleNames)
+# PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES + StyleNames)
+PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES)
 
 __all__ = StyleNames + ["StyleNames", "JUPYTER_PYGMENT_STYLES", "PYGMENT_STYLES"]

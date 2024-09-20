@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+[project]
+name = "scipyen_console_styles"
+version = "0.0.1"
+dependencies = ["pygments"]
+readme = "README.md"
+authors = [{name="Cezar M. Tigaret", email="cezar.tigaret@gmail.com"}]
+description = "Styles for Scipyen Console"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language : Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    ]
+
+[project.urls]
+Homepage = "https://github.com/ctigaret/scipyen"
+Issues = "https://github.com/ctigaret/scipyen/issues"
+
+[project.entry-points."pygments.styles"]
+KeplerDark = "keplerdark:KeplerDark"

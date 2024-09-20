@@ -1,0 +1,28 @@
+Metadata-Version: 2.1
+Name: scipyen_console_styles
+Version: 0.0.1
+Summary: Styles for Scipyen Console
+Author-email: "Cezar M. Tigaret" <cezar.tigaret@gmail.com>
+Project-URL: Homepage, https://github.com/ctigaret/scipyen
+Project-URL: Issues, https://github.com/ctigaret/scipyen/issues
+Classifier: Programming Language : Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pygments
+
+# Pygments for Scipyen's console
+
+## Installation
+
+* Activate the virtual environment used by Scipyen
+* Go to the directory of this subproject and install using `pip`:
+    
+    ```
+    scipyact
+    cd scipyen/src/scipyen/gui/scipyen_console_pygments
+    pip install .
+    ```
+
+* run Scipyen

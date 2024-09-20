@@ -88,6 +88,7 @@ import zmq
 
 from pygments import styles as pstyles
 from pygments.token import Token
+from pygments.style import Style    
 
 from qtconsole import styles as styles
 from qtconsole import __version__
@@ -177,6 +178,23 @@ aliases.update(qt_aliases)
 # shouldn't be scrubbed from backend flags:
 qt_aliases = set(qt_aliases.keys())
 qt_flags = set(qt_flags.keys())
+
+def change_error_display_for_style(style:typing.Union[str, Style]):
+    # https://stackoverflow.com/questions/70766518/how-to-change-ipython-error-highlighting-color
+    
+    # TODO: 2024-09-20 12:56:07
+    # match tb highlight in ultratb to a specification in the style itself.
+    #
+    # (for now, it;s just replacing the ugly ansi yellow with the ansi red)
+    if isinstance(style, str):
+        style = styles.get_style_by_name(style)
+
+    try:
+        from IPython.core import ultratb
+        ultratb.VerboseTB._tb_highlight = "bg:ansired"
+    except Exception:
+        print("Error patching background color for tracebacks, they'll be the ugly default instead")
+
 
 # JUPYTER_PYGMENT_STYLES = list(pstyles.get_all_styles())
 # 
@@ -591,7 +609,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def _set_syntax_style(self, val): # slot for menu action
         """Used as slot for Syntax style menu action
         """
-        #print("_set_syntax_style", val)
+        # print(f"{self.__class__.__name__}._set_syntax_style({val})")
         self.syntaxStyle = val
 
     # @Slot(str)
@@ -805,14 +823,17 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             'nocolor'
             
         """
+        
+        # print(f"{self.__class__.__name__}.set_pygment(scheme: {scheme}, colors: {colors})")
+        
         import pkg_resources
         #print("console.set_pygment scheme:", scheme, "colors:", colors)
-        if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0) \
-            or scheme not in PYGMENT_STYLES:
-            self.set_default_style()
-            #self._control.style = self._initial_style
-            #self.style_sheet = self._initial_style_sheet
-            return
+        # if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0) \
+        #     or scheme not in PYGMENT_STYLES:
+        #     self.set_default_style()
+        #     #self._control.style = self._initial_style
+        #     #self.style_sheet = self._initial_style_sheet
+        #     return
         
 #         if scheme in StyleNames: # custom styles from scipyen_console_styles
 #             # NOTE: 82024-09-20 10:20:21
@@ -888,7 +909,8 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         #else:
             #colors=None
             
-        if scheme in scipyen_console_styles.available_pygments():
+        # if scheme in scipyen_console_styles.available_pygments():
+        if scheme in PYGMENT_STYLES:
             #print("found %s scheme" % scheme)
             # rules of thumb:
             #
@@ -912,10 +934,8 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                 else:
                     #print("no style sheet found for %s" % scheme)
                     sheet = styles.sheet_from_template(scheme, colors)
-                    #if colors:
-                        #sheet = styles.sheet_from_template(scheme, colors)
-                    #else:
-                        #sheet = styles.sheet_from_template(scheme)
+                    
+                change_error_display_for_style(scheme)
                     
                 self.style_sheet = sheet
                 self.syntax_style = scheme
@@ -928,8 +948,6 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                 # remember these changes - to save them in _save_settings_()
                 self._console_pygment = scheme
                 self._console_colors = colors
-                #self._custom_style_sheet = sheet
-                #self._custom_syntax_scheme = scheme
                 
                 # NOTE: 2021-01-08 14:23:14
                 # These two will affect all Jupyter console apps in Scipyen that
@@ -1024,9 +1042,6 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         # NOTE: Whis won;t have any effect here because during __init__ there's
         # no widget (RichJupyterWidget) yet
         
-        # NOTE: 2021-08-30 10:42:57
-        # Needed for window geometry & position
-        self._load_settings_()
         # NOTE: 2021-01-23 21:15:52 
         # this is the parent (running) Scipyen application, not
         # the ExternalIPython! - this is another 
@@ -1085,6 +1100,10 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
         self._cached_connections_ = dict()
         
+        # NOTE: 2021-08-30 10:42:57
+        # Needed for window geometry & position, etc
+        self._load_settings_()
+        
     def _widget(self):
         """Consistent retrieval of console widget - for look and feel settings
         """
@@ -1141,16 +1160,36 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     def _supplement_view_menu_(self):
         ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
         
+        self.syntax_style_menu.clear()
+        
+        style_group = QtWidgets.QActionGroup(self)
+        
+        actions = [QtWidgets.QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
+        
+        for action in actions:
+            action.setCheckable(True)
+            style_group.addAction(action)
+            self.syntax_style_menu.addAction(action)
+            if action.text() == self.active_frontend.syntaxStyle:
+                action.setChecked(True)
+                self.syntax_style_menu.setDefaultAction(action)
+       
+        
         self.colors_menu = self.view_menu.addMenu("Console colors")
         colors_group = QtWidgets.QActionGroup(self)
         for c in self.active_frontend.available_colors:
             action = QtWidgets.QAction("{}".format(c), self,
-                                       triggered = lambda v, val=c:
-                                           self.active_frontend._set_console_colors(colors=val))
+                                       triggered = partial(self._set_syntax_style, c))
+            # action = QtWidgets.QAction("{}".format(c), self,
+            #                            triggered = lambda v, val=c:
+            #                                self._set_syntax_style(colors=val))
+            # action = QtWidgets.QAction("{}".format(c), self,
+            #                            triggered = lambda v, val=c:
+            #                                self.active_frontend._set_syntax_style(colors=val))
             action.setCheckable(True)
             colors_group.addAction(action)
             self.colors_menu.addAction(action)
-            if c == self.active_frontend.colors:
+            if c == self.active_frontend.syntaxStyle:
                 action.setChecked(True)
                 self.colors_menu.setDefaultAction(action)
                 
@@ -1266,8 +1305,11 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         widget=self.new_frontend_orphan_kernel_factory(km, kc)
         if widget:
             self.add_tab_with_frontend(widget)
+            if hasattr(widget, "_set_console_colors"):
+                widget._set_syntax_style(self._console_colors)
+            if hasattr(widget, "_set_syntax_style"):
+                widget._set_syntax_style(self._console_pygment)
             return True
-        
         return False
         
     def create_tab_with_current_kernel(self):
@@ -1276,6 +1318,10 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         current_widget_index = self.tab_widget.indexOf(current_widget)
         current_widget_name = self.tab_widget.tabText(current_widget_index)
         widget = self.slave_frontend_factory(current_widget)
+        if hasattr(widget, "_set_console_colors"):
+            widget._set_syntax_style(self._console_colors)
+        if hasattr(widget, "_set_syntax_style"):
+            widget._set_syntax_style(self._console_pygment)
         self.add_tab_with_frontend(widget)
 
     def create_tab_with_new_frontend(self, code=None, **kwargs):
@@ -1289,6 +1335,11 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             if widget.kernel_client and isinstance(code, str) and len(code.strip()):
                 widget.kernel_client.execute(code=code, **kwargs)
             
+            if hasattr(widget, "_set_console_colors"):
+                widget._set_syntax_style(self._console_colors)
+            if hasattr(widget, "_set_syntax_style"):
+                widget._set_syntax_style(self._console_pygment)
+                
             return True
         return False
             
@@ -1633,7 +1684,35 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             return new_title
         
         return old_title
-            
+    
+    @property
+    def syntaxStyle(self):
+        return self._console_pygment
+    
+    @markConfigurable("SyntaxStyle", "qt")
+    @syntaxStyle.setter
+    def syntaxStyle(self, style:str):
+        self._console_pygment = style
+        if hasattr(self, "active_frontend") and isinstance(self.active_frontend, ConsoleWidget):
+            self.active_frontend._set_syntax_style(style)
+        # colors = self._console_colors
+        
+    def _set_syntax_style(self, style):
+        self.syntaxStyle = style
+
+    @property
+    def consoleColors(self):
+        return self._console_colors
+    
+    @markConfigurable("ConsoleColors", "qt")
+    @consoleColors.setter
+    def consoleColors(self, val:str):
+        self._console_colors = val
+        if hasattr(self, "active_frontend") and isinstance(self.active_frontend, ConsoleWidget):
+            self.active_frontend._set_console_colors(val)
+        
+    def _set_console_colors(self, val:str):
+        self.consoleColors = val
         
     def add_tab_with_frontend(self, frontend, name=None):
         """ Insert a tab with a given frontend in the tab bar, and give it a name
@@ -3953,19 +4032,30 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             self.syntax_style_menu = self.settings_menu.addMenu("Syntax Style")
             
             style_group = QtWidgets.QActionGroup(self)
-            # for style in available_syntax_styles:
-            for style in PYGMENT_STYLES:
-                action = QtWidgets.QAction("{}".format(style), self,
-                                       triggered=lambda:
-                                           self.active_frontend._set_syntax_style(style))
-                                           # self.active_frontend._slot_setSyntaxStyle(style))
-        
+            
+            actions = [QtWidgets.QAction("{}".format(s), self, triggered = partial(self.active_frontend._set_syntax_style, s)) for s in PYGMENT_STYLES]
+            
+            for action in actions:
                 action.setCheckable(True)
                 style_group.addAction(action)
                 self.syntax_style_menu.addAction(action)
-                if style == self.active_frontend.syntaxStyle:
+                if action.text() == self.active_frontend.syntaxStyle:
                     action.setChecked(True)
                     self.syntax_style_menu.setDefaultAction(action)
+            # for style in available_syntax_styles:
+#             for style in PYGMENT_STYLES:
+#                 print(f"{self.__class__.__name__}._configureUI_ adding menu item for pygment {style}")
+#                 action = QtWidgets.QAction("{}".format(style), self,
+#                                        triggered=lambda v:
+#                                            self.active_frontend._set_syntax_style(val=style))
+#                                            # self.active_frontend._slot_setSyntaxStyle(style))
+#         
+#                 action.setCheckable(True)
+#                 style_group.addAction(action)
+#                 self.syntax_style_menu.addAction(action)
+#                 if style == self.active_frontend.syntaxStyle:
+#                     action.setChecked(True)
+#                     self.syntax_style_menu.setDefaultAction(action)
 
         self.colors_menu = self.settings_menu.addMenu("Console Colors")
         colors_group = QtWidgets.QActionGroup(self)

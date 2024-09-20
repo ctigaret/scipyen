@@ -630,8 +630,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             # print("\tupdateForeignNamespace: foreign namespaces:", self.foreign_namespaces)
             # print("\tself.foreign_namespaces[ns_name]['current']", self.foreign_namespaces[ns_name]["current"])
-
-            removed_symbols = self.foreign_namespaces[ns_name]["current"] - initial
+            ns = self.foreign_namespaces.get(ns_name, self.foreign_namespaces.get(ns_name.replace(" ", "_"), None))
+            if ns is None:
+                return
+            removed_symbols = ns["current"] - initial
             # print("\tremoved_symbols", removed_symbols)
             for vname in removed_symbols:
                 self.removeRowForVariable2(vname, ns=ns_name)
@@ -639,13 +641,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # self.removeRowForVariable(vname, ns = ns_name.replace("_", " "))
 
             added_symbols = initial - \
-                self.foreign_namespaces[ns_name]["current"]
+                ns["current"]
 
-            self.foreign_namespaces[ns_name]["current"] -= removed_symbols
+            ns["current"] -= removed_symbols
 
-            self.foreign_namespaces[ns_name]["current"] |= added_symbols
+            ns["current"] |= added_symbols
 
-            self.foreign_namespaces[ns_name]["current"] -= self.foreign_namespaces[ns_name]["initial"]
+            ns["current"] -= ns["initial"]
 
     def clear(self):
         self.cached_vars.clear()

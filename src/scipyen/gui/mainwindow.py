@@ -6840,8 +6840,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                              cmd_foreign_shell_ns_listing,
                                              )
 
-        # print("_slot_ext_krn_shell_chnl_msg_recvd")
-        # print("\ttab:", msg["workspace_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
+        print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd")
+        print("\ttab:", msg["workspace_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
         # print("\tuser_expressions:", msg["content"].get("user_expressions", {}))
 
         if self.external_console.window.tab_widget.count() == 0:
