@@ -1278,7 +1278,7 @@ def test_ANSI():
     print("To reset attributes: \\x1b[0m\n")
     for i in range(0, 8):
         print("\x1b[1;3{0}m\\x1b[1;3{0}m{1} \x1b[0;3{0}m\\x1b[0;3{0}m{1} "
-            "\x1b[1;4{0};3{0}m\\x1b[1;3{0};4{0}m{1}".format(i, RESET))
+            "\x1b[1;4{0};3{0}m\\x1b[1;4{0};3{0}m{1}".format(i, RESET))
         
     print("Test other characters")
     print("\x1b[3;37m{0}{1}".format("italic", RESET))

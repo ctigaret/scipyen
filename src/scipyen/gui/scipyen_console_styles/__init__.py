@@ -6,6 +6,8 @@
 """
 """
 
+import inspect
+
 from pygments import styles as pstyles
 from pygments.token import Token
 
@@ -22,12 +24,15 @@ def get_available_syntax_styles():
     return sorted(list(pstyles.get_all_styles()))
 
 def get_style_colors(stylename:str) -> dict:
-    if stylename == "KeplerDark":
+    if stylename in StyleNames:
         # use my own
         # TODO: 2024-09-19 15:24:37 
         # give possibility of 
         # future additional custom schemes to be packaged with Scipyen
-        style = KeplerDark
+        frame_record = inspect.getouterframes(inspect.currentframe())[0]
+        style = frame_record[0].f_globals.get(stylename, None)
+        if style is None:
+            raise RuntimeError(f"No class found for {stylename} style")
         fgcolor = style.style_for_token(Token.Text)['color'] or ''
         if len(fgcolor) in (3,6):
             # could be 'abcdef' or 'ace' hex, which needs '#' prefix
@@ -40,7 +45,7 @@ def get_style_colors(stylename:str) -> dict:
 
         return dict(
             bgcolor = style.background_color,
-            select = style.highlight_color,
+            select  = style.highlight_color,
             fgcolor = fgcolor
         )
     

@@ -118,8 +118,8 @@ from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
                                  saveWindowSettings, loadWindowSettings,)
 
 from gui.workspacegui import WorkspaceGuiMixin
-from gui import console_styles
-from gui.console_styles import *
+from gui import scipyen_console_styles
+from gui.scipyen_console_styles import *
 # from gui.kepler_dark_console_pygment_style import KeplerDark
 
 from gui.guiutils import (get_font_style, get_font_weight,)
@@ -552,12 +552,12 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.font = font
         
     @property
-    def colors(self):
+    def consoleColors(self):
         return self._console_colors
     
     @markConfigurable("ConsoleColors", "qt")
-    @colors.setter
-    def colors(self, val:str):
+    @consoleColors.setter
+    def consoleColors(self, val:str):
         #print("colors.setter val %s" % val)
         style = self._console_pygment
         
@@ -575,7 +575,12 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def _set_console_colors(self, colors):
         """Used as a slot for colors menu actions
         """
-        self.colors = colors
+        self.consoleColors = colors
+
+    # @Slot(str)
+    # def _slot_setConsoleColors(self, colors:str):
+    #     # NOTE: 2024-09-20 09:51:43 duplicates the above
+    #     self.consoleColors = colors
         
     def _set_sb_pos(self, val):# slot for menu action
         """Used as slot for ScrollBarPosition menu actions
@@ -589,11 +594,17 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         #print("_set_syntax_style", val)
         self.syntaxStyle = val
 
+    # @Slot(str)
+    # def _slot_setSyntaxStyle(self, stylename:str):
+    #     # NOTE: 2024-09-20 09:50:44 duplicate of the above
+    #     self.syntaxStyle = stylename
+        
     @property
     def syntaxStyle(self):
         """Name of the syntax highlight pygment (str)
         """
-        self._console_pygment = self.syntax_style
+        # update from syntax_style set up via jupyter/pygments mechanism?
+        # self._console_pygment = self.syntax_style
         return self._console_pygment
     
     @markConfigurable("SyntaxStyle", "qt")
@@ -609,6 +620,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         is a traitlets.Instance property, and for ScipyenConsole is None.
         """
         return True
+    
 
     def _save_settings_(self):
         gname, pfx = saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
@@ -802,32 +814,52 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             #self.style_sheet = self._initial_style_sheet
             return
         
-        if scheme in StyleNames:
-            mystyle = getattr(console_styles, scheme)
-            if styles.dark_color(mystyle.background_color):
-                style_sheet_template = styles.default_dark_style_template
-                self.syntax_style = "native"
-            else:
-                style_sheet_template = styles.default_light_style_template
-                self.syntax_style = styles.default_light_syntax_style
-                
-            style_sheet = style_sheet_template%console_styles.get_style_colors(mystyle.name)
-            
-            self.style_sheet = style_sheet
-            self.setStyleSheet(self.style_sheet)
-            if self._control is not None:
-                self._control.document().setDefaultStyleSheet(self.style_sheet)
-                
-            if self._page_control is not None:
-                self._page_control.document().setDefaultStyleSheet(self.style_sheet)
-                
-            if self._highlighter is not None:
-                if self.syntax_style:
-                    self._highlighter.set_style(mystyle)
-                    self._ansi_processor.set_background_color(self.syntax_style)
-                else:
-                    self._highlighter.set_style_sheet(self.style_sheet)
-            return
+#         if scheme in StyleNames: # custom styles from console_styles
+#             # NOTE: 82024-09-20 10:20:21
+#             # this bypasses the traitlet oberver mechanism in JupyterWidget
+#             # because the Scipyen's custom styles are not registered with
+#             # pygments (TODO)
+#             mystyle = getattr(console_styles, scheme)
+#             
+#             isDark = styles.dark_color(mystyle.background_color)
+#             
+#             style_sheet_template = styles.default_dark_style_template if isDark else styles.default_light_style_template
+#             style_sheet = style_sheet_template%console_styles.get_style_colors(mystyle.name)
+# 
+#             syntax_style = style_sheet if isDark else styles.default_light_syntax_style
+#             
+#             # self.style_sheet = style_sheet # observed traitlet in JupyterWidget
+#             # calls next lines automatically, but we bypass that directly because
+#             # our style is NOT registered with the pygments
+#             self.setStyleSheet(style_sheet)
+#             if self._control is not None:
+#                 self._control.document().setDefaultStyleSheet(style_sheet)
+#                 
+#             if self._page_control is not None:
+#                 self._page_control.document().setDefaultStyleSheet(style_sheet)
+#                 
+#             if self._highlighter is not None:
+#                 self._highlighter.set_style(mystyle)
+#                 # BUG: 2024-09-20 10:26:28 FIXME
+#                 # this one also relies on style being registered with pygments
+#                 # self._ansi_processor.set_background_color(syntax_style)
+#                 
+#                 self._ansi_processor.default_color_map = self._ansi_processor.darkbg_color_map.copy()
+#                 if not isDark:
+#                     for i in range(8):
+#                         self._ansi_processor.default_color_map[i + 8] = self._ansi_processor.default_color_map[i]
+# 
+#                     # ...and replace white with black.
+#                     self._ansi_processor.default_color_map[7] = self._ansi_processor.default_color_map[15] = 'black'
+# 
+#                 # Update the current color map with the new defaults.
+#                 self._ansi_processor.color_map.update(self._ansi_processor.default_color_map)
+#                     
+#                 
+# 
+#             self._console_pygment = mystyle.name
+#             self._console_colors = mystyle.name if isDark else styles.default_light_syntax_style # which is 'default'
+#             return
         
         # NOTE: 2020-12-23 11:15:50
         # code below is modified from qtconsoleapp module, plus my comments;
@@ -3924,9 +3956,9 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # for style in available_syntax_styles:
             for style in PYGMENT_STYLES:
                 action = QtWidgets.QAction("{}".format(style), self,
-                                       triggered=lambda v,
-                                       syntax_style=style:
-                                           self.active_frontend._set_syntax_style(val=syntax_style))
+                                       triggered=lambda:
+                                           self.active_frontend._set_syntax_style(style))
+                                           # self.active_frontend._slot_setSyntaxStyle(style))
         
                 action.setCheckable(True)
                 style_group.addAction(action)
@@ -3939,12 +3971,12 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         colors_group = QtWidgets.QActionGroup(self)
         for c in self.active_frontend.available_colors:
             action = QtWidgets.QAction("{}".format(c), self,
-                                       triggered = lambda v, val=c:
-                                           self.active_frontend._set_console_colors(colors=val))
+                                       triggered = lambda:
+                                           self.active_frontend._set_console_colors(c))
             action.setCheckable(True)
             colors_group.addAction(action)
             self.colors_menu.addAction(action)
-            if c == self.active_frontend.colors:
+            if c == self.active_frontend.consoleColors:
                 action.setChecked(True)
                 self.colors_menu.setDefaultAction(action)
         

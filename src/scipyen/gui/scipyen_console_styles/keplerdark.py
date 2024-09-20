@@ -2,6 +2,9 @@
 # SPDX-FileCopyrightText: 2024 Cezar C. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+# WARNING: when creating a new style make sure the style's `name` attribute is
+# identical to the class name (case-sensitive!)
     
 from pygments.style import Style
 from pygments.token import Keyword, Name, Comment, String, Error, \
@@ -14,7 +17,7 @@ from pygments import styles as pstyles
 class KeplerDark(Style):
     name = "KeplerDark"
     
-    background_color = '#202020'
+    background_color = '#232629'
     # highlight_color = '#404040'
     highlight_color = '#384f29'
     line_number_color = '#aaaaaa'
@@ -22,7 +25,9 @@ class KeplerDark(Style):
     styles = {
         # Token:              '#d0d0d0',
         Token:              '#eeeeee',
-        Whitespace:         '#666666',
+        # Token:              '#ffff00',
+        # Whitespace:         '#666666',
+        Whitespace:         '#232629',
 
         Comment:            'italic #ababab',
         Comment.Preproc:    'noitalic bold #ff3a3a',

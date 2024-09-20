@@ -8,8 +8,6 @@
 All functions defined here are to be imported in the top namespace
 (e.g., 'from workspacefunctions import *')
 
-DOES NOT WORK (yet)
-
 """
 from __future__ import print_function
 #from sys import getsizeof, stderr
