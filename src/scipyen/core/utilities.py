@@ -2711,11 +2711,20 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     else:
         return tuple()
     
-def summarize_object_properties(objname, obj, namespace="Internal"):
-    """Returns a dict with object properties for display in Scipyen workspace.
-    The dict keys represent the column names in the WorkspaceViewer table, and 
-    are mapped to the a dict with two key: str value pairs: display, tooltip,
-    where:
+def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal") -> dict:
+    """Summary of object properties to be displayed in Scipyen workspace view.
+    
+    Parameters:
+    
+    
+
+    Returns a dict (key ↦ value mapping) with the following keys:
+        "Data Type (DType)", "Workspace", "Minimum", "Maximum", "Size",
+        "Dimensions", "Shape", "Axes", "Array Order", "Memory Size",
+        "Address", "Icon"
+    
+    and the values are nested key ↦ str where the keys define the "role" of the
+        str value in the workspace view:
     
     "display" : str with the display string of the property (display role for the
                 corresponding item)
@@ -2771,21 +2780,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     wspace_name = "Namespace: %s" % namespace
     
-    # NOTE: 2021-10-03 21:07:45
-    # this consumes too much of resources (time & memory) and is unnecessary
-    # use the short version above
-    #if isinstance(obj, str):
-        #ttip = obj
-    #elif isinstance(obj, (tuple, list)):
-        #ttip = "%s" % (obj,)
-    #else:
-        #try:
-            #ttip = "%s" % obj
-        #except:
-            #ttip = typename
-    
-    # icon = None
-    
     result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
     
     tt = abbreviated_type_names.get(typename, typename)
@@ -2798,11 +2792,14 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         tt = abbreviated_type_names.get(clsname, clsname)
         icon = QtGui.QIcon.fromTheme("class")
         
-    if tt == "function":
+    if tt == "function" or "function" in tt or "method" in tt:
         icon = QtGui.QIcon.fromTheme("code-function")
 
     if tt == "module":
         icon = QtGui.QIcon.fromTheme("class-or-package")
+        
+    if tt.lower() == "macro":
+        icon = QtGui.QIcon.fromTheme("component")
         
     if objtype is type:
         tt += f" <{obj.__name__}>"
@@ -3061,7 +3058,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsztip = "memory size: "
             
         result["Data Type (DType)"]     = {"display": dtypestr,     "tooltip" : dtypetip}
-        # result["Data Type (DType)"]     = {"display": dtypestr,     "tooltip" : "%s%s" % (dtypetip, dtypestr)}
         result["Workspace"]     = {"display": namespace,    "tooltip" : "Location: %s kernel namespace" % namespace}
         result["Minimum"]       = {"display": datamin,      "tooltip" : "%s%s" % (mintip, datamin)}
         result["Maximum"]       = {"display": datamax,      "tooltip" : "%s%s" % (maxtip, datamax)}
@@ -3085,6 +3081,43 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
 
     return result
     
+def augment_obj_prop_dict(prop_dict):
+    """Adds/modifies 'Icon' entry in the properties dictionary for variable listing.
+    Only useful for objects in the namespace of an external kernel.
+    See summarize_object_properties for what a properties dict looks like
+    """
+    import builtins
+    if 'Icon' not in prop_dict.keys(): # don't overwrite what summarize_object_properties did
+        tt = prop_dict["Object Type"]["display"]
+        
+        icon = QtGui.QIcon.fromTheme("object")
+        
+        if "<" in tt and ">" in tt:
+            tt, dundername = tt.split(" ")
+            icon = QtGui.QIcon.fromTheme("datatype") if dundername in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
+            
+        
+        elif tt == "type":
+            icon = QtGui.QIcon.fromTheme("class")
+        
+        if "instance" in tt == "instance":
+            tt = abbreviated_type_names.get(clsname, clsname)
+            icon = QtGui.QIcon.fromTheme("class")
+            
+        if tt == "function" or "function" in tt or "method" in tt:
+            icon = QtGui.QIcon.fromTheme("code-function")
+
+        if tt == "module":
+            icon = QtGui.QIcon.fromTheme("class-or-package")
+            
+        if tt.lower() == "macro":
+            icon = QtGui.QIcon.fromTheme("component")
+        
+        
+        prop_dict["Icon"] = icon
+        
+    return prop_dict
+        
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
     """Alternative to list.index(), such that a missing value returns None
     instead of raising an Exception.

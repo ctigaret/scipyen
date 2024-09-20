@@ -144,13 +144,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self._foreign_workspace_count_ = -1
 
         self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
-        # FIXME: 2021-08-19 21:45:17
+        # BUG: 2021-08-19 21:45:17 FIXME
         # self.foreign_namespaces.observe(self._foreignNamespacesCountChanged_, names="length")
-
-        # TODO/FIXME 2020-07-31 00:07:29
-        # low priority: choose pallette in a clever way to take into account the
-        # currently used GUI palette - VERY low priority!
-        # self.foreign_kernel_palette = list(sb.color_palette("pastel", 1))
 
         # NOTE: 2021-07-28 09:58:38
         # currentItem/Name are set by selecting/activating an item in workspace view
@@ -205,9 +200,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.deleted_vars.clear()
         self.internalVariablesMonitor.clear()
 
-    def removeForeignNamespace(self, wspace: dict):
+    def removeForeignNamespace(self, session: dict):
         # print("workspaceModel to remove %s" % wspace)
-        self.clearForeignNamespaceDisplay(wspace, remove=True)
+        self.clearForeignNamespaceDisplay(session, remove=True)
 
     def _loadSessionCache_(self, connfilename: str):
         saved_sessions = dict()
@@ -347,7 +342,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         workspace: dict or str
 
-            When a dict it must have the following key/value pairs:
+            When a dict it represents a session and must contain the following
+                key ↦ value mapping:
 
                 "connection_file": str = name of the connection file
 
@@ -362,16 +358,19 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 For a non-local session/connection, "master" is mapped to None.
 
             When a str, it is the workspace name _AS_REGISTERED_ with the workspace
-            model (i.e. " " replaced with "_")
-
+            model. 
+    
         remove: bool, optional (default is False)
             When True, the workspace name will also be de-registered.
 
-            If workspace is a dict is till be used to determine whether the 
-            workspace belongs to a remote kernel (which is NOT managed by Scipyen's
-            external ipython) and a snapshot of the symbols in the kernel's 
-            namespace will be saved to the "cached_sessions.json" file 
+            If workspace is a session dict (see above) it will be used to determine 
+            whether the workspace belongs to a remote kernel (which is NOT managed
+            by Scipyen's external ipython); in this case, and a snapshot of the 
+            symbols in the kernel's namespace will be saved to the "cached_sessions.json" file 
             (typically located in ~/.config/Scipyen)
+    
+            WARNING: This has not been throughly tested and may not work with 
+            non-serializable objects, such as many of the Qt classes.
 
         """
         # check that we received a sessions dictionary and that this was generated
@@ -417,8 +416,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 self.foreign_namespaces[nsname]["current"].clear()
 
             # OK. Now, update the workspace table
-            kernel_items_rows = self.rowIndexForItemsWithProps(
-                Workspace=nsname)
+            kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=nsname)
 
             # print("kernel_items_rows for %s" % nsname,kernel_items_rows)
             if isinstance(kernel_items_rows, int):

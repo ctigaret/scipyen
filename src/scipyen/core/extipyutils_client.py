@@ -167,13 +167,18 @@ init_commands.extend(
     "from imaging.axiscalibration import (AxesCalibration,AxisCalibrationData, ChannelCalibrationData, CalibrationData)",
     "from iolib import pictio as pio",
     "from iolib import h5io, jsonio",
-    "print('To use matplotlib run %matplotlib magic')"
+    "print('To use matplotlib run %matplotlib magic')",
+    
     ])
 
 if os.path.isfile(_ext_ipython_initialization_file):
     init_commands.append(_ext_ipython_initialization_cmd)
     
-
+init_commands.extend([
+    "u_ns = get_ipython().user_ns",
+    "get_ipython().user_ns_hidden.update(u_ns)",
+    "del u_ns"
+    ])
 
 class ForeignCall(DataBag):
     """Usage:
@@ -702,6 +707,26 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
     ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not k.startswith('_') ])}"
     
     expr = {"ns_listing_of_%s" % namespace : ue1}
+    #expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : ue1}
+    
+    if as_call:
+        return ForeignCall(user_expressions = expr)
+    
+    return expr
+    
+def cmd_foreign_shell_ns_hidden_listing(namespace:str="Internal", as_call=True) -> dict:
+    """Creates a user_expression containing the variable names in a foreign namespace.
+    
+    This one returns get_ipython().user_ns and get_ipython().user_ns_hidden
+    """
+    
+    # NOTE 2020-07-29 22:51:02: WRONG: the value of "ns_listing_of_%s" % namespace
+    # must be a str
+    #ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not inspect.ismodule(get_ipython().user_ns[k]) and not k.startswith('_') ])}"
+    
+    ue1 = "{'user_ns':set([k for k in get_ipython().user_ns_hidden.keys() or k.startswith('_') ])}"
+    
+    expr = {f"hidden_ns_listing_of_{namespace}" : ue1}
     #expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : ue1}
     
     if as_call:

@@ -2245,7 +2245,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                                 "master": self._connections_[cfile]["master"],
                                 "name": self._connections_[cfile]["name"]}
                 
-                #print("remove_connection session_dict =", session_dict)
+                # print(f"{self.__class__.__name__}.remove_connection: session_dict =", session_dict)
                 
                 if isinstance(self._connections_[cfile]["master"], dict) and self._connections_[cfile]["master"]["client_session_ID"] == sessionID:
                     # locally managed kernel
@@ -3053,7 +3053,9 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     #### END some useful properties
     
     @safeWrapper
-    def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None, redirect:typing.Optional[dict]=None, **kwargs):
+    def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], 
+                where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None, 
+                redirect:typing.Optional[dict]=None, **kwargs):
         """Execute code asynchronously, in a kernel.
         By default, code is executed in the kernel behind the active frontend.
         
@@ -3099,7 +3101,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                 a ForeignCall object
                 
                 
-        Help on method execute in module jupyter_client.client:
+        Documentation of method 'execute' in module jupyter_client.client:
 
         execute(code, silent=False, store_history=True, user_expressions=None,
                 allow_stdin=None, stop_on_error=True) 

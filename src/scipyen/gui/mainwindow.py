@@ -128,6 +128,7 @@ from core.prog import (safeWrapper, deprecation, iter_attribute,
 warnings.showwarning = prog.showwarning
 
 from core.utilities import (summarize_object_properties,
+                            augment_obj_prop_dict,
                             standard_obj_summary_headers,
                             safe_identity_test, unique, index_of, 
                             gethash, NestedFinder, normalized_index,
@@ -2680,6 +2681,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     kw = {"options":options}
                 else:
                     kw = {}
+                    
                 connection_file, file_type = QtWidgets.QFileDialog.getOpenFileName(self,
                                                                                    "Connect to Existing Kernel",
                                                                                    jupyter_runtime_dir(),
@@ -2696,11 +2698,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # this will automatically start a (remote) IPython kernel
                 self.external_console = consoles.ExternalIPython.launch()
 
-            # self.workspace["external_console"] = self.external_console
-            # self.workspaceModel.user_ns_hidden.update(
-            #     {"external_console": self.external_console})
+            # NOTE: 2024-09-20 23:40:49
+            # bind a reference to the external console in our workspace
+            # useful to get to it diretly in Scipyen's console
             self.workspaceModel.bindObjectInNamespace("external_console", self.external_console,
                                         hidden=True)
+            
+            # NOTE: 2024-09-20 23:41:42
+            # what's this for ?!?
             # self.external_console.window.sig_kernel_count_changed[int].connect(self._slot_remote_kernel_count_changed)
 
             # NOTE: 2021-01-15 14:46:07
@@ -2723,6 +2728,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 self._slot_ext_krn_restart)
             self.external_console.window.sig_kernel_stopped_channels[dict].connect(
                 self._slot_ext_krn_stop)
+                    
+            # NOTE: 2024-09-20 23:45:25
+            # OK, we now need to get a list of hidden variable names in the foreign kernel
+            # 
+            ns = self.external_console.window.find_tab_title(self.external_console.window.active_frontend)
+            list_init_hidden = "list(get_ipython().user_ns_hidden.keys())"
+            self.external_console.execute(cmd_foreign_shell_ns_hidden_listing(namespace=ns))
 
         else:
             # NOTE: 2021-01-30 13:53:37
@@ -6818,6 +6830,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         from core.extipyutils_client import (unpack_shell_channel_data,
                                              cmds_get_foreign_data_props,
                                              cmd_foreign_shell_ns_listing,
+                                             cmd_foreign_shell_ns_hidden_listing,
                                              )
 
         if self.external_console.window.tab_widget.count() == 0:
@@ -6842,16 +6855,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         connection_file = connection[0]
         
         self.workspaceModel.updateForeignNamespace(ns_name, connection_file, tuple())
-        # if ns_name not in self.workspaceModel.foreign_namespaces:
-        #     self.workspaceModel.foreign_namespaces[ns_name] = dict()
-
+        
         if msg["msg_type"] == "execute_reply":
-            # print("\n\t** execute_reply from %s" % msg["workspace_name"])
-            # print("\n****** execute_reply from %s\n"% msg["workspace_name"], msg, "\n*****\n")
             vardict = unpack_shell_channel_data(msg)
-
-            # print("\n\t** len(vardict) =",  len(vardict))
-            # print("\n\t** vardict =",  vardict)
 
             if len(vardict):
                 # dict with properties of variables in external kernel namespace
@@ -6862,21 +6868,31 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 ns_listings = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
 
-                # this is needed here so that they don't clutter our own namespace
-                for key in prop_dicts.keys():
-                    vardict.pop(key, None)
+                ns_hidden_listing = dict(
+                    [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
+                
+                if len(ns_hidden_listing):
+                    pass # TODO 2024-09-21 00:10:10 finalize this !
+                    # self.workspaceModel.foreign_namespaces["initial"] = 
 
-                for key in ns_listings.keys():
-                    vardict.pop(key, None)
-
-                # now vardict only has variables shuttled (via pickle) from the
-                # external kernel namespace into our own
-                # NOTE: 2023-06-28 22:30:51 WARNING
-                # next line injects these variables in our workspace
-                # WARNING: these variables ARE NOT references, but true bit
-                # copies of the data in the foreign kernel
-                # self.workspace.update(vardict)
-                # self.workspaceModel.update()
+                # NOTE: 2024-09-20 23:58:16
+                # call directly updateFromExternal below, so no more clutter of internal ns
+                #
+                # # this is needed here so that they don't clutter our own namespace
+                # # for key in prop_dicts.keys():
+                # #     vardict.pop(key, None)
+                # # 
+                # # for key in ns_listings.keys():
+                # #     vardict.pop(key, None)
+                # 
+                # # now vardict only has variables shuttled (via pickle) from the
+                # # external kernel namespace into our own
+                # # NOTE: 2023-06-28 22:30:51 WARNING
+                # # next line injects these variables in our workspace
+                # # WARNING: these variables ARE NOT references, but true bit
+                # # copies of the data in the foreign kernel
+                # # self.workspace.update(vardict)
+                # # self.workspaceModel.update()
 
                 if len(prop_dicts):
                     # print("mainWindow: len(prop_dicts)", len(prop_dicts))
@@ -6888,15 +6904,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         for propname in value.keys():
                             value[propname]["tooltip"] = value[propname]["tooltip"].replace(
                                 "Internal", msg["workspace_name"])
+                            
+                        value = augment_obj_prop_dict(value)
 
                     self.workspaceModel.updateFromExternal(prop_dicts)
 
                 if len(ns_listings):
-                    # print("ns_listings =", ns_listings)
                     for key, val in ns_listings.items():
                         ns_name = key.replace("ns_listing_of_", "")
-                        # ns_name = key.replace("ns_listing_of_","").replace(" ", "_")
-                        # print("\n\t.... ns_name", ns_name, "val", val)
                         if ns_name == msg["workspace_name"]:
                             if isinstance(val, dict):
                                 self.workspaceModel.updateForeignNamespace(
@@ -6908,22 +6923,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                                                       where=msg["parent_header"]["session"])
 
         elif msg["msg_type"] == "kernel_info_reply":
-            # print("\n\t** kernel_info_reply from %s" % msg["workspace_name"])
-            # print("\n****** kernel_info_reply from %s\n" % msg["workspace_name"], msg, "\n********\n")
-            # usually sent when right after the kernel started - we use this as
-            # a signal that the kernel has been started, by which we trigger
-            # an initial directory listing.
-            # it seems this is only sent when a new connection is established to
-            # the kernel (via a new connection file); opening a slave tab again
-            #
-            # pass
-            # self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"].replace(" ", "_")),
             self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"]),
                                           where=msg["parent_header"]["session"])
 
         elif msg["msg_type"] == "is_complete_reply":
-            # print("\n\t** is_complete_reply from %s" % msg["workspace_name"])
-            # print("\n****** is_complete_reply from %s\n"% msg["workspace_name"], msg, "\n********\n")
             self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"]),
                                           where=msg["parent_header"]["session"])
 
