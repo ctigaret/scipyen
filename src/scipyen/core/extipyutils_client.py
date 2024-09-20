@@ -76,7 +76,7 @@ from core.traitcontainers import DataBag
 from core.prog import safeWrapper
 import qtpy
 
-qtPackages = tuple(p for p in qtpy.__dict__.keys() if p.startswith("Qt") and isinstance(qtpy.__dict__[p], types.ModuleType))
+qtPackages = ", ".join([p for p in qtpy.__dict__.keys() if p.startswith("Qt") and isinstance(qtpy.__dict__[p], types.ModuleType)])
 
 #from contextlib import contextmanager
 #print(sys.path)
@@ -112,12 +112,7 @@ init_commands = [
     "import sys, os, io, warnings, numbers, types, typing, re, importlib",
     "import traceback, keyword, inspect, itertools, functools, collections",
     ]
-#if __virtual_site_packages__:
-    #init_commands.append("".join(["sys.path.insert(2, '", __virtual_site_packages__, "')"]))
 
-if os.path.isfile(_ext_ipython_initialization_file):
-    init_commands.append(_ext_ipython_initialization_cmd)
-    
 # NOTE: 2022-02-06 22:30:26
 # some of the commands below expose Scipyen API to external kernels; this may
 # be done via such init commands as below; 
@@ -130,6 +125,7 @@ if os.path.isfile(_ext_ipython_initialization_file):
 # access by the user.
 init_commands.extend(
     [
+    "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
     "import signal, pickle, json, csv",
     "import numpy as np",
     "import scipy",
@@ -137,7 +133,7 @@ init_commands.extend(
     "import seaborn as sb",
     "from importlib import reload",
     "from pprint import pprint",
-    f"from QtPy import {tuple(qtPackages)}",
+    f"from qtpy import ({qtPackages})",
     "import matplotlib as mpl",
     "mpl.rcParams['savefig.format'] = 'svg'",
     "mpl.rcParams['xtick.direction'] = 'in'",
@@ -145,8 +141,8 @@ init_commands.extend(
     "from matplotlib import pyplot as plt",
     "from matplotlib import cm",
     "import matplotlib.mlab as mlb",
-    "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
-    "from core import extipyutils_host as hostutils",
+    "import core.extipyutils_host as hostutils",
+    # "from hostutils import ContextExecutor",
     "from core.workspacefunctions import *",
     "from plots import plots as plots",
     "from core import datatypes as dt",
@@ -173,6 +169,10 @@ init_commands.extend(
     "from iolib import h5io, jsonio",
     "print('To use matplotlib run %matplotlib magic')"
     ])
+
+if os.path.isfile(_ext_ipython_initialization_file):
+    init_commands.append(_ext_ipython_initialization_cmd)
+    
 
 
 class ForeignCall(DataBag):
@@ -379,12 +379,22 @@ def define_foreign_data_props_getter_fun_str(dataname:str, namespace:str="Intern
     
     The function should be removed from the foreign ns after use.
     """
+    # NOTE: 2024-09-20 22:07:10
+    # remove "Icon" from summary, otherwise we have issues eval-ing it
     return "\n".join(["@hostutils.ContextExecutor()", # core.extipyutils_host is imported remotely as hostutils
     "def f(objname, obj):",                           # use regular function wrapped in a context manager
     "    from core.utilities import summarize_object_properties",
-    "    return summarize_object_properties(objname, obj, namespace='%s')" % namespace,
+    f"    ret = summarize_object_properties(objname, obj, namespace='{namespace}')",
+    "    ret.pop('Icon', None)",
+    "    return ret"
     "", # ensure NEWLINE
     ])
+    # return "\n".join(["@hostutils.ContextExecutor()", # core.extipyutils_host is imported remotely as hostutils
+    # "def f(objname, obj):",                           # use regular function wrapped in a context manager
+    # "    from core.utilities import summarize_object_properties",
+    # "    return summarize_object_properties(objname, obj, namespace='%s')" % namespace,
+    # "", # ensure NEWLINE
+    # ])
 
 def define_foreign_data_props_getter_gen_str(dataname:str, namespace:str="Internal") -> str:
     """Defines a generator to retrieve object properties in the foreign namespace.
@@ -399,7 +409,9 @@ def define_foreign_data_props_getter_gen_str(dataname:str, namespace:str="Intern
     return "\n".join(["@hostutils.contextmanager", # core.extipyutils_host is imported remotely as hostutils
     "def f_gen(objname, obj):",             # use a generator func
     "    from core.utilities import summarize_object_properties",
-    "    yield summarize_object_properties(objname, obj, namespace='%s')" % namespace,
+    f"    ret = summarize_object_properties(objname, obj, namespace='{namespace}')",
+    "    ret = ret.pop('Icon', None)",
+    "    yield ret"
     "",                                                     # ensure NEWLINE
      ])
     
@@ -462,7 +474,7 @@ def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list
     
     """
     exec_calls = list()
-    #### BEGIN variant 2 - works but the with statement must be executed (hence
+    #### BEGIN variant 2 - works but the 'with' statement must be executed (hence
     # passed as code , not as part of user_expressions)
     # a bit more convoluted, as it creates sub_special_%(dataname) in the foreign namespace
     special = "properties_of"
@@ -763,7 +775,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
                     try:
                         data_dict = {key:eval(data_str)}
                     except:
-                        print(f"unpack_shell_channel_data: data_str = {data_str}")
+                        print(f"unpack_shell_channel_data: data_str = {data_str}\n")
                         traceback.print_exc()
                     
                 ret.update(data_dict)

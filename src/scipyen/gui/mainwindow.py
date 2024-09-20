@@ -6820,24 +6820,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                                              cmd_foreign_shell_ns_listing,
                                              )
 
-        # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd")
-        # print("\ttab:", msg["workspace_name"], "\n\ttype:", msg["msg_type"], "\n\tstatus:", msg["content"]["status"])
-        # print("\tuser_expressions:", msg["content"].get("user_expressions", {}))
-
         if self.external_console.window.tab_widget.count() == 0:
             # only listen to kernels that have a frontend
             return
-
-        # print("mainWindow._slot_ext_krn_shell_chnl_msg_recvd:\n\tsession ID =",
-            # msg["parent_header"]["session"],
-            # "\n\tworkspace =", msg["workspace_name"],
-            # "\n")
-
-        # print("mainwindow\n\t_slot_ext_krn_shell_chnl_msg_recvd msg type", msg["msg_type"])
-
-        # print("\nmainwindow shell channel message received")
-        # print("\tmessage type:", msg["msg_type"])
-        # print("\tvia connection file:", msg["connection_file"])
 
         # ATTENTION: 2021-01-30 14:13:28
         # only use for debugging
@@ -6890,9 +6875,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # next line injects these variables in our workspace
                 # WARNING: these variables ARE NOT references, but true bit
                 # copies of the data in the foreign kernel
-                self.workspace.update(vardict)
-                self.workspaceModel.update()
-                # self.workspaceModel.update(from_console=False)
+                # self.workspace.update(vardict)
+                # self.workspaceModel.update()
 
                 if len(prop_dicts):
                     # print("mainWindow: len(prop_dicts)", len(prop_dicts))
@@ -6929,7 +6913,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # usually sent when right after the kernel started - we use this as
             # a signal that the kernel has been started, by which we trigger
             # an initial directory listing.
-            # it seems this is only sent whe a new connection is established to
+            # it seems this is only sent when a new connection is established to
             # the kernel (via a new connection file); opening a slave tab again
             #
             # pass
