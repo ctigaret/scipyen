@@ -814,17 +814,17 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             #self.style_sheet = self._initial_style_sheet
             return
         
-#         if scheme in StyleNames: # custom styles from console_styles
+#         if scheme in StyleNames: # custom styles from scipyen_console_styles
 #             # NOTE: 82024-09-20 10:20:21
 #             # this bypasses the traitlet oberver mechanism in JupyterWidget
 #             # because the Scipyen's custom styles are not registered with
 #             # pygments (TODO)
-#             mystyle = getattr(console_styles, scheme)
+#             mystyle = getattr(scipyen_console_styles, scheme)
 #             
 #             isDark = styles.dark_color(mystyle.background_color)
 #             
 #             style_sheet_template = styles.default_dark_style_template if isDark else styles.default_light_style_template
-#             style_sheet = style_sheet_template%console_styles.get_style_colors(mystyle.name)
+#             style_sheet = style_sheet_template%scipyen_console_styles.get_style_colors(mystyle.name)
 # 
 #             syntax_style = style_sheet if isDark else styles.default_light_syntax_style
 #             
@@ -888,7 +888,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         #else:
             #colors=None
             
-        if scheme in console_styles.available_pygments():
+        if scheme in scipyen_console_styles.available_pygments():
             #print("found %s scheme" % scheme)
             # rules of thumb:
             #
@@ -3946,7 +3946,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         self.listMagicsAction.triggered.connect(self._slot_listMagics)
         
-        available_syntax_styles = console_styles.get_available_syntax_styles() # defined in this module
+        available_syntax_styles = scipyen_console_styles.get_available_syntax_styles() # defined in this module
         
         # if len(available_syntax_styles):
         if len(PYGMENT_STYLES):
