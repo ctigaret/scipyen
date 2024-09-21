@@ -2651,7 +2651,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         If no ExternalIPython console exists, launches an instance
                         of ExternalIPython console and starts NEURON.
 
-            "neuron_ext": launches neuron in an external kernel
+            "neuron_ext": launches neuron in an external, existing, kernel
                         Useful in combination with jupyter notebook or jupyterlab.
 
                         Requires a running notebook (preferred if using bokeh)
@@ -2734,12 +2734,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # OK, we now need to get a list of hidden variable names in the foreign kernel
             # 
             ns = self.external_console.window.find_tab_title(self.external_console.window.active_frontend)
-            list_init_hidden = "list(get_ipython().user_ns_hidden.keys())"
             self.external_console.execute(cmd_foreign_shell_ns_hidden_listing(namespace=ns))
 
         else:
             # NOTE: 2021-01-30 13:53:37
-            # an instance of ExternalIPython is already running
+            # an instance of ExternalIPython is already running, but the kernel
+            # may have been stopped (and therefore connection is gone) and the
+            # window closed
             frontend_factory = None
             # print("\texternal console exists")
             if self.external_console.window.active_frontend is None:
@@ -6839,14 +6840,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         'metadata',         ↦   mapping — information about the message that is 
                                 not part of the 'content'
                                 Can be used as information store about requests &
-                                replies (e.g. informaiton about request or execution
+                                replies (e.g. infomration about request or execution
                                 context)
         
         'content',          ↦   mapping — THE BODY OF THE MESSAGE, depends on msg_type:
         
                                 'status'    ↦ str: "ok" | "error" | "abort"
                                             present in ALL _reply messages
-        
+                all '*_reply' messages:
                         when 'status' is 'error':
                                 'ename'     ↦ str — exception name
                                 'evalue'    ↦ str — exception value
@@ -6925,7 +6926,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         header = msg["header"]
         
-        # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd From workspace {ns_name}:")
+        print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd from workspace: '{ns_name}'")
         # print(f"\theader: {header}")
 
         connections = list(filter(lambda x: x[1]["name"] == ns_name, self.external_console.window.connections.items()))
@@ -6938,36 +6939,42 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         msg_connection_file = msg.get('connection_file', None)
         # print(f"\tconnection_file\n\t\tfrom console: {connection_file}\n\t\tfrom message: {msg_connection_file}\n\tidentical: {connection_file == msg_connection_file}")
         
-        # print(f"\tgot {msg['msg_type']}")
+        print(f"\t{msg['msg_type']}: {msg['content']['status']}")
+        if msg['content']['status'] == 'error':
+            scipywarn(f"Error {msg['content']['ename']}: {msg['content']['evalue']}")
+            return
+        elif msg['content']['status'] == "abort":
+            scipywarn(f"Aborted in {msg['workspace_name']}")
+            return
         
-        # if msg["msg_type"] == "execute_reply":
-        #     if msg['content']['status'] == 'ok':
-        #         print(f"\texecution count: {msg['content']['execution_count']}")
-        #     else:
-        #         print(f"\tWARNING: {msg['content']['status']}")
-            
-            # print(f"\t=> calling unpack_shell_channel_data(…)")
+        if msg["msg_type"] == "execute_reply":
             vardict = unpack_shell_channel_data(msg)
+            print(f"\t\tvardict: {len(vardict)}")
 
             if len(vardict):
                 # print(f"\t\tgot vardict with ({len(vardict)}) key ↦ value mappings:")
                 # dict with properties of variables in external kernel namespace
                 prop_dicts = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
-                # print(f"\t\t{len(prop_dicts)} property dicts")
+                print(f"\t\tproperty mappings: {list(prop_dicts.keys())}")
 
                 ns_hidden_listing = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
                 # print(f"\t\t{len(ns_hidden_listing)} hidden listing")
+                print(f"\t\thidden_ns_listing: {list(ns_hidden_listing.keys())}")
                 
                 if len(ns_hidden_listing):
                     # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\tns_hidden_listing:\n\t{ns_hidden_listing}")
                     user_ns_hidden_vars = ns_hidden_listing[f"hidden_ns_listing_of_{ns_name}"]
                     self.workspaceModel.updateForeignNamespace(ns_name, connection_file, user_ns_hidden_vars, hidden=True)
+                else:
+                    self.workspaceModel.updateForeignNamespace(ns_name, connection_file, {'user_ns':dict()}, hidden=True)
                     
                 # dict with listing of contents of the external kernel namespace
                 ns_listings = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
+                
+                print(f"\t\tns_listings: {list(ns_listings.keys())}")
                 
                 # print(f"\t\t{len(ns_listings)} var listing")
                 
@@ -7007,7 +7014,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         elif msg["msg_type"] == "kernel_info_reply":
             # print(f"\t=> query namespace listing")
-            # will evoke an execute_reply message containing namespace lisiting of visible variables
+            if ns_name not in self.workspaceModel.foreign_namespaces:
+                self.workspaceModel.updateForeignNamespace(ns_name, msg["connection_file"], tuple(), hidden=False)
+            # evoke an execute_reply message containing namespace listing of visible variables
             self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"]),
                                           where=msg["parent_header"]["session"])
             
@@ -7034,10 +7043,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             pass
             
         else:
-            print(f"\tTODO")
+            # print(f"\tTODO")
             pass
             
-        print("\n***\n")
+        print("***\n")
 
     def execute_in_external_console(self, call, where=None):
         self.external_console.execute(call, where=where)
@@ -7052,7 +7061,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(dict)
     @safeWrapper
     def _slot_ext_krn_stop(self, conndict):
-        # print("mainWindow: _slot_ext_krn_stop %s" % conndict)
+        print("mainWindow: _slot_ext_krn_stop %s" % conndict)
         signalBlocker = QtCore.QSignalBlocker(self.external_console.window)
         self.workspaceModel.removeForeignNamespace(conndict)
 

@@ -39,6 +39,7 @@ import asyncio
 import warnings
 from copy import deepcopy
 from functools import partial
+from collections import deque
 import json
 
 from traitlets import Bunch
@@ -160,6 +161,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # CAUTION this is volatile, DO NOT USE it to retrieve current var name
         # e.g., for the purpose of renaming
         # self.originalVarName = "" # varname cache for individual row changes
+        
         self._wspace_headers_ = [k for k in standard_obj_summary_headers if k != "Icon"]
         self.setColumnCount(len(self._wspace_headers_))
         self.setHorizontalHeaderLabels(self._wspace_headers_)  # defined in core.utilities
@@ -189,7 +191,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # or such like. What if the system uses a dark-ish palette?
         # This approach is WRONG, but fixing it has low priority.
         # self.foreign_kernel_palette = list(sb.color_palette("pastel", change["new"]))
-        # print("workspaceModel: foreign namespaces = %s, (old: %s, new: %s)" % (len(self.foreign_namespaces), change["old"], change["new"]))
+        
+        print(f"{self.__class__.__name__}._foreignNamespacesCountChanged_ foreign namespaces = {len(self.foreign_namespaces)} (old: {change['old']}, new: {change['new']})")
         pass
 
     def __reset_variable_dictionaries__(self):
@@ -224,14 +227,16 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     pass
 
             if connfilename in saved_sessions:
-                saved_current = set(saved_sessions[connfilename]["current"])
-                saved_initial = set(saved_sessions[connfilename]["initial"])
+                saved_current = set(saved_sessions[connfilename]["current_symbols"])
+                saved_initial = set(saved_sessions[connfilename]["initial_symbols"])
+                saved_hidden  = set(saved_sessions[connfilename]["hidden_symbols"])
 
             else:
                 saved_current = None
                 saved_initial = None
+                saved_hidden = None
 
-        return saved_current, saved_initial
+        return saved_current, saved_initial, saved_hidden
 
     def _mergeSessionCache_(self, connfilename: str, symbols: set):
         # NOTE: 2021-01-28 22:15:24:
@@ -265,7 +270,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #   v in saved_initial OR v in saved_current AND
         #       v not in intial_symbols
 
-        saved_current, saved_initial = self._loadSessionCache_(connfilename)
+        saved_current, saved_initial, saved_hidden = self._loadSessionCache_(connfilename)
 
         if saved_initial is not None and saved_current is not None:
             retained_initial = symbols & saved_initial
@@ -280,15 +285,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
             # print("added_symbols", added_symbols)
 
-            current = retained_current | added_symbols
+            current_symbols = retained_current | added_symbols
 
-            initial = symbols - current
+            initial_symbols= symbols - current_symbols
 
         else:
-            current = set()
-            initial = symbols
+            current_symbols = set()
+            initial_symbols = symbols
+            
+        hidden_symbols = saved_hidden
 
-        return current, initial
+        return current_symbols, initial_symbols, hidden_symbols
 
     def _saveSessionCache_(self, connfilename: str, nsname: str):
         mainWindow = self.shell.user_ns.get("mainWindow", None)
@@ -296,8 +303,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             sessions_filename = os.path.join(os.path.dirname(mainWindow.scipyenSettings.user_config_path()),
                                              "cached_sessions.json")
 
-            session_dict = {"current": list(self.foreign_namespaces[nsname]["current"]),
-                            "initial": list(self.foreign_namespaces[nsname]["initial"]),
+            session_dict = {"current_symbols": list(self.foreign_namespaces[nsname]["current_symbols"]),
+                            "initial_symbols": list(self.foreign_namespaces[nsname]["initial_symbols"]),
+                            "hidden_symbols": list(self.foreign_namespaces[nsname]["hidden_symbols"]),
                             "name": nsname,
                             }
 
@@ -334,7 +342,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 with open(sessions_filename, mode="wt") as file_out:
                     json.dump(saved_sessions, file_out, indent=4)
 
-    def clearForeignNamespaceDisplay(self, workspace: typing.Union[dict, str], remove: bool = False):
+    def clearForeignNamespaceDisplay(self, workspace: typing.Union[dict, str], 
+                                     remove: bool = False):
         """De-registers a foreign workspace dictionary.
 
         Parameters:
@@ -380,11 +389,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             nsname = workspace
             connfilename = None
 
-            is_local = None
+            is_master = None
 
         elif isinstance(workspace, dict) and \
                 all([s in workspace.keys() for s in ("connection_file", "master", "name")]):
-            is_local = isinstance(workspace["master"], dict)
+            is_master = isinstance(workspace["master"], dict)
             nsname = workspace["name"]
             connfilename = workspace.get("connection_file")
 
@@ -407,13 +416,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 # NOTE: 2021-01-29 10:08:16 RESOLVED: we are sending the
                 # connection dict instead of just the workspace name
                 # print("connfilename", connfilename)
-                if connfilename and os.path.isfile(connfilename) and not is_local:
+                if connfilename and os.path.isfile(connfilename) and not is_master:
                     self._saveSessionCache_(connfilename, nsname)
 
                 self.foreign_namespaces.pop(nsname)
 
             else:
-                self.foreign_namespaces[nsname]["current"].clear()
+                self.foreign_namespaces[nsname]["current_symbols"].clear()
 
             # OK. Now, update the workspace table
             kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=nsname)
@@ -558,24 +567,23 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         if isinstance(val, dict):
             symbols = val.get('user_ns', set())
 
-        elif isinstance(val, (list, set, tuple)):
+        elif isinstance(val, (list, set, tuple, deque)):
             symbols = set([k for k in val])
 
         else:
             raise TypeError(
                 "val expected to be a dict or a list; got %s instead" % type(val).__name__)
 
-        # print("WorkspaceModel.updateForeignNamespace symbols", initial)
-
         if ns_name not in self.foreign_namespaces:
+            print(f"{self.__class__.__name__}.updateForeignNamespace new namespace: {ns_name}")
             if hidden:
                 hidden_symbols = symbols.copy()
                 initial_symbols = set()
                 current_symbols = set()
             else:
-                initial_symbols = symbols.copy()
                 hidden_symbols = set()
-                current_symbols = set()
+                initial_symbols = symbols.copy()
+                current_symbols = symbols.copy()
             # first time ns_name is dealt with
             # NOTE:2021-01-28 21:58:59
             # check to see if there is a snapshot of a currently live kernel
@@ -586,7 +594,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     cdict = externalConsole.window.connections.get(cfile, None)
                     if isinstance(cdict, dict) and "master" in cdict and cdict["master"] is None:
                         # print("found remote connection for %s" % cfile)
-                        current, initial = self._mergeSessionCache_(cfile, initial_symbols)
+                        current_symbols, initial_symbols, hidden_symbols = self._mergeSessionCache_(cfile, initial_symbols)
 
             # special treatment for objects loaded from NEURON at kernel
             # initialization time (see extipyutils_client
@@ -611,6 +619,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             ns = self.foreign_namespaces.get(ns_name, None)
             if ns is None:
                 return
+            print(f"{self.__class__.__name__}.updateForeignNamespace found namespace: {ns_name}")
             
             if hidden:
                 hidden_symbols = symbols.copy()

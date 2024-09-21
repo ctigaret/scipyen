@@ -759,7 +759,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     to the %s identifier in the caller namespace
     
     ATTENTION 
-    If ths identifier is already bound to another variable in the caller namespace,
+    If this identifier is already bound to another variable in the caller namespace,
     this may result in this (local) variable being overwritten by the copy of the 
     remote variable. 
     
@@ -787,7 +787,6 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     # peel-off layers one by one so we can always be clear of what this does
     msg_status = msg["content"]["status"]
     usr_expr = msg["content"].get("user_expressions", {})
-    # print(f"unpack_shell_channel_data: usr_expr = {usr_expr}")
     if msg_status == "ok":
         for key, value in usr_expr.items():
             value_status = value["status"]
@@ -801,6 +800,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
                         data_dict = {key:eval(data_str)}
                     except:
                         print(f"unpack_shell_channel_data: data_str = {data_str}\n")
+                        data_dict = dict()
                         traceback.print_exc()
                     
                 ret.update(data_dict)

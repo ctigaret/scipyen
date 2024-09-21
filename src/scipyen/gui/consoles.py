@@ -3032,6 +3032,13 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         return self.window.active_frontend.kernel_manager.session if self.window.active_frontend else None
     
     @property
+    def active_frontend(self):
+        """Returns the active_frontend of the `window` attribute.
+        This may be None, is the kernel was `exit`-ed (and window was closed)
+        """
+        return self.window.active_frontend
+    
+    @property
     def active_client_session(self):
         """Kernel client session of the active frontend.
         The manager and client session are different objects.
