@@ -436,9 +436,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                     except:
                         pass
 
-    def updateForeignNamespace(self, ns_name: str, cfile: str, val: typing.Any):
+    def updateForeignNamespace(self, ns_name:str, cfile:str, val:typing.Union[dict, list],
+                               hidden:bool = False):
         """Symbols in external kernels' namepaces are stored here
-
         Parameters:
         ==========
         ns_name:str Name of the external kernel workspace (this kernel may be managed
@@ -553,16 +553,13 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             will be masked as it happens now).
 
         """
-        # print("WorkspaceModel.updateForeignNamespace ns_name = ",ns_name, " val =", val)
         # print(f"{self.__class__.__name__}.updateForeignNamespace ns_name = {ns_name}, cfile = {cfile}")
-        initial = set()
-        current = set()
 
         if isinstance(val, dict):
-            initial = val.get("user_ns", set())
+            symbols = val.get('user_ns', set())
 
         elif isinstance(val, (list, set, tuple)):
-            initial = set([k for k in val])
+            symbols = set([k for k in val])
 
         else:
             raise TypeError(
@@ -570,24 +567,26 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         # print("WorkspaceModel.updateForeignNamespace symbols", initial)
 
-        # saved_sessions = dict()
-        # saved_current = set()
-        # saved_initial = set()
-
-        # if len(initial):
-        # print("\t%s in foreign_namespaces" % ns_name, ns_name in self.foreign_namespaces)
         if ns_name not in self.foreign_namespaces:
+            if hidden:
+                hidden_symbols = symbols.copy()
+                initial_symbols = set()
+                current_symbols = set()
+            else:
+                initial_symbols = symbols.copy()
+                hidden_symbols = set()
+                current_symbols = set()
+            # first time ns_name is dealt with
             # NOTE:2021-01-28 21:58:59
             # check to see if there is a snapshot of a currently live kernel
-            # to retrieve live symbols from there
+            # to retrieve live symbols from there (session 'cache')
             if os.path.isfile(cfile):  # make sure connection is alive
                 externalConsole = self.shell.user_ns.get("external_console", None)
                 if externalConsole:
                     cdict = externalConsole.window.connections.get(cfile, None)
                     if isinstance(cdict, dict) and "master" in cdict and cdict["master"] is None:
                         # print("found remote connection for %s" % cfile)
-                        current, initial = self._mergeSessionCache_(
-                            cfile, initial)
+                        current, initial = self._mergeSessionCache_(cfile, initial_symbols)
 
             # special treatment for objects loaded from NEURON at kernel
             # initialization time (see extipyutils_client
@@ -595,49 +594,43 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             # core.neuron_python.nrn_ipython module)
 
             # may have already been in saved current
-            neuron_symbols = initial & {"h", "ms", "mV"}
+            neuron_symbols = initial_symbols & {"h", "ms", "mV"}
 
-            current = current | neuron_symbols  # set operations ensure unique elements
-
-            # for v in ("h", "ms", "mV",):
-            # if v in initial:
-            # current.add(v)
-            # initial.remove(v)
-
-            # The distinction between initial and current boils down to symbols
-            # visible in the workspace table and for which properties are queried
-            # (i.e., those in the "current" set) versus the symbols NOT visible
-            # in the workspace table and therefore skipped from property query
-            # (thus keeping the whole excercise of updating the workspace table
-            # less demanding)
+            current_symbols = current_symbols | neuron_symbols  # set operations ensure unique elements
 
             # will trigger _foreignNamespacesCountChanged_ which at the
             # moment, does nothing
-            self.foreign_namespaces[ns_name] = {"current": current,
-                                                "initial": initial,
+            self.foreign_namespaces[ns_name] = {"current_symbols": current_symbols,
+                                                "initial_symbols": initial_symbols,
+                                                "hidden_symbols": hidden_symbols
                                                 }
 
         else:
             # print("\tupdateForeignNamespace: foreign namespaces:", self.foreign_namespaces)
             # print("\tself.foreign_namespaces[ns_name]['current']", self.foreign_namespaces[ns_name]["current"])
-            ns = self.foreign_namespaces.get(ns_name, self.foreign_namespaces.get(ns_name.replace(" ", "_"), None))
+            ns = self.foreign_namespaces.get(ns_name, None)
             if ns is None:
                 return
-            removed_symbols = ns["current"] - initial
-            # print("\tremoved_symbols", removed_symbols)
+            
+            if hidden:
+                hidden_symbols = symbols.copy()
+                initial_symbols = ns["initial_symbols"].copy()
+                current_symbols = ns["current_symbols"].copy()
+            else:
+                hidden_symbols = ns["hidden_symbols"].copy()
+                initial_symbols = ns["initial_symbols"].copy()
+                current_symbols = symbols.copy()
+                
+            added_symbols = current_symbols - initial_symbols # newly added symbols
+            removed_symbols = initial_symbols - current_symbols # symbols removed
+            
             for vname in removed_symbols:
                 self.removeRowForVariable2(ns, vname, ns_name)
-                # self.removeRowForVariable(vname, ns=ns_name)
-                # self.removeRowForVariable(vname, ns = ns_name.replace("_", " "))
+                
+            # cache for next round of listings
+            ns["initial_symbols"] = current_symbols 
+            ns["current_symbols"] = current_symbols
 
-            added_symbols = initial - \
-                ns["current"]
-
-            ns["current"] -= removed_symbols
-
-            ns["current"] |= added_symbols
-
-            ns["current"] -= ns["initial"]
 
     def clear(self):
         self.cached_vars.clear()

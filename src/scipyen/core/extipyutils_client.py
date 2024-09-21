@@ -781,7 +781,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     # "ns_listing_of_%s"    (workspace_name)
     #
     # ATTENTION The specials are set by the functions than generate the commands
-    # generating the user_expressions dictionaries.
+    # for constructing the user_expressions dictionaries.
     
     ret = dict()
     # peel-off layers one by one so we can always be clear of what this does

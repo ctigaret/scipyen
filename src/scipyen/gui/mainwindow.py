@@ -6801,29 +6801,100 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
     @Slot(object)
     @safeWrapper
-    def _slot_ext_krn_shell_chnl_msg_recvd(self, msg):
-        # TODO 2020-07-13 00:45:57
-        # when the kernel first comes alive get initial ns listing, store in
-        # workspace model, filter out names of hidden vars in the list;
-        # if any remains, populate workspace table (call updateFromExternal())
-        # then after each execute_reply get a new dir() listing and compare
-        # with the stored; any new var -> call props and populate in workspace table
-        # (call updateFromExternal())
-        # any removed var - remove row from workspace table (create method
-        # removeFromExternal)
-        #
-        # NOTE: the databags in the workspace do not observe the contents of the
-        # variable names list - so append or insert or del(...) won't work
-        # but they will react when a new list replaces the old one
-        # because lists work by reference, the next idiom won't work either:
-        # a = DataBag()
-        # a.observe(lambda x: print(x), "change")
-        # a.a = [1,2,3]
-        # a.a = [4.5.6] # -> notifies
-        # b = a.a # -> a REFERENCE to a.a
-        # b.append(400) # -> a.a now contains 400 but no notification
-        # a.a -> [4,5,6,400]
-        #
+    def _slot_ext_krn_shell_chnl_msg_recvd(self, msg:dict):
+        """Parses the message received from the external kernel.
+        The function processes <action>_reply messages emitted from the external
+        kernel, via the kernel's shell 'channel' or 'socket', in reply to an
+        <action>_request message sent by the client (e.g. console.execute(…))
+        
+        Here, `action` is one of 'execute', 'kernel_info', 'is_complete'
+        
+        Parameters:
+        ===========
+        msg — the received message (kernel's reply) — the key:str ↦ value mapping
+        below:
+        
+        'header',           ↦   mapping:
+                                'msg_id'    ↦ str — typically UUID, unique per message
+                                'msg_type'  ↦ str — one of:
+                                            'execute_reply', 
+                                            'kernel_info_reply'
+                                            'is_complete_reply'
+                                'username'  ↦ str — platform user name
+                                'session'   ↦ str — typically UUID, unique per session
+                                            NOTE: this identifies the kernel process
+                                'date'      ↦ datetime.datetime (ISO 8601 timestamp)
+                                'version'   ↦ str — major.minor e.g. 5.3
+                                            (message protocol version: verison of
+                                            the Jupyter message specification used)
+                                
+        'msg_id',           ↦   exposed from 'header' (¹)
+        
+        'msg_type',         ↦   exposed from 'header' (¹)
+        
+        'parent_header',    ↦   mapping — copy of the header of the message that 
+                                caused the current message, or empty.
+                                Not empty in *_reply messages.
+        
+        'metadata',         ↦   mapping — information about the message that is 
+                                not part of the 'content'
+                                Can be used as information store about requests &
+                                replies (e.g. informaiton about request or execution
+                                context)
+        
+        'content',          ↦   mapping — THE BODY OF THE MESSAGE, depends on msg_type:
+        
+                                'status'    ↦ str: "ok" | "error" | "abort"
+                                            present in ALL _reply messages
+        
+                        when 'status' is 'error':
+                                'ename'     ↦ str — exception name
+                                'evalue'    ↦ str — exception value
+                                'traceback' ↦ list[str] — traceback frames as strings
+        
+                        when 'status' is 'abort' (being deprecated):
+                                ⋆ same as 'error' but without error information:
+                                no 'ename', 'evalue', 'traceback'
+        
+                'execute_reply' messages:
+                        regardless of 'status':
+                                'execution_count' ↦ int
+        
+                        when 'status' == 'ok':
+                                'payload' ↦ list[dict]³
+                                'user_expressions' ↦ dict — the result for the 
+                                    'user_expressions' in the preceding 
+                                        'execute_request' message.
+        
+        'buffers',          ↦   list — additional binary buffers associated with 
+                                a message.
+                                Typically empty, this is not officially used by 
+                                IPython except for IPython Parallel `apply` and 
+                                some ipywidgets `comm` messages.
+        
+        'workspace_name',   ↦   str — the "name" of the external console "tab" or
+                                frontend (²)
+                                Provides a a means to identify which external
+                                process is being used; also gives the name of the 
+                                workspace for the variable symbols displayed in
+                                Scipyen workspace viewer.
+                                
+        
+        'connection_file'   ↦   str — the json connection file used by the external
+                                kernel for communication and messaging with the
+                                frontend (²)
+                                Further means to identify kernel ↔ frontend
+                                communication in Scipyen.
+                                
+        FOOTNOTES:
+        ¹ Python implementation of the protocol;
+        ² Introduced by Scipyen, and valid only for Scipyen sessions
+        ³ Considered deprecated in IPython, but no replacement implemented.
+            A "payload" dict is :
+                'source' ↦ str, one of: 'page', 'set_next_input', 'edit_magic',
+                                        'ask_exit'
+        
+        """
         # but the following idiom DOES work:
         # b = list(a.a) # could in principle be generalized to b = type(a.a)(a.a)
         #               # for built-in types only ?!? but also for user-defined
@@ -6848,7 +6919,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # print("external kernel via %s" % msg["connection_file"])
             # print("\t", msg)
             
+        # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\tmessage keys =\n\t{list(msg.keys())}")
+            
         ns_name = msg["workspace_name"]
+        
+        header = msg["header"]
+        
+        # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd From workspace {ns_name}:")
+        # print(f"\theader: {header}")
 
         connections = list(filter(lambda x: x[1]["name"] == ns_name, self.external_console.window.connections.items()))
         
@@ -6857,73 +6935,109 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         connection = connections[0]
         connection_file = connection[0]
+        msg_connection_file = msg.get('connection_file', None)
+        # print(f"\tconnection_file\n\t\tfrom console: {connection_file}\n\t\tfrom message: {msg_connection_file}\n\tidentical: {connection_file == msg_connection_file}")
         
-        self.workspaceModel.updateForeignNamespace(ns_name, connection_file, tuple())
+        # print(f"\tgot {msg['msg_type']}")
         
-        if msg["msg_type"] == "execute_reply":
+        # if msg["msg_type"] == "execute_reply":
+        #     if msg['content']['status'] == 'ok':
+        #         print(f"\texecution count: {msg['content']['execution_count']}")
+        #     else:
+        #         print(f"\tWARNING: {msg['content']['status']}")
+            
+            # print(f"\t=> calling unpack_shell_channel_data(…)")
             vardict = unpack_shell_channel_data(msg)
 
             if len(vardict):
+                # print(f"\t\tgot vardict with ({len(vardict)}) key ↦ value mappings:")
                 # dict with properties of variables in external kernel namespace
                 prop_dicts = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
+                # print(f"\t\t{len(prop_dicts)} property dicts")
 
                 ns_hidden_listing = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
-                # self.workspace["ns_hidden_listing"] = ns_hidden_listing
+                # print(f"\t\t{len(ns_hidden_listing)} hidden listing")
                 
                 if len(ns_hidden_listing):
                     # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\tns_hidden_listing:\n\t{ns_hidden_listing}")
                     user_ns_hidden_vars = ns_hidden_listing[f"hidden_ns_listing_of_{ns_name}"]
-                    # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\ns_hidden_listing:\n\t{ns_hidden_listing}")
-                    self.workspaceModel.foreign_namespaces[ns_name]["initial"] = user_ns_hidden_vars.get("user_ns", set())
+                    self.workspaceModel.updateForeignNamespace(ns_name, connection_file, user_ns_hidden_vars, hidden=True)
                     
                 # dict with listing of contents of the external kernel namespace
                 ns_listings = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
                 
+                # print(f"\t\t{len(ns_listings)} var listing")
+                
                 if len(ns_listings):
-                    user_ns_vars = ns_listings[f"ns_listing_of_{ns_name}"]
-                    self.workspaceModel.foreign_namespaces[ns_name]["current"] = user_ns_vars.get("user_ns", set())
+                    for key, val in ns_listings.items():
+                        ns_name = key.replace("ns_listing_of_", "")
+                        if ns_name == msg["workspace_name"]: # is this check really necessary? FIXME 2024-09-21 17:31:14
+                            if isinstance(val, dict):
+                                self.workspaceModel.updateForeignNamespace(ns_name, msg["connection_file"], val, hidden=False)
+                                if ns_name in self.workspaceModel.foreign_namespaces:
+                                    for varname in self.workspaceModel.foreign_namespaces[ns_name]["current_symbols"]:
+                                        # print(f"\t\t\tquerying properties for {varname}")
+                                        self.external_console.execute(cmds_get_foreign_data_props(varname,
+                                                                                                  namespace=msg["workspace_name"]),
+                                                                      where=msg["parent_header"]["session"])
 
+                            
                 if len(prop_dicts):
-                    # print("mainWindow: len(prop_dicts)", len(prop_dicts))
+                    # print("\t\t\t processing properties dicts")
                     for key, value in prop_dicts.items():
                         if value["Workspace"]["display"] == "Internal":
                             value["Workspace"] = {"display": ns_name,
                                                   "tooltip": f"Location: namespace of {ns_name}"}
 
-                        for propname in value.keys():
-                            value[propname]["tooltip"] = value[propname]["tooltip"].replace(
-                                "Internal", ns_name)
-                            
                         # NOTE: 2024-09-21 14:28:31
                         # Icon objects cannot be shuttled so we need to insert them here
                         # (on the client side we removed the Icon property)
                         value = augment_obj_prop_dict(value)
 
+                        for propname in value.keys():
+                            if propname != "Icon":
+                                value[propname]["tooltip"] = value[propname]["tooltip"].replace(
+                                    "Internal", ns_name)
+                            
                     self.workspaceModel.updateFromExternal(prop_dicts)
 
-                if len(ns_listings):
-                    for key, val in ns_listings.items():
-                        ns_name = key.replace("ns_listing_of_", "")
-                        if ns_name == msg["workspace_name"]:
-                            if isinstance(val, dict):
-                                self.workspaceModel.updateForeignNamespace(
-                                    ns_name, msg["connection_file"], val)
-                                if ns_name in self.workspaceModel.foreign_namespaces:
-                                    for varname in self.workspaceModel.foreign_namespaces[ns_name]["current"]:
-                                        self.external_console.execute(cmds_get_foreign_data_props(varname,
-                                                                                                  namespace=msg["workspace_name"]),
-                                                                      where=msg["parent_header"]["session"])
 
         elif msg["msg_type"] == "kernel_info_reply":
+            # print(f"\t=> query namespace listing")
+            # will evoke an execute_reply message containing namespace lisiting of visible variables
             self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"]),
                                           where=msg["parent_header"]["session"])
+            
+        elif msg['msg_type'] == "complete_reply":
+            # print(f"\tTODO")
+            pass
 
-        elif msg["msg_type"] == "is_complete_reply":
+        elif msg["msg_type"] == "is_complete_reply": 
+            # code completeness
+            # refresh the listing to see if anything changed
+            # print(f"\t-> refresh ns listing")
+            # will evoke an execute_reply message containing namespace lisiting of visible variables
             self.external_console.execute(cmd_foreign_shell_ns_listing(namespace=msg["workspace_name"]),
                                           where=msg["parent_header"]["session"])
+            
+        elif msg["msg_type"] == "history_reply":
+            # request history from a kernel
+            # print(f"\tTODO")
+            pass
+            
+        elif msg["msg_type"] == "inspect_reply":
+            # introspection
+            # print(f"\tTODO")
+            pass
+            
+        else:
+            print(f"\tTODO")
+            pass
+            
+        print("\n***\n")
 
     def execute_in_external_console(self, call, where=None):
         self.external_console.execute(call, where=where)
