@@ -6873,7 +6873,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
                 
                 if len(ns_hidden_listing):
-                    self.workspaceModel.foreign_namespaces[ns_name]["initial"] = set(ns_hidden_listing.keys())
+                    hvardicts=list(filter(lambda x: msg["workspace_name"] in x[1], ns_hidden_listing))
+                    print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd hvardicts: {hvardicts}")
+                    # self.workspaceModel.foreign_namespaces[ns_name]["initial"] = set(ns_hidden_listing.keys())
                     pass # TODO 2024-09-21 00:10:10 finalize this !
                     # self.workspaceModel.foreign_namespaces["initial"] = 
 
