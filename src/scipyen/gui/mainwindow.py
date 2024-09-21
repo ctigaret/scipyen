@@ -2668,7 +2668,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # 1. start remote kernel
         # 2. once started, automatically import useful libraries such as bokeh etc
         # 3. make this in two flavours, one of them with NEURON environment
-        from core.extipyutils_client import nrn_ipython_initialization_cmd
+        from core.extipyutils_client import (nrn_ipython_initialization_cmd,
+                                             cmd_foreign_shell_ns_hidden_listing)
         from functools import partial
         # print("_init_ExternalIPython_ new", new)
 
@@ -6872,6 +6873,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
                 
                 if len(ns_hidden_listing):
+                    self.workspaceModel.foreign_namespaces[ns_name]["initial"] = set(ns_hidden_listing.keys())
                     pass # TODO 2024-09-21 00:10:10 finalize this !
                     # self.workspaceModel.foreign_namespaces["initial"] = 
 
