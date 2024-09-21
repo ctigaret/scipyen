@@ -4608,8 +4608,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)
         
         # ### BEGIN scripts menu
-        self.menuScripts = QtWidgets.QMenu("Scripts", self)
-        self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
+        # NOTE: 2024-09-21 14:55:07
+        # menuScripts is now def'ed in the ui file
+        # self.menuScripts = QtWidgets.QMenu("Scripts", self)
+        # self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
         self.actionScriptRun = QtWidgets.QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
         self.actionScriptRun.triggered.connect(self.slot_runPythonScript)
         self.menuScripts.addAction(self.actionScriptRun)
@@ -4788,7 +4790,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.applicationsAction.setMenu(self.applicationsMenu)
         self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
-        
+        self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
+        self.settingsAction.setMenu(self.menuSettings)
         # NOTE: 2024-06-01 18:08:54
         # whats this action should be the last action added to the toolbar
         
@@ -6865,50 +6868,38 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 prop_dicts = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
 
+                ns_hidden_listing = dict(
+                    [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
+                # self.workspace["ns_hidden_listing"] = ns_hidden_listing
+                
+                if len(ns_hidden_listing):
+                    # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\tns_hidden_listing:\n\t{ns_hidden_listing}")
+                    user_ns_hidden_vars = ns_hidden_listing[f"hidden_ns_listing_of_{ns_name}"]
+                    # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\ns_hidden_listing:\n\t{ns_hidden_listing}")
+                    self.workspaceModel.foreign_namespaces[ns_name]["initial"] = user_ns_hidden_vars.get("user_ns", set())
+                    
                 # dict with listing of contents of the external kernel namespace
                 ns_listings = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
-
-                ns_hidden_listing = dict(
-                    [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
                 
-                if len(ns_hidden_listing):
-                    hvardicts=list(filter(lambda x: msg["workspace_name"] in x[1], ns_hidden_listing))
-                    print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd hvardicts: {hvardicts}")
-                    # self.workspaceModel.foreign_namespaces[ns_name]["initial"] = set(ns_hidden_listing.keys())
-                    pass # TODO 2024-09-21 00:10:10 finalize this !
-                    # self.workspaceModel.foreign_namespaces["initial"] = 
-
-                # NOTE: 2024-09-20 23:58:16
-                # call directly updateFromExternal below, so no more clutter of internal ns
-                #
-                # # this is needed here so that they don't clutter our own namespace
-                # # for key in prop_dicts.keys():
-                # #     vardict.pop(key, None)
-                # # 
-                # # for key in ns_listings.keys():
-                # #     vardict.pop(key, None)
-                # 
-                # # now vardict only has variables shuttled (via pickle) from the
-                # # external kernel namespace into our own
-                # # NOTE: 2023-06-28 22:30:51 WARNING
-                # # next line injects these variables in our workspace
-                # # WARNING: these variables ARE NOT references, but true bit
-                # # copies of the data in the foreign kernel
-                # # self.workspace.update(vardict)
-                # # self.workspaceModel.update()
+                if len(ns_listings):
+                    user_ns_vars = ns_listings[f"ns_listing_of_{ns_name}"]
+                    self.workspaceModel.foreign_namespaces[ns_name]["current"] = user_ns_vars.get("user_ns", set())
 
                 if len(prop_dicts):
                     # print("mainWindow: len(prop_dicts)", len(prop_dicts))
                     for key, value in prop_dicts.items():
                         if value["Workspace"]["display"] == "Internal":
-                            value["Workspace"] = {"display": msg["workspace_name"],
-                                                  "tooltip": "Location: %s kernel namespace" % msg["workspace_name"]}
+                            value["Workspace"] = {"display": ns_name,
+                                                  "tooltip": f"Location: namespace of {ns_name}"}
 
                         for propname in value.keys():
                             value[propname]["tooltip"] = value[propname]["tooltip"].replace(
-                                "Internal", msg["workspace_name"])
+                                "Internal", ns_name)
                             
+                        # NOTE: 2024-09-21 14:28:31
+                        # Icon objects cannot be shuttled so we need to insert them here
+                        # (on the client side we removed the Icon property)
                         value = augment_obj_prop_dict(value)
 
                     self.workspaceModel.updateFromExternal(prop_dicts)

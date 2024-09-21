@@ -60,6 +60,9 @@
     <property name="title">
      <string>Fi&amp;le</string>
     </property>
+    <property name="icon">
+     <iconset theme="system-file-manager-symbolic"/>
+    </property>
     <widget class="QMenu" name="menuImport">
      <property name="title">
       <string>&amp;Import</string>
@@ -82,18 +85,24 @@
     <property name="title">
      <string>Hel&amp;p</string>
     </property>
+    <property name="icon">
+     <iconset theme="help-contents"/>
+    </property>
     <addaction name="actionHelp_On_Console"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
      <string>View</string>
     </property>
+    <property name="icon">
+     <iconset theme="quickview"/>
+    </property>
     <widget class="QMenu" name="menuSelected_Image_or_Volume">
      <property name="title">
       <string>&amp;Selected Variable</string>
      </property>
      <property name="icon">
-      <iconset theme="object">
+      <iconset theme="x-shape-image">
        <normaloff>.</normaloff>.</iconset>
      </property>
      <addaction name="actionView_Data_New_Window"/>
@@ -104,6 +113,9 @@
    <widget class="QMenu" name="menuViewers">
     <property name="title">
      <string>Windows</string>
+    </property>
+    <property name="icon">
+     <iconset theme="window-new"/>
     </property>
    </widget>
    <widget class="QMenu" name="menuSettings">
@@ -135,12 +147,24 @@
     <property name="title">
      <string>Consoles</string>
     </property>
+    <property name="icon">
+     <iconset theme="akonadiconsole"/>
+    </property>
     <addaction name="actionOpen_System_Terminal"/>
+   </widget>
+   <widget class="QMenu" name="menuScripts">
+    <property name="title">
+     <string>Scripts</string>
+    </property>
+    <property name="icon">
+     <iconset theme="dialog-scripts"/>
+    </property>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
    <addaction name="menuViewers"/>
    <addaction name="menuConsoles"/>
+   <addaction name="menuScripts"/>
    <addaction name="menuSettings"/>
    <addaction name="menuHelp"/>
   </widget>
