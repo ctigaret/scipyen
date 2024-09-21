@@ -2800,6 +2800,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             if frontend_factory is not None:
                 if frontend_factory():
                     self.external_console.window.setVisible(True)
+                    ns = self.external_console.window.find_tab_title(self.external_console.window.active_frontend)
+                    self.external_console.execute(cmd_foreign_shell_ns_hidden_listing(namespace=ns))
                     if isinstance(new, str) and str == "neuron_ext":
                         self.external_console.window.start_neuron_in_current_tab()
 
