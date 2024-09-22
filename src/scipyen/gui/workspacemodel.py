@@ -186,15 +186,15 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.internalVariableChanged.connect(self._slot_cacheInternalVariableChange_)
         self.sig_startAsyncUpdate.connect(self._slot_updateModelAsync_)
 
-    def _foreignNamespacesCountChanged_(self, change):
-        # FIXME / TODO 2020-07-30 23:49:13
-        # this assumes the GUI has the default (light coloured) palette e.g. Breeze
-        # or such like. What if the system uses a dark-ish palette?
-        # This approach is WRONG, but fixing it has low priority.
-        # self.foreign_kernel_palette = list(sb.color_palette("pastel", change["new"]))
-        
-        print(f"{self.__class__.__name__}._foreignNamespacesCountChanged_ foreign namespaces = {len(self.foreign_namespaces)} (old: {change['old']}, new: {change['new']})")
-        pass
+#     def _foreignNamespacesCountChanged_(self, change):
+#         # FIXME / TODO 2020-07-30 23:49:13
+#         # this assumes the GUI has the default (light coloured) palette e.g. Breeze
+#         # or such like. What if the system uses a dark-ish palette?
+#         # This approach is WRONG, but fixing it has low priority.
+#         # self.foreign_kernel_palette = list(sb.color_palette("pastel", change["new"]))
+#         
+#         print(f"{self.__class__.__name__}._foreignNamespacesCountChanged_ foreign namespaces = {len(self.foreign_namespaces)} (old: {change['old']}, new: {change['new']})")
+#         pass
 
     def __reset_variable_dictionaries__(self):
         self.cached_vars = dict([item for item in self.shell.user_ns.items(
