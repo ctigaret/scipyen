@@ -112,6 +112,7 @@ from core.prog import safeWrapper
 from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
 from core.strutils import str2symbol
+from core.utilities import counter_suffix
 
 from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
                                  saveWindowSettings, loadWindowSettings,)
@@ -988,7 +989,11 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     
     # NOTE: 2021-08-29 19:09:24
     # all widget factories currently generate a RichJupyterWidget
-    def __init__(self, app, consoleapp, confirm_exit=True, new_frontend_factory=None, slave_frontend_factory=None, connection_frontend_factory=None, new_frontend_orphan_kernel_factory=None):
+    def __init__(self, app, consoleapp, confirm_exit=True, 
+                 new_frontend_factory=None, 
+                 slave_frontend_factory=None, 
+                 connection_frontend_factory=None, 
+                 new_frontend_orphan_kernel_factory=None):
         """
     """
     # ExternalIPython.new_frontend_master → new_frontend_factory
@@ -1796,8 +1801,12 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                         "manager_session_ID": manager_session_ID,
                         "tab_name": ""}
         
-        n_internal_kernels = len([d["master"] for d in self._connections_.values() if d["master"] is not None])
-        n_external_kernels = len([d["master"] for d in self._connections_.values() if d["master"] is None])
+        
+        existing_master_sessions = list(d["master"] for d in self._connections_.values() if d["master"] if not None)
+        existing_master_kernel_names = list(d["tab_name"] for d in existing_master_sessions)
+        existing_slave_sessions = list(d["master"] for d in self._connections_.values() if d["master"] is None)
+        n_masters = len(existing_master_sessions)
+        n_slaves = len([d["master"] for d in self._connections_.values() if d["master"] is None])
         
         if self.is_master_frontend(frontend):
             # NOTE: 2021-01-24 14:36:38
@@ -1808,7 +1817,11 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             if cfile not in self._connections_.keys():
                 # a "master" frontend is by defition connected to an internal
                 # kernel
-                kname = "kernel %d" % n_internal_kernels
+                if n_masters > 0:
+                    normalized_names = [n.replace(" ", "_") for n in existing_master_kernel_names]
+                    kname = counter_suffix("kernel", normalized_names).replace("_", " ")
+                else:
+                    kname = "kernel 0"
                 
                 # NOTE: 2021-01-24 21:47:15
                 # distinguish between kernel name (but not the one in the connection file,
@@ -1868,7 +1881,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 # process (e.g. jupyter notebook); therefore we set up its 
                 # dictionary, but there will be no master
                 external_slave = True
-                kname = "external %d" % n_external_kernels
+                kname = "external %d" % n_slaves
                 
                 if not isinstance(name, str) or len(name.strip()) == 0:
                     name = "%s (slave 0)" % kname
@@ -2466,8 +2479,25 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.sig_shell_msg_received.emit(msg)
         
     @property
-    def connections(self):
+    def connections(self) -> dict:
+        """Dictionary of connections: connection_file_name ↦ connection_info
+        
+        A connection_info is a mapping:
+        'master' ↦ mapping:
+                    'client_session_ID' ↦ str
+                    'manager_session_ID' ↦ str
+                    'tab_name' ↦ str
+        'slave' ↦ list if mappings with same structure as 'master'
+        'name' ↦ str — typically the same as master's tab_name
+        
+        """
         return self._connections_
+    
+    @property
+    def tabNames(self):
+        """List of tab names for external independent processes
+        """
+        return list(v.get('master', dict()).get('tab_name', None) for v in self.connections.values())
         
 class ExternalIPython(JupyterApp, JupyterConsoleApp):
     """Modifed version of qtconsole.qtconsoleapp.JupyterQtConsoleApp
@@ -2664,8 +2694,6 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # Load defaults from $HOME/.jupyter/jupyter_qtconsole_config.py
         # then override with settings in $HOME/.config/Scipyen/Scipyen.conf
         self.init_colors(widget)
-        #self.init_layout(widget)
-        #widget._load_settings_()
         # ### END
         
         widget._existing = True
@@ -2733,6 +2761,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                                 connection_frontend_factory=self.new_frontend_connection,
                                 new_frontend_orphan_kernel_factory=self.new_frontend_master_with_orphan_kernel,
                                 )
+        # NOTE: 2024-09-22 09:54:24
+        # in Scipyen, widget_factory is Any(ConsoleWidget)
         self.widget = self.widget_factory(config=self.config,
                                         local_kernel=local_kernel)
         
@@ -2966,31 +2996,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
 
     @classmethod
     def launch(cls, argv=None, existing:typing.Optional[str]=None, **kwargs):
-        
-        # NOTE: 2023-07-15 21:33:52
-        # the launch_instance mechanism in jupyter and qtconsole does not return
-        # an instance of this python "app"
-        #scipyenvdir = os.getenv("CONDA_PREFIX")
-        #if scipyenvdir is not None:
-            #if argv is None:
-                #argv=["-Xfrozen_modules=off"]
-            #elif isinstance(argv, tuple):
-                #if len(argv) == 0:
-                    #argv=("-Xfrozen_modules=off", )
-                #else:
-                    #aa = list(argv)
-                    #aa.append(" -Xfrozen_modules=off")
-                    #argv = tuple(aa)
-
-            #elif isinstance(argv, list):
-                #if len(argv) == 0:
-                    #argv=["-Xfrozen_modules=off"]
-                #else:
-                    #argv.append(" -Xfrozen_modules=off")
-
-
-
-
+        """Launches an externa IPpython application"""
         # NOTE: 2021-08-29 21:49:44
         # Do NOT confuse this with Scipyen app (self.app)
         # In fact it is a reference to ExternalIPython, which is returned below
@@ -3323,12 +3329,19 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             return ret
                     
     def get_connection_file(self):
+        """Retrieve the connection file from the currently active external process"""
         fcall = ForeignCall(user_expressions={"connection_file":"get_connection_file()"})
         self.execute(fcall)
         
     def get_connection_info(self):
+        """Retrieve connection information from the currently active external process"""
         fcall = ForeignCall(user_expressions={"connection_info":"get_connection_info()"})
         self.execute(fcall)
+        
+    @property
+    def connections(self) -> dict:
+        """Dictionary of connections (as view from client - side)"""
+        return self.window.connections
         
     #def frontend_execute(self, frontend, **kwargs) -> bool:
         #"""Delegates to frontend.execute() method.

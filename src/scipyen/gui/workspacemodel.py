@@ -144,7 +144,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # details in self.updateForeignNamespace docstring
         self._foreign_workspace_count_ = -1
 
-        self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
+        # self.foreign_namespaces = DataBag(allow_none=True, mutable_types=True)
+        self.foreign_namespaces = dict()
         # BUG: 2021-08-19 21:45:17 FIXME
         # self.foreign_namespaces.observe(self._foreignNamespacesCountChanged_, names="length")
 
@@ -401,8 +402,9 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             return
 
         # print("clearForeignNamespaceDisplay nsname", nsname, "connection_file", connfilename)
-
-        if nsname in self.foreign_namespaces:
+        internal_nsname = nsname.replace(" ", "_")
+        # if nsname in self.foreign_namespaces:
+        if internal_nsname in self.foreign_namespaces:
             # NOTE: 2021-01-28 17:45:54
             # check if workspace nsname belongs to a remote kernel - see docstring to
             # self.updateForeignNamespace for details
@@ -419,10 +421,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 if connfilename and os.path.isfile(connfilename) and not is_master:
                     self._saveSessionCache_(connfilename, nsname)
 
-                self.foreign_namespaces.pop(nsname)
+                self.foreign_namespaces.pop(internal_nsname)
 
             else:
-                self.foreign_namespaces[nsname]["current_symbols"].clear()
+                self.foreign_namespaces[internal_nsname]["current_symbols"].clear()
 
             # OK. Now, update the workspace table
             kernel_items_rows = self.rowIndexForItemsWithProps(Workspace=nsname)
@@ -564,6 +566,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         """
         # print(f"{self.__class__.__name__}.updateForeignNamespace ns_name = {ns_name}, cfile = {cfile}")
 
+        internal_ns_name = ns_name.replace(" ", "_")
+
         if isinstance(val, dict):
             symbols = val.get('user_ns', set())
 
@@ -574,8 +578,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             raise TypeError(
                 "val expected to be a dict or a list; got %s instead" % type(val).__name__)
 
-        if ns_name not in self.foreign_namespaces:
-            print(f"{self.__class__.__name__}.updateForeignNamespace new namespace: {ns_name}")
+        if internal_ns_name not in self.foreign_namespaces:
+            # print(f"{self.__class__.__name__}.updateForeignNamespace new namespace: {ns_name} ({internal_ns_name})")
             if hidden:
                 hidden_symbols = symbols.copy()
                 initial_symbols = set()
@@ -608,7 +612,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
             # will trigger _foreignNamespacesCountChanged_ which at the
             # moment, does nothing
-            self.foreign_namespaces[ns_name] = {"current_symbols": current_symbols,
+            self.foreign_namespaces[internal_ns_name] = {"current_symbols": current_symbols,
                                                 "initial_symbols": initial_symbols,
                                                 "hidden_symbols": hidden_symbols
                                                 }
@@ -616,10 +620,11 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             # print("\tupdateForeignNamespace: foreign namespaces:", self.foreign_namespaces)
             # print("\tself.foreign_namespaces[ns_name]['current']", self.foreign_namespaces[ns_name]["current"])
-            ns = self.foreign_namespaces.get(ns_name, None)
+            ns = self.foreign_namespaces.get(internal_ns_name, None)
             if ns is None:
+                scipywarn(f"{self.__class__.__name__}.updateForeignNamespace expecting namespace: {ns_name} ({internal_ns_name}) but not found")
                 return
-            print(f"{self.__class__.__name__}.updateForeignNamespace found namespace: {ns_name}")
+            # print(f"{self.__class__.__name__}.updateForeignNamespace found namespace: {ns_name} ({internal_ns_name})")
             
             if hidden:
                 hidden_symbols = symbols.copy()
@@ -634,12 +639,47 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             removed_symbols = initial_symbols - current_symbols # symbols removed
             
             for vname in removed_symbols:
+                # self.removeRowForVariable2(ns, vname, internal_ns_name)
                 self.removeRowForVariable2(ns, vname, ns_name)
                 
             # cache for next round of listings
             ns["initial_symbols"] = current_symbols 
             ns["current_symbols"] = current_symbols
-
+ 
+    def hasForeignNamespace(ns_name:str) -> bool:
+        """Check the presence of a foreign name space"""
+        
+        internal_ns_name = ns_name.replace(" ", "_")
+        return internal_ns_name in self.foreign_namespaces.keys()
+    
+    def getForeignNamespaceSymbols(self, ns_name:str, what:str = "current"):
+        """Returns a set of symbol names in the foreign name space `ns_name`
+        
+        If the foreign name space `ns_name` does not exist, or is not registered,
+        returns an empty set.
+        
+        Representation of foreign name spaces contain three sets of symbols
+        that indicate how are they to be displayed in the workspace view:
+        'hidden' -> never displayed
+        'current' -> always displayed
+        'initial' -> used to determine additions and removals of symbols
+            in the foreign name space
+        
+        Parameters:
+        ==========
+        ns_name: name of the foreign name space (e.g., 'kernel 0')
+        what: one of 'current', 'initial', 'hidden'
+        """
+        
+        internal_ns_name = ns_name.replace(" ", "_")
+        
+        if internal_ns_name not in self.foreign_namespaces.keys():
+            return set()
+        
+        target = f"{what}_symbols" if what in ("current", "initial", "hidden") else "current_symbols"
+        
+        return self.foreign_namespaces[internal_ns_name].get(target, set())
+        
 
     def clear(self):
         self.cached_vars.clear()
@@ -1870,7 +1910,8 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # print(f"{self.__class__.__name__}.removeRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
         row = self.rowIndexForItemsWithProps(Name=dataname, Workspace=ns_name)
         
-        data = self.shell.user_ns.get(dataname, None)
+        # data = self.shell.user_ns.get(dataname, None)
+        data = ns.get(dataname, None)
         
         if isinstance(data, QtWidgets.QWidget):
             data.windowTitleChanged.disconnect()
@@ -2115,21 +2156,25 @@ class WorkspaceModel(QtGui.QStandardItemModel):
                 display: the displayed text
                 tooltip: tooltip text
         """
+        # print(f"{self.__class__.__name__}.updateFromExternal")
+        # print("prop_dicts")
+        # print(f"{prop_dicts}")
         # bg_cols = sb.color_palette("pastel", self._foreign_workspace_count_)
 
         # self._foreign_workspace_count_ += 1
         for varname, props in prop_dicts.items():
             ns_key = props["Workspace"]["display"]
+            internal_ns_key = ns_key.replace(" " , "_")
             # ns_key = ns.replace(" ", "_")
 
             vname = varname.replace("properties_of_", "")
 
             namespaces = sorted([k for k in self.foreign_namespaces.keys()])
 
-            if ns_key not in namespaces:
+            if internal_ns_key not in namespaces:
                 continue  # FIXME 2020-07-30 22:42:16 should NEVER happen
 
-            ns_index = namespaces.index(ns_key)
+            # ns_index = namespaces.index(internal_ns_key)
 
             items_row_ndx = self.rowIndexForNamedItemsWithProps(
                 vname, Workspace=ns_key)

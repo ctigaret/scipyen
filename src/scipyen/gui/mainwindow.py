@@ -2702,8 +2702,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # NOTE: 2024-09-20 23:40:49
             # bind a reference to the external console in our workspace
             # useful to get to it diretly in Scipyen's console
-            self.workspaceModel.bindObjectInNamespace("external_console", self.external_console,
-                                        hidden=True)
+            self.workspaceModel.bindObjectInNamespace("external_console", 
+                                                      self.external_console,
+                                                      hidden=True)
             
             # NOTE: 2024-09-20 23:41:42
             # what's this for ?!?
@@ -6925,10 +6926,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\tmessage keys =\n\t{list(msg.keys())}")
             
         ns_name = msg["workspace_name"]
+        internal_ns_name = ns_name.replace(" ", "_") # internal representation of namespace name to avoid confusing the foreign_namespaces in workspace model
         
         header = msg["header"]
         
-        print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd from workspace: '{ns_name}'")
+        # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd {msg['msg_type']} from workspace: '{ns_name}' -> {msg['content']['status']}")
         # print(f"\theader: {header}")
 
         connections = list(filter(lambda x: x[1]["name"] == ns_name, self.external_console.window.connections.items()))
@@ -6941,7 +6943,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         msg_connection_file = msg.get('connection_file', None)
         # print(f"\tconnection_file\n\t\tfrom console: {connection_file}\n\t\tfrom message: {msg_connection_file}\n\tidentical: {connection_file == msg_connection_file}")
         
-        print(f"\t{msg['msg_type']}: {msg['content']['status']}")
+        # print(f"\t{msg['msg_type']}: {msg['content']['status']}")
         if msg['content']['status'] == 'error':
             scipywarn(f"Error {msg['content']['ename']}: {msg['content']['evalue']}")
             return
@@ -6951,19 +6953,19 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         if msg["msg_type"] == "execute_reply":
             vardict = unpack_shell_channel_data(msg)
-            print(f"\t\tvardict: {len(vardict)}")
+            # print(f"\t\tvardict: {len(vardict)}")
 
             if len(vardict):
                 # print(f"\t\tgot vardict with ({len(vardict)}) key ↦ value mappings:")
                 # dict with properties of variables in external kernel namespace
                 prop_dicts = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("properties_of_")])
-                print(f"\t\tproperty mappings: {list(prop_dicts.keys())}")
+                # print(f"\t\tproperty mappings: {list(prop_dicts.keys())}")
 
                 ns_hidden_listing = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("hidden_ns_listing_of_")])
                 # print(f"\t\t{len(ns_hidden_listing)} hidden listing")
-                print(f"\t\thidden_ns_listing: {list(ns_hidden_listing.keys())}")
+                # print(f"\t\thidden_ns_listing: {list(ns_hidden_listing.keys())}")
                 
                 if len(ns_hidden_listing):
                     # print(f"{self.__class__.__name__}._slot_ext_krn_shell_chnl_msg_recvd:\n\tns_hidden_listing:\n\t{ns_hidden_listing}")
@@ -6976,7 +6978,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 ns_listings = dict(
                     [(key, val) for key, val in vardict.items() if key.startswith("ns_listing_of_")])
                 
-                print(f"\t\tns_listings: {list(ns_listings.keys())}")
+                # print(f"\t\tns_listings: {list(ns_listings.keys())}")
                 
                 # print(f"\t\t{len(ns_listings)} var listing")
                 
@@ -6986,12 +6988,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                         if ns_name == msg["workspace_name"]: # is this check really necessary? FIXME 2024-09-21 17:31:14
                             if isinstance(val, dict):
                                 self.workspaceModel.updateForeignNamespace(ns_name, msg["connection_file"], val, hidden=False)
-                                if ns_name in self.workspaceModel.foreign_namespaces:
-                                    for varname in self.workspaceModel.foreign_namespaces[ns_name]["current_symbols"]:
-                                        # print(f"\t\t\tquerying properties for {varname}")
-                                        self.external_console.execute(cmds_get_foreign_data_props(varname,
-                                                                                                  namespace=msg["workspace_name"]),
-                                                                      where=msg["parent_header"]["session"])
+                                for varname in self.workspaceModel.getForeignNamespaceSymbols(ns_name, "current"):
+                                    # print(f"\t\t\tquerying properties for {varname}")
+                                    self.external_console.execute(cmds_get_foreign_data_props(varname,
+                                                                                                namespace=msg["workspace_name"]),
+                                                                    where=msg["parent_header"]["session"])
 
                             
                 if len(prop_dicts):
@@ -7048,7 +7049,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             # print(f"\tTODO")
             pass
             
-        print("***\n")
+        # print("***\n")
 
     def execute_in_external_console(self, call, where=None):
         self.external_console.execute(call, where=where)
