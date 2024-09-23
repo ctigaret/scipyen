@@ -1253,6 +1253,11 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     
     make_desktop_entry
     
+    # NOTE: install console color schemes
+    cd $scipyendir/src/scipyen/scipyen_console_styles
+    pip install .
+    cd $scipyendir
+    
 fi
 
 t=$SECONDS
