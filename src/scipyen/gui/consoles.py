@@ -85,8 +85,9 @@ import zmq
 # import sip
 
 from pygments import styles as pstyles
+#from pygments import style as pstyle
 from pygments.token import Token
-from pygments.style import Style    
+from pygments.style import Style
 
 from qtconsole import styles as styles
 from qtconsole import __version__
@@ -887,27 +888,31 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         # 1. light or lightbg (i.e. colors suitable for schemes with light background)
         # 2. dark or linux (i.e colors suitable for schemes with dark background)
         # 3. nocolor - for black and white scheme
-        if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
-            colors=colors.lower()
-            if colors in ('lightbg', 'light'):
-                colors='lightbg'
-            elif colors in ('dark', 'linux'):
-                colors='linux'
-            else:
-                colors='nocolor'
-        
-        else: # (colors is "" or anything else)
-            # make an informed choice of colors, according to whether the scheme
-            # is bright (light) or dark
-            if scheme=='bw':
-                colors='nocolor'
-            elif styles.dark_style(scheme):
-                colors='linux'
-            else:
-                colors='lightbg'
-        #else:
-            #colors=None
-            
+        try:
+            if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
+                colors=colors.lower()
+                if colors in ('lightbg', 'light'):
+                    colors='lightbg'
+                elif colors in ('dark', 'linux'):
+                    colors='linux'
+                else:
+                    colors='nocolor'
+
+            else: # (colors is "" or anything else)
+                # make an informed choice of colors, according to whether the scheme
+                # is bright (light) or dark
+                if scheme=='bw':
+                    colors='nocolor'
+                elif styles.dark_style(scheme): # BUG/FIXME: in a conda enviornment this coughs up
+                    colors='linux'
+                else:
+                    colors='lightbg'
+            #else:
+                #colors=None
+        except:
+            traceback.print_exc
+            colors="linux"
+
         # if scheme in scipyen_console_styles.available_pygments():
         if scheme in PYGMENT_STYLES:
             #print("found %s scheme" % scheme)

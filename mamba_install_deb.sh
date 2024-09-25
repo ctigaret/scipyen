@@ -44,23 +44,31 @@
 # fi
 # # <<< conda initialize <<<
 
-mamba create -y --prefix $HOME/scipyenv
-mamba activate $HOME/scipyenv
+# __env_create="$('mamba create -y --name scipyenv_test python=3.11 --file mamba_reqs.txt')"
+#
+# __env_evolve=
+
+# mamba create -y --prefix $HOME/scipyenv python=3.11 --file mamba_reqs.txt
+
+realscript=`realpath $0`
+scipyendir=`dirname "$realscript"`
 
 
-mamba install --prefix $HOME/scipyenv -y jupyter qtconsole jupyterthemes numpy \
-    matplotlib scipy sympy h5py pyqtgraph PyWavelets pandas quantities python-neo \
-    cmocean confuse inflect seaborn pingouin  qimage2ndarray pyxdg bokeh \
-    scikit-image scikit-learn dill pyinstaller dbus-python \
-    pyserial python-magic shapely pandas-flavor jupyter_qtconsole_colorschemes \
-    sphinx cmasher more-itertools termcolor termcolor2 inflect isodate ipyparallel
-                     
-mamba install --prefix $HOME/scipyenv -y -c conda-forge vigra
+(mamba create -y --name scipyenv_test python=3.11 --file mamba_reqs.txt) && (mamba activate scipyenv_test && cd src/scipyen/gui/scipyen_console_styles/ && pip install . pyabf imreg-dft modelspec pyqtdarktheme)
+# mamba activate $HOME/scipyenv
+#
+#
+# mamba install --prefix $HOME/scipyenv -y jupyter qtconsole jupyterthemes numpy \
+#     matplotlib scipy sympy h5py pyqtgraph PyWavelets pandas quantities python-neo \
+#     cmocean confuse inflect seaborn pingouin  qimage2ndarray pyxdg bokeh \
+#     scikit-image scikit-learn dill pyinstaller dbus-python \
+#     pyserial python-magic shapely pandas-flavor jupyter_qtconsole_colorschemes \
+#     sphinx cmasher more-itertools termcolor termcolor2 inflect isodate ipyparallel
+#
+# mamba install --prefix $HOME/scipyenv -y -c conda-forge vigra
 
-pip install nixio 
-pip install pyabf
-pip install imreg-dft
-pip install modelspec
+# mamba activate $HOME/scipyenv && pip install nixio pyabf imreg-dft modelspec
 
-cd src/scipyen/gui/scipyen_console_styles/ && pip install .
+# BUG: this install in the base environment
+# cd src/scipyen/gui/scipyen_console_styles/ && pip install .
 

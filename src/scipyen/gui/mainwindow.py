@@ -237,7 +237,7 @@ import patsy as pt
 import pandas as pd  # for DataFrame and Series
 import pingouin as pn  # nicer stats
 import mpmath as mpm
-import researchpy as rp  # for use with DataFrames & stats
+#import researchpy as rp  # for use with DataFrames & stats
 import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python
 import sklearn as sk  # machine learning, also nice plot_* functionality
 import seaborn as sb  # statistical data visualization
@@ -1758,9 +1758,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.app.setStyle(QtWidgets.QApplication.style())
         elif val == "Dark Style" and has_qdarkstyle_for_win:
             self.app.setStyleSheet(qdarkstyle.load_stylesheet())
-        elif val.startswith("PyQtDarkTheme_") and hasQDarkTheme:
-            theme = val.replace("PyQtDarkTheme_", "")
-            qdarktheme.set_theme(theme)
+        #elif val.startswith("PyQtDarkTheme_") and hasQDarkTheme:
+        elif val.startswith("Qt_") and hasQDarkTheme:
+            #theme = val.replace("PyQtDarkTheme_", "")
+            theme = val.replace("Qt", "").lower()
+            qdarktheme.setup_theme(theme)
         else:
             self.app.setStyle(val)
 
@@ -4605,6 +4607,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             s for s in QtWidgets.QStyleFactory.keys() if not s.startswith("bb10")]
         if sys.platform == "win32" and has_qdarkstyle_for_win:
             self._available_Qt_style_names_.append("Dark Style")
+        elif hasQDarkTheme:
+            self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
+
 
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
@@ -5239,7 +5244,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             valid_urls = [u for u in urls if u.isValid() and (u.isRelative() or u.isLocalFile())]
             
             if len(valid_urls) == 0:
-                scipywarn(f"{self.__class__.__name__}.slot_loadDroppedURLs: Remote URLs not yet supported", NotImplemented)
+                scipywarn(f"{self.__class__.__name__}.slot_loadDroppedURLs: Remote URLs not yet supported") #, NotImplemented)
                 
             
             url_dirs = [u.path() for u in valid_urls if os.path.isdir(u.path()) or (os.path.isfile(u.path()) and chdirs) ]
@@ -7260,9 +7265,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.app.setStyle(QtWidgets.QApplication.style())
             self._current_GUI_style_name = "Default"
         else:
-            if hasQDarkTheme and val.startswith("PyQtDarkTheme_"):
-                theme = val.replace("PyQtDarkTheme_", "")
-                qdarktheme.set_theme(theme)
+            #if hasQDarkTheme and val.startswith("PyQtDarkTheme_"):
+            if hasQDarkTheme and val.startswith("Qt"):
+                #theme = val.replace("PyQtDarkTheme_", "")
+                theme = val.replace("Qt", "").lower()
+                qdarktheme.setup_theme(theme)
             else:
                 self.app.setStyle(val)
 
@@ -7297,11 +7304,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def _slot_set_Application_style(self):
         from .itemslistdialog import ItemsListDialog
         themeslist = ["Default"] + self._available_Qt_style_names_
-        if hasQDarkTheme:
-            qdarkthemes = [
-                f"PyQtDarkTheme_{t}" for t in qdarktheme.get_themes()]
+        #if hasQDarkTheme:
+            #qdarkthemes = [
+                #f"PyQtDarkTheme_{t}" for t in qdarktheme.get_themes()]
 
-            themeslist.extend(qdarkthemes)
+            #themeslist.extend(qdarkthemes)
 
         d = ItemsListDialog(self, itemsList=["Default"] + self._available_Qt_style_names_,
                             title="Choose Application GUI Style",

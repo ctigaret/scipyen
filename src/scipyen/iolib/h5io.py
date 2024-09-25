@@ -109,7 +109,6 @@ from uuid import uuid4
 import json, pickle
 import h5py
 import numpy as np
-import nixio as nix 
 from core.vigra_patches import vigra
 import pandas as pd
 import quantities as pq

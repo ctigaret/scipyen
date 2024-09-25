@@ -9,6 +9,8 @@
 import inspect
 
 from pygments import styles as pstyles
+from pygments.styles import get_style_by_name
+from qtconsole import styles as qcstyles
 from pygments.token import Token
 
 from .keplerdark import KeplerDark
@@ -51,10 +53,17 @@ def get_style_colors(stylename:str) -> dict:
     
     else:
         return pstyles.get_colors(stylename)
+
+def dark_style(stylename):
+    return qcstyles.dark_color(get_style_by_name(stylename).background_color)
+
+
     
 JUPYTER_PYGMENT_STYLES = list(pstyles.get_all_styles())
 
 # PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES + StyleNames)
 PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES)
 
-__all__ = StyleNames + ["StyleNames", "JUPYTER_PYGMENT_STYLES", "PYGMENT_STYLES"]
+__all__ = StyleNames + ["StyleNames", "JUPYTER_PYGMENT_STYLES", "PYGMENT_STYLES",
+                        "available_pygments", "get_available_syntax_styles",
+                        "get_style_colors", "get_style_by_name", "dark_style"]
