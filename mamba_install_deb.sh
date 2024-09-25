@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-
+# NOTE: the comments below are for my own benefit - do NOT use !!!
 # Transaction finished
 # 
 # To activate this environment, use:
@@ -54,7 +54,7 @@ realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
 
 
-(mamba create -y --name scipyenv_test python=3.11 --file mamba_reqs.txt) && (mamba activate scipyenv_test && cd src/scipyen/gui/scipyen_console_styles/ && pip install . pyabf imreg-dft modelspec pyqtdarktheme)
+(mamba create -y --name scipyenv python=3.11 --file mamba_reqs.txt) && (mamba activate scipyenv_test && cd src/scipyen/gui/scipyen_console_styles/ && pip install . pyabf imreg-dft modelspec pyqtdarktheme)
 # mamba activate $HOME/scipyenv
 #
 #
