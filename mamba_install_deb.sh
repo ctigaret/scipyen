@@ -61,3 +61,6 @@ pip install nixio
 pip install pyabf
 pip install imreg-dft
 pip install modelspec
+
+cd src/scipyen/gui/scipyen_console_styles/ && pip install .
+
