@@ -52,7 +52,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
     """
     sig_dataChanged = Signal(name="sig_dataChanged")
     #                                 index(row), column name
-    sig_parameterChanged = Signal(str,        str,        name="sig_parameterChanged")
+    sig_parameterChanged = Signal(str,str, name="sig_parameterChanged")
     sig_badBounds = Signal(str, name="sig_badBounds")
     sig_infeasible_x0 = Signal(str, name="sig_infeasible_x0")
     
