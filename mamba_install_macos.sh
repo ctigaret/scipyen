@@ -11,7 +11,7 @@ echo -e "\tthen run from the root scipyen directory (i.e. root of the git tree)"
 mamba create -y --prefix $HOME/scipyenv
 mamba activate $HOME/scipyenv
 
-mamba config --add channels conda-forge
+mamba config --add channels conda-forge # not needed on recent miniforge versions
 
 mamba install --prefix $HOME/scipyenv -y jupyter
 mamba install --prefix $HOME/scipyenv -y jupyterthemes
