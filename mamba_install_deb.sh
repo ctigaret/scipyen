@@ -51,13 +51,48 @@
 # mamba create -y --prefix $HOME/scipyenv python=3.11 --file mamba_reqs.txt
 
 realscript=`realpath $0`
+
+echo "$realscript"
+
 scipyendir=`dirname "$realscript"`
+
+echo "$scipyendir"
 
 env_name="scipyenv"
 
+mamba create -y --name "$env_name" python=3.11 --file mamba_reqs.txt
 
-(mamba create -y --name "$env_name" python=3.11 --file mamba_reqs.txt) && (mamba activate "$env_name" && cd $"scipyendir"/src/scipyen/gui/scipyen_console_styles/ && pip install . pyabf imreg-dft modelspec pyqtdarktheme)
-# mamba activate $HOME/scipyenv
+if [[ $? -ne 0 ]] ; then
+echo -e "Could not create the mamba environment $env_name. Goodbye!"
+exit 1
+
+fi
+
+mamba activate "$env_name"
+
+if [[ $? -ne 0 ]] ; then
+echo -e "Could not activate the mamba environment $env_name. Goodbye!"
+exit 1
+fi
+
+cd "$scipyendir"/src/scipyen/gui/scipyen_console_styles
+
+if [[ $? -ne 0 ]] ; then
+echo -e "Trouble looking for "$scipyendir"/src/scipyen/gui/scipyen_console_styles. Goodbye!"
+exit 1
+fi
+
+pip install .
+pip install pyabf imreg-dft modelspec pyqtdarktheme
+
+# (mamba create -y --name "$env_name" python=3.11 --file mamba_reqs.txt) && (mamba activate "$env_name" && cd $"scipyendir"/src/scipyen/gui/scipyen_console_styles && pip install . pyabf imreg-dft modelspec pyqtdarktheme)
+
+
+
+
+
+
+#mamba activate $HOME/scipyenv
 #
 #
 # mamba install --prefix $HOME/scipyenv -y jupyter qtconsole jupyterthemes numpy \
