@@ -53,8 +53,10 @@
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
 
+env_name="scipyenv"
 
-(mamba create -y --name scipyenv python=3.11 --file mamba_reqs.txt) && (mamba activate scipyenv_test && cd src/scipyen/gui/scipyen_console_styles/ && pip install . pyabf imreg-dft modelspec pyqtdarktheme)
+
+(mamba create -y --name $env_name python=3.11 --file mamba_reqs.txt) && (mamba activate $env_name && cd src/scipyen/gui/scipyen_console_styles/ && pip install . pyabf imreg-dft modelspec pyqtdarktheme)
 # mamba activate $HOME/scipyenv
 #
 #
