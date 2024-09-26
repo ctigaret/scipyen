@@ -12,4 +12,4 @@ scipyendir=`dirname "$realscript"`
 
 echo "$scipyendir"
 
-mamba activate scipyenv && python -Xfrozen_modules=off "$scipyendir"/src/scipyen/scipyen.py
+python -Xfrozen_modules=off "$scipyendir"/src/scipyen/scipyen.py
