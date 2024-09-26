@@ -13,8 +13,9 @@ scipyendir=`dirname "$realscript"`
 echo "$scipyendir"
 
 if test -z "$CONDA_DEFAULT_ENV" ; then 
-echo "Not in a conda environment"
-exit -1
+mamba init && mamba activate scipyenv
+# echo "Not in a conda environment"
+# exit -1
 # else 
 # echo "OK" ; 
 fi

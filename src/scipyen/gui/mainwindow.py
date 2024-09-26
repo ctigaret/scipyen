@@ -105,7 +105,7 @@ from collections import deque, ChainMap
 
 # BEGIN 3rd party modules
 
-# BEGIN PyQtxxx and themeing utilities
+# BEGIN PyQtxxx and utilities for setting GUI appearance
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
@@ -116,6 +116,23 @@ except:
     has_sip = False
 # import sip
 
+
+# BEGIN About QStyle plugins
+# WARNING: 2024-09-26 15:44:57
+#
+# A PtQtxxx stack pulled from PyPi or conda-forge, it is likely ot have a limited
+# set of Qt styles available. In this case, there is nothing much that can be done. 
+# Simply "copying" the style libraries available on the your platform won't do, 
+# as this may crash Scipyen because they belong to a different build.
+#
+# The alternative is to build an environment locally (see install.sh) which
+# WILL inolve building a local PyQt wheel. Incidentally, this will also build
+# the vigra libraries loclly, from sources. Howeverm this option has its limitations
+# due to embedded dependencies on the host platform.
+#
+# 
+#
+# END About QStyle plugins
 
 # BEGIN pyqtdarktheme - recommended for Windows
 hasQDarkTheme = False
@@ -1816,8 +1833,11 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # of taste); this can be done in one of two ways:
         # a) install system-wide -- check the documentation of your linux distribution
         #
-        # the icon themes (directories containing a *.theme file & a set of folders)
-        #   should end up in /usr/share/icons
+        # The icon themes should end up in /usr/share/icons
+        # the theme itself is a directory containing a Index.theme file and a 
+        # prescribed set of folders containing appropriately named subfolders 
+        # and image files, see documentation on freedesktop.org).
+        #   
         #
         # Using 'breeze' and example:
         # In debian-based distros this usually entails:
@@ -1828,20 +1848,32 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # Now you may want to ensure they match the Qt version used by Scipyen (PyQt5)
         #
         # b) install for youself (as an end-user) - using your own
-        # desktop customization software provded by the platform
+        # desktop customization software provded by the platform, or manually 
+        # (see below)
         #
-        # Similar to bive (but not identical) the icon theme(s) shpuld end up in
+        # Similar to above (but not identical) the icon theme(s) should end up in
         # $HOME/.local/share/icons
         #
-        
+        # CAUTION: The icon files MUST follow the freedesktop.org icon theme
+        # specification! Downloading any light/dark version of icon files from
+        # the web just won't do!
+        #
+        # Good examples are found at https://www.opendesktop.org/browse?cat=132
+        #
+        # "Full" icon themes (i.e. where both light and dark versions are avaliable):
+        #   Breeze, KDE-Story, Vortex, Chameleon, Round-Chameleon, Wings, Uos,
+        # Ars, Relax, Gradient, Flight, Infinity
+        #
+        # Download then extract the archive in $HOME/.local/share/icons
+        #
         # NOTE: 2024-09-26 13:11:11
-        # this is NOT needed if running in an environment virtualenv or conda) 
+        # this is NOT needed if running in an environment (virtualenv or conda) 
         # where the PyQt5 stack was built locally, during the creation of the
         # environment, because the appropriate "hooks" to the local platform
         # were there
         # 
         # TODO: 2024-09-26 13:12:17 FIXME: how to make the distinction between
-        # the case where PyQt5 was pulled from a conda channel or pypi, vs having
+        # the case where PyQt5 was pulled from pypi or conda channel, vs having
         # been built locally?
         
         themePaths = QtGui.QIcon.themeSearchPaths()

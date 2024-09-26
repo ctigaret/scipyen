@@ -176,15 +176,6 @@ if sys.platform == "linux":
     themePaths.extend(IconTheme.icondirs)
     fbPaths.extend(IconTheme.icondirs)
     
-    # hasBreezeIcons = any(os.path.isdir(os.path.join(themePath,"breeze")) for themePath in themePaths)
-    # hasBreezeDarkIcons = any(os.path.isdir(os.path.join(themePath, "breeze-dark")) for themePath in themePaths)
-    # if all([hasBreezeIcons, hasBreezeDarkIcons]):
-    #     QtGui.QIcon.setThemeName("breeze")
-    # else:
-    #     scipywarn(f"Using the default icon theme {QtGui.QIcon.themeName()} which may miss icons")
-            
-        
-    
     
 # NOTE: 2023-09-30 15:49:27 
 # this below is ALWAYS added by default in the Qt resource system
