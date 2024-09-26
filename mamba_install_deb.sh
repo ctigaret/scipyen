@@ -74,11 +74,11 @@
 # 
 realscript=`realpath $0`
 
-echo "$realscript"
+# echo "$realscript"
 
 scipyendir=`dirname "$realscript"`
 
-echo "$scipyendir"
+# echo "$scipyendir"
 
 env_name="scipyenv"
 
