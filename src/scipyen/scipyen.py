@@ -173,6 +173,18 @@ fbPaths = QtGui.QIcon.fallbackSearchPaths()
 if sys.platform == "linux":
     themePaths.extend(IconTheme.icondirs)
     fbPaths.extend(IconTheme.icondirs)
+    
+    for themePath in themePaths:
+        breeze_icons_dir = os.path.join(themePath,"icons", "breeze")
+        breeze_dark_icons_dir = os.path.join(themePath,"icons", "breeze-dark")
+        if not os.path.isdir(breeze_icons_dir) and not os.path.isdir(breeze_dark_icons_dir):
+            scipywarn(f"Using the default icon theme {QtGui.QIcon.themeName()} which may miss icons")
+            
+        else:
+            QtGui.QIcon.setThemeName("breeze")
+        
+    
+    
 # NOTE: 2023-09-30 15:49:27 
 # this below is ALWAYS added by default in the Qt resource system
 # themePaths.append(":/icons") 
@@ -183,6 +195,8 @@ if sys.platform == "linux":
     
 QtGui.QIcon.setThemeSearchPaths(themePaths)
 QtGui.QIcon.setFallbackSearchPaths(fbPaths)
+
+
     
 # NOTE: 2023-09-28 22:06:54
 # this should be necessary only on windows platform
