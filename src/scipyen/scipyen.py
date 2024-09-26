@@ -168,19 +168,20 @@ mpath = pathlib.Path(__module_path__)
 # iconsdir = mpath / "gui" / "resources" 
 
     
-
+# NOTE: 2024-09-26 13:09:00
+# this should extend the availability for Qt icons globally, in this Scipyen session
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
 if sys.platform == "linux":
     themePaths.extend(IconTheme.icondirs)
     fbPaths.extend(IconTheme.icondirs)
     
-    hasBreezeIcons = any(os.path.isdir(os.path.join(themePath,"breeze")) for themePath in themePaths)
-    hasBreezeDarkIcons = any(os.path.isdir(os.path.join(themePath, "breeze-dark")) for themePath in themePaths)
-    if all([hasBreezeIcons, hasBreezeDarkIcons]):
-        QtGui.QIcon.setThemeName("breeze")
-    else:
-        scipywarn(f"Using the default icon theme {QtGui.QIcon.themeName()} which may miss icons")
+    # hasBreezeIcons = any(os.path.isdir(os.path.join(themePath,"breeze")) for themePath in themePaths)
+    # hasBreezeDarkIcons = any(os.path.isdir(os.path.join(themePath, "breeze-dark")) for themePath in themePaths)
+    # if all([hasBreezeIcons, hasBreezeDarkIcons]):
+    #     QtGui.QIcon.setThemeName("breeze")
+    # else:
+    #     scipywarn(f"Using the default icon theme {QtGui.QIcon.themeName()} which may miss icons")
             
         
     

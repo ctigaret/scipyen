@@ -42,274 +42,7 @@ CHANGELOG:
 # TODO enable drag&drop from history to outside of the Scipyen (e.g.
 # a text editor, desktop file manager etc)
 
-# NOTE: 2021-10-21 13:24:24
-# all things imported below will be available in the user workspace
-# BEGIN core python modules
-from imaging.axisutils import (axisTypeFromString,
-                               axisTypeName,
-                               axisTypeStrings,
-                               axisTypeSymbol,
-                               axisTypeUnits,
-                               dimEnum,
-                               dimIter,
-                               evalAxisTypeExpression,
-                               getAxisTypeFlagsInt,
-                               getNonChannelDimensions,
-                               hasChannelAxis,
-                               )
-from .consoles import styles, pstyles
-from core import utilities
-from core.datatypes import *
-from core.scipyen_config import (markConfigurable, confuse,
-                                 saveWindowSettings, loadWindowSettings, )
-from core.workspacefunctions import *
-from core import scipyen_plugin_loader
-from core.scipyen_plugin_loader import reload
-
-from imaging.scandata import (AnalysisUnit, ScanData,)
-from imaging.axiscalibration import (AxesCalibration,
-                                     AxisCalibrationData,
-                                     ChannelCalibrationData,
-                                     CalibrationData)
-from imaging import axisutils, vigrautils
-from imaging import (imageprocessing as imgp, imgsim,)
-from systems import *
-from ephys import (ephys, membrane)
-# from ephys import (ephys,)
-from .workspacemodel import WorkspaceModel
-from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
-from .triggerdetectgui import guiDetectTriggers
-from .itemslistdialog import ItemsListDialog
-from .interact import (getInput, getInputs, packInputs, selectWSData)
-from . import interact
-from .widgets import gradientwidgets
-from .widgets import stylewidgets
-from .widgets import colorwidgets
-from . import scipyen_colormaps as colormaps
-from . import consoles
-from . import scipyenviewer
-from . import quickdialog as qd
-from . import resources_rc #as resources_rc
-# from . import icons_rc
-from . import pictgui as pgui
-from . import xmlviewer as xv
-from . import textviewer as tv
-from . import tableeditor as te
-from . import signalviewer as sv
-from . import matrixviewer as matview
-from . import imageviewer as iv
-from . import dictviewer as dv
-from .cursors import (SignalCursor, SignalCursorTypes,
-                    cursors2epoch, cursors2intervals)
-                    
-
-from iolib import h5io, jsonio
-from iolib import pictio as pio
-from core import pyabfbridge as pab
-from core import datazone
-from core.datazone import (DataZone, Interval, 
-                           intervals2cursors, intervals2epoch,
-                           epoch2cursors, epoch2intervals)
-
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
-from core.triggerprotocols import TriggerProtocol
-from core.traitcontainers import DataBag
-from core import prog
-from core.prog import (safeWrapper, deprecation, iter_attribute,
-                       filter_type, filterfalse_type,
-                       filter_attribute, filterfalse_attribute,
-                       timefunc, timeblock, processtimefunc, 
-                       processtimeblock, Timer, scipywarn, warn_with_traceback, 
-                       get_properties, printStyled)
-
-# NOTE: 2024-01-30 22:00:13
-# use our own warning - OK for scipyen console
-warnings.showwarning = prog.showwarning
-
-from core.utilities import (summarize_object_properties,
-                            augment_obj_prop_dict,
-                            standard_obj_summary_headers,
-                            safe_identity_test, unique, index_of, 
-                            gethash, NestedFinder, normalized_index,
-                            reverse_mapping_lookup)
-import core.data_analysis as anl
-from core.strutils import InflectEngine
-import core.strutils as strutils
-import core.utilities as utilities
-import core.sysutils as sysutils
-import core.curvefitting as crvf
-import core.signalprocessing as sigp
-import core.tiwt as tiwt
-import core.xmlutils as xmlutils
-import core.desktoputils as desktoputils
-from core import neoutils
-from core import datatypes
-from plots import plots as plots
-from core.scipyen_config import scipyen_config as scipyen_settings
-from core import scipyen_config as scipyenconf
-from core.scipyenmagics import ScipyenMagics
-import core.quantities as cq
-from jupyter_client.session import Message
-from IPython.display import set_matplotlib_formats
-from IPython.core.history import HistoryAccessor
-
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-from qtpy.QtCore import (Signal, Slot, Property,)
-from qtpy.uic import loadUiType
-from jupyter_core.paths import jupyter_runtime_dir
-import shapely
-import neo
-if neo.__version__ >= '0.13.0':
-    from neo.core.objectlist import ObjectList as NeoObjectList
-    
-else:
-    NeoObjectList = list # alias for backward compatibility :(
-from core.vigra_patches import vigra
-import h5py
-import xarray as xa
-import quantities as pq
-from matplotlib._pylab_helpers import Gcf as Gcf
-import matplotlib.mlab as mlb
-import matplotlib.pyplot as plt
-import sys
-import os
-import types
-import atexit
-import re
-import inspect
-import gc
-try:
-    from qtpy import sip as sip
-    has_sip = True
-except:
-    has_sip = False
-# import sip
-import io
-import warnings
-import numbers
-import faulthandler
-import importlib
-import subprocess
-import platform
-import traceback
-import keyword
-import inspect
-import weakref
-import itertools, more_itertools
-import typing
-import functools
-import operator
-import json
-import pathlib
-from pprint import pprint
-from copy import copy, deepcopy
-import collections
-from collections import deque
-# from collections import ChainMap
-# from importlib import reload  # I use this all too often ! - trying scipyen_plugin_loader.reload, above
-# END core python modules
-
-# BEGIN 3rd party modules
-
-# BEGIN Configurable objects with traitlets.config
-# NOTE: 2021-08-23 11:02:10
-# ATTENTION do not import config directly, as it will override IPython's own
-# 'config' object
-import traitlets
-from traitlets.utils.bunch import Bunch
-# END Configurable objects with traitlets.config
-
-# BEGIN numerics & data visualization
-import numpy as np
-import numpy.ma as ma
-import pywt  # wavelets
-import scipy
-from scipy import io as sio
-from scipy import stats
-
-# for statistics
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-import statsmodels.stats as sms
-import statsmodels.regression as smr
-import patsy as pt
-import pandas as pd  # for DataFrame and Series
-import pingouin as pn  # nicer stats
-import mpmath as mpm
-#import researchpy as rp  # for use with DataFrames & stats
-import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python
-import sklearn as sk  # machine learning, also nice plot_* functionality
-import seaborn as sb  # statistical data visualization
-from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
-# print("mainwindow.py __name__ =", __name__)
-# BEGIN matplotlib modules
-import matplotlib as mpl
-# NOTE: 2024-05-02 10:47:43
-# the  next line is obsolete as os.environ["QT_API"] should take care of it ?
-mpl.use("Qtagg")
-# mpl.use("Qt5Agg") #
-# NOTE: 2021-08-17 12:17:08
-# this is NOT recommended anymore
-# import matplotlib.pylab as plb
-
-# BEGIN configure matplotlib
-mpl.rcParams["savefig.format"] = "svg"
-mpl.rcParams["xtick.direction"] = "in"
-mpl.rcParams["ytick.direction"] = "in"
-mpl.rcParams["svg.fonttype"]="none"
-
-# NOTE: 2017-08-24 22:48:45
-# required to enable interaction with matplotlib plots
-plt.ion()
-
-# END configure matplotlib
-
-from gui.pyqtgraph_patch import pyqtgraph as pg
-
-from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
-
-
-# END numerics & data visualization
-
-# BEGIN jupyter
-# END jupyter
-
-# BEGIN pyqtdarktheme - recommended for Windows
-hasQDarkTheme = False
-try:
-    import qdarktheme
-    hasQDarkTheme = True
-except:
-    pass
-# END pyqtdarktheme
-
-
-import colorama # for console output styles
-
-# from IPython.lib.deepreload import reload as dreload
-
-# from IPython.core.autocall import ZMQExitAutocall
-
-
-# END 3rd party modules
-
-# BEGIN 2022-02-21 15:43:38 check if NEURON python is installed
-neuron_spec = importlib.util.find_spec("neuron")
-has_neuron = neuron_spec is not None
-# END
-
-# BEGIN scipyen core modules
-# import core.prog as prog
-
-# NOTE: 2017-04-16 09:48:15
-# these are also imported into the console in slot_initQtConsole(), so they are
-# available directly in the console
-# also imports datetime & time; all become directly available in console, see
-# NOTE: 2017-04-16 09:48:15 above
-
-# import core.simulations as sim
-
+# BEGIN import modules
 
 # NOTE: 2020-09-28 11:37:25
 # ### BEGIN expose important data types
@@ -331,6 +64,316 @@ has_neuron = neuron_spec is not None
 
 
 # ### END expose important data types
+
+
+# NOTE: 2021-10-21 13:24:24
+# all things imported below will be available in the user workspace
+# BEGIN core python modules
+import sys
+import os
+import types
+import atexit
+import re
+import inspect
+import gc
+import io
+import warnings
+import numbers
+import faulthandler
+import importlib
+# NOTE: 2024-09-26 12:16:28
+# I wrap reload with scipyen_plugin_loader.reload, further below
+# from importlib import reload  # I use this all too often !
+import subprocess
+import platform
+import traceback
+import keyword
+import inspect
+import weakref
+import itertools, more_itertools # NOTE: 2024-09-26 12:44:08 this is not a core python but might as well be!
+import typing
+import functools
+import operator
+import json
+import pathlib
+from pprint import pprint
+from copy import copy, deepcopy
+import collections
+from collections import deque, ChainMap
+
+# END core python modules
+
+# BEGIN 3rd party modules
+
+# BEGIN PyQtxxx
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
+from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy.uic import loadUiType
+try:
+    from qtpy import sip as sip
+    has_sip = True
+except:
+    has_sip = False
+# import sip
+# END PyQtxxx
+
+# BEGIN jupyter, ipython, qtconsole et al
+from jupyter_client.session import Message
+from IPython.display import set_matplotlib_formats
+from IPython.core.history import HistoryAccessor
+from jupyter_core.paths import jupyter_runtime_dir
+from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
+# from IPython.lib.deepreload import reload as dreload
+
+# from IPython.core.autocall import ZMQExitAutocall
+
+# BEGIN Configurable objects with traitlets.config
+# NOTE: 2021-08-23 11:02:10
+# ATTENTION do not import config directly, as it will override IPython's own
+# 'config' object
+import traitlets
+from traitlets.utils.bunch import Bunch
+
+# END Configurable objects with traitlets.config
+
+# END jupyter, ipython, qtconsole et al
+
+# BEGIN numerics & data visualization
+# BEGIN data types & numerics
+# NOTE: 2024-09-26 12:36:36
+# vigra is imported via my own vigra_patches module
+import numpy as np
+import numpy.ma as ma
+import pywt  # wavelets
+import scipy
+from scipy import io as sio
+from scipy import stats
+import shapely
+import neo
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
+import h5py
+import xarray as xa
+import quantities as pq
+# END data types & numerics
+
+# BEGIN statistics, plotting and visualization (other than pyqtgraph)
+# NOTE: 2024-09-26 12:40:27
+# ptqtgraph is imported via gui.pyqtgraph_patch
+
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+import statsmodels.stats as sms
+import statsmodels.regression as smr
+import patsy as pt
+import pandas as pd  # for DataFrame and Series
+import pingouin as pn  # nicer stats
+import mpmath as mpm
+#import researchpy as rp  # for use with DataFrames & stats -- not here ?!?
+import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python
+import sklearn as sk  # machine learning, also nice plot_* functionality
+import seaborn as sb  # statistical data visualization
+# print("mainwindow.py __name__ =", __name__)
+
+# BEGIN matplotlib modules
+import matplotlib as mpl
+
+from matplotlib._pylab_helpers import Gcf as Gcf
+import matplotlib.mlab as mlb
+import matplotlib.pyplot as plt
+
+# BEGIN configure matplotlib
+# NOTE: 2024-05-02 10:47:43
+# the  next line is obsolete as os.environ["QT_API"] should take care of it ?
+mpl.use("Qtagg")
+# mpl.use("Qt5Agg") #
+# NOTE: 2021-08-17 12:17:08
+# this is NOT recommended anymore
+# import matplotlib.pylab as plb
+
+mpl.rcParams["savefig.format"] = "svg"
+mpl.rcParams["xtick.direction"] = "in"
+mpl.rcParams["ytick.direction"] = "in"
+mpl.rcParams["svg.fonttype"]="none"
+
+# NOTE: 2017-08-24 22:48:45
+# required to enable interaction with matplotlib plots
+plt.ion()
+
+# END configure matplotlib
+
+# END matplotlib modules
+
+# END statistics, plotting and visualization (other than pyqtgraph)
+
+import colorama # for console output styles
+# END numerics & data visualization
+
+# END 3rd party modules
+
+# BEGIN scipyen modules
+
+from core import datazone
+from core import datatypes
+from core import neoutils
+from core import prog
+from core import pyabfbridge as pab
+from core import scipyen_plugin_loader
+from core import scipyen_config as scipyenconf
+from core import utilities
+
+from core.datazone import (DataZone, Interval, 
+                           intervals2cursors, intervals2epoch,
+                           epoch2cursors, epoch2intervals)
+
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from core.datatypes import *
+
+from core.prog import (safeWrapper, deprecation, iter_attribute,
+                       filter_type, filterfalse_type,
+                       filter_attribute, filterfalse_attribute,
+                       timefunc, timeblock, processtimefunc, 
+                       processtimeblock, Timer, scipywarn, warn_with_traceback, 
+                       get_properties, printStyled)
+
+# NOTE: 2024-01-30 22:00:13
+# use our own warning - OK for scipyen console
+warnings.showwarning = prog.showwarning
+
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
+from core.triggerprotocols import TriggerProtocol
+from core.traitcontainers import DataBag
+
+from core.utilities import (summarize_object_properties,
+                            augment_obj_prop_dict,
+                            standard_obj_summary_headers,
+                            safe_identity_test, unique, index_of, 
+                            gethash, NestedFinder, normalized_index,
+                            reverse_mapping_lookup)
+
+import core.curvefitting as crvf
+import core.data_analysis as anl
+import core.desktoputils as desktoputils
+import core.quantities as cq
+import core.strutils as strutils
+import core.signalprocessing as sigp
+import core.sysutils as sysutils
+import core.tiwt as tiwt
+import core.utilities as utilities
+import core.xmlutils as xmlutils
+
+from core.scipyen_config import (markConfigurable, confuse,
+                                 saveWindowSettings, loadWindowSettings, )
+from core.scipyen_config import scipyen_config as scipyen_settings
+from core.scipyenmagics import ScipyenMagics
+from core.strutils import InflectEngine
+from core.scipyen_plugin_loader import reload
+from core.vigra_patches import vigra
+from core.workspacefunctions import *
+
+from plots import plots as plots
+
+
+from imaging.axisutils import (axisTypeFromString,
+                               axisTypeName,
+                               axisTypeStrings,
+                               axisTypeSymbol,
+                               axisTypeUnits,
+                               dimEnum,
+                               dimIter,
+                               evalAxisTypeExpression,
+                               getAxisTypeFlagsInt,
+                               getNonChannelDimensions,
+                               hasChannelAxis,
+                               )
+
+from imaging import axisutils, vigrautils
+from imaging import (imageprocessing as imgp, imgsim,)
+from imaging.scandata import (AnalysisUnit, ScanData,)
+from imaging.axiscalibration import (AxesCalibration,
+                                     AxisCalibrationData,
+                                     ChannelCalibrationData,
+                                     CalibrationData)
+from ephys import (ephys, membrane)
+from systems import *
+
+from . import interact
+from . import scipyen_colormaps as colormaps
+from . import consoles
+from . import scipyenviewer
+from . import quickdialog as qd
+from . import resources_rc #as resources_rc
+# from . import icons_rc
+from . import pictgui as pgui
+from . import xmlviewer as xv
+from . import textviewer as tv
+from . import tableeditor as te
+from . import signalviewer as sv
+from . import matrixviewer as matview
+from . import imageviewer as iv
+from . import dictviewer as dv
+
+from .consoles import styles, pstyles
+from .cursors import (SignalCursor, SignalCursorTypes,DataCursor, 
+                    cursors2epoch, cursors2intervals)
+from .interact import (getInput, getInputs, packInputs, selectWSData)
+from .itemslistdialog import ItemsListDialog
+from .triggerdetectgui import guiDetectTriggers
+from .widgets import gradientwidgets
+from .widgets import stylewidgets
+from .widgets import colorwidgets
+from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
+from .workspacemodel import WorkspaceModel
+                    
+
+from iolib import h5io, jsonio
+from iolib import pictio as pio
+
+
+from gui.pyqtgraph_patch import pyqtgraph as pg
+
+# from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
+# END scipyen modules
+
+
+# END import modules
+
+
+# BEGIN pyqtdarktheme - recommended for Windows
+hasQDarkTheme = False
+try:
+    import qdarktheme
+    hasQDarkTheme = True
+except:
+    pass
+# END pyqtdarktheme
+
+
+
+
+# BEGIN 2022-02-21 15:43:38 check if NEURON python is installed
+neuron_spec = importlib.util.find_spec("neuron")
+has_neuron = neuron_spec is not None
+# END
+
+# BEGIN GUI themes according to platform (incomplete...)
+
+# if sys.platform == "linux":
+# END
+
+# BEGIN scipyen core modules
+# NOTE: 2017-04-16 09:48:15
+# these are also imported into the console in slot_initQtConsole(), so they are
+# available directly in the console
+# also imports datetime & time; all become directly available in console, see
+# NOTE: 2017-04-16 09:48:15 above
+
+# import core.simulations as sim
+
+
 # END scipyen core modules
 
 # BEGIN scipyen iolib modules
@@ -1758,9 +1801,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             self.app.setStyle(QtWidgets.QApplication.style())
         elif val == "Dark Style" and has_qdarkstyle_for_win:
             self.app.setStyleSheet(qdarkstyle.load_stylesheet())
-        #elif val.startswith("PyQtDarkTheme_") and hasQDarkTheme:
         elif val.startswith("Qt_") and hasQDarkTheme:
-            #theme = val.replace("PyQtDarkTheme_", "")
             theme = val.replace("Qt", "").lower()
             qdarktheme.setup_theme(theme)
         else:
@@ -1768,6 +1809,41 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
 
         self._current_GUI_style_name = val
         
+        # NOTE: 2024-09-26 12:58:23 deal with the icons
+        # on Linux the recommended way is to install the light & dark versions of 
+        # a freedesktop-compliant icon theme (I prefer breeze, but that's a matter
+        # of taste); this can be done in one of two ways:
+        # a) install system-wide -- check the documentation of your linux distribution
+        #
+        # the icon themes (directories containing a *.theme file & a set of folders)
+        #   should end up in /usr/share/icons
+        #
+        # Using 'breeze' and example:
+        # In debian-based distros this usually entails:
+        # sudo apt install breeze
+        # sudo apt install breeze-dark
+        # (which will also bring about the corresponding Qt style libraries)
+        #
+        # Now you may want to ensure they match the Qt version used by Scipyen (PyQt5)
+        #
+        # b) install for youself (as an end-user) - using your own
+        # desktop customization software provded by the platform
+        #
+        # Similar to bive (but not identical) the icon theme(s) shpuld end up in
+        # $HOME/.local/share/icons
+        #
+        
+        # NOTE: 2024-09-26 13:11:11
+        # this is NOT needed if running in an environment virtualenv or conda) 
+        # where the PyQt5 stack was built locally, during the creation of the
+        # environment, because the appropriate "hooks" to the local platform
+        # were there
+        # 
+        # TODO: 2024-09-26 13:12:17 FIXME: how to make the distinction between
+        # the case where PyQt5 was pulled from a conda channel or pypi, vs having
+        # been built locally?
+        
+        themePaths = QtGui.QIcon.themeSearchPaths()
         if sys.platform == "win32":
             if hasQDarkTheme:
                 QtGui.QIcon.setThemeName("breeze-dark")
@@ -1779,7 +1855,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 else:
                     QtGui.QIcon.setThemeName("breeze-dark")
                     
-        elif sys.platform == "darwin":
+        # elif sys.platform == "darwin":
+        else:
             windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
             _,_,v,_ = windowColor.getHsv()
             if v > 128:
@@ -7273,7 +7350,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             else:
                 self.app.setStyle(val)
 
-            self._current_GUI_style_name = val
+            # self._current_GUI_style_name = val
             
     @Slot()
     @safeWrapper
