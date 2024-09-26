@@ -176,7 +176,7 @@ if sys.platform == "linux":
     
     hasBreezeIcons = any(os.path.isdir(os.path.join(themePath,"icons", "breeze")) for themePath in themePaths)
     hasBreezeDarkIcons = any(os.path.isdir(os.path.join(themePath,"icons", "breeze-dark")) for themePath in themePaths)
-    if all([hasBreezeIcons, hasBreezeDarkIcons])
+    if all([hasBreezeIcons, hasBreezeDarkIcons]):
         QtGui.QIcon.setThemeName("breeze")
     else:
         scipywarn(f"Using the default icon theme {QtGui.QIcon.themeName()} which may miss icons")
