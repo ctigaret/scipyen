@@ -7413,8 +7413,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 if qdarkstyleprop in (bytes(p).decode() for p in props):
                     self.app.setProperty(qdarkstyleprop, False)
                 
-                self.app.setStyle(styleProxy)
                 self.app.setPalette(qtPalette)
+                self.app.setStyle(styleProxy)
                 
                 
                 
