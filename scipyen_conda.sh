@@ -17,7 +17,7 @@ echo "Not in a conda environment"
 exit -1
 else 
 if test "$CONDA_DEFAULT_ENV" = "base" ; then
-. (conda info --base)/stc/profile.d/mamba.sh
+. ( conda info --base )/etc/profile.d/mamba.sh
 mamba activate scipyenv
 fi
 echo "OK" ; 
