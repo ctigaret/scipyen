@@ -1,3 +1,4 @@
+#!/usr/bin/bash
 # -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
