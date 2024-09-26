@@ -7386,9 +7386,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             styleProxy = MenuProxy(QtWidgets.QApplication.style())
             self.app.setStyle(styleProxy)
             # self.app.setStyle(QtWidgets.QApplication.style())
-            self._current_GUI_style_name = "Default"
+            # self._current_GUI_style_name = "Default"
         else:
-            #if hasQDarkTheme and val.startswith("PyQtDarkTheme_"):
             if hasQDarkTheme and val.startswith("Qt"):
                 #theme = val.replace("PyQtDarkTheme_", "")
                 theme = val.replace("Qt", "").lower()
@@ -7406,7 +7405,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # undoes the HACK in qdarktheme.setup_theme
                 qdarkstyleprop = "_qdarktheme_use_setup_style"
                 props = self.app.dynamicPropertyNames()
-                if qdarkstyleprop in props:
+                if qdarkstyleprop in (p.decode() for p in props):
                     self.app.setProperty(qdarkstyleprop, False)
                 self.app.setStyle(styleProxy)
                 # self.app.setStyle(val)
