@@ -72,9 +72,8 @@ echo "Now, restart the shell (or, better, open a new shell) then:"
 echo "1. Activate this environment: mamba activate scipyenv"
 echo "2. Change to directory $scipyendir/src/scipyen/gui/scipyen_console_styles"
 echo "3. run: pip install . pyabf imreg-dft modelspec pyqtdarktheme"
-echo "4. To run Scipyen, open a new shell, then:"
-echo "   4.1 activate scipyenv: mamba activate scipyenv"
-echo "   4.2 execute: python -Xfrozen_modules=off $scipyendir/src/scipyen/scipyen.py"
+echo "4. To run Scipyen, open a new shell, then execute the following script according to your platform:"
+echo "   Linux: Execute $scipyendir/scipyen_conda.sh"
 fi
 
 # bash ./mamba_post_install.sh
