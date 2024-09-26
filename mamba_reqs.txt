@@ -39,3 +39,4 @@ termcolor
 termcolor2
 ipyparallel
 vigra
+grayskull

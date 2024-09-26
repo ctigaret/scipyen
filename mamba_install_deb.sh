@@ -64,14 +64,20 @@ mamba create -y --name "$env_name" python=3.11 --file mamba_reqs.txt
 mamba init
 
 if test $? -ne 0  ; then
-echo -e "Could not create the mamba environment $env_name. Goodbye!"
+echo "Could not create the mamba environment $env_name. Goodbye!"
 exit 1
 else
-echo -e "The mamba environment $env_name was created successfully"
-
+echo "The mamba environment $env_name was created successfully"
+echo "Now, restart the shell (or, better, open a new shell) then:"
+echo "1. Activate this environment: mamba activate scipyenv"
+echo "2. Change directory to the $scipyendir/src/scipyen/gui/scipyen/scipyen_console_styles"
+echo "3. run: pip install . pyabf imreg-dft modelspec pyqtdarktheme"
+echo "4. At any time, to run Scipyen:"
+echo "   4.1 activate scipyenv: mamba activate scipyenv"
+echo "   4.2 execute: python -Xfrozen_modules=off $scipyendir/src/scipyen/scipyen.py"
 fi
 
-bash ./mamba_post_install.sh
+# bash ./mamba_post_install.sh
 
 
 
