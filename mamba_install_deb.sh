@@ -50,6 +50,27 @@
 
 # mamba create -y --prefix $HOME/scipyenv python=3.11 --file mamba_reqs.txt
 
+# Do you wish to update your shell profile to automatically initialize conda?
+# This will activate conda on startup and change the command prompt when activated.
+# If you'd prefer that conda's base environment not be activated on startup,
+#    run the following command when conda is activated:
+# 
+# conda config --set auto_activate_base false
+# 
+# You can undo this by running `conda init --reverse $SHELL`? [yes|no]
+# [no] >>> no
+# 
+# You have chosen to not have conda modify your shell scripts at all.
+# To activate conda's base environment in your current shell session:
+# 
+# eval "$(/home/cezar/miniforge3/bin/conda shell.YOUR_SHELL_NAME hook)" 
+# 
+# To install conda's shell functions for easier access, first activate, then:
+# 
+# conda init
+# 
+# Thank you for installing Miniforge3!
+# 
 realscript=`realpath $0`
 
 echo "$realscript"
@@ -60,40 +81,57 @@ echo "$scipyendir"
 
 env_name="scipyenv"
 
-mamba create -y --name "$env_name" python=3.11 --file mamba_reqs.txt
+if test -z "$CONDA_DEFAULT_ENV" ; then 
+
+read -e -p "Enter the miniforge directory (no spaces, please): "
+
+my_miniforge=$(printf %s "$REPLY" | envsubst)
+
+if test -d $my_miniforge ; then
+my_conda=${my_miniforge}/bin/conda
+
+eval "$($my_conda shell.bash hook)" 
+else
+echo "You did not provide a valid path to miniforge. Bailing out "
+exit -1
+fi
+
+fi
+
+mamba create -y --name "$env_name" python=3.11 --file "$scipyendir"/setup_env/conda_reqs.txt
 mamba init
 
 if test $? -ne 0  ; then
 echo "Could not create the mamba environment $env_name. Goodbye!"
 exit 1
 else
-echo "The mamba environment $env_name was created successfully"
 echo "Now, restart the shell (or, better, open a new shell) then:"
-echo "1. Activate this environment: mamba activate scipyenv"
-echo "2. Change to directory $scipyendir/src/scipyen/gui/scipyen_console_styles"
-echo "3. run: pip install . pyabf imreg-dft modelspec pyqtdarktheme"
-echo "4. To run Scipyen, open a new shell, then execute the following script according to your platform:"
-echo "   Linux: Execute 'mamba activate scipyenv' then 'sh $scipyendir/scipyen_conda.sh'"
 fi
 
-# bash ./mamba_post_install.sh
+
+if test "$CONDA_DEFAULT_ENV" = "base" ; then
+eval "$(conda shell.bash hook)"
+conda activate scipyenv
+fi
+
+if test "$CONDA_DEFAULT_ENV" = "$env_name" ; then
+pip install "$scipyendir"/setup_env/conda_pip_reqs.txt
+cd "$scipyendir"/src/scipyen/gui/scipyen_console_styles
+pip install .
+else
+echo "Cannot activate the $env_name environment. You must continue the installation manually"
+echo ""
+echo "1. Restart the shell (or, better, open a new shell)"
+echo "2. Activate the environment: mamba activate scipyenv"
+echo "3. Change to directory to $scipyendir"
+echo "4. Run: pip install -r $scipyendir/setup_env/conda_pip_reqs.txt"
+echo "5. Change to directory $scipyendir/src/scipyen/gui/scipyen_console_styles"
+echo "6. Run: pip install ."
+echo ""
+fi
+
+echo "To run Scipyen, open a new shell, then execute the following script according to your platform:"
+echo "   Linux: Execute 'mamba activate scipyenv' then 'sh $scipyendir/scipyen_conda.sh'"
 
 
-
-#mamba activate $HOME/scipyenv
-#
-#
-# mamba install --prefix $HOME/scipyenv -y jupyter qtconsole jupyterthemes numpy \
-#     matplotlib scipy sympy h5py pyqtgraph PyWavelets pandas quantities python-neo \
-#     cmocean confuse inflect seaborn pingouin  qimage2ndarray pyxdg bokeh \
-#     scikit-image scikit-learn dill pyinstaller dbus-python \
-#     pyserial python-magic shapely pandas-flavor jupyter_qtconsole_colorschemes \
-#     sphinx cmasher more-itertools termcolor termcolor2 inflect isodate ipyparallel
-#
-# mamba install --prefix $HOME/scipyenv -y -c conda-forge vigra
-
-# mamba activate $HOME/scipyenv && pip install nixio pyabf imreg-dft modelspec
-
-# BUG: this install in the base environment
-# cd src/scipyen/gui/scipyen_console_styles/ && pip install .
 

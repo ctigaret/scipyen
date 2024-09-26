@@ -13,10 +13,10 @@ scipyendir=`dirname "$realscript"`
 # echo "$scipyendir"
 
 if test -z "$CONDA_DEFAULT_ENV" ; then 
-echo "Not in a conda environment"
-exit -1
+eval "$($HOME/miniforge3/bin/conda shell.bash hook)" 
+# echo "Not in a conda environment"
+# exit -1
 else 
-# echo "$CONDA_DEFAULT_ENV"
 if test "$CONDA_DEFAULT_ENV" = "base" ; then
 eval "$(conda shell.bash hook)"
 conda activate scipyenv

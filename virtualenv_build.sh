@@ -300,7 +300,7 @@ function dopyqt5 ()
         fi
         
         # NOTE: good practice is to create an out-of-source build tree, » ...
-        pyqt5_build_dir=${pyqt5_src_dir}-build
+        pyqt5_build_dir="PyQt5-build"
         
         # NOTE: clear build dir if it exists -- best to start fresh
         if [ -d ${pyqt5_build_dir} ] ; then
@@ -319,9 +319,9 @@ function dopyqt5 ()
         # cores in your system seems to be a good choice), or
         # • remove the --jobs option altogether
         if [[ $njobs -gt 0 ]] ; then
-            ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../${pyqt5_build_dir} --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+            ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
         else
-            ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../${pyqt5_build_dir} --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+            ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
         fi
 
         if [[ $? -ne 0 ]] ; then
@@ -332,20 +332,9 @@ function dopyqt5 ()
             echo -e "pip install --upgrade PyQt5-sip\n\n"
             echo -e "Then run this script again"
             exit 1
-            
-        else
-            # NOTE: 2024-09-17 09:06:15
-            # bundle the Qt libraries with this wheel so that (hopefully) we 
-            # won't have to worry about Qt being upgraded on the host platform
-            pfx=$(${qmake_binary} -query QT_INSTALL_PREFIX)
-            pyqt-bundle --qt-dir $pfx $wheel_file
-            if [[ $? -ne 0 ]] ; then
-                echo -e "ERROR: Cannot bundle the Qt libraries with the wheel"
-#                 exit 1
-            fi
         fi
         
-        # NOTE: check if a wheel file has been produced; the filename typically
+        # NOTE: check is a wheel file has been produced; the filename typically
         # ends in .whl » if found then call pip to install it inside the 
         # environment ⟶ IT WORKS!
         wheel_file=`ls | grep whl`
@@ -909,7 +898,7 @@ SECONDS=0
 get_pyver
 
 # virtual_env="testenv"
-virtual_env_pfx="scipyenv_test_do_not_use_yet" #.$pyver"
+virtual_env_pfx="scipyenv" #.$pyver"
 # virtual_env_pfx="scipyenv_test" #.$pyver"
 # install_dir=$HOME
 # pyqt5_version=5.15.9
@@ -930,7 +919,7 @@ install_dir=${HOME}
 realscript=`realpath $0`
 scipyendir=`dirname "$realscript"`
 docdir=${scipyendir}/doc
-installscriptdir=${scipyendir}/env_install
+installscriptdir=${scipyendir}/environment-setup
 scipyensrcdir=${scipyendir}/src/scipyen
 using_python=""
 install_neuron=0
@@ -1235,7 +1224,7 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
         exit 1
     fi
     
-    # build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
+    build Pyqt5/6 NOTE: 2023-06-25 10:55:09 FIXME how to pass the virtualenv python to builder when run as root?
     dopyqt5
     
 #     dopyqt6 # NOTE: 2024-05-29 10:45:15 not yet ...
@@ -1263,6 +1252,11 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     make_launch_script
     
     make_desktop_entry
+    
+    # NOTE: install console color schemes
+    cd $scipyendir/src/scipyen/scipyen_console_styles
+    pip install .
+    cd $scipyendir
     
 fi
 
