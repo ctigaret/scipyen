@@ -16,6 +16,25 @@ import sys, os, platform, pathlib, subprocess
 import atexit, re, inspect, gc, io, traceback
 import faulthandler, warnings
 
+from core.prog import scipywarn
+
+my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)
+
+my_virtualenv = os.environ.get("VIRTUAL_ENV", None)
+
+if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
+    conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
+    print(f"Scipyen is running in the conda environment {my_conda_env} (located at {conda_env_prefix})")
+    if my_conda_env == "base":
+        scipywarn("Scipyen should be run in its own conda environment")
+        
+elif isinstance(my_virtualenv, str) and len(my_virtualenv.strip()):
+    print(f"Scipyen is running in the virtualenv environment {my_virtualenv}")
+    
+else:
+    raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment or a conda environment")
+
+
 # NOTE: 2024-05-02 10:22:39
 # optional use of Qt6 as PyQt5/6 or PySide2/6
 # but currently, force Qt5 (for now)
