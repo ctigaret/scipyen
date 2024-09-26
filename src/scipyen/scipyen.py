@@ -174,8 +174,8 @@ if sys.platform == "linux":
     themePaths.extend(IconTheme.icondirs)
     fbPaths.extend(IconTheme.icondirs)
     
-    hasBreezeIcons = any(os.path.isdir(os.path.join(themePath,"icons", "breeze")) for themePath in themePaths)
-    hasBreezeDarkIcons = any(os.path.isdir(os.path.join(themePath,"icons", "breeze-dark")) for themePath in themePaths)
+    hasBreezeIcons = any(os.path.isdir(os.path.join(themePath,"breeze")) for themePath in themePaths)
+    hasBreezeDarkIcons = any(os.path.isdir(os.path.join(themePath, "breeze-dark")) for themePath in themePaths)
     if all([hasBreezeIcons, hasBreezeDarkIcons]):
         QtGui.QIcon.setThemeName("breeze")
     else:
