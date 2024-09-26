@@ -16,7 +16,7 @@ if test -z "$CONDA_DEFAULT_ENV" ; then
 echo "Not in a conda environment"
 exit -1
 else 
-echo "$CONDA_DEFAULT_ENV"
+# echo "$CONDA_DEFAULT_ENV"
 if test "$CONDA_DEFAULT_ENV" = "base" ; then
 eval "$(conda shell.bash hook)"
 conda activate scipyenv

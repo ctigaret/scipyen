@@ -7405,7 +7405,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 # undoes the HACK in qdarktheme.setup_theme
                 qdarkstyleprop = "_qdarktheme_use_setup_style"
                 props = self.app.dynamicPropertyNames()
-                if qdarkstyleprop in (p.decode() for p in props):
+                if qdarkstyleprop in (bytes(p).decode() for p in props):
                     self.app.setProperty(qdarkstyleprop, False)
                 self.app.setStyle(styleProxy)
                 # self.app.setStyle(val)
