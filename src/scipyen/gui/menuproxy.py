@@ -73,7 +73,8 @@ class MenuProxy(QtWidgets.QProxyStyle):
             iconExtent = self.pixelMetric(self.PM_SmallIconSize)
             margin = self.pixelMetric(self.PM_LayoutLeftMargin) / 2
             top = opt.rect.y() + (opt.rect.height() - iconExtent) / 2
-            iconRect = QtCore.QRect(opt.rect.x() + margin, top, iconExtent, iconExtent)
+            # iconRect = QtCore.QRect(opt.rect.x() + margin, top, iconExtent, iconExtent)
+            iconRect = QtCore.QRect(int(opt.rect.x() + margin), int(top), int(iconExtent), int(iconExtent))
             pm = opt.icon.pixmap(widget.window().windowHandle(), 
                 QtCore.QSize(iconExtent, iconExtent), 
                 QtGui.QIcon.Normal if opt.state & self.State_Enabled else QtGui.QIcon.Disabled)
