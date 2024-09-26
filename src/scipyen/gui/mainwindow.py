@@ -4638,10 +4638,10 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # END scripts menu
 
         # BEGIN Applications menu
-        self.applicationsMenu = QtWidgets.QMenu("Applications", self)
-        self.applicationsMenu.setTearOffEnabled(True)
-        self.applicationsMenu.setToolTipsVisible(True)
-        self.menubar.insertMenu(self.menuHelp.menuAction(), self.applicationsMenu)
+        # self.menuApplications = QtWidgets.QMenu("Applications", self) # NOTE: 2024-09-26 12:02:54 def'ed in the ui file
+        self.menuApplications.setTearOffEnabled(True)
+        self.menuApplications.setToolTipsVisible(True)
+        self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuApplications)
         # ### END Applications menu
         
         # ### BEGIN Help menu
@@ -4796,7 +4796,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
         self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
-        self.applicationsAction.setMenu(self.applicationsMenu)
+        self.applicationsAction.setMenu(self.menuApplications)
         self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
         self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")

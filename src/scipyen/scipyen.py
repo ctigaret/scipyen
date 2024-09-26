@@ -21,6 +21,7 @@ from xdg import IconTheme
 from core.prog import scipywarn
 
 my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)
+conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
 
 my_virtualenv = os.environ.get("VIRTUAL_ENV", None)
 

@@ -61,7 +61,8 @@
      <string>Fi&amp;le</string>
     </property>
     <property name="icon">
-     <iconset theme="system-file-manager-symbolic"/>
+     <iconset theme="system-file-manager-symbolic">
+      <normaloff>.</normaloff>.</iconset>
     </property>
     <widget class="QMenu" name="menuImport">
      <property name="title">
@@ -86,7 +87,8 @@
      <string>Hel&amp;p</string>
     </property>
     <property name="icon">
-     <iconset theme="help-contents"/>
+     <iconset theme="help-contents">
+      <normaloff>.</normaloff>.</iconset>
     </property>
     <addaction name="actionHelp_On_Console"/>
    </widget>
@@ -95,7 +97,8 @@
      <string>View</string>
     </property>
     <property name="icon">
-     <iconset theme="quickview"/>
+     <iconset theme="quickview">
+      <normaloff>.</normaloff>.</iconset>
     </property>
     <widget class="QMenu" name="menuSelected_Image_or_Volume">
      <property name="title">
@@ -115,7 +118,8 @@
      <string>Windows</string>
     </property>
     <property name="icon">
-     <iconset theme="window-new"/>
+     <iconset theme="window-new">
+      <normaloff>.</normaloff>.</iconset>
     </property>
    </widget>
    <widget class="QMenu" name="menuSettings">
@@ -148,7 +152,8 @@
      <string>Consoles</string>
     </property>
     <property name="icon">
-     <iconset theme="akonadiconsole"/>
+     <iconset theme="akonadiconsole">
+      <normaloff>.</normaloff>.</iconset>
     </property>
     <addaction name="actionOpen_System_Terminal"/>
    </widget>
@@ -157,7 +162,16 @@
      <string>Scripts</string>
     </property>
     <property name="icon">
-     <iconset theme="dialog-scripts"/>
+     <iconset theme="dialog-scripts">
+      <normaloff>.</normaloff>.</iconset>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuApplications">
+    <property name="title">
+     <string>Applications</string>
+    </property>
+    <property name="icon">
+     <iconset theme="homerun"/>
     </property>
    </widget>
    <addaction name="menuFile"/>
@@ -165,6 +179,7 @@
    <addaction name="menuViewers"/>
    <addaction name="menuConsoles"/>
    <addaction name="menuScripts"/>
+   <addaction name="menuApplications"/>
    <addaction name="menuSettings"/>
    <addaction name="menuHelp"/>
   </widget>
