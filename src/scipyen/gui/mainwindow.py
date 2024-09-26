@@ -7397,8 +7397,13 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.dark.palette.DarkPalette))
                 else:
                     self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.light.palette.LightPalette))
+                    
+                styleProxy = MenuProxy(QtWidgets.QApplication.style())
+                self.app.setStyle(styleProxy)
             else:
-                styleProxy = MenuProxy(QtWidgets.QStyleFactory.create(val))
+                qtStyle = QtWidgets.QStyleFactory.create(val)
+                qtPalette = qtStyle.standardPalette()
+                styleProxy = MenuProxy(qtStyle)
                 
                 # NOTE: 2024-09-26 14:54:59 HACK 
                 # remove traces of qdarktheme from the app
@@ -7407,8 +7412,14 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 props = self.app.dynamicPropertyNames()
                 if qdarkstyleprop in (bytes(p).decode() for p in props):
                     self.app.setProperty(qdarkstyleprop, False)
+                
                 self.app.setStyle(styleProxy)
-                # self.app.setStyle(val)
+                self.app.setPalette(qtPalette)
+                
+                
+                
+                # NOTE: 2024-09-26 17:14:32
+                # quick hack to restore palette
         
             
     @Slot()
