@@ -24,15 +24,9 @@ my_virtualenv = os.environ.get("VIRTUAL_ENV", None)
 
 if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
     conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
-    if isinstance(conda_env_prefix, str) and len(conda_env_prefix.strip()):
-        env_xdg_data_dirs = os.environ.get("XDG_DATA_DIRS", None)
-        if isinstance(env_xdg_data_dirs, str):
-            xdg_data_dirs = env_xdg_data_dirs.split(":")
-            my_home_xdg_data_dir = os.path.join(os.environ["HOME"], ".local", "share")
-            xdg_data_dirs.append(my_home_xdg_data_dir)
-            os.environ["XDG_DATA_DIRS"] = ":".join(xdg_data_dirs)
             
     print(f"Scipyen is running in the conda environment {my_conda_env} (located at {conda_env_prefix})\n")
+    
     if my_conda_env == "base":
         scipywarn("Scipyen should be run in its own conda environment.\n")
         
@@ -58,6 +52,16 @@ if sys.platform == "linux":
         # print("In a wayland session")
         os.environ["QT_QPA_PLATFORM"]="xcb"
         # import pywayland
+        
+    # conda_env_prefix wad defined above
+    if isinstance(conda_env_prefix, str) and len(conda_env_prefix.strip()):
+        env_xdg_data_dirs = os.environ.get("XDG_DATA_DIRS", None)
+        if isinstance(env_xdg_data_dirs, str):
+            xdg_data_dirs = env_xdg_data_dirs.split(":")
+            my_home_xdg_data_dir = os.path.join(os.environ["HOME"], ".local", "share")
+            xdg_data_dirs.append(my_home_xdg_data_dir)
+            os.environ["XDG_DATA_DIRS"] = ":".join(xdg_data_dirs)
+        
         
     
     # os.environ["QT_QPA_PLATFORM"]="xcb"
@@ -160,7 +164,7 @@ mpath = pathlib.Path(__module_path__)
 # iconsdir = mpath / "gui" / "resources" / "icons"
 iconsdir = mpath / "gui" / "resources" 
 
-conda_env_icons
+# conda_env_icons
 
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
