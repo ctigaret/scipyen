@@ -6,21 +6,22 @@
 
 realscript=`realpath $0`
 
-echo "$realscript"
+# echo "$realscript"
 
 scipyendir=`dirname "$realscript"`
 
-echo "$scipyendir"
+# echo "$scipyendir"
 
 if test -z "$CONDA_DEFAULT_ENV" ; then 
 echo "Not in a conda environment"
 exit -1
 else 
+echo "$CONDA_DEFAULT_ENV"
 if test "$CONDA_DEFAULT_ENV" = "base" ; then
-. ( conda info --base )/etc/profile.d/mamba.sh
-mamba activate scipyenv
+eval "$(conda shell.bash hook)"
+conda activate scipyenv
 fi
-echo "OK" ; 
+# echo "OK" ;
 fi
 
 
