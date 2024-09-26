@@ -105,7 +105,7 @@ from collections import deque, ChainMap
 
 # BEGIN 3rd party modules
 
-# BEGIN PyQtxxx
+# BEGIN PyQtxxx and themeing utilities
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 from qtpy.QtCore import (Signal, Slot, Property,)
 from qtpy.uic import loadUiType
@@ -115,6 +115,31 @@ try:
 except:
     has_sip = False
 # import sip
+
+
+# BEGIN pyqtdarktheme - recommended for Windows
+hasQDarkTheme = False
+try:
+    import qdarktheme
+    hasQDarkTheme = True
+except:
+    pass
+
+# END pyqtdarktheme
+
+# BEGIN qdarkstyle is another possibility (for windows)
+# based entirely on style sheets
+hasQDarkStyle = False
+
+try:
+    import qdarkstyle
+    hasQDarkStyle = True
+except:
+    hasQDarkStyle = False
+# if sys.platform == "win32":
+
+# END qdarkstyle
+
 # END PyQtxxx
 
 # BEGIN jupyter, ipython, qtconsole et al
@@ -321,6 +346,7 @@ from .cursors import (SignalCursor, SignalCursorTypes,DataCursor,
                     cursors2epoch, cursors2intervals)
 from .interact import (getInput, getInputs, packInputs, selectWSData)
 from .itemslistdialog import ItemsListDialog
+from .menuproxy import MenuProxy
 from .triggerdetectgui import guiDetectTriggers
 from .widgets import gradientwidgets
 from .widgets import stylewidgets
@@ -341,15 +367,6 @@ from gui.pyqtgraph_patch import pyqtgraph as pg
 
 # END import modules
 
-
-# BEGIN pyqtdarktheme - recommended for Windows
-hasQDarkTheme = False
-try:
-    import qdarktheme
-    hasQDarkTheme = True
-except:
-    pass
-# END pyqtdarktheme
 
 
 
@@ -397,14 +414,6 @@ has_neuron = neuron_spec is not None
 
 # BEGIN scipyen systems modules
 # END scipyen systems modules
-
-has_qdarkstyle_for_win = False
-if sys.platform == "win32":
-    try:
-        import qdarkstyle
-        has_qdarkstyle_for_win = True
-    except:
-        has_qdarkstyle_for_win = False
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -1796,16 +1805,8 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     def guiStyle(self, val: str):
         if not isinstance(val, str) or val not in self._available_Qt_style_names_:
             return
-
-        if val == "Default":
-            self.app.setStyle(QtWidgets.QApplication.style())
-        elif val == "Dark Style" and has_qdarkstyle_for_win:
-            self.app.setStyleSheet(qdarkstyle.load_stylesheet())
-        elif val.startswith("Qt_") and hasQDarkTheme:
-            theme = val.replace("Qt", "").lower()
-            qdarktheme.setup_theme(theme)
-        else:
-            self.app.setStyle(val)
+        
+        self._do_apply_style(val)
 
         self._current_GUI_style_name = val
         
@@ -4682,10 +4683,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # NOTE: 2023-03-29 14:08:58 CT - selecting bb10 bright & dark styles crashes the GUI - not sure why
         self._available_Qt_style_names_ = [
             s for s in QtWidgets.QStyleFactory.keys() if not s.startswith("bb10")]
-        if sys.platform == "win32" and has_qdarkstyle_for_win:
-            self._available_Qt_style_names_.append("Dark Style")
-        elif hasQDarkTheme:
+        if hasQDarkStyle:
+            self._available_Qt_style_names_.append("QDarkStyle Dark")
+            self._available_Qt_style_names_.append("QDarkStyle Light")
+            
+        if hasQDarkTheme:
             self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
+            
+        # if sys.platform == "win32" and hasQDarkStyle:
+        #     self._available_Qt_style_names_.append("Dark Style")
+        # elif hasQDarkTheme:
+        #     self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
 
 
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
@@ -7337,9 +7345,15 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @safeWrapper
     def _slot_test_gui_style(self, val: str):
         self._prev_gui_style_name = self._current_GUI_style_name
+        self._do_apply_style(val)
 
+            # self._current_GUI_style_name = val
+            
+    def _do_apply_style(self, val:str):
         if val == "Default":
-            self.app.setStyle(QtWidgets.QApplication.style())
+            styleProxy = MenuProxy(QtWidgets.QApplication.style())
+            self.app.setStyle(styleProxy)
+            # self.app.setStyle(QtWidgets.QApplication.style())
             self._current_GUI_style_name = "Default"
         else:
             #if hasQDarkTheme and val.startswith("PyQtDarkTheme_"):
@@ -7347,10 +7361,24 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                 #theme = val.replace("PyQtDarkTheme_", "")
                 theme = val.replace("Qt", "").lower()
                 qdarktheme.setup_theme(theme)
+            elif hasQDarkStyle and val.startswith("QDarkStyle"):
+                if val == "QDarkstyle Dark":
+                    self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.dark.palette.DarkPalette))
+                else:
+                    self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.light.palette.LightPalette))
             else:
-                self.app.setStyle(val)
-
-            # self._current_GUI_style_name = val
+                styleProxy = MenuProxy(QtWidgets.QStyleFactory.create(val))
+                
+                # NOTE: 2024-09-26 14:54:59 HACK 
+                # remove traces of qdarktheme from the app
+                # undoes the HACK in qdarktheme.setup_theme
+                qdarkstyleprop = "_qdarktheme_use_setup_style"
+                props = self.app.dynamicPropertyNames()
+                if qdarkstyleprop in props:
+                    self.app.setProperty(qdarkstyleprop, False)
+                self.app.setStyle(styleProxy)
+                # self.app.setStyle(val)
+        
             
     @Slot()
     @safeWrapper
