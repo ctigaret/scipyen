@@ -15,6 +15,8 @@ import sys, os, platform, pathlib, subprocess
 
 import atexit, re, inspect, gc, io, traceback
 import faulthandler, warnings
+import xdg
+from xdg import IconTheme
 
 from core.prog import scipywarn
 
@@ -162,12 +164,15 @@ except:
 mpath = pathlib.Path(__module_path__)
 
 # iconsdir = mpath / "gui" / "resources" / "icons"
-iconsdir = mpath / "gui" / "resources" 
+# iconsdir = mpath / "gui" / "resources" 
 
-# conda_env_icons
+    
 
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
+if sys.platform == "linux":
+    themePaths.extend(IconTheme.icondirs)
+    fbPaths.extend(IconTheme.icondirs)
 # NOTE: 2023-09-30 15:49:27 
 # this below is ALWAYS added by default in the Qt resource system
 # themePaths.append(":/icons") 
