@@ -410,27 +410,7 @@ has_neuron = neuron_spec is not None
 
 # END scipyen core modules
 
-# BEGIN scipyen iolib modules
-# import iolib.pictio as pio
-# import iolib.pictio as pio
-# END scipyen iolib modules
 
-# BEGIN scipyen gui modules
-# from . import gui_viewers # list defined in gui.__init__.py !!!
-# colormaps.registerCustomColorMaps()
-
-
-# qtconsole.styles and pygments.styles, respectively:
-# END scipyen gui modules
-
-
-# BEGIN scipyen ephys modules
-# from ephys import *
-# import ephys.ltp as ltp
-# END scipyen ephys modules
-
-# BEGIN scipyen systems modules
-# END scipyen systems modules
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -541,12 +521,16 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"), 
                                                from_imports=True, import_from="gui")
+    
+    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutLicense.ui"),
+                                        from_imports=True, import_from="gui")
 else:
     # Form class,        Base class
     __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, "mainwindow.ui"))
 
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
 
+    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutLicense.ui"))
 
 
 class WorkspaceViewer(QtWidgets.QTableView):
@@ -1001,6 +985,13 @@ class VTH(object):
             VTH.gui_handlers[viewerClass] = deepcopy(
                 VTH.default_handlers[viewerClass])
 
+class LicenseDialog(QtWidgets.QDialog, __UI_AboutLicense__):
+    def __init__(self, txt, parent):
+        QtWidgets.QDialog.__init__(self, parent)
+        self.setupUi(self)
+        
+        self.textEdit.setHtml(txt)
+        # self.show()
 
 # class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, DirectoryObserver, WorkspaceGuiMixin):
 class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
@@ -4852,7 +4843,12 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.menuFile.insertSeparator(self.actionReload_Plugins)
 
         self.menuFile.insertSeparator(self.actionQuit)
-
+        
+        self.actionAbout.triggered.connect(self._slot_about)
+        self.actionAbout_Components.triggered.connect(self._slot_aboutComponents)
+        self.actionAbout_Qt.triggered.connect(self._slot_aboutQt)
+        self.actionLicense.triggered.connect(self._slot_showLicense)
+        
         # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
         self.startPluginLoad.connect(self.slot_loadPlugins)
         
@@ -7452,6 +7448,51 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
             
         # self.informationMessage_static(text=f"Restart Scipyen to load plugins from {self.userPluginsDirectory}")
 
+    @Slot()
+    @safeWrapper
+    def _slot_about(self) -> None:
+        txt = ["Scipyen (Scientific Python Environment for Neuroscience)",
+               "Open-source environment for the analysis of electrophysiology ",
+               "and microscopy imaging data using Python programming language",
+               "",
+               "<bd>Authors:</bd>",
+               "",
+               "Cezar M. Tigaret"]
+        
+        QtWidgets.QMessageBox.about(self, "About Scipyen", "\n".join(txt))
+        
+    @Slot()
+    def _slot_aboutQt(self)->None:
+        QtWidgets.QMessageBox.aboutQt(self, "Scipyen and Qt")
+        
+    
+    @Slot()
+    def _slot_showLicense(self) -> None:
+        txt = pio.loadTextFile(os.path.join(self._scipyendir_, "doc", "AboutLicense.html"))
+        d = LicenseDialog(txt, self)
+        d.show()
+    
+    @Slot()
+    @safeWrapper
+    def _slot_aboutComponents(self) -> None:
+        numpyTxt = ""
+        scipyTxt = ""
+        mplTxt = ""
+        neoTxt = ""
+        hdf5Txt = ""
+        vigraTxt = ""
+        qtTxt = ""
+        breezeTxt = ""
+        pyqtGraphTxt = ""
+        jupyterTxt = ""
+        
+        txt = [numpyTxt, scipyTxt, mplTxt, neoTxt, hdf5Txt, vigraTxt, 
+               qtTxt, breezeTxt, pyqtGraphTxt, jupyterTxt]
+        
+        QtWidgets.QMessageBox.about(self, "Main Software Components", "\n".join(txt))
+        
+        
+        
     @Slot()
     @safeWrapper
     def _slot_set_Application_style(self):

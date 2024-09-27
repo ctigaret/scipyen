@@ -91,6 +91,10 @@
       <normaloff>.</normaloff>.</iconset>
     </property>
     <addaction name="actionHelp_On_Console"/>
+    <addaction name="actionAbout"/>
+    <addaction name="actionAbout_Qt"/>
+    <addaction name="actionAbout_Components"/>
+    <addaction name="actionLicense"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
@@ -171,7 +175,8 @@
      <string>Applications</string>
     </property>
     <property name="icon">
-     <iconset theme="homerun"/>
+     <iconset theme="homerun">
+      <normaloff>.</normaloff>.</iconset>
     </property>
    </widget>
    <addaction name="menuFile"/>
@@ -1252,6 +1257,41 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionRecent">
    <property name="text">
     <string>Recent</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="icon">
+    <iconset theme="help-about">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>About</string>
+   </property>
+  </action>
+  <action name="actionAbout_Components">
+   <property name="icon">
+    <iconset theme="help-about">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>About Components</string>
+   </property>
+  </action>
+  <action name="actionLicense">
+   <property name="icon">
+    <iconset theme="license">
+     <normaloff>.</normaloff>.</iconset>
+   </property>
+   <property name="text">
+    <string>License</string>
+   </property>
+  </action>
+  <action name="actionAbout_Qt">
+   <property name="icon">
+    <iconset theme="help-about"/>
+   </property>
+   <property name="text">
+    <string>About Qt</string>
    </property>
   </action>
  </widget>
