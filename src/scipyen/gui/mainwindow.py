@@ -484,11 +484,11 @@ _info_banner_.append("The Workspace dock widget of the Scipyen main window shows
 _info_banner_.append("\t'Internal': this is the 'user' namespace accessible directly in Scipyen's Console.\n")
 _info_banner_.append("\t'kernel X', where 'X' is an integer ≥ 0: the 'user' namespace in an External Console.\n")
 _info_banner_.append("In either case, the symbols of variables or modules that were, respectivly, creatd or imported during start up are HIDDEN, and can be revealed by calling 'dir' in the console frontend of the respective Jupyter process.\n")
-_info_banner_.append("NOTE: An 'External console' operates in a completely independent Jupyter process, with its own, independent, namespace. \n"
+_info_banner_.append("NOTE: An 'External console' operates in a completely independent Jupyter process, with its own, independent, namespace. \n")
 _info_banner_.append("This process can be launched (and managed) by Scipyen (i.e. 'local'), or started independently ('remote'). The latter can be accessed via a 'connection' file\n")
 _info_banner_.append("In Scipyen, there is a limited provision to copy simple objects across namespaces\n")
 _info_banner_.append(
-    "Here is a selection of useful python modules available in console (either the internal, Scipyen's console or an External console using a local Jupyter process\n")
+    "Here is a selection of useful python modules available in console (either the internal, Scipyen's console or an External console using a local Jupyter process)\n")
 _info_banner_.append("Module: -> alias, where mentioned:")
 _info_banner_.append("=================================")
 _info_banner_.append("numpy -> np")
