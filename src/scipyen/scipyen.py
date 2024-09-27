@@ -56,17 +56,29 @@ if sys.platform == "linux":
         os.environ["QT_QPA_PLATFORM"]="xcb"
         # import pywayland
         
-    # conda_env_prefix wad defined above
+    new_xdg_data_dirs = [os.path.join(os.environ["HOME"], ".local", "share")]
+
+    # conda_env_prefix was defined above
     if isinstance(conda_env_prefix, str) and len(conda_env_prefix.strip()):
-        env_xdg_data_dirs = os.environ.get("XDG_DATA_DIRS", None)
-        if isinstance(env_xdg_data_dirs, str):
-            xdg_data_dirs = env_xdg_data_dirs.split(":")
-            my_home_xdg_data_dir = os.path.join(os.environ["HOME"], ".local", "share")
-            xdg_data_dirs.append(my_home_xdg_data_dir)
-            os.environ["XDG_DATA_DIRS"] = ":".join(xdg_data_dirs)
+        conda_env_xdg_data_dir = os.path.join(conda_env_prefix, "share")
+        conda_env_icons_dir = os.path.join(conda_env_xdg_data_dir, "icons")
+        if os.path.isdir(conda_env_xdg_data_dir):
+            new_xdg_data_dirs.append(conda_env_xdg_data_dir)
+
+        if os.path.isdir(conda_env_icons_dir):
+            IconTheme.icondirs.append(conda_env_icons_dir)
+
+    env_xdg_data_dirs = os.environ.get("XDG_DATA_DIRS", None)
+
+    if isinstance(env_xdg_data_dirs, str):
+        xdg_data_dirs = env_xdg_data_dirs.split(":")
+    else:
+        xdg_data_dirs = list()
+
+    xdg_data_dirs.extend(new_xdg_data_dirs)
+
+    os.environ["XDG_DATA_DIRS"] = ":".join(xdg_data_dirs)
         
-        
-    
     # os.environ["QT_QPA_PLATFORM"]="xcb"
     
 # TODO 2024-09-11 23:56:17

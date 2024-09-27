@@ -478,28 +478,35 @@ _info_banner_ = ["\n*** NOTE: ***"]
 _info_banner_.append(
     "User variables created in the console will become visible in the User variables tab in the main window.\n")
 _info_banner_.append(
-    "The Pict main window GUI object is accessible from the console as `mainWindow` or `mainWindow` (an alias of mainWindow).\n")
-_info_banner_.append("Except for user variables, if any of `mainWindow`, `mainWindow`, or loaded modules are deleted from the console workspace by calling del(...), they can be restored using the `Console/Restore Namespace` menu item.\n")
-_info_banner_.append("The Workspace dock widget of the Pict main window shows variables shared between the console (the IPython kernel) and the Pict window, including modules imported manually at the console.\n")
+    "The Scipyen's main GUI window is accessible from the console as `mainWindow`.\n")
+#_info_banner_.append("Except for user variables, if any of `mainWindow`, loaded modules are deleted from the console workspace by calling del(...), they can be restored using the `Console/Restore Namespace` menu item.\n")
+_info_banner_.append("The Workspace dock widget of the Scipyen main window shows name space symbols ('bindings' of objects) in one of the following namespaces:.\n")
+_info_banner_.append("\t'Internal': this is the 'user' namespace accessible directly in Scipyen's Console.\n")
+_info_banner_.append("\t'kernel X', where 'X' is an integer ≥ 0: the 'user' namespace in an External Console.\n")
+_info_banner_.append("In either case, the symbols of variables or modules that were, respectivly, creatd or imported during start up are HIDDEN, and can be revealed by calling 'dir' in the console frontend of the respective Jupyter process.\n")
+_info_banner_.append("NOTE: An 'External console' operates in a completely independent Jupyter process, with its own, independent, namespace. \n"
+_info_banner_.append("This process can be launched (and managed) by Scipyen (i.e. 'local'), or started independently ('remote'). The latter can be accessed via a 'connection' file\n")
+_info_banner_.append("In Scipyen, there is a limited provision to copy simple objects across namespaces\n")
 _info_banner_.append(
-    "Several useful python modules are available in console as the following aliases:\n")
+    "Here is a selection of useful python modules available in console (either the internal, Scipyen's console or an External console using a local Jupyter process\n")
 _info_banner_.append("Module: -> alias, where mentioned:")
 _info_banner_.append("=================================")
 _info_banner_.append("numpy -> np")
 _info_banner_.append("matplotlib -> mpl")
 _info_banner_.append("matplotlib.pyploy -> plt")
-_info_banner_.append("matplotlib.pylab -> plb")
 _info_banner_.append("matplotlib.matlab -> mlb")
 _info_banner_.append("scipy")
 _info_banner_.append("vigra")
 _info_banner_.append("quantities -> pq")
+_info_banner_.append("pyqtgraph -> pg")
+_info_banner_.append("neo")
 _info_banner_.append("\n")
-_info_banner_.append("The following modules are from PyQt5")
+_info_banner_.append("The following modules are from the underlying Qt framework")
 _info_banner_.append("============================================")
 _info_banner_.append("QtCore, QtGui, QtWidgets, QtXml")
 # _info_banner_.append("QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml")
 _info_banner_.append("\n")
-_info_banner_.append("The following modules belong to pict package")
+_info_banner_.append("The following modules belong to Scipyen")
 _info_banner_.append("============================================")
 _info_banner_.append("signalviewer -> sv (*)   GUI for 1D signals + cursors")
 _info_banner_.append("imageviewer -> iv (*)    GUI for images (VigraArray)")
@@ -512,11 +519,10 @@ _info_banner_.append(
     "datatypes                new python quantities and data types")
 _info_banner_.append(
     "xmlutils                 GUI viewer for XML documents + utilities")
-_info_banner_.append("ephys                    utilities for neo core objects")
 _info_banner_.append(
-    "tiwt                     wavelet function + purelet denoise")
+    "ephys                    electrophysiology routines")
 _info_banner_.append(
-    "ephys                    package with various electrophysiology routines")
+    "tiwt                     wavelet functions + purelet denoise")
 _info_banner_.append("curvefitting -> crvf")
 _info_banner_.append("signalprocessing -> sigp")
 _info_banner_.append("imageprocessing -> imgp")
@@ -3254,7 +3260,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     # FIXME -- why does it appear to execute only ONE print command?
     @Slot()
     @safeWrapper
-    def _helpOnConsole_(self):
+    def _slot_helpOnConsole_(self):
         self.console.execute("console_info()")
 
     @Slot()
@@ -4814,7 +4820,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                     self.actionRunning_IPython_for_Neuron)
 
         # self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
-        self.actionHelp_On_Console.triggered.connect(self._helpOnConsole_)
+        self.actionHelp_On_Console.triggered.connect(self._slot_helpOnConsole_)
 
         self.actionOpen.triggered.connect(self.slot_openFiles)
         self.actionView_Data.triggered.connect(self.slot_viewSelectedVar)

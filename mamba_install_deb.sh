@@ -84,7 +84,7 @@ env_name="scipyenv"
 
 if test -z "$CONDA_DEFAULT_ENV" ; then 
 
-read -e -p "Enter the miniforge directory (no spaces, please): "
+read -e -p "Enter the miniforge directory (no spaces, please) or CTRL+C to cancel: "
 
 my_miniforge=$(printf %s "$REPLY" | envsubst)
 
