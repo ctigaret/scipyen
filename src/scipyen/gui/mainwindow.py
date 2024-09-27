@@ -1873,26 +1873,34 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # the case where PyQt5 was pulled from pypi or conda channel, vs having
         # been built locally?
         
-        themePaths = QtGui.QIcon.themeSearchPaths()
+        # themePaths = QtGui.QIcon.themeSearchPaths()
+        windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+        _,_,v,_ = windowColor.getHsv()
+        if v > 128:
+            QtGui.QIcon.setThemeName("breeze")
+        else:
+            QtGui.QIcon.setThemeName("breeze-dark")
+
+
         if sys.platform == "win32":
             if hasQDarkTheme:
                 QtGui.QIcon.setThemeName("breeze-dark")
-            else:
-                windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-                _,_,v,_ = windowColor.getHsv()
-                if v > 128:
-                    QtGui.QIcon.setThemeName("breeze")
-                else:
-                    QtGui.QIcon.setThemeName("breeze-dark")
-                    
+#             else:
+#                 windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+#                 _,_,v,_ = windowColor.getHsv()
+#                 if v > 128:
+#                     QtGui.QIcon.setThemeName("breeze")
+#                 else:
+#                     QtGui.QIcon.setThemeName("breeze-dark")
+#
         # elif sys.platform == "darwin":
-        else:
-            windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-            _,_,v,_ = windowColor.getHsv()
-            if v > 128:
-                QtGui.QIcon.setThemeName("breeze")
-            else:
-                QtGui.QIcon.setThemeName("breeze-dark")
+        # else:
+        #     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+        #     _,_,v,_ = windowColor.getHsv()
+        #     if v > 128:
+        #         QtGui.QIcon.setThemeName("breeze")
+        #     else:
+        #         QtGui.QIcon.setThemeName("breeze-dark")
             
             
 
@@ -7455,7 +7463,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
                "Open-source environment for the analysis of electrophysiology ",
                "and microscopy imaging data using Python programming language",
                "",
-               "<bd>Authors:</bd>",
+               "Authors:",
                "",
                "Cezar M. Tigaret"]
         

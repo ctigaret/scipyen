@@ -4044,8 +4044,9 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self.saveRawSelectionToFile.triggered.connect(self._slot_saveRawSelectionToFile)
         
-        self.settings_menu = menuBar.addMenu(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
-        
+        self.settings_menu = menuBar.addMenu("Settings")
+        # self.settings_menu = menuBar.addMenu(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
+
         self.listMagicsAction = self.file_menu.addAction(QtGui.QIcon.fromTheme("view-list-text"),"List magics")
 
         self.listMagicsAction.triggered.connect(self._slot_listMagics)

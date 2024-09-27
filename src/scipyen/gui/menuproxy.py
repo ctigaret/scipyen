@@ -27,12 +27,18 @@ class MenuProxy(QtWidgets.QProxyStyle):
             opt.icon and not opt.icon.isNull() and opt.text):
                 if not self.alertShown:
                     if widget.isNativeMenuBar():
+                        return False
+                        # NOTE: 2024-09-27 22:31:42
+                        # this warning is not needed
                         # this will probably not be shown...
-                        print('WARNING: menubar items with icons and text not supported for native menu bars')
+                    #     print('WARNING: menubar items with icons and text not supported for native menu bars')
                     styleName = self.baseStyle().objectName()
-                    if not 'windows' in styleName and styleName != 'fusion':
-                        print('WARNING: menubar items with icons and text not supported for "{}" style'.format(
-                            styleName))
+                    # NOTE: 2024-09-27 22:32:39 TODO
+                    # this warning likely not needed, either
+                    # if not 'windows' in styleName and styleName != 'fusion':
+                    #     return False
+                        # print('WARNING: menubar items with icons and text not supported for "{}" style'.format(
+                        #     styleName))
                     self.alertShown = True
                 return True
         return False
@@ -65,13 +71,15 @@ class MenuProxy(QtWidgets.QProxyStyle):
             textOpt = QtWidgets.QStyleOptionMenuItem(opt)
             textOpt.icon = QtGui.QIcon()
             self.menuHack = True
+            # super().drawControl(ctl, textOpt, qp, widget)
             self.drawControl(ctl, textOpt, qp, widget)
             self.menuHack = False
 
             # compute the rectangle for the icon and call the default 
             # implementation to draw it
             iconExtent = self.pixelMetric(self.PM_SmallIconSize)
-            margin = self.pixelMetric(self.PM_LayoutLeftMargin) / 2
+            # margin = self.pixelMetric(self.PM_LayoutLeftMargin) / 2
+            margin = self.pixelMetric(self.PM_LayoutLeftMargin)
             top = opt.rect.y() + (opt.rect.height() - iconExtent) / 2
             # iconRect = QtCore.QRect(opt.rect.x() + margin, top, iconExtent, iconExtent)
             iconRect = QtCore.QRect(int(opt.rect.x() + margin), int(top), int(iconExtent), int(iconExtent))
