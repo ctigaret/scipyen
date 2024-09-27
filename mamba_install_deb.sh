@@ -116,7 +116,7 @@ conda activate scipyenv
 fi
 
 if test "$CONDA_DEFAULT_ENV" = "$env_name" ; then
-pip install "$scipyendir"/setup_env/conda_pip_reqs.txt
+pip install -r "$scipyendir"/setup_env/conda_pip_reqs.txt
 cd "$scipyendir"/src/scipyen/gui/scipyen_console_styles
 pip install .
 else
