@@ -1084,7 +1084,7 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
         QtWidgets.QDialog.__init__(self, parent)
         self.setupUi(self)
         
-        self.textEdit.setHtml(txt)
+        self.textBrowser.setHtml(txt)
         wintitle = f"About {aboutSuffix}"
         self.setWindowTitle(wintitle)
         self.show()
