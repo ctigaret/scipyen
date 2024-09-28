@@ -581,7 +581,7 @@ def infoSoftwareComponents() -> str:
     txt.append('<h3>Data Analysis</h3>')
     txt.append(f'<ul> <a href="https://neuralensemble.org/neo/">neo</a> {getModuleVersion(neo)} </ul>')
     txt.append(f'<ul> <a href="https://github.com/swharden/pyABF">pyABF</a> {getModuleVersion(pab.pyabf)} </ul>')
-    txt.append(f'<ul> <a href="http://hci.iwr.uni-heidelberg.de/vigra/doc/vigranumpy/index.html">vigra</a> - VIGRA Computer Vision Library {getModuleVersion(vigra)} </ul>')
+    txt.append(f'<ul> <a href="http://ukoethe.github.io/vigra/">vigra</a> - VIGRA Computer Vision Library {getModuleVersion(vigra)} </ul>')
     
     txt.append(f'<ul> <a href="https://numpy.org">NumPy</a> {getModuleVersion(np)} </ul>')
     txt.append(f'<ul> <a href="https://scipy.org/">SciPy</a> {getModuleVersion(scipy)} </ul>')
