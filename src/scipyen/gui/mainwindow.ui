@@ -1274,7 +1274,7 @@ NOTE: you can click anywhere in the row to select</string>
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>Software Used</string>
+    <string>Components</string>
    </property>
   </action>
   <action name="actionLicense">
