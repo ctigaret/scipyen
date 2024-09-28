@@ -596,7 +596,7 @@ def infoSoftwareComponents() -> str:
     
     txt.append(f'<ul> <a href="https://github.com/spyder-ide/qtpy">qtpy</a> {getModuleVersion(qtpy)}, {pyqtAPIver} - (see also "About Qt")</ul>')
     txt.append(f'<ul> <a href="https://www.pyqtgraph.org/">PyQtGraph</a> - Scientific Graphics and GUI Library for Python {getModuleVersion(pg)}</ul>')
-    txt.append('<ul> <a href="https://develop.kde.org/frameworks/breeze-icons/#license">Breeze Icons</a> copyright KDE and licenced under the GNU LGPL version 3 or later</ul>')
+    txt.append('<ul> <a href="https://develop.kde.org/frameworks/breeze-icons/">Breeze Icons</a> copyright KDE and licenced under the GNU LGPL version 3 or later</ul>')
 
 
     txt.append("<p>¹Used or available for use at the console — this is not an exhaustive list, and excludes libraries installed after Scipyen's installation.</p>")
@@ -1981,24 +1981,6 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         if sys.platform == "win32":
             if hasQDarkTheme:
                 QtGui.QIcon.setThemeName("breeze-dark")
-#             else:
-#                 windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-#                 _,_,v,_ = windowColor.getHsv()
-#                 if v > 128:
-#                     QtGui.QIcon.setThemeName("breeze")
-#                 else:
-#                     QtGui.QIcon.setThemeName("breeze-dark")
-#
-        # elif sys.platform == "darwin":
-        # else:
-        #     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-        #     _,_,v,_ = windowColor.getHsv()
-        #     if v > 128:
-        #         QtGui.QIcon.setThemeName("breeze")
-        #     else:
-        #         QtGui.QIcon.setThemeName("breeze-dark")
-            
-            
 
     @property
     def scriptManagerAutoLaunch(self):
