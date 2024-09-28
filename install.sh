@@ -47,7 +47,6 @@ function install_miniforge ()
         echo
         exit -1
     else
-        rm -fr Miniforge3.sh
         source "${miniforge_dir}/etc/profile.d/conda.sh"
         # For mamba support also run the following command
         source "${miniforge_dir}/etc/profile.d/mamba.sh"
@@ -62,6 +61,7 @@ function install_miniforge ()
             exit -1
         fi
     fi
+    rm -fr Miniforge3.sh
 }
 
 function complete_install ()
@@ -90,6 +90,7 @@ mkdir -p ${target_dir}
 if [ -r ${target_dir}/scipyen ] ; then
     dt=`date '+%Y-%m-%d_%H-%M-%s'`
     mv ${target_dir}/scipyen ${target_dir}/scipyen.$dt
+    echo "Old scipyen launch script will be renamed to ${target_dir}/scipyen ${target_dir}/scipyen.$dt"
 fi
 
 shopt -s lastpipe
@@ -113,6 +114,9 @@ shopt -u lastpipe
 chmod +x ${target_dir}/scipyen
 
 echo -e "Scipyen launch script created as ${target_dir}/scipyen \n"
+echo
+echo "You may need to include ${target_dir} in your PATH environemt variable"
+echo 
 
 }
 
@@ -123,13 +127,16 @@ env_name="scipyenv"
 miniforge_dir=$HOME/miniforge3
 virtualenv_dir=$HOME/$env_name
 
-if [[ $(pwd) == ${scipyendir} ]]; then
-    echo
-    echo "You must run this script from a directory OUTSIDE scipyen repo."
-    echo "Goodbye!"
-    echo
-    exit -1
-fi
+# if [[ $(pwd) == ${scipyendir} ]]; then
+#     conda_reqs=setup_env/conda_reqs.txt
+#     echo
+#     echo "You must run this script from a directory OUTSIDE scipyen repo."
+#     echo "Goodbye!"
+#     echo
+#     exit -1
+# else
+#     conda_reqs="$scipyendir"/setup_env/conda_reqs.txt
+# fi
 
 
 if [ -z "$CONDA_DEFAULT_ENV" ]; then
