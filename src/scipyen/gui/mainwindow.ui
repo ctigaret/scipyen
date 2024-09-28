@@ -1270,11 +1270,11 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionAbout_Components">
    <property name="icon">
-    <iconset theme="help-about">
+    <iconset theme="tools-symbolic">
      <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
-    <string>About Components</string>
+    <string>Software Used</string>
    </property>
   </action>
   <action name="actionLicense">

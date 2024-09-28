@@ -190,6 +190,7 @@ import pywt  # wavelets
 import scipy
 from scipy import io as sio
 from scipy import stats
+import sympy
 import shapely
 import neo
 if neo.__version__ >= '0.13.0':
@@ -513,6 +514,99 @@ _info_banner_.append(
 
 def console_info():
     print("\n".join(_info_banner_))
+    
+def getModuleVersion(p:typing.Union[types.ModuleType, str]) -> str:
+    if isinstance(p, str):
+        try:
+            p = importlib.import_module(p) 
+        except:
+            return ""
+        
+    if hasattr(p, "version"):
+        if isinstance(p.version, types.ModuleType):
+            if hasattr(p.version, "full_version"):
+                return str(p.version.full_version)
+            else:
+                return ""
+            
+        else:
+            return str(p.version)
+        
+    else:
+        return str(p.__version__) if hasattr(p,"__version__") else ""
+    
+def infoSoftwareComponents() -> str:
+    import qtpy, IPython
+    
+    _upa = qtpy.API.upper()
+    
+    if hasattr(pg.Qt, _upa):
+        pyqtAPI = getattr(pg.Qt, _upa)
+    else:
+        pyqtAPI = qtpy.API
+        
+    if pyqtAPI in ("PyQt5", "PyQt6"):
+        pyqtAPIver = f" {pyqtAPI} {QtCore.PYQT_VERSION_STR}, Qt {QtCore._qt_version}"
+        
+    elif pyqtAPI in ("PySide2", "PySide6"):
+        try:
+            pyside = importlib.import_module(pyqtAPI.lower())
+            pyqtAPIver = f" {pyqtAPI} {pyside.__version__}, Qt {QtCore._qt_version}"
+        except:
+            pyqtAPIver = f" Qt {QtCore._qt_version}"
+                
+    else:
+        pyqtAPIver = f" Qt {QtCore._qt_version}"
+    
+    
+    txt = list()
+    
+    txt += ['<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"',
+            '    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+            '<html>',
+            '<head>',
+            '<title>Third Party Software Available or Used in Scipyen</title>',
+            '<meta charset="utf-8"/>',
+            '<meta> name="generator" content="Kate Editor"</meta>',
+            '</head>',
+            '<body>',
+            '<h2>Third Party Software in Scipyen¹</h2>',
+            '(Click on the links below, for credits & licenses)']
+    
+    txt.append('<h3>Environment</h3>')
+    txt.append(f'<ul> <a href="https://www.python.org/">Python™</a> {sys.version} </ul>')
+    txt.append(f'<ul> <a href="https://ipython.org/">IPython</a> Interactive Computing {getModuleVersion(IPython)} </ul>')
+    txt.append(f'<ul> <a href="https://pypi.org/project/qtconsole/">qtconsole</a> Jupyter QtConsole {getModuleVersion("qtconsole")} </ul>')
+    
+    txt.append('<h3>Data Analysis</h3>')
+    txt.append(f'<ul> <a href="https://neuralensemble.org/neo/">neo</a> {getModuleVersion(neo)} </ul>')
+    txt.append(f'<ul> <a href="https://github.com/swharden/pyABF">pyABF</a> {getModuleVersion(pab.pyabf)} </ul>')
+    txt.append(f'<ul> <a href="http://hci.iwr.uni-heidelberg.de/vigra/doc/vigranumpy/index.html">vigra</a> - VIGRA Computer Vision Library {getModuleVersion(vigra)} </ul>')
+    
+    txt.append(f'<ul> <a href="https://numpy.org">NumPy</a> {getModuleVersion(np)} </ul>')
+    txt.append(f'<ul> <a href="https://scipy.org/">SciPy</a> {getModuleVersion(scipy)} </ul>')
+    txt.append(f'<ul> <a href="https://www.sympy.org/">SymPy</a> {getModuleVersion(sympy)} </ul>')
+    txt.append(f'<ul> <a href="https://www.h5py.org/">h5py</a> HDF5 for Python {getModuleVersion(h5py)} </ul>')
+    txt.append(f'<ul> <a href="https://pandas.pydata.org/">{pd.__name__}</a> {getModuleVersion(pd)} </ul>')
+    txt.append(f'<ul> <a href="https://github.com/python-quantities/python-quantities">{pq.__name__}</a> {getModuleVersion(pq)} </ul>')
+    
+    txt.append('<h3>User Interface & Plotting Frameworks</h3>')
+    txt.append(f'<ul> <a href="https://matplotlib.org/">matplotlib</a> - An object-oriented plotting library {getModuleVersion(mpl)} </ul>')
+    txt.append(f'<ul> <a href="https://seaborn.pydata.org/">{sb.__name__}</a> {getModuleVersion(sb)} </ul>')
+    
+    txt.append(f'<ul> <a href="https://github.com/spyder-ide/qtpy">qtpy</a> {getModuleVersion(qtpy)}, {pyqtAPIver} - (see also "About Qt")</ul>')
+    txt.append(f'<ul> <a href="https://www.pyqtgraph.org/">PyQtGraph</a> - Scientific Graphics and GUI Library for Python {getModuleVersion(pg)}</ul>')
+    txt.append('<ul> <a href="https://develop.kde.org/frameworks/breeze-icons/#license">Breeze Icons</a> copyright KDE and licenced under the GNU LGPL version 3 or later</ul>')
+
+
+    txt.append("<p>¹Used or available for use at the console — this is not an exhaustive list, and excludes libraries installed after Scipyen's installation.</p>")
+    txt.append("</body>")
+    txt.append("</html>")
+    
+    
+    
+    
+    return "\n".join(txt)
 
 if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     # Form class,        Base class
@@ -522,7 +616,7 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
     __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"), 
                                                from_imports=True, import_from="gui")
     
-    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutLicense.ui"),
+    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutDialog.ui"),
                                         from_imports=True, import_from="gui")
 else:
     # Form class,        Base class
@@ -985,14 +1079,16 @@ class VTH(object):
             VTH.gui_handlers[viewerClass] = deepcopy(
                 VTH.default_handlers[viewerClass])
 
-class LicenseDialog(QtWidgets.QDialog, __UI_AboutLicense__):
-    def __init__(self, txt, parent):
+class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
+    def __init__(self, txt, parent, aboutSuffix:typing.Optional[str] = None):
         QtWidgets.QDialog.__init__(self, parent)
         self.setupUi(self)
         
         self.textEdit.setHtml(txt)
-        # self.show()
-
+        wintitle = f"About {aboutSuffix}"
+        self.setWindowTitle(wintitle)
+        self.show()
+        
 # class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, DirectoryObserver, WorkspaceGuiMixin):
 class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
@@ -2730,7 +2826,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         """External IPython launcher.
 
         If no External IPython console instance exists, launches an instance
-        of External IPytyhon console (running external kernels as separate processes).
+        of External IPython console (running external kernels as separate processes).
 
         When parameter "new" is "neuron" the console initializes the NEURON python
         environment in the console.
@@ -3245,9 +3341,9 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         self.console.consoleWidget.set_pygment(
             self.console.consoleWidget._console_pygment)
         
-        verstr = f"'Scipyen is using Qt {QtCore._qt_version}, neo {neo.__version__}, VIGRA {vigra.version}'"
-        
-        self.console.execute(f"print({verstr})", hidden=True)
+#         verstr = f"'Scipyen is using Qt {QtCore._qt_version}, neo {neo.__version__}, VIGRA {vigra.version}'"
+#         
+#         self.console.execute(f"print({verstr})", hidden=True)
 
     # NOTE: 2016-03-20 21:18:32
     # to run code inside the console and use the console as stdout,
@@ -7477,27 +7573,29 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot()
     def _slot_showLicense(self) -> None:
         txt = pio.loadTextFile(os.path.join(self._scipyendir_, "doc", "AboutLicense.html"))
-        d = LicenseDialog(txt, self)
-        d.show()
+        d = AboutDialog(txt, self, "License")
+        # d.show()
     
     @Slot()
     @safeWrapper
     def _slot_aboutComponents(self) -> None:
-        numpyTxt = ""
-        scipyTxt = ""
-        mplTxt = ""
-        neoTxt = ""
-        hdf5Txt = ""
-        vigraTxt = ""
-        qtTxt = ""
-        breezeTxt = ""
-        pyqtGraphTxt = ""
-        jupyterTxt = ""
-        
-        txt = [numpyTxt, scipyTxt, mplTxt, neoTxt, hdf5Txt, vigraTxt, 
-               qtTxt, breezeTxt, pyqtGraphTxt, jupyterTxt]
-        
-        QtWidgets.QMessageBox.about(self, "Main Software Components", "\n".join(txt))
+        txt = infoSoftwareComponents()
+        d = AboutDialog(txt, self, "Software Components")
+#         numpyTxt = ""
+#         scipyTxt = ""
+#         mplTxt = ""
+#         neoTxt = ""
+#         hdf5Txt = ""
+#         vigraTxt = ""
+#         qtTxt = ""
+#         breezeTxt = ""
+#         pyqtGraphTxt = ""
+#         jupyterTxt = ""
+#         
+#         txt = [numpyTxt, scipyTxt, mplTxt, neoTxt, hdf5Txt, vigraTxt, 
+#                qtTxt, breezeTxt, pyqtGraphTxt, jupyterTxt]
+#         
+#         QtWidgets.QMessageBox.about(self, "Main Software Components", "\n".join(txt))
         
         
         
