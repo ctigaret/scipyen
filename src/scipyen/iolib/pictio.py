@@ -1053,6 +1053,7 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
 
         axon_info["t_starts"] = axonIO._t_starts
         axon_info["sampling_rate"] = axonIO._sampling_rate
+        axon_info["abf_version"] = data.annotations["abf_version"]
         
         # see NOTE: 2024-05-30 16:17:08
         # data.annotate(axon_info)
