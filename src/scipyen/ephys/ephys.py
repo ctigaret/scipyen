@@ -1142,6 +1142,10 @@ class RecordingEpisodeType(TypeEnum):
                         # the induction protocol)
                         
 
+# @dataclass
+# class ProtocolSweepMapping:
+#     protocol: ElectrophysiologyProtocol
+#     sweeps:
 
 class SynapticPathway: pass
 
@@ -1264,12 +1268,17 @@ class RecordingEpisode(Episode):
         (theoretically possible, but then one may also think of this as being two
         distinct pathways)
     
-"""
+    """
     # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
+    # FIXME: 2024-09-29 23:32:05 TODO:
+    # conversion to mapping protocol ↦ sweep indices across all blocks in the episode
+    # actually, strike that: an episode must contain blocks recorded WITH THE SAME EPISODE
     def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  name: typing.Optional[str] = None,
                  blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
-                 protocols: typing.Sequence[ElectrophysiologyProtocol] = list(), 
+                 protocol: typing.Optional[ElectrophysiologyProtocol] = None,
+                 # protocols: typing.Sequence[ElectrophysiologyProtocol] = list(), 
+                 # protocols: typing.Mapping[str, typing.Mapping[str, typing.Any]] = dict(), 
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  xtalk: typing.Optional[typing.Union[dict, tuple, list]] = None ,
                  **kwargs):
@@ -1283,12 +1292,9 @@ class RecordingEpisode(Episode):
         name:str - the name of this episode (optional, default is None)
             When None, it is up to the user of this object to give an appropriate
             name
-        protocols: the electrophysiology recording protocol object, or objects, 
-            or None
-            WARNING: As of 2024-02-18 11:09:55 Scipyen only supports 
-            pyabfbridge.ABFProtocol objects.
-
-            Optional; default is None.
+    
+        protocol: ElectrophysiologyProtocol — the protocol used in common througout
+            the episode
 
         pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
             Optional; default is None.
@@ -1374,7 +1380,9 @@ class RecordingEpisode(Episode):
         self._beginFrame_ = 0
         self._endFrame_ = 0
         
-        self._protocols_ = list()
+        # self._protocols_ = list()
+        # self._protocols_ = dict()
+        self._protocol_ = None
         
         self._blocks_ = list()
         self._pathways_ = list()
@@ -1389,6 +1397,7 @@ class RecordingEpisode(Episode):
         end = kwargs.pop("end", None)
         beginFrame = kwargs.pop("beginFrame", None)
         endFrame = kwargs.pop("endFrame", None)
+        
         if isinstance(begin, datetime.datetime):
             self.begin = begin
         if isinstance(end, datetime.datetime):
@@ -1415,23 +1424,25 @@ class RecordingEpisode(Episode):
         # TODO 2024-06-18 11:30:48 FIXME
         # check that all blocks follow the same protocol
         # self.protocols = list() # set up from blocks, if any
-        if isinstance(protocols, ElectrophysiologyProtocol):
+        if isinstance(protocol, ElectrophysiologyProtocol):
+            self._protocol_ = protocol
             if len(self._protocols_) == 0:
                 self._protocols_.append(protocols)
                 
             else:
                 scipywarn("protocols already set up by the blocks; 'protocol' argument will be ignored")
                 
-        elif isinstance(protocols, (tuple, list, collections.deque)) and all (isinstance(p, ElectrophysiologyProtocol) for p in protocols):
+        elif isinstance(protocols, (tuple, list, collections.deque)) and len(protocols) and all (isinstance(p, ElectrophysiologyProtocol) for p in protocols):
             self._protocols_.extend(protocols)
+            
+        if isinstance(protocol, ElectrophysiologyProtocol):
+            self._protocols_.append(protocol)
             
         if isinstance(pathways, (tuple, list)):
             if len(pathways):
                 if not all(isinstance(v, SynapticPathway) for v in pathways):
                     raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
             self._pathways_ = pathways
-        # else:
-        #     self._pathways_ = []
         
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
@@ -1696,24 +1707,31 @@ class RecordingEpisode(Episode):
             scipywarn("Cannot parse protocols from the Block objects")
             traceback.print_exc()
             
-        if len(block_protocols):
-            if len(self._protocols_):
-                protocols = self._protocols_ + block_protocols
-                self._protocols_ = unique(protocols, idcheck=False)
-            else:
-                self._protocols_[:] = block_protocols
-    
+        if len(block_protocols) != 1:
+            raise RuntimeError("An episode can have exactly one protocol")
+        
+        self._protocol_ = block_protocols[0]
+        
     def addBlock(self, x:neo.Block):
         """Adds a new block; blocks will be reordered by rec_datetime if necessary"""
         if not isinstance(x, neo.Block):
             raise TypeError(f"Expecting a neo.Block; instead, got {type().__name__}")
         
         protocol = getProtocol(x)
-        if isinstance(protocol, ElectrophysiologyProtocol):
-            if len(self._protocols_):
-                if protocol not in self.protocols:
-                    scipywarn("The block was acquired with a different protocol")
-            self._protocols_.append(protocol)
+        if isinstance(self._protocol_, ElectrophysiologyProtocol:
+            # make sure they use the same protocol
+            protocols = unique([protocol, self._protocol_], idcheck=False)
+            if len(protocols) != 1:
+                raise RuntimeError("Cannot add new block because is using a different protocol")
+            
+        else:
+            self._protocol_ = protocol
+        
+        # if isinstance(protocol, ElectrophysiologyProtocol):
+        #     if len(self._protocols_):
+        #         if protocol not in self.protocols:
+        #             scipywarn("The block was acquired with a different protocol")
+        #     self._protocols_.append(protocol)
             
         blocks = self._blocks_ + [x]
         self.blocks = blocks
@@ -1757,8 +1775,13 @@ class RecordingEpisode(Episode):
         self._endFrame_ = end
             
     @property
-    def protocols(self) -> list:
-        return self._protocols_
+    def protocol(self) -> ElectrophysiologyProtocol:
+        return self._protocol_
+    
+    @protocol.setter
+    def protocol(self, val:ElectrophysiologyProtocol) -> None:
+        if isinstance(val, ElectrophysiologyProtocol) or val is None:
+            self._protocol_ = val
     
     @property
     def begin(self) -> datetime.datetime:
