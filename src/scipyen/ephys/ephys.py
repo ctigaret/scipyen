@@ -1718,7 +1718,7 @@ class RecordingEpisode(Episode):
             raise TypeError(f"Expecting a neo.Block; instead, got {type().__name__}")
         
         protocol = getProtocol(x)
-        if isinstance(self._protocol_, ElectrophysiologyProtocol:
+        if isinstance(self._protocol_, ElectrophysiologyProtocol):
             # make sure they use the same protocol
             protocols = unique([protocol, self._protocol_], idcheck=False)
             if len(protocols) != 1:
