@@ -491,10 +491,8 @@ from core import datatypes, strutils, utilities
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
 from core.prog import scipywarn
-# from iolib import pictio as pio # NOTE: not here, so we can import this from
-# pictiio (pio); instead we import pio where it is needed i.e. in getABF()
 from ephys.ephys_protocol import ElectrophysiologyProtocol
-
+from core.neoutils import getGeneratorInfo
 import pyabf
 from pyabf.abf1.headerV1 import HeaderV1
 from pyabf.abf2.headerV2 import HeaderV2
@@ -1213,32 +1211,34 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-            if obj.annotations["lActualEpisodes"] != obj.annotations["protocol"]["lEpisodesPerRun"]:
-                scipywarn(f"In {obj.name}: Mismatch betw    een lActualEpisodes ({obj.annotations['lActualEpisodes']}) and lEpisodesPerRun ({obj.annotations['protocol']['lEpisodesPerRun']})")
+            info_dict = getGeneratorInfo(obj)
+                
+            if info_dict["lActualEpisodes"] != info_dict["protocol"]["lEpisodesPerRun"]:
+                scipywarn(f"In {obj.name}: Mismatch between lActualEpisodes ({info_dict['lActualEpisodes']}) and lEpisodesPerRun ({info_dict['protocol']['lEpisodesPerRun']})")
             
             # ### BEGIN ADC inputs information
             # NOTE: further info in self._inputs_
-            self._nADCChannels_ = obj.annotations["sections"]["ADCSection"]["llNumEntries"]
+            self._nADCChannels_ = info_dict["sections"]["ADCSection"]["llNumEntries"]
             # ### END   ADC inputs information
             
             # ### BEGIN DAC outputs information
             # NOTE: further info in self._outputs_
-            self._nDACChannels_ = obj.annotations["sections"]["DACSection"]["llNumEntries"]
-            self._activeDACChannel_ = obj.annotations["protocol"]["nActiveDACChannel"]
-            self._hasAltDacOutState_ = bool(obj.annotations["protocol"]["nAlternateDACOutputState"])
+            self._nDACChannels_ = info_dict["sections"]["DACSection"]["llNumEntries"]
+            self._activeDACChannel_ = info_dict["protocol"]["nActiveDACChannel"]
+            self._hasAltDacOutState_ = bool(info_dict["protocol"]["nAlternateDACOutputState"])
             # ### END   DAC outputs information
             
             # ### BEGIN digital outputs information
             # NOTE: further info indirectly via self._outputs_
-            self._nDigitalOutputs_ = obj.annotations["sections"]["DACSection"]["llNumEntries"]
-            self._nTotalDigitalOutputs_ = obj.annotations["protocol"]["nDigitizerTotalDigitalOuts"]
-            self._nSynchronizedDigitalOutputs_ = obj.annotations["protocol"]["nDigitizerSynchDigitalOuts"]
-            self._hasAltDigOutState_ = bool(obj.annotations["protocol"]["nAlternateDigitalOutputState"])
-            self._digTrainActiveHi_ = bool(obj.annotations["protocol"]["nDigitalTrainActiveLogic"])
-            self._digHolding_ = obj.annotations["protocol"]["nDigitalHolding"]
+            self._nDigitalOutputs_ = info_dict["sections"]["DACSection"]["llNumEntries"]
+            self._nTotalDigitalOutputs_ = info_dict["protocol"]["nDigitizerTotalDigitalOuts"]
+            self._nSynchronizedDigitalOutputs_ = info_dict["protocol"]["nDigitizerSynchDigitalOuts"]
+            self._hasAltDigOutState_ = bool(info_dict["protocol"]["nAlternateDigitalOutputState"])
+            self._digTrainActiveHi_ = bool(info_dict["protocol"]["nDigitalTrainActiveLogic"])
+            self._digHolding_ = info_dict["protocol"]["nDigitalHolding"]
     
             # allow the use of blocks read from ABF before 2023-09-20 23:26:08
-            digHolds = obj.annotations["sections"]["EpochSection"].get("nEpochDigitalOutput", None) # 3,2,1,0,7,6,5,4
+            digHolds = info_dict["sections"]["EpochSection"].get("nEpochDigitalOutput", None) # 3,2,1,0,7,6,5,4
     
             if isinstance(digHolds, list) and len(digHolds) == self._nDigitalOutputs_:
                 digHolds = list(map(bool, digHolds))
@@ -1253,23 +1253,23 @@ class ABFProtocol(ElectrophysiologyProtocol):
             else:
                 self._digHoldingValue_ = [False] * self._nDigitalOutputs_
                 
-            self._digUseLastEpochHolding_ = bool(obj.annotations["protocol"]["nDigitalInterEpisode"])
+            self._digUseLastEpochHolding_ = bool(info_dict["protocol"]["nDigitalInterEpisode"])
             # ### END   digital outputs information
             
             # NOTE: 2024-03-08 22:33:34 see NOTE: 2024-03-08 22:32:29
-            # self._acquisitionMode_ = ABFAcquisitionMode.type(obj.annotations["protocol"]["nOperationMode"])
-            self._acquisitionMode_ = ABFAcquisitionMode(obj.annotations["protocol"]["nOperationMode"])
-            self._nSweeps_ = obj.annotations["protocol"]["lEpisodesPerRun"]
-            self._nRuns_   = obj.annotations["protocol"]["lRunsPerTrial"]
-            self._nTrials_ = obj.annotations["protocol"]["lNumberOfTrials"]
-            self._nTotalDataPoints_ = obj.annotations["sections"]["DataSection"]["llNumEntries"]
+            # self._acquisitionMode_ = ABFAcquisitionMode.type(info_dict["protocol"]["nOperationMode"])
+            self._acquisitionMode_ = ABFAcquisitionMode(info_dict["protocol"]["nOperationMode"])
+            self._nSweeps_ = info_dict["protocol"]["lEpisodesPerRun"]
+            self._nRuns_   = info_dict["protocol"]["lRunsPerTrial"]
+            self._nTrials_ = info_dict["protocol"]["lNumberOfTrials"]
+            self._nTotalDataPoints_ = info_dict["sections"]["DataSection"]["llNumEntries"]
             self._nDataPointsPerSweep_ = int(self._nTotalDataPoints_/self._nSweeps_/self._nADCChannels_)
-            self._samplingRate_ = float(obj.annotations["sampling_rate"]) * pq.Hz
-            self._sweepInterval_ = obj.annotations["protocol"]["fEpisodeStartToStart"] * pq.s
-            self._averaging_ = ABFAveragingMode(obj.annotations["protocol"]["nAverageAlgorithm"]) # 0 = Cumulative; 1 = Most recent
-            self._averageWeighting_ =  obj.annotations["protocol"]["fAverageWeighting"] 
+            self._samplingRate_ = float(info_dict["sampling_rate"]) * pq.Hz
+            self._sweepInterval_ = info_dict["protocol"]["fEpisodeStartToStart"] * pq.s
+            self._averaging_ = ABFAveragingMode(info_dict["protocol"]["nAverageAlgorithm"]) # 0 = Cumulative; 1 = Most recent
+            self._averageWeighting_ =  info_dict["protocol"]["fAverageWeighting"] 
             
-            self._protocolFile_ = obj.annotations["sProtocolPath"].decode()
+            self._protocolFile_ = info_dict["sProtocolPath"].decode()
 
             self._sourceHash_ = hash(obj)
             self._sourceId_ = id(obj)
@@ -2614,9 +2614,10 @@ class ABFInputConfiguration:
 
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-
+            info_dict = getGeneratorInfo(obj)
+                
             if physical:
-                p = [v["nADCNum"] for v in obj.annotations["listADCInfo"]]
+                p = [v["nADCNum"] for v in info_dict["listADCInfo"]]
                 if adcChannel not in p:
                     adcName = ""
                     adcUnits = ""
@@ -2624,17 +2625,17 @@ class ABFInputConfiguration:
                     self._physicalChannelIndex_ = adcChannel
                     logical = p.index(adcChannel)
                     self._adcChannel_ = logical
-                    adcName = obj.annotations["listADCInfo"][logical]["ADCChNames"].decode()
-                    adcUnits = obj.annotations["listADCInfo"][logical]["ADCChUnits"].decode()
+                    adcName = info_dict["listADCInfo"][logical]["ADCChNames"].decode()
+                    adcUnits = info_dict["listADCInfo"][logical]["ADCChUnits"].decode()
             else:
-                if adcChannel not in range(len(obj.annotations["listADCInfo"])):
+                if adcChannel not in range(len(info_dict["listADCInfo"])):
                     adcName = ""
                     adcUnits = ""
                 else:
                     self._adcChannel_ = adcChannel
-                    self._physicalChannelIndex_ = obj.annotations["listADCInfo"][adcChannel]["nADCNum"]
-                    adcName = obj.annotations["listADCInfo"][adcChannel]["ADCChNames"].decode()
-                    adcUnits = obj.annotations["listADCInfo"][adcChannel]["ADCChUnits"].decode()
+                    self._physicalChannelIndex_ = info_dict["listADCInfo"][adcChannel]["nADCNum"]
+                    adcName = info_dict["listADCInfo"][adcChannel]["ADCChNames"].decode()
+                    adcUnits = info_dict["listADCInfo"][adcChannel]["ADCChUnits"].decode()
                     
             self._adcName_ = adcName
             self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
@@ -2992,17 +2993,16 @@ class ABFOutputConfiguration:
             
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-            # if dacChannel not in (c["nDACNum"] for c in obj.annotations["listDACInfo"]):
-            #     raise ValueError(f"Invalid DAC channel index {dacChannel}")
+            info_dict = getGeneratorInfo(obj)
             
             if physical: # specify via its physical index
-                p = [v["nDACNum"] for v in obj.annotations["listDACInfo"]]
+                p = [v["nDACNum"] for v in info_dict["listDACInfo"]]
                 if dacChannel in p:
                     self._physicalChannelIndex_ = dacChannel
                     logical = p.index(dacChannel)
                     self._dacChannel_ = logical
-                    dacName = obj.annotations["listDACInfo"][logical]["DACChNames"].decode()
-                    dacUnits = obj.annotations["listDACInfo"][logical]["DACChUnits"].decode()
+                    dacName = info_dict["listDACInfo"][logical]["DACChNames"].decode()
+                    dacUnits = info_dict["listDACInfo"][logical]["DACChUnits"].decode()
                 else:
                     self._physicalChannelIndex_ = None
                     self._dacChannel_ = None
@@ -3010,11 +3010,11 @@ class ABFOutputConfiguration:
                     dacUnits = ""
                     
             else: # specify via its logical index
-                if dacChannel in range(len(obj.annotations["listDACInfo"])):
+                if dacChannel in range(len(info_dict["listDACInfo"])):
                     self._dacChannel_ = dacChannel
-                    self._physicalChannelIndex_ = obj.annotations["listDACInfo"][dacChannel]["nDACNum"]
-                    dacName = obj.annotations["listDACInfo"][dacChannel]["DACChNames"].decode()
-                    dacUnits = obj.annotations["listDACInfo"][dacChannel]["DACChUnits"].decode()
+                    self._physicalChannelIndex_ = info_dict["listDACInfo"][dacChannel]["nDACNum"]
+                    dacName = info_dict["listDACInfo"][dacChannel]["DACChNames"].decode()
+                    dacUnits = info_dict["listDACInfo"][dacChannel]["DACChUnits"].decode()
                 else:
                     self._physicalChannelIndex_ = None
                     self._dacChannel_ = None
@@ -3024,8 +3024,8 @@ class ABFOutputConfiguration:
             self._dacName_ = dacName
             self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
 
-            self._dacHoldingLevel_ = float(obj.annotations["listDACInfo"][self._dacChannel_]["fDACHoldingLevel"]) * self._dacUnits_
-            self._interEpisodeLevel_ = bool(obj.annotations["listDACInfo"][self._dacChannel_]["nInterEpisodeLevel"])
+            self._dacHoldingLevel_ = float(info_dict["listDACInfo"][self._dacChannel_]["fDACHoldingLevel"]) * self._dacUnits_
+            self._interEpisodeLevel_ = bool(info_dict["listDACInfo"][self._dacChannel_]["nInterEpisodeLevel"])
             
             if np.abs(self._dacHoldingLevel_).magnitude > 1e6:
                 self._dacHoldingLevel_ = np.nan * self._dacUnits_
@@ -3034,9 +3034,9 @@ class ABFOutputConfiguration:
                 self._dacHoldingLevel_ = 0.0 * self._dacUnits_
             
             # command (analog) waveform flags:
-            self._waveformEnabled_ = bool(obj.annotations["listDACInfo"][self._dacChannel_]["nWaveformEnable"])
+            self._waveformEnabled_ = bool(info_dict["listDACInfo"][self._dacChannel_]["nWaveformEnable"])
             
-            wsrc = obj.annotations["listDACInfo"][self._dacChannel_]["nWaveformSource"]
+            wsrc = info_dict["listDACInfo"][self._dacChannel_]["nWaveformSource"]
             
             if wsrc in ABFDACWaveformSource.values():
                 self._waveformSource_ = ABFDACWaveformSource.type(wsrc)
@@ -3114,10 +3114,13 @@ class ABFOutputConfiguration:
         if isinstance(obj, pyabf.ABF):
             self._init_epochs_abf_(obj)
             
-        else:
+        elif isinstance(obj, neo.Block):
+            assert sourcedFromABF(obj), "Object does not appear sourced from an ABF file"
+            info_dict = getGeneratorInfo(obj)
+                
             digPatterns = getDIGPatterns(obj)
-            if self.logicalIndex in obj.annotations["dictEpochInfoPerDAC"]:
-                dacEpochDict = obj.annotations["dictEpochInfoPerDAC"][self.logicalIndex]
+            if self.logicalIndex in info_dict["dictEpochInfoPerDAC"]:
+                dacEpochDict = info_dict["dictEpochInfoPerDAC"][self.logicalIndex]
                 epochs = list()
                 for epochNum, epochDict in dacEpochDict.items():
                     epoch = ABFEpoch()
@@ -4901,8 +4904,7 @@ def unitStrAsQuantity(x:str, convert:bool=True):
     return scq.unit_quantity_from_name_or_symbol(x) if convert else x
 
 def sourcedFromABF(x:neo.Block) -> bool:
-    ver = getABFversion(x) # raises AssertionError if x is not sourced from ABF
-    return True
+    return x.annotations.get("software", None) == "Axon"
 
 def getABF(obj:typing.Union[str, neo.Block]):
     """
@@ -5136,14 +5138,15 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
     
     # check of this neo.Block was read from an ABF file
     assert sourcedFromABF(obj), "Object does not appear to have been sourced from an ABF file"
-    
+    info_dict = getGeneratorInfo(obj)
+        
     epochsDigitalPattern = dict()
     
     # reverses the banks => 7-4 then 3-0
     banks = [1,0] if reverse_banks else [0,1]
     
-    nSynchDIGBits = obj.annotations["protocol"]["nDigitizerSynchDigitalOuts"]
-    nAlternateDIGBits = obj.annotations["protocol"]["nDigitizerTotalDigitalOuts"] - nSynchDIGBits
+    nSynchDIGBits = info_dict["protocol"]["nDigitizerSynchDigitalOuts"]
+    nAlternateDIGBits = info_dict["protocol"]["nDigitizerTotalDigitalOuts"] - nSynchDIGBits
 
     getSynchBitList = partial(valToBitList, bitCount = nSynchDIGBits,
                                 as_bool=True)
@@ -5151,7 +5154,7 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
     getAlternateBitList = partial(valToBitList, bitCount = nAlternateDIGBits,
                                     as_bool = True)
     
-    for epoch_info in obj.annotations["EpochInfo"]:
+    for epoch_info in info_dict["EpochInfo"]:
         epochNumber = epoch_info["nEpochNum"]
         if isinstance(epoch_num, int) and epoch_num != epochNumber:
             continue
@@ -5869,21 +5872,25 @@ def _(obj:pyabf.ABF) -> int:
 
 @getABFversion.register(neo.Block)
 def _(obj:neo.Block) -> int:
-    abf_version = obj.annotations.get("abf_version", None)
-    assert isinstance(abf_version, float), "Object does not seem to be created from an ABF file"
+    info_dict = getGeneratorInfo(obj)
     
+    abf_version = info_dict.get("abf_version", None)
+    assert isinstance(abf_version, float), "Object does not appear to be sourced from an ABF file"
+    
+    # NOTE: 2024-09-29 21:45:08
+    # we need to compare the int part of abf_verison with fileVersionMajor below
     abf_version = int(abf_version)
     
-    fFileSignature = obj.annotations.get("fFileSignature", None)
+    fFileSignature = info_dict.get("fFileSignature", None)
     
-    assert isinstance(fFileSignature, bytes), "Object does not seem to be created from an ABF file"
+    assert isinstance(fFileSignature, bytes), "Object does not appear to be sourced from an ABF file"
     
     fileSig = fFileSignature.decode()
     fileSigVersion = int(fileSig[-1])
     
     assert abf_version == fileSigVersion, "Mismatch between reported ABF versions; check obejct's annotations properties"
     
-    fFileVersionNumber = obj.annotations.get("fFileVersionNumber", None)
+    fFileVersionNumber = info_dict.get("fFileVersionNumber", None)
     
     assert isinstance(fFileVersionNumber, float), "Object does not seem to be created from an ABF file"
     
@@ -5910,9 +5917,13 @@ def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
 @usedADCs.register(neo.Block)
 def _(obj:neo.Block, useQuantities:bool=True) -> dict:
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
-    return dict(map(lambda x: (x, (obj.annotations["listADCInfo"][x]["ADCChNames"].decode(),
-                                   unitStrAsQuantity(obj.annotations["listADCInfo"][x]["ADCChUnits"].decode(), useQuantities))),
-                    range(obj.annotations["sections"]["ADCSection"]["llNumEntries"])))
+    info_dict = getGeneratorInfo(obj)
+    return dict(map(lambda x: (x, (info_dict["listADCInfo"][x]["ADCChNames"].decode(),
+                                   unitStrAsQuantity(info_dict["listADCInfo"][x]["ADCChUnits"].decode(), useQuantities))),
+                    range(info_dict["sections"]["ADCSection"]["llNumEntries"])))
+    # return dict(map(lambda x: (x, (obj.annotations["listADCInfo"][x]["ADCChNames"].decode(),
+    #                                unitStrAsQuantity(obj.annotations["listADCInfo"][x]["ADCChUnits"].decode(), useQuantities))),
+    #                 range(obj.annotations["sections"]["ADCSection"]["llNumEntries"])))
 
 @singledispatch
 def usedDACs(obj, useQuantities:bool=True) -> dict:
@@ -5931,9 +5942,11 @@ def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
 @usedDACs.register(neo.Block)
 def _(obj:neo.Block, useQuantities:bool=True) -> dict:
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
-    
+    info_dict = getGeneratorInfo(obj)
     return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),
-                    filter(lambda x: x["nWaveformEnable"] > 0 and x["nWaveformSource"] > 0, obj.annotations["listDACInfo"])))
+                    filter(lambda x: x["nWaveformEnable"] > 0 and x["nWaveformSource"] > 0, info_dict["listDACInfo"])))
+    # return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),
+    #                 filter(lambda x: x["nWaveformEnable"] > 0 and x["nWaveformSource"] > 0, obj.annotations["listDACInfo"])))
     
 @singledispatch    
 def isDACWaveformEnabled(obj, channel:int) -> bool:

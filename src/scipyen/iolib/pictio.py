@@ -1000,7 +1000,6 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
     
     data = neo.Block()
     axon_info = dict()
-    #protocol_sweeps = list()
     
     try:
         axonIO = neo.io.AxonIO(filename=fileName)
@@ -1024,7 +1023,6 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
                     if s.name is None or (isinstance(s.name, str) and len(s.name.strip()) == 0):
                         s.name = "segment_%d" % k
         
-        #protocol_sweeps = axonIO.read_protocol()
         # NOTE: 2024-05-30 16:17:08
         # NEO api changed (AGAIN!) so now annotate(…) only accept keys of type `str`
         #
@@ -1035,7 +1033,7 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
         
         # augment axon_info with missing bits that pyabf can actually get
         # I know this is a bit redundant and duplicates some data, but it simpler
-        # than tweaking axonrawio in neo package...
+        # than tweaking axonrawio in the neo package...
         abf = pab.getABF(fileName)
         abfEpochSection = pab.getABFsection(abf, "epoch") # needed for DIG holding levels
         abfStringsSection = pab.getABFsection(abf, "strings") # needed for indexed strings, containing inter alia the name of a stimulus file (when used)
@@ -1056,10 +1054,10 @@ def loadAxonFile(fileName:typing.Union[str, pathlib.Path], create_group_across_s
         axon_info["t_starts"] = axonIO._t_starts
         axon_info["sampling_rate"] = axonIO._sampling_rate
         
-        
         # see NOTE: 2024-05-30 16:17:08
         # data.annotate(axon_info)
-        data.annotations.update(axon_info)
+        # data.annotations.update(axon_info)
+        data.annotations["generator"] = axon_info
         
         return data
     

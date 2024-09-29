@@ -210,13 +210,6 @@ from core.utilities import (normalized_index, name_lookup, GeneralIndexType,
 
 from core.strutils import (InflectEngine, pluralize)
 
-# from iolib.pictio import getABF
-# from core.pyabfbridge import getABFProtocolEpochs
-
-
-#from .patchneo import neo
-
-
 #### END pict.core modules
 
 ephys_data = (neo.Block, neo.Segment, neo.AnalogSignal, neo.IrregularlySampledSignal, 
@@ -982,6 +975,13 @@ def get_neo_version():
     major, minor, dot = importlib.metadata.version("neo").split(".")
     return eval(major), eval(minor), eval(dot)
 
+def getGeneratorInfo(o:neo.Block) -> dict:
+    """Retrieve generator meta-data used to construct a protocol for this trial"""
+    generator = o.annotations.get("generator", None)
+    if isinstance(generator, dict) and len(generator):
+        return generator
+    return o.annotations
+    
 @safeWrapper
 def assign_to_signal(dest:neo.AnalogSignal, 
                      src:[neo.AnalogSignal, pq.Quantity], 
