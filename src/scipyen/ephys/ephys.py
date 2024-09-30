@@ -1279,7 +1279,7 @@ class RecordingEpisode(Episode):
                  name: typing.Optional[str] = None,
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
-                 xtalk: dict = dict() ,
+                 pathStimBySweep: dict = dict() ,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1298,8 +1298,8 @@ class RecordingEpisode(Episode):
         pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
             Optional; default is None.
 
-        xtalk: dict — configuration of pathway cross-stimulation
-            (for testing pathway cross-talk, or independence)
+        pathwayStimulusbySweep: dict — indicates which pathways are stimulated in
+            which sweep; also useful for testing pathway cross-talk, or independence
     
             This is a key ↦ value mapping, where:
     
@@ -1344,13 +1344,13 @@ class RecordingEpisode(Episode):
             and in the order 'path1' → 'path0' in every other segment, starting
             with the 2ⁿᵈ (segment index 1) , 𝑖.𝑒,, on `odd-numbered` segments.
                 
-            By default the `xtalk` attribute of a recording episode is an empty
-            dict.
+            By default the `pathwayStimulusbySweep` attribute of a recording 
+            episode is an empty dict.
     
             ¹ Here a `segment` has the same meaning as a `sweep`; we use `segment`
             to also indicate that this refers to a neo.Segment object.
 
-            Optional, default is an empty dicttionary.
+            Optional, default is an empty dictionary.
 
         Var-keyword parameters (kwargs)
         -------------------------------
@@ -1424,27 +1424,17 @@ class RecordingEpisode(Episode):
         # NOTE: no checks are done on the value of the key(s) so expect errors
         #   when trying to match an episode with data having the wrong number of
         # sweeps
-        if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
-            if len(self._pathways_) == 0:
-                raise ValueError("Cannot apply crosstalk when there are no pathways defined")
-            
-            for k,p in xtalk.items():
-                if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
-                    raise TypeError("Cross-talk has invalid key types; expecting int or pairs of int")
-                
-                if any(p_ not in range(len(self._pathways_)) for p_ in p):
-                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self._pathways_)} pathways")
-                
-            self.xtalk = xtalk
-            
-        elif isinstance(xtalk, (tuple, list)):
-            if len(xtalk) and not all(isinstance(v, int) for v in xtalk):
-                raise TypeError("When a tuple, 'xtalk' must contain only integers")
-            
-            self.xtalk = tuple(xtalk)
-            
-        else:
-            self.xtalk = tuple()
+        #
+        if isinstance(pathwayStimulusbySweep,dict):
+            self.pathwayStimulusbySweep = pathwayStimulusbySweep
+#         elif isinstance(xtalk, (tuple, list)):
+#             if len(xtalk) and not all(isinstance(v, int) for v in pathwayStimulusbySweep):
+#                 raise TypeError("When a tuple, 'pathwayStimulusbySweep' must contain only integers")
+#             
+#             self.pathwayStimulusbySweep = tuple(pathwayStimulusbySweep)
+#             
+#         else:
+#             self.xtalk = tuple()
             # raise ValueError(f"Invalid xtalk specification ({xtalk})")
 
         # NOTE: 2024-09-30 08:52:22

@@ -509,6 +509,12 @@ NOTE: you can click anywhere in the row to select</string>
           <iconset theme="go-home">
            <normaloff>.</normaloff>.</iconset>
          </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
+         </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
@@ -525,6 +531,12 @@ NOTE: you can click anywhere in the row to select</string>
          <property name="icon">
           <iconset theme="go-previous">
            <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -546,6 +558,12 @@ NOTE: you can click anywhere in the row to select</string>
           <iconset theme="go-next">
            <normaloff>.</normaloff>.</iconset>
          </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
+         </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
@@ -566,6 +584,12 @@ NOTE: you can click anywhere in the row to select</string>
           <iconset theme="go-up">
            <normaloff>.</normaloff>.</iconset>
          </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
+         </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
@@ -582,6 +606,12 @@ NOTE: you can click anywhere in the row to select</string>
          <property name="icon">
           <iconset theme="view-filter">
            <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
          </property>
          <property name="checkable">
           <bool>true</bool>
@@ -612,6 +642,12 @@ NOTE: you can click anywhere in the row to select</string>
           <iconset theme="document-open-folder">
            <normaloff>.</normaloff>.</iconset>
          </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
+         </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
@@ -634,6 +670,12 @@ NOTE: you can click anywhere in the row to select</string>
          <property name="icon">
           <iconset theme="document-open-folder">
            <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -658,6 +700,12 @@ NOTE: you can click anywhere in the row to select</string>
           <iconset theme="go-parent-folder">
            <normaloff>.</normaloff>.</iconset>
          </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
+         </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
@@ -680,6 +728,12 @@ NOTE: you can click anywhere in the row to select</string>
          <property name="icon">
           <iconset theme="scriptnew">
            <normaloff>.</normaloff>.</iconset>
+         </property>
+         <property name="iconSize">
+          <size>
+           <width>22</width>
+           <height>22</height>
+          </size>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -919,6 +973,12 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="whatsThis">
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When a single variable is selected in the workspace (User Variables tab), shows a file save dialog to choose among supported file types. &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;When more than one variable is selected, saves all of them to HDF5 files named after the variable name (symbol) in the workspace.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>22</width>
+     <height>22</height>
+    </size>
    </property>
    <property name="toolButtonStyle">
     <enum>Qt::ToolButtonFollowStyle</enum>
