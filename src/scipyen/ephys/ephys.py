@@ -1279,7 +1279,7 @@ class RecordingEpisode(Episode):
                  name: typing.Optional[str] = None,
                  pathways: typing.Sequence[SynapticPathway] = list(),
                  episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
-                 xtalk: typing.Optional[typing.Union[dict, tuple, list]] = None ,
+                 xtalk: dict = dict() ,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1298,69 +1298,59 @@ class RecordingEpisode(Episode):
         pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
             Optional; default is None.
 
-        xtalk: dict, tuple, or list — configuration of pathway cross-stimulation
+        xtalk: dict — configuration of pathway cross-stimulation
             (for testing pathway cross-talk, or independence)
+    
+            This is a key ↦ value mapping, where:
+    
+            • the keys are either:
+                ∘ an int: the index of the segment¹ where the cross-stimulation
+                    of the pathways indicated in the corresponsing tuple, 
+                    has occurred.
+    
+                ∘ a tuple of two int (x,y) where `x` is the index of the 
+                    first segment where cross-stimulation is applied, and 
+                    `y` is the number of segments skipped.
 
-            • when a dict it contains key ↦ value mappings
-                ∘ values are tuples of int indices of pathways, and their ORDER
-                    indicates the order in which the pathways are cross-stimulated;
+            • values are tuples of SynapticPathway objects, and their ORDER
+                indicates the order in which the pathways are cross-stimulated
+                in a given sweep;
 
-                    in theory, there can be any number of pathways, but in practice
-                    the tuple contains only two pathways tested for cross-talk
+                In theory, there can be any number of pathways, but in practice
+                only first two pathways are tested for cross-talk.
+    
+                A tuple that contains only one pathway indicates no crosstalk in
+                the sweep(s) specified by the key.
 
-                    For example, a tuple (0,1) indicates that the pathways are
-                    given each a single stimulus (pathwya 0 first, then pathway 1).
+            Examples: 
+            A dictionary with the following structure:
 
-                    To be useful these stimulations must occur with the same 
-                    inter-stimulus interval (ISI) as the one used for paired-
-                    pulse stimulation of a single pathway (so that pathway 
-                    independence can be assessed based on response facilitation
-                    or lack thereof)
-                    
-                ∘ the keys are either:
-                    □ an int: the index of the segment¹ where the cross-stimulation
-                        of the pathways, indicated in the tuple, has occurred
+            0 ↦ (path0, path1)
+            1 ↦ (path1, path0)
 
-                        Example: a dictionary with the following structure
+            indicates a cross-stimulation of two pathwyas ('path0' & 'path1') in 
+            the order 'path0' → 'path1' in the 1ˢᵗ segment (sweep 0), and in 
+            the order 'path1' → 'path0' in the 2ⁿᵈ segment (sweep 1)
 
-                        0 ↦ (0,1)
-                        1 ↦ (1,0)
 
-                        indicates a cross-stimulationof two pathwyas in the 
-                        order 0 → 1 in the first segment, and in the order 1 → 0
-                        in the second segment
+            A dictionary with the following structure:
 
-                    □ a tuple of two int (x,y) where `x` is the index of the 
-                        first segment where cross-stimulation is applied, and 
-                        `y` is the number of segments skipped.
+            (0,2) ↦ (path0, path1)
+            (1,2) ↦ (path1, path0)
 
-                        Example: a dictionary with the following structure
-
-                        (0,2) ↦ (0,1)
-                        (1,2) ↦ (1,0)
-
-                        indicates cross-stimulation of two pathways in the 
-                        order 0 → 1 in every other segment, starting with the
-                        first (segment index 0)² i.e., on `even-numbered` segments, 
-                        and in the order 1 → 0 in every other segment, starting
-                        with the second (segment index 1) i.e., on `odd-numbered`
-                        segments
-
-            • when a tuple or list, it indicates the pathway indices and the 
-                order in which they are stimulated, througout the episode
+            indicates cross-stimulation of two pathways ('path0' & 'path1') in 
+            the order 'path0' → 'path1' in every other segment starting with the
+            1ˢᵗ  (segment index 0) , 𝑖.𝑒, on `even-numbered` segments, 
+            and in the order 'path1' → 'path0' in every other segment, starting
+            with the 2ⁿᵈ (segment index 1) , 𝑖.𝑒,, on `odd-numbered` segments.
                 
             By default the `xtalk` attribute of a recording episode is an empty
-            tuple.
-
+            dict.
+    
             ¹ Here a `segment` has the same meaning as a `sweep`; we use `segment`
             to also indicate that this refers to a neo.Segment object.
 
-            ² Python uses 0-based indexing of elements in a collection.
-
-            Indicates the order of the stimulated pathways in a cross-talk contingency,
-            were each pathway is stimulated in turn, in a paired-pulse stimulation
-
-            Optional, default is None
+            Optional, default is an empty dicttionary.
 
         Var-keyword parameters (kwargs)
         -------------------------------

@@ -1117,7 +1117,9 @@ def inspect_members(obj, predicate=None):
         mb = tuple(filter(lambda x: predicate(x[1]), mb))
         
     return dict(mb)
-                   
+
+class Procedure: pass # shim, redef'ed below
+
 @dataclass
 class Episode:
     """Generic episode for frame-based data.
