@@ -1159,7 +1159,8 @@ class RecordingEpisode(Episode):
     experiment where distinct sets of conditions are applied in sequence.
 
     All sweeps in the episode must have been recorded using the same recording
-    protocol (an ElectrophysiologyProtocol object).
+    protocol (an ElectrophysiologyProtocol object) and, implicitly, from the
+    same RecordingSource.
     
     The sweeps in an episode may belong to either:
     
@@ -1197,8 +1198,8 @@ class RecordingEpisode(Episode):
     ↓
     • recording after drug wash-out
     
-    In all three episodes the synaptic respones are recorded with the SAME 
-        electrophysiology recording protocol.
+    In each of the three episodes the synaptic respones are recorded with the 
+    SAME electrophysiology recording protocol.
 
     2) Segments recorded while testing for cross-talk between synaptic pathways,
     (and therefore, where the paired pulses are crossed between pathways) is a
@@ -1273,13 +1274,11 @@ class RecordingEpisode(Episode):
     # FIXME: 2024-09-29 23:32:05 TODO:
     # conversion to mapping protocol ↦ sweep indices across all blocks in the episode
     # actually, strike that: an episode must contain blocks recorded WITH THE SAME EPISODE
-    def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
-                 name: typing.Optional[str] = None,
-                 blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
+    def __init__(self, blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
                  protocol: typing.Optional[ElectrophysiologyProtocol] = None,
-                 # protocols: typing.Sequence[ElectrophysiologyProtocol] = list(), 
-                 # protocols: typing.Mapping[str, typing.Mapping[str, typing.Any]] = dict(), 
+                 name: typing.Optional[str] = None,
                  pathways: typing.Sequence[SynapticPathway] = list(),
+                 episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  xtalk: typing.Optional[typing.Union[dict, tuple, list]] = None ,
                  **kwargs):
         """Constructor for RecordingEpisode.
@@ -1380,8 +1379,6 @@ class RecordingEpisode(Episode):
         self._beginFrame_ = 0
         self._endFrame_ = 0
         
-        # self._protocols_ = list()
-        # self._protocols_ = dict()
         self._protocol_ = None
         
         self._blocks_ = list()
@@ -1393,6 +1390,76 @@ class RecordingEpisode(Episode):
             self._blocks_[:] = sorted(list(blocks), key = lambda x: x.rec_datetime)
             self._setup_from_blocks_() # also sets up protocols
             
+        if isinstance(protocol, ElectrophysiologyProtocol):
+            # NOTE: 2024-09-30 08:49:45
+            # ignore (with warning) if protocol was set up from the 'blocks' argument
+            if isinstance(self._protocol_, ElectrophysiologyProtocol):
+                scipywarn("The episode's protocol was already set up by the 'blocks' argument; 'protocol' argument will be ignored")
+            else:
+                self._protocol_ = protocol
+                
+        if isinstance(pathways, (tuple, list)):
+            if len(pathways):
+                if not all(isinstance(v, SynapticPathway) for v in pathways):
+                    raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
+            self._pathways_ = pathways
+        
+        # NOTE: 2023-10-15 13:27:27
+        # crosstalk mapping: ATTENTION: in this context cross-talk represents an
+        # overlap between synapses activated by ideally distinct axonal pathways 
+        # (encapsulated by SynapticStimulus objects) in the same RecordingSource
+        #
+        # Testing the degree of pathway separation is based on short-term plasticity
+        # at the synapses under study: the "facilitation" or "depletion" of the synaptic
+        # responses seen when two individual stimuli are delivered to the same synapse
+        # (or group of synapses) at a short time interval ("paired-pulse ratio").
+        #
+        # When the two stimuli are delievered to distinct axonal bundles that synapse
+        # on the same cell, the lack of facilitation or depletion indicates that 
+        # the two axonal pathways activate completely separated groups of synapses
+        # on the postsynaptic cell.
+        #
+        # sweep index:intᵃ or tuple of int ↦ ordered sequence of pathway 
+        # indexes (int), 
+        #   e.g., for two pathways, using int keys:
+        #       0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
+        #       1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
+        #
+        #   or, as a tuple of two int:
+        #       (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from path 0 to path 1
+        #       (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from path 1 to path 0
+        #
+        #   ᵃ NOTE: relative to the first sweep in the episode! 
+        #
+        # NOTE: no checks are done on the value of the key(s) so expect errors
+        #   when trying to match an episode with data having the wrong number of
+        # sweeps
+        if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
+            if len(self._pathways_) == 0:
+                raise ValueError("Cannot apply crosstalk when there are no pathways defined")
+            
+            for k,p in xtalk.items():
+                if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
+                    raise TypeError("Cross-talk has invalid key types; expecting int or pairs of int")
+                
+                if any(p_ not in range(len(self._pathways_)) for p_ in p):
+                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self._pathways_)} pathways")
+                
+            self.xtalk = xtalk
+            
+        elif isinstance(xtalk, (tuple, list)):
+            if len(xtalk) and not all(isinstance(v, int) for v in xtalk):
+                raise TypeError("When a tuple, 'xtalk' must contain only integers")
+            
+            self.xtalk = tuple(xtalk)
+            
+        else:
+            self.xtalk = tuple()
+            # raise ValueError(f"Invalid xtalk specification ({xtalk})")
+
+        # NOTE: 2024-09-30 08:52:22
+        # parameters for the superclass (dataytypes.Episode) constructor
+        #
         begin = kwargs.pop("begin", None)
         end = kwargs.pop("end", None)
         beginFrame = kwargs.pop("beginFrame", None)
@@ -1421,86 +1488,7 @@ class RecordingEpisode(Episode):
         if isinstance(endFrame, int):
             self.endFrame = endFrame
             
-        # TODO 2024-06-18 11:30:48 FIXME
-        # check that all blocks follow the same protocol
-        # self.protocols = list() # set up from blocks, if any
-        if isinstance(protocol, ElectrophysiologyProtocol):
-            self._protocol_ = protocol
-            if len(self._protocols_) == 0:
-                self._protocols_.append(protocols)
-                
-            else:
-                scipywarn("protocols already set up by the blocks; 'protocol' argument will be ignored")
-                
-        elif isinstance(protocols, (tuple, list, collections.deque)) and len(protocols) and all (isinstance(p, ElectrophysiologyProtocol) for p in protocols):
-            self._protocols_.extend(protocols)
-            
-        if isinstance(protocol, ElectrophysiologyProtocol):
-            self._protocols_.append(protocol)
-            
-        if isinstance(pathways, (tuple, list)):
-            if len(pathways):
-                if not all(isinstance(v, SynapticPathway) for v in pathways):
-                    raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
-            self._pathways_ = pathways
-        
-        # NOTE: 2023-10-15 13:27:27
-        # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
-        # between synapses activated by ideally distinct axonal pathways 
-        # (encapsulated by SynapticStimulus objects) in the same RecordingSource
-        #
-        # Testing the degree of pathway separation is based on short-term plasticity
-        # at the synapses under study: the "facilitation" or "depletion" of the synaptic
-        # responses seen when two individual stimuli are delivered to the same synapse
-        # (or group of synapses) at a short time interval ("paired-pulse ratio").
-        #
-        # When the two stimuli are delievered to distinct axonal bundles that synapse
-        # on the same cell, the lack of facilitation or depletion indicates that 
-        # the two axonal pathways activate completely separated groups of synapses
-        # on the postsynaptic cell.
-        #
-        # sweep index:intᵃ or tuple of int ↦ ordered sequence of pathway 
-        # indexes (int), 
-        #   e.g., for two pathways, using int keys:
-        #       0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
-        #       1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
-        #
-        #   or, as a tuple of two int:
-        #       (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from path 0 to path 1
-        #       (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from path 1 to path 0
-        #
-        #   ᵃ NOTE: relative to the first sweep in the episode! 
-        #
-        # NOTE: no checks are done on the value of the key(s) so expect errors
-        #   when trying to match an episode with data having the wrong number of sweeps
-        if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
-            if len(self._pathways_) == 0:
-                raise ValueError("Cannot apply crosstalk when there are no pathways defined")
-            
-            for k,p in xtalk.items():
-                if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
-                    raise TypeError("Cross-talk has invalid key types; expecting int or pairs of int")
-                
-                if any(p_ not in range(len(self._pathways_)) for p_ in p):
-                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self._pathways_)} pathways")
-                
-            self.xtalk = xtalk
-            
-        # elif xtalk is None:
-        #     self.xtalk = tuple()
-        
-        elif isinstance(xtalk, (tuple, list)):
-            if len(xtalk) and not all(isinstance(v, int) for v in xtalk):
-                raise TypeError("When a tuple, 'xtalk' must contain only integers")
-            
-            self.xtalk = tuple(xtalk)
-            
-        else:
-            self.xtalk = tuple()
-            # raise ValueError(f"Invalid xtalk specification ({xtalk})")
-        
-        # self._data_ = None
-        
+
     def __repr__(self):
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
@@ -1518,8 +1506,8 @@ class RecordingEpisode(Episode):
 
         ret.append(f"\txtalk: {self.xtalk}")
         
-        ret.append(f"\tprotocols:")
-        ret += unique([f"\t\t{p.name}" for p in self.protocols])
+        ret.append(f"\tProtocol: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
+        # ret += unique([f"\t\t{p.name}" for p in self.protocols])
         
         return "\n".join(ret)
         
@@ -1532,14 +1520,11 @@ class RecordingEpisode(Episode):
             p.text(supertxt)
             p.breakable()
             attr_repr = [" "]
-            # attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
-            #                                                                     "electrodeMode",
-            #                                                                     "clampMode",
-            #                                                                     )]
             
-            attr_repr.append("Protocols:")
-            
-            attr_repr += unique([f"\t\t{p.name}" for p in getattr(self, "protocols", list())])
+            p.text("Protocol:")
+            # attr_repr.append("Protocol:")
+            attr_repr.append(f"\t{self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
+            # attr_repr += [f"\t{s}" for s in repr(self.protocol).split("\n")]
             
             # with p.group(4 ,"(",")"):
             with p.group(4 ,"",""):

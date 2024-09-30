@@ -1390,13 +1390,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        # ret = True
-        # for p in properties:
-        #     # NOTE: see NOTE: 2023-11-05 21:05:46 and NOTE: 2023-11-05 21:06:10
-        #     if not np.all(getattr(self, p[0]) == getattr(other, p[0])):
-        #     # if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False):
-        #         return False
-        
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
         ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
 

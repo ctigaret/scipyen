@@ -1132,8 +1132,9 @@ class Episode:
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
     endFrame:int = 0
+    procedure:Procedure  = field(default_factory = Procedure)
+    # treatment:str = "control"
     # procedure:Procedure = field(default_factory = lambda: Procedure())
-    # procedure:Procedure  = field(default_factory = Procedure)
     
     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
@@ -1308,13 +1309,14 @@ class AdministrationRoute(TypeEnum):
 
 @dataclass
 class Procedure:
-    """A procedure associates a Schedule with a category of actions.
+    """A procedure associates a Schedule or an Episode with an action category.
     The action categories are instances of ProcedureType.
     """
     name:str = ""
     _:KW_ONLY
-    procedureType:ProcedureType = ProcedureType.null
-    schedule:Schedule = field(default_factory = Schedule)
+    procedureType: ProcedureType = ProcedureType.null
+    schedule: Schedule = field(default_factory = Schedule)
+    episode: Episode = field(default_factory = Episode)
     # OR:
     # schedule:Schedule = field(default_factory = lambda: Schedule())
     
