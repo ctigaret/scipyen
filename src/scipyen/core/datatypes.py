@@ -1160,6 +1160,12 @@ class Episode:
         entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
         # entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
+        
+        h5io.toHDF5(self.procedure, entity, name="procedure", oname="procedure",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
         h5io.storeEntityInCache(entity_cache, self, entity)
         
         return entity
@@ -1178,8 +1184,12 @@ class Episode:
         end = attrs["end"]
         beginFrame = attrs["beginFrame"]
         endFrame = attrs["endFrame"]
+
+        procedure = h5io.fromHDF5(entity["procedure"], cache=cache)
         
-        return cls(name, begin=begin, end=end, beginFrame=beginFrame, endFrame=endFrame)
+        return cls(name, begin=begin, end=end, 
+                   beginFrame=beginFrame, endFrame=endFrame,
+                   procedure=procedure)
         
 @dataclass
 class Schedule:
@@ -1317,8 +1327,8 @@ class Procedure:
     name:str = ""
     _:KW_ONLY
     procedureType: ProcedureType = ProcedureType.null
-    schedule: Schedule = field(default_factory = Schedule)
-    episode: Episode = field(default_factory = Episode)
+    schedule: typing.Optional[Schedule] = field(default=None)
+    # episode: typing.Optional[Episode] = field(default_factory = Episode)
     # OR:
     # schedule:Schedule = field(default_factory = lambda: Schedule())
     

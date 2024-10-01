@@ -473,8 +473,6 @@ class AuxiliaryInput(__BaseAuxInput__):
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
-        
-
         from iolib import h5io
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
@@ -1480,7 +1478,7 @@ class RecordingEpisode(Episode):
 
         ret.append(f"\tPathway Stimulation by Sweep: {self.pathwayStimulusbySweep}")
         
-        ret.append(f"\tProtocol: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
+        ret.append(f"\tProtocol name: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
         # ret += unique([f"\t\t{p.name}" for p in self.protocols])
         
         return "\n".join(ret)
@@ -1495,7 +1493,7 @@ class RecordingEpisode(Episode):
             p.breakable()
             attr_repr = [" "]
             
-            p.text("Protocol:")
+            p.text("Protocol name:")
             # attr_repr.append("Protocol:")
             attr_repr.append(f"\t{self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
             # attr_repr += [f"\t{s}" for s in repr(self.protocol).split("\n")]
@@ -1591,7 +1589,7 @@ class RecordingEpisode(Episode):
         blocks = h5io.fromHDF5(entity["blocks"], cache=cache)
         protocol = h5io.fromHDF5(entity["protocol"], cache=cache)
         pathwayStimulusbySweep = h5io.fromHDF5(entity["pathwayStimulusbySweep"], cache=cache)
-        
+
         name=attrs["name"]
         begin=attrs["begin"]
         end=attrs["end"]

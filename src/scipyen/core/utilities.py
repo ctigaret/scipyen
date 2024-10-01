@@ -1030,7 +1030,8 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
             
             if not ret:
                 return ret
-            
+          
+        # ### BEGIN arrays ...
         if hasattr(x, "shape"):
             if not hasattr(y, "shape"):
                 return False
@@ -1069,6 +1070,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
             # if not ret:
             #     return ret
             
+        # ### END arrays ...
         # ret &= pyqtgraph.eq(x,y)
         
         return ret ## good fallback, though potentially expensive

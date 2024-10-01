@@ -682,7 +682,7 @@ class ABFEpoch:
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
+        return all(np.all( utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0])) ) for p in properties)
         
     def is_identical_except_digital(self, other):
         if not isinstance(other, self.__class__):
@@ -690,7 +690,7 @@ class ABFEpoch:
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        return all(np.all(utilities.safe_identity_check(getattr(self, p[0]), getattr(other, p[0]), idcheck=False)) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
+        return all(np.all(utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False)) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
         # return all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] not in ("mainDigitalPattern", "alternateDigitalPattern"))
         
     @property
@@ -1414,6 +1414,31 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # ret = all(self.getADC(c) == other.getADC(c) for c in range(self.nADCChannels))
             
         return ret
+    
+    def diff(self, other) -> dict:
+        if not isinstance(other, self.__class__):
+            return {"Type":(self.__class__, other.__class__)}
+        
+        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        
+        prop_diffs = list(filter(lambda x: np.any(x[0] != x[1]), ((getattr(self, p[0]), getattr(other, p[0])) for p in properties)))
+        
+        if len(prop_diffs):
+            return {"Properties": prop_diffs}
+        
+        dac_diffs = list(filter(lambda x: x[0] != x[1], ((self.getDAC(k), other.getDAC(k)) for k in range(self.nDACChannels))))
+        
+        if len(dac_diffs):
+            return {"DACs":dac_diffs}
+        
+        adc_diffs = list(filter(lambda x: x[0] != x[1], ((self.getADC(k), other.getADC(k)) for k in range(self.nADCChannels))))
+        
+        if len(adc_diffs):
+            return {"ADCs": adc_diffs}
+            
+        
+        
+        
     
     def toHDF5(self, group:h5py.Group, name:str, oname:str, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -2760,7 +2785,8 @@ class ABFInputConfiguration:
         return np.all([utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False) for p in props if p[0] != "protocol"])
     
     def __repr__(self):
-        return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
+        # return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
+        return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
 
     def getChannelIndex(self, physical:bool=False) -> int:
         return self.physicalIndex if physical else self.logicalIndex
@@ -3100,8 +3126,9 @@ class ABFOutputConfiguration:
                 
             
     def __repr__(self):
-        ret = f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.units.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}  (physical ↔ logical)"
-        return ret
+        # ret = f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.units.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}  (physical ↔ logical)"
+        # return ret
+        return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.units)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}  (physical ↔ logical)"
         
     def _init_epochs_(self, obj):
         if isinstance(obj, pyabf.ABF):
@@ -3240,7 +3267,7 @@ class ABFOutputConfiguration:
             for k in range(len(epochs)):
                 if epochs[k] != other_epochs[k]:
                     return False
-            # ret = all(self.epochs[k] == other.epochs[k] for k in range(len(self.epochs)))
+            ret &= all(self.epochs[k] == other.epochs[k] for k in range(len(self.epochs)))
 
         # if checked out then verify all epochs Tables are sweep by sweep 
         # identical in all DAC channels, including digital output patterns!

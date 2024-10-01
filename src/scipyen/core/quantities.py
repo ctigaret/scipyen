@@ -614,8 +614,12 @@ def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -
     """Returns the (short) symbol of this quantity's units)
     E.g., 'V', 'mV', '1/Hz'
     """
+    if isinstance(x, pq.UnitQuantity):
+        return x.symbol
+    
     if isinstance(x, pq.Quantity):
         x = x.dimensionality
+        
     dimstr = f"{x}"
     if dimstr == "dimensionless":
         return ""
