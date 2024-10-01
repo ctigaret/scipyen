@@ -1138,6 +1138,17 @@ class Episode:
     # treatment:str = "control"
     # procedure:Procedure = field(default_factory = lambda: Procedure())
     
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        ret = True
+        ret &= self.name == other.name
+        if ret:
+            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
+            
+        return ret
+    
     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Dataset:
@@ -1198,6 +1209,14 @@ class Schedule:
     _:KW_ONLY
     episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
     
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        ret = len(self.episodes) == len(other.episodes)
+        
+        return ret
+        
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         
@@ -1331,6 +1350,25 @@ class Procedure:
     # episode: typing.Optional[Episode] = field(default_factory = Episode)
     # OR:
     # schedule:Schedule = field(default_factory = lambda: Schedule())
+    
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        ret = self.name == other.name
+        
+        if ret:
+            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in filter(lambda x: x.name != "schedule", dataclasses.fields(self.__class__)))
+            
+        if ret:
+            ret &= type(self.schedule) == type(other.schedule) # they can be Schedule or None
+
+        if ret:
+            # compare schedules — CAUTION: at least one of the episodes in the schedule
+            # contains a reference to this Procedure instance, leading to infinite
+            # recursion.
+            
+        return ret
     
     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,

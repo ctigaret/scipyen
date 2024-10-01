@@ -681,8 +681,9 @@ class ABFEpoch:
             return False
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
+        return all(getattr(self, p[0])==getattr(other, p[0]) for p in properties)
         
-        return all(np.all( utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0])) ) for p in properties)
+        # return all(np.all( utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0])) ) for p in properties)
         
     def is_identical_except_digital(self, other):
         if not isinstance(other, self.__class__):
@@ -1390,6 +1391,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
+        # selfProp = getattr(self, p[0])
+        # otherProp = getattr(other, p[0])
+        
+        #  NOTE: 2024-10-01 19:17:40
+        # ths below suffers from the fact that the == operator checks the IDs
+        # I guess e need to override that in the appropriate classes
         # check equality of properties (descriptors); this includes nSweeps and nADCChannels
         ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties)
 
@@ -1421,17 +1428,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        prop_diffs = list(filter(lambda x: np.any(x[0] != x[1]), ((getattr(self, p[0]), getattr(other, p[0])) for p in properties)))
+        prop_diffs = list(filter(lambda x: np.any(x[2] != x[4]), ((p, "self:", getattr(self, p[0]), "other:", getattr(other, p[0])) for p in properties)))
         
         if len(prop_diffs):
             return {"Properties": prop_diffs}
         
-        dac_diffs = list(filter(lambda x: x[0] != x[1], ((self.getDAC(k), other.getDAC(k)) for k in range(self.nDACChannels))))
+        dac_diffs = list(filter(lambda x: x[1] != x[2], ((f"DAC {k}", self.getDAC(k), other.getDAC(k)) for k in range(self.nDACChannels))))
         
         if len(dac_diffs):
             return {"DACs":dac_diffs}
         
-        adc_diffs = list(filter(lambda x: x[0] != x[1], ((self.getADC(k), other.getADC(k)) for k in range(self.nADCChannels))))
+        adc_diffs = list(filter(lambda x: x[1] != x[2], ((f"ADC {k}", self.getADC(k), other.getADC(k)) for k in range(self.nADCChannels))))
         
         if len(adc_diffs):
             return {"ADCs": adc_diffs}
@@ -3233,8 +3240,6 @@ class ABFOutputConfiguration:
         if not isinstance(other, self.__class__):
             return False
         
-        properties = inspect.getmembers_static(self, lambda x: isinstance(x, property))# and x[0] != "protocol")
-        
         ret = True
         
         # NOTE: 2023-11-05 21:21:39
@@ -3245,16 +3250,11 @@ class ABFOutputConfiguration:
         # 2) we want to avoid reentrant code when comparing the protocols of 
         #   self and other.
         #
-        # EXCLUDE epochs because we chekc them individualy
+        # Also, EXCLUDE epochs because we check them individualy
+        #
+        properties = list(filter(lambda x: x[0] not in ("protocol", "epochs"), inspect.getmembers_static(self, lambda x: isinstance(x, property))))
         
-        for p in properties:
-            if p[0] not in ("protocol", "epochs"):
-                # NOTE: 2023-11-05 21:05:46
-                # no need to compare all; just compare until first distinct one
-                # if getattr(self, p[0]) != getattr(other, p[0]):
-                if not utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False):
-                    return False
-        # ret = all(np.all(getattr(self, p[0]) == getattr(other, p[0])) for p in properties if p[0] != "protocol")
+        ret &= all(getattr(self, p[0])==getattr(other, p[0]) for p in properties)
 
         epochs = self.epochs
         other_epochs = other.epochs
@@ -3264,9 +3264,6 @@ class ABFOutputConfiguration:
                 return False
         
         if ret:
-            for k in range(len(epochs)):
-                if epochs[k] != other_epochs[k]:
-                    return False
             ret &= all(self.epochs[k] == other.epochs[k] for k in range(len(self.epochs)))
 
         # if checked out then verify all epochs Tables are sweep by sweep 
