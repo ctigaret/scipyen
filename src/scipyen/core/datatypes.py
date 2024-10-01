@@ -1367,6 +1367,7 @@ class Procedure:
             # compare schedules — CAUTION: at least one of the episodes in the schedule
             # contains a reference to this Procedure instance, leading to infinite
             # recursion.
+            pass
             
         return ret
     
