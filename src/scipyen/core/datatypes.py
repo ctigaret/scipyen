@@ -1134,7 +1134,7 @@ class Episode:
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
     endFrame:int = 0
-    procedure:Procedure  = field(default_factory = Procedure)
+    procedure:typing.Optional[Procedure] = field(default = None)
     # treatment:str = "control"
     # procedure:Procedure = field(default_factory = lambda: Procedure())
     

@@ -1233,12 +1233,12 @@ class RecordingEpisode(Episode):
     
         The pathways define their own clamping modes and recording source.
     
-    • xtalk: optional, a mapping of int (sweep indices) or tuples (start:int,step:int)
-        to pairs (2-tuples) of valid int indices into the 'pathways' attribute.
-        
-        When not None, it indicates that the episode was used for testing the 
-        independence of two or more synaptic pathways, using paired-pulse stimulations.
-        
+    • pathwayStimulusbySweep: a dict with key ↦ value mapping where:
+        key: int (sweep indices) or tuples (start:int,step:int)
+        value: tuples of SynapticPathway objects
+    
+        Optional, default is an empty dict.
+    
         E.g., for two pathways, using int keys:
             0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
             1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
@@ -1274,12 +1274,14 @@ class RecordingEpisode(Episode):
     # FIXME: 2024-09-29 23:32:05 TODO:
     # conversion to mapping protocol ↦ sweep indices across all blocks in the episode
     # actually, strike that: an episode must contain blocks recorded WITH THE SAME EPISODE
+    #
+    # NOTE: 2024-10-01 08:34:35
+    # 'pathways' removed - one can get the pathways from pathwayStimulusbySweep
     def __init__(self, blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
                  protocol: typing.Optional[ElectrophysiologyProtocol] = None,
                  name: typing.Optional[str] = None,
-                 pathways: typing.Sequence[SynapticPathway] = list(),
                  episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
-                 pathStimBySweep: dict = dict() ,
+                 pathwayStimulusbySweep: dict = dict() ,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1294,9 +1296,6 @@ class RecordingEpisode(Episode):
     
         protocol: ElectrophysiologyProtocol — the protocol used in common througout
             the episode
-
-        pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
-            Optional; default is None.
 
         pathwayStimulusbySweep: dict — indicates which pathways are stimulated in
             which sweep; also useful for testing pathway cross-talk, or independence
@@ -1372,7 +1371,7 @@ class RecordingEpisode(Episode):
         self._protocol_ = None
         
         self._blocks_ = list()
-        self._pathways_ = list()
+        # self._pathways_ = list()
         
         super().__init__(name=name)#, **kwargs)
         
@@ -1388,12 +1387,6 @@ class RecordingEpisode(Episode):
             else:
                 self._protocol_ = protocol
                 
-        if isinstance(pathways, (tuple, list)):
-            if len(pathways):
-                if not all(isinstance(v, SynapticPathway) for v in pathways):
-                    raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
-            self._pathways_ = pathways
-        
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk represents an
         # overlap between synapses activated by ideally distinct axonal pathways 
@@ -1425,8 +1418,9 @@ class RecordingEpisode(Episode):
         #   when trying to match an episode with data having the wrong number of
         # sweeps
         #
-        if isinstance(pathwayStimulusbySweep,dict):
-            self.pathwayStimulusbySweep = pathwayStimulusbySweep
+        # if isinstance(pathwayStimulusbySweep,dict):
+        if self._validatePSbyS(pathwayStimulusbySweep):
+            self._pathwayStimulusbySweep_ = pathwayStimulusbySweep
 #         elif isinstance(xtalk, (tuple, list)):
 #             if len(xtalk) and not all(isinstance(v, int) for v in pathwayStimulusbySweep):
 #                 raise TypeError("When a tuple, 'pathwayStimulusbySweep' must contain only integers")
@@ -1481,10 +1475,10 @@ class RecordingEpisode(Episode):
             ret.append(f"\tPathways: []")
         else:
             ret.append(f"\tPathways:")
-            for p in self._pathways_:
+            for p in self.pathways:
                 ret.append(f"\t{p}")
 
-        ret.append(f"\txtalk: {self.xtalk}")
+        ret.append(f"\tPathway Stimulation by Sweep: {self.pathwayStimulusbySweep}")
         
         ret.append(f"\tProtocol: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
         # ret += unique([f"\t\t{p.name}" for p in self.protocols])
@@ -1518,27 +1512,29 @@ class RecordingEpisode(Episode):
             p.text("Pathways:")
             p.breakable()
             
-            if isinstance(self._pathways_, (tuple, list)) and len(self._pathways_):
+            # if isinstance(self._pathways_, (tuple, list)) and len(self._pathways_):
+            if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
                 # with p.group(4, "(",")"):
                 with p.group(4, "",""):
-                    for pth in self._pathways_:
+                    for pth in self.pathways:
                         p.text(pth.name)
                         p.breakable()
                     p.text("\n")
                 
-            if isinstance(self.xtalk, (tuple, list)) and len(self.xtalk):
+            # if isinstance(self.pathwayStimulusbySweep, (tuple, list)) and len(self.pathwayStimulusbySweep):
+            if isinstance(self.pathwayStimulusbySweep, dict) and len(self.pathwayStimulusbySweep):
                 link = " \u2192 "
-                txt = ["Test for independence:"]
-                for x in self.xtalk:
-                    if len(x[1]) > 1:
-                        txt.append(f"sweep {x[0]}: {x[1][0].name} {link} {x[1][1].name}")
+                txt = ["Pathway Stimulation by Sweep:"]
+                for k,v in self.pathwayStimulusbySweep.items():
+                    txt.append(f"Sweeps {k} ↦ {v}")
+                    # if len(x[1]) > 1:
+                    #     txt.append(f"sweep {x[0]}: {x[1][0].name} {link} {x[1][1].name}")
                 p.text("\n".join(txt))
                 p.breakable()
                 p.text("\n")
                 
             p.breakable()
             
-
     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Group:
@@ -1551,7 +1547,7 @@ class RecordingEpisode(Episode):
             group[target_name] = cached_entity
             return cached_entity
         
-        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "xtalk", "type"))
+        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "type"))
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -1568,12 +1564,12 @@ class RecordingEpisode(Episode):
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.toHDF5(self.protocols, entity, name="protocols", oname="protocols",
+        h5io.toHDF5(self.protocol, entity, name="protocol", oname="protocol",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
+        h5io.toHDF5(self.pathwayStimulusbySweep, entity, name="pathwayStimulusbySweep", oname="pathwayStimulusbySweep",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
@@ -1593,43 +1589,60 @@ class RecordingEpisode(Episode):
         attrs = h5io.attrs2dict(entity.attrs)
         
         blocks = h5io.fromHDF5(entity["blocks"], cache=cache)
-        protocols = h5io.fromHDF5(entity["protocols"], cache=cache)
-        pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
+        protocol = h5io.fromHDF5(entity["protocol"], cache=cache)
+        pathwayStimulusbySweep = h5io.fromHDF5(entity["pathwayStimulusbySweep"], cache=cache)
         
         name=attrs["name"]
         begin=attrs["begin"]
         end=attrs["end"]
         beginFrame=attrs["beginFrame"]
         endFrame=attrs["endFrame"]
-        xtalk=attrs["xtalk"]
+        # pathwayStimulusbySweep=attrs["pathwayStimulusbySweep"]
         episodeType=attrs["type"]
         
         return cls(name=name, episodeType=episodeType, begin=begin, end=end,
                 beginframe=beginFrame,endFrame=endFrame,
-                protocols=protocols,
+                protocol=protocol,
                 blocks = blocks,
-                pathways=pathways,
-                xtalk=xtalk)
+                # pathways=pathways,
+                pathwayStimulusbySweep=pathwayStimulusbySweep)
         
+    def _validatePSbyS(self, val:dict):
+        if not isinstance(val, dict):
+            return False
+        
+        if len(val) == 0:
+            return True
+        
+        keys = list(self._pathwayStimulusbySweep_.keys())
+        
+        int_keys = list(filter(lambda x: isinstance(x, int)), keys)
+        tuple_keys = list(filter(lambda x: isinstance(x, tuple) and len(x)==2 and all(isinstancev, int) for v in x), keys)
+        
+        if len(int_keys + tuple_keys) != len(val):
+            return False
+        
+        values = [val[k] for k in int_keys + tuple_keys]
+        
+        OK_vals = list(filter(lambda x: isinstance(x, tuple) and (all(isinstance(v, SynapticPathway) for v in x) if len(x) else True), values ))
+        
+        if len(OK_vals) != len(values):
+            return False
+        
+        return True
         
     @property
-    def pathways(self) -> list:
-        return self._pathways_
+    def pathwayStimulusbySweep(self) -> dict:
+        """Maps a correspondence between the sweep(s) that stimulate pathways and the stimulated pathways
+        """
+        return self._pathwayStimulusbySweep_
     
-    @pathways.setter
-    def pathways(self, val):
-        if isinstance(val, (tuple, list)):
-            if all(isinstance(v, SynapticPathway) for v in val):
-                self._pathways_[:] = [v for v in val]
-            elif len(val) == 0:
-                self._pathways_.clear()
-            else:
-                raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
-            
-        elif val is None:
-            self._pathways_.clear()
-        else:
-            raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
+    @pathwayStimulusbySweep.setter
+    def pathwayStimulusbySweep(self, val:dict) -> None:
+        if not self._validatePSbyS(val):
+            raise ValueError("pathwayStimulusbySweep got an incorrect argument")
+        
+        self._pathwayStimulusbySweep_ = val
             
     @property
     def blocks(self) -> list:
@@ -1841,6 +1854,19 @@ class RecordingEpisode(Episode):
             self._type_ = val
         else:
             scipywarn(f"Expecting a RecordingEpisodeType, instead got {val}")
+            
+    @property
+    def pathways(self) -> typing.List[SynapticPathway]:
+        ret = list()
+        for v in self.pathwayStimulusbySweep.values():
+            p = [v_ for v_ in val if v_ not in ret]
+            ret += p
+
+        return ret
+    
+    @pathways.setter
+    def pathways(self, val) -> None:
+        raise RuntimeError(f"Pathways cannot be set directly; you must use pathwayStimulusbySweep property")
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
