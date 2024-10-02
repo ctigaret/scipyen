@@ -105,7 +105,6 @@ def make_scaled_unit_quantity(quantity:pq.Quantity, power:typing.Optional[typing
     else:
         prefixes = DecimalPrefixes
         powers = DecimalPowers
-        
     
     if not isinstance(quantity, pq.Quantity):
         raise TypeError("base_quantity expected to be a Quantity; got %s instead" % type(base_quantity).__name__)
@@ -438,7 +437,7 @@ def getUnitConstantFamily(c:pq.UnitConstant):
     
 def familyConstants(family:str):
     if family not in CONSTANTS:
-        raise ValueError(f"Family {family} is not a family of constants; valid families are {constantsFamlies()}")
+        raise ValueError(f"Family {family} is not a family of constants; valid constants families are {constantsFamilies()}\n\n\t(see {__name__}.constantsFamilies())")
     
     return CONSTANTS[family]
 
@@ -494,8 +493,14 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
     """
     Retrieves the family of units for this quantity
     """
+    dims = list()
     families = list()
-    u = unit.dimensionality
+    if not isinstance(unit, pq.UnitQuantity):
+        udim = unit.dimensionality
+        if len(udim) == 1:
+            u = udim # for now ...
+    else:
+        u = unit
     
     for family in UNITS_DICT:
         uset = UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
@@ -515,11 +520,13 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
     
     elif len(families) > 1:
         return sorted(list(set(families)))
+    
+    return families
         
     
 def familyUnits(family:str, kind:typing.Optional[str]=None):
     if family not in UNITS_DICT:
-        raise ValueError(f"{family} is not a valid UnitQuantity family; valid families are {list(UNITS_DICT.keys())}")
+        raise ValueError(f"{family} is not a valid UnitQuantity family; valid units families are {list(UNITS_DICT.keys())}\n\n\t(see {__name__}.UNITS_DICT)")
     
     if kind is None:
         return UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
@@ -531,7 +538,7 @@ def familyUnits(family:str, kind:typing.Optional[str]=None):
         elif kind == "derived":
             return UNITS_DICT[family]["derived"]
         else:
-            raise ValueError(f"Invalid UnitQuantity kind : {kind}; expecting one of 'irreducible' or 'derived'")
+            raise ValueError(f"Invalid UnitQuantity kind : {kind}; expecting one of 'irreducible' or 'derived', or None")
         
     else:
         raise TypeError(f"UnitQuantity kind expected to be None or a str; instead, got {type(kind).__name__}")
@@ -877,6 +884,15 @@ def check_dosage_units(value):
     #
     # ¹ a dosing based exclusively on volume is theoretically possible, although
     # impractical
+    
+    # acceptable families: 
+    # Concentration (Volume⁻¹), 
+    # Mass, 
+    # Volume, 
+    # Mass/Volume, 
+    # Mass/Mass
+    # Mass⁻¹
+    
     families = ["Mass"]
             
 def check_time_units(value):

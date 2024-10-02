@@ -1101,11 +1101,12 @@ class NestedFinder(object):
     FIXME: This is buggy whe searching by type !!!
     
     """
-    supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index) # this implicitly includes namedtuple
-    supported_hierarchical_types = (dict, list, tuple, deque)
+    supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index, set) # this implicitly includes namedtuple
+    supported_hierarchical_types = (dict, list, tuple, deque, set)
     nesting_types = supported_hierarchical_types
     
-    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
+    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, 
+                 comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
         """NestedFinder initializer.
         
         Parameters:
@@ -1148,6 +1149,7 @@ class NestedFinder(object):
         self._item_as_value_ = None
         
         self._comparator_ = operator.eq # see 'operator' module for other examples
+        self._safe_comparator_ = comparator
         
         isbinfun = isfunction(comparator) and len(signature(comparator).parameters) == 2
         isparfun = isinstance(comparator, partial) and len(signature(comparator.func).parameters) >= 2
@@ -1559,7 +1561,11 @@ class NestedFinder(object):
                             self._paths_.append(list(self._found_))
                             yield k
                     else:
-                        if self._comparator_(item, v):
+                        if all(is_hashable(o) for o in (item, v)):
+                            comp = self._comparator_
+                        else:
+                            comp = self._safe_comparator_
+                        if comp(item, v):
                             self._found_.append(k)
                             self._paths_.append(list(self._found_))
                             # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
@@ -2488,7 +2494,7 @@ class NestedFinder(object):
     def findvalue(self, value):
         """Search for the key or indexing object nested in self.data.
         
-        Calls self.find(value, True)
+        Calls self.find(value, find_value=True)
         """
         return self.find(value, find_value=True)
     
