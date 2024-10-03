@@ -1098,7 +1098,7 @@ class NestedFinder(object):
     performed INSIDE their elements when these elements are of a nesting type as
     described above.
     
-    FIXME: This is buggy whe searching by type !!!
+    FIXME: This is buggy when searching by type !!!
     
     """
     supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index, set) # this implicitly includes namedtuple

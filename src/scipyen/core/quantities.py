@@ -32,6 +32,7 @@ import quantities as pq
 from traitlets import Bunch
 import operator
 from functools import (reduce, partial, cache)
+import more_itertools
 
 from core import unicode_symbols
 from core.unicode_symbols import uchar
@@ -204,6 +205,10 @@ radiant_flux_density_unit = flux_density_unit = rfdu = fdu = make_scaled_unit_qu
 Φₑλ = spectral_flux_wavelength_unit = sfwu = make_scaled_unit_quantity(pq.W*(pq.m**(-1)), name="spectral_flux_wavelength_unit",symbol='W⋅m⁻¹')
 ΦE = electric_flux_unit = efu = make_scaled_unit_quantity(pq.V * pq.m, name = "electric_flux_unit", symbol="V⋅m")
 flow_unit = flow = f_u = make_scaled_unit_quantity((pq.m**3)/pq.s, name="flow unit", symbol="m³⋅s⁻¹")
+
+wpv = make_scaled_unit_quantity(pq.kg/pq.l, name="weight per volume", symbol = "kg⋅L⁻¹")
+wpw = make_scaled_unit_quantity(pq.kg/pq.l, name="weight per weight", symbol = "kg⋅kg⁻¹")
+
 # NOTE: 2023-05-18 16:17:50
 # testing currency units
 Pound_Sterling = pq.UnitCurrency("Pound_Sterling", symbol="£")
@@ -260,6 +265,8 @@ custom_unit_families["flow"] = {"irreducible": set(),
                                 "derived": {flow_unit}}
 custom_unit_families["currency"] = {"irreducible": {Euro, Pound_Sterling, US_Dollar},
                                     "derived": set()}
+custom_unit_families["dose"] = {"irreducible": {wpv, wpw},
+                                "derived": set()}
 
 
 # NOTE: 2023-05-18 12:46:33
@@ -277,7 +284,8 @@ for cq in __custom_quantities__:
     pq.unit_registry[cq[0]] = cq[1]
     setattr(pq, cq[0], cq[1])
 
-del(cq, _pqpfx) # better keep __custom_quantities__
+del(cq, _pqpfx)
+# better keep __custom_quantities__
 # del(__custom_quantities__, cq, _pqpfx)
 
 # universal gas constant
@@ -493,35 +501,60 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
     """
     Retrieves the family of units for this quantity
     """
-    dims = list()
-    families = list()
-    if not isinstance(unit, pq.UnitQuantity):
-        udim = unit.dimensionality
-        if len(udim) == 1:
-            u = udim # for now ...
+    if isinstance(unit, pq.UnitQuantity):
+        udim_pw = [(unit, 1)]
+    elif isinstance(unit, pq.Quantity):
+        udim_pw = list(unit.dimensionality.items())
     else:
-        u = unit
+        raise TypeError(f"Expecting a Quantity or UnitQuantity; got {type(unit).__name__} instead")
     
-    for family in UNITS_DICT:
-        uset = UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
-        udims = [u.dimensionality for u in uset]
+    families = list()
+    ndims = len(udim_pw)
+    
+    for u, p in udim_pw:
+        ufamily = list()
+        for family, contents in UNITS_DICT.items():
+            uset = contents["irreducible"] | contents["derived"]
+            if u in uset:
+                if p > 1:
+                    fml = f"{family} ** {p}"
+                elif p < 0:
+                    fml = f"{family} ** ({p})"
+                else:
+                    fml = family
+                    
+                ufamily.append(fml)
+                
+        families.append(ufamily)
         
-        if u in udims:
-            families.append(family)
-
-        else: # see if the reference unit is in one of the reference units in the family
-            urefs = [u_._reference.units for u_ in uset]
-            uref = unit._reference.units
-            if uref in urefs:
-                families.append(family)
+    return "; ".join(list(map(lambda x: " * ".join(x), more_itertools.partial_product(*families))))
+        
+    # family_exprs = list(msp)
+    # ret = list()
+    # for k in range()
+    # for ufamily in families:
+    #     ret.append(" * ".join(ufamily))
+        
+    # return "; ".join(ret)
+    
+#     for family in UNITS_DICT:
+#         uset = UNITS_DICT[family]["irreducible"] | UNITS_DICT[family]["derived"]
+#         udims = [u.dimensionality for u in uset]
+#         
+#         if u in udims:
+#             families.append(family)
+# 
+#         else: # see if the reference unit is in one of the reference units in the family
+#             urefs = [u_._reference.units for u_ in uset]
+#             uref = unit._reference.units
+#             if uref in urefs:
+#                 families.append(family)
             
-    if len(families) == 1:
-        return families[0]
     
-    elif len(families) > 1:
-        return sorted(list(set(families)))
-    
-    return families
+#     elif len(families) > 1:
+#         return sorted(list(set(families)))
+#     
+#     return families
         
     
 def familyUnits(family:str, kind:typing.Optional[str]=None):
@@ -886,14 +919,8 @@ def check_dosage_units(value):
     # impractical
     
     # acceptable families: 
-    # Concentration (Volume⁻¹), 
-    # Mass, 
-    # Volume, 
-    # Mass/Volume, 
-    # Mass/Mass
-    # Mass⁻¹
-    
-    families = ["Mass"]
+    # Mass * Concentration ** (-1), 
+    # Mass * Volume ** (-1), 
             
 def check_time_units(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
