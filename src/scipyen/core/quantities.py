@@ -206,8 +206,9 @@ radiant_flux_density_unit = flux_density_unit = rfdu = fdu = make_scaled_unit_qu
 ΦE = electric_flux_unit = efu = make_scaled_unit_quantity(pq.V * pq.m, name = "electric_flux_unit", symbol="V⋅m")
 flow_unit = flow = f_u = make_scaled_unit_quantity((pq.m**3)/pq.s, name="flow unit", symbol="m³⋅s⁻¹")
 
-wpv = make_scaled_unit_quantity(pq.kg/pq.l, name="weight per volume", symbol = "kg⋅L⁻¹")
-wpw = make_scaled_unit_quantity(pq.kg/pq.l, name="weight per weight", symbol = "kg⋅kg⁻¹")
+wpv = make_scaled_unit_quantity(pq.kg/pq.L, name="weight per volume")#, symbol = "kg⋅L⁻¹")
+wpw = make_scaled_unit_quantity(pq.kg/pq.L, name="weight per weight")#, symbol = "kg⋅kg⁻¹")
+vpv = make_scaled_unit_quantity(pq.L/pq.L, name="volume per volume")#, symbol = "kg⋅kg⁻¹")
 
 # NOTE: 2023-05-18 16:17:50
 # testing currency units
@@ -265,8 +266,8 @@ custom_unit_families["flow"] = {"irreducible": set(),
                                 "derived": {flow_unit}}
 custom_unit_families["currency"] = {"irreducible": {Euro, Pound_Sterling, US_Dollar},
                                     "derived": set()}
-custom_unit_families["dose"] = {"irreducible": {wpv, wpw},
-                                "derived": set()}
+custom_unit_families["dose"] = {"irreducible": set(),
+                                "derived": {wpv, wpw, vpv}}
 
 
 # NOTE: 2023-05-18 12:46:33
@@ -425,6 +426,8 @@ def get_units():
     return result, irreducible, derived
 
 UNITS_DICT, IRREDUCIBLES, DERIVED = get_units()
+
+UNITS_DICT["Dose"]["derived"] |= UNITS_DICT["Concentration"]["derived"]
 
 CONSTANTS = get_constants()
         

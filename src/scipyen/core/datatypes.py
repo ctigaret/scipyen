@@ -1516,9 +1516,10 @@ class Treatment:
         
         unitFamily = scq.getUnitFamily(self.dose)
     
-        acceptableUnitFamilies = ("Mass", "Volume", "Substance", "Concentration", "Flow")
+        acceptableUnitFamilies = ("Concentration", "Dose")
     
-        if unitFamily not in acceptableUnitFamilies:
+        # if unitFamily not in acceptableUnitFamilies:
+        if not any(a in unitFamily for a in acceptableUnitFamilies):
             raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
         
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
