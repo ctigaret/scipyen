@@ -992,6 +992,71 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
         
         if isinstance(x, partial):
             return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+        
+        if isinstance(x, np.ndarray):
+            ret &= x.size == y.size
+            if ret:
+                ret &= x.shape == y.shape
+                
+            if ret:
+                ret &= x.dtype == y.dtype
+                
+            if ret:
+                ret &= np.all(x==y)
+            
+            return ret
+        
+        if isinstance(x, pd.DataFrame):
+            ret &= x.size == y.size
+            if ret:
+                ret &= x.shape == y.shape
+                
+            if ret:
+                ret &= np.all(x.columns == y.columns)
+                
+            if ret:
+                ret &= np.all(x.index == y.index)
+                
+            if ret:
+                for c in x.columns:
+                    ret &= np.all(x[c].dtype == y[c].dtype)
+                
+            if ret:
+                ret &= np.all(x==y)
+            
+            return ret
+            
+        if isinstance(x, pd.Series):
+            ret &= x.size == y.size
+            if ret:
+                ret &= x.shape == y.shape
+                
+            if ret:
+                ret &= np.all(x.index == y.index)
+                
+            if ret:
+                ret &= np.all(x.dtype == y.dtype)
+                
+            if ret:
+                ret &= np.all(x==y)
+            
+            return ret
+            
+        if isinstance(x, pd.Index):
+            ret &= x.size == y.size
+            if ret:
+                ret &= x.shape == y.shape
+                
+            if ret:
+                ret &= np.all(x.index == y.index)
+                
+            if ret:
+                ret &= np.all(x.dtype == y.dtype)
+                
+            if ret:
+                ret &= np.all(x==y)
+            
+            return ret
             
         if hasattr(x, "size"): # np arrays and subtypes
             if not hasattr(y, "size"):
@@ -999,10 +1064,10 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
             
             ret &= x.size == y.size
 
-            if not ret:
-                return ret
+            # if not ret:
+            return ret
         
-        elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
+        if hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
             if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
                 return False
             
@@ -1031,7 +1096,7 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
             if not ret:
                 return ret
           
-        # ### BEGIN arrays ...
+        # ### BEGIN array-like ...
         if hasattr(x, "shape"):
             if not hasattr(y, "shape"):
                 return False

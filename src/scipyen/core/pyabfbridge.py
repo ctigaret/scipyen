@@ -2544,7 +2544,7 @@ class ABFInputConfiguration:
     """
     def __init__(self, obj: typing.Optional[typing.Union[pyabf.ABF, neo.Block]]=None,
                  protocol:typing.Optional[ABFProtocol] = None,
-                 adcChannel:int = 0, physical:bool=False,
+                 adcChannel:int = 0, physical:bool=False, physicalIndex:typing.Optional[int]=None,
                  name:str = None,
                  units:typing.Optional[typing.Union[pq.Quantity, str]] = None):
         """
@@ -2666,7 +2666,19 @@ class ABFInputConfiguration:
             self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
 
         else:
-            self._physicalChannelIndex_ = self._adcChannel_ = adcChannel
+            if isinstance(physicalIndex, int):
+                self._physicalChannelIndex_ = physicalIndex
+                
+            else:
+                raise TypeError(f"Expecting physicalIndex an int; instead, got {type(physicalIndex).__name__}")
+            
+            if isinstance(adcChannel, int):
+                self._adcChannel_ = adcChannel
+            else:
+                raise TypeError((f"Expecting adcChannel an int; instead, got {type(adcChannel).__name__}"))
+            # BUG: 2024-10-06 13:31:46 FIXME
+            # this assigns logical & physical to be the same  --  wrong!
+            # self._physicalChannelIndex_ = self._adcChannel_ = adcChannel
             if isinstance(name, str) and len(name.strip()):
                 adcName = name
                 
@@ -2780,8 +2792,8 @@ class ABFInputConfiguration:
         units = attrs.get("units", pq.dimensionless)
         logicalIndex = attrs.get("logicalIndex", 0)
         
-        return cls(obj=None, protocol=None, adcChannel=adcChannel,
-                   physical=True, name=name, units=units)
+        return cls(obj=None, protocol=None, adcChannel=logicalIndex,
+                   physical=True, physicalIndex = adcChannel, name=name, units=units)
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -2789,7 +2801,8 @@ class ABFInputConfiguration:
         
         props = inspect.getmembers_static(self, lambda x: isinstance(x, property))
         
-        return np.all([utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False) for p in props if p[0] != "protocol"])
+        return np.all([getattr(self, p[0]) == getattr(other, p[0]) for p in props if p[0] != "protocol"])
+        # return np.all([utilities.safe_identity_test(getattr(self, p[0]), getattr(other, p[0]), idcheck=False) for p in props if p[0] != "protocol"])
     
     def __repr__(self):
         # return f"{self.__class__.__name__} ({super().__repr__()}): \'{self.name}\' (\'{scq.shortSymbol(self.adcUnits.symbol)}\') at index {self.physicalIndex} ↔ {self.logicalIndex}) (physical ↔ logical)"
