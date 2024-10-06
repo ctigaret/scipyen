@@ -47,7 +47,20 @@ def make_prefix_symbol(pfx):
         return pfx[0].upper()
     
     if pfx == "micro":
-        return "u"
+        # return "u"
+        return "μ"
+    
+    if pfx == "nano":
+        return "n"
+
+    if pfx == "femto":
+        return "f"
+    
+    if pfx == "atto":
+        return "a"
+    
+    if pfx == "zepto":
+        return "z"
     
     if pfx.endswith("bi"):
         return pfx[0].upper() + pfx[-1]
@@ -187,9 +200,11 @@ angle_frequency_unit = angleFrequencyUnit = afu = af = make_scaled_unit_quantity
 # angle_frequency_unit = angleFrequencyUnit = afu = af = pq.UnitQuantity('angle frequency unit', 1/pq.rad, symbol='1/rad')
 
 # these are too useful to leave out
-kiloohm = kohm = make_scaled_unit_quantity(pq.ohm, "kilo")
-megaohm = Mohm = make_scaled_unit_quantity(pq.ohm, "mega")
-gigaohm = Gohm = make_scaled_unit_quantity(pq.ohm, "giga")
+microohm = μohm = μΩ = make_scaled_unit_quantity(pq.ohm, "micro", symbol="μΩ")
+millioohm = mohm = mΩ = make_scaled_unit_quantity(pq.ohm, "milli", symbol="mΩ")
+kiloohm = kohm = kΩ = make_scaled_unit_quantity(pq.ohm, "kilo", symbol = "kΩ")
+megaohm = Mohm = MΩ = make_scaled_unit_quantity(pq.ohm, "mega", symbol = "MΩ")
+gigaohm = Gohm = GΩ = make_scaled_unit_quantity(pq.ohm, "giga", symbol="GΩ")
 
 # NOTE: the string argument refers to the prefix to be prepended to the original
 # unit string
@@ -205,7 +220,14 @@ radiant_flux_density_unit = flux_density_unit = rfdu = fdu = make_scaled_unit_qu
 Φₑλ = spectral_flux_wavelength_unit = sfwu = make_scaled_unit_quantity(pq.W*(pq.m**(-1)), name="spectral_flux_wavelength_unit",symbol='W⋅m⁻¹')
 ΦE = electric_flux_unit = efu = make_scaled_unit_quantity(pq.V * pq.m, name = "electric_flux_unit", symbol="V⋅m")
 flow_unit = flow = f_u = make_scaled_unit_quantity((pq.m**3)/pq.s, name="flow unit", symbol="m³⋅s⁻¹")
-
+μM = make_scaled_unit_quantity(1e-6 * pq.mol/pq.L, name="μM", symbol = "μM")
+μm = make_scaled_unit_quantity(1e-6 * pq.m, name="μm", symbol = "μm")
+μV = make_scaled_unit_quantity(1e-6 * pq.V, name="μV", symbol = "μV")
+pV = make_scaled_unit_quantity(1e-12 * pq.V, name="pV", symbol = "pV")
+fV = make_scaled_unit_quantity(1e-15 * pq.V, name="pV", symbol = "pV")
+μA = make_scaled_unit_quantity(1e-6 * pq.A, name="μA", symbol = "μA")
+μC = make_scaled_unit_quantity(1e-6 * pq.C, name="μC", symbol = "μC")
+μS = make_scaled_unit_quantity(1e-6 * pq.S, name="μS", symbol = "μS")
 wpv = make_scaled_unit_quantity(pq.kg/pq.L, name="weight per volume")#, symbol = "kg⋅L⁻¹")
 wpw = make_scaled_unit_quantity(pq.kg/pq.L, name="weight per weight")#, symbol = "kg⋅kg⁻¹")
 vpv = make_scaled_unit_quantity(pq.L/pq.L, name="volume per volume")#, symbol = "kg⋅kg⁻¹")
@@ -238,9 +260,17 @@ custom_unit_symbols[pnm.symbol] = pnm
 custom_unit_symbols[emd.symbol] = emd
 custom_unit_symbols[emw.symbol] = emw
 custom_unit_symbols[emm.symbol] = emm
-custom_unit_symbols[kohm.symbol] = kohm
-custom_unit_symbols[Mohm.symbol] = Mohm
-custom_unit_symbols[Gohm.symbol] = Gohm
+custom_unit_symbols[μΩ.symbol] = μΩ
+custom_unit_symbols[mΩ.symbol] = mΩ
+custom_unit_symbols[kΩ.symbol] = kΩ
+custom_unit_symbols[MΩ.symbol] = MΩ
+custom_unit_symbols[GΩ.symbol] = GΩ
+custom_unit_symbols[μM.symbol] = μM
+custom_unit_symbols[μm.symbol] = μm
+custom_unit_symbols[μV.symbol] = μV
+custom_unit_symbols[μA.symbol] = μA
+custom_unit_symbols[μC.symbol] = μC
+custom_unit_symbols[μS.symbol] = μS
 custom_unit_symbols[radiant_flux_unit.symbol] = radiant_flux_unit
 custom_unit_symbols[radiant_flux_density_unit.symbol] = radiant_flux_density_unit
 custom_unit_symbols[spectral_flux_frequency_unit.symbol] = spectral_flux_frequency_unit
