@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>844</width>
+    <width>898</width>
     <height>843</height>
    </rect>
   </property>
@@ -46,8 +46,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>844</width>
-     <height>28</height>
+     <width>898</width>
+     <height>30</height>
     </rect>
    </property>
    <property name="sizePolicy">
@@ -1011,6 +1011,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="whatsThis">
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When several objects are selected in the workspace (User Variables tab) this will save them as HDF5 files named after the object name (symbol) in the workspace.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;When only one object is selected in the workspace, will show a dialog for selecting the file name and a file type (where appropriate) for saving the object.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
   </action>
   <action name="actionQuit">
    <property name="icon">
@@ -1019,6 +1022,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>&amp;Quit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
    </property>
   </action>
   <action name="action_Console">
@@ -1120,6 +1126,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="statusTip">
     <string>Select working directory</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+D</string>
+   </property>
   </action>
   <action name="actionNew_Signal_Viewer">
    <property name="text">
@@ -1144,6 +1153,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="whatsThis">
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Opens the selected file(s) in the File System tab, or presents an file chooser dialog when no files are selected.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
    </property>
   </action>
   <action name="actionOpen_Files">
@@ -1299,6 +1311,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="whatsThis">
     <string>Open system terminal in current folder</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+T</string>
+   </property>
   </action>
   <action name="actionSet_user_plugins_directory">
    <property name="icon">
@@ -1326,6 +1341,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>About</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+/</string>
    </property>
   </action>
   <action name="actionAbout_Components">

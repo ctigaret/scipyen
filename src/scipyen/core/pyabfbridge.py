@@ -1442,10 +1442,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         if len(adc_diffs):
             return {"ADCs": adc_diffs}
-            
-        
-        
-        
     
     def toHDF5(self, group:h5py.Group, name:str, oname:str, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -2770,8 +2766,12 @@ class ABFInputConfiguration:
                 parent_obj_class = parent.attrs.get("type_name", None)
                 if parent_obj_class == "ABFProtocol":
                     entity["protocol"] = parent # soft link here
-                
-        
+                    
+            else:
+                # to avoid infinite recursion, we only save the protocol when this ADC
+                # is saved as part of a protocol
+                h5io.toHDF5(None, entity, name="protocol") 
+                    
         h5io.storeEntityInCache(entity_cache, self, entity)
         
         return entity
@@ -2791,8 +2791,9 @@ class ABFInputConfiguration:
         name = attrs.get("name", f"ADC{adcChannel}")
         units = attrs.get("units", pq.dimensionless)
         logicalIndex = attrs.get("logicalIndex", 0)
+        protocol = h5io.fromHDF5(entity["protocol"], cache)
         
-        return cls(obj=None, protocol=None, adcChannel=logicalIndex,
+        return cls(obj=None, protocol=protocol, adcChannel=logicalIndex,
                    physical=True, physicalIndex = adcChannel, name=name, units=units)
 
     def __eq__(self, other):
@@ -2949,6 +2950,7 @@ class ABFOutputConfiguration:
                  protocol:typing.Optional[ABFProtocol] = None,
                  dacChannel:int = 0, 
                  physical:bool=False, 
+                 physicalIndex:typing.Optional[int]=None,
                  name: typing.Optional[str] = None,
                  units: typing.Optional[typing.Union[str, pq.Quantity]]=pq.dimensionless,
                  dacHoldingLevel:typing.Optional[typing.Union[float,pq.Quantity]] = None,
@@ -3091,8 +3093,18 @@ class ABFOutputConfiguration:
             
         else:
             # print(f"{self.__class__.__name__}.__init__ from atoms")
+            if isinstance(physicalIndex, int):
+                self._physicalChannelIndex_ = physicalIndex
+                
+            else:
+                raise TypeError(f"Expecting physicalIndex an int; instead, got {type(physicalIndex).__name__}")
             
-            self._physicalChannelIndex_ = self._dacChannel_ = dacChannel
+            if isinstance(dacChannel, int):
+                self._dacChannel_ = dacChannel
+            else:
+                raise TypeError((f"Expecting adcChannel an int; instead, got {type(adcChannel).__name__}"))
+            
+            # self._physicalChannelIndex_ = self._dacChannel_ = dacChannel
             if isinstance(name, str) and len(name.strip()):
                 self._dacName_ = name
             else:
@@ -3308,58 +3320,85 @@ class ABFOutputConfiguration:
             return cached_entity
         
         
-        attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
-                            inspect.getmembers_static(self, inspect.isdatadescriptor)))
+        # attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
+        #                     inspect.getmembers_static(self, inspect.isdatadescriptor)))
         
-        prattr = list(filter(lambda x: x[0]=="protocol", attrs))
+        attrs = list(filter(lambda x: x[0] not in ("protocol", "epochs"), inspect.getmembers_static(self, lambda x: isinstance(x, property))))
         
-        protocol_attr = None
-        if len(prattr):
-            ndx = attrs.index(prattr[0])
-            protocol_attr = attrs.pop(ndx)
+        # print(f"{self.__class__.__name__}.toHDF5@: attrs = ")
+        # for p in attrs:
+        #     print(f"{p[0]} = {getattr(self, p[0])}")
+#         prattr = list(filter(lambda x: x[0]=="protocol", attrs))
+#         
+#         protocol_attr = None
+#         if len(prattr):
+#             ndx = attrs.index(prattr[0])
+#             protocol_attr = attrs.pop(ndx)
             
         
-        eattr = list(filter(lambda x: x[0] == "epochs", attrs))
-        
-        epochs_attr = None
-        if len(eattr):
-            ndx = attrs.index(eattr[0])
-            epochs_attr = attrs.pop(ndx)
+#         eattr = list(filter(lambda x: x[0] == "epochs", attrs))
+#         
+#         epochs_attr = None
+#         if len(eattr):
+#             ndx = attrs.index(eattr[0])
+#             epochs_attr = attrs.pop(ndx)
         
         objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
         obj_attrs.update(objattrs)
-        # if isinstance(name, str) and len(name.strip()):
-        #     target_name = name
             
         entity = group.create_group(target_name, track_order = track_order)
         entity.attrs.update(obj_attrs)
-            
-        if isinstance(protocol_attr, tuple) and protocol_attr[0] == "protocol":
-            # NOTE: 2024-07-18 16:03:58
-            # see NOTE: 2024-07-18 14:57:47
-            group_obj_class = group.attrs.get("python.class", None)
-            if group_obj_class == "builtins.list":
-                parent = group.parent   # by definition in HDF5, this is also a Group
-                                        # and its attributes must indicate it is an
-                                        # ABFProtocol
-                parent_obj_class = parent.attrs.get("type_name", None)
-                if parent_obj_class == "ABFProtocol":
-                    entity["protocol"] = parent # soft link here
+        
+        group_obj_class = group.attrs.get("python.class", None)
+        if group_obj_class == "builtins.list":
+            parent = group.parent   # by definition in HDF5, this is also a Group
+                                    # and its attributes must indicate it is an
+                                    # ABFProtocol
+            parent_obj_class = parent.attrs.get("type_name", None)
+            if parent_obj_class == "ABFProtocol":
+                entity["protocol"] = parent # soft link here
                 
-        if isinstance(epochs_attr, tuple) and epochs_attr[0] == "epochs":
-            epochs = getattr(self, "epochs")
-            # NOTE: 2024-07-19 11:02:03 ATTENTION
-            # this below IS THE CORRECT WAY, as the h5io function will treat the
-            # epochs list appropriately (including descending into it and encoding
-            # its elements, recursively) to be compatible with full round Robin
-            # read/write
-            epochs_group = h5io.toHDF5(epochs, entity, name="epochs",
-                                               oname="epochs",
-                                               compression=compression,
-                                               chunks=chunks, 
-                                               track_order=track_order,
-                                               entity_cache=entity_cache,
-                                               )
+        else:
+            # to avoid infinite recursion, we only save the protocol when this DAC
+            # is saved as part of a protocol
+            h5io.toHDF5(None, entity, name="protocol")
+            
+        epochs_group = h5io.toHDF5(self.epochs, entity, name="epochs",
+                                            oname="epochs",
+                                            compression=compression,
+                                            chunks=chunks, 
+                                            track_order=track_order,
+                                            entity_cache=entity_cache,
+                                            )
+        # epochs = self.epochs
+            
+        # if isinstance(protocol_attr, tuple) and protocol_attr[0] == "protocol":
+        #     # NOTE: 2024-07-18 16:03:58
+        #     # see NOTE: 2024-07-18 14:57:47
+        #     group_obj_class = group.attrs.get("python.class", None)
+        #     if group_obj_class == "builtins.list":
+        #         parent = group.parent   # by definition in HDF5, this is also a Group
+        #                                 # and its attributes must indicate it is an
+        #                                 # ABFProtocol
+        #         parent_obj_class = parent.attrs.get("type_name", None)
+        #         if parent_obj_class == "ABFProtocol":
+        #             entity["protocol"] = parent # soft link here
+                
+        # if isinstance(epochs_attr, tuple) and epochs_attr[0] == "epochs":
+        #     epochs = getattr(self, "epochs")
+        #     # NOTE: 2024-07-19 11:02:03 ATTENTION
+        #     # this below IS THE CORRECT WAY, as the h5io function will treat the
+        #     # epochs list appropriately (including descending into it and encoding
+        #     # its elements, recursively) to be compatible with full round Robin
+        #     # read/write
+        #     epochs_group = h5io.toHDF5(epochs, entity, name="epochs",
+        #                                        oname="epochs",
+        #                                        compression=compression,
+        #                                        chunks=chunks, 
+        #                                        track_order=track_order,
+        #                                        entity_cache=entity_cache,
+        #                                        )
+        
         h5io.storeEntityInCache(entity_cache, self, entity)
         
         return entity
@@ -3375,21 +3414,29 @@ class ABFOutputConfiguration:
             attrs = h5io.attrs2dict(entity.attrs)
         
         dacChannel = attrs.get("physicalIndex", 0)
+        logicalIndex = attrs.get("logicalIndex", 0)
         name = attrs.get("name", f"DAC{dacChannel}")
         units = attrs.get("units", pq.dimensionless)
         dacHoldingLevel = attrs.get("dacHoldingLevel", pq.dimensionless)
         interEpisodeLevel = attrs.get("returnToHold", True)
         waveFormEnabled = attrs.get("analogWaveformEnabled", False)
-        waveFormSource = attrs.get("waveFormSource", 0)
+        waveFormSource = attrs.get("analogWaveformSource", 0)
+        
+        # print(f"waveFormSource = {waveFormSource}")
         
         # print(f"entity/epochs: {entity['epochs']}")
         
-        
+        protocol = h5io.fromHDF5(entity["protocol"], cache)
         epochs = h5io.fromHDF5(entity["epochs"], cache)
         
-        return cls(obj=None, protocol=None, dacChannel=dacChannel, units=units,
-                   dacHoldingLevel=dacHoldingLevel, interEpisodeLevel=interEpisodeLevel,
-                   waveFormEnabled=waveFormEnabled, waveFormSource=waveFormSource,
+        return cls(obj=None, protocol=protocol, dacChannel=logicalIndex, 
+                   physicalIndex = dacChannel, 
+                   physical=True,
+                   units=units,
+                   dacHoldingLevel=dacHoldingLevel, 
+                   interEpisodeLevel=interEpisodeLevel,
+                   waveFormEnabled=waveFormEnabled, 
+                   waveFormSource=waveFormSource,
                    epochs=epochs, name=name)
         
     def is_identical_except_digital(self, other):
