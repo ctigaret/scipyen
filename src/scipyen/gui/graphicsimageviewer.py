@@ -1684,7 +1684,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def keyPressEvent(self, evt):
         if evt.key() == QtCore.Qt.Key_Escape:
             self.__escape_pressed___ = True
-            
+        else:
+            super().keyPressEvent(evt)
         evt.accept()
         
     @safeWrapper

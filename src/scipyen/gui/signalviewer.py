@@ -3053,6 +3053,8 @@ anything else       anything else       ❌
                 self._cursor_coordinates_text_=""
                 self._update_coordinates_viewer_()
                 #self.dynamicCursorStatus.clear()
+        else:
+            super().keyPressEvent(keyevt)
                 
     @safeWrapper
     def setupCursors(self, cursorType="c", *where, **kwargs):

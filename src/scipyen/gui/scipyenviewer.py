@@ -681,6 +681,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
         self.update_title(doc_title = None, win_title = None, enforce = True)
         
+    def keyPressEvent(self, e: QtGui.QKeyEvent) -> None:
+        # print(f"{self.__class__.__name__}.keyPressEvent({e.key()})")
+        if e.matches(QtGui.QKeySequence.Close):
+            self.closeEvent(e)
+        else:
+            super().keyPressEvent(e)
+            e.accept()
+        
     def closeEvent(self, evt:QtCore.QEvent):
         """All viewers in Scipyen should behave consistently.
         However, this may by reimplemented in derived classes.

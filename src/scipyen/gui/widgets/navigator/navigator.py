@@ -20,6 +20,7 @@ import gui.pictgui as pgui
 from gui import guiutils
 from iolib import pictio
 
+# TODO finalize this
 # TODO/FIXME: 2023-05-06 23:12:19
 # Since this is only intended for use with local file system (i.e. file:// URI 
 # protocol) I should use pathlib.Path instead of QtCore.QUrl
