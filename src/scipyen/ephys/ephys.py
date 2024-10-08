@@ -333,6 +333,15 @@ class SynapticStimulus(__BaseSynStim__):
                     
         return super().__new__(cls, **new_args)
     
+    def __eq__(self, other) -> bool:
+        ret = type(self) == type(other)
+        if not ret:
+            return ret
+        
+        ret &= all(getattr(self, f) == getattr(other, f) for f in self._fields)
+        
+        return ret
+        
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
         
@@ -2032,6 +2041,18 @@ class SynapticPathway:
     schedule: typing.Optional[RecordingSchedule] = None
     measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    
+    def __eq__(self, other) -> bool:
+        from dataclasses import fields
+        ret = type(self) == type(other)
+        
+        if not ret:
+            return ret
+        
+        ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
+        
+        return ret
+    
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
