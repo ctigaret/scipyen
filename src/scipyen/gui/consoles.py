@@ -187,7 +187,15 @@ def change_error_display_for_style(style:typing.Union[str, Style]):
     #
     # (for now, it;s just replacing the ugly ansi yellow with the ansi red)
     if isinstance(style, str):
+        style_name = style
         style = styles.get_style_by_name(style)
+    elif isinstance(style, Style):
+        style_name = style.name
+    else:
+        raise TypeError(f"Expecting a pygments Style or a str (syle name); instead, got a {type(style).__name__}")
+
+    is_dark_style = styles.dark_style(style_name)
+    # print(f"change_error_display: using dark style = {is_dark_style}")
 
     try:
         from IPython.core import ultratb

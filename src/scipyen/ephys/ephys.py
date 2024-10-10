@@ -807,7 +807,6 @@ class RecordingSource(__BaseSource__):
         
         h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
-    
 
     @classmethod
     def fromHDF5(cls, entity:h5py.Group, 
@@ -1240,7 +1239,7 @@ class RecordingEpisode(Episode):
     
         The pathways define their own clamping modes and recording source.
     
-    • pathwayStimulusBySweep: a dict with key ↦ value mapping where:
+    • pathActivationBySweep: a dict with key ↦ value mapping where:
         key: int (sweep indices) or tuples (start:int,step:int)
         value: tuples of SynapticPathway objects
     
@@ -1283,12 +1282,12 @@ class RecordingEpisode(Episode):
     # actually, strike that: an episode must contain blocks recorded WITH THE SAME EPISODE
     #
     # NOTE: 2024-10-01 08:34:35
-    # 'pathways' removed - one can get the pathways from pathwayStimulusBySweep
+    # 'pathways' removed - one can get the pathways from pathActivationBySweep
     def __init__(self, blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
                  protocol: typing.Optional[ElectrophysiologyProtocol] = None,
                  name: typing.Optional[str] = None,
                  episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
-                 pathwayStimulusBySweep: dict = dict() ,
+                 pathActivationBySweep: dict = dict() ,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1304,7 +1303,7 @@ class RecordingEpisode(Episode):
         protocol: ElectrophysiologyProtocol — the protocol used in common througout
             the episode
 
-        pathwayStimulusBySweep: dict — indicates which pathways are stimulated in
+        pathActivationBySweep: dict — indicates which pathways are stimulated in
             which sweep; also useful for testing pathway cross-talk, or independence
     
             This is a key ↦ value mapping, where:
@@ -1350,7 +1349,7 @@ class RecordingEpisode(Episode):
             and in the order 'path1' → 'path0' in every other segment, starting
             with the 2ⁿᵈ (segment index 1) , 𝑖.𝑒,, on `odd-numbered` segments.
                 
-            By default the `pathwayStimulusBySweep` attribute of a recording 
+            By default the `pathActivationBySweep` attribute of a recording 
             episode is an empty dict.
     
             ¹ Here a `segment` has the same meaning as a `sweep`; we use `segment`
@@ -1425,14 +1424,14 @@ class RecordingEpisode(Episode):
         #   when trying to match an episode with data having the wrong number of
         # sweeps
         #
-        # if isinstance(pathwayStimulusBySweep,dict):
-        if self._validatePSbyS(pathwayStimulusBySweep):
-            self._pathwayStimulusbySweep_ = pathwayStimulusBySweep
+        # if isinstance(pathActivationBySweep,dict):
+        if self._validatePAxS(pathActivationBySweep):
+            self._pAxS = pathActivationBySweep
 #         elif isinstance(xtalk, (tuple, list)):
-#             if len(xtalk) and not all(isinstance(v, int) for v in pathwayStimulusBySweep):
-#                 raise TypeError("When a tuple, 'pathwayStimulusBySweep' must contain only integers")
+#             if len(xtalk) and not all(isinstance(v, int) for v in pathActivationBySweep):
+#                 raise TypeError("When a tuple, 'pathActivationBySweep' must contain only integers")
 #             
-#             self.pathwayStimulusBySweep = tuple(pathwayStimulusBySweep)
+#             self.pathActivationBySweep = tuple(pathActivationBySweep)
 #             
 #         else:
 #             self.xtalk = tuple()
@@ -1485,7 +1484,7 @@ class RecordingEpisode(Episode):
             for p in self.pathways:
                 ret.append(f"\t{p}")
 
-        ret.append(f"\tPathway Stimulation by Sweep: {self.pathwayStimulusBySweep}")
+        ret.append(f"\tPathway Stimulation by Sweep: {self.pathActivationBySweep}")
         
         ret.append(f"\tProtocol name: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
         # ret += unique([f"\t\t{p.name}" for p in self.protocols])
@@ -1528,11 +1527,11 @@ class RecordingEpisode(Episode):
                         p.breakable()
                     p.text("\n")
                 
-            # if isinstance(self.pathwayStimulusBySweep, (tuple, list)) and len(self.pathwayStimulusBySweep):
-            if isinstance(self.pathwayStimulusBySweep, dict) and len(self.pathwayStimulusBySweep):
+            # if isinstance(self.pathActivationBySweep, (tuple, list)) and len(self.pathActivationBySweep):
+            if isinstance(self.pathActivationBySweep, dict) and len(self.pathActivationBySweep):
                 link = " \u2192 "
                 txt = ["Pathway Stimulation by Sweep:"]
-                for k,v in self.pathwayStimulusBySweep.items():
+                for k,v in self.pathActivationBySweep.items():
                     txt.append(f"Sweeps {k} ↦ {v}")
                     # if len(x[1]) > 1:
                     #     txt.append(f"sweep {x[0]}: {x[1][0].name} {link} {x[1][1].name}")
@@ -1576,7 +1575,7 @@ class RecordingEpisode(Episode):
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.toHDF5(self.pathwayStimulusBySweep, entity, name="pathwayStimulusBySweep", oname="pathwayStimulusBySweep",
+        h5io.toHDF5(self.pathActivationBySweep, entity, name="pathActivationBySweep", oname="pathActivationBySweep",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
@@ -1597,14 +1596,14 @@ class RecordingEpisode(Episode):
         
         blocks = h5io.fromHDF5(entity["blocks"], cache=cache)
         protocol = h5io.fromHDF5(entity["protocol"], cache=cache)
-        pathwayStimulusBySweep = h5io.fromHDF5(entity["pathwayStimulusBySweep"], cache=cache)
+        pathActivationBySweep = h5io.fromHDF5(entity["pathActivationBySweep"], cache=cache)
 
         name=attrs["name"]
         begin=attrs["begin"]
         end=attrs["end"]
         beginFrame=attrs["beginFrame"]
         endFrame=attrs["endFrame"]
-        # pathwayStimulusBySweep=attrs["pathwayStimulusBySweep"]
+        # pathActivationBySweep=attrs["pathActivationBySweep"]
         episodeType=attrs["type"]
         
         return cls(name=name, episodeType=episodeType, begin=begin, end=end,
@@ -1612,19 +1611,49 @@ class RecordingEpisode(Episode):
                 protocol=protocol,
                 blocks = blocks,
                 # pathways=pathways,
-                pathwayStimulusBySweep=pathwayStimulusBySweep)
+                pathActivationBySweep=pathActivationBySweep)
         
-    def _validatePSbyS(self, val:dict):
+    @staticmethod
+    def checkCrossTalk(val:dict) -> bool:
+        if len(val) == 0:
+            return False
+        
+        if not all(isinstance(k, int) or (isinstance(k, tuple) and len(k)>0 and all(isinstance(k_, int) for k_ in k)) for k in val) or \
+            not all(isinstance(v, tuple) and all(isinstance(x, SynapticPathway) for x in v) for v in val.values()):
+            raise ValueError("Argument must map ints or tuples of int keys to tuples of SynapticPathway objects")
+        
+        ret = all(len(v)==2 for v in val.values())
+        
+        return ret
+    
+        # TODO: 2024-10-10 09:03:01
+        # check combinatorics:
+        # 1 pathway => no xtalk
+        # 2 pathways => 1->2, 2->1 => even number of sweeps
+        # 3 pathways => 1->2, 1->3, 2->3, 2->1, 3->1, 3->2 => even number of sweeps
+        # ⋮
+        # etc
+        #
+        # if ret:
+        #     paths = list()
+        #     for v in val.values():
+        #         p = [v_ for v_ in v if v_ not in ret]
+        #         paths += p
+    
+            
+    
+    @staticmethod
+    def validatePAxS(val:dict):
         if not isinstance(val, dict):
             return False
         
         if len(val) == 0:
             return True
         
-        keys = list(self._pathwayStimulusbySweep_.keys())
+        keys = list(val.keys())
         
-        int_keys = list(filter(lambda x: isinstance(x, int)), keys)
-        tuple_keys = list(filter(lambda x: isinstance(x, tuple) and len(x)==2 and all(isinstancev, int) for v in x), keys)
+        int_keys = list(filter(lambda x: isinstance(x, int), keys))
+        tuple_keys = list(filter(lambda x: isinstance(x, tuple) and len(x)==2 and all(isinstance (v, int) for v in x), keys))
         
         if len(int_keys + tuple_keys) != len(val):
             return False
@@ -1639,17 +1668,21 @@ class RecordingEpisode(Episode):
         return True
         
     @property
-    def pathwayStimulusBySweep(self) -> dict:
+    def pathActivationBySweep(self) -> dict:
         """Maps a correspondence between the sweep(s) that stimulate pathways and the stimulated pathways
         """
-        return self._pathwayStimulusbySweep_
+        return self._pAxS
     
-    @pathwayStimulusBySweep.setter
-    def pathwayStimulusBySweep(self, val:dict) -> None:
-        if not self._validatePSbyS(val):
-            raise ValueError("pathwayStimulusBySweep got an incorrect argument")
+    @pathActivationBySweep.setter
+    def pathActivationBySweep(self, val:dict) -> None:
+        if not self._validatePAxS(val):
+            raise ValueError("pathActivationBySweep got an incorrect argument")
         
-        self._pathwayStimulusbySweep_ = val
+        self._pAxS = val
+        
+    @property
+    def isXTalk(self) -> bool:
+        return self.checkCrossTalk(self.pathActivationBySweep)
             
     @property
     def blocks(self) -> list:
@@ -1865,15 +1898,15 @@ class RecordingEpisode(Episode):
     @property
     def pathways(self) -> typing.List[SynapticPathway]:
         ret = list()
-        for v in self.pathwayStimulusBySweep.values():
-            p = [v_ for v_ in val if v_ not in ret]
+        for v in self.pathActivationBySweep.values():
+            p = [v_ for v_ in v if v_ not in ret]
             ret += p
 
         return ret
     
-    @pathways.setter
-    def pathways(self, val) -> None:
-        raise RuntimeError(f"Pathways cannot be set directly; you must use pathwayStimulusBySweep property")
+    # @pathways.setter
+    # def pathways(self, val) -> None:
+    #     raise RuntimeError(f"Pathways cannot be set directly; you must use pathActivationBySweep property")
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
