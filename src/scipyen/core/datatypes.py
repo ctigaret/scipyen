@@ -1085,6 +1085,60 @@ class TypeEnum(IntEnum):
         """
         return self.strand(self.name, name)
         
+class ProcedureType(TypeEnum):
+    null = 0
+    mating = 1
+    treatment = 2
+    behaviour = 4 # includes navigation in real or virtual environment, rotarod, inclined plane, licking etc # TODO to refine
+    surgery = 8
+    biopsy = 16
+    postop = 32
+    tagging = 64
+    weaning = 128
+    cull = 256
+    other = 512
+    
+class AdministrationRoute(TypeEnum):
+    null = 0
+    bath = 1 # relates to ex vivo tissue slices
+    puff = 2 # relates to ex vivo tissue slices — e.g. picospritzer, pressurized micropipette, etc
+    intraperitoneal = 4
+    intramuscular = 8
+    intravenous = 16
+    intraarterial = 32
+    intracerebral = 64
+    intraventricular = 128 # can be in the heart!
+    intracerebroventricular = intracerebral | intraventricular # 192
+    intracardiac = 256
+    intracardioventricular = intracardiac | intraventricular # 384
+    subcutaneous = 512
+    transcutaneous = 1024
+    peros = 2048 # e.g. gavage
+    inhalation = 4096
+    intranasal = 8192
+    intraorbital = 16384
+    food_water = 32768
+    other = 65536
+    
+    # aliases
+    ip = intraperitoneal
+    iv = intravenous
+    ia = intraarterial
+    im = intramuscular
+    ic = intracerebral
+    icv = intracerebroventricular
+    icd = intracardiac
+    icdv = intracardioventricular
+    ins = intranasal # 'in' is a reserved Python keyword
+    inh = inhalation
+    io = intraorbital
+    sc = subcutaneous
+    tc = transcutaneous
+    gavage = peros
+    oral = peros
+    custom = other
+    bulk = bath
+    
     
 def inspect_members(obj, predicate=None):
     skips = ("__class__", "__module__", "__name__", "__qualname__", "__func__",
@@ -1118,7 +1172,122 @@ def inspect_members(obj, predicate=None):
         
     return dict(mb)
 
-class Procedure: pass # shim, redef'ed below
+@dataclass
+class Procedure:
+    """An experimental procedure: what is being done during an Episode.
+    
+    A succession of procedures (attached to the episodes of a Schedule) 
+        represents an experimental protocol.
+    
+    """
+    name:str = ""
+    _:KW_ONLY
+    procedureType: ProcedureType = ProcedureType.null
+    description: str = ""
+    
+    # def __post_init__(self, dose:typing.Optional[pq.Quantity] = None):
+    #     if isinstance(dose, pq.Quantity):
+    #         pass
+        # if isinstance(schedule, Schedule) or schedule is None:
+        #     self._schedule_ = schedule
+        # else:
+        #     raise TypeError(f"Expecting a Schedule, or None; instead, got {type(schedule).__name__}")
+        # 
+        # if isinstance(self._schedule_, Schedule):
+        #     for e in self._schedule_.episodes:
+        #         e.procedure = self
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        ret = self.name == other.name
+        
+        if ret:
+            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in filter(lambda x: x.name != "schedule", dataclasses.fields(self.__class__)))
+            
+        # if ret:
+        #     ret &= type(self.schedule) == type(other.schedule) # they can be Schedule or None
+
+#         if ret:
+#             # compare schedules — CAUTION: at least one of the episodes in the schedule
+#             # contains a reference to this Procedure instance, leading to infinite
+#             # recursion.
+#             # besides, in each Procedure the schedule is associated with it
+#             
+#             ret &= self.schedule.name == other.schedule.name
+            
+        # if ret:
+        #     ret &= len(self.schedule.episodes) == len(other.schedule.episodes)
+            
+        # if ret:
+        #     epiFields = list(filter(lambda x: x.name != "procedure", dataclasses.fields(Episode)))
+        #     for e, e1 in zip(self.schedule.episodes, other.schedule.episodes):
+        #         ret &= all(getattr(e, f) == getattr(e1,f) for f in epiFields)
+                
+        return ret
+#     
+#     @property
+#     def schedule(self) -> typing.Optional[Schedule]:
+#         return self._schedule_
+    
+#     @schedule.setter
+#     def schedule(self, schedule:typing.Optional[Schedule]) -> None:
+#         if schedule is None or isinstance(schedule, Schedule):
+#             self._schedule_ = schedule
+#         else:
+#             raise TypeError(f"Expecting a Schedule, or None; instead, got {type(schedule).__name__}")
+#         
+#         if isinstance(self._schedule_, Schedule):
+#             for e in self._schedule_.episodes:
+#                 e.procedure = self
+    
+    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
+                       compression:str, chunks:bool, track_order:bool,
+                       entity_cache:dict) -> h5py.Group:
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+        
+        attrs = {"name": self.name, "procedureType": self.procedureType, "description": self.description}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        # h5io.toHDF5(self.schedule, entity, name="schedule", 
+        #                     oname="schedule", compression=compression,
+        #                     chunks=chunks, track_order=track_order,
+        #                     entity_cache=entity_cache)
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+    
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict] = None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        procedureType = attrs["procedureType"]
+        description = attrs["description"]
+        
+        # schedule = h5io.fromHDF5(entity["schedule"], cache)
+        # procedure will be assigned to self, in each of the schedule's episodes
+        # by the c'tor below
+        return cls(name, procedureType=procedureType, description=description)
+        
 
 @dataclass
 class Episode:
@@ -1144,8 +1313,6 @@ class Episode:
     endFrame:int = 0
     description:str = ""
     procedure:typing.Optional[Procedure] = field(default = None)
-    # treatment:str = "control"
-    # procedure:Procedure = field(default_factory = lambda: Procedure())
     
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -1316,173 +1483,6 @@ class Schedule:
         if episode in self.episodes:
             self.episodes.remove(episode)
     
-class ProcedureType(TypeEnum):
-    null = 0
-    mating = 1
-    treatment = 2
-    behaviour = 4 # includes navigation in real or virtual environment, rotarod, inclined plane, licking etc # TODO to refine
-    surgery = 4
-    biopsy = 8
-    postop = 16
-    tagging = 32
-    cull = 64
-    other = 128
-    
-class AdministrationRoute(TypeEnum):
-    null = 0
-    bath = 1 # relates to ex vivo tissue slices
-    puff = 2 # relates to ex vivo tissue slices — e.g. picospritzer, pressurized micropipette, etc
-    intraperitoneal = 4
-    intramuscular = 8
-    intravenous = 16
-    intraarterial = 32
-    intracerebral = 64
-    intraventricular = 128 # can be in the heart!
-    intracerebroventricular = intracerebral | intraventricular # 192
-    intracardiac = 256
-    intracardioventricular = intracardiac | intraventricular # 384
-    subcutaneous = 512
-    transcutaneous = 1024
-    peros = 2048 # e.g. gavage
-    inhalation = 4096
-    intranasal = 8192
-    intraorbital = 16384
-    food_water = 32768
-    other = 65536
-    
-    # aliases
-    ip = intraperitoneal
-    iv = intravenous
-    ia = intraarterial
-    im = intramuscular
-    ic = intracerebral
-    icv = intracerebroventricular
-    icd = intracardiac
-    icdv = intracardioventricular
-    ins = intranasal # 'in' is a reserved Python keyword
-    inh = inhalation
-    io = intraorbital
-    sc = subcutaneous
-    tc = transcutaneous
-    gavage = peros
-    oral = peros
-    custom = other
-    bulk = bath
-    
-
-@dataclass
-class Procedure:
-    """An experimental procedure.
-    """
-    name:str = ""
-    _:KW_ONLY
-    procedureType: ProcedureType = ProcedureType.null
-    administration: AdministrationRoute = AdministrationRoute.null
-    substance: str = ""
-    dose: dataclasses.InitVar(pq.Quantity | None) = field(default = None)
-    
-    def __post_init__(self, dose:typing.Optional[pq.Quantity] = None):
-        if isinstance(dose, pq.Quantity):
-            pass
-        if isinstance(schedule, Schedule) or schedule is None:
-            self._schedule_ = schedule
-        else:
-            raise TypeError(f"Expecting a Schedule, or None; instead, got {type(schedule).__name__}")
-
-        if isinstance(self._schedule_, Schedule):
-            for e in self._schedule_.episodes:
-                e.procedure = self
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        
-        ret = self.name == other.name
-        
-        if ret:
-            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in filter(lambda x: x.name != "schedule", dataclasses.fields(self.__class__)))
-            
-        if ret:
-            ret &= type(self.schedule) == type(other.schedule) # they can be Schedule or None
-
-        if ret:
-            # compare schedules — CAUTION: at least one of the episodes in the schedule
-            # contains a reference to this Procedure instance, leading to infinite
-            # recursion.
-            # besides, in each Procedure the schedule is associated with it
-            
-            ret &= self.schedule.name == other.schedule.name
-            
-        if ret:
-            ret &= len(self.schedule.episodes) == len(other.schedule.episodes)
-            
-        if ret:
-            epiFields = list(filter(lambda x: x.name != "procedure", dataclasses.fields(Episode)))
-            for e, e1 in zip(self.schedule.episodes, other.schedule.episodes):
-                ret &= all(getattr(e, f) == getattr(e1,f) for f in epiFields)
-                
-        return ret
-    
-    @property
-    def schedule(self) -> typing.Optional[Schedule]:
-        return self._schedule_
-    
-    @schedule.setter
-    def schedule(self, schedule:typing.Optional[Schedule]) -> None:
-        if schedule is None or isinstance(schedule, Schedule):
-            self._schedule_ = schedule
-        else:
-            raise TypeError(f"Expecting a Schedule, or None; instead, got {type(schedule).__name__}")
-        
-        if isinstance(self._schedule_, Schedule):
-            for e in self._schedule_.episodes:
-                e.procedure = self
-    
-    def toHDF5(self,group:h5py.Group, name:str, oname:str, 
-                       compression:str, chunks:bool, track_order:bool,
-                       entity_cache:dict) -> h5py.Group:
-        from iolib import h5io
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-        
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
-        
-        attrs = {"name": self.name, "procedureType": self.procedureType}
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        entity = group.create_group(target_name, track_order=track_order)
-        entity.attrs.update(obj_attrs)
-        h5io.toHDF5(self.schedule, entity, name="schedule", 
-                            oname="schedule", compression=compression,
-                            chunks=chunks, track_order=track_order,
-                            entity_cache=entity_cache)
-        h5io.storeEntityInCache(entity_cache, self, entity)
-        return entity
-    
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group, 
-                             attrs:typing.Optional[dict] = None, cache:dict = {}):
-        
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
-        
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        name = attrs["name"]
-        procedureType = attrs["procedureType"]
-        
-        schedule = h5io.fromHDF5(entity["schedule"], cache)
-        # procedure will be assigned to self, in each of the schedule's episodes
-        # by the c'tor below
-        return cls(name, procedureType=procedureType, schedule=schedule)
-        
     
 @dataclass
 class Treatment:
@@ -1506,13 +1506,13 @@ class Treatment:
     """
     name:str = "Vehicle"
     _:KW_ONLY
-    dose:pq.Quantity = field(default_factory=lambda : math.nan * pq.g)
+    dose: dataclasses.InitVar(pq.Quantity | None) = field(default = None)
     route:AdministrationRoute = AdministrationRoute.null
+    description: str = ""
     # procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
     
     def __post_init__(self):
-        super().__init__(name=self.name, episodes = self.episodes)
-        # super().__init__(name=self.name, procedureType = ProcedureType.treatment, episodes = self.episodes)
+        super().__init__(name=self.name) #, episodes = self.episodes)
         
         unitFamily = scq.getUnitFamily(self.dose)
     

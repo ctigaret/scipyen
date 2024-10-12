@@ -1136,15 +1136,14 @@ class RecordingEpisodeType(TypeEnum):
     A value of 0 and any value > 5 are invalid.
     
     """
-    Drug            = 1 # a recording episode in the presence of a drug or mixture
-                        # of drugs
-    
-    Tracking        = 2 # used for tracking the electrophysiological behaviour of
+    Tracking        = 1 # used for tracking the electrophysiological behaviour of
                         # a source (e.g., synaptic responses, somatic spiking, etc);
-                        
+                        # this is the most common type of electrophysiology recording
+                        # epiode
+    
     Monitoring      = Tracking
                         
-    Conditioning    = 4 # used for induction of plasticity (i.e. application of 
+    Conditioning    = 2 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
                         
 
@@ -1425,7 +1424,7 @@ class RecordingEpisode(Episode):
         # sweeps
         #
         # if isinstance(pathActivationBySweep,dict):
-        if self._validatePAxS(pathActivationBySweep):
+        if self.validatePAxS(pathActivationBySweep):
             self._pAxS = pathActivationBySweep
 #         elif isinstance(xtalk, (tuple, list)):
 #             if len(xtalk) and not all(isinstance(v, int) for v in pathActivationBySweep):
@@ -1675,7 +1674,7 @@ class RecordingEpisode(Episode):
     
     @pathActivationBySweep.setter
     def pathActivationBySweep(self, val:dict) -> None:
-        if not self._validatePAxS(val):
+        if not self.validatePAxS(val):
             raise ValueError("pathActivationBySweep got an incorrect argument")
         
         self._pAxS = val
