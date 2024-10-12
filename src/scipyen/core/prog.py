@@ -334,8 +334,7 @@ class ImmutableDescriptor(BaseDescriptorValidator):
     """
         Crude implementation of a read-only descriptor.
         
-        Useful for implementing 'dataclass' classes that are not frozen, but 
-        have read-only attributes.
+        Useful for implementing read-only fields in dataclass types. 
         
         Usage in a 'dataclass' definition:
         
@@ -352,14 +351,28 @@ class ImmutableDescriptor(BaseDescriptorValidator):
     def __init__(self, *, default):
         self._default = default
         
-    def __get__(self, obj, objtype=None) -> object:
+    def __set_name__(self, obj:object, name:str):
+        if len(name.strip()) == 0:
+            raise ValueError("Cannot accept an empty name")
+        self._name = "_"+name
+        
+    def __get__(self, obj:object, objtype=None) -> object:
         if obj is None:
             return self._default
         
-        return getattr(obj, self.private_name, self._default)
+        return getattr(obj, self._name, self._default)
      
     def __set__(self, obj, value):
-        pass
+        # MUST allow self.__set__ to be called when the descriptor is first 
+        # assigned in the owner, based on the default value prescribed in the 
+        # owner's constructor; once this is done we disallow any assignments
+        # which deviate from the default
+        #
+        # NOTE: it is still legal to "assign" the (same) default value through 
+        # this method, with the net effect being no change
+        #
+        if value != self._default:
+            raise RuntimeError("This descriptor is read-only")
     
     def validate(self, value):
         return value == self._default

@@ -1140,18 +1140,6 @@ class Procedure:
     procedureType: ProcedureType = ProcedureType.null
     description: str = ""
     
-    # def __post_init__(self, dose:typing.Optional[pq.Quantity] = None):
-    #     if isinstance(dose, pq.Quantity):
-    #         pass
-        # if isinstance(schedule, Schedule) or schedule is None:
-        #     self._schedule_ = schedule
-        # else:
-        #     raise TypeError(f"Expecting a Schedule, or None; instead, got {type(schedule).__name__}")
-        # 
-        # if isinstance(self._schedule_, Schedule):
-        #     for e in self._schedule_.episodes:
-        #         e.procedure = self
-
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
@@ -1159,43 +1147,11 @@ class Procedure:
         ret = self.name == other.name
         
         if ret:
-            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in filter(lambda x: x.name != "schedule", dataclasses.fields(self.__class__)))
+            ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in dataclasses.fields(self.__class__))
+            # # skip 'description' as this is not definitory
+            # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in filter(lambda x: x.name != "description", dataclasses.fields(self.__class__)))
             
-        # if ret:
-        #     ret &= type(self.schedule) == type(other.schedule) # they can be Schedule or None
-
-#         if ret:
-#             # compare schedules — CAUTION: at least one of the episodes in the schedule
-#             # contains a reference to this Procedure instance, leading to infinite
-#             # recursion.
-#             # besides, in each Procedure the schedule is associated with it
-#             
-#             ret &= self.schedule.name == other.schedule.name
-            
-        # if ret:
-        #     ret &= len(self.schedule.episodes) == len(other.schedule.episodes)
-            
-        # if ret:
-        #     epiFields = list(filter(lambda x: x.name != "procedure", dataclasses.fields(Episode)))
-        #     for e, e1 in zip(self.schedule.episodes, other.schedule.episodes):
-        #         ret &= all(getattr(e, f) == getattr(e1,f) for f in epiFields)
-                
         return ret
-#     
-#     @property
-#     def schedule(self) -> typing.Optional[Schedule]:
-#         return self._schedule_
-    
-#     @schedule.setter
-#     def schedule(self, schedule:typing.Optional[Schedule]) -> None:
-#         if schedule is None or isinstance(schedule, Schedule):
-#             self._schedule_ = schedule
-#         else:
-#             raise TypeError(f"Expecting a Schedule, or None; instead, got {type(schedule).__name__}")
-#         
-#         if isinstance(self._schedule_, Schedule):
-#             for e in self._schedule_.episodes:
-#                 e.procedure = self
     
     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
@@ -1210,17 +1166,14 @@ class Procedure:
         if isinstance(name, str) and len(name.strip()):
             target_name = name
         
-        attrs = {"name": self.name, "procedureType": self.procedureType, "description": self.description}
+        attrs = {"name": self.name, "procedureType": self.procedureType, 
+                 "description": self.description}
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
         
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
-        # h5io.toHDF5(self.schedule, entity, name="schedule", 
-        #                     oname="schedule", compression=compression,
-        #                     chunks=chunks, track_order=track_order,
-        #                     entity_cache=entity_cache)
         h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
     
@@ -1238,30 +1191,161 @@ class Procedure:
         procedureType = attrs["procedureType"]
         description = attrs["description"]
         
-        # schedule = h5io.fromHDF5(entity["schedule"], cache)
-        # procedure will be assigned to self, in each of the schedule's episodes
-        # by the c'tor below
         return cls(name, procedureType=procedureType, description=description)
+    
+class DoseDescriptor:
+    def __init__(self, *, default:typing.Optional[pq.Quantity]=None):
+        if isinstance(default, pq.Quantity):
+            if not scq.checkDosageUnits(default):
+                raise ValueError(f"Expecting dosage units; instead, got {default.units}")
+            
+        elif default is not None:
+            raise TypeError(f"Expecting a pq.Quantity or None; instead, got {type(default).__name__}")
         
+        self._default = default
+        
+    def __set_name__(self, obj:object, name:str):
+        if len(name.strip()) == 0:
+            raise ValueError("Cannot accept an empty name")
+        self._name = "_"+name
+        
+    def __get__(self, obj:object, objtype:type) -> object:
+        if obj is None:
+            return self._default
+        return getattr(obj, self._name, self._default)
+    
+    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
+        if isinstance(value, pq.Quantity):
+            if not scq.checkDosageUnits(value):
+                raise ValueError(f"Expecting dosage units; instead got {value.units}")
+            
+        elif value is not None:
+            raise TypeError(f"Expecting a dosage Quantity or None; instead got {type(value).__name__}")
+        
+        setattr(obj, self._name, value)
+    
+@dataclass
 class Treatment(Procedure):
+    """
+    Encapsulates the administration of a dose of compound via a specified route.
+    
+    name: treatment name (typically, the compound's name)
+    dose: a pq.Quantity. This can be:
+        • a scalar quantity - unique dose administered just once during this 
+            treatment
+        • a signal-like object:
+            ∘ neo.AnalogSignal - a "continuously" time-varying dose, sampled at
+                regular time intervals
+            ∘ neo.IrregularlySampledSignal - different doses administered at 
+                discrete, possibly irregular, times
+    
+    """
     name:str = "Vehicle"
     _:KW_ONLY
-    dose: dataclasses.InitVar(pq.Quantity | None) = field(default = None)
+    # dose: dataclasses.InitVar(pq.Quantity | None) = field(default = None)
+    dose: DoseDescriptor = DoseDescriptor(default=None)
     route:AdministrationRoute = AdministrationRoute.null
-
-
-    def __post_init__(self, dose):
-        super().__init__(name=self.name) #, episodes = self.episodes)
+    description: str = ""
+    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
+    
+    def __post_init__(self):
+        super().__init__(name=self.name, description=self.description, 
+                         procedureType = ProcedureType.treatment)
         
-        unitFamily = scq.getUnitFamily(self.dose)
-    
-        acceptableUnitFamilies = ("Concentration", "Dose")
-    
-        # if unitFamily not in acceptableUnitFamilies:
-        if not any(a in unitFamily for a in acceptableUnitFamilies):
-            raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        
+        ret = self.name == other.name
+        
+        if ret:
+            ret &= type(self.dose) == type(other.dose)
+            
+        if ret:
+            if isinstance(self.dose, pq.Quantity):
+                ret &= self.dose.ndim == other.dose.ndim
+                if ret:
+                    ret &= self.dose.shape == other.dose.shape
+                    
+                if ret:
+                    ret &= scq.unitsConvertible(self.dose, other.dose)
+                    
+                if ret:
+                    if self.dose.units != other.dose.units:
+                        ret &= np.all(self.dose == other.dose.rescale(self.dose.units))
+                    else:
+                        ret &= np.all(self.dose == other.dose)
+        
+        if ret:
+            ret &= self.route == other.route
+            
+        if ret: 
+            ret &= self.descripion == other.description
+            
+        return ret
+       
+        
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
 
-    
+        from iolib import h5io
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+
+        # NOTE: 2024-07-20 15:03:37
+        # Because only scalar Quantities can be stored as HDF5 attributes, this 
+        # would preclude using using time-varying dose data types such as AnalogSignal, 
+        # IrregularlySampledSignal. 
+        # 
+        # Instead, the dose is stored as a HDF5 Dataset
+        #
+        
+        attrs = {"name": getattr(self, "name", ""), 
+                 "route": getattr(self, "route", AdministrationRoute.null), 
+                 "description": getattr(self, "description", "")}
+        
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+        
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+            
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+        
+        # NOTE: 2024-07-20 15:16:44 see NOTE: 2024-07-20 15:03:37
+        # stores the "dose" Quantity as a dataset
+        h5io.toHDF5(self.dose, entity, name="dose", oname="dose",
+                            compression=compression,chunks=chunks,
+                            track_order=track_order, entity_cache=entity_cache)
+        
+        h5io.storeEntityInCache(entity_cache, self, entity)
+        return entity
+        
+        
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group, 
+                             attrs:typing.Optional[dict] = None, cache:dict = {}):
+        
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+        
+        attrs = h5io.attrs2dict(entity.attrs)
+        
+        name = attrs["name"]
+        route = attrs["route"]
+        description = attrs["description"]
+        
+        dose = h5io.fromHDF5(entity["dose"], cache)
+        
+        return cls(name, dose=dose, route=route, description=description,
+                   procedureType = ProcedureType.treatment)
+
+
 @dataclass
 class Episode:
     """Generic episode for frame-based data.
@@ -1319,7 +1403,6 @@ class Episode:
             target_name = name
         
         entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
-        # entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         
         h5io.toHDF5(self.procedure, entity, name="procedure", oname="procedure",
@@ -1355,12 +1438,8 @@ class Episode:
 @dataclass
 class Schedule:
     """Logical grouping of a sequence of episodes.
-        A Schedule can be logically associated with a Procedure. This means that
-        all its episodes are associated with that Procedure.
-        Adding a new Episode to a Schedule associated that Episode with the 
-        Schedule's Procedure.
-        Re-associating a Schedule with a new Procedure will re-associate all
-        its episodes with the new Procedure
+        A Schedule can be logically considered a "protocol", where any of its
+        constituent episodes may associate a Procedure. 
     """
     name:str = ""
     _:KW_ONLY
@@ -1455,107 +1534,9 @@ class Schedule:
     def removeEpisode(self, episode):
         if episode in self.episodes:
             self.episodes.remove(episode)
-    
-    
-@dataclass
-class Treatment:
-    """
-    Encapsulates the administration of a dose of compound via a specified route.
-    
-    name: treatment name (typically, the compound's name)
-    dose: a pq.Quantity. This can be:
-        • a scalar quantity - unique dose administered just once during this 
-            treatment
-        • a signal-like object:
-            ∘ neo.AnalogSignal - a "continuously" time-varying dose, sampled at
-                regular time intervals
-            ∘ neo.IrregularlySampledSignal - different doses administered at 
-                discrete, possibly irregular, times
-    
-    WARNING: Do not use. See NOTE 2024-07-20 17:32:21 in the docstring for this
-    module (near top of the file).
-    
-    
-    """
-    name:str = "Vehicle"
-    _:KW_ONLY
-    dose: dataclasses.InitVar(pq.Quantity | None) = field(default = None)
-    route:AdministrationRoute = AdministrationRoute.null
-    description: str = ""
-    # procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
-    
-    def __post_init__(self):
-        super().__init__(name=self.name) #, episodes = self.episodes)
-        
-        unitFamily = scq.getUnitFamily(self.dose)
-    
-        acceptableUnitFamilies = ("Concentration", "Dose")
-    
-        # if unitFamily not in acceptableUnitFamilies:
-        if not any(a in unitFamily for a in acceptableUnitFamilies):
-            raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
-        
-    def toHDF5(self, group, name, oname, compression, chunks, track_order,
-                       entity_cache) -> h5py.Group:
-
-        from iolib import h5io
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-
-        # NOTE: 2024-07-20 15:03:37
-        # We only support storing scalar Quantities as HDF5 attributes. Hence,
-        # if we used this approach, we'd have to enforce a unique, constant dose
-        # for the procedure. 
-        #
-        # In reality, a dose can also be a scalar Quantity, or a signal-like 
-        # object that inherits from pq.Quantity (neo AnalogSignal, 
-        # IrregularlySampledSignal, or our own DataSignal or 
-        # IrregularlySampledDataSignal).
-        #
-        # Therefore, "dose" is best stored as a HDF5 Dataset
-        
-        attrs = {"name": getattr(self, "name"), "route": getattr(self, "route")}
-        
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-        
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
             
-        entity = group.create_group(target_name, track_order=track_order)
-        entity.attrs.update(obj_attrs)
-        
-        # NOTE: 2024-07-20 15:16:44 see NOTE: 2024-07-20 15:03:37
-        # stores the "dose" Quantity as a dataset
-        h5io.toHDF5(self.dose, entity, name="dose", oname="dose",
-                            compression=compression,chunks=chunks,
-                            track_order=track_order, entity_cache=entity_cache)
-        
-        h5io.toHDF5(self.schedule, entity, name="schedule", 
-                            oname="schedule", compression=compression,
-                            chunks=chunks, track_order=track_order,
-                            entity_cache=entity_cache)
-        h5io.storeEntityInCache(entity_cache, self, entity)
-        return entity
-        
-        
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group, 
-                             attrs:typing.Optional[dict] = None, cache:dict = {}):
-        
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
-        
-        attrs = h5io.attrs2dict(entity.attrs)
-        
-        name = attrs["name"]
-        
-        schedule = h5io.fromHDF5(entity["schedule"], cache)
-        
-        dose = h5io.fromHDF5(entity["dose"], cache)
-        
-        return cls(name, dose=dose, schedule=schedule)
+    @property
+    def procedures(self):
+        return [e.procedure for e in self.episodes]
+    
+    

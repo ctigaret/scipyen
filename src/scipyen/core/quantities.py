@@ -446,6 +446,8 @@ def getUnits():
 
 UNITS_DICT, IRREDUCIBLES, DERIVED = getUnits()
 
+UNITS_DICT["Length"]["irreducible"] |= {μm}
+UNITS_DICT["Concentration"]["derived"] |= {μM}
 UNITS_DICT["Dose"]["irreducible"] |= UNITS_DICT["Concentration"]["irreducible"]
 UNITS_DICT["Dose"]["irreducible"] |= UNITS_DICT["Substance"]["irreducible"]
 UNITS_DICT["Dose"]["derived"] |= UNITS_DICT["Concentration"]["derived"]
@@ -527,9 +529,11 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity]):
     Retrieves the family of units for this quantity
     """
     if isinstance(unit, pq.UnitQuantity):
-        udim_pw = [(unit, 1)]
+        udim_pw = list(unit.simplified.dimensionality.items())
+        
     elif isinstance(unit, pq.Quantity):
         udim_pw = list(unit.dimensionality.items())
+
     else:
         raise TypeError(f"Expecting a Quantity or UnitQuantity; got {type(unit).__name__} instead")
     
