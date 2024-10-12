@@ -40,7 +40,7 @@ from core.prog import BaseDescriptorValidator
 
 _pqpfx = sorted(inspect.getmembers(pq.prefixes, lambda x: isinstance(x, (float, int))) + [("deca", pq.prefixes.deka)], key = lambda x: x[1])
 
-def make_prefix_symbol(pfx):
+def makePrefixSymbol(pfx):
     if pfx.endswith("a"):
         if pfx in ("deka", "deca"):
             return "da"
@@ -67,7 +67,7 @@ def make_prefix_symbol(pfx):
     
     return pfx[0]
 
-AllPrefixes = dict(((p[0], dict((("symbol", make_prefix_symbol(p[0])), ("mantissa", 2 if p[0].endswith("bi") else 10), ("exponent", int(log(p[1], 2) if p[0].endswith("bi") else int(log10(p[1])))), ("value", p[1])))) for p in _pqpfx))
+AllPrefixes = dict(((p[0], dict((("symbol", makePrefixSymbol(p[0])), ("mantissa", 2 if p[0].endswith("bi") else 10), ("exponent", int(log(p[1], 2) if p[0].endswith("bi") else int(log10(p[1])))), ("value", p[1])))) for p in _pqpfx))
 
 DecimalPrefixes = dict((k,v) for k,v in AllPrefixes.items() if v["mantissa"] == 10)
 
@@ -78,7 +78,7 @@ BinaryPrefixes = dict((k,v) for k,v in AllPrefixes.items() if v["mantissa"] == 2
 BinaryPowers = dict((v["exponent"], {("name", k), ("symbol", v["symbol"])}) for k,v in BinaryPrefixes.items())
 
 
-def make_scaled_unit_quantity(quantity:pq.Quantity, power:typing.Optional[typing.Union[int, str]]=None, base:int=10, scale:typing.Union[int, float] = 1., symbol:typing.Optional[str]=None, name:typing.Optional[str] = None):
+def makeScaledUnitQuantity(quantity:pq.Quantity, power:typing.Optional[typing.Union[int, str]]=None, base:int=10, scale:typing.Union[int, float] = 1., symbol:typing.Optional[str]=None, name:typing.Optional[str] = None):
     """Create custom quantity as a scaled version of an existing quantity
     
     The function generates a new quantity, scaled by base^power * scale.
@@ -161,23 +161,14 @@ arbitrary_unit = arbitraryUnit = ArbitraryUnit = a_u = pq.UnitQuantity('arbitrar
 
 pixel_unit = pixelUnit = PixelUnit = pixel = pu = pix = px = pq.UnitQuantity('pixel', 1. * pq.dimensionless, symbol='pixel')
 
-day_in_vitro = div = DiV = make_scaled_unit_quantity(pq.day, symbol = "div", name = "day_in_vitro")
-postnatal_day = pnd = PnD = make_scaled_unit_quantity(pq.day, symbol = "pnf", name = "postnatal_day")
-embryonic_day = emd = EmD = make_scaled_unit_quantity(pq.day, symbol = "emd", name = "embryonic_day")
-week_in_vitro = wiv = WiV = make_scaled_unit_quantity(pq.week, symbol = "wiv", name = "week_in_vitro")
-postnatal_week = pnw = PnW = make_scaled_unit_quantity(pq.week, symbol = "pnw", name = "postnatal_week")
-embryonic_week = emw = EmW = make_scaled_unit_quantity(pq.day, symbol = "emw", name = "embryonic_week")
-postnatal_month = pnm = PnM = make_scaled_unit_quantity(pq.month, symbol = "pnm", name = "postnatal_month")
-embryonic_month = emm = EmM = make_scaled_unit_quantity(pq.month, symbol = "emm", name = "embryonic_month")
-# week_in_vitro = wiv = WiV = pq.UnitTime("week in vitro", 1 * pq.week, symbol = "wiv")
-
-# postnatal_day = pnd = PnD = pq.UnitTime("postnatal day", 1 * pq.day, symbol = "pnd")
-# postnatal_week = pnw = PnW = pq.UnitTime("postnatal week", 1 * pq.week, symbol = "pnw")
-# postnatal_month = pnm = PnM = pq.UnitTime("postnatal month", 1 * pq.month, symbol = "pnm")
-
-# embryonic_day = emd = EmD = pq.UnitTime("embryonic day", 1 * pq.day, symbol = "emd")
-# embryonic_week = emw = EmW = pq.UnitTime("embryonic week", 1 * pq.week, symbol = "emw")
-# embryonic_month = emm = EmM = pq.UnitTime("embryonic month", 1 * pq.month, symbol = "emm")
+day_in_vitro = div = DiV = makeScaledUnitQuantity(pq.day, symbol = "div", name = "day_in_vitro")
+postnatal_day = pnd = PnD = makeScaledUnitQuantity(pq.day, symbol = "pnf", name = "postnatal_day")
+embryonic_day = emd = EmD = makeScaledUnitQuantity(pq.day, symbol = "emd", name = "embryonic_day")
+week_in_vitro = wiv = WiV = makeScaledUnitQuantity(pq.week, symbol = "wiv", name = "week_in_vitro")
+postnatal_week = pnw = PnW = makeScaledUnitQuantity(pq.week, symbol = "pnw", name = "postnatal_week")
+embryonic_week = emw = EmW = makeScaledUnitQuantity(pq.day, symbol = "emw", name = "embryonic_week")
+postnatal_month = pnm = PnM = makeScaledUnitQuantity(pq.month, symbol = "pnm", name = "postnatal_month")
+embryonic_month = emm = EmM = makeScaledUnitQuantity(pq.month, symbol = "emm", name = "embryonic_month")
 
 # NOTE: 2017-07-21 16:05:38
 # a dimensionless unit for channel axis (when there are more than one channel in the data)
@@ -186,8 +177,7 @@ channel_unit = channelUnit = ChannelUnit = channel = cu = pq.UnitQuantity("chann
 
 # NOTE: 2023-05-18 14:20:01 ATTENTION
 # defined as one cycle per unit length
-space_frequency_unit = spaceFrequencyUnit = sfu = sf = make_scaled_unit_quantity(1/pq.m, name='space_frequency_unit', symbol='1/m')
-# space_frequency_unit = spaceFrequencyUnit = sfu = sf = pq.UnitQuantity('space frequency unit', 1/pq.m, symbol='1/m')
+space_frequency_unit = spaceFrequencyUnit = sfu = sf = makeScaledUnitQuantity(1/pq.m, name='space_frequency_unit', symbol='1/m')
 
 # NOTE: 2021-10-22 21:54:33 ATTENTION:
 # "angle_frequency_unit" is not to be confused with "angular frequency" (ω) which is 
@@ -196,15 +186,14 @@ space_frequency_unit = spaceFrequencyUnit = sfu = sf = make_scaled_unit_quantity
 # Here, 1 angle frequency unit is defined as one cycle per radian -- another form of 
 # space frequency; here 'cycle' is distinct from "pq.cycle" which is derived
 # from radians
-angle_frequency_unit = angleFrequencyUnit = afu = af = make_scaled_unit_quantity(1/pq.rad, name='angle_frequency_unit', symbol='1/rad')
-# angle_frequency_unit = angleFrequencyUnit = afu = af = pq.UnitQuantity('angle frequency unit', 1/pq.rad, symbol='1/rad')
+angle_frequency_unit = angleFrequencyUnit = afu = af = makeScaledUnitQuantity(1/pq.rad, name='angle_frequency_unit', symbol='1/rad')
 
 # these are too useful to leave out
-microohm = μohm = μΩ = make_scaled_unit_quantity(pq.ohm, "micro", symbol="μΩ")
-millioohm = mohm = mΩ = make_scaled_unit_quantity(pq.ohm, "milli", symbol="mΩ")
-kiloohm = kohm = kΩ = make_scaled_unit_quantity(pq.ohm, "kilo", symbol = "kΩ")
-megaohm = Mohm = MΩ = make_scaled_unit_quantity(pq.ohm, "mega", symbol = "MΩ")
-gigaohm = Gohm = GΩ = make_scaled_unit_quantity(pq.ohm, "giga", symbol="GΩ")
+microohm = μohm = μΩ = makeScaledUnitQuantity(pq.ohm, "micro", symbol="μΩ")
+millioohm = mohm = mΩ = makeScaledUnitQuantity(pq.ohm, "milli", symbol="mΩ")
+kiloohm = kohm = kΩ = makeScaledUnitQuantity(pq.ohm, "kilo", symbol = "kΩ")
+megaohm = Mohm = MΩ = makeScaledUnitQuantity(pq.ohm, "mega", symbol = "MΩ")
+gigaohm = Gohm = GΩ = makeScaledUnitQuantity(pq.ohm, "giga", symbol="GΩ")
 
 # NOTE: the string argument refers to the prefix to be prepended to the original
 # unit string
@@ -214,23 +203,23 @@ gigaohm = Gohm = GΩ = make_scaled_unit_quantity(pq.ohm, "giga", symbol="GΩ")
 # if you want to add new custom quantities, write the code between the BEGIN / END 
 # lines below
 # ### BEGIN custom units
-Φₑ = radiant_flux_unit = rfu = make_scaled_unit_quantity(pq.W, name = "radiant_flux_unit", symbol='W')
-radiant_flux_density_unit = flux_density_unit = rfdu = fdu = make_scaled_unit_quantity(pq.W/(pq.m**2), name="radiant_flux_density_unit",symbol='W⋅m⁻²')
-Φₑν = spectral_flux_frequency_unit = sffu = make_scaled_unit_quantity(pq.W*(pq.Hz**(-1)), name="spectral_flux_frequency_unit",symbol='W⋅Hz⁻¹')
-Φₑλ = spectral_flux_wavelength_unit = sfwu = make_scaled_unit_quantity(pq.W*(pq.m**(-1)), name="spectral_flux_wavelength_unit",symbol='W⋅m⁻¹')
-ΦE = electric_flux_unit = efu = make_scaled_unit_quantity(pq.V * pq.m, name = "electric_flux_unit", symbol="V⋅m")
-flow_unit = flow = f_u = make_scaled_unit_quantity((pq.m**3)/pq.s, name="flow unit", symbol="m³⋅s⁻¹")
-μM = make_scaled_unit_quantity(1e-6 * pq.mol/pq.L, name="μM", symbol = "μM")
-μm = make_scaled_unit_quantity(1e-6 * pq.m, name="μm", symbol = "μm")
-μV = make_scaled_unit_quantity(1e-6 * pq.V, name="μV", symbol = "μV")
-pV = make_scaled_unit_quantity(1e-12 * pq.V, name="pV", symbol = "pV")
-fV = make_scaled_unit_quantity(1e-15 * pq.V, name="pV", symbol = "pV")
-μA = make_scaled_unit_quantity(1e-6 * pq.A, name="μA", symbol = "μA")
-μC = make_scaled_unit_quantity(1e-6 * pq.C, name="μC", symbol = "μC")
-μS = make_scaled_unit_quantity(1e-6 * pq.S, name="μS", symbol = "μS")
-wpv = make_scaled_unit_quantity(pq.kg/pq.L, name="weight per volume")#, symbol = "kg⋅L⁻¹")
-wpw = make_scaled_unit_quantity(pq.kg/pq.L, name="weight per weight")#, symbol = "kg⋅kg⁻¹")
-vpv = make_scaled_unit_quantity(pq.L/pq.L, name="volume per volume")#, symbol = "kg⋅kg⁻¹")
+Φₑ = radiant_flux_unit = rfu = makeScaledUnitQuantity(pq.W, name = "radiant_flux_unit", symbol='W')
+radiant_flux_density_unit = flux_density_unit = rfdu = fdu = makeScaledUnitQuantity(pq.W/(pq.m**2), name="radiant_flux_density_unit",symbol='W⋅m⁻²')
+Φₑν = spectral_flux_frequency_unit = sffu = makeScaledUnitQuantity(pq.W*(pq.Hz**(-1)), name="spectral_flux_frequency_unit",symbol='W⋅Hz⁻¹')
+Φₑλ = spectral_flux_wavelength_unit = sfwu = makeScaledUnitQuantity(pq.W*(pq.m**(-1)), name="spectral_flux_wavelength_unit",symbol='W⋅m⁻¹')
+ΦE = electric_flux_unit = efu = makeScaledUnitQuantity(pq.V * pq.m, name = "electric_flux_unit", symbol="V⋅m")
+flow_unit = flow = f_u = makeScaledUnitQuantity((pq.m**3)/pq.s, name="flow unit", symbol="m³⋅s⁻¹")
+μM = makeScaledUnitQuantity(1e-6 * pq.mol/pq.L, name="μM", symbol = "μM")
+μm = makeScaledUnitQuantity(1e-6 * pq.m, name="μm", symbol = "μm")
+μV = makeScaledUnitQuantity(1e-6 * pq.V, name="μV", symbol = "μV")
+pV = makeScaledUnitQuantity(1e-12 * pq.V, name="pV", symbol = "pV")
+fV = makeScaledUnitQuantity(1e-15 * pq.V, name="pV", symbol = "pV")
+μA = makeScaledUnitQuantity(1e-6 * pq.A, name="μA", symbol = "μA")
+μC = makeScaledUnitQuantity(1e-6 * pq.C, name="μC", symbol = "μC")
+μS = makeScaledUnitQuantity(1e-6 * pq.S, name="μS", symbol = "μS")
+wpv = makeScaledUnitQuantity(pq.kg/pq.L, name="weight per volume")#, symbol = "kg⋅L⁻¹")
+wpw = makeScaledUnitQuantity(pq.kg/pq.L, name="weight per weight")#, symbol = "kg⋅kg⁻¹")
+vpv = makeScaledUnitQuantity(pq.L/pq.L, name="volume per volume")#, symbol = "kg⋅kg⁻¹")
 
 # NOTE: 2023-05-18 16:17:50
 # testing currency units
@@ -304,7 +293,7 @@ custom_unit_families["dose"] = {"irreducible": set(),
 # The units in the Quantities package are implicitly orrganized in families by
 # modules. This leaves no straightforward way in which custom quantities can be 
 # added to these specific quantities, unless the custom quantity is a generated
-# using make_scaled_unit_quantity()
+# using makeScaledUnitQuantity()
 
 # grab the custom quantities def'ed above, so far
 __custom_quantities__ = list((mb, eval(mb)) for mb in dir() if isinstance(eval(mb), pq.Quantity))
@@ -331,8 +320,7 @@ qe = 1.602176634e-19 * pq.C
 # Avogadro constant
 N_A = 6.02214076e23 * pq.mol**(-1)
 
-
-def get_constants():
+def getConstants():
     ret = dict()
     
     modules = [(k,v) for (k,v) in pq.constants.__dict__.items() if inspect.ismodule(v) and k not in ("_codata", "_utils")]
@@ -342,10 +330,11 @@ def get_constants():
         
     return ret
 
-def get_units():
-    """Collects all units definitions in the Python Quantities package, augmented.
-    This is typically called AFTER importing this module, therefore it SHOULD
-    contain custom units defined at the top of this module.
+def getUnits():
+    """Collects all units definitions.
+    Units are defined in the Python Quantities package and augmented in this module.
+    Must be called AFTER importing this module, so that it contains the custom 
+    uniqt quantities defined in this module.
     
     Returns:
     ========
@@ -455,11 +444,14 @@ def get_units():
                 
     return result, irreducible, derived
 
-UNITS_DICT, IRREDUCIBLES, DERIVED = get_units()
+UNITS_DICT, IRREDUCIBLES, DERIVED = getUnits()
 
+UNITS_DICT["Dose"]["irreducible"] |= UNITS_DICT["Concentration"]["irreducible"]
+UNITS_DICT["Dose"]["irreducible"] |= UNITS_DICT["Substance"]["irreducible"]
 UNITS_DICT["Dose"]["derived"] |= UNITS_DICT["Concentration"]["derived"]
+UNITS_DICT["Dose"]["derived"] |= UNITS_DICT["Substance"]["derived"]
 
-CONSTANTS = get_constants()
+CONSTANTS = getConstants()
         
 def constantsFamilies():
     return list(CONSTANTS.keys())
@@ -674,11 +666,11 @@ def str2quantity(x:str):
     if len(parts) == 1:
         # just a dimensionality str
         # NOTE: will raise if str is incorrect
-        return unit_quantity_from_name_or_symbol(parts[0])
+        return unitQuantityFromNameOrSymbol(parts[0])
     elif len(parts) == 2:
         # will raise if x is wrong
         val = eval(parts[0])
-        unit = unit_quantity_from_name_or_symbol(parts[1])
+        unit = unitQuantityFromNameOrSymbol(parts[1])
         return val * unit
     else:
         raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; indtead, got {x}")
@@ -784,7 +776,7 @@ def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.
     return " ".join([fmt % x.magnitude, x.units.dimensionality.string])
 
 #@cache
-def name_from_unit(u, as_key:bool=False):
+def nameFromUnit(u, as_key:bool=False):
     """
     FIXME make it more intelligent!
     """
@@ -942,20 +934,25 @@ def name_from_unit(u, as_key:bool=False):
         else:
             return f"Compound Quantity {u.dimensionality.string}" if not as_key else "?"
         
-def check_dosage_units(value):
+def checkDosageUnits(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
+
+    acceptable_families = ["Mass", "Volume", "Concentration", "Dose", "Substance"]
+
+    families = getUnitFamily(value)
+    
+    return any(f in families for f in acceptable_families)
+    
+    
     
     # test if this is a Mass, Volume¹, Concentration, Compound, or Substance unit
     #
     # ¹ a dosing based exclusively on volume is theoretically possible, although
     # impractical
     
-    # acceptable families: 
-    # Mass * Concentration ** (-1), 
-    # Mass * Volume ** (-1), 
             
-def check_time_units(value):
+def checkTimeUnits(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
     
@@ -963,7 +960,7 @@ def check_time_units(value):
     
     return value._reference.dimensionality == ref.dimensionality
 
-def check_electrical_current_units(value):
+def checkElectricalCurrentUnits(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
     
@@ -971,7 +968,7 @@ def check_electrical_current_units(value):
     
     return value._reference.dimensionality == ref._reference.dimensionality
 
-def check_electrical_potential_units(value):
+def checkElectricalPotentialUnits(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)
     
@@ -1008,7 +1005,7 @@ def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     else:
         return 1.0
     
-def units_convertible(x: pq.Quantity, y: pq.Quantity) -> bool:
+def unitsConvertible(x: pq.Quantity, y: pq.Quantity) -> bool:
     """Checks that the units of python Quantities x and y are identical or convertible to each other.
     NOTE: To check that x and y have IDENTICAL units simply call 'x.units == y.units'
     """
@@ -1020,18 +1017,18 @@ def units_convertible(x: pq.Quantity, y: pq.Quantity) -> bool:
     
     return x._reference.dimensionality == y._reference.dimensionality
 
-def check_rescale(x: pq.Quantity, y: pq.Quantity) -> pq.Quantity:
+def checkRescale(x: pq.Quantity, y: pq.Quantity) -> pq.Quantity:
     """Checks that units of `x` are convertible to units of `y`.
     
     Returns `x` rescaled to units of `y`, or raises AssertionError if `x` units 
     and `y` units are not convertible to each other (or not identical)
     
     """
-    assert(units_convertible(x,y)), f"Cannot convert {x.units} to {y.units}"
+    assert(unitsConvertible(x,y)), f"Cannot convert {x.units} to {y.units}"
     
     return x if x.units == y.units else x.rescale(y.units)
 
-def unit_quantity_from_name_or_symbol(s):
+def unitQuantityFromNameOrSymbol(s):
     if not isinstance(s, str):
         raise TypeError("Expecting a string; got %s instead" % type(s).__name__)
     
@@ -1061,8 +1058,8 @@ def unit_quantity_from_name_or_symbol(s):
         
 def nSamples(t:pq.Quantity, s:pq.Quantity) -> int:
     """Returns the number of samples in a time interval `t` for sampling rate `s`"""
-    assert isinstance(t, pq.Quantity) and check_time_units(t), f"{t} should be a time quantity (i.e. a 'duration')"
-    assert isinstance(s, pq.Quantity) and check_time_units(1./s), f"sampling rate {s} is not a frequency quantity"
+    assert isinstance(t, pq.Quantity) and checkTimeUnits(t), f"{t} should be a time quantity (i.e. a 'duration')"
+    assert isinstance(s, pq.Quantity) and checkTimeUnits(1./s), f"sampling rate {s} is not a frequency quantity"
     return int(t.rescale(pq.s) * s.rescale(pq.Hz))
     
 class QuantityDescriptorValidator(BaseDescriptorValidator):
@@ -1098,7 +1095,7 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
         
         if isinstance(default, pq.Quantity):
             # a default is supplied -- verify is the right thing
-            if not check_time_units(default):
+            if not checkTimeUnits(default):
                 raise TypeError(f"Expecting a time quantity")
             
             # then use it to construct a NEW quantity, so that new instances of 
@@ -1123,7 +1120,7 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
                 if not isinstance(d, pq.Quantity):
                     raise TypeError(f"Expecting the 'default_factory' to be a python Quantity factory function; instead, got a factory for {type(d).__name__}")
                 
-                if not check_time_units(d):
+                if not checkTimeUnits(d):
                     raise TypeError(f"Expecting the 'default_factory' to be a factory for time quantity; instead it generates {d.units} units")
                 
                 my_default_factory = default_factory

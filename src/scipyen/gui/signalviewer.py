@@ -5770,7 +5770,7 @@ anything else       anything else       ❌
         else:
             t_units = pq.s # reasonable default (although not necessarily always applicable !!!)
             
-        if scq.check_time_units(t_units):
+        if scq.checkTimeUnits(t_units):
             factory = neo.Epoch
         else:
             factory = DataZone

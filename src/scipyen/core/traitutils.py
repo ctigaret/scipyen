@@ -47,7 +47,7 @@ import pandas as pd
 import neo
 import quantities as pq
 from core import datasignal
-from core.quantities import units_convertible
+from core.quantities import unitsConvertible
 from core.utilities import gethash, safe_identity_test
 from .prog import (timefunc, processtimefunc)
 

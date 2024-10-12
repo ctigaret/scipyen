@@ -19,7 +19,7 @@ import quantities as pq
 import neo
 
 from core.prog import (safeWrapper, with_doc)
-from core.quantities import check_time_units
+from core.quantities import checkTimeUnits
 
 @dataclass
 class DataCursor:
@@ -2180,7 +2180,7 @@ def cursors2epoch(*args, **kwargs):
                 
             if all([isinstance(v, pq.Quantity) for v in pc_]):
                 if pc_[0].units != pc_[1].units:
-                    if not units_convertible(pc_[0], pc_[1]):
+                    if not unitsConvertible(pc_[0], pc_[1]):
                         raise TypeError("Quantities must have compatible dimensionalities")
                     
             elif all([isinstance(v, numbers.Number) for v in pc_]):
@@ -2250,7 +2250,7 @@ def cursors2epoch(*args, **kwargs):
         if isinstance(t[0], pq.Quantity):
             units = t[0].units
             
-        if zone or not check_time_units(units):
+        if zone or not checkTimeUnits(units):
             klass = DataZone
         else:
             klass = neo.Epoch

@@ -15,7 +15,7 @@ from neo.core.dataobject import DataObject, ArrayDict
 import pyqtgraph as pg
 
 from core import quantities as cq
-from core.quantities import check_time_units
+from core.quantities import checkTimeUnits
 # from core.utilities import counter_suffix
 from .prog import (safeWrapper, with_doc)
 from qtpy import QtWidgets
@@ -117,11 +117,11 @@ class DataZone(neo.Epoch):
                 places = places * units
                 
             else:
-                if not cq.units_convertible(places, units):
+                if not cq.unitsConvertible(places, units):
                     units = places.units
             
             if isinstance(extents, pq.Quantity):
-                if not cq.units_convertible(places, extents):
+                if not cq.unitsConvertible(places, extents):
                     raise TypeError(f"Extents dimensionality {extents.dimensionality.string} is incompatible with {places.dimensionality.string}")
             else:
                 extents = extents * places.units
@@ -151,7 +151,7 @@ class DataZone(neo.Epoch):
                             description=description, 
                             array_annotations=array_annotations, **annotations)
                 
-        self.__domain_name__ = cq.name_from_unit(self.places)
+        self.__domain_name__ = cq.nameFromUnit(self.places)
             
             
     def __reduce__(self):
@@ -170,7 +170,7 @@ class DataZone(neo.Epoch):
         self.file_origin = getattr(obj, "file_origin", None)
         self.description = getattr(obj, "description", None)
         self.segment = getattr(obj, "segment", None)
-        self.__domain_name__ = cq.name_from_unit(self.units)
+        self.__domain_name__ = cq.nameFromUnit(self.units)
         
         if not hasattr(self, "array_annotations"):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
@@ -389,7 +389,7 @@ class DataZone(neo.Epoch):
         """A brief description of the domain name
         """
         if self.__domain_name__ is None:
-            self.__domain_name__ = name_from_unit(self.domain)
+            self.__domain_name__ = nameFromUnit(self.domain)
             
         return self.__domain_name__
     
@@ -509,7 +509,7 @@ Changelog:
         
         if all(isinstance(v, pq.Quantity) for v in (t0,t1)):
             if t0.units != t1.units:
-                if not units_convertible(t0, t1):
+                if not unitsConvertible(t0, t1):
                     raise TypeError(f"t0 units ({t0.units}) are incompatible with t1 units ({t1.units})")
                 
                 t1 = t1.rescale(t0)
@@ -654,7 +654,7 @@ def intervals2epoch(*args, **kwargs):
     
     labels = np.array([x[2] for x in epoch_intervals])
     
-    klass = DataZone if zone or not check_time_units(units) else neo.Epoch
+    klass = DataZone if zone or not checkTimeUnits(units) else neo.Epoch
     
     name = kwargs.pop("name", klass.__name__)
     

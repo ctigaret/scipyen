@@ -322,7 +322,7 @@ def scale_waveform(x:np.ndarray, α, β):
         xx = x.magnitude # → this is a REFERENCE ; its changes will be reflected in x !!!
         
         if isinstance(α, pq.Quantity):
-            if not scq.units_convertible(α, x):
+            if not scq.unitsConvertible(α, x):
                 raise TypeError("numerator has wrong units")
             if α.units != x.units:
                 α = α.rescale(x.units)
@@ -330,7 +330,7 @@ def scale_waveform(x:np.ndarray, α, β):
             α = α.magnitude
         
         if isinstance(β, pq.Quantity):
-            if not scq.units_convertible(β, x):
+            if not scq.unitsConvertible(β, x):
                 raise TypeError("denominator has wrong units")
             if β.units != x.units:
                 β = β.rescale(x.units)
@@ -424,7 +424,7 @@ def normalise_waveform(x:np.ndarray, axis:typing.Optional[int]=None, rng:typing.
 #                 raise ValueError("rng must be a scalar")
 #             
 #             if isinstance(rng, pq.Quantity):
-#                 if not scq.units_convertible(x, rng):
+#                 if not scq.unitsConvertible(x, rng):
 #                     raise TypeError(f"rng quantity ({rng.units.dimensionality}) is incompatible with x quantity ({x.units.dimensionality})")
 #                 if rng.units != x.units:
 #                     rng.rescale(x.units)
@@ -981,7 +981,7 @@ def remove_dc(x, value:typing.Optional[typing.Union[pq.Quantity, np.ndarray]] = 
             
             if isinstance(value, pq.Quantity) and isinstance(x, pq.Quantity):
                 if isinstance(x, pq.Quantity):
-                    if not scq.units_convertible(value, x):
+                    if not scq.unitsConvertible(value, x):
                         raise TypeError(f"Value units {value.units} are incompatible with signal units {x.units}")
                     value = float(value.rescale(x.units))
                 else:
@@ -1008,7 +1008,7 @@ def remove_dc(x, value:typing.Optional[typing.Union[pq.Quantity, np.ndarray]] = 
                         raise TypeError("When channel is not specified, value must be a scalar")
                     
                     if isinstance(x, pq.Quantity):
-                        if not scq.units_convertible(value, x):
+                        if not scq.unitsConvertible(value, x):
                             raise TypeError(f"Value units {value.units} are incompatible with signal units {x.units}")
                         
                         val = float(value.rescale(x.units))
@@ -1352,7 +1352,7 @@ def detrend(x:typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
         
     elif detrend_type.lower() == "constant":
         if isinstance(bp, pq.Quantity):
-            if bp.size == 1 and scq.units_convertible(bp, x):
+            if bp.size == 1 and scq.unitsConvertible(bp, x):
                 return x-bp
             else:
                 raise TypeError(f"Wrong constant value in bp: {bp} for {detrend_type} detrending")
@@ -1598,7 +1598,7 @@ def resample_pchip(sig, new_sampling_period, old_sampling_period = 1):
     
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         if isinstance(new_sampling_period, pq.Quantity):
-            if not scq.units_convertible(new_sampling_period, sig.sampling_period):
+            if not scq.unitsConvertible(new_sampling_period, sig.sampling_period):
                 raise TypeError("new sampling period units (%s) are incompatible with those of the signal's sampling period (%s)" % (new_sampling_period.units, sig.sampling_period.units))
             
             new_sampling_period.rescale(sig.sampling_period.units)
@@ -2324,7 +2324,7 @@ def peak_normalise_signal(sig:typing.Union[neo.AnalogSignal, np.ndarray],
             raise ValueError("minVal must be scalar")
         
         if isinstance(sig, (neo.AnalogSignal, pq.Quantity)):
-            if not scq.units_convertible(minVal, sig):
+            if not scq.unitsConvertible(minVal, sig):
                 raise ValueError(f"Units of minVal ({minVal.units}) are incompatible with signal units ({sig.units})")
                 
             if minVal.units != sig.units:
@@ -2355,7 +2355,7 @@ def peak_normalise_signal(sig:typing.Union[neo.AnalogSignal, np.ndarray],
             raise ValueError("maxVal must be scalar")
         
         if isinstance(sig, (neo.AnalogSignal, pq.Quantity)):
-            if not scq.units_convertible(maxVal, sig):
+            if not scq.unitsConvertible(maxVal, sig):
                 raise ValueError(f"Units of maxVal ({maxVal.units}) are incompatible with signal units ({sig.units})")
                 
             if maxVal.units != sig.units:
@@ -2812,7 +2812,7 @@ NOTES:
                 raise ValueError("Threshold must be a scalar")
             
             if isinstance(sig, pq.Quantity):
-                if not scq.units_convertible(sig, minampli):
+                if not scq.unitsConvertible(sig, minampli):
                     raise ValueError("Threshold and signal have incompatible units")
                 
                 if minampli.units != sig.units:

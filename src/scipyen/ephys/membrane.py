@@ -66,7 +66,7 @@ import core.datasignal as datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import (DataZone, Interval)
 from core import quantities as scq
-from core.quantities import units_convertible
+from core.quantities import unitsConvertible
 import core.neoutils as neoutils
 # from core.utilities import unique
 #import core.triggerprotocols
@@ -458,7 +458,7 @@ Returns a tuple (Istart, Istop, Iinj_0, delta_I)
     protocol = pab.ABFProtocol(data)#, generateOutputConfigs=False)
     dac = protocol.outputConfiguration(protocol.activeDACChannelIndex)
 
-    if not scq.units_convertible(dac.units, pq.A):
+    if not scq.unitsConvertible(dac.units, pq.A):
         scipywarn(
             f"Data block {data.name} does not appear to be a current clamp experiment. Expecting a DAC command in current units; instead, got {dac.dacUnits}")
         useProtocol = False
@@ -516,7 +516,7 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
         if command.shape[0] != signal.shape[0]:
             raise ValueError(f"Signal and command must have same number of samples on axis 0")
         
-        if command.times.units != signal.times.units and not scq.units_convertible(command.times.units, signal.times.units):
+        if command.times.units != signal.times.units and not scq.unitsConvertible(command.times.units, signal.times.units):
             raise ValueError(f"Signal and command must have compatible domain units")
         
         if command.t_start != signal.t_start:
@@ -569,7 +569,7 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
     stop = kwargs.pop("test_stop", None)
     relative = kwargs.pop("relative_times", True)
     
-    if any(not isinstance(v, pq.Quantity) or v.size != 1 or scq.check_time_units(v) for v in (start, stop)):
+    if any(not isinstance(v, pq.Quantity) or v.size != 1 or scq.checkTimeUnits(v) for v in (start, stop)):
         if isinstance(command, neo.core.basesignal.BaseSignal):
             up_first = kwargs.pop("up_first", True)
             minduration = kwargs.pop("minduration", None)
@@ -607,7 +607,7 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
     else: # command is a scalar ⇒ use it as test amplitude (can be negative !!!)
         test_amplitude = command
         
-        if any(not isinstance(v, pq.Quantity) or v.size != 1 or scq.check_time_units(v) for v in (start, stop)):
+        if any(not isinstance(v, pq.Quantity) or v.size != 1 or scq.checkTimeUnits(v) for v in (start, stop)):
             raise ValueError(f"When the command is a scalar, the start and stop times of the membrane test must be specified as scalar time quantities")
         
         start, stop = min(start, stop), max(start, stop)
@@ -805,12 +805,12 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
             base_0001_abf.sweepUnitsC # ⇒ 'mV'
     
             # We can do better, and create a Python Quantity object straight away:
-            vmUnits = scq.unit_quantity_from_name_or_symbol(base_0001_abf.sweepUnitsC)
+            vmUnits = scq.unitQuantityFromNameOrSymbol(base_0001_abf.sweepUnitsC)
     
             vmUnits # ⇒ UnitQuantity('millivolt', 0.001 * V, 'mV')
     
             # Similarly we obtain the time units:
-            time_units = scq.unit_quantity_from_name_or_symbol(base_0001_abf.sweepUnitsX)
+            time_units = scq.unitQuantityFromNameOrSymbol(base_0001_abf.sweepUnitsX)
     
             # Finally, create a neo.AnalogSignal (NOTE the channel number in dacNames
             #   below refers to the DAC output channel):
@@ -882,7 +882,7 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
     
     domain_units = im_signal.times.units
     
-    if not units_convertible(im_signal, pq.A):
+    if not unitsConvertible(im_signal, pq.A):
         scipywarn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         # warnings.warn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         
@@ -895,7 +895,7 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
         domain_units = im_signal.times.units
         
     if isinstance(testVm, (neo.AnalogSignal, DataSignal, pq.Quantity)):
-        if not units_convertible(testVm, pq.V):
+        if not unitsConvertible(testVm, pq.V):
             scipywarn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
             # warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
     
@@ -917,7 +917,7 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
         # Vchange = np.abs(Vss - Vbase)
         
     elif isinstance(testVm, pq.Quantity):
-        if not units_convertible(testVm, pq.V):
+        if not unitsConvertible(testVm, pq.V):
             raise TypeError(f"Expecting a quantity in units of electrical potential; got {testVm.units} instead")
         
         if testVm.size != 1:
@@ -942,7 +942,7 @@ def measure_Rs_Rin(im_signal:neo.AnalogSignal,
         if any(v.size != 1 for v in intervals):
             raise ValueError(f"'intervals' must be scalar quantities")
         
-        if any(not units_convertible(v, domain_units) for v in intervals):
+        if any(not unitsConvertible(v, domain_units) for v in intervals):
             raise ValueError(f"All 'intervals' elements must have same units as the im_signal domain")
         
         else:
@@ -1302,7 +1302,7 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     domain_units = signal.times.units
     
-    if not units_convertible(signal, pq.A):
+    if not unitsConvertible(signal, pq.A):
         scipywarn(f"'signal' expected to have units of membrane current, not {signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         # warnings.warn(f"'signal' expected to have units of membrane current, not {signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         
@@ -1315,7 +1315,7 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         domain_units = signal.times.units
         
     if isinstance(vstep, (neo.AnalogSignal, DataSignal, pq.Quantity)):
-        if not units_convertible(vstep, pq.V):
+        if not unitsConvertible(vstep, pq.V):
             # warnings.warn(f"'vstep' signal is expected to have units of membrane potential, not {vstep.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
             scipywarn(f"'vstep' signal is expected to have units of membrane potential, not {vstep.units}.\n\nAUnits of mV will be applied to a copy of the signal. Be careful how you interpret the results")
     
@@ -1337,7 +1337,7 @@ def cursors_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
         # Vchange = np.abs(Vss - Vbase)
         
     elif isinstance(vstep, pq.Quantity):
-        if not units_convertible(vstep, pq.V):
+        if not unitsConvertible(vstep, pq.V):
             raise TypeError(f"Expecting a quantity in units of electrical potential; got {vstep.units} instead")
         
         if vstep.size != 1:
@@ -1963,7 +1963,7 @@ def rheobase_latency(*args, **kwargs):
         # now. generate a fused latency vs Iinj signal
         latencies = neoutils.fuse_irregular_signals(*[a["First_AP_latency"] for a in args], name="First AP latency")
         
-    elif all(isinstance(a, IrregularlySampledDataSignal) and scq.check_electrical_current_units(a.times.units) and scq.check_time_units(a.units) for a in args):
+    elif all(isinstance(a, IrregularlySampledDataSignal) and scq.checkElectricalCurrentUnits(a.times.units) and scq.checkTimeUnits(a.units) for a in args):
         assert(all(a.shape[0] >= minsteps for a in args)), f"All records must have at least {minsteps} current injection steps"
         # NOTE: the approach here is that we cannot check if data comes from the same source 
         # unless we annotate those signals in the first place (in the code for analyse_AP_step_injection_series)
@@ -1995,8 +1995,8 @@ def rheobase_latency(*args, **kwargs):
     # print(f"rheobase_latency: \n\tIinj_mean = {Iinj_mean.magnitude} \n\tlatencies_mean = {latencies_mean.magnitude}")
     
     if isinstance(xstart, pq.Quantity):
-        # if not units_convertible(xstart, latencies_mean.units):
-        if not units_convertible(xstart, latencies.units):
+        # if not unitsConvertible(xstart, latencies_mean.units):
+        if not unitsConvertible(xstart, latencies.units):
             raise TypeError("'xstart' expected to have %s units; instead it has %s" % (latencies.units, xstart.units))
             # raise TypeError("'xstart' expected to have %s units; instead it has %s" % (latencies_mean.units, xstart.units))
         
@@ -2012,8 +2012,8 @@ def rheobase_latency(*args, **kwargs):
     xend = kwargs.get("xend", 0)
     
     if isinstance(xend, pq.Quantity):
-        # if not units_convertible(xstart, latencies_mean.units):
-        if not units_convertible(xstart, latencies.units):
+        # if not unitsConvertible(xstart, latencies_mean.units):
+        if not unitsConvertible(xstart, latencies.units):
             raise TypeError("'xend' expected to have %s units; instead it has %s" % (latencies.units, xend.units))
             # raise TypeError("'xend' expected to have %s units; instead it has %s" % (latencies_mean.units, xend.units))
         
@@ -2155,7 +2155,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
         t_stop = t_start = t0.durations[0]
         
     elif isinstance(t0, pq.Quantity):
-        if not units_convertible(t0, pq.s):
+        if not unitsConvertible(t0, pq.s):
             raise TypeError("'t0' expected to have time units; got %s instead" % t0.units)
         
         if t0.size == 1:
@@ -2190,7 +2190,7 @@ def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=N
             t_stop = t1*pq.s
             
         elif isinstance(t1, pq.Quantity):
-            if not units_convertible(t1, pq.s):
+            if not unitsConvertible(t1, pq.s):
                 raise TypeError("'t1' expected to have time units; got %s instead" % t1.units)
             
             if t1.size !=1:
@@ -2387,7 +2387,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
             t0, t1 = baseEpoch
             baseEpoch = neo.Epoch(times = t0 * vm.times.units, durations = (t1-t0) * vm.times.units)
             
-        elif all([(isinstance(v, pq.Quantity) and units_convertible(v, vm.times)) for v in baseEpoch]):
+        elif all([(isinstance(v, pq.Quantity) and unitsConvertible(v, vm.times)) for v in baseEpoch]):
             t0, t1 = baseEpoch
             baseEpoch = neo.Epoch(times = t0, durations = (t1-t0))
             
@@ -2402,7 +2402,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
             ssEpoch = neo.Epoch(times = t0 * vm.times.units,
                                   durations = (t1-t0) * vm.times.units)
             
-        elif all([(isinstance(v, pq.Quantity) and units_convertible(v, vm.times)) for v in ssEpoch]):
+        elif all([(isinstance(v, pq.Quantity) and unitsConvertible(v, vm.times)) for v in ssEpoch]):
             t0, t1 = ssEpoch
             ssEpoch = neo.Epoch(times=t0, durations=(t1-t0))
             
@@ -2485,13 +2485,13 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         # im passed as a sequence of 3 values: amplitude, t start, t stop
         
         Iinj = im[0]
-        assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.units_convertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
+        assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.unitsConvertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
         
         I_t0 = im[1] # I start
-        assert isinstance(I_t0, pq.Quantity) and I_t0.size == 1 and scq.units_convertible(I_t0.units, pq.s), f"im[1] expected to be a time scalar; got {im[1]} instead"
+        assert isinstance(I_t0, pq.Quantity) and I_t0.size == 1 and scq.unitsConvertible(I_t0.units, pq.s), f"im[1] expected to be a time scalar; got {im[1]} instead"
         
         I_t1 = im[2] # I stop
-        assert isinstance(I_t1, pq.Quantity) and I_t1.size == 1 and scq.units_convertible(I_t1.units, pq.s), f"im[2] expected to be a time scalar; got {im[2]} instead"
+        assert isinstance(I_t1, pq.Quantity) and I_t1.size == 1 and scq.unitsConvertible(I_t1.units, pq.s), f"im[2] expected to be a time scalar; got {im[2]} instead"
         
         if baseEpoch is None:
             baseT1 = I_t0
@@ -2525,7 +2525,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         if isinstance(Iinj, numbers.Real):
             Iinj = Iinj * pq.pA
             
-        assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.units_convertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
+        assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.unitsConvertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
 
         if not isinstance(baseEpoch, neo.Epoch):
             raise ValueError("base epoch must be specified")
@@ -3323,14 +3323,14 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
     elif isinstance(triggers, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
         times = triggers.times
         
-        if not units_convertible(times, signal.times.units):
+        if not unitsConvertible(times, signal.times.units):
             raise TypeError("triggers domain units (%s) are incompatible with this data" % triggers.times.dimensionality)
         
         elif times.units != signal.times.units:
             times = times.rescale(signal.times.units)
         
     elif isinstance(triggers, pq.Quantity):
-        if units_convertible(triggers, signal.times):
+        if unitsConvertible(triggers, signal.times):
             times = triggers
             
             if triggers.units != signal.times.units:
@@ -3346,7 +3346,7 @@ def analyse_AP_pulse_train(segment, signal_index=0, triggers=None,tail=None, thr
         if all([isinstance(v, numbers.Real) for v in triggers]):
             times = np.array(triggers) * signal.times.units
             
-        elif all([isinstance(v, pq.Quantity) and units_convertible(v, signal.times.units) for v in triggers]):
+        elif all([isinstance(v, pq.Quantity) and unitsConvertible(v, signal.times.units) for v in triggers]):
             times = triggers
             
         else:
@@ -3487,7 +3487,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         t0 *= signal.times.units
         
     elif isinstance(t0, pq.Quantity):
-        if not units_convertible(t0, signal.times.units):
+        if not unitsConvertible(t0, signal.times.units):
             raise TypeError("t0 expected to be a float or quantity scalar with %s units" % signal.time.dimensionality)
         
         elif t0.units != signal.times.units:
@@ -3500,7 +3500,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         t1 *= signal.times.units
         
     elif isinstance(t1, pq.Quantity):
-        if not units_convertible(t1, signal.times.units):
+        if not unitsConvertible(t1, signal.times.units):
             raise TypeError("t1 expected to be a float or quantity scalar with %s units" % signal.time.dimensionality)
         
         elif t1.units != signal.times.units:
@@ -3525,7 +3525,7 @@ def analyse_AP_pulse_signal(signal, times,  tail=None, thr=20, atol=1e-8, smooth
         thr *= pq.V/pq.s
         
     elif isinstance(thr, pq.Quantity):
-        if not units_convertible(thr, dsdtnits):
+        if not unitsConvertible(thr, dsdtnits):
             raise TypeError("'thr' expected to have %s units; got %s instead" % (dsdtnits.dimensionality, thr.units.dimensionality))
         
         thr = thr.rescale(pq.V/pq.s)
@@ -3737,7 +3737,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             times = times * sig.time.units
             
         else:
-            if not units_convertible(times, sig.times):
+            if not unitsConvertible(times, sig.times):
                 raise TypeError("times units (%s) are incompatible with this signal (%s)" % (times.units.dimensionality, sig.times.units.dimensionality))
             
             times = times.rescale(sig.times.units)
@@ -3796,7 +3796,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             raise ValueError("when a vector, 'after' must have the same length as times")
         
         if isinstance(after, pq.Quantity):
-            if not units_convertible(after, sig.times.units):
+            if not unitsConvertible(after, sig.times.units):
                 raise TypeError("units of after are incompatible with signal's times units")
             
         else:
@@ -3827,7 +3827,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
                 raise ValueError("'before' had incompatible size" )
             
             if isinstance(before, pq.Quantity):
-                if not units_convertible(before, sig.times.units):
+                if not unitsConvertible(before, sig.times.units):
                     raise TypeError("'before' has incompatible units")
                 
                 before = before.rescale(sig.times.units)
@@ -3904,7 +3904,7 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
             times = times.flatten() * sig.times.units
                 
         else:
-            if not units_convertible(times, sig.times):
+            if not unitsConvertible(times, sig.times):
                 raise TypeError("times units (%s) are incompatible with this signal (%s)" % (times.units.dimensionality, sig.times.units.dimensionality))
             
             times = times.rescale(sig.times.units)
@@ -3930,7 +3930,7 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
                 tail *= sig.times.units
                 
             else:
-                if not units_convertible(tail, sig.time.units):
+                if not unitsConvertible(tail, sig.time.units):
                     raise TypeError("'tail' units (%s) are incompatible with signal's times: %s" % (tail.units.dimensionality, sig.times.units.dimensionality) )
                 
                 tail = tail.rescale(sig.times.units)
@@ -4226,7 +4226,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             if resample_with_period.size > 1:
                 raise TypeError("new sampling period must be a scalar Quantity; got %s instead" % resample_with_period)
             
-            if units_convertible(resample_with_period, vm.sampling_period):
+            if unitsConvertible(resample_with_period, vm.sampling_period):
                 if resample_with_period.units != vm.sampling_period.units:
                     resample_with_period.rescale(vm.sampling_period.units)
                     
@@ -4243,7 +4243,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
             if resample_with_rate.size > 1:
                 raise TypeError("new sampling rate must be a scalar Quantity; got %s instead" % resample_with_rate)
         
-            if units_convertible(resample_with_rate, vm.sampling_rate):
+            if unitsConvertible(resample_with_rate, vm.sampling_rate):
                 if resample_with_rate.units != vm.sampling_rate.units:
                     resample_with_rate.rescale(vm.sampling_rate.units)
                     
@@ -4340,7 +4340,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                 if im[1].size > 1:
                     raise TypeError(f"Expecting a scalar quantity in im[1]; got {im[1].size} instead")
                 
-                if units_convertible(im[1], pq.s):
+                if unitsConvertible(im[1], pq.s):
                     istart = im[1].rescale(pq.s)
                 else:
                     raise TypeError(f"Expecting a time quantity in im[1]; got {im[1]} instead")
@@ -4355,7 +4355,7 @@ def extract_AP_train(vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple
                 if im[2].size > 1:
                     raise TypeError(f"Expecting a scalar quantity in im[2]; got {im[2].size} instead")
                 
-                if units_convertible(im[2], pq.s):
+                if unitsConvertible(im[2], pq.s):
                     istop = im[2].rescale(pq.s)
                 else:
                     raise TypeError(f"Expecting a time quantity in im[2]; got {im[2]} instead")
@@ -4450,7 +4450,7 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
         min_fast_rise_duration *= pq.s
     
     elif isinstance(min_fast_rise_duration, pq.Quantity):
-        if not units_convertible(min_fast_rise_duration, sig.times):
+        if not unitsConvertible(min_fast_rise_duration, sig.times):
             raise TypeError("units of 'min_fast_rise_duration' (%s) are not compatible with those of the signal's time domain (%s)" % (min_fast_rise_duration.units, sig.times.units))
         
         if min_fast_rise_duration.units != sig.times.units:
@@ -4581,7 +4581,7 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
         if isinstance(ref_value, numbers.Number):
             ref_value *= w.units
     
-        if not isinstance(ref_value, pq.Quantity) or not scq.units_convertible(ref_value, w) or ref_value.size > 1:
+        if not isinstance(ref_value, pq.Quantity) or not scq.unitsConvertible(ref_value, w) or ref_value.size > 1:
             raise TypeError(f"Reference {ref_name} expected to be a scalar float or Quantity; instead, got {type(ref_value).__name__}")
         
     
@@ -4995,7 +4995,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
         after *= pq.s
         
     elif isinstance(after, pq.Quantity):
-        if not units_convertible(after, sig.times):
+        if not unitsConvertible(after, sig.times):
             raise TypeError("units of 'after' (%s) are not compatible with those of the signal's time domain (%s)" % (after.units, sig.times.units))
         
     elif after is not None:
@@ -5014,7 +5014,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
         min_fast_rise_duration *= pq.s
     
     elif isinstance(min_fast_rise_duration, pq.Quantity):
-        if not units_convertible(min_fast_rise_duration, sig.times):
+        if not unitsConvertible(min_fast_rise_duration, sig.times):
             raise TypeError("units of 'min_fast_rise_duration' (%s) are not compatible with those of the signal's time domain (%s)" % (min_fast_rise_duration.units, sig.times.units))
         
         if min_fast_rise_duration.units != sig.times.units:
@@ -5030,7 +5030,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
         min_ap_isi *= pq.s
         
     elif isinstance(min_ap_isi, pq.Quantity):
-        if not units_convertible(min_ap_isi, sig.times):
+        if not unitsConvertible(min_ap_isi, sig.times):
             raise TypeError("units of 'min_ap_isi' (%s) are not compatible with those of the signal's time domain (%s)" % (min_ap_isi.units, sig.times.units))
     
         if min_ap_isi.units != sig.times.units:
@@ -5054,7 +5054,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
         decay_ref *= sig.units
         
     elif isinstance(decay_ref, pq.Quantity):
-        if not units_convertible(decay_ref, sig):
+        if not unitsConvertible(decay_ref, sig):
             raise TypeError("'decay_ref' units (%s) are incompatible with the signal's units (%s)" % (decay_ref.units, sig.units))
         
         if decay_ref.units != sig.units:
@@ -5067,7 +5067,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
         reference_Vm = get_duration_at_Vm * sig.units
         
     elif isinstance(get_duration_at_Vm, pq.Quantity):
-        if not units_convertible(get_duration_at_Vm, sig.units):
+        if not unitsConvertible(get_duration_at_Vm, sig.units):
             raise TypeError("get_duration_at_Vm expected to have %s units; got %s instead" % (sig.units.dimensionality, get_duration_at_Vm.units.dimensionality))
         
         if get_duration_at_Vm.units != sig.units:
@@ -5956,7 +5956,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
         after *= pq.s
         
     elif isinstance(after, pq.Quantity):
-        if not units_convertible(after, sig.times):
+        if not unitsConvertible(after, sig.times):
             raise TypeError("units of 'after' (%s) are not compatible with those of the signal's time domain (%s)" % (after.units, sig.times.units))
         
     elif after is not None:
@@ -5975,7 +5975,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
         min_fast_rise_duration *= pq.s
     
     elif isinstance(min_fast_rise_duration, pq.Quantity):
-        if not units_convertible(min_fast_rise_duration, sig.times):
+        if not unitsConvertible(min_fast_rise_duration, sig.times):
             raise TypeError("units of 'min_fast_rise_duration' (%s) are not compatible with those of the signal's time domain (%s)" % (min_fast_rise_duration.units, sig.times.units))
         
         if min_fast_rise_duration.units != sig.times.units:
@@ -5991,7 +5991,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
         min_ap_isi *= pq.s
         
     elif isinstance(min_ap_isi, pq.Quantity):
-        if not units_convertible(min_ap_isi, sig.times):
+        if not unitsConvertible(min_ap_isi, sig.times):
             raise TypeError("units of 'min_ap_isi' (%s) are not compatible with those of the signal's time domain (%s)" % (min_ap_isi.units, sig.times.units))
     
         if min_ap_isi.units != sig.times.units:
@@ -6015,7 +6015,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
         decay_ref *= sig.units
         
     elif isinstance(decay_ref, pq.Quantity):
-        if not units_convertible(decay_ref, sig):
+        if not unitsConvertible(decay_ref, sig):
             raise TypeError("'decay_ref' units (%s) are incompatible with the signal's units (%s)" % (decay_ref.units, sig.units))
         
         if decay_ref.units != sig.units:
@@ -6028,7 +6028,7 @@ def detect_AP_waveforms_in_train_old(sig, iinj,
         reference_Vm = get_duration_at_Vm * sig.units
         
     elif isinstance(get_duration_at_Vm, pq.Quantity):
-        if not units_convertible(get_duration_at_Vm, sig.units):
+        if not unitsConvertible(get_duration_at_Vm, sig.units):
             raise TypeError("get_duration_at_Vm expected to have %s units; got %s instead" % (sig.units.dimensionality, get_duration_at_Vm.units.dimensionality))
         
         if get_duration_at_Vm.units != sig.units:
@@ -6603,7 +6603,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             decay_ref *= ap.units
             
         elif isinstance(decay_ref, pq.Quantity):
-            if not units_convertible(decay_ref, ap.units):
+            if not unitsConvertible(decay_ref, ap.units):
                 raise TypeError("decay_ref has incompatible units (%s)" % decay_ref.units.dimensionality)
             
             if decay_ref.units != ap.units:
@@ -6617,7 +6617,7 @@ def ap_duration_at_Vm(ap, value, **kwargs): #decay_ref, decay_intercept_approx="
             value *= ap.units
             
         elif isinstance(value, pq.Quantity):
-            if not units_convertible(value, ap.units):
+            if not unitsConvertible(value, ap.units):
                 raise TypeError("value units (%s) not convertible to signal's units (%s)" % (value.units.dimensionality, ap.units.dimensionality))
             
             value = value.rescale(ap.units)
@@ -6657,7 +6657,7 @@ def ap_phase_plot_data(vm, dvdt=None, smooth_window=None):
     if not isinstance(vm, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
     
-    if not units_convertible(vm.units, pq.V):
+    if not unitsConvertible(vm.units, pq.V):
         # warnings.warn("'vm' this does not seem to contain a Vm signal")
         scipywarn("'vm' this does not seem to contain a Vm signal")
     
@@ -6715,7 +6715,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
     if not isinstance(vm, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal object; got %s instead" % (type(vm).__name__))
     
-    if not units_convertible(vm.units, pq.V):
+    if not unitsConvertible(vm.units, pq.V):
         # warnings.warn("this does not seem to be a Vm signal")
         scipywarn("this does not seem to be a Vm signal")
     
@@ -6738,7 +6738,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
         dvdt_thr *= dvdt.units
         
     elif isinstance(dvdt_thr, pq.Quantity):
-        if not units_convertible(dvdt_thr, dvdt.units):
+        if not unitsConvertible(dvdt_thr, dvdt.units):
             raise TypeError("'dvdt_thr' expected to have %s units; got %s instead" % (dvdt.units.dimensionality, dvdt_thr.units.dimensionality))
         
         dvdt_thr = dvdt_thr.rescale(dvdt.units)
@@ -6829,7 +6829,7 @@ def analyse_AP_waveform(vm, dvdt=None, d2vdt2=None, ref_vm = None, ref_vm_relati
             ref_vm *= vm.units
             
         elif isinstance(ref_vm, pq.Quantity):
-            if not units_convertible(ref_vm, vm.units):
+            if not unitsConvertible(ref_vm, vm.units):
                 raise TypeError("ref_vm has wrong units: %s" % ref_vm.units.dimensionality)
             
             #print("analyse_AP_waveform vm.units", vm.units)
@@ -7564,7 +7564,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         if Iinj_0.size != 1:
             raise TypeError("Iinj_0 must be a scalar quantity")
         
-        if units_convertible(Iinj_0, pq.pA):
+        if unitsConvertible(Iinj_0, pq.pA):
             Iinj_0 = Iinj_0.rescale(pq.pA)
             
         else:
@@ -7580,7 +7580,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         if delta_I.size != 1:
             raise TypeError("delta_I must be a scalar quantity")
         
-        if units_convertible(delta_I, pq.pA):
+        if unitsConvertible(delta_I, pq.pA):
             delta_I = delta_I.rescale(pq.pA)
             
         else:
@@ -7623,7 +7623,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             if all([isinstance(v, float) for v in Iinj]):
                 Iinj = np.array(Iinj) * pq.pA
                 
-            elif all([isinstance(v, pq.Quantity) and units_convertible(v, pq.pA) for v in Iinj]):
+            elif all([isinstance(v, pq.Quantity) and unitsConvertible(v, pq.pA) for v in Iinj]):
                 Iinj = np.array([v.rescale(pq.pA).magnitude for v in Iinj]) * pq.pA
                 
             else:
@@ -8019,10 +8019,10 @@ def plot_rheobase_latency(data,
         
     if isinstance(data, dict):
         if "Latency_v_Iinj" in data.keys() and isinstance(data["Latency_v_Iinj"], IrregularlySampledDataSignal):
-            if not scq.check_time_units(data["Latency_v_Iinj"].units):
+            if not scq.checkTimeUnits(data["Latency_v_Iinj"].units):
                 raise ValueError(f"Wrong units {data['Latency_v_Iinj'].units} in the latency v current injection signal")
             
-            if not scq.check_electrical_current_units(data["Latency_v_Iinj"].domain.units):
+            if not scq.checkElectricalCurrentUnits(data["Latency_v_Iinj"].domain.units):
                 raise ValueError(f"Wrong domain units {data['Latency_v_Iinj'].domain.units} in the latency v current injection signal")
             
             x = data["Latency_v_Iinj"].domain.magnitude
@@ -8034,7 +8034,7 @@ def plot_rheobase_latency(data,
         elif all(k in data.keys() for k in ("Latency", "I")):
             if not isinstance(data["Latency"], IrregularlySampledDataSignal):
                 raise TypeError(f"Latency per steps expected to be an  IrregularlySampledDataSignal; got {type(data['Latency']).__name__} instead")
-            if not scq.check_time_units(data["Latency"].units):
+            if not scq.checkTimeUnits(data["Latency"].units):
                 raise ValueError(f"Wrong units {data['Latency'].units} for latencies")
             
             x = data["Latency"].magnitude
@@ -8042,7 +8042,7 @@ def plot_rheobase_latency(data,
             
             if not isinstance(data["I"], IrregularlySampledDataSignal):
                 raise TypeError(f"Injected current per steps expected to be an  IrregularlySampledDataSignal; got {type(data['I']).__name__} instead")
-            if not scq.check_electrical_current_units(data["I"].units):
+            if not scq.checkElectricalCurrentUnits(data["I"].units):
                 raise ValueError(f"Wrong units {data['I'].units} for injected current")
             
             y = data["I"].magnitude
@@ -8064,7 +8064,7 @@ def plot_rheobase_latency(data,
             fitrheo = False
         
     elif isinstance(data, IrregularlySampledDataSignal):
-        assert(scq.check_electrical_current_units(data.domain.units) and scq.check_time_units(data.units)), "Data does not seem to be a latency vs injected current signal"
+        assert(scq.checkElectricalCurrentUnits(data.domain.units) and scq.checkTimeUnits(data.units)), "Data does not seem to be a latency vs injected current signal"
         # NOTE: 2024-01-19 12:56:51
         # check for existence of rheobase-latency fit in the signal's annotations'
         rheolat = data.annotations.get("rheobase_latency_analysis", None)
@@ -9157,7 +9157,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
     
     domain_units = im_signal.times.units
     
-    if not units_convertible(im_signal, pq.A):
+    if not unitsConvertible(im_signal, pq.A):
         # warnings.warn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         scipywarn(f"'im_signal' expected to have units of membrane current, not {im_signal.units}.\n\nA new signal will be generated with units of pA. BE careful how you interpret the results")
         
@@ -9170,7 +9170,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         domain_units = im_signal.times.units
         
     if isinstance(testVm, (neo.AnalogSignal, DataSignal, pq.Quantity)):
-        if not units_convertible(testVm, pq.V):
+        if not unitsConvertible(testVm, pq.V):
             # warnings.warn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nA new signal will be generated with units of mV. Be careful how you interpret the results")
             scipywarn(f"'testVm' signal is expected to have units of membrane potential, not {testVm.units}.\n\nA new signal will be generated with units of mV. Be careful how you interpret the results")
     
@@ -9191,7 +9191,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         Vchange = np.abs(Vss - Vbase)
         
     elif isinstance(testVm, pq.Quantity):
-        if not units_convertible(testVm, pq.V):
+        if not unitsConvertible(testVm, pq.V):
             raise TypeError(f"Expecting a quantity in units of electrical potential; got {testVm.units} instead")
         
         if testVm.size != 1:
@@ -9213,7 +9213,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         if any(v.size != 1 for v in intervals):
             raise ValueError(f"'intervals' must be scalar quantities")
         
-        if any(not units_convertible(v, domain_units) for v in intervals):
+        if any(not unitsConvertible(v, domain_units) for v in intervals):
             raise ValueError(f"All 'intervals' elements must have same units as the im_signal domain")
         
         else:
@@ -9334,7 +9334,7 @@ def PSCwaveform(model_parameters, units=pq.pA, t_start=0*pq.s, duration=0.02*pq.
     
     dstring = f"Clements_Bekkers_97 α={model_parameters[0]}, β={model_parameters[1]}, x₀={model_parameters[2]}, τ₁={model_parameters[3]}, τ₂={model_parameters[4]}"
     
-    if quantities.check_time_units(x):
+    if quantities.checkTimeUnits(x):
         klass = neo.AnalogSignal
     else:
         klass = DataSignal
@@ -10374,7 +10374,7 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
         Vm *= pq.mV
         
     elif isinstance(Vm, pq.Quantity):
-        uname = scq.name_from_unit(Vm)
+        uname = scq.nameFromUnit(Vm)
         if uname != "Potential":
             raise TypeError("Vm expected to be a Potential; got {uname} instead")
         Vm  = Vm.rescale(pq.mV)
@@ -10386,7 +10386,7 @@ def nsfa(xdata:np.ndarray, ydata:np.ndarray, /, i=0, N=1, b=0, **kwargs):
         Erev *= pq.mV
         
     elif isinstance(Erev, pq.Quantity):
-        uname = scq.name_from_unit(Erev)
+        uname = scq.nameFromUnit(Erev)
         if uname != "Potential":
             raise TypeError("Erev expected to be a Potential; got {uname} instead")
         Erev  = Erev.rescale(pq.mV)

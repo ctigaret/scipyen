@@ -652,7 +652,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 
     def _check_value_special_criteria_(self, value, crit:dict):
         from core.utilities import unique
-        from core.quantities import units_convertible
+        from core.quantities import unitsConvertible
         
         if len(crit) == 0:
             return
@@ -727,7 +727,7 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
                 c = crit.get("units", NoData)
                 
                 if isinstance(c. pq.Quantity):
-                    if not units_convertible(value, c):
+                    if not unitsConvertible(value, c):
                         raise AttributeError(f"Value units {value.units} are incompatible with {c}")
                     
             if isinstance(value, vigra.VigraArray):
@@ -1913,7 +1913,7 @@ def is_type_or_subclass(x, y):
     return isinstance(x, y)
 
 def __check_array_attribute__(rt, param):
-    from core.quantities import units_convertible
+    from core.quantities import unitsConvertible
     # print(f"rt = {rt}; param = {param}")
     if rt["default_value"] is not None:
         if not isinstance(rt["default_value"], np.ndarray):
@@ -1978,7 +1978,7 @@ def __check_array_attribute__(rt, param):
                         
         if isinstance(param, pq.Quantity):
             if rt["default_value_ndim"] is None:
-                if isinstance(rt["default_value"], pq.Quantity) and not units_convertible(rt["default_value"].units, param.units):
+                if isinstance(rt["default_value"], pq.Quantity) and not unitsConvertible(rt["default_value"].units, param.units):
                     raise ValueError(f"Default value has wrong units ({rt['default_value'].units}); expecting {param} ")
                 
             rt["default_value_units"] = param

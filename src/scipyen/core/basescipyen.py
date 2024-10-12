@@ -18,7 +18,7 @@ import pandas as pd
 from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
-from core.quantities import units_convertible
+from core.quantities import unitsConvertible
 from core.datatypes import (Episode, Schedule, ProcedureType, AdministrationRoute, 
                             Procedure, TypeEnum,
                             )

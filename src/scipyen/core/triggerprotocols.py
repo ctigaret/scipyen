@@ -56,7 +56,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.datatypes import (is_string, 
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
-from core.quantities import (check_time_units, units_convertible, QuantityDescriptorValidator)
+from core.quantities import (checkTimeUnits, unitsConvertible, QuantityDescriptorValidator)
 from core.neoutils import (get_index_of_named_signal, remove_events, clear_events,
                            is_same_as, get_events)
 
@@ -248,7 +248,7 @@ class TriggerProtocol:
     # and IT IS NOT a TriggerEvent object. For this reason, the imagingDelay
     # will not have a corresponding event in a data segment's "events" list.
     #
-    imagingDelay:QuantityDescriptorValidator = QuantityDescriptorValidator("imagingDelay", validator=check_time_units) # 0*pq.s by default
+    imagingDelay:QuantityDescriptorValidator = QuantityDescriptorValidator("imagingDelay", validator=checkTimeUnits) # 0*pq.s by default
     
     # TODO: a validator to check type and contents
     segments:typing.Union[int, list[int], tuple[int], range, slice] = dataclasses.field(default_factory = list)
@@ -1084,7 +1084,7 @@ def auto_define_trigger_events(src:typing.Union[neo.Block, neo.Segment, typing.S
     if isinstance(times, pq.Quantity):
         # simply construct TriggerEvents based on the supplied time stamps
         # NO SIGNAL PARSING is performed
-        if not check_time_units(times):  # event times passed at function call -- no detection is performed
+        if not checkTimeUnits(times):  # event times passed at function call -- no detection is performed
             raise TypeError("times expected to have time units; it has %s instead" % times.units)
 
         for segment in data: # construct events, store them in segments
@@ -1114,7 +1114,7 @@ def auto_define_trigger_events(src:typing.Union[neo.Block, neo.Segment, typing.S
                         
                     if sndx in range(len(s.analogsignals)):
                         if isinstance(time_slice, (tuple, list)) \
-                            and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
+                            and all([isinstance(t, pq.Quantity) and checkTimeUnits(t) for t in time_slice]) \
                                 and len(time_slice) == 2:
                                     
                             if reltimes:
@@ -1143,7 +1143,7 @@ def auto_define_trigger_events(src:typing.Union[neo.Block, neo.Segment, typing.S
             for ks, s in enumerate(data):
                 if analog_index in range(len(s.analogsignals)):
                     if isinstance(time_slice, (tuple, list)) \
-                        and all([isinstance(t, pq.Quantity) and check_time_units(t) for t in time_slice]) \
+                        and all([isinstance(t, pq.Quantity) and checkTimeUnits(t) for t in time_slice]) \
                             and len(time_slice) == 2:
                         # print(f"auto_define_trigger_events:\n")
                         # print(f"signal start {s.analogsignals[analog_index].t_start}")
@@ -2099,7 +2099,7 @@ def auto_detect_trigger_protocols(data: typing.Union[neo.Block, neo.Segment, typ
                         use_lo_hi=up, clear=clear)
             
             if len(p_tuple) == 3:
-                if not isinstance(p_tuple[2], tuple) or len(p_tuple[2]) != 2 or (not all(isinstance(v_, pq.Quantity) and units_convertible(v_, pq.s) for v_ in p_tuple[2])):
+                if not isinstance(p_tuple[2], tuple) or len(p_tuple[2]) != 2 or (not all(isinstance(v_, pq.Quantity) and unitsConvertible(v_, pq.s) for v_ in p_tuple[2])):
                     raise ValueError(f"When specified, the third element in a {p_name} trigger specification must have exactly two time quantities")
                 pfun(data, time_slice = p_tuple[2])
                 

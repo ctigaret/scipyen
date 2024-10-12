@@ -418,7 +418,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if any(v.size > 1 for v in (minimum, maximum)):
                 raise TypeError("Expecting scalar quantities for both minimum and maximum ")
             
-            if scq.units_convertible(minimum, maximum):
+            if scq.unitsConvertible(minimum, maximum):
                 # NOTE: 2022-11-09 09:07:15
                 # rescale to minimum units explicitly, 
                 # in case minimum magnitude is 0 (and thus raise exception)
@@ -514,7 +514,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         ret = super().valueFromText(s)
         return ret * self.units
 
-        # unit = scq.unit_quantity_from_name_or_symbol(self.suffix)
+        # unit = scq.unitQuantityFromNameOrSymbol(self.suffix)
         # return ret*unit
     
     def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
@@ -546,7 +546,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 return # Only scalar quantities are allowed
                 # raise TypeError("Only scalar quantities are allowed")
             
-            if scq.units_convertible(self.units, value.units):
+            if scq.unitsConvertible(self.units, value.units):
                 fval = float(value.magnitude)
                 if fval > -math.inf and fval < math.inf:
                     val = float(value.rescale(self.units).magnitude)

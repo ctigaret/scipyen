@@ -840,7 +840,7 @@ def Heaviside(x:typing.Union[pq.Quantity, np.ndarray],
     # if all(isinstance(v, pq.Quantity) for v in (x, x0)):
     if isinstance(x, pq.Quantity):
         if isinstance(x0, pq.Quantity):
-            if not scq.units_convertible(x,x0):
+            if not scq.unitsConvertible(x,x0):
                 raise TypeError(f"x and x0 have incompatible units")
             
             if x.units != x0.units:
@@ -894,7 +894,7 @@ def Heaviside2(x:typing.Union[pq.Quantity, np.ndarray],
     # if all(isinstance(v, pq.Quantity) for v in (x, x0)):
     if isinstance(x, pq.Quantity):
         if isinstance(x0, pq.Quantity):
-            if not scq.units_convertible(x,x0):
+            if not scq.unitsConvertible(x,x0):
                 raise TypeError(f"x and x0 have incompatible units")
             
             if x.units != x0.units:
@@ -952,7 +952,7 @@ def ramp(x, p = (0., 0., 1., 1.)):
     
     if isinstance(x, pq.Quantity):
         if isinstance(x0, pq.Quantity):
-            if not scq.units_convertible(x,x0):
+            if not scq.unitsConvertible(x,x0):
                 raise TypeError(f"x and x0 have incompatible units")
             
             if x.units != x0.units:
@@ -961,7 +961,7 @@ def ramp(x, p = (0., 0., 1., 1.)):
             x0 = x0.magnitude.flatten()[0]
 
         if isinstance(x1, pq.Quantity):
-            if not scq.units_convertible(x,x1):
+            if not scq.unitsConvertible(x,x1):
                 raise TypeError(f"x and x1 have incompatible units")
             
             if x.units != x1.units:

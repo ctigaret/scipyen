@@ -17,8 +17,8 @@ import numpy as np
 import quantities as pq
 from neo import (Block, Segment,)
 
-from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
-                            unit_quantity_from_name_or_symbol,quantity2str,)
+from core.quantities import (arbitrary_unit, checkTimeUnits, unitsConvertible,
+                            unitQuantityFromNameOrSymbol,quantity2str,)
 
 from core.datatypes import UnitTypes
 
@@ -245,7 +245,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
     def signalStart(self, value):
         value = self._check_time_value_("start", value)
         if isinstance(value, pq.Quantity):
-            if check_time_units(value):
+            if checkTimeUnits(value):
                 value = float(value.rescale(pq.s).magnitude.flatten()[0])
                 
             else:
@@ -413,7 +413,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
         
         if isinstance(value, pq.Quantity):
             if value.size == 1:
-                if check_time_units(value):
+                if checkTimeUnits(value):
                     value = value.rescale(pq.s)
                     
                 else:

@@ -23,8 +23,8 @@ from core.quantities import (arbitrary_unit,
                             channel_unit,
                             pixel_unit,
                             quantity2scalar,
-                            unit_quantity_from_name_or_symbol,
-                            units_convertible,
+                            unitQuantityFromNameOrSymbol,
+                            unitsConvertible,
                             )
 
 from core.datatypes import (is_numeric, is_numeric_string,
@@ -380,7 +380,7 @@ class CalibrationData(object):
                         
                 if not isinstance(self._data_.units, pq.Quantity):
                     try:
-                        self._data_.units = unit_quantity_from_name_or_symbol(arg)
+                        self._data_.units = unitQuantityFromNameOrSymbol(arg)
                     except:
                         pass # let the next args deal with it
                     
@@ -447,7 +447,7 @@ class CalibrationData(object):
                     self._data_.units = arg.units
                     
                 if not isinstance(self._data_.origin, (complex, float, int)):
-                    if not units_convertible(self._data_.units.units, arg.units):
+                    if not unitsConvertible(self._data_.units.units, arg.units):
                         raise TypeError(f"'origin' units {arg.units} are incompatible with the specified units ({self._data_.units})")
                     
                     if arg.units != self._data_.units.units:
@@ -456,7 +456,7 @@ class CalibrationData(object):
                     self._data_.origin = quantity2scalar(arg)
                     
                 elif not isinstance(self._data_.resolution, (complex, float, int)):
-                    if not units_convertible(self._data_.units.units, arg.units):
+                    if not unitsConvertible(self._data_.units.units, arg.units):
                         raise TypeError(f"'origin' units {arg.units} are incompatible with the specified units ({self._data_.units})")
                     
                     if arg.units != self._data_.units.units:
@@ -466,7 +466,7 @@ class CalibrationData(object):
                     
                 elif self.__class__ == ChannelCalibrationData:
                     if not isinstance(self._data_.maximum, (complex, float, int)):
-                        if not units_convertible(self._data_.units.units, arg.units):
+                        if not unitsConvertible(self._data_.units.units, arg.units):
                             raise TypeError(f"'max value' units {arg.units} are incompatible with the specified units ({self._data_.units})")
                         
                         if arg.units != self._data_.units.units:
@@ -599,7 +599,7 @@ class CalibrationData(object):
         if units_ is not None:
             if isinstance(units_, str):
                 try:
-                    units_ = unit_quantity_from_name_or_symbol(units_)
+                    units_ = unitQuantityFromNameOrSymbol(units_)
                 except:
                     units_ = None
             
@@ -615,7 +615,7 @@ class CalibrationData(object):
         origin_ = origin_ if origin_ is not None else minimum
         if origin_ is not None:
             if isinstance(origin_, pq.Quantity):
-                if not units_convertible(origin_.units, self._data_.units.units):
+                if not unitsConvertible(origin_.units, self._data_.units.units):
                     raise TypeError(f"'origin (or minimum)' units {origin_.units} are incompatible with the specified units ({self._data_.units})")
                     
                 if origin_.units != self._data_.units.units:
@@ -629,7 +629,7 @@ class CalibrationData(object):
         resoln  = kwargs.pop("resolution", None)
         if resoln is not None:
             if isinstance(resoln, pq.Quantity):
-                if not units_convertible(resoln.units, self._data_.units.units):
+                if not unitsConvertible(resoln.units, self._data_.units.units):
                     raise TypeError(f"'resolution' units {resoln.units} are incompatible with the specified units ({self._data_.units})")
                     
                 if resoln.units != self._data_.units.units:
@@ -644,7 +644,7 @@ class CalibrationData(object):
         if maxval is not None:
             if self.__class__ == ChannelCalibrationData:
                 if isinstance(maxval, pq.Quantity):
-                    if not units_convertible(maxval.units, self._data_.units.units):
+                    if not unitsConvertible(maxval.units, self._data_.units.units):
                         raise TypeError(f"'maximum value' units {maxval.units} are incompatible with the specified units ({self._data_.units})")
                         
                     if maxval.units != self._data_.units.units:
@@ -789,7 +789,7 @@ class CalibrationData(object):
         ret = other.__class__ == self.__class__
         
         if ret and (ignore is None or "units" not in ignore):
-            ret &= units_convertible(self.units, other.units)
+            ret &= unitsConvertible(self.units, other.units)
             
         if ignore is not None and "units" in ignore:
             if isinstance(ignore, str):
@@ -861,14 +861,14 @@ class CalibrationData(object):
             u = pq.quantity.validate_dimensionality(u.simplified)
             
         if isinstance(u, str):
-            u = unit_quantity_from_name_or_symbol(u)
+            u = unitQuantityFromNameOrSymbol(u)
             
         if not isinstance(u, pq.Quantity):
             raise TypeError(f"Units expected to be a Python Quantity, Dimensionality, or str; got {type(u).__name__} instead")
         
         if hasattr(self, "type"):
             units_for_type = axisTypeUnits(self.type)
-            if not units_convertible(u.units, units_for_type.units):
+            if not unitsConvertible(u.units, units_for_type.units):
                 axis_type_names = "|".join(axisTypeStrings(self.type))
                 warnings.warn(f"Assigning units {u} for a {axis_type_names} axis", RuntimeWarning, stacklevel=2)
                 
@@ -899,7 +899,7 @@ class CalibrationData(object):
             self._data_.origin = val
             
         elif isinstance(val, pq.Quantity):
-            if not units_convertible(val.units, self.units.units):
+            if not unitsConvertible(val.units, self.units.units):
                 raise TypeError(f"Origin units ({val.units}) incompatible with my units ({self.units.units})")
             
             if val.units != self.units.units:
@@ -931,7 +931,7 @@ class CalibrationData(object):
             self._data_.resolution = val
             
         elif isinstance(val, pq.Quantity):
-            if not units_convertible(val.units, self.units.units):
+            if not unitsConvertible(val.units, self.units.units):
                 raise TypeError(f"Resolution units ({val.units}) incompatible with my units ({self.units.units})")
             
             if val.units != self.units.units:
@@ -1006,7 +1006,7 @@ class CalibrationData(object):
         if value(size) != 1:
             raise TypeError(f"Expecting a scalar Quantity; instead, got a {value.size}-sized Quantity")
         
-        if not units_convertible(value.units, self.units.units):
+        if not unitsConvertible(value.units, self.units.units):
             raise TypeError(f"Cannot convert between {value.units} and {self.units}")
         
         value_dim = pq.quantity.validate_dimensionality(value.units)
@@ -1053,7 +1053,7 @@ class ChannelCalibrationData(CalibrationData):
             self._data_.maximum = val
             
         elif isinstance(val, pq.Quantity):
-            if not units_convertible(val.units, self.units.units):
+            if not unitsConvertible(val.units, self.units.units):
                 raise TypeError(f"Maximum value units ({val.units}) incompatible with my units ({self.units.units})")
             
             if val.units != self.units.units:
@@ -2046,7 +2046,7 @@ class AxisCalibrationData(CalibrationData):
         
         def __eval_xml_element_text__(param, txt):
             if param == "units":
-                value = unit_quantity_from_name_or_symbol(txt)
+                value = unitQuantityFromNameOrSymbol(txt)
             elif param in ("key", "name"):
                 value = txt
             elif param == "type":

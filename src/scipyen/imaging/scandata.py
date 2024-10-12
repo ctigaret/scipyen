@@ -32,8 +32,8 @@ from core.quantities import(arbitrary_unit,
                             day_in_vitro,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
-                            unit_quantity_from_name_or_symbol,
-                            check_time_units)
+                            unitQuantityFromNameOrSymbol,
+                            checkTimeUnits)
 
 from core.utilities import (get_index_for_seq, sp_set_loc )
 

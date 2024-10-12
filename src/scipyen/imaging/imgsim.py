@@ -33,7 +33,7 @@ from core import (datatypes  , signalprocessing as sgp, curvefitting as crvf,
 # NOTE: 2020-10-08 09:45:31
 # inside core.utilities, safeWrapper below is imported from core.prog
 from core.utilities import (safeWrapper, counter_suffix, unique, )
-from core.quantities import (units_convertible, check_time_units)
+from core.quantities import (unitsConvertible, checkTimeUnits)
 
 #from .patchneo import neo
 from neo.core import baseneo
@@ -151,7 +151,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
         if len(duration.magnitude.flatten()) != 1:
             raise TypeError("duration expected to be a scalar; got %s instead" % duration)
         
-        if not check_time_units(duration):
+        if not checkTimeUnits(duration):
             raise TypeError("When a quantity, duration muste have time units; got %s instead" % duration.units)
         
         kwargs["domain_units"] = duration.units
@@ -160,7 +160,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
             if len(sampling_frequency.magnitude.flatten()) != 1:
                 raise TypeError(("sampling_frequency expected to be a scalar;  got %s instead" % sampling_frequency))
             
-            if not units_convertible(duration, 1/sampling_frequency):
+            if not unitsConvertible(duration, 1/sampling_frequency):
                 raise TypeError("duration (%s) and sampling_frequency (%s) have incompatible units" % (duration.units, sampling_frequency.units))
             
             sampling_frequency = sampling_frequency.rescale(1/duration.units).magnitude
@@ -205,7 +205,7 @@ def synthetic_spine(field_width, spatial_resolution, *args, **kwargs):
             if len(spatial_resolution.magnitude.flatten()) != 1:
                 raise TypeError("spatial_resolution expected to be a scalar")
             
-            if not units_convertible(width, spatial_resolution):
+            if not unitsConvertible(width, spatial_resolution):
                 raise TypeError("field_width and spatial_resolution have incompatible units")
             
             # rescale resolution units to width units

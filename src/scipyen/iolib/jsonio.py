@@ -676,7 +676,7 @@ def _(o:pd.CategoricalDtype):
 @object2JSON.register(pq.UnitQuantity)
 def _(o: pq.UnitQuantity):
     hdr, ret = makeJSONStub(o)
-    factory = makeFuncStub("core.quantities.unit_quantity_from_name_or_symbol")
+    factory = makeFuncStub("core.quantities.unitQuantityFromNameOrSymbol")
     factory["posonly"] = (o.dimensionality.string, )
     ret["factory"] = factory
     return {hdr:ret}
@@ -1014,7 +1014,7 @@ def decode_hook(dct):
                 return val
             
         elif key == "unitquantity":
-            return scq.unit_quantity_from_name_or_symbol(val)
+            return scq.unitQuantityFromNameOrSymbol(val)
         
         elif key.endswith("SignatureDict"):
             return prog.SignatureDict(**val)
@@ -1045,7 +1045,7 @@ def decode_hook(dct):
                 return ret.view(artype)
             
             if key == "quantityarray":
-                units = scq.unit_quantity_from_name_or_symbol(data["__units__"])
+                units = scq.unitQuantityFromNameOrSymbol(data["__units__"])
                 return ret * units
             
             if entry == "vigraarray":

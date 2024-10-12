@@ -219,10 +219,10 @@ from core.utilities import (safeWrapper,
 
 from core.neoutils import (get_index_of_named_signal, concatenate_blocks)
 from core import quantities as scq
-from core.quantities import (units_convertible, check_time_units, 
-                             check_electrical_current_units, 
-                             check_electrical_potential_units,
-                             check_rescale)
+from core.quantities import (unitsConvertible, checkTimeUnits, 
+                             checkElectricalCurrentUnits, 
+                             checkElectricalPotentialUnits,
+                             checkRescale)
 import core.pyabfbridge as pab 
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
@@ -2553,8 +2553,8 @@ class Analysis(BaseScipyenData):
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
     """Infers the clamping mode from the units of signal and command"""
-    vc_mode = scq.check_electrical_current_units(signal) and scq.check_electrical_potential_units(command)
-    ic_mode = scq.check_electrical_potential_units(signal) and scq.check_electrical_current_units(command)
+    vc_mode = scq.checkElectricalCurrentUnits(signal) and scq.checkElectricalPotentialUnits(command)
+    ic_mode = scq.checkElectricalPotentialUnits(signal) and scq.checkElectricalCurrentUnits(command)
     
             
     clampMode = ClampMode.VoltageClamp if vc_mode else ClampMode.CurrentClamp if ic_mode else ClampMode.NoClamp
@@ -2566,7 +2566,7 @@ def checkClampMode(clampMode:ClampMode, signal:typing.Union[neo.AnalogSignal, Da
     """Verifies that the clamping mode in clampMode is applicable to the signal & command.
 Returns the signal and the command, possibly with units modified as expected for the specified clamping mode"""
     if clampMode == ClampMode.VoltageClamp:
-        if not scq.check_electrical_current_units(signal):
+        if not scq.checkElectricalCurrentUnits(signal):
             warnings.warn(f"'signal' has wrong units ({signal.units}) for VoltageClamp mode.\nThe signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
             klass = type(signal)
             signal = klass(signal.magnitude, units = pq.pA, 
@@ -2574,7 +2574,7 @@ Returns the signal and the command, possibly with units modified as expected for
                                          name=signal.name)
             
         if isinstance(command, pq.Quantity):# scalar Quantity, or Quantity array (including signal)
-            if not scq.check_electrical_potential_units(command):
+            if not scq.checkElectricalPotentialUnits(command):
                 if isinstance(command, (neo.AnalogSignal, DataSignal)):
                     warnings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
                     klass = type(command)
@@ -2590,7 +2590,7 @@ Returns the signal and the command, possibly with units modified as expected for
             command = command * pq.mV
         
     else: # current clamp mode
-        if not scq.check_electrical_potential_units(signal):
+        if not scq.checkElectricalPotentialUnits(signal):
             warnings.warn(f"'signal' has wrong units ({signal.units}) for CurrentClamp mode.\nThe signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
             klass = type(signal)
             signal = klass(signal.magnitude, units = pq.mV, 
@@ -2598,7 +2598,7 @@ Returns the signal and the command, possibly with units modified as expected for
                                          name=signal.name)
             
         if isinstance(command, pq.Quantity):
-            if not scq.check_electrical_current_units(command):
+            if not scq.checkElectricalCurrentUnits(command):
                 if isinstance(command, (neo.AnalogSignal, DataSignal)):
                     warnings.warn(f"'command' has wrong units ({command.units}) for CurrentClamp mode.\nThe command signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
                     klass = type(command)
@@ -3096,7 +3096,7 @@ def interval_index(signal, interval:tuple, duration:bool=False):
         x *= signal.times.units
         
     else:
-        x = check_rescale(x, signal.times.units)
+        x = checkRescale(x, signal.times.units)
         
     return signal.time_index(x)
     
@@ -3248,14 +3248,14 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
         t0 *= signal.times.units
         
     else:
-        if not units_convertible(t0, signal.times.units):
+        if not unitsConvertible(t0, signal.times.units):
             raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
 
     if not isinstance(t1, pq.Quantity):
         t1 *= signal.times.units
 
     else:
-        if not units_convertible(t1, signal.times.units):
+        if not unitsConvertible(t1, signal.times.units):
             raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
     
     if t0 == t1:
@@ -3351,13 +3351,13 @@ def cursor_reduce(func:types.FunctionType,
         t0 *= signal.times.units
         
     else:
-        t0 = check_rescale(t0, signal.times.units)
+        t0 = checkRescale(t0, signal.times.units)
 
     if not isinstance(t1, pq.Quantity):
         t1 *= signal.times.units
 
     else:
-        t1 = check_rescale(t1, signal.times.units)
+        t1 = checkRescale(t1, signal.times.units)
         
     t0, t1 = min(t0,t1), max(t0,t1)
         
@@ -3399,10 +3399,10 @@ def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSi
         scipywarn("No domain values were supplied")
         return
     
-    if not all(isinstance(v, pq.Quantity) and v.size == 1 and units_convertible(v, signal.times.units) for v in args):
+    if not all(isinstance(v, pq.Quantity) and v.size == 1 and unitsConvertible(v, signal.times.units) for v in args):
         raise TypeError(f"All domain values expected to be scalar Quantities in {signal.times.units}")
     
-    args = sorted([check_rescale(t, signal.times.units) for t in args])
+    args = sorted([checkRescale(t, signal.times.units) for t in args])
     
     t0 = args[0]
     
@@ -3685,7 +3685,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
             if t.size != 1:
                 raise ValueError(f"Expecting a scalar quantity instead, got {t}")
             
-            t = check_rescale(t, signal.times.units)
+            t = checkRescale(t, signal.times.units)
             
         else:
             raise TypeError(f"Invalid domain coordinate {t}")
@@ -3694,7 +3694,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         if cursor.size != 1:
             raise ValueError(f"Expecting a scalar quantity; instead, got {cursor}")
         
-        t = check_rescale(cursor, signal.times.units)
+        t = checkRescale(cursor, signal.times.units)
         
     elif isinstance(cursor, (tuple, list)) and len(cursor) in (2,3) and all([isinstance(c, (numbers.Number, pq.Quantity)) for v in cursor[0:2] ]):
         # cursor parameter sequence
@@ -3707,7 +3707,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
             if t.size != 1:
                 raise ValueError(f"Expecting a scalar quantity; instead got {t}")
             
-            t = check_rescale(t, signal.times.units)
+            t = checkRescale(t, signal.times.units)
         
     else:
         raise TypeError("Cursor expected to be a float, python Quantity, DataCursor or SignalCursor; got %s instead" % type(cursor).__name__)
@@ -4066,13 +4066,13 @@ def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
             t0 *= signal.times.units
             
         elif isinstance(t0, pq.Quantity):
-            t0 = check_rescale(t0, signal.times.units)
+            t0 = checkRescale(t0, signal.times.units)
         
         if isinstance(t1, numbers.Number):
             t1 *= signal.times.units
             
         elif isinstance(t1, pq.Quantity):
-            t1 = check_rescale(t1, signal.times.units)
+            t1 = checkRescale(t1, signal.times.units)
             
     else:
         raise TypeError(f"Invalid cursor specification: expecting a SignalCursor or a DataCursor instead got a {type(cursor).__name__}")
@@ -4673,7 +4673,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
             raise TypeError("When specified, domain_units must be a Python UnitQuantity or Quantity object; got %s instead" % type(domain_units).__name__)
         
         
-        if check_time_units(domain_units):
+        if checkTimeUnits(domain_units):
             returnDataSignal = False
             
         else:
@@ -5254,7 +5254,7 @@ on the acquisition device)
             testVm = testVm * pq.mV
             
         elif isinstance(testVm, pq.Quantity):
-            if not units_convertible(testVm, pq.V):
+            if not unitsConvertible(testVm, pq.V):
                 raise TypeError("When a quantity, testVm must have voltage units; got %s instead" % testVm.dimensionality)
             
             if testVm.size != 1:
@@ -5269,7 +5269,7 @@ on the acquisition device)
         
         vm_signal = s.analogsignals[command_signal]
         
-        if not units_convertible(vm_signal, pq.V):
+        if not unitsConvertible(vm_signal, pq.V):
             warnings.warn(f"The Vm signal has wrong units ({vm_signal.units}); expecting electrical potential units")
             warnings.warn(f"The Vm signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
             klass = type(vm_signal)
@@ -5335,7 +5335,7 @@ on the acquisition device)
         if isi.size != 1:
             raise ValueError("ISI given explicitly must be a scalar; got %s instead" % isi)
             
-        if not units_convertible(isi, s.analogsignals[signal].times):
+        if not unitsConvertible(isi, s.analogsignals[signal].times):
             raise ValueError("ISI given explicitly has units %s which are incompatible with the time axis" % isi.units)
             
         warnings.warn("Inter-stimulus interval is explicitly given: %s" % isi)
@@ -5485,8 +5485,8 @@ command signal.
     commandIsPotential = False
     
     if isinstance(signal, (neo.AnalogSignal, DataSignal)):
-        recordsCurrent = check_electrical_current_units(signal)
-        recordsPotential = check_electrical_potential_units(signal)
+        recordsCurrent = checkElectricalCurrentUnits(signal)
+        recordsPotential = checkElectricalPotentialUnits(signal)
         
     else:
         raise TypeError(f"'signal' expected a neo.AnalogSignal or DataSignal; instead, got {type(signal).__name__}")
@@ -5495,8 +5495,8 @@ command signal.
         raise ValueError(f"'signal' had incompatible units {signal.units}")
         
     if isinstance(command, (neo.AnalogSignal, DataSignal)):
-        commandIsCurrent = check_electrical_current_units(command)
-        commandIsPotential = check_electrical_potential_units(command)
+        commandIsCurrent = checkElectricalCurrentUnits(command)
+        commandIsPotential = checkElectricalPotentialUnits(command)
         
         if not any(commandIsCurrent, commandIsPotential):
             raise ValueError(f"'command' has incompatible units {command.units}")

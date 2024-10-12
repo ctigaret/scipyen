@@ -15,7 +15,7 @@ from core.vigra_patches import vigra
 from traitlets.utils.importstring import import_item
 from core import quantities as cq
 from core.triggerprotocols import TriggerProtocol
-from core.quantities import units_convertible
+from core.quantities import unitsConvertible
 
 class ScipyenResults(BaseScipyenData):
     """TODO: 2022-11-18 14:46:04"""

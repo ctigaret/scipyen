@@ -60,13 +60,13 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             self._genotype = pd.NA
         
         val = kwargs.pop("age", pd.NA)
-        if isinstance(val, pq.Quantity) and scq.check_time_units(val):
+        if isinstance(val, pq.Quantity) and scq.checkTimeUnits(val):
             self._age = val
         else:
             self._age = pd.NA
         
         if isinstance(self._age, pq.Quantity):
-            if not scq.check_time_units(self._age):
+            if not scq.checkTimeUnits(self._age):
                 raise TypeError(f"Age must be given in time units; instead got {self._age}")
             
             self._age_units = self._age.units
@@ -598,7 +598,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     @age.setter
     def age(self, value):
         if isinstance(value, pq.Quantity):
-            if not scq.check_time_units(value):
+            if not scq.checkTimeUnits(value):
                 raise TypeError(f"Age must be given in time units; instead got {value}")
             
             self._age_units = value.units

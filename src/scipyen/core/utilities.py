@@ -49,7 +49,7 @@ from core import prog
 from .prog import safeWrapper, deprecation, with_doc, is_hashable
 
 from .strutils import get_int_sfx
-from .quantities import units_convertible
+from .quantities import unitsConvertible
 from .datazone import DataZone
 
 # NOTE: 2021-07-24 15:03:53
@@ -268,7 +268,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
         x = x.magnitude
         
     else:
-        if not units_convertible(x,y):
+        if not unitsConvertible(x,y):
             return False
         
         elif x.units != y.units:
@@ -443,7 +443,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
         x = x.magnitude
         
     else:
-        if not units_convertible(x,y):
+        if not unitsConvertible(x,y):
             return False
         
         elif x.units != y.units:

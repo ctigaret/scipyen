@@ -196,7 +196,7 @@ from .prog import (safeWrapper, deprecation,
 from .datatypes import (is_string, is_vector,
                         RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
-from .quantities import (units_convertible, check_time_units, name_from_unit)
+from .quantities import (unitsConvertible, checkTimeUnits, nameFromUnit)
 from .datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from .datazone import (DataZone, Interval)
 from .triggerevent import (DataMark, TriggerEvent, TriggerEventType,)
@@ -323,7 +323,7 @@ def get_domain_name(obj):
 @get_domain_name.register(neo.Event)
 @get_domain_name.register(neo.SpikeTrain)
 def _(obj):
-    return name_from_unit(obj.times)
+    return nameFromUnit(obj.times)
 
 @get_domain_name.register(DataSignal)
 @get_domain_name.register(IrregularlySampledDataSignal)
@@ -334,7 +334,7 @@ def _(obj):
 @get_domain_name.register(DataMark)
 @get_domain_name.register(TriggerEvent)
 def _(obj):
-    return name_from_unit(obj.times)
+    return nameFromUnit(obj.times)
 
 @singledispatch
 def set_relative_time_start(data, t = 0):
@@ -875,9 +875,9 @@ def fuse_irregular_signals(*args, func:typing.Optional[typing.Callable] = np.nan
     if len(args) == 1:
         return args[0]
     
-    assert(all(lambda x: units_convertible(x[0].times.units, x[1].times.units) for x in pairwise(args))), "Signals must have domains with compatible units"
+    assert(all(lambda x: unitsConvertible(x[0].times.units, x[1].times.units) for x in pairwise(args))), "Signals must have domains with compatible units"
 
-    assert(all(lambda x: units_convertible(x[0].units, x[1].units) for x in pairwise(args))), "Signals must have compatible units"
+    assert(all(lambda x: unitsConvertible(x[0].units, x[1].units) for x in pairwise(args))), "Signals must have compatible units"
     
     assert(all(lambda x: x[0].ndim == x[1].ndim for x in pairwise(args))), "Signals must have the same dimensions (i.e., number of axes)"
     
@@ -3074,7 +3074,7 @@ def concatenate_signals(*args, axis:int = 1, ignore_domain:bool = False, ignore_
             signal_data = [sig.magnitude for sig in signals]
             
         else:
-            if not all([units_convertible(sig.units, signals[0].units) for sig in signals[1:]]):
+            if not all([unitsConvertible(sig.units, signals[0].units) for sig in signals[1:]]):
                 raise MergeError("There are signals with non-convertible units; this may become an error in the future")
             
             signal_data = [signals[0].magnitude] + [sig.rescale(units_0).magnitude if sig.units != units_0 else sig.magnitude for sig in signals[1:]]
@@ -3964,13 +3964,13 @@ events:list                                     neo.Event,
                     sig.t_start += deltaSeconds
                     
                 for sig in seg.irregularlysampledsignals:
-                    if check_time_units(sig.times):
+                    if checkTimeUnits(sig.times):
                         sig.times += deltaSeconds
                         
                 if len(seg.events):
                     evts = list()
                     for event in seg.events:
-                        if check_time_units(event.times):
+                        if checkTimeUnits(event.times):
                             # NOTE: 2023-12-19 10:55:13
                             # an event may be a DataMsrk or TriggerEvent, not just neo.Event!
                             evt = event.__class__(times = event.times + deltaSeconds,
@@ -3990,7 +3990,7 @@ events:list                                     neo.Event,
                 if len(seg.epochs):
                     epchs = list()
                     for epoch in seg.epochs:
-                        if check_time_units(epoch.times):
+                        if checkTimeUnits(epoch.times):
                             # NOTE: 2023-12-19 10:58:26
                             # this may be a DataZone!
                             epch = epoch.__class__(times = epoch.times + deltaSeconds,
@@ -5114,10 +5114,10 @@ def _(a, b, rtol = 1e-4, atol =  1e-4, equal_nan = True, use_math=False, compara
     
     
     if ret:
-        ret &= units_convertible(a.units, b.units)
+        ret &= unitsConvertible(a.units, b.units)
 
     if ret:
-        ret &= units_convertible(a.times.units, b.times.units)
+        ret &= unitsConvertible(a.times.units, b.times.units)
     
     if ret:
         ret &= sim_func(a,b)
@@ -5873,7 +5873,7 @@ def merge_annotations(A, *Bs):
 #         for k,c in enumerate(values_):
 #             if all([isinstance(v, pq.Quantity) for v in c[0:2]]):
 #                 if c[0].units != c[1].units:
-#                     if not units_convertible(c[0], c[1]):
+#                     if not unitsConvertible(c[0], c[1]):
 #                         raise TypeError("Quantities must have compatible dimensionalities")
 #                     
 #                 values = values_ # convert back
@@ -5950,7 +5950,7 @@ def merge_annotations(A, *Bs):
 #     if isinstance(t[0], pq.Quantity):
 #         units = t[0].units
 #         
-#     if zone or not check_time_units(units):
+#     if zone or not checkTimeUnits(units):
 #         klass = DataZone
 #     else:
 #         klass = neo.Epoch
@@ -5983,7 +5983,7 @@ def irregularsignal2epoch(sig, name=None, labels=None):
     if not isinstance(sig, neo.IrregularlySampledSignal):
         raise TypeError("Expecting a neo.IrregularlySampledSignal; got %s instead" % type(sig).__name__)
     
-    if not units_convertible(sig.units, sig.times.units):
+    if not unitsConvertible(sig.units, sig.times.units):
         raise TypeError("Signal was expected to have time units; it has %s instead" % sig.units)
     
     if isinstance(labels, str) and len(labels.strip()):
@@ -7813,10 +7813,10 @@ def plot_neo(obj: neo.core.basesignal.BaseSignal,
         
 
     times_units_str = obj.times.units.dimensionality.string
-    xlabel = "" if times_units_str == "dimensionless" else f"{name_from_unit(obj.times.units)} ({obj.times.units.dimensionality.string})"
+    xlabel = "" if times_units_str == "dimensionless" else f"{nameFromUnit(obj.times.units)} ({obj.times.units.dimensionality.string})"
     name = obj.name
     if name is None or len(name.strip()) == 0:
-        name = name_from_unit(obj.units.dimensionality)
+        name = nameFromUnit(obj.units.dimensionality)
     ylabel = f"{name} ({obj.units.dimensionality.string})"
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)

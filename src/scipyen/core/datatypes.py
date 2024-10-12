@@ -10,51 +10,6 @@ RELATIVE_TOLERANCE
 ABSOLUTE_TOLERANCE
 EQUALS_NAN
 
-NOTE 2024-07-20 17:32:21
-About Treatment class:
-
-    Not really sure about the utility of this class. 
-
-    A drug treatment associates:
-    • a DOSE
-    • an administration time or times
-    • a unique administration route
-    
-    So, this can be represented as a signal-like Quantity array (this includes
-        a scalar quantity, by the way). 
-
-    When a signal, it implicitly includes administration times, or durations,
-    in the "domain" or "times" attribute of the signal object.
-    
-    Such signal implicitly indicates whether the drug is given once
-    a unique dose, continuously (a constant or varying dose) or at discrete times 
-    (same or different doses) and therefore objects of this type are far more 
-    usable.
-    
-    The administration route (an Enum) can be stored in the signal's 'annotations'
-    attribute.
-    
-    Furthermore, this should be independent of a Schedule, Episode, or Procedure.
-    
-    In this respect I see the following possible scenarios:
-    
-    1. "treatment" during electrophysiology experiments: e.g. drug on a slice, or 
-        injected during in vivo recording.
-        • the experiment will have distinct episodes (vehicle, antagonist 1 at
-            dose 1, etc, ...) → the compound name and dose can be stored directly
-            in the annotations of the electrophysiological data of the corresponding 
-            episode.
-        • the drug concentration varies DURING the recording (i.e. within the 
-            same "episode") → the drug concentration is measured/sampled with:
-            a) the same sampling rate as the physiological signal, so it can be
-            stored together with the physiology signal in the same neo.Segment
-            b) a different (lower) sampling rate therefore storable in a separate 
-            neo.Segment/neo.Block (similar to the Ca2+ transient signals in ScanData)
-    
-    2. "treatment" during a behavioural task — usually the same dose given at
-        either repeated times, or several dosages at discrete time points
-        - best stored as an irregularly sampled signal associated with some (as
-        yet, unwritten) data type for behavioural experiments.
     
 '''
 
@@ -1288,7 +1243,25 @@ class Procedure:
         # by the c'tor below
         return cls(name, procedureType=procedureType, description=description)
         
+class Treatment(Procedure):
+    name:str = "Vehicle"
+    _:KW_ONLY
+    dose: dataclasses.InitVar(pq.Quantity | None) = field(default = None)
+    route:AdministrationRoute = AdministrationRoute.null
 
+
+    def __post_init__(self, dose):
+        super().__init__(name=self.name) #, episodes = self.episodes)
+        
+        unitFamily = scq.getUnitFamily(self.dose)
+    
+        acceptableUnitFamilies = ("Concentration", "Dose")
+    
+        # if unitFamily not in acceptableUnitFamilies:
+        if not any(a in unitFamily for a in acceptableUnitFamilies):
+            raise ValueError(f"'dose' has wrong units; the units should be units of {acceptableUnitFamilies}")
+
+    
 @dataclass
 class Episode:
     """Generic episode for frame-based data.

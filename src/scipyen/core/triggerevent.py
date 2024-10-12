@@ -22,7 +22,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.datatypes import (is_string, TypeEnum,
                             RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.prog import scipywarn
-from core.quantities import check_time_units
+from core.quantities import checkTimeUnits
 #from core.utilities import unique
 
 def _new_DataMark(cls, places = None, labels=None, units=None, name=None, 
@@ -187,8 +187,8 @@ class DataMark(neo.Event):
         
             units = units.units
         
-        # if cls.__name__ == "TriggerEvent" and not check_time_units(units):
-        if cls is TriggerEvent and not check_time_units(units):
+        # if cls.__name__ == "TriggerEvent" and not checkTimeUnits(units):
+        if cls is TriggerEvent and not checkTimeUnits(units):
             raise TypeError("expecting a time unit; got %s instead" % units)
             
         if isinstance(value, (tuple, list)):
@@ -196,10 +196,10 @@ class DataMark(neo.Event):
             if all([isinstance(v, Number) for v in value]): # plain numbers
                 times = np.array(value) * units
                 
-            #elif all([isinstance(v, pq.Quantity) and check_time_units(v) for v in value]): # python quantities
+            #elif all([isinstance(v, pq.Quantity) and checkTimeUnits(v) for v in value]): # python quantities
             elif all([isinstance(v, pq.Quantity) for v in value]): # python quantities
                 if cls is TriggerEvent:
-                    if not all(check_time_units(v) for v in value):
+                    if not all(checkTimeUnits(v) for v in value):
                         raise TypeError(f"Expecting time units for a {cls.__name__} object")
                     
                 if any([v.ndim > 0 for v in value]):
@@ -243,7 +243,7 @@ class DataMark(neo.Event):
             times = np.array([value]) * units # create a dimensioned array
             
         elif isinstance(value, pq.Quantity):
-            if not check_time_units(value):
+            if not checkTimeUnits(value):
                 raise TypeError("value is expected to have units compatible to %s, but has %s instead" % (units, value.units))
             
             times = value.flatten() # enforce a row vector, even for undimensioned objects (with ndim = 0)

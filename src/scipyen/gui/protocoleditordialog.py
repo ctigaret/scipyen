@@ -14,8 +14,8 @@ from qtpy.uic import loadUiType
 import numpy as np
 import quantities as pq
 
-from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
-                            unit_quantity_from_name_or_symbol, quantity2str, )
+from core.quantities import (arbitrary_unit, checkTimeUnits, unitsConvertible,
+                            unitQuantityFromNameOrSymbol, quantity2str, )
 from core.datatypes import UnitTypes
 from core.strutils import (numbers2str,)
 from core.traitcontainers import DataBag

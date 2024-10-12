@@ -48,7 +48,7 @@ from core.quantities import (space_frequency_unit,
                                     channel_unit, 
                                     arbitrary_unit,
                                     pixel_unit,
-                                    units_convertible)
+                                    unitsConvertible)
 
 #### END pict.core modules
 
@@ -311,28 +311,28 @@ def axisTypeFromUnits(u:typing.Union[pq.Quantity, pq.dimensionality.Dimensionali
         elif u is pq.dimensionless:
             return vigra.AxisType.UnknownAxisType
         
-        elif units_convertible(u.units, pq.m):
+        elif unitsConvertible(u.units, pq.m):
             return vigra.AxisType.Space
         
-        elif units_convertible(u.units, pq.s):
+        elif unitsConvertible(u.units, pq.s):
             return vigra.AxisType.Time
         
-        elif units_convertible(u.units, pq.radian):
+        elif unitsConvertible(u.units, pq.radian):
             return vigra.AxisType.Angle
         
-        elif units_convertible(u.units, pq.Hz):
+        elif unitsConvertible(u.units, pq.Hz):
             # this can/should be further distinguished to either Frequency, or 
             # Frequency | Time, in the caller code.
             # see  NOTE: 2021-11-27 17:13:56 for why we cast to vigra.AxisType
             return vigra.AxisType(vigra.AxisType.Frequency | vigra.AxisType.Time)
         
-        elif units_convertible(u.units, 1/pq.m):
+        elif unitsConvertible(u.units, 1/pq.m):
             return vigra.AxisType(vigra.AxisType.Frequency | vigra.AxisType.Space)
         
-        elif units_convertible(u.units, 1/pq.radian):
+        elif unitsConvertible(u.units, 1/pq.radian):
             return vigra.AxisType(vigra.AxisType.Frequency | vigra.AxisType.Angle)
         
-        elif units_convertible(u.units, 1/pixel_unit):
+        elif unitsConvertible(u.units, 1/pixel_unit):
             return vigra.AxisType(vigra.AxisType.Frequency | vigra.AxisType.Edge)
         
         else: # anything else including chanel_unit

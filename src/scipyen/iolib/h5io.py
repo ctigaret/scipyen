@@ -142,8 +142,8 @@ from core.quantities import(arbitrary_unit,
                             day_in_vitro,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
-                            unit_quantity_from_name_or_symbol,
-                            name_from_unit, units_convertible,
+                            unitQuantityFromNameOrSymbol,
+                            nameFromUnit, unitsConvertible,
                             str2quantity, quantity2str)
 
 from core.datatypes import (TypeEnum,UnitTypes, GENOTYPES, 
@@ -2007,8 +2007,8 @@ def _(obj:neo.core.dataobject.DataObject, axisindex:int):
         raise TypeError(f"'axisindex' expected to be an int; got {type(axisindex).__name__} instead")
     
     seed = dict()
-    seed["name"] = name_from_unit(obj.times.units) if axisindex == 0 else name_from_unit(obj.units)
-    seed["key"] = name_from_unit(obj.times.units, True) if axisindex == 0 else name_from_unit(obj.units, True)
+    seed["name"] = nameFromUnit(obj.times.units) if axisindex == 0 else nameFromUnit(obj.units)
+    seed["key"] = nameFromUnit(obj.times.units, True) if axisindex == 0 else nameFromUnit(obj.units, True)
     seed["array_annotations"] = extract_array_annotations(obj)
     
     # NOTE: 2022-10-07 11:26:34
@@ -2186,8 +2186,8 @@ def _(obj, axisindex):
     elif axisindex == 3:
         ret["units"] = obj.units
         ret["dtype"] = jsonio.dtype2JSON(obj.dtype)
-        ret["name"] = name_from_unit(obj.units)
-        ret["key"] = name_from_unit(obj.units, True)
+        ret["name"] = nameFromUnit(obj.units)
+        ret["key"] = nameFromUnit(obj.units, True)
         
     else:
         raise ValueError(f"Invalid axis index {axisindex} for {type(obj).__name__} object")

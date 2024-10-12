@@ -17,7 +17,7 @@ from neo.core.basesignal import BaseSignal
 from neo.core import container
 from neo.core.dataobject import DataObject, ArrayDict
 
-from core.quantities import (units_convertible, name_from_unit)
+from core.quantities import (unitsConvertible, nameFromUnit)
 from core.strutils import is_path #, is_pathname_valid
 
 
@@ -320,7 +320,7 @@ class DataSignal(BaseSignal):
         
         if isinstance(domainargs["sampling_period"], pq.Quantity):
             #print("sampling_period", domainargs["sampling_period"])
-            if units_convertible(1/domainargs["sampling_period"], quants["domain_units"]):
+            if unitsConvertible(1/domainargs["sampling_period"], quants["domain_units"]):
                 domainargs["sampling_rate"] = domainargs["sampling_period"]
                 domainargs["sampling_period"] = 1/domainargs["sampling_period"]
         else:
@@ -334,7 +334,7 @@ class DataSignal(BaseSignal):
             
                 
         if isinstance(domainargs["sampling_rate"], pq.Quantity):
-            if units_convertible(domainargs["sampling_rate"], quants["domain_units"]):
+            if unitsConvertible(domainargs["sampling_rate"], quants["domain_units"]):
                 domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
             
         if all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_period"])) :
@@ -367,10 +367,10 @@ class DataSignal(BaseSignal):
         self._sampling_period = domainargs["sampling_period"]
 
         if not isinstance(self._domain_name_, str) or len(self._domain_name_.strip()) == 0:
-            self._domain_name_ = name_from_unit(self._origin)
+            self._domain_name_ = nameFromUnit(self._origin)
         
         if not hasattr(self, "_name_") or not isinstance(self._name_, str) or len(self._name_.strip()) == 0:
-            self._name_ = name_from_unit(self.units)
+            self._name_ = nameFromUnit(self.units)
     
     def __array_finalize__(self, obj):
         super(DataSignal, self).__array_finalize__(obj)
@@ -389,7 +389,7 @@ class DataSignal(BaseSignal):
         
         self.segment            = getattr(obj, "segment",       None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
-        self._domain_name_    = name_from_unit(self._origin)
+        self._domain_name_    = nameFromUnit(self._origin)
     
     def __reduce__(self):
         return _new_DataSignal, (self.__class__, 
@@ -689,7 +689,7 @@ class DataSignal(BaseSignal):
         """A brief description of the domain name
         """
         if self._domain_name_ is None:
-            self._domain_name_ = name_from_unit(self.domain)
+            self._domain_name_ = nameFromUnit(self.domain)
             
         return self._domain_name_
     
@@ -1339,7 +1339,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             # but we do allow rescaling
             # If this behaviour is not what you want then pass a non-quantity array as signal
             if isinstance(units, pq.Quantity):
-                if not units_convertible(quants["units"], units):
+                if not unitsConvertible(quants["units"], units):
                     raise TypeError(f"Specified units {units} are incompatible with those inferred from the signal data {quants['units']}")
                 
                 
@@ -1352,7 +1352,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                 
         else:
             if isinstance(domain_units, pq.Quantity):
-                if not units_convertible(quants["domain_units"], domain_units):
+                if not unitsConvertible(quants["domain_units"], domain_units):
                     raise TypeError(f"Specified domain units {domain_units} are incompatible with those inferred from the domain data {quants['domain_units']}")
 
         # now,, rescale signal data if supplied as quantity(ies)
@@ -1492,12 +1492,12 @@ class IrregularlySampledDataSignal(BaseSignal):
                             **annots["annotations"])
 
         
-        self._domain_name_ = name_from_unit(self._domain)
+        self._domain_name_ = nameFromUnit(self._domain)
         
         if isinstance(name, str):
             self._name_ = name
         else:
-            self._name_ = name_from_unit(self.units)
+            self._name_ = nameFromUnit(self.units)
     
     def __reduce__(self):
         return _new_IrregularlySampledDataSignal, (self.__class__,
@@ -1528,7 +1528,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         #self.channel_index      = getattr(obj, "channel_index", None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
         if isinstance(self._domain, pq.Quantity):
-            self._domain_name_    = name_from_unit(self._domain)
+            self._domain_name_    = nameFromUnit(self._domain)
         else:
             self._domain_name_    = "Dimensionless"
         
@@ -1666,7 +1666,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             
         elif isinstance(other, pq.Quantity):
             if other.size == 1:
-                if not units_convertible(other.units, self.units):
+                if not unitsConvertible(other.units, self.units):
                     ret = np.full_like(self, False)
                 else:
                     ret = self.magnitude == (other.rescale(self.units)).magnitude
@@ -1680,7 +1680,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                 if other.shape != self.shape:
                     return False
                 
-                if not units_convertible(other.units, self.units):
+                if not unitsConvertible(other.units, self.units):
                     ret = np.full_like(self, False)
                 else:
                     ret = self.magnitude == (other.rescale(self.units)).magnitude1
@@ -1920,7 +1920,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         """A brief description of the domain name
         """
         if self._domain_name_ is None:
-            self._domain_name_ = name_from_unit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
+            self._domain_name_ = nameFromUnit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
             
         return self._domain_name_
     
@@ -1948,7 +1948,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                 raise ValueError("new domain has incompatible length (%d); expecting %d" % (len(value), len(self)))
             
             if isinstance(value, pq.Quantity):
-                if not units_convertible(value, self.domain.units):
+                if not unitsConvertible(value, self.domain.units):
                     raise TypeError("incompatible units (%s) for new domain; expecting %s" % (value.units.dimensionality, self.domain.units.dimensionality))
                 
                 if value.units != self.domain.units:

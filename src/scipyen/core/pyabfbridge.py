@@ -771,7 +771,7 @@ class ABFEpoch:
     @firstLevel.setter
     def firstLevel(self, val:typing.Optional[pq.Quantity] = None):
         if isinstance(val, pq.Quantity):
-            assert (scq.check_electrical_current_units(val) or scq.check_electrical_potential_units(val)), f"Expecting a quantity in A or V; instead, got {val}"
+            assert (scq.checkElectricalCurrentUnits(val) or scq.checkElectricalPotentialUnits(val)), f"Expecting a quantity in A or V; instead, got {val}"
             
         else:
             self._levelDelta_ = None
@@ -785,11 +785,11 @@ class ABFEpoch:
     @deltaLevel.setter
     def deltaLevel(self, val:typing.Optional[pq.Quantity]= None):
         if isinstance(val, pq.Quantity):
-            assert (scq.check_electrical_current_units(val) or scq.check_electrical_potential_units(val)), f"Expecting a quantity in A or V; instead, got {val}"
+            assert (scq.checkElectricalCurrentUnits(val) or scq.checkElectricalPotentialUnits(val)), f"Expecting a quantity in A or V; instead, got {val}"
             if self.firstLevel is None:
                 raise RuntimeError("'firstLevel' property must be set before 'deltaLevel'")
             else:
-                assert scq.units_convertible(self._level_, val), f"Value units ({val.units}) are incompaibl with firstLevel units ({self._level_.units})"
+                assert scq.unitsConvertible(self._level_, val), f"Value units ({val.units}) are incompaibl with firstLevel units ({self._level_.units})"
         
         self._levelDelta_ = val
         
@@ -799,7 +799,7 @@ class ABFEpoch:
     
     @firstDuration.setter
     def firstDuration(self, val:pq.Quantity):
-        assert isinstance(val, pq.Quantity) and scq.check_time_units(val), f"{val} is not a time quantity"
+        assert isinstance(val, pq.Quantity) and scq.checkTimeUnits(val), f"{val} is not a time quantity"
         self._duration_ = val
         
     @property
@@ -808,7 +808,7 @@ class ABFEpoch:
     
     @deltaDuration.setter
     def deltaDuration(self, val):
-        assert isinstance(val, pq.Quantity) and scq.check_time_units(val), f"{val} is not a time quantity"
+        assert isinstance(val, pq.Quantity) and scq.checkTimeUnits(val), f"{val} is not a time quantity"
         self._durationDelta_ = val
     
     @property
@@ -817,7 +817,7 @@ class ABFEpoch:
     
     @pulsePeriod.setter
     def pulsePeriod(self, val):
-        assert isinstance(val, pq.Quantity) and scq.check_time_units(val), f"{val} is not a time quantity"
+        assert isinstance(val, pq.Quantity) and scq.checkTimeUnits(val), f"{val} is not a time quantity"
         self._pulsePeriod_ = val
         
     @property
@@ -832,7 +832,7 @@ class ABFEpoch:
     
     @pulseWidth.setter
     def pulseWidth(self, val):
-        assert isinstance(val, pq.Quantity) and scq.check_time_units(val), f"{val} is not a time quantity"
+        assert isinstance(val, pq.Quantity) and scq.checkTimeUnits(val), f"{val} is not a time quantity"
         self._pulseWidth_ = val
         
     @property
@@ -2139,15 +2139,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if adc is None:
             raise ValueError(f"{'Physical' if physicalADC else 'Logical'} ADC index {adcIndex} is invalid for this protocol")
 
-        recordsCurrent = scq.check_electrical_current_units(adc.units)
-        recordsPotential = scq.check_electrical_potential_units(adc.units)
+        recordsCurrent = scq.checkElectricalCurrentUnits(adc.units)
+        recordsPotential = scq.checkElectricalPotentialUnits(adc.units)
 
         if not isinstance(dac, ABFOutputConfiguration):
             dac = self.getDAC(dac, physicalDAC) # get active DAC by default
 
-        commandIsCurrent = scq.check_electrical_current_units(dac.units)
+        commandIsCurrent = scq.checkElectricalCurrentUnits(dac.units)
 
-        commandIsPotential = scq.check_electrical_potential_units(dac.units)
+        commandIsPotential = scq.checkElectricalPotentialUnits(dac.units)
 
         if recordsPotential and commandIsCurrent:
             return self.ClampMode.CurrentClamp
@@ -2631,7 +2631,7 @@ class ABFInputConfiguration:
                 raise NotImplementedError(f"ABF version {abfVer} is not supported")
 
             self._adcName_ = adcName
-            self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
+            self._adcUnits_ = scq.unitQuantityFromNameOrSymbol(adcUnits)
 
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
@@ -2659,7 +2659,7 @@ class ABFInputConfiguration:
                     adcUnits = info_dict["listADCInfo"][adcChannel]["ADCChUnits"].decode()
                     
             self._adcName_ = adcName
-            self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(adcUnits)
+            self._adcUnits_ = scq.unitQuantityFromNameOrSymbol(adcUnits)
 
         else:
             if isinstance(physicalIndex, int):
@@ -2684,7 +2684,7 @@ class ABFInputConfiguration:
             self._adcName_ = adcName
             
             if isinstance(units, str) and len(units.strip()):
-                self._adcUnits_ = scq.unit_quantity_from_name_or_symbol(units)
+                self._adcUnits_ = scq.unitQuantityFromNameOrSymbol(units)
                 
             elif isinstance(units, pq.Quantity):
                 self._adcUnits_ = units
@@ -3009,7 +3009,7 @@ class ABFOutputConfiguration:
                         dacUnits = ""
                 
                 self._dacName_ = dacName 
-                self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
+                self._dacUnits_ = scq.unitQuantityFromNameOrSymbol(dacUnits)
                 self._dacHoldingLevel_ = float(obj._dacSection.fDACHoldingLevel[self._dacChannel_]) * self._dacUnits_
                 self._interEpisodeLevel_ = bool(obj._dacSection.nInterEpisodeLevel[self._dacChannel_])
                 
@@ -3063,7 +3063,7 @@ class ABFOutputConfiguration:
                     dacUnits = ""
                     
             self._dacName_ = dacName
-            self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(dacUnits)
+            self._dacUnits_ = scq.unitQuantityFromNameOrSymbol(dacUnits)
 
             self._dacHoldingLevel_ = float(info_dict["listDACInfo"][self._dacChannel_]["fDACHoldingLevel"]) * self._dacUnits_
             self._interEpisodeLevel_ = bool(info_dict["listDACInfo"][self._dacChannel_]["nInterEpisodeLevel"])
@@ -3114,13 +3114,13 @@ class ABFOutputConfiguration:
                 self._dacUnits_ = units
                 
             elif isintance(units, str):
-                self._dacUnits_ = scq.unit_quantity_from_name_or_symbol(units)
+                self._dacUnits_ = scq.unitQuantityFromNameOrSymbol(units)
                 
             else:
                 self._dacUnits_ = pq.dimensionless
 
             if isinstance(dacHoldingLevel, pq.Quantity):
-                if not scq.units_convertible(dacHoldingLevel, self._dacUnits_):
+                if not scq.unitsConvertible(dacHoldingLevel, self._dacUnits_):
                     raise TypeError(f"'dacHoldingLevel' has wrong units ({dacHoldingLevel.units}) for a DAC output in {self._dacUnits_}")
                 dacHoldingLevel = dacHoldingLevel.rescale(self._dacUnits_)
                 
@@ -4794,7 +4794,7 @@ class ABFOutputConfiguration:
     
     @dacHoldingLevel.setter
     def dacHoldingLevel(self, val: pq.Quantity):
-        if not scq.units_convertible(self.units, val.units):
+        if not scq.unitsConvertible(self.units, val.units):
             raise TypeError(f"Argument units {val.units} are incompatible with this channel units ({self.units})")
         
         self._dacHoldingLevel_ = val.rescale(self.units)
@@ -4978,7 +4978,7 @@ def __wrap_to_quantity__(x:typing.Union[list, tuple], convert:bool=True):
     return (x[0], unitStrAsQuantity(x[1])) if convert else x
 
 def unitStrAsQuantity(x:str, convert:bool=True):
-    return scq.unit_quantity_from_name_or_symbol(x) if convert else x
+    return scq.unitQuantityFromNameOrSymbol(x) if convert else x
 
 def sourcedFromABF(x:neo.Block) -> bool:
     return x.annotations.get("software", None) == "Axon"
@@ -5511,8 +5511,8 @@ def _(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None) -> pd.
             else:
                 dacName = dacUnits = None
                 
-            dacLevel = epoch.level*scq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.level
-            dacLevelDelta = epoch.levelDelta*scq.unit_quantity_from_name_or_symbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.levelDelta
+            dacLevel = epoch.level*scq.unitQuantityFromNameOrSymbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.level
+            dacLevelDelta = epoch.levelDelta*scq.unitQuantityFromNameOrSymbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.levelDelta
 
             epValues = np.array([epoch.epochTypeStr,    # str description of epoch type (as per Clampex e.g Step, Pulse, etc)                            
                               dacLevel,                 # "first" DAC level -> quantity; CAUTION units depen on Clampex and whether its telegraphs were OK
@@ -5677,10 +5677,10 @@ def _(abf: pyabf.ABF,
     # inputs from the amplifier
     
     def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
-        x_units = scq.unit_quantity_from_name_or_symbol(abf.sweepUnitsX)
+        x_units = scq.unitQuantityFromNameOrSymbol(abf.sweepUnitsX)
         x = abf.sweepX
         y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
-        y_units = scq.unit_quantity_from_name_or_symbol(y_units_str) if isinstance(y_units_str, str) else pq.dimensionless
+        y_units = scq.unitQuantityFromNameOrSymbol(y_units_str) if isinstance(y_units_str, str) else pq.dimensionless
         abfChannel = abf.sweepChannel # the current channel in the ABF, set when calling abf.setSweep(…)
         
         # NOTE: 2023-08-28 15:09:15
@@ -5848,10 +5848,10 @@ def _(data:neo.Block,
       absoluteTime:bool=False) -> dict:
 
     def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
-        x_units = scq.unit_quantity_from_name_or_symbol(abf.sweepUnitsX)
+        x_units = scq.unitQuantityFromNameOrSymbol(abf.sweepUnitsX)
         x = abf.sweepX
         y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
-        y_units = scq.unit_quantity_from_name_or_symbol(y_units_str)
+        y_units = scq.unitQuantityFromNameOrSymbol(y_units_str)
         y = abf.sweepC # the command waveform for this sweep
         # y_label = abf.sweepLabelC
         sampling_rate = abf.sampleRate * pq.Hz
