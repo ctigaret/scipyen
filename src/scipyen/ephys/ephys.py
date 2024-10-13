@@ -1476,12 +1476,13 @@ class RecordingEpisode(Episode):
         ret.append(f"\tbegin={self.begin}, end={self.end}")
         ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
             
-        if len(self._pathways_) == 0:
-            ret.append(f"\tPathways: []")
-        else:
-            ret.append(f"\tPathways:")
-            for p in self.pathways:
-                ret.append(f"\t{p}")
+        # pathways = self.pathways
+        # if len(pathways) == 0:
+        #     ret.append(f"\tPathways: []")
+        # else:
+        #     ret.append(f"\tPathways:")
+        #     for p in pathways:
+        #         ret.append(f"\t{p}")
 
         ret.append(f"\tPathway Stimulation by Sweep: {self.pathActivationBySweep}")
         
@@ -1518,13 +1519,13 @@ class RecordingEpisode(Episode):
             p.breakable()
             
             # if isinstance(self._pathways_, (tuple, list)) and len(self._pathways_):
-            if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
-                # with p.group(4, "(",")"):
-                with p.group(4, "",""):
-                    for pth in self.pathways:
-                        p.text(pth.name)
-                        p.breakable()
-                    p.text("\n")
+            # if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
+            #     # with p.group(4, "(",")"):
+            #     with p.group(4, "",""):
+            #         for pth in self.pathways:
+            #             p.text(pth.name)
+            #             p.breakable()
+            #         p.text("\n")
                 
             # if isinstance(self.pathActivationBySweep, (tuple, list)) and len(self.pathActivationBySweep):
             if isinstance(self.pathActivationBySweep, dict) and len(self.pathActivationBySweep):
@@ -1920,6 +1921,85 @@ class RecordingSchedule(Schedule):
             
         return "\n".join(ret)
         
+    def __add__(self, other):
+        if isinstance(other, self.__class__):
+            newepisodes = self.episodes.__add__(other.episodes)
+            return self.__class__(name=self.name, episodes = newepisodes)
+            
+        elif isinstance(other, typing.Sequence):
+            if len(other) and not all(isinstance(e, RecordingEpisode)):
+                raise TypeError("Can only add a sequence of RecordingEpisodes")
+            newepisodes = self.episodes.__add__(other)
+            return self.__class__(name=self.name, episodes = newepisodes)
+        
+        else:
+            raise TypeError(f"Invalid argument type ({type(other).__name__})")
+            
+    def __iadd__(self, other):
+        if isinstance(other, self.__class__):
+            self.episodes.__iadd__(other.episodes)
+            return self
+            
+        elif isinstance(other, typing.Sequence):
+            if len(other) and not all(isinstance(e, RecordingEpisode)):
+                raise TypeError("Can only add a sequence of RecordingEpisodes")
+            self.episodes.__iadd__(other)
+            return self
+        
+        else:
+            raise TypeError(f"Invalid argument type ({type(other).__name__})")
+
+    def append(self, value:RecordingEpisode):
+        if not isinstance(value, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+        
+        self.episodes.append(value)
+        
+    def insert(self, index:int, value:RecordingEpisode):
+        if not isinstance(value, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+
+        self.episodes.insert(index, value)
+        
+    def remove(self, value:RecordingEpisode):
+        if not isinstance(value, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+        
+        self.episodes.remove(value)
+
+    def extend(self, value):
+        if isinstance(value, self.__class__):
+            self.episodes.append(value.episodes)
+            
+        elif isinstance(value, typing.Sequence):
+            if len(value):
+                if all(isinstance(v, RecordingEpisode) for v in value):
+                    self.episodes.append(value)
+                else:
+                    raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+                    
+        else:
+            raise TypeError(f"Can only append a RecordingSchedule or a sequence of RecordingEpisodes")
+        
+    def index(self, episode:RecordingEpisode):
+        if not isinstance(episode, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+        if episode not in self.episodes:
+            raise ValueError("Episode is not contained in this RecordingSchedule")
+        
+        ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
+        
+        return ndx[0]
+
+    def count(self, episode:RecordingEpisode):
+        if not isinstance(episode, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+        
+        if episode not in self.episodes:
+            return 0
+        
+        return len(e for e in self.episodes if e == episode)
+    
     @property
     def nFrames(self) -> int:
         return sum([e.nFrames for e in self.episodes])
@@ -1937,18 +2017,6 @@ class RecordingSchedule(Schedule):
             
         return ret
         
-    def addEpisode(self, episode: RecordingEpisode):
-        if not isinstance(episode, RecordingEpisode):
-            raise TypeError(f"Expecting a RecordingEpisode; instead, got {type(episode).__name__}")
-        super().addEpisode(episode)
-        
-    def addEpisodes(self, episodes:typing.Sequence[RecordingEpisode]):
-        if len(episodes):
-            if not all(isinstance(e, RecordingEpisode) for e in episodes):
-                raise TypeError("Expecting a sequence of Recording Episode objects")
-            
-            super().addEpisodes(episodes)
-            
     def updateEpisodeFrames(self):
         currentFrame = 0
         for k, episode in enumerate(self.episodes):

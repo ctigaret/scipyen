@@ -1458,6 +1458,268 @@ class Schedule:
     
     def __len__(self)->int:
         return len(self.episodes)
+    
+    def __getitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque, str]):
+        if isinstance(key, int):
+            if key >= len(self.episodes) or key < -1 * len(self.episodes):
+                raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
+            return self.episodes[key]
+        
+        elif isinstance(key, str):
+            if len(self.episodes) == 0:
+                raise KeyError(f"Episode named {key} not found")
+            
+            ret = list(filter(lambda x:x.name == key, self.episodes))
+            
+            if len(ret) == 0:
+                raise KeyError(f"Episode named {key} not found")
+            elif len(ret) > 1:
+                scipywarn(f"Duplicate episode name ({key}) found")
+                
+            return ret
+        
+        elif isinstance(key, slice):
+            return self.episodes[key]
+        
+        elif isinstance(key, range):
+            if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
+                raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+            
+            return [self.episodes[k] for k in key]
+        
+        elif isinstance(key, (tuple, list, collections.deque)):
+            if len(key) == 0:
+                return list()
+            elif all(isinstance(k, int) for k in key):
+                if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
+                    raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+                return [self.episodes[k] for k in key]
+            
+            else:
+                raise KeyError("All indices must be int")
+            
+        else:
+            raise TypeError(f"Invalid indexing key type {type(key).__name__}")
+        
+    def __setitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque], 
+                    value:typing.Union[Episode, typing.Iterable[Episode]]):
+        if isinstance(key, int):
+            if key >= len(self.episodes) or key < -1 * len(self.episodes):
+                raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
+            if not isinstance(value, Episode):
+                raise TypeError(f"Expecting an Episode; instead, got {type(value).__name__}")
+            
+            self.episodes[key] = value
+        
+        elif isinstance(key, slice):
+            if not isinstance(value, typing.Iterable):
+                raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
+            if not all(isinstance(v, Episode) for v in value):
+                raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+            l_indices = len(range(*key.indices(len(self.episodes))))
+            if l_indices < len(value):
+                raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
+            if l_indices > len(value):
+                raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
+            
+            self.episodes[key] = value
+        
+        elif isinstance(key, range):
+            if not isinstance(value, typing.Iterable):
+                raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
+            if not all(isinstance(v, Episode) for v in value):
+                raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+            if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
+                raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+            if len(key) < len(value):
+                raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
+            if len(key) > len(value):
+                raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
+            
+            for k in key:
+                self.episodes[k] = value[k]
+            
+        elif isinstance(key, (tuple, list, collections.deque)):
+            if len(key) == 0:
+                return
+            elif all(isinstance(k, int) for k in key):
+                if not isinstance(value, typing.Iterable):
+                    raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
+                if not all(isinstance(v, Episode) for v in value):
+                    raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+                if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
+                    raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+                if len(values) > len(key):
+                    raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
+                if len(values) < len(key):
+                    raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
+                
+                for k in key:
+                    self.episodes[k] = value[k]
+            else:
+                raise KeyError("All indices must be int")
+            
+        else:
+            raise TypeError(f"Invalid indexing key type {type(key).__name__}")
+        
+    def __delitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque, str]):
+        if isinstance(key, int):
+            if key >= len(self.episodes) or key < -1 * len(self.episodes):
+                raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
+            
+            del self.episodes[key]
+            
+        elif isinstance(key, str):
+            if len(self.episodes) == 0:
+                raise KeyError(f"Episode named {key} not found")
+            
+            ret = list(filter(lambda x:x.name == key, self.episodes))
+            
+            if len(ret) == 0:
+                raise KeyError(f"Episode named {key} not found")
+            
+            elif len(ret) > 1:
+                scipywarn(f"Duplicate episode name ({key}) found")
+                
+            keep  = [e for e in self.episodes if e.name != key]
+
+            self.episodes[:] = keep
+        
+        elif isinstance(key, slice):
+             del self.episodes[key]
+        
+        elif isinstance(key, range):
+            if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
+                raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+            
+            keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
+            self.episodes[:] = keep
+            
+        elif isinstance(key, (tuple, list, collections.deque)):
+            if len(key) == 0:
+                return
+            
+            elif all(isinstance(k, int) for k in key):
+                if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
+                    raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+                
+                keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
+                self.episodes[:] = keep
+            
+            # elif all(isinstance(k, str) for k in key):
+            #     keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
+            #     self.episodes[:] = keep
+            
+            else:
+                raise KeyError("All indices must be int or str")
+            
+        else:
+            raise TypeError(f"Invalid indexing key type {type(key).__name__}")
+        
+    def __iter__(self):
+        return self.episodes.__iter__()
+    
+    def __reversed__(self):
+        return self.episodes.__reversed__()
+    
+    def __add__(self, other):
+        if isinstance(other, self.__class__):
+            newepisodes = self.episodes.__add__(other.episodes)
+            return self.__class__(name=self.name, episodes = newepisodes)
+            
+        elif isinstance(other, typing.Sequence):
+            if len(other) and not all(isinstance(e, Episode)):
+                raise TypeError("Can only add a sequence of Episodes")
+            newepisodes = self.episodes.__add__(other)
+            return self.__class__(name=self.name, episodes = newepisodes)
+        
+        else:
+            raise TypeError(f"Invalid argument type ({type(other).__name__})")
+            
+    def __iadd__(self, other):
+        if isinstance(other, self.__class__):
+            self.episodes.__iadd__(other.episodes)
+            return self
+            
+        elif isinstance(other, typing.Sequence):
+            if len(other) and not all(isinstance(e, Episode)):
+                raise TypeError("Can only add a sequence of Episodes")
+            self.episodes.__iadd__(other)
+            return self
+        
+        else:
+            raise TypeError(f"Invalid argument type ({type(other).__name__})")
+        
+    def __mul__(self, value:int):
+        return self.__class__(name=self.name, episodes = self.episodes.__mul__(value))
+            
+    def __imul__(self, value:int):
+        self.episodes.__imul__(value)
+        return self
+    
+    def __contains__(self, value:Episode):
+        return value in self.episodes
+    
+    def append(self, value:Episode):
+        if not isinstance(value, Episode):
+            raise TypeError("A Schedule can only contain Episodes")
+        
+        self.episodes.append(value)
+        
+    def insert(self, index:int, value:Episode):
+        if not isinstance(value, Episode):
+            raise TypeError("A Schedule can only contain Episodes")
+
+        self.episodes.insert(index, value)
+        
+    def pop(self, index:int=-1) -> Episode:
+        return self.episodes.pop(index)
+    
+    def remove(self, value:Episode):
+        if not isinstance(value, Episode):
+            raise TypeError("A Schedule can only contain Episodes")
+        
+        self.episodes.remove(value)
+        
+    def reverse(self):
+        self.episodes.reverse()
+        
+    def sort(self, *args, **kwargs):
+        self.episodes.sort(*argsm **kwargs)
+    
+    def extend(self, value):
+        if isinstance(value, self.__class__):
+            self.episodes.append(value.episodes)
+            
+        elif isinstance(value, typing.Sequence):
+            if len(value):
+                if all(isinstance(v, Episode) for v in value):
+                    self.episodes.append(value)
+                else:
+                    raise TypeError("A Schedule can only contain Episodes")
+                    
+        else:
+            raise TypeError(f"Can only append a Schedule or a sequence of Episodes")
+        
+    def index(self, episode:Episode):
+        if not isinstance(episode, Episode):
+            raise TypeError("A Schedule can only contain Episodes")
+        if episode not in self.episodes:
+            raise ValueError("Episode is not contained in this Schedule")
+        
+        ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
+        
+        return ndx[0]
+
+    def count(self, episode:Episode):
+        if not isinstance(episode, Episode):
+            raise TypeError("A Schedule can only contain Episodes")
+        
+        if episode not in self.episodes:
+            return 0
+        
+        return len(e for e in self.episodes if e == episode)
+    
         
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -1503,26 +1765,29 @@ class Schedule:
         return cls(name, episodes=episodes)
     
     @singledispatchmethod
-    def episode(self, ndx):
-        pass
+    def episode(self, ndx) -> Episode:
+        raise NotImplementedError(f"Wrong index type: {type(ndx).__name__}")
     
     @episode.register(int)
-    def _(self, ndx:int):
-        if ndx < 0 or ndx >= len(self.episodes):
+    def _(self, ndx:int) -> Episode:
+        if ndx >= len(self.episodes) or ndx < -1 * len(self.episodes):
             raise IndexError(f"Invalid episode index {ndx} for {len(self.episodes)}")
         
         return self.episodes[ndx]
     
     @episode.register(str)
-    def _(self, name:str):
+    def _(self, name:str) -> Episode:
         episodes = [e for e in self.episodes if e.name == name]
         if len(episodes):
             return episodes[0]
         else:
             raise IndexError(f"Episode name {name} does not exist")
         
-    def episodeNames(self):
+    def episodeNames(self) -> list[str]:
         return [e.name for e in self.episodes]
+    
+    def epsodeIndex(self, name:str) -> int:
+        return self.episodeNames.index(name)
     
     def addEpisode(self, episode:Episode):
         if episode not in self.episodes:
