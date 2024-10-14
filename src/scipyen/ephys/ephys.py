@@ -674,9 +674,7 @@ def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optiona
 class __BaseSource__(typing.NamedTuple):
     name: str = "cell"
     adc: int = 0
-    # adc: typing.Union[int, str] = 0
     dac: typing.Optional[int] = None
-    # dac: typing.Optional[typing.Union[int, str]] = None
     syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
     auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
     auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
@@ -770,8 +768,6 @@ class RecordingSource(__BaseSource__):
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
-        
-        
         from iolib import h5io
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
@@ -826,7 +822,8 @@ class RecordingSource(__BaseSource__):
         auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
         auxout = h5io.fromHDF5(entity["auxout"], cache=cache)
         
-        return cls(name=name, adc=adc, dac=dac, syn=syn, auxin=auxin, auxout=auxout)
+        return cls(name=name, adc=adc, dac=dac, syn=syn, 
+                   auxin=auxin, auxout=auxout)
         
     @property
     def clamped(self) -> bool:
@@ -867,8 +864,8 @@ class RecordingSource(__BaseSource__):
     @property
     def syn_dac(self) -> tuple:
         """Tuple of DAC channels used for synaptic stimulation; may be empty.
-        These channels emit TTLs (emulated as pulses or steps in ± 5 V range and 
-        embedded in analog signals) to drive devices that elicit synaptic activity,
+        These channels emulate TTLs by emitting analog waveforms as pulses or steps 
+        in ± 5 V range, to drive devices that elicit synaptic activity
         such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
         for optogenetic stimulation.
         """
@@ -881,7 +878,7 @@ class RecordingSource(__BaseSource__):
         return tuple()
     
     @property
-    def pathways(self):
+    def pathways(self) -> tuple:
         """Factory for SynapticPathway objects based on the `syn` field.
         The SynapticPathway fields `pathwayType`, `schedule` and `measurement` 
         will have their default values.
@@ -891,24 +888,20 @@ class RecordingSource(__BaseSource__):
     
         """
         if isinstance(self.syn, SynapticStimulus):
-            return SynapticPathway(source = self, stimulus = self.syn,
+            return (SynapticPathway(source = self, stimulus = self.syn,
                                    name = self.syn.name,
-                                   # name = "_".join([self.name, self.syn.name]),
-                                   # name = " ".join([self.name, self.syn.name]),
-                                   )
+                                   ), )
             
         if isinstance(self.syn, (tuple, list)):
             if len(self.syn) == 1:
-                return SynapticPathway(source=self, stimulus = self.syn[0],
+                return tuple(SynapticPathway(source=self, stimulus = self.syn[0],
                                        name = self.syn[0].name,
-                                       # name = "_".join([self.name, self.syn[0].name]),
-                                       # name = " ".join([self.name, self.syn[0].name]),
-                                       )
+                                       ))
             elif len(self.syn) > 1:
                 return tuple(SynapticPathway(source=self, stimulus = s,
                                              name = s.name) for s in self.syn)
-                                             # name = "_".join([self.name, s.name])) for s in self.syn)
-                                             # name = " ".join([self.name, s.name])) for s in self.syn)
+            
+        return tuple()
         
     @property
     def in_daq_cmd(self) -> tuple:
@@ -1054,6 +1047,188 @@ class RecordingSource(__BaseSource__):
         
         return tuple()
     
+    def getPathwaysByStimulation(self, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+        """Classifies the pathways in this `src` according to the means of activation.
+        
+        A synaptic pathway is activated by stimulating its synaptic inputs¹ using a
+        physical "stimulus": e.g., electric pulse delivered to axons through electrodes, 
+        light pulses delivered from a light source, mechanical stimulus (piezo device).
+        
+        To control, the timing and, sometimes, the duration of the stimulus, the device
+        that emits the stimulus is controlled va a TTL² electric signal delivered 
+        using a DAQ board, in one of two ways:
+        • via a digital output channel ("DIG") - the most common way by far
+        • as an analog waveform that emulates a TTL, via a digital to analog output
+            channel (DAC) - typically used when no digital channels are available
+            in the hardware.
+        
+        This function simply groups the SynapticPathway objects in the RecordingSource
+        'src' according to whether the pathways use a digital (DIGPathways) or 
+        analog-to-digital channel (DACPathways).
+        
+        Parameters:
+        -----------
+        asDict:bool, optional default is False
+        
+        Returns:
+        --------
+        If `asDict` is False (default) return a pair of tuples, each containing
+        a poibly empty sequence of SynapticPathway objects: 
+            • the first element contain pathways where the stimulus is delivered 
+                via a DAC using TTL emulation
+            • the second element contains pathways where stimulus is delivered 
+                via a DIG channel
+        
+        If `asDict` is True, returns a dict with the keys "DACPathways", 
+            "DIGPathways" mapped to the sequences described above.
+        
+        
+        ¹ Neurotransmitter photo-uncaging is included here as method of activating
+        synaptic inputs although technically it only emulates presynaptic neurotransmitter
+        release.
+        
+        ² transistor-transistor-logic; this is typically a DC voltage pulse of 5 V
+        amplitude (of either polarity) which "triggers" circuits in the controlled 
+        device (stimulus isolator, light shutter, piezo device, etc).  The controlled
+        device can usually be configured to "react" to the rising or falling phase 
+        of the pulse, or to one of the two voltage levels of the pulse.
+        
+
+        """
+        import more_itertools
+        pathways = self.pathways
+        if len(pathways) == 0:
+            if asDict:
+                return {"DACStimPathways": tuple(), "DIGStimPathways": tuple()}
+            return tuple(), tuple()
+        dac_stim, dig_stim = tuple(tuple(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways))
+        if asDict:
+            return {"DACStimPathways": dac_stim, "DIGStimPathways": dig_stim}
+        return dac_stim, dig_stim
+        
+    def pathwaysInProtocol(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+        """Returns the usage of this RecordingSource pathways in the protocol.
+    
+        To discern which pathways are acutally used in the specified protocol, 
+        this method check that the DAC and DIG channels declared in the pathway
+        definition are actually employed by the protocol.
+        
+        The methods returns the pathways classified according to their means of
+        stimulation
+        
+        """
+        dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulation()
+        adc = protocol.getADC(self.adc)
+        dac = protocol.getDAC(self.dac)
+        activeDAC  = protocol.getDAC()
+        # digOutDacs = protocol.digitalOutputDACs
+        mainDIGOut = protocol.digitalOutputs(alternate=False)
+        altDIGOut  = protocol.digitalOutputs(alternate=True)
+        protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC))
+        protocol_dig_stim_pathways = tuple(p for p in dig_stim_pathways if p.stimulus.channel in mainDIGOut or altDIGOut)
+        
+        if asDict:
+            return {"DACStimPathways": protocol_dac_stim_pathways, "DIGStimPathways": protocol_dig_stim_pathways}
+        return protocol_dac_stim_pathways, protocol_dig_stim_pathways
+    
+    def getPathwayActivtionbBySweep(self, protocol:ElectrophysiologyProtocol) -> dict:
+        """Distribution of pathway activation by sweep, given a protocol"""
+        protocol_dac_stim_pathways, protocol_dig_stim_pathways = self.pathwaysInProtocol(protocol)
+        if all(len(x) == 0 for x in (protocol_dac_stim_pathways, protocol_dig_stim_pathways)):
+            return dict()
+        
+        uniquePathways = unique(protocol_dac_stim_pathways + protocol_dig_stim_pathways, idcheck=True)
+        
+        return getPathwayBySweepActivation(protocol, uniquePathways)
+    
+#     def mainAltPathways(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> tuple:
+#         """Classifies the pathways used in `protocol` according to their main status.
+#         
+#         This applies to recording from two pathways in interleaved sweeps.
+#         
+#         A "Main" pathway is the one where the primary recording is performed.
+#         An "Alternate" pathway - when present - is recorded in alternative
+#         sweeps, such that the "Main" pathway is recorded on even-indexed sweeps
+#         (i.e., sweeps 0, 2, 4, …) whereas the "Alternate" is recorded in 
+#         odd-indexed sweeps (i.e., sweeep 1, 3, 5, …)
+#     
+#         NOTE: Clampex (and possibly, CED) support alternative (i.e. interleaved) recording from up to two pathways,
+#         alternatively stimulated across sweeps.
+#         """
+#         
+#         dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulation()
+#         adc = protocol.getADC(self.adc)
+#         dac = protocol.getDAC(self.dac)
+#         activeDAC  = protocol.getDAC()
+#         digOutDacs = protocol.digitalOutputDACs
+#         mainDIGOut = protocol.digitalOutputs(alternate=False)
+#         altDIGOut  = protocol.digitalOutputs(alternate=True)
+#         protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC))
+#         protocol_dig_stim_pathways = tuple(p for p in dig_stim_pathways if p.stimulus.channel in mainDIGOut or altDIGOut)
+#         
+#         mainPathways = tuple()
+#         altPathways = tuple()
+#         nSrcStimPathways = len(protocol_dac_stim_pathways) + len(protocol_dig_stim_pathways)
+#         
+#         if nSrcStimPathways == 0:
+#             scipywarn(f"Protocol {protocol.name} does not seem to monitor any of the pathways declared in source {self.name}")
+#         
+#         elif nSrcStimPathways == 1:
+#             # When there is a single pathway simulated in the protocol, this 
+#             # is by definition the 'main' pathway.
+#             #
+#             mainPathways = protocol_dig_stim_pathways if len(protocol_dig_stim_pathways) else protocol_dac_stim_pathways
+#         
+#         elif nSrcStimPathways == 2:
+#             if len(protocol_dac_stim_pathways) == 0:
+#                 # both main and alternative stimulated pathways are stimulated
+#                 # via DIG channels
+#                 
+#                 # 'mainOnly': DIG channel indexes used in the 'main' but NOT the
+#                 # 'alternative' pattern; 
+#                 # will be an empty set when mainDIGOut is empty, or when
+#                 # mainDIGOut == altDIGOut
+#                 # 
+#                 mainOnly = mainDIGOut - altDIGOut
+#                 
+#                 # 'altOnly': DIG channel indexes used in the 'alternative' but NOT
+#                 # 'main' pattern; 
+#                 # will be an empty set when altDIGOut is empty, or when
+#                 # mainDIGOut == altDIGOut
+#                 #
+#                 altOnly  = altDIGOut - mainDIGOut
+# 
+#                 if len(mainDIGOut) > 0:
+#                     if len(mainOnly) == 0: # same channels in both mainDIGOut and altDIGOut
+#                         mainPathways = protocol_dig_stim_pathways
+#                     else:
+#                         mainPathways = tuple(x for x in protocol_dig_stim_pathways if x.stimulus.channel in mainOnly)
+#                     
+#                 if len(altDIGOut) > 0:
+#                     # there are pathways alternatively stimulated
+#                     if len(altOnly) == 0:
+#                         altPathways = protocol_dig_stim_pathways
+#                     else:
+#                         altPathways = tuple(x for x in protocol_dig_stim_pathways if x.stimulus.channel in altOnly)
+#                     
+#             elif len(protocol_dac_stim_pathways) == 1:
+#                 # one stim pathway (main) is DIG, the other (alternative) is DAC
+#                 # because here, nSrcStimPathways == 2
+#                 if not protocol.alternateDACOutputStateEnabled:
+#                     scipywarn(f"Tracking mode: Alternate DAC outputs are disabled in protocol {protocol.name} yet source {self.name} declares pathway {dac_stim_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
+#                 else:                        
+#                     mainPathways, altPathways = protocol_dig_stim_pathways, protocol_dac_stim_pathways
+#                     
+#             else: # enforce one dac and one dig pathway paradigm
+#                 scipywarn(f"Tracking mode: In protocol {protocol.name}, for source {self.name}: at most one pathway should be declared as simulated via DAC-emulated TTLs")
+#                     
+#         else: # nSrcStimPathways > 2
+#             # NOTE: 2024-03-09 22:54:05
+#             # I think this is technically impossible in Clampex
+#             scipywarn(f"Protocol {protocol.name} seems to be stimulating more than two pathways; This is not currently supported.")
+#             
+#         return mainPathways, altPathways
+#     
     @classmethod
     def __new__(cls, *args, **kwargs):
         super_anns = super().__annotations__
@@ -1108,7 +1283,6 @@ RecordingSource.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus o
 RecordingSource.auxin.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
 RecordingSource.auxout.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
 
-
 class ClampMode(TypeEnum):
     NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
                         # but OK with other ElectrodeMode
@@ -1146,11 +1320,6 @@ class RecordingEpisodeType(TypeEnum):
     Conditioning    = 2 # used for induction of plasticity (i.e. application of 
                         # the induction protocol)
                         
-
-# @dataclass
-# class ProtocolSweepMapping:
-#     protocol: ElectrophysiologyProtocol
-#     sweeps:
 
 class SynapticPathway: pass
 
@@ -1424,17 +1593,8 @@ class RecordingEpisode(Episode):
         # sweeps
         #
         # if isinstance(pathActivationBySweep,dict):
-        if self.validatePAxS(pathActivationBySweep):
+        if validatePAxS(pathActivationBySweep):
             self._pAxS = pathActivationBySweep
-#         elif isinstance(xtalk, (tuple, list)):
-#             if len(xtalk) and not all(isinstance(v, int) for v in pathActivationBySweep):
-#                 raise TypeError("When a tuple, 'pathActivationBySweep' must contain only integers")
-#             
-#             self.pathActivationBySweep = tuple(pathActivationBySweep)
-#             
-#         else:
-#             self.xtalk = tuple()
-            # raise ValueError(f"Invalid xtalk specification ({xtalk})")
 
         # NOTE: 2024-09-30 08:52:22
         # parameters for the superclass (dataytypes.Episode) constructor
@@ -1467,7 +1627,6 @@ class RecordingEpisode(Episode):
         if isinstance(endFrame, int):
             self.endFrame = endFrame
             
-
     def __repr__(self):
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
@@ -1513,28 +1672,16 @@ class RecordingEpisode(Episode):
                     p.breakable()
                 p.text("\n")
                 
-            # p.text("\n")
-                
             p.text("Pathways:")
             p.breakable()
             
-            # if isinstance(self._pathways_, (tuple, list)) and len(self._pathways_):
-            # if isinstance(self.pathways, (tuple, list)) and len(self.pathways):
-            #     # with p.group(4, "(",")"):
-            #     with p.group(4, "",""):
-            #         for pth in self.pathways:
-            #             p.text(pth.name)
-            #             p.breakable()
-            #         p.text("\n")
-                
-            # if isinstance(self.pathActivationBySweep, (tuple, list)) and len(self.pathActivationBySweep):
             if isinstance(self.pathActivationBySweep, dict) and len(self.pathActivationBySweep):
                 link = " \u2192 "
                 txt = ["Pathway Stimulation by Sweep:"]
+                
                 for k,v in self.pathActivationBySweep.items():
                     txt.append(f"Sweeps {k} ↦ {v}")
-                    # if len(x[1]) > 1:
-                    #     txt.append(f"sweep {x[0]}: {x[1][0].name} {link} {x[1][1].name}")
+
                 p.text("\n".join(txt))
                 p.breakable()
                 p.text("\n")
@@ -1613,59 +1760,6 @@ class RecordingEpisode(Episode):
                 # pathways=pathways,
                 pathActivationBySweep=pathActivationBySweep)
         
-    @staticmethod
-    def checkCrossTalk(val:dict) -> bool:
-        if len(val) == 0:
-            return False
-        
-        if not all(isinstance(k, int) or (isinstance(k, tuple) and len(k)>0 and all(isinstance(k_, int) for k_ in k)) for k in val) or \
-            not all(isinstance(v, tuple) and all(isinstance(x, SynapticPathway) for x in v) for v in val.values()):
-            raise ValueError("Argument must map ints or tuples of int keys to tuples of SynapticPathway objects")
-        
-        ret = all(len(v)==2 for v in val.values())
-        
-        return ret
-    
-        # TODO: 2024-10-10 09:03:01
-        # check combinatorics:
-        # 1 pathway => no xtalk
-        # 2 pathways => 1->2, 2->1 => even number of sweeps
-        # 3 pathways => 1->2, 1->3, 2->3, 2->1, 3->1, 3->2 => even number of sweeps
-        # ⋮
-        # etc
-        #
-        # if ret:
-        #     paths = list()
-        #     for v in val.values():
-        #         p = [v_ for v_ in v if v_ not in ret]
-        #         paths += p
-    
-            
-    
-    @staticmethod
-    def validatePAxS(val:dict):
-        if not isinstance(val, dict):
-            return False
-        
-        if len(val) == 0:
-            return True
-        
-        keys = list(val.keys())
-        
-        int_keys = list(filter(lambda x: isinstance(x, int), keys))
-        tuple_keys = list(filter(lambda x: isinstance(x, tuple) and len(x)==2 and all(isinstance (v, int) for v in x), keys))
-        
-        if len(int_keys + tuple_keys) != len(val):
-            return False
-        
-        values = [val[k] for k in int_keys + tuple_keys]
-        
-        OK_vals = list(filter(lambda x: isinstance(x, tuple) and (all(isinstance(v, SynapticPathway) for v in x) if len(x) else True), values ))
-        
-        if len(OK_vals) != len(values):
-            return False
-        
-        return True
         
     @property
     def pathActivationBySweep(self) -> dict:
@@ -1675,14 +1769,14 @@ class RecordingEpisode(Episode):
     
     @pathActivationBySweep.setter
     def pathActivationBySweep(self, val:dict) -> None:
-        if not self.validatePAxS(val):
+        if not validatePAxS(val):
             raise ValueError("pathActivationBySweep got an incorrect argument")
         
         self._pAxS = val
         
     @property
     def isXTalk(self) -> bool:
-        return self.checkCrossTalk(self.pathActivationBySweep)
+        return checkCrossTalk(self.pathActivationBySweep)
             
     @property
     def blocks(self) -> list:
@@ -1745,12 +1839,6 @@ class RecordingEpisode(Episode):
         else:
             self._protocol_ = protocol
         
-        # if isinstance(protocol, ElectrophysiologyProtocol):
-        #     if len(self._protocols_):
-        #         if protocol not in self.protocols:
-        #             scipywarn("The block was acquired with a different protocol")
-        #     self._protocols_.append(protocol)
-            
         blocks = self._blocks_ + [x]
         self.blocks = blocks
         
@@ -1781,7 +1869,6 @@ class RecordingEpisode(Episode):
                 del self._protocols_[ndx]
             
         self._setup_from_blocks_() # will also update the protocols, 
-        # but best deal with these now
         
     def setFrameLimits(self, begin:int, end:int):
         if abs(end-begin) != self.nFrames-1:
@@ -1855,8 +1942,6 @@ class RecordingEpisode(Episode):
         if not isinstance(val, int):
             raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
         
-        # nFrames = sum([len(b.segments) for b in self._blocks_])
-        
         if len(self._blocks_) and val >= self.beginFrame + self.nFrames:
             raise ValueError(f"'endFrame' ({val}) must be less than {self.nFrames} available frames")
         
@@ -1873,10 +1958,6 @@ class RecordingEpisode(Episode):
         """Number of frames in this episode; """
         if len(self._blocks_) == 0:
             return 0
-        
-        # if len(self._blocks_) == 1:
-        #     return len(self._blocks_[0].segments)
-            # return self._endFrame_ - self._beginFrame_ + 1
         
         return sum([len(b.segments) for b in self._blocks_])
     
@@ -1904,10 +1985,6 @@ class RecordingEpisode(Episode):
 
         return ret
     
-    # @pathways.setter
-    # def pathways(self, val) -> None:
-    #     raise RuntimeError(f"Pathways cannot be set directly; you must use pathActivationBySweep property")
-
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
     def __init__(self, name: typing.Optional[str] = None, **kwargs):
@@ -2125,13 +2202,10 @@ class SynapticPathwayType(TypeEnum):
 # @with_doc(BaseScipyenData, use_header=True)
 @dataclass
 class SynapticPathway:
-    """Logical association of a SynapticStimulus with a Schedule.
-    Also specifies the "type" of the SynapticPathway - specifies the role of
-    the SynapticPathway in an experiment.
+    """Logical association of a SynapticStimulus with a recording configuration.
+    Also specifies the "type" of the SynapticPathway, which represents the role
+    of the SynapticPathway in an experiment.
 
-    SynapticPathway objects have a pathwayType attribute which specifies
-    the pathway's role in a synaptic plasticity experiment.
-    
     """
     pathwayType: SynapticPathwayType = SynapticPathwayType.Null
     name: str = "pathway"
@@ -2152,7 +2226,6 @@ class SynapticPathway:
         ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
         
         return ret
-    
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -2199,6 +2272,7 @@ class SynapticPathway:
                             entity_cache=entity_cache)
         
         h5io.storeEntityInCache(entity_cache, self, entity)
+        
         return entity
     
     @classmethod
@@ -2524,7 +2598,7 @@ class LocationMeasure:
         WARNING: In order to be fully mutable when locations are specified as 
         sequences of scalars, the sequences must also be mutable
     
-"""
+    """
     # NOTE: 2024-02-29 22:37:54
     # mandatory signature for func:
     # func(*args, **kwargs) where:
@@ -2628,6 +2702,68 @@ def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal],
     clampMode = ClampMode.VoltageClamp if vc_mode else ClampMode.CurrentClamp if ic_mode else ClampMode.NoClamp
 
     return clampMode
+
+def checkCrossTalk(val:dict) -> bool:
+    if len(val) == 0:
+        return False
+    
+    if validatePAxS(val):
+        return all(len(unique(v))==2 for v in val.values())
+        
+    else:
+        return False
+#     
+#     if not all(isinstance(k, int) or (isinstance(k, tuple) and len(k)>0 and all(isinstance(k_, int) for k_ in k)) for k in val) or \
+#         not all(isinstance(v, tuple) and all(isinstance(x, SynapticPathway) for x in v) for v in val.values()):
+#         raise ValueError("Argument must map ints or tuples of int keys to tuples of SynapticPathway objects")
+    
+    # ret = all(len(v)==2 for v in val.values())
+    
+    # return ret
+
+    # TODO: 2024-10-10 09:03:01
+    # check combinatorics:
+    # 1 pathway => no xtalk
+    # 2 pathways => 1->2, 2->1 => even number of pathways, even number of sweeps
+    # 3 pathways => 1->2, 1->3, 2->3, 2->1, 3->1, 3->2 => even number of sweeps
+    # ⋮
+    # etc
+    #
+    # if ret:
+    #     paths = list()
+    #     for v in val.values():
+    #         p = [v_ for v_ in v if v_ not in ret]
+    #         paths += p
+
+        
+
+def validatePAxS(val:dict):
+    if not isinstance(val, dict):
+        return False
+    
+    if len(val) == 0:
+        return True
+    
+    # if not all(isinstance(k, int) or (isinstance(k, tuple) and len(k)>0 and all(isinstance(k_, int) for k_ in k)) for k in val) or \
+    #     not all(isinstance(v, tuple) and all(isinstance(x, SynapticPathway) for x in v) for v in val.values()):
+    #     raise ValueError("Argument must map ints or tuples of int keys to tuples of SynapticPathway objects")
+    
+    keys = list(val.keys())
+    
+    int_keys = list(filter(lambda x: isinstance(x, int), keys))
+    tuple_keys = list(filter(lambda x: isinstance(x, tuple) and len(x)==2 and all(isinstance (v, int) for v in x), keys))
+    
+    if len(int_keys + tuple_keys) != len(val):
+        return False
+    
+    values = [val[k] for k in int_keys + tuple_keys]
+    
+    OK_vals = list(filter(lambda x: isinstance(x, tuple) and (all(isinstance(v, SynapticPathway) for v in x) if len(x) else True), values ))
+    
+    if len(OK_vals) != len(values):
+        return False
+    
+    return True
 
 def checkClampMode(clampMode:ClampMode, signal:typing.Union[neo.AnalogSignal, DataSignal],
                    command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity, numbers.Number]) -> tuple:
@@ -5691,5 +5827,7 @@ def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]):
         return 
     return pab.ABFProtocol(x)
     
-    
+def getPathwayBySweepActivation(protocol:ElectrophysiologyProtocol, pathways) -> dict:
+    """Correspondence between pathway activation and sweep number"""
+    return dict(protocol.getPathwaysDigitalStimulationSequence(pathways, indices=False))
     
