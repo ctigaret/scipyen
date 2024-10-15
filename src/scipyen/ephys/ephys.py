@@ -1047,7 +1047,8 @@ class RecordingSource(__BaseSource__):
         
         return tuple()
     
-    def getPathwaysByStimulation(self, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+    def getPathwaysByStimulationType(self, digital:typing.Optional[bool]=None,
+                                     asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
         """Classifies the pathways in this `src` according to the means of activation.
         
         A synaptic pathway is activated by stimulating its synaptic inputs¹ using a
@@ -1101,7 +1102,17 @@ class RecordingSource(__BaseSource__):
             if asDict:
                 return {"DACStimPathways": tuple(), "DIGStimPathways": tuple()}
             return tuple(), tuple()
-        dac_stim, dig_stim = tuple(tuple(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways))
+        
+        if isinstance(digital, bool):
+            if digital:
+                dac_stim = tuple()
+                dig_stim = tuple(x for x in pathways if x.stimulus.dig)
+            else:
+                dac_stim = tuple()
+                dig_stim = tuple(x for x in pathways if not x.stimulus.dig)
+        else:
+            dac_stim, dig_stim = tuple(tuple(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways))
+            
         if asDict:
             return {"DACStimPathways": dac_stim, "DIGStimPathways": dig_stim}
         return dac_stim, dig_stim
