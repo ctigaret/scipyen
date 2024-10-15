@@ -346,10 +346,11 @@ class SynapticStimulus(__BaseSynStim__):
                        entity_cache) -> h5py.Dataset:
         
         from iolib import h5io
+        print(f"{self.__class__.__name__}.toHDF5: {self.name} -> name: {name}, oname: {oname}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
+            group[name] = cached_entity
             return cached_entity
         
         attrs = {"name": self.name, "channel": self.channel, "dig": self.dig}
@@ -769,6 +770,7 @@ class RecordingSource(__BaseSource__):
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         from iolib import h5io
+        print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -1677,7 +1679,7 @@ class RecordingEpisode(Episode):
             attr_repr.append(f"\t{self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
             # attr_repr += [f"\t{s}" for s in repr(self.protocol).split("\n")]
             
-            # with p.group(4 ,"(",")"):
+            # with p.group(q4 ,"(",")"):
             with p.group(4 ,"",""):
                 for t in attr_repr:
                     p.text(t)
@@ -1706,6 +1708,7 @@ class RecordingEpisode(Episode):
         """Overrides datatypes.Episode.toHDF5"""
         
         from iolib import h5io
+        print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -2122,6 +2125,7 @@ class RecordingSchedule(Schedule):
         # datatypes.Schedule, that method encodes datatype.Episode as h5py.Datasets
         # whereas here we need to encode RecordingEpisodes as h5py.Group
         from iolib import h5io
+        print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -2248,6 +2252,7 @@ class SynapticPathway:
                        entity_cache) -> h5py.Group:
         
         from iolib import h5io
+        print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -2268,6 +2273,11 @@ class SynapticPathway:
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         
+        h5io.toHDF5(self.source, entity, name="source", oname="source",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
         h5io.toHDF5(self.stimulus, entity, name="stimulus", oname="stimulus",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
@@ -2279,11 +2289,6 @@ class SynapticPathway:
                             entity_cache=entity_cache)
         
         h5io.toHDF5(self.measurements, entity, name="measurements", oname="measurements",
-                            compression=compression, chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
-        
-        h5io.toHDF5(self.source, entity, name="source", oname="source",
                             compression=compression, chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)

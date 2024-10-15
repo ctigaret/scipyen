@@ -2617,8 +2617,8 @@ def toHDF5(obj, group:h5py.Group, name:typing.Optional[str]=None,
             group[target_name] = cached_entity
             return cached_entity
         
-        # call either the toHDF5 method of the object;s class, or the 
-        # custom (3rd party£toHDF5), if it exists
+        # call either the toHDF5 method of the object's class, or the 
+        # custom (3rd party toHDF5), if it exists
         return entity_factory_method(group, target_name, oname, compression, chunks,
                                      track_order, entity_cache)
 
