@@ -1131,7 +1131,7 @@ class RecordingSource(__BaseSource__):
             return {"DACStimPathways": protocol_dac_stim_pathways, "DIGStimPathways": protocol_dig_stim_pathways}
         return protocol_dac_stim_pathways, protocol_dig_stim_pathways
     
-    def getPathwayActivtionbBySweep(self, protocol:ElectrophysiologyProtocol) -> dict:
+    def getPathwayActivationbBySweep(self, protocol:ElectrophysiologyProtocol) -> dict:
         """Distribution of pathway activation by sweep, given a protocol"""
         protocol_dac_stim_pathways, protocol_dig_stim_pathways = self.pathwaysInProtocol(protocol)
         if all(len(x) == 0 for x in (protocol_dac_stim_pathways, protocol_dig_stim_pathways)):
