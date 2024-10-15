@@ -1128,7 +1128,7 @@ class RecordingSource(__BaseSource__):
         stimulation
         
         """
-        dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulation()
+        dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulationType()
         adc = protocol.getADC(self.adc)
         dac = protocol.getDAC(self.dac)
         activeDAC  = protocol.getDAC()
@@ -1167,7 +1167,7 @@ class RecordingSource(__BaseSource__):
 #         alternatively stimulated across sweeps.
 #         """
 #         
-#         dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulation()
+#         dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulationType()
 #         adc = protocol.getADC(self.adc)
 #         dac = protocol.getDAC(self.dac)
 #         activeDAC  = protocol.getDAC()
