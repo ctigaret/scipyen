@@ -1301,11 +1301,12 @@ class ClampMode(TypeEnum):
     CurrentClamp=4      # |     self-explanatory
     
 class ElectrodeMode(TypeEnum):
+    Null = 0
     Field=1             # typically, associated with ClampMode.NoClamp; other ClampModes don't make sense
     WholeCellPatch=2    # can associate any ClampMode
     ExcisedPatch=4      # can associate any ClampMode although ClampMode.VoltageClamp makes more sense
     Sharp=8             # can associate any ClampMode although ClampMode.CurrentClamp makes more sense
-    Tetrode=16          # these are really for 
+    Tetrode=16          # 16-64 are for 
     LinearArray=32      # local field potentials etc
     MultiElectrodeArray=64 # MEAs on a culture/slice?
    
@@ -2220,11 +2221,16 @@ class SynapticPathway:
     """
     pathwayType: SynapticPathwayType = SynapticPathwayType.Null
     name: str = "pathway"
-    stimulus: SynapticStimulus = field(default_factory = lambda: SynapticStimulus())
-    electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
-    clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
-    schedule: typing.Optional[RecordingSchedule] = None
-    measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
+    # stimulus: SynapticStimulus = field(default_factory = lambda: SynapticStimulus())
+    stimulus: SynapticStimulus = field(default_factory = SynapticStimulus)
+    # electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
+    electrodeMode: ElectrodeMode = ElectrodeMode.Null
+    # clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
+    clampMode: ClampMode = ClampMode.NoClamp
+    # schedule: typing.Optional[RecordingSchedule] = None
+    schedule: RecordingSchedule = field(default_factory = RecordingSchedule)
+    # measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
+    measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = dict)
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
     
     def __eq__(self, other) -> bool:

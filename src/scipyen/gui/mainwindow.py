@@ -6117,11 +6117,17 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         
         for k, item in enumerate(filePaths):
             # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded ({k}, {item})")
-            OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, 
-                                    updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
-            if OK and isinstance(progressSignal, QtCore.SignalInstance):
-                # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded loaded ({k}, {item})")
-                progressSignal.emit(k)
+            try:
+                OK &= self.loadDiskFile(item, fileReader=ioReader, addToRecent=addToRecent, 
+                                        updateUi=updateUi) # places the loaded data DIRECTLY into self.workspace
+                
+                if OK and isinstance(progressSignal, QtCore.SignalInstance):
+                    # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded loaded ({k}, {item})")
+                    progressSignal.emit(k)
+                        
+            except:
+                traceback.print_exc()
+                continue
                     
             if isinstance(loopControl, dict) and loopControl.get("break", None) == True:
                 if isinstance(canceledSignal, QtCore.SignalInstance):
