@@ -5829,5 +5829,5 @@ def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]):
     
 def getPathwayBySweepActivation(protocol:ElectrophysiologyProtocol, pathways) -> dict:
     """Correspondence between pathway activation and sweep number"""
-    return dict(protocol.getPathwaysDigitalStimulationSequence(pathways, indices=False))
+    return dict(protocol.getSweepwiseDigitalActivationForPathways(pathways, indices=False))
     

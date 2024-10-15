@@ -2161,7 +2161,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return sweep * self.sweepDuration
         return sweep * self.sweepInterval
     
-    def getPathwaysDigitalStimulationSequence(self, pathways:typing.Sequence[SynapticPathway],
+    def getSweepwiseDigitalActivationForPathways(self, pathways:typing.Sequence[SynapticPathway],
                                         dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                                         byFirstStimulus:bool=True,
                                         indices:bool=True):
