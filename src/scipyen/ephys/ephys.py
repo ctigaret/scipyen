@@ -1447,6 +1447,13 @@ class RecordingSource(__BaseSource__):
                     
         return super().__new__(cls, **new_args)
     
+    def __repr__(self) -> str:
+        import dataclasses
+        ret = [f"{self.__class__.__name__}("]
+        ret += ", ".join([f"{a}={getattr(self,a).name if a == 'electrodeMode' else getattr(self, a)}" for a in self._fields])
+        ret +=[")"]
+        return "".join(ret)
+    
 RecordingSource.name.__doc__ = "str: The name of the source; default is 'cell'"
 RecordingSource.adc.__doc__  = "int, str: The index or name of the primary ADC channel — records the eletrical behaviour of the source (cell or field)."
 RecordingSource.dac.__doc__  = "int, str: The index or name of the primary DAC channel — the output channel that operates the voltage- or current-clamp."
@@ -1819,7 +1826,7 @@ class RecordingEpisode(Episode):
         
         self._clampMode_ = val
         
-    def __repr__(self):
+    def __repr__(self) -> str:
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
         ret.append(f"\tBlocks: {self.nBlocks}")
@@ -2352,7 +2359,6 @@ class SynapticPathway:
     of the SynapticPathway in an experiment.
 
     """
-    pathwayType: SynapticPathwayType = SynapticPathwayType.Null
     name: str = "pathway"
     adc: int|None = None # physical index of the ADC channel used in recording this pathway
     dac: int|None = None # physical index of the DAC channel used in recording this pathway
@@ -2370,15 +2376,19 @@ class SynapticPathway:
     # software one can consider a repatched cell as the same source, with same
     # electrode mode, but undergoing different episodes).
     #
-    # THerefore:
+    # Therefore:
     # NOTE: 2024-10-16 13:36:07
     # add clampMode to RecordingEpisode!
     electrodeMode: InitVar[typing.Union[ElectrodeMode, int, str]] = ElectrodeMode.Null
+    
+    pathwayType: InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
+    
     schedule: RecordingSchedule = field(default_factory = RecordingSchedule)
     measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = dict)
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
     
-    def __post_init__(self, electrodeMode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null):
+    def __post_init__(self, electrodeMode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
+                      pathwayType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
         if isinstance(electrodeMode, (int, str)):
             if electrodeMode not in ElectrodeMode:
                 raise ValueError(f"Invalid electrode mode {electrodeMode}")
@@ -2389,6 +2399,17 @@ class SynapticPathway:
             raise TypeError(f"Invalid electrode mode {electrodeMode}")
         
         self._electrodeMode_ = electrodeMode
+        
+        if isinstance(pathwayType, (int, str)):
+            if pathwayType not in SynapticPathwayType:
+                raise ValueError(f"Invalid synaptic pathway type {pathwayType}")
+            
+            pathwayType = SynapticPathwayType.type(pathwayType)
+            
+        if not isinstance(pathwayType, SynapticPathwayType):
+            raise TypeError(f"Invalid synaptic pathway type {pathwayType}")
+        
+        self._pathwayType_ = pathwayType
         
     @property
     def electrodeMode(self) -> ElectrodeMode:
@@ -2407,6 +2428,36 @@ class SynapticPathway:
         
         self._electrodeMode_ = val
         
+    @property
+    def pathwayType(self) -> SynapticPathwayType:
+        return self._pathwayType_
+    
+    @pathwayType.setter
+    def pathwayType(self, val:typing.Union[SynapticPathwayType, int, str]):
+        if isinstance(val, (int, str)):
+            if val not in SynapticPathwayType:
+                raise ValueError(f"Invalid syaptic pathway type {val}")
+            
+            val = SynapticPathwayType.type(val)
+            
+        if not isinstance(val, SynapticPathwayType):
+            raise TypeError(f"Invalid synaptic pathway type {val}")
+        
+        self._pathwayType = val
+        
+    def __repr__(self) -> str:
+        import dataclasses
+        all_attr_names = list(f.name for f in dataclasses.fields(self.__class__)) + [x[0] for x in inspect.getmembers_static(self, lambda x: isinstance(x, property))]
+        ret = [f"{self.__class__.__name__}"]
+        ret += ["("]
+        
+        ret += ", ".join([f"{a}={getattr(self,a).name if a == 'electrodeMode' else getattr(self, a)}" for a in all_attr_names])
+        ret += [")"]
+        
+        return "".join(ret)
+        
+        
+        
     def __eq__(self, other) -> bool:
         from dataclasses import fields
         ret = type(self) == type(other)
@@ -2416,6 +2467,12 @@ class SynapticPathway:
         
         ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
         
+        if ret:
+            ret &= self.pathwayType == other.pathwayType
+            
+        if ret:
+            ret &= self.electrodeMode == other.electrodeMode
+            
         return ret
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
