@@ -983,19 +983,19 @@ class RecordingSource(__BaseSource__):
             return (SynapticPathway(source = self, stimulus = self.syn,
                                     name = self.syn.name, adc = self.adc, 
                                     dac = self.dac,
-                                    electrodeMode = self.electrodeMode), )
+                                    electrode = self.electrodeMode), )
             
         if isinstance(self.syn, (tuple, list)):
             if len(self.syn) == 1:
                 return tuple(SynapticPathway(source=self, stimulus = self.syn[0],
                                        name = self.syn[0].name,
                                        adc = self.adc, dac = self.dac,
-                                       electrodeMode = self.electrodeMode))
+                                       electrode = self.electrodeMode))
             elif len(self.syn) > 1:
                 return tuple(SynapticPathway(source=self, stimulus = s,
                                              name = s.name,
                                              adc = self.adc, dac = self.dac,
-                                             electrodeMode = self.electrodeMode) for s in self.syn)
+                                             electrode = self.electrodeMode) for s in self.syn)
             
         return tuple()
         
@@ -1258,17 +1258,10 @@ class RecordingSource(__BaseSource__):
         
         if self.clamped:
             protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC))
-            for p in protocol_dac_stim_pathways:
-                p.clampMode = protocol.getClampMode(p.adc, p.dac)
-            
         else:
             protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL))
             
         protocol_dig_stim_pathways = tuple(p for p in dig_stim_pathways if p.stimulus.channel in mainDIGOut or altDIGOut)
-        
-        if self.clamped:
-            for p in protocol_dig_stim_pathways:
-                p.clampMode = protocol.getClampMode(p.adc, p.dac)
         
         if asDict:
             return {"DACStimPathways": protocol_dac_stim_pathways, "DIGStimPathways": protocol_dig_stim_pathways}
@@ -2379,37 +2372,40 @@ class SynapticPathway:
     # Therefore:
     # NOTE: 2024-10-16 13:36:07
     # add clampMode to RecordingEpisode!
-    electrodeMode: InitVar[typing.Union[ElectrodeMode, int, str]] = ElectrodeMode.Null
+    electrode: InitVar[typing.Union[ElectrodeMode, int, str]] = ElectrodeMode.Null
     
-    pathwayType: InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
+    pathType: InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
     
     schedule: RecordingSchedule = field(default_factory = RecordingSchedule)
     measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = dict)
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
     
-    def __post_init__(self, electrodeMode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
-                      pathwayType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
-        if isinstance(electrodeMode, (int, str)):
-            if electrodeMode not in ElectrodeMode:
-                raise ValueError(f"Invalid electrode mode {electrodeMode}")
-            
-            electrodeMode = ElectrodeMode.type(electrodeMode)
-            
-        if not isinstance(electrodeMode, ElectrodeMode):
-            raise TypeError(f"Invalid electrode mode {electrodeMode}")
+    def __post_init__(self, electrode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
+                      pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
         
-        self._electrodeMode_ = electrodeMode
+        # print(f"{self.__class__.__name__}.__post_init__: electrodeMode = {electrodeMode}, pathwayType = {pathType}")
         
-        if isinstance(pathwayType, (int, str)):
-            if pathwayType not in SynapticPathwayType:
-                raise ValueError(f"Invalid synaptic pathway type {pathwayType}")
+        if isinstance(electrode, (int, str)):
+            if electrode not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {electrode}")
             
-            pathwayType = SynapticPathwayType.type(pathwayType)
+            electrode = ElectrodeMode.type(electrode)
             
-        if not isinstance(pathwayType, SynapticPathwayType):
-            raise TypeError(f"Invalid synaptic pathway type {pathwayType}")
+        if not isinstance(electrode, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {electrode}")
         
-        self._pathwayType_ = pathwayType
+        self._electrodeMode_ = electrode
+        
+        if isinstance(pathType, (int, str)):
+            if pathType not in SynapticPathwayType:
+                raise ValueError(f"Invalid synaptic pathway type {pathType}")
+            
+            pathType = SynapticPathwayType.type(pathType)
+            
+        if not isinstance(pathType, SynapticPathwayType):
+            raise TypeError(f"Invalid synaptic pathway type {pathType}")
+        
+        self._pathwayType_ = pathType
         
     @property
     def electrodeMode(self) -> ElectrodeMode:
@@ -2451,7 +2447,7 @@ class SynapticPathway:
         ret = [f"{self.__class__.__name__}"]
         ret += ["("]
         
-        ret += ", ".join([f"{a}={getattr(self,a).name if a == 'electrodeMode' else getattr(self, a)}" for a in all_attr_names])
+        ret += ", ".join([f"{a}={getattr(self,a).name if a in ('electrodeMode', 'pathwayType') else getattr(self, a)}" for a in all_attr_names])
         ret += [")"]
         
         return "".join(ret)
@@ -2545,8 +2541,8 @@ class SynapticPathway:
         source = h5io.fromHDF5(entity["source"], cache=cache)
         measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
         
-        return cls(name=name, adc=adc, dac=dac, pathwayType=pathwayType, 
-                   stimulus=stimulus, electrodeMode=electrodeMode,
+        return cls(name=name, adc=adc, dac=dac, pathType=pathwayType, 
+                   stimulus=stimulus, electrode=electrodeMode,
                    schedule=schedule, measurements=measurements, source=source)
         
 @dataclass
