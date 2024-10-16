@@ -1702,7 +1702,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def activeDACChannelIndex(self) -> int:
-        """Alias to self.activeDacChannel, for backward compatibility"""
+        """Alias to self.activeDACChannel, for backward compatibility"""
         return self.activeDACChannel
     
     @property
@@ -1715,62 +1715,72 @@ class ABFProtocol(ElectrophysiologyProtocol):
         • it has "Digital Outputs" enabled in the corresponding 'Channel #' 
             sub-tab of the "Waveform" tab in Clampex protocol editor; 
         
-            NOTE:
-            ∘ when "Alternate Digital Outputs" is disabled in the "Waveform" tab:
-                ⋆ this is the only DAC that associates digital output in the protocol
-        
-                ⋆ the digital pattern defined in an epoch under this DAC's "Channel #"
-                sub-tab will be sent out with every sweep;
-        
-                ⋆ the pattern will be emitted on the digital channel index
-                corresponding to the actual index of the bit (highest on the left)
-                in the DIG channels bank; e.g., for the top bank (3-0):
-        
-                0001 → emits a TTL PULSE on DIG0 
-                000* → emits a TTL TRAIN on DIG0
-                0010 → emits a TTL PULSE on DIG1
-                00*0 → emits a TTL TRAIN on DIG1
-        
-            ∘ when "Alternate Digital Outputs" is enabled in the "Waveform" tab:
-                ⋆ this DAC will send the pattern defined under this DAC's
-                    "Channel #" sub-tab, ONLY during even-numbered sweeps 
-                    (0, 2, 4, ...); this is the MAIN digital pattern
-        
-                ⋆ the "alternative" pattern needs to be defined in ANOTHER DAC
-                    sub-tab and will be emitted during odd-numbered sweeps
-                    (1, 3, 5, ...); this is the ALTERNATIVE digital pattern
-        
-        
-                ⋆ there can be only one alternate DIG pattern defined in any 
-                    other DAC
-        
-                ⋆ the pattern is determined as described above; 
-                
-            WARNING: In a two-pathways experiment, the MAIN and ALTERNATE patterns
-            should use bits corresponding to distinct DIG channels.
-        
-            NOTE: The association between the alternate DIG pattern and a particular DAC
-        is only for GUI purposes - it does NOT engage the "other" DAC in any way
-        (the "other" DAC may still be used for other purposes e.g. sending out
-        analog DAC command waveforms during its epochs)
-        
         OR:
         • when no DAC is sending digital output, it is the channel with the 
             highest index that sends out analog waveforms
             
+        
+        NOTE 1:
+        ∘ when "Alternate Digital Outputs" is DISABLED in the "Waveform" tab:
+            ⋆ the "active" DAC is the only DAC that associates digital output in
+                the protocol
+    
+            ⋆ the digital pattern defined in an epoch under this DAC's "Channel #"
+            sub-tab will be sent out with every sweep;
+    
+            ⋆ the pattern will be emitted on the digital channel index
+            corresponding to the actual index of the bit (highest on the left)
+            in the DIG channels bank; e.g., for the top bank (3-0):
+    
+            0001 → emits a TTL PULSE on DIG0 
+            000* → emits a TTL TRAIN on DIG0
+            0010 → emits a TTL PULSE on DIG1
+            00*0 → emits a TTL TRAIN on DIG1
+    
+        ∘ when "Alternate Digital Outputs" is ENABLED in the "Waveform" tab:
+            ⋆ this DAC will send the pattern defined under this DAC's
+                "Channel #" sub-tab, ONLY during even-numbered sweeps 
+                (0, 2, 4, ...); this is the MAIN digital pattern
+    
+            ⋆ the "alternative" pattern needs to be defined in ANOTHER DAC
+                sub-tab and will be emitted during odd-numbered sweeps
+                (1, 3, 5, ...); this is the ALTERNATIVE digital pattern
+    
+            ⋆ there can be only one alternate DIG pattern defined in any 
+                other DAC;     
+        
+        ∘ when two DACs are used to configure alternate digital patterns (see above)
+            the "active" DAC is the one where "Analog waveform" is enabled in the
+            corresponding "Channel #" sub-tab.
+        
+            CAUTION: This means that one can record using DAC0, yet the actual
+            "active" DAC may be DAC1. This is important when constructing a
+            RecordingSource (see ephys module) — one needs to specify the actual 
+            DAC used for recording (DAC0 in this example) instead of the "active"
+            DAC (DAC1 in this example).
+            
+        WARNING: In a two-pathways experiment, the MAIN and ALTERNATE patterns
+        should use bits corresponding to distinct DIG channels.
+        
+        NOTE: The association between the alternate DIG pattern and a particular DAC
+        is only for GUI purposes - it does NOT engage the "other" DAC in any way
+        (the "other" DAC may still be used for other purposes e.g. sending out
+        analog DAC command waveforms during its epochs)
+        
         Works for most cases where a single DAC (0 or 1) is used , but currently
         meaningless when no analog or digital commands are sent at all or with
         atypical connections and DAC configurations (see comments in the code)
         
         
-        Swithching DIG off in all DACs returns 0 here.
+        When DIG channels are off in all DACs, this method return 0.
+        
+        NOTE: DAC channels have identical physical and logical indices. WARNING:
+        This is in contrast to the ADC channels, where the ADCs logical indices 
+        may differ from the physical ones (depending on which ADCs are actually 
+        used, in the protocol, to record the data).
         
         
         """
-#         Therefore, to find out which DAC is associated with stimuli in your experiment:
-#         
-#         TODO/FIXME 
-#         
         # NOTE: 2023-10-09 13:31:58
         # Beyond DAC1, the active DAC index returns the highest DAC index in use.
         # HOWEVER, it appears that the highest value returned here is 3 (as if there 
@@ -2094,7 +2104,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                      dac:typing.Optional[typing.Union[int, str, ABFOutputConfiguration]] = None,
                      physicalADC:bool=True,
                      physicalDAC:bool=True) -> object:
-        """Infers the clamping mode used in the experiemnt run with this protocol.
+        """Infers the clamping mode used in the experiment run with this protocol.
         
         The inferrence is based on the physical units of the input - output signal
         pair, as follows:

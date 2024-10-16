@@ -169,7 +169,7 @@ import difflib
 import re as _re
 from enum import Enum, IntEnum
 from abc import ABC
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
+from dataclasses import (dataclass, KW_ONLY, MISSING, field, InitVar)
 # from dataclasses import (dataclass, MISSING)
 #### END core python modules
 
@@ -249,6 +249,90 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
+class ClampMode(TypeEnum):
+    NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
+                        # but OK with other ElectrodeMode
+    VoltageClamp=2      # |these two should be
+    CurrentClamp=4      # |     self-explanatory
+    
+class ElectrodeMode(TypeEnum):
+    Null = 0
+    Field=1             # typically, associated with ClampMode.NoClamp; other ClampModes don't make sense
+    WholeCellPatch=2    # can associate any ClampMode
+    ExcisedPatch=4      # can associate any ClampMode although ClampMode.VoltageClamp makes more sense
+    Sharp=8             # can associate any ClampMode although ClampMode.CurrentClamp makes more sense
+    Tetrode=16          # 16-64 are for 
+    LinearArray=32      # local field potentials etc
+    MultiElectrodeArray=64 # MEAs on a culture/slice?
+   
+class RecordingEpisodeType(TypeEnum):
+    """Once can define valid type combinations as follows:
+    Tracking | Drug     (= 3)   ⇒ Tracking episode recorded in the presence of 
+                                    drug(s)
+    Conditioning | Drug (= 5)   ⇒ Conditioning in the presence of drug(s)
+    
+    A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
+    an episode of "drug washout".
+    
+    A value of 0 and any value > 5 are invalid.
+    
+    """
+    Tracking        = 1 # used for tracking the electrophysiological behaviour of
+                        # a source (e.g., synaptic responses, somatic spiking, etc);
+                        # this is the most common type of electrophysiology recording
+                        # epiode
+    
+    Monitoring      = Tracking
+                        
+    Conditioning    = 2 # used for induction of plasticity (i.e. application of 
+                        # the induction protocol)
+                        
+class SynapticPathwayType(TypeEnum):
+    """
+    Synaptic pathway type.
+    Encapsulates: Null, Test, Control, Auxiliary, UserDefined
+    
+    A Test pathway is defined by the presence of a Conditioning episode between
+    two non-Conditioning episodes - see RecordingEpisodeType class.
+    
+        A non-Conditioning episode is usually a Tracking episode, but can also be
+        a Crosstalk or Drug episode.
+        
+        Where justified, the test pathway may be "conditioned" more than once.
+        In this case, the Conditioning episodes MUST be separated by at least 
+        one non-Conditioning episode (usually a Tracking episode).
+        
+        In addition, there may be any number of Crosstalk, Drug and Washout
+        applied either before, or after the Conditioning episode.
+    
+    The Control pathway is defined by the presence of at least one Tracking
+        episode. No Conditioning episodes are allowed in a Control pathway.
+        
+    A combination of types IS NOT ALLOWED. The values were chosen to prevent
+    ambiguities. Thus,
+    
+    Null    | Control   ⇒ Control       (1)
+    Null    | Test      ⇒ Test          (2)
+    Control | Test      ⇒ Auxiliary     (3)
+    Control | Auxiliary ⇒ UserDefined   (4)
+    
+    Any value > 4 is invalid.
+    
+    """
+    Null        = 0 # undefined; can associate any episode type, EXCEPT for Conditioning and Tracking
+    Undefined   = Null
+    Control     = 1 # can associate any episode type, EXCEPT for Conditioning
+    Test        = 2 # can associate any episode type
+    Auxiliary   = 3 # can associate any episode type, EXCEPT for Tracking;
+                    # NOTE: this requirement is for analysis purpose only; the 
+                    # pathway can be activated during any type of episode, but
+                    # synaptic responses do not need to be analysed during the 
+                    # tracking episodes.
+                    # auxiliary pathways can be:
+                    # • present along the tracking pathway, during tracking only
+                    # • present along the induction pathway, during induction only
+                    # • present throughout
+    UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
 
 class __BaseSynStim__(typing.NamedTuple):
     name: str = "stim"
@@ -346,7 +430,7 @@ class SynapticStimulus(__BaseSynStim__):
                        entity_cache) -> h5py.Dataset:
         
         from iolib import h5io
-        print(f"{self.__class__.__name__}.toHDF5: {self.name} -> name: {name}, oname: {oname}")
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name} -> name: {name}, oname: {oname}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -679,6 +763,7 @@ class __BaseSource__(typing.NamedTuple):
     syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
     auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
     auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
+    electrodeMode: ElectrodeMode = ElectrodeMode.Null
     
 class RecordingSource(__BaseSource__):
     __slots__ = ()
@@ -696,6 +781,8 @@ class RecordingSource(__BaseSource__):
                    "    sending analog commands to the source in voltage- or current-clamp, (a.k.a the primary 'output', i.e.,",
                    "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
                    "    Optional; default is None².\n",
+                   "    WARNING: This must be the DAC channel actually used for clamping.\n",
+                   "    and not necessarily the 'active' DAC channel of the protocol\n",
                    "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
                    "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
                    "    (one SynapticStimulus per synaptic pathway).",
@@ -770,14 +857,15 @@ class RecordingSource(__BaseSource__):
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         from iolib import h5io
-        print(f"{self.__class__.__name__}.toHDF5: {self.name}")
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
-        attrs = {"name":self.name, "adc":self.adc, "dac":self.dac}
+        attrs = {"name":self.name, "adc":self.adc, "dac":self.dac,
+                 "electrodeMode": self.electrodeMode}
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -819,13 +907,14 @@ class RecordingSource(__BaseSource__):
         name = attrs["name"]
         adc  = attrs["adc"]
         dac  = attrs["dac"]
+        electrodeMode = attrs["electrodeMode"]
         
         syn = h5io.fromHDF5(entity["syn"], cache=cache)
         auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
         auxout = h5io.fromHDF5(entity["auxout"], cache=cache)
         
         return cls(name=name, adc=adc, dac=dac, syn=syn, 
-                   auxin=auxin, auxout=auxout)
+                   auxin=auxin, auxout=auxout, electrodeMode = electrodeMode)
         
     @property
     def clamped(self) -> bool:
@@ -881,27 +970,32 @@ class RecordingSource(__BaseSource__):
     
     @property
     def pathways(self) -> tuple:
-        """Factory for SynapticPathway objects based on the `syn` field.
+        """Factory for SynapticPathway objects based on the specifications in the `syn` field.
         The SynapticPathway fields `pathwayType`, `schedule` and `measurement` 
         will have their default values.
         
-        Depending on the `syn` field, returns a SynapticPathway, a tuple of 
-        SynapticPathway objects, or None.
+        Returns a possibly empty tuple of SynapticPathway objects where all their 
+        fields are set to default values, except for their 'name', 'stimulus',
+        and 'source'.
     
         """
         if isinstance(self.syn, SynapticStimulus):
             return (SynapticPathway(source = self, stimulus = self.syn,
-                                   name = self.syn.name,
-                                   ), )
+                                    name = self.syn.name, adc = self.adc, 
+                                    dac = self.dac,
+                                    electrodeMode = self.electrodeMode), )
             
         if isinstance(self.syn, (tuple, list)):
             if len(self.syn) == 1:
                 return tuple(SynapticPathway(source=self, stimulus = self.syn[0],
                                        name = self.syn[0].name,
-                                       ))
+                                       adc = self.adc, dac = self.dac,
+                                       electrodeMode = self.electrodeMode))
             elif len(self.syn) > 1:
                 return tuple(SynapticPathway(source=self, stimulus = s,
-                                             name = s.name) for s in self.syn)
+                                             name = s.name,
+                                             adc = self.adc, dac = self.dac,
+                                             electrodeMode = self.electrodeMode) for s in self.syn)
             
         return tuple()
         
@@ -1085,6 +1179,9 @@ class RecordingSource(__BaseSource__):
         If `asDict` is True, returns a dict with the keys "DACPathways", 
             "DIGPathways" mapped to the sequences described above.
         
+        NOTE: All fields of the SynapticPathway objects returned by this method
+        have default values, except for those specified in this source ('name', 
+        'stimulus', and 'source').
         
         ¹ Neurotransmitter photo-uncaging is included here as method of activating
         synaptic inputs although technically it only emulates presynaptic neurotransmitter
@@ -1096,7 +1193,10 @@ class RecordingSource(__BaseSource__):
         device can usually be configured to "react" to the rising or falling phase 
         of the pulse, or to one of the two voltage levels of the pulse.
         
-
+        See also:
+        ---------
+        • self.pathways
+        
         """
         import more_itertools
         pathways = self.pathways
@@ -1119,34 +1219,92 @@ class RecordingSource(__BaseSource__):
             return {"DACStimPathways": dac_stim, "DIGStimPathways": dig_stim}
         return dac_stim, dig_stim
         
-    def pathwaysInProtocol(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
-        """Returns the usage of this RecordingSource pathways in the protocol.
+    def pathwaysFromProtocol(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+        """Constructs SynapticPathway objects used in 'protocol', based on this source specifications.
     
-        To discern which pathways are acutally used in the specified protocol, 
-        this method check that the DAC and DIG channels declared in the pathway
-        definition are actually employed by the protocol.
+        Generates SynapticPathway objects after checking which ADC/DAC/DIG channels
+        specified in this source definition are actually used by the protocol.
         
-        The methods returns the pathways classified according to their means of
-        stimulation
+        Returns new instances of SynapticPathway, grouped by their stimulation
+        method (DIG TTL or DAC emulation of TTL) and wrapped in a tuple or dict.
+        
+        To obtain a sequence of the SynapticPathway instances use the following
+        idiom:
+        
+        ``` python
+        
+        tuple(unique(itertools.chain.from_iterable(src.pathwaysFromProtocol(protocol))))
+        
+        ```
+        
+        where 'src' is a RecordingSource object, and 'protocol' is an 
+        ElectrophysiologyProtocol object.
+        
+        See also:
+        • self.pathways
+        • self.getPathwaysByStimulationType
         
         """
         dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulationType()
+        
         adc = protocol.getADC(self.adc)
         dac = protocol.getDAC(self.dac)
+        
         activeDAC  = protocol.getDAC()
         # digOutDacs = protocol.digitalOutputDACs
+        
         mainDIGOut = protocol.digitalOutputs(alternate=False)
         altDIGOut  = protocol.digitalOutputs(alternate=True)
-        protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC))
+        
+        if self.clamped:
+            protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC))
+            for p in protocol_dac_stim_pathways:
+                p.clampMode = protocol.getClampMode(p.adc, p.dac)
+            
+        else:
+            protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL))
+            
         protocol_dig_stim_pathways = tuple(p for p in dig_stim_pathways if p.stimulus.channel in mainDIGOut or altDIGOut)
+        
+        if self.clamped:
+            for p in protocol_dig_stim_pathways:
+                p.clampMode = protocol.getClampMode(p.adc, p.dac)
         
         if asDict:
             return {"DACStimPathways": protocol_dac_stim_pathways, "DIGStimPathways": protocol_dig_stim_pathways}
+        
         return protocol_dac_stim_pathways, protocol_dig_stim_pathways
     
     def getPathwayActivationbBySweep(self, protocol:ElectrophysiologyProtocol) -> dict:
-        """Distribution of pathway activation by sweep, given a protocol"""
-        protocol_dac_stim_pathways, protocol_dig_stim_pathways = self.pathwaysInProtocol(protocol)
+        """Distribution of pathway activation by sweep, in a given protocol.
+        
+        Returns:
+        --------
+        
+        A key ↦ value mapping indicating which synaptic pathways are activated
+            during specific sweeps, as configured in the protocol.
+        
+        key: int|tuple[int] — sweep index or indices
+        
+        value: tuple[SynapticPathway] — the pathways that are activated while
+            recording the sweeps with index (indices) in the 'key'; may be empty.
+        
+        To obtain a sequence of all pathways used in the protocol one can use the
+        following idiom:
+        
+        ``` python
+        mapping = self.getPathwayActivationbBySweep(protocol)
+        
+        pathways = tuple(unique(itertools.chain.from_iterable(mapping.values())))
+        
+        ```
+        
+        See also:
+        ---------
+        • self.pathwaysFromProtocol
+        
+        """
+        protocol_dac_stim_pathways, protocol_dig_stim_pathways = self.pathwaysFromProtocol(protocol)
         if all(len(x) == 0 for x in (protocol_dac_stim_pathways, protocol_dig_stim_pathways)):
             return dict()
         
@@ -1296,44 +1454,6 @@ RecordingSource.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus o
 RecordingSource.auxin.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
 RecordingSource.auxout.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
 
-class ClampMode(TypeEnum):
-    NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
-                        # but OK with other ElectrodeMode
-    VoltageClamp=2      # |these two should be
-    CurrentClamp=4      # |     self-explanatory
-    
-class ElectrodeMode(TypeEnum):
-    Null = 0
-    Field=1             # typically, associated with ClampMode.NoClamp; other ClampModes don't make sense
-    WholeCellPatch=2    # can associate any ClampMode
-    ExcisedPatch=4      # can associate any ClampMode although ClampMode.VoltageClamp makes more sense
-    Sharp=8             # can associate any ClampMode although ClampMode.CurrentClamp makes more sense
-    Tetrode=16          # 16-64 are for 
-    LinearArray=32      # local field potentials etc
-    MultiElectrodeArray=64 # MEAs on a culture/slice?
-   
-class RecordingEpisodeType(TypeEnum):
-    """Once can define valid type combinations as follows:
-    Tracking | Drug     (= 3)   ⇒ Tracking episode recorded in the presence of 
-                                    drug(s)
-    Conditioning | Drug (= 5)   ⇒ Conditioning in the presence of drug(s)
-    
-    A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
-    an episode of "drug washout".
-    
-    A value of 0 and any value > 5 are invalid.
-    
-    """
-    Tracking        = 1 # used for tracking the electrophysiological behaviour of
-                        # a source (e.g., synaptic responses, somatic spiking, etc);
-                        # this is the most common type of electrophysiology recording
-                        # epiode
-    
-    Monitoring      = Tracking
-                        
-    Conditioning    = 2 # used for induction of plasticity (i.e. application of 
-                        # the induction protocol)
-                        
 
 class SynapticPathway: pass
 
@@ -1470,6 +1590,8 @@ class RecordingEpisode(Episode):
                  name: typing.Optional[str] = None,
                  episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
                  pathActivationBySweep: dict = dict() ,
+                 electrodeMode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
+                 clampMode:typing.Union[ClampMode, int, str] = ClampMode.NoClamp,
                  **kwargs):
         """Constructor for RecordingEpisode.
 
@@ -1561,7 +1683,7 @@ class RecordingEpisode(Episode):
         self._blocks_ = list()
         # self._pathways_ = list()
         
-        super().__init__(name=name)#, **kwargs)
+        super().__init__(name, **kwargs)
         
         if isinstance(blocks, (tuple, list, collections.deque)) and all(isinstance(v, neo.Block) for v in blocks):
             self._blocks_[:] = sorted(list(blocks), key = lambda x: x.rec_datetime)
@@ -1641,6 +1763,62 @@ class RecordingEpisode(Episode):
         if isinstance(endFrame, int):
             self.endFrame = endFrame
             
+        if isinstance(electrodeMode, (int, str)):
+            if electrodeMode not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {electrodeMode}")
+            
+            electrodeMode = ElectrodeMode.type(electrodeMode)
+            
+        if not isinstance(electrodeMode, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {electrodeMode}")
+        
+        self._electrodeMode_ = electrodeMode
+        
+        if isinstance(clampMode, (int, str)):
+            if clampMode not in ClampMode:
+                raise ValueError(f"Invalid clamp mode {clampMode}")
+            
+            clampMode = ClampMode.type(clampMode)
+            
+        if not isinstance(clampMode, ClampMode):
+            raise TypeError(f"Invalid clamp mode {clampMode}")
+        
+        self._clampMode_ = clampMode
+        
+    @property
+    def electrodeMode(self) -> ElectrodeMode:
+        return self._electrodeMode_
+    
+    @electrodeMode.setter
+    def electrodeMode(self, val:typing.Union[int, str, ElectrodeMode]):
+        if isinstance(val, (int, str)):
+            if val not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {val}")
+            
+            val = ElectrodeMode.type(val)
+            
+        if not isinstance(val, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {val}")
+        
+        self._electrodeMode_ = val
+        
+    @property
+    def clampMode(self) -> ClampMode:
+        return self._clampMode_
+    
+    @clampMode.setter
+    def clampMode(self, val:typing.Union[int, str, ClampMode]):
+        if isinstance(val, (int, str)):
+            if val not in ClampMode:
+                raise ValueError(f"Invalid clamp mode {val}")
+            
+            val = ClampMode.type(val)
+            
+        if not isinstance(val, ClampMode):
+            raise TypeError(f"Invalid clamp mode {val}")
+        
+        self._clampMode_ = val
+        
     def __repr__(self):
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
@@ -1648,15 +1826,9 @@ class RecordingEpisode(Episode):
         ret.append(f"\tFrames: {self.nFrames}")
         ret.append(f"\tbegin={self.begin}, end={self.end}")
         ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
+        ret.append(f"\tElectrode mode={self.electrodeMode}")
+        ret.append(f"\tClamp mode={self.clampMode}")
             
-        # pathways = self.pathways
-        # if len(pathways) == 0:
-        #     ret.append(f"\tPathways: []")
-        # else:
-        #     ret.append(f"\tPathways:")
-        #     for p in pathways:
-        #         ret.append(f"\t{p}")
-
         ret.append(f"\tPathway Stimulation by Sweep: {self.pathActivationBySweep}")
         
         ret.append(f"\tProtocol name: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
@@ -1708,14 +1880,15 @@ class RecordingEpisode(Episode):
         """Overrides datatypes.Episode.toHDF5"""
         
         from iolib import h5io
-        print(f"{self.__class__.__name__}.toHDF5: {self.name}")
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
-        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "type"))
+        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "type",
+                                                     "clampMode", "electrodeMode"))
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -1765,15 +1938,17 @@ class RecordingEpisode(Episode):
         end=attrs["end"]
         beginFrame=attrs["beginFrame"]
         endFrame=attrs["endFrame"]
-        # pathActivationBySweep=attrs["pathActivationBySweep"]
         episodeType=attrs["type"]
+        clampMode = attrs["clampMode"]
+        electrodeMode = attrs["electrodeMode"]
         
         return cls(name=name, episodeType=episodeType, begin=begin, end=end,
                 beginframe=beginFrame,endFrame=endFrame,
                 protocol=protocol,
                 blocks = blocks,
-                # pathways=pathways,
-                pathActivationBySweep=pathActivationBySweep)
+                pathActivationBySweep=pathActivationBySweep,
+                clampMode = clampMode,
+                electrodeMode = electrodeMode)
         
         
     @property
@@ -2125,7 +2300,7 @@ class RecordingSchedule(Schedule):
         # datatypes.Schedule, that method encodes datatype.Episode as h5py.Datasets
         # whereas here we need to encode RecordingEpisodes as h5py.Group
         from iolib import h5io
-        print(f"{self.__class__.__name__}.toHDF5: {self.name}")
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -2168,52 +2343,6 @@ class RecordingSchedule(Schedule):
         
         return cls(name, episodes=episodes)
         
-class SynapticPathwayType(TypeEnum):
-    """
-    Synaptic pathway type.
-    Encapsulates: Null, Test, Control, Auxiliary, UserDefined
-    
-    A Test pathway is defined by the presence of a Conditioning episode between
-    two non-Conditioning episodes - see RecordingEpisodeType class.
-    
-        A non-Conditioning episode is usually a Tracking episode, but can also be
-        a Crosstalk or Drug episode.
-        
-        Where justified, the test pathway may be "conditioned" more than once.
-        In this case, the Conditioning episodes MUST be separated by at least 
-        one non-Conditioning episode (usually a Tracking episode).
-        
-        In addition, there may be any number of Crosstalk, Drug and Washout
-        applied either before, or after the Conditioning episode.
-    
-    The Control pathway is defined by the presence of at least one Tracking
-        episode. No Conditioning episodes are allowed in a Control pathway.
-        
-    A combination of types IS NOT ALLOWED. The values were chosen to prevent
-    ambiguities. Thus,
-    
-    Null    | Control   ⇒ Control       (1)
-    Null    | Test      ⇒ Test          (2)
-    Control | Test      ⇒ Auxiliary     (3)
-    Control | Auxiliary ⇒ UserDefined   (4)
-    
-    Any value > 4 is invalid.
-    
-    """
-    Null        = 0 # undefined; can associate any episode type, EXCEPT for Conditioning and Tracking
-    Undefined   = Null
-    Control     = 1 # can associate any episode type, EXCEPT for Conditioning
-    Test        = 2 # can associate any episode type
-    Auxiliary   = 3 # can associate any episode type, EXCEPT for Tracking;
-                    # NOTE: this requirement is for analysis purpose only; the 
-                    # pathway can be activated during any type of episode, but
-                    # synaptic responses do not need to be analysed during the 
-                    # tracking episodes.
-                    # auxiliary pathways can be:
-                    # • present along the tracking pathway, during tracking only
-                    # • present along the induction pathway, during induction only
-                    # • present throughout
-    UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
     
 # @with_doc(BaseScipyenData, use_header=True)
 @dataclass
@@ -2225,18 +2354,59 @@ class SynapticPathway:
     """
     pathwayType: SynapticPathwayType = SynapticPathwayType.Null
     name: str = "pathway"
-    # stimulus: SynapticStimulus = field(default_factory = lambda: SynapticStimulus())
+    adc: int|None = None # physical index of the ADC channel used in recording this pathway
+    dac: int|None = None # physical index of the DAC channel used in recording this pathway
     stimulus: SynapticStimulus = field(default_factory = SynapticStimulus)
-    # electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
-    electrodeMode: ElectrodeMode = ElectrodeMode.Null
-    # clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
-    clampMode: ClampMode = ClampMode.NoClamp
-    # schedule: typing.Optional[RecordingSchedule] = None
+    
+    # NOTE: 2024-10-16 11:57:17
+    # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in
+    # either clamp mode, and the clamp mode can change during a session (i.e.,
+    # a sequence of recording trials).
+    #
+    # On the other hand it makes sense to define an electrode mode, as it cannot
+    # change during the session - once impaled, it would be tricky to also patch
+    # the cell, and vice-versa (although re-patching the cells has been reported,
+    # e.g. see Lamsa et al, Science 315:1262, 2007, for the purpose of this 
+    # software one can consider a repatched cell as the same source, with same
+    # electrode mode, but undergoing different episodes).
+    #
+    # THerefore:
+    # NOTE: 2024-10-16 13:36:07
+    # add clampMode to RecordingEpisode!
+    electrodeMode: InitVar[typing.Union[ElectrodeMode, int, str]] = ElectrodeMode.Null
     schedule: RecordingSchedule = field(default_factory = RecordingSchedule)
-    # measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
     measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = dict)
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
     
+    def __post_init__(self, electrodeMode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null):
+        if isinstance(electrodeMode, (int, str)):
+            if electrodeMode not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {electrodeMode}")
+            
+            electrodeMode = ElectrodeMode.type(electrodeMode)
+            
+        if not isinstance(electrodeMode, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {electrodeMode}")
+        
+        self._electrodeMode_ = electrodeMode
+        
+    @property
+    def electrodeMode(self) -> ElectrodeMode:
+        return self._electrodeMode_
+    
+    @electrodeMode.setter
+    def electrodeMode(self, val:typing.Union[int, str, ElectrodeMode]):
+        if isinstance(val, (int, str)):
+            if val not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {val}")
+            
+            val = ElectrodeMode.type(val)
+            
+        if not isinstance(val, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {val}")
+        
+        self._electrodeMode_ = val
+        
     def __eq__(self, other) -> bool:
         from dataclasses import fields
         ret = type(self) == type(other)
@@ -2252,7 +2422,7 @@ class SynapticPathway:
                        entity_cache) -> h5py.Group:
         
         from iolib import h5io
-        print(f"{self.__class__.__name__}.toHDF5: {self.name}")
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -2260,9 +2430,11 @@ class SynapticPathway:
             return cached_entity
         
         attrs = {"name": self.name,
+                 "adc": self.adc,
+                 "dac":self.dac,
                  "pathwayType": self.pathwayType,
                  "electrodeMode": self.electrodeMode,
-                 "clampMode": self.clampMode}
+                 }
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -2309,18 +2481,16 @@ class SynapticPathway:
         name = attrs["name"]
         pathwayType = attrs["pathwayType"]
         electrodeMode = attrs["electrodeMode"]
-        clampMode = attrs["clampMode"]
+        adc = attrs["adc"]
+        dac = attrs["dac"]
         schedule = h5io.fromHDF5(entity["schedule"], cache=cache)
         stimulus = h5io.fromHDF5(entity["stimulus"], cache=cache)
         source = h5io.fromHDF5(entity["source"], cache=cache)
         measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
         
-        return cls(name=name, pathwayType=pathwayType, stimulus=stimulus,
-                   electrodeMode=electrodeMode, clampMode=clampMode,
+        return cls(name=name, adc=adc, dac=dac, pathwayType=pathwayType, 
+                   stimulus=stimulus, electrodeMode=electrodeMode,
                    schedule=schedule, measurements=measurements, source=source)
-        
-        
-        
         
 @dataclass
 class LocationMeasure:

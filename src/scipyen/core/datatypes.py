@@ -799,6 +799,20 @@ class TypeEnum(IntEnum):
         return -1
     
     @classmethod
+    def __contains__(cls, value) -> bool:
+        if isinstance(value, cls):
+            return value in cls.types()
+        
+        elif isinstance(value, int):
+            return value in cls.values()
+        
+        elif isinstance(value, str):
+            return value in cls.names()
+        
+        else:
+            return False
+
+    @classmethod
     def type(cls, t):
         """Returns the enum type corresponding to `t`, where
         `t` can be:

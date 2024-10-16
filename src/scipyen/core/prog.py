@@ -97,7 +97,7 @@ class AttributeSpecification:
     allow_none:bool = False
     
     def __post_init__(self):
-        print(f"{self.__class__.__name__}.__post_init__:\nself.types: {self.types}")
+        # print(f"{self.__class__.__name__}.__post_init__:\nself.types: {self.types}")
         if not (isinstance(self.types, type)) and not (isinstance(self.types, tuple) and all(isinstance(t_, type) for t_ in self.types)):
                 raise DescriptorException(f"Incorrect type specification")
             
