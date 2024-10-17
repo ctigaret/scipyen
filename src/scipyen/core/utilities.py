@@ -979,13 +979,13 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
         if not ret:
             return ret
         
-        # if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
-        #     try:
-        #         # return np.all(x == y)
-        #         return x == y
-        #     except:
-        #         print(f"x is {type(x)}, y is {type(y)}")
-        #         raise
+        if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
+            try:
+                # return np.all(x == y)
+                return x.__eq__(y)
+            except:
+                print(f"x is {type(x)}, y is {type(y)}")
+                raise
         
         if isfunction(x):
             return x == y
@@ -3601,6 +3601,9 @@ def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Seque
         
         unique(seq, lambda x: x._some_member_property_or_getter_function_)
     
+        When None, elements are compared according via safe_identity_test function
+    defined in this module.
+    
     indices: bool, default is False. When True, the function returns a sequence
         of (element, index) tuples, where 'index' is the 0-based index of 
         'element' in 'seq'
@@ -3673,15 +3676,14 @@ def duplicates(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.S
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
-    if indices:
-        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, indices=indices, idcheck=idcheck)))
-        
-    else:
-        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, idcheck=idcheck), key=key))
+    return seq.__class__(gen_unique(gen_duplicates(seq, key=key, indices=indices, idcheck=idcheck)))
+#     if indices:
+#         
+#     else:
+#         return seq.__class__(gen_unique(gen_duplicates(seq, key=key, idcheck=idcheck), key=key))
     
     
 
-# def gen_unique(seq, key=None, indices:bool=False):
 def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
     """Iterates through unique elements in the sequence 'seq'.
     
@@ -3731,7 +3733,7 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
     See also:
     ========
     
-    unique for a function version
+    unique for a functional version
     
     gen_duplicates for iterating through the duplicates in 'seq'.
     
@@ -3815,7 +3817,6 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
             else:
                 yield from (x for x in seq if __check_val__(key))
             
-# def gen_duplicates(seq, key=None, indices:bool=False):
 def gen_duplicates(seq, key=None, indices:bool=False, idcheck:bool=True):
     """Iterates through the duplicate elements in the sequence 'seq'.
     Parameters:

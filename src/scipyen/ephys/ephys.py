@@ -1288,9 +1288,12 @@ class RecordingSource(__BaseSource__):
         ``` python
         mapping = self.getPathwayActivationbBySweep(protocol)
         
-        pathways = tuple(unique(itertools.chain.from_iterable(mapping.values())))
+        pathways = tuple(unique(itertools.chain.from_iterable(mapping.values()), idcheck=False))
         
         ```
+        (NOTE: `idcheck` is set to False in order to force comparing the SynapticPathway
+        objects by their properties, rather than their Python ID or memory locations)
+        
         
         See also:
         ---------
@@ -1680,6 +1683,9 @@ class RecordingEpisode(Episode):
         
         self._protocol_ = None
         
+        # sequence of neo.Block objects.
+        # these may be references to existing Block objects, or can be owned by
+        # the episode
         self._blocks_ = list()
         # self._pathways_ = list()
         
