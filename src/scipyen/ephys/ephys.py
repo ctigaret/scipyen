@@ -338,7 +338,9 @@ class __BaseSynStim__(typing.NamedTuple):
     name: str = "stim"
     channel: typing.Union[int, str] = 0
     dig: bool=True
-    
+
+class SynapticPathway: pass
+
 class SynapticStimulus(__BaseSynStim__):
     # see https://stackoverflow.com/questions/61844368/how-to-initialize-a-namedtuple-child-class-different-ways-based-on-input-argumen
     __slots__ = ()
@@ -756,103 +758,159 @@ def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optiona
     
     return AuxiliaryOutput(name, channel, digttl)
 
-class __BaseSource__(typing.NamedTuple):
+# class __BaseSource__(typing.NamedTuple):
+#     name: str = "cell"
+#     adc: int = 0
+#     dac: typing.Optional[int] = None
+#     syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
+#     auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
+#     auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
+#     electrodeMode: ElectrodeMode = ElectrodeMode.Null
+    
+# class RecordingSource(__BaseSource__):
+@dataclass
+class RecordingSource():
     name: str = "cell"
     adc: int = 0
     dac: typing.Optional[int] = None
-    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
-    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
-    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
-    electrodeMode: ElectrodeMode = ElectrodeMode.Null
+    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]]     = field(default_factory=list)
+    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]     = field(default_factory=list)
+    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]   = field(default_factory=list)
+    electrodeMode: ElectrodeMode = field(default=ElectrodeMode.Null)
+    pathways: InitVar[typing.Sequence[SynapticPathway]] = tuple()
     
-class RecordingSource(__BaseSource__):
-    __slots__ = ()
-    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
+    def __post_init__(self, pathways):
+        if isinstance(pathways, (tuple, list)) and len(pathways) and all(isinstance(p, SynapticPathway) and p.adc == self.adc and p.dac == self.dac for p in pathways):
+            pp = list()
+            for p in pathways:
+                if isinstance(self.syn, SynapticStimulus):
+                    if p.stimulus == self.syn:
+                        pp.append(p)
+                        
+                elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+                    if p.stimulus in self.syn:
+                        pp.append(p)
+                        
+            self.pathways = tuple(pp)
+            
+        elif isinstance(pathways, SynapticPathway):
+            if isinstance(self.syn, SynapticStimulus):
+                if pathways.stimulus == self.syn:
+                    self.pathways = (pathway, )
+                    
+            elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+                if pathways.stimulus in self.syn:
+                    self.pathways = (pathways, )
+                    
+        else:
+            if isinstance(self.syn, SynapticStimulus):
+                self.pathways = (SynapticPathway(source = self, stimulus = self.syn,
+                                        name = self.syn.name, adc = self.adc, 
+                                        dac = self.dac,
+                                        electrode = self.electrodeMode), )
+            elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+                if len(self.syn) == 1:
+                    self.pathways = tuple(SynapticPathway(source=self, stimulus = self.syn[0],
+                                        name = self.syn[0].name,
+                                        adc = self.adc, dac = self.dac,
+                                        electrode = self.electrodeMode))
+                elif len(self.syn) > 1:
+                    self.pathways = tuple(SynapticPathway(source=self, stimulus = s,
+                                                name = s.name,
+                                                adc = self.adc, dac = self.dac,
+                                                electrode = self.electrodeMode) for s in self.syn)
+                
+            else:
+                self.pathways = tuple()
+        
+    
+    # __slots__ = ()
+    # __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
 
-    __doc__ = "\n".join(["Semantic association between input and output signals in single-electrode recordings.\n",
-                   "Signature:\n",
-                   f"\tRecordingSource({__sig__})\n",
-                   "where:",
-                   "• name (str): The name of the source; default is 'cell'\n",
-                   "• adc (int): The PHYSICAL¹ index (int) or name (str) of the ADC channel for the",
-                   "    input signal containing the recorded electric behaviour of the source",
-                   "    (a.k.a the primary 'input' channel i.e., cell or field → amplifier → DAQ device).\n",
-                   "• dac (int, None): The PHYSICAL index (int) or name (str) of the DAC channel",
-                   "    sending analog commands to the source in voltage- or current-clamp, (a.k.a the primary 'output', i.e.,",
-                   "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
-                   "    Optional; default is None².\n",
-                   "    WARNING: This must be the DAC channel actually used for clamping.\n",
-                   "    and not necessarily the 'active' DAC channel of the protocol\n",
-                   "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
-                   "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
-                   "    (one SynapticStimulus per synaptic pathway).",
-                   "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
-                   "    from those specified in 'dac', or 'auxout' fields of this object. ",
-                   "    Optional; default is SynapticStimulus('stim', None, None).\n",
-                   "• auxin (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
-                   "    NOTE: When present, these must specify ADCs distinct from the 'adc' above",
-                   "    Optional; default is None.\n",
-                   "• auxout (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
-                   "    Auxiliary outputs for purposes OTHER THAN clamping command waveforms or ",
-                   "    synaptic stimulation (e.g., imaging frame triggers, etc)",
-                   "    NOTE: These must be distinct from the channels specified by the 'dac' ",
-                   "    or 'syn' fields above.",
-                   "    Optional; default is None.\n",
-                   "",
-                   "Channel indices are expected to be >= 0 and correspond to the",
-                   "    PHYSICAL¹ (NOT logical!) channel indices in the acquisition protocol. ",
-                   "",
-                   "Channel names are as assigned in the acquisition protocol (if available).",
-                   "",
-                   "NOTES:",
-                   "",
-                   "¹ Analog channels (analog input — ADCs — or output — DACs) have both physical ",
-                   "    and logical indices. Physical indices are integers from 0 to one less than the ",
-                   "    maximum number of physical channels of the same category (i.e. input or output)",
-                   "    provided by the digital acquisition (DAQ) device.",
-                   "    Logical indices are integers from 0 to one less than maximum number of channels",
-                   "    of the same category, ACTUALLY used in the recording protocol.",
-                   "",
-                   "    Assuming a DAQ device provides eight ADCs (physical indices 0-7)",
-                   "    with only four of these used to record data (say, 0, 1, 5, 6) - their",
-                   "    logical indices would be 0-3, corresponding to physical indices as follows:",
-                   "    0: 0, 1: 1, 2: 5, 3: 6",
-                   "",
-                   "    The logical index is also the index of the recorded signal stored in the file.",
-                   "    E.g. in an ABF file, the signal at index 0 may have been recorded from the physical",
-                   "    ADC 1 (taking data from, say, the second amplifier channel).",
-                   "    In such case, the ADC in question has physical index 1, and logical index 0.",
-                   "",
-                   "    A more complex case is when a large set of inputs is specified in the recording",
-                   "    protocol, such that the signal recorded from the cell via the physical ADC ends up ",
-                   "    with a higher index in the file. Here, specifying a logical index of 0 will not",
-                   "    indicate the actual ADC channel used to record from the cell.",
-                   "",
-                   "    Because of this, it is not possible to infer which ADC channel has been",
-                   "    actually used to record from a source (cell or field) based only on the",
-                   "    signals contained in the recorded file."
-                   "",
-                   "    The RecordingSource object helps avoid such ambiguities.",
-                   "",
-                   "",
-                   "²   The DAC channels are used for sending analog `command` signals to the recorded source",
-                   "    in order to `clamp` the membrane potential or membrane current. However, not all experiments",
-                   "    require this — a good example are field recordings, where there is nothing to `clamp`."
-                   "",
-                   "ADDITIONAL NOTES: ",
-                   "",
-                   "1. This object type is oblivious to the recording mode or electrode mode.",
-                   "",
-                   "2. The order of parameters matters, unless they are given as name↦value pairs.",
-                   "",
-                   "3. A RecordingSource object is immutable. However one can create a modified copy by calling",
-                   "    its '_replace' method specifying different values to selected fields, e.g.:",
-                   "",
-                   "\t source1 = RecordingSource('cell1', 0, 1, SynapticStimulus('path0', 0))",
-                   "",
-                   "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
-                   "",
-                   ])
+    # __doc__ = "\n".join(["Semantic association between input and output signals in single-electrode recordings.\n",
+    #                "Signature:\n",
+    #                f"\tRecordingSource({__sig__})\n",
+    #                "where:",
+    #                "• name (str): The name of the source; default is 'cell'\n",
+    #                "• adc (int): The PHYSICAL¹ index (int) or name (str) of the ADC channel for the",
+    #                "    input signal containing the recorded electric behaviour of the source",
+    #                "    (a.k.a the primary 'input' channel i.e., cell or field → amplifier → DAQ device).\n",
+    #                "• dac (int, None): The PHYSICAL index (int) or name (str) of the DAC channel",
+    #                "    sending analog commands to the source in voltage- or current-clamp, (a.k.a the primary 'output', i.e.,",
+    #                "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
+    #                "    Optional; default is None².\n",
+    #                "    WARNING: This must be the DAC channel actually used for clamping.\n",
+    #                "    and not necessarily the 'active' DAC channel of the protocol\n",
+    #                "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
+    #                "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
+    #                "    (one SynapticStimulus per synaptic pathway).",
+    #                "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
+    #                "    from those specified in 'dac', or 'auxout' fields of this object. ",
+    #                "    Optional; default is SynapticStimulus('stim', None, None).\n",
+    #                "• auxin (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
+    #                "    NOTE: When present, these must specify ADCs distinct from the 'adc' above",
+    #                "    Optional; default is None.\n",
+    #                "• auxout (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
+    #                "    Auxiliary outputs for purposes OTHER THAN clamping command waveforms or ",
+    #                "    synaptic stimulation (e.g., imaging frame triggers, etc)",
+    #                "    NOTE: These must be distinct from the channels specified by the 'dac' ",
+    #                "    or 'syn' fields above.",
+    #                "    Optional; default is None.\n",
+    #                "",
+    #                "Channel indices are expected to be >= 0 and correspond to the",
+    #                "    PHYSICAL¹ (NOT logical!) channel indices in the acquisition protocol. ",
+    #                "",
+    #                "Channel names are as assigned in the acquisition protocol (if available).",
+    #                "",
+    #                "NOTES:",
+    #                "",
+    #                "¹ Analog channels (analog input — ADCs — or output — DACs) have both physical ",
+    #                "    and logical indices. Physical indices are integers from 0 to one less than the ",
+    #                "    maximum number of physical channels of the same category (i.e. input or output)",
+    #                "    provided by the digital acquisition (DAQ) device.",
+    #                "    Logical indices are integers from 0 to one less than maximum number of channels",
+    #                "    of the same category, ACTUALLY used in the recording protocol.",
+    #                "",
+    #                "    Assuming a DAQ device provides eight ADCs (physical indices 0-7)",
+    #                "    with only four of these used to record data (say, 0, 1, 5, 6) - their",
+    #                "    logical indices would be 0-3, corresponding to physical indices as follows:",
+    #                "    0: 0, 1: 1, 2: 5, 3: 6",
+    #                "",
+    #                "    The logical index is also the index of the recorded signal stored in the file.",
+    #                "    E.g. in an ABF file, the signal at index 0 may have been recorded from the physical",
+    #                "    ADC 1 (taking data from, say, the second amplifier channel).",
+    #                "    In such case, the ADC in question has physical index 1, and logical index 0.",
+    #                "",
+    #                "    A more complex case is when a large set of inputs is specified in the recording",
+    #                "    protocol, such that the signal recorded from the cell via the physical ADC ends up ",
+    #                "    with a higher index in the file. Here, specifying a logical index of 0 will not",
+    #                "    indicate the actual ADC channel used to record from the cell.",
+    #                "",
+    #                "    Because of this, it is not possible to infer which ADC channel has been",
+    #                "    actually used to record from a source (cell or field) based only on the",
+    #                "    signals contained in the recorded file."
+    #                "",
+    #                "    The RecordingSource object helps avoid such ambiguities.",
+    #                "",
+    #                "",
+    #                "²   The DAC channels are used for sending analog `command` signals to the recorded source",
+    #                "    in order to `clamp` the membrane potential or membrane current. However, not all experiments",
+    #                "    require this — a good example are field recordings, where there is nothing to `clamp`."
+    #                "",
+    #                "ADDITIONAL NOTES: ",
+    #                "",
+    #                "1. This object type is oblivious to the recording mode or electrode mode.",
+    #                "",
+    #                "2. The order of parameters matters, unless they are given as name↦value pairs.",
+    #                "",
+    #                "3. A RecordingSource object is immutable. However one can create a modified copy by calling",
+    #                "    its '_replace' method specifying different values to selected fields, e.g.:",
+    #                "",
+    #                "\t source1 = RecordingSource('cell1', 0, 1, SynapticStimulus('path0', 0))",
+    #                "",
+    #                "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
+    #                "",
+    #                ])
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -891,6 +949,11 @@ class RecordingSource(__BaseSource__):
                             track_order=track_order,
                             entity_cache=entity_cache)
         
+        h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
         h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
 
@@ -912,6 +975,7 @@ class RecordingSource(__BaseSource__):
         syn = h5io.fromHDF5(entity["syn"], cache=cache)
         auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
         auxout = h5io.fromHDF5(entity["auxout"], cache=cache)
+        pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
         
         return cls(name=name, adc=adc, dac=dac, syn=syn, 
                    auxin=auxin, auxout=auxout, electrodeMode = electrodeMode)
@@ -968,36 +1032,42 @@ class RecordingSource(__BaseSource__):
         
         return tuple()
     
-    @property
-    def pathways(self) -> tuple:
-        """Factory for SynapticPathway objects based on the specifications in the `syn` field.
-        The SynapticPathway fields `pathwayType`, `schedule` and `measurement` 
-        will have their default values.
-        
-        Returns a possibly empty tuple of SynapticPathway objects where all their 
-        fields are set to default values, except for their 'name', 'stimulus',
-        and 'source'.
-    
-        """
-        if isinstance(self.syn, SynapticStimulus):
-            return (SynapticPathway(source = self, stimulus = self.syn,
-                                    name = self.syn.name, adc = self.adc, 
-                                    dac = self.dac,
-                                    electrode = self.electrodeMode), )
-            
-        if isinstance(self.syn, (tuple, list)):
-            if len(self.syn) == 1:
-                return tuple(SynapticPathway(source=self, stimulus = self.syn[0],
-                                       name = self.syn[0].name,
-                                       adc = self.adc, dac = self.dac,
-                                       electrode = self.electrodeMode))
-            elif len(self.syn) > 1:
-                return tuple(SynapticPathway(source=self, stimulus = s,
-                                             name = s.name,
-                                             adc = self.adc, dac = self.dac,
-                                             electrode = self.electrodeMode) for s in self.syn)
-            
-        return tuple()
+    # FIXME: 2024-10-17 22:35:04
+    # this approach is WRONG, because it will create a new Python object 
+    # (SynapticPathway instance) every time the property getter is called; this
+    # creates all sorts of trouble when attempting to use them by reference, down 
+    # the line (the new objects represent conceptually the same pathway even if 
+    # they are distinct Python objects!)
+#     @property
+#     def pathways(self) -> tuple:
+#         """Factory for SynapticPathway objects based on the specifications in the `syn` field.
+#         The SynapticPathway fields `pathwayType`, `schedule` and `measurement` 
+#         will have their default values.
+#         
+#         Returns a possibly empty tuple of SynapticPathway objects where all their 
+#         fields are set to default values, except for their 'name', 'stimulus',
+#         and 'source'.
+#     
+#         """
+#         if isinstance(self.syn, SynapticStimulus):
+#             return (SynapticPathway(source = self, stimulus = self.syn,
+#                                     name = self.syn.name, adc = self.adc, 
+#                                     dac = self.dac,
+#                                     electrode = self.electrodeMode), )
+#             
+#         if isinstance(self.syn, (tuple, list)):
+#             if len(self.syn) == 1:
+#                 return tuple(SynapticPathway(source=self, stimulus = self.syn[0],
+#                                        name = self.syn[0].name,
+#                                        adc = self.adc, dac = self.dac,
+#                                        electrode = self.electrodeMode))
+#             elif len(self.syn) > 1:
+#                 return tuple(SynapticPathway(source=self, stimulus = s,
+#                                              name = s.name,
+#                                              adc = self.adc, dac = self.dac,
+#                                              electrode = self.electrodeMode) for s in self.syn)
+#             
+#         return tuple()
         
     @property
     def in_daq_cmd(self) -> tuple:
@@ -1396,69 +1466,101 @@ class RecordingSource(__BaseSource__):
 #             
 #         return mainPathways, altPathways
 #     
-    @classmethod
-    def __new__(cls, *args, **kwargs):
-        super_anns = super().__annotations__
-        fields = list(super_anns.keys())
-        super_defaults = super()._field_defaults
-        
-        args = args[1:] # drop cls
-        
-        if len(args) > len(super_anns):
-            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
-        
-        new_args = dict()
-        
-        for k, arg in enumerate(args):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
-                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-            new_args[fields[k]] = arg
-            
-        if len(new_args) == len(super_anns):
-            if len(kwargs):
-                dups = [k for k in kwargs if k in fields]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-                else:
-                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-                
-        else:
-            if len(kwargs):
-                dups = [k for k in kwargs if k in new_args]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-                
-                spurious = [k for k in kwargs if k not in fields]
-                if len(spurious):
-                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-                
-                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-                
-                new_args.update(new_kwargs)
-                
-            # finally, add the default unspecified args
-            for (k,v) in super_defaults.items():
-                if k not in new_args:
-                    new_args[k] = v
-                    
-        return super().__new__(cls, **new_args)
-    
+#     @classmethod
+#     def __new__(cls, *args, **kwargs):
+#         super_anns = super().__annotations__
+#         fields = list(super_anns.keys())
+#         super_defaults = super()._field_defaults
+#         
+#         args = args[1:] # drop cls
+#         
+#         if len(args) > len(super_anns):
+#             raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+#         
+#         new_args = dict()
+#         
+#         for k, arg in enumerate(args):
+#             if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+#                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+#             new_args[fields[k]] = arg
+#             
+#         if len(new_args) == len(super_anns):
+#             if len(kwargs):
+#                 dups = [k for k in kwargs if k in fields]
+#                 if len(dups):
+#                     raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+#                 else:
+#                     raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+#                 
+#         else:
+#             if len(kwargs):
+#                 dups = [k for k in kwargs if k in new_args]
+#                 if len(dups):
+#                     raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+#                 
+#                 spurious = [k for k in kwargs if k not in fields]
+#                 if len(spurious):
+#                     raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+#                 
+#                 new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+#                 
+#                 new_args.update(new_kwargs)
+#                 
+#             # finally, add the default unspecified args
+#             for (k,v) in super_defaults.items():
+#                 if k not in new_args:
+#                     new_args[k] = v
+#                     
+#         self = super().__new__(cls, **new_args)
+#         ret._fields = ret._fields + ("pathways", )
+#         ret._field_defaults = ret._field_defaults + tuple()
+#         
+#         if isinstance(ret.syn, SynapticStimulus):
+#             pathways = (SynapticPathway(source = ret, stimulus = ret.syn,
+#                                     name = ret.syn.name, adc = ret.adc, 
+#                                     dac = ret.dac,
+#                                     electrode = ret.electrodeMode), )
+#         elif isinstance(ret.syn, (tuple, list)):
+#             if len(ret.syn) == 1:
+#                 pathways = tuple(SynapticPathway(source=ret, stimulus = ret.syn[0],
+#                                        name = ret.syn[0].name,
+#                                        adc = ret.adc, dac = ret.dac,
+#                                        electrode = ret.electrodeMode))
+#             elif len(ret.syn) > 1:
+#                 pathways = tuple(SynapticPathway(source=ret, stimulus = s,
+#                                              name = s.name,
+#                                              adc = ret.adc, dac = ret.dac,
+#                                              electrode = ret.electrodeMode) for s in ret.syn)
+#             
+#         else:
+#             pathways = tuple()
+#             
+#         setattr(ret, "pathways", pathways)
+#         
+#         
+#         return ret
+#     
     def __repr__(self) -> str:
         import dataclasses
         ret = [f"{self.__class__.__name__}("]
-        ret += ", ".join([f"{a}={getattr(self,a).name if a == 'electrodeMode' else getattr(self, a)}" for a in self._fields])
+        ret += ", ".join([f"{a.name}={getattr(self,a.name).name if a == 'electrodeMode' else getattr(self, a.name)}" for a in dataclasses.fields(self)])
         ret +=[")"]
+        if len(self.pathways):
+            ret += f"with{len(self.pathways)} synaptic pathways:\n"
+            if len(self.pathways) <= 5:
+                ret += ", ".join([f"{p.name}" for p in self.pathways])
+            else:
+                ret += ",\n".join([f"{p.name}" for p in self.pathways])
         return "".join(ret)
     
-RecordingSource.name.__doc__ = "str: The name of the source; default is 'cell'"
-RecordingSource.adc.__doc__  = "int, str: The index or name of the primary ADC channel — records the eletrical behaviour of the source (cell or field)."
-RecordingSource.dac.__doc__  = "int, str: The index or name of the primary DAC channel — the output channel that operates the voltage- or current-clamp."
-RecordingSource.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus objects or None — origin of trigger (TTL-like) signals for synaptic stimulation, one per 'synaptic pathway'."
-RecordingSource.auxin.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
-RecordingSource.auxout.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
+# RecordingSource.name.__doc__ = "str: The name of the source; default is 'cell'"
+# RecordingSource.adc.__doc__  = "int, str: The index or name of the primary ADC channel — records the eletrical behaviour of the source (cell or field)."
+# RecordingSource.dac.__doc__  = "int, str: The index or name of the primary DAC channel — the output channel that operates the voltage- or current-clamp."
+# RecordingSource.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus objects or None — origin of trigger (TTL-like) signals for synaptic stimulation, one per 'synaptic pathway'."
+# RecordingSource.auxin.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
+# RecordingSource.auxout.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
 
 
-class SynapticPathway: pass
 
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class RecordingEpisode(Episode):
@@ -2383,6 +2485,11 @@ class SynapticPathway:
     pathType: InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
     
     schedule: RecordingSchedule = field(default_factory = RecordingSchedule)
+    
+    # CAUTION 2024-10-17 22:31:14 FIXME
+    # these measurements MUST be mapped to the episode boundaries, so that one 
+    # can easily access the measurement values during a particular episode or
+    # across several apisodes of the schedule!
     measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = dict)
     source: RecordingSource = field(default_factory = lambda: RecordingSource())
     
