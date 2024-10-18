@@ -804,18 +804,18 @@ class RecordingSource():
                     
         else:
             if isinstance(self.syn, SynapticStimulus):
-                self.pathways = (SynapticPathway(source = self, stimulus = self.syn,
+                self.pathways = (SynapticPathway(stimulus = self.syn,
                                         name = self.syn.name, adc = self.adc, 
                                         dac = self.dac,
                                         electrode = self.electrodeMode), )
             elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
                 if len(self.syn) == 1:
-                    self.pathways = tuple(SynapticPathway(source=self, stimulus = self.syn[0],
+                    self.pathways = tuple(SynapticPathway(stimulus = self.syn[0],
                                         name = self.syn[0].name,
                                         adc = self.adc, dac = self.dac,
                                         electrode = self.electrodeMode))
                 elif len(self.syn) > 1:
-                    self.pathways = tuple(SynapticPathway(source=self, stimulus = s,
+                    self.pathways = tuple(SynapticPathway(stimulus = s,
                                                 name = s.name,
                                                 adc = self.adc, dac = self.dac,
                                                 electrode = self.electrodeMode) for s in self.syn)
@@ -1215,7 +1215,7 @@ class RecordingSource():
     
     def getPathwaysByStimulationType(self, digital:typing.Optional[bool]=None,
                                      asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
-        """Classifies the pathways in this `src` according to the means of activation.
+        """Groups the synaptic pathways in this recording source by their means of activation.
         
         A synaptic pathway is activated by stimulating its synaptic inputs¹ using a
         physical "stimulus": e.g., electric pulse delivered to axons through electrodes, 
@@ -1289,13 +1289,14 @@ class RecordingSource():
             return {"DACStimPathways": dac_stim, "DIGStimPathways": dig_stim}
         return dac_stim, dig_stim
         
-    def pathwaysFromProtocol(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
-        """Constructs SynapticPathway objects used in 'protocol', based on this source specifications.
-    
-        Generates SynapticPathway objects after checking which ADC/DAC/DIG channels
-        specified in this source definition are actually used by the protocol.
+    def pathwaysInProtocol(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+        """SynapticPathway objects used in 'protocol'.
         
-        Returns new instances of SynapticPathway, grouped by their stimulation
+        The method identified which SynapticPathway objects defined by this 
+        RecordingSource are actually used in the specified protocol, by checking
+        the usage of the pathway's ADC/DAC/DIG channels in the protocol.
+        
+        SynapticPathway objects are grouped by their stimulation
         method (DIG TTL or DAC emulation of TTL) and wrapped in a tuple or dict.
         
         To obtain a sequence of the SynapticPathway instances use the following
@@ -1303,7 +1304,7 @@ class RecordingSource():
         
         ``` python
         
-        tuple(unique(itertools.chain.from_iterable(src.pathwaysFromProtocol(protocol))))
+        tuple(unique(itertools.chain.from_iterable(src.pathwaysInProtocol(protocol)), idcheck=False))
         
         ```
         
@@ -1367,10 +1368,10 @@ class RecordingSource():
         
         See also:
         ---------
-        • self.pathwaysFromProtocol
+        • self.pathwaysInProtocol
         
         """
-        protocol_dac_stim_pathways, protocol_dig_stim_pathways = self.pathwaysFromProtocol(protocol)
+        protocol_dac_stim_pathways, protocol_dig_stim_pathways = self.pathwaysInProtocol(protocol)
         if all(len(x) == 0 for x in (protocol_dac_stim_pathways, protocol_dig_stim_pathways)):
             return dict()
         
@@ -1546,7 +1547,7 @@ class RecordingSource():
         ret += ", ".join([f"{a.name}={getattr(self,a.name).name if a == 'electrodeMode' else getattr(self, a.name)}" for a in dataclasses.fields(self)])
         ret +=[")"]
         if len(self.pathways):
-            ret += f"with{len(self.pathways)} synaptic pathways:\n"
+            ret += f" with {len(self.pathways)} synaptic pathways:\n"
             if len(self.pathways) <= 5:
                 ret += ", ".join([f"{p.name}" for p in self.pathways])
             else:
@@ -2491,7 +2492,7 @@ class SynapticPathway:
     # can easily access the measurement values during a particular episode or
     # across several apisodes of the schedule!
     measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = dict)
-    source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    # source: RecordingSource = field(default_factory = lambda: RecordingSource())
     
     def __post_init__(self, electrode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
                       pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
@@ -2611,10 +2612,10 @@ class SynapticPathway:
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
         
-        h5io.toHDF5(self.source, entity, name="source", oname="source",
-                            compression=compression, chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
+        # h5io.toHDF5(self.source, entity, name="source", oname="source",
+        #                     compression=compression, chunks=chunks,
+        #                     track_order=track_order,
+        #                     entity_cache=entity_cache)
         
         h5io.toHDF5(self.stimulus, entity, name="stimulus", oname="stimulus",
                             compression=compression, chunks=chunks,
@@ -2651,12 +2652,12 @@ class SynapticPathway:
         dac = attrs["dac"]
         schedule = h5io.fromHDF5(entity["schedule"], cache=cache)
         stimulus = h5io.fromHDF5(entity["stimulus"], cache=cache)
-        source = h5io.fromHDF5(entity["source"], cache=cache)
+        # source = h5io.fromHDF5(entity["source"], cache=cache)
         measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
         
         return cls(name=name, adc=adc, dac=dac, pathType=pathwayType, 
                    stimulus=stimulus, electrode=electrodeMode,
-                   schedule=schedule, measurements=measurements, source=source)
+                   schedule=schedule, measurements=measurements)#, source=source)
         
 @dataclass
 class LocationMeasure:

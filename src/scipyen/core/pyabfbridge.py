@@ -730,10 +730,10 @@ class ABFEpoch:
     
     @property
     def emulatesTTL(self) -> bool:
-        """True when epoch type is ABFEpochType.Pulse and meets conditions below:
-        • First level != 0
-        • Delta level  == 0
-        • Delta duration  == 0
+        """True when epoch type is ABFEpochType.Pulse and meets the conditions below:
+        • First level       != 0
+        • Delta level       == 0
+        • Delta duration    == 0
         • all digital outputs are zero
         First duration, train rate and pulse duration are all > 0 (enforced by Clampex)
         """
@@ -2253,8 +2253,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Examples:
         ---------
         
-        Example 1: given a source declaring two pathways stimulated, 
-            respectively via DIG 0 and DIG 1, and a protocol that stimulates 
+        Example 1: given a source declaring two pathways stimulated, respectively, 
+            via digital channels DIG 0 and DIG 1, and a protocol that stimulates 
             these pathways alternatively according to the schematic below 
             (NOTE: protocol has alternateDigitalOutputStateEnabled True),
         
@@ -2332,10 +2332,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             even if both pathways are also stimulated several times later).
         
             When `byFirstStimulus` is False, the function returns the full 
-            stimulation sequence of the pathways in the sweep
+            stimulation sequence of the pathways in the sweep.
         
         Example 4: Same recording source as above, but the protocol defines a single
             sweep for the stimulation of a single pathway
+            TODO! docstring for this example
         
         """
         # from ephys.ephys import SynapticPathway
@@ -2358,40 +2359,53 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if not all(isinstance(v, self.SynapticPathway) for v in pathways):
             raise TypeError("`pathways` expected to be a sequence of ephys.SynapticPathway objects")
         
+        pathways = utilities.unique(pathways, idcheck=False)
         # pathways = utilities.unique([p for p in pathways if p.stimulus.dig])
-        pathways = [p for p in pathways if p.stimulus.dig]
+        # digStimPathways = [p for p in pathways if p.stimulus.dig]
+        # dacStimPathways = [p for p in pathways if p.stimulus.dig]
         
-        if len(pathways) == 0:
-            scipywarn("Neither pathway declares stimuus via a digital output channel")
-            return
+        ret = tuple()
         
-        if byFirstStimulus:
-            # NOTE: 2024-03-10 20:11:22
-            # description of the algorithm in the one-line nested comprehension
-            # below:
-            # for each sweep:
-            #   for each pathway:
-            #       get the epochs with digital stimulus ON for the pathway's stimulus channel, in current sweep
-            #           → as tuples of pathway index, epochs sequence
-            #           (NOTE: the epochs sequence there may have more than one epoch, or NO epoch if there is no stimulation on that DIG channel in current sweep)
-            #       take out (filter) the entries with no epochs
-            #       sort entries by the start time of the first epoch in the entry (does nothing of no entry left after the filter step)
-            # collect a tuple of tuples: (sweep index, tuple of pathway indices ordered by the time of their first epoch, sorted above)
-            if indices:
-                return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
-            return tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(p, dac.getEpochsForDigitalChannel(p.stimulus.channel, s)) for p in pathways]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
-            
-        else:
-            # NOTE: 2024-03-10 20:14:34
-            # description of the algorithm (one-liner nested comprehensions)
-            # for each sweep:
-            #   get epochs with digital output
-            #   collect only those that use the stimulus digital channel declared in the pathway specifications
-            # collect a tuple of tuples: (sweep index, tuple of pathway indices stimulated in all epochs in the sweep)
-            if indices:
-                return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
-            return tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda p: p.stimulus.channel == c, pathways) for c in e.getUsedDigitalOutputChannels(s%2 > 0))])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+        if len(pathways):
+            if byFirstStimulus:
+                # NOTE: 2024-03-10 20:11:22
+                # description of the algorithm in the one-line nested comprehension
+                # below:
+                # 1. for each sweep:
+                #   1.1. for each pathway:
+                #       1.1.1. get the epochs with digital stimulus ON for the pathway's 
+                #       digital stimulus channel, in the current sweep →
+                #           → as tuples of pathway index, epochs sequence
+                #           (NOTE: the epochs sequence there may have more than 
+                #           one epoch, or NO epoch if there is no stimulation on 
+                #           that DIG channel, in current sweep)
+                #       1.1.2. take out (filter) the entries with no epochs
+                #       1.1.3. sort entries by the start time of the first epoch in 
+                #           the entry (does nothing if no entry left after the filter 
+                #           in step 1.1.2.)
+                # 2. collect a tuple of tuples: (sweep index, tuple of pathway indices 
+                #   ordered by the time of their first epoch, sorted as in step 1.1.3. above)
+                if indices:
+                    # this one returns pathway INDEXES, NOT pathway objects
+                    ret = tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
+                else:
+                    # this one returns pathway OBJECTS, NOT THEIR INDEXES
+                    ret = tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(p, dac.getEpochsForDigitalChannel(p.stimulus.channel, s)) for p in pathways]))), key = lambda x: dac.getEpochStartTime(x[1][0]))))) for s in range(self.nSweeps))
                 
+            else:
+                # NOTE: 2024-03-10 20:14:34
+                # description of the algorithm (one-liner nested comprehensions)
+                # 2. for each sweep:
+                #   2.1. get epochs with digital output
+                #   2.2. collect only those that use the stimulus digital channel 
+                #       declared in the pathway specifications
+                # collect a tuple of tuples: (sweep index, tuple of pathway indices stimulated in all epochs in the sweep)
+                if indices:
+                    ret = tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda k: pathways[k].stimulus.channel == c, range(len(pathways)))) for c in e.getUsedDigitalOutputChannels(s%2 > 0)])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+                else:
+                    ret = tuple([(s, tuple(itertools.chain.from_iterable([list(itertools.chain.from_iterable([list(filter(lambda p: p.stimulus.channel == c, pathways) for c in e.getUsedDigitalOutputChannels(s%2 > 0))])) for e in dac.getEpochsWithDigitalOutput()]))) for s in range(self.nSweeps)])
+                
+        return ret
     
     @property
     def inputs(self):
@@ -3522,7 +3536,27 @@ class ABFOutputConfiguration:
         """List of ABF Epochs emitting digital signals (TTLs)"""
         return [e for e in self.epochs if len(e.getUsedDigitalOutputChannels())]
     
-    def getEpochsWithTTLWaveforms(self) -> typing.List[ABFEpoch]:
+    def getEpochsWithTTLWaveforms(self, sweep:int = 0,
+                                  indexes: bool=False,
+                                  train: typing.Optional[bool] = None) -> typing.List[ABFEpoch]:
+        """Returns the epochs (or their indices) where the DAC emits TTL-emulating wavforms.
+        A an epoch with TTL-emulating waveform(s) has:
+        • type ABFEpochType.Pulse
+        • First level       != 0 (NOTE: this should be ± 5 V but this is not
+                                    enforced here)
+        • Delta level       == 0
+        • Delta duration    == 0
+        • all digital outputs are 0 (off)
+        
+        See also ABFEpoch.emulatesTTL()
+        
+        Furthermore, the DACs index must be > 2 (the first two DACs are ALWAYS 
+        used for clamping waveforms, not for trigger emulation)
+        
+        """
+        isAlternateWaveorm = self.alternateDACOutputStateEnabled and sweep % 2 > 0
+        ret = list()
+        
         return [e for e in self.epochs if e.emulatesTTL]
     
     def getDigitalTriggerEvent(self, sweep:int = 0, digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
@@ -4428,7 +4462,8 @@ class ABFOutputConfiguration:
         return digOFF * pq.V
         
     def getEpochsForDigitalChannel(self, digChannel: int, sweep: int = 0, 
-                                   indexes: bool=False, train: typing.Optional[bool] = None) -> list:
+                                   indexes: bool=False, 
+                                   train: typing.Optional[bool] = None) -> list:
         """Returns the index of the epoch where the digChannel is used (set to 1 or '*')
         Parameters:
         -----------
