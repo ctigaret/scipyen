@@ -1134,23 +1134,18 @@ class ABFEpoch:
         else:
             return False
 
-# These two will be (properly) redefined further below
-# class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
-#     pass
-# class ABFInputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
-#     pass                         # will be (properly) redefined further below
-
 class ABFProtocol(ElectrophysiologyProtocol):
+    """Instance of an ABF protocol (for Clampex v ≥ 10).
+    Particularities:
+        • When "Alternative Waveforms" is enabled, only TWO DACs will emit analog
+        waveforms, on alternative sweeps ()
+    """
     # TODO 2024-07-19 13:19:40 FIXME URGENTLY
     # implement code related to pyabf stimulusFilefolder & stimulusWaveformFromFile
     # 
     from ephys.ephys import SynapticPathway
     from ephys.ephys import ClampMode
     
-    # def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF,neo.Block]]=None,
-    #              generateOutputConfigs:bool=True,
-    #              generateInputConfigs:bool=True,
-    #              **kwargs):
     def __init__(self, obj:typing.Optional[typing.Union[pyabf.ABF,neo.Block]]=None,
                  **kwargs):
         super().__init__()
@@ -1718,7 +1713,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         OR:
         • when no DAC is sending digital output, it is the channel with the 
             highest index that sends out analog waveforms
-            
         
         NOTE 1:
         ∘ when "Alternate Digital Outputs" is DISABLED in the "Waveform" tab:
@@ -2225,11 +2219,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
             that emit stimulus signals. See examples below
         
         indices: bool, default is True.
-            When True, the returned tuple will contain
-            the indexes of the pathways in the sequence of pathways suppkied in 
-            the 'pathways' parameter (see above)
-            When False, the return tuple will contin a reference to 
-            the pathway itself
+            When True, the returned tuple will contain the indexes of the pathways 
+                in the sequence supplied in the 'pathways' parameter (see above)
+            When False, the return tuple will contin a reference to the pathway 
+                itself
             
         
         Returns:
@@ -2989,11 +2982,6 @@ class ABFOutputConfiguration:
 
         if not isinstance(protocol, ABFProtocol):
             protocol = None
-        # if isinstance(protocol, ABFProtocol):
-        #     assert self._protocol_._sourceHash_ == hash(obj) and self._protocol_._sourceId_ == id(obj), f"The source {type(obj).__name__} object does not appear linked to the supplied protocol"
-        # else:
-        #     protocol = None
-            # raise TypeError(f"'protocol' expected to be an ABFProtocol object; instead, got {type(protocol).__name__}")
         
         self._protocol_ = protocol
         
