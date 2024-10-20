@@ -975,8 +975,10 @@ def get_neo_version():
     major, minor, dot = importlib.metadata.version("neo").split(".")
     return eval(major), eval(minor), eval(dot)
 
-def getGeneratorInfo(o:neo.Block) -> dict:
-    """Retrieve generator meta-data used to construct a protocol for this trial"""
+def getAcquisitionInfo(o:neo.Block) -> dict:
+    """Retrieve the meta-data used to construct a protocol for this trial.
+    The meta-data also contains information about the acquisition software.
+    """
     generator = o.annotations.get("generator", None)
     if isinstance(generator, dict) and len(generator):
         return generator

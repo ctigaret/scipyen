@@ -492,7 +492,7 @@ from core.triggerevent import (TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
 from core.prog import scipywarn
 from ephys.ephys_protocol import ElectrophysiologyProtocol
-from core.neoutils import getGeneratorInfo
+from core.neoutils import getAcquisitionInfo
 import pyabf
 from pyabf.abf1.headerV1 import HeaderV1
 from pyabf.abf2.headerV2 import HeaderV2
@@ -1207,7 +1207,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-            info_dict = getGeneratorInfo(obj)
+            info_dict = getAcquisitionInfo(obj)
                 
             if info_dict["lActualEpisodes"] != info_dict["protocol"]["lEpisodesPerRun"]:
                 scipywarn(f"In {obj.name}: Mismatch between lActualEpisodes ({info_dict['lActualEpisodes']}) and lEpisodesPerRun ({info_dict['protocol']['lEpisodesPerRun']})")
@@ -1677,7 +1677,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     @property
     def digitalOutputDACs(self) -> tuple:
-        """Tuple of DAC channels where digital output is enabled"""
+        """DAC channels where digital output is configured"""
         return tuple(filter(lambda x: x.digitalOutputEnabled, self.DACs))
     
     @property
@@ -2078,16 +2078,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     def digitalOutputs(self, alternate:typing.Optional[bool] = None, 
                        trains:typing.Optional[bool] = None) -> set:
-        """Returns the indices of digital output channels used in this protocol.
+        """Indices of the digital output channels used in this protocol.
     
-        By default, returns ALL channels used in both main and alternate patterns,
-        for either TTL pulses OR TTL trains.
+        By default, returns all DIG channels used in both main and alternate 
+        patterns, for TTL pulses and TTL trains.
         
-        This behaviour can be controlled with the two parameters:
+        This behaviour can be refined with the two parameters:
         
-        • alternate (False/True/None) - default is None
+        • alternate (False|True|None) - default is None — whether to report only
+            DIG channels used in the main (False) or alternate (TRUE) pattern
         
-        • trains (False/True/None) - default is None
+        • trains (False|True|None) - default is None — whether to report only
+            DIG channels used to generate single pulses (False) or trains (True).
         
         """
         
@@ -2510,8 +2512,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
     def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
-        """Reintroduced temporarily for back compatibility with existing scripts.
-            Calls self.getDAC(…)
+        """Calls self.getDAC(…)
         """
         return self.getDAC(index, physical)
     
@@ -2652,7 +2653,7 @@ class ABFInputConfiguration:
 
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-            info_dict = getGeneratorInfo(obj)
+            info_dict = getAcquisitionInfo(obj)
                 
             if physical:
                 p = [v["nADCNum"] for v in info_dict["listADCInfo"]]
@@ -2787,6 +2788,7 @@ class ABFInputConfiguration:
             else:
                 # to avoid infinite recursion, we only save the protocol when this ADC
                 # is saved as part of a protocol
+                scipywarn(f"Saving as an independent object will break the relationship between this ADC and its parent protocol.")
                 h5io.toHDF5(None, entity, name="protocol") 
                     
         h5io.storeEntityInCache(entity_cache, self, entity)
@@ -3046,7 +3048,7 @@ class ABFOutputConfiguration:
             
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
-            info_dict = getGeneratorInfo(obj)
+            info_dict = getAcquisitionInfo(obj)
             
             if physical: # specify via its physical index
                 p = [v["nDACNum"] for v in info_dict["listDACInfo"]]
@@ -3180,7 +3182,7 @@ class ABFOutputConfiguration:
             
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear sourced from an ABF file"
-            info_dict = getGeneratorInfo(obj)
+            info_dict = getAcquisitionInfo(obj)
                 
             digPatterns = getDIGPatterns(obj)
             if self.logicalIndex in info_dict["dictEpochInfoPerDAC"]:
@@ -3331,29 +3333,7 @@ class ABFOutputConfiguration:
             group[target_name] = cached_entity
             return cached_entity
         
-        
-        # attrs = list(filter(lambda x: not x[0].startswith("_") and x[1].fset, 
-        #                     inspect.getmembers_static(self, inspect.isdatadescriptor)))
-        
         attrs = list(filter(lambda x: x[0] not in ("protocol", "epochs"), inspect.getmembers_static(self, lambda x: isinstance(x, property))))
-        
-        # print(f"{self.__class__.__name__}.toHDF5@: attrs = ")
-        # for p in attrs:
-        #     print(f"{p[0]} = {getattr(self, p[0])}")
-#         prattr = list(filter(lambda x: x[0]=="protocol", attrs))
-#         
-#         protocol_attr = None
-#         if len(prattr):
-#             ndx = attrs.index(prattr[0])
-#             protocol_attr = attrs.pop(ndx)
-            
-        
-#         eattr = list(filter(lambda x: x[0] == "epochs", attrs))
-#         
-#         epochs_attr = None
-#         if len(eattr):
-#             ndx = attrs.index(eattr[0])
-#             epochs_attr = attrs.pop(ndx)
         
         objattrs = h5io.makeAttrDict(**dict(map(lambda x: (x[0], getattr(self, x[0])), attrs)))
         obj_attrs.update(objattrs)
@@ -3373,6 +3353,7 @@ class ABFOutputConfiguration:
         else:
             # to avoid infinite recursion, we only save the protocol when this DAC
             # is saved as part of a protocol
+            scipywarn(f"When saved as independent object, the parent protocol will NOT be saved,\nthus the relationship of this DAC channel with the parent protocol will be lost.")
             h5io.toHDF5(None, entity, name="protocol")
             
         epochs_group = h5io.toHDF5(self.epochs, entity, name="epochs",
@@ -3551,110 +3532,166 @@ class ABFOutputConfiguration:
                          eventType:TriggerEventType = TriggerEventType.presynaptic,
                          label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
                          name:typing.Optional[str] = None,
-                         enableEmptyEvent:bool=True) -> TriggerEvent:
+                         enableEmptyEvent:bool=True) -> TriggerEvent|None:
         """Generates TriggerEvent objects from all epochs in the protocol.
         These may be empty if the protocol epochs do not define digital patterns.
         (NOTE: 'enableEmptyEvent' parameter is not yet used)
         
         See also: self.getEpochDigitalTriggerEvent
         """
-        
-        
         usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in self.epochs]))
-        
         
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
-                return
+                raise ValueError(f"Invalid DIG channel index {digChannel}")
+            
+            digChannel = (digChannel,)
             
         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
             if all(v not in usedDigs for v in digChannel):
-                return
+                raise ValueError(f"Invalid DIG channel indexes {digChannel}")
+            
+            digChannel = tuple(sorted(set(digChannel)))
             
         elif digChannel is None:
-            digChannel = tuple(set(usedDigs))
-            
-        if isinstance(digChannel, int):
-            times = list()
-            for epoch in self.epochs:
-                if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
-                    continue
-                
-                # if digChannel not in epoch.getUsedDigitalOutputChannels():
-                #     continue
-                
-                digPattern = self.getEpochDigitalPattern(epoch, sweep)[digChannel // 4]
-                
-                digChannelValue = tuple(reversed(digPattern))[digChannel]
-                
-                if digChannelValue == "*": # ⟹ pulse train
-                    times.extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
-                
-                elif digChannelValue == 1: # ⟹ single TTL pulse ⇒ take the onset time as
-                                        # a trigger event; in theory, a device may 
-                                        # actually require a "ON" state during which 
-                                        # it performs some ciclic function etc;
-                                        # regardless of this we may conosider the onset
-                                        # of the "ON" state as a trigger for such device
-                    
-                    times.extend([self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)])
-                    
-                else:
-                    continue
-                
-            if len(times) == 0 and not enableEmptyEvent:
-                return
-            
-            trig = TriggerEvent(times=times, units = pq.s, labels = label, name=name,
-                                event_type = eventType)
-        
-            if isinstance(label, str) and len(label.strip()):
-                trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
-
-            return trig
-        
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            channel_times = [list()] * len(digChannel)
-            
-            for epoch in self.epochs:
-                if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
-                    continue
-                
-                digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
-                # print(f"digChannelValue = {digChannelValue}" )
-                for k, chnl in enumerate(digChannel):
-                    if chnl >= len(digChannelValue):
-                        continue
-                    if digChannelValue[chnl] == "*":
-                        channel_times[k].extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
-                        
-                    elif digChannelValue[chnl] == 1:
-                        channel_times[k].extend([self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)])
-                        
-            trigs = [TriggerEvent(times=channel_times[k], units = pq.s, event_type = eventType, 
-                                name=name, labels = label) for k in range(len(channel_times))]
-
-            # NOTE: 2023-10-31 15:00:10
-            # remove duplicates
-            # CAUTION: TriggerEvent objects are not hashable hence cannot use 
-            # set logic to achieve this
-            uniqueTrigs = list()
-
-            for k,t in enumerate(trigs):
-                if k == 0:
-                    uniqueTrigs.append(t)
-                else:
-                    if t not in uniqueTrigs:
-                        uniqueTrigs.append(t)
-                        
-            if len(uniqueTrigs) == 1:
-                return uniqueTrigs[0]
-            
-            else:
-                return uniqueTrigs
+            digChannel = tuple(sorted(set(usedDigs)))
             
         else:
             raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
+            
+        channel_times = [list()] * len(digChannel)
+        
+        # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> digChannel: {digChannel}")
+        for epoch in self.epochs:
+            if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+                continue
+            digPattern = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getEpochDigitalPattern(epoch, sweep))))
+            digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+            # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> epoch: {epoch.epochNumber}, digPattern: {digPattern}, digChannelValue: {digChannelValue}")
+            
+            # digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
+            # print(f"digChannelValue = {digChannelValue}" )
+            for k, chnl in enumerate(digChannel):
+                # print(f"k: {k} -> chnl: {chnl}")
+                # if chnl >= len(digChannelValue):
+                #     continue
+                # if digChannelValue[chnl] == "*":
+                if digChannelValue[k] == "*":
+                    channel_times[k].extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
+                    
+                elif digChannelValue[k] == 1:
+                    channel_times[k].extend([self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)])
+                    
+        # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> channel_times: {channel_times}")
+        trigs = [TriggerEvent(times=channel_times[k], units = pq.s, event_type = eventType, 
+                            name=name, labels = label) for k in range(len(channel_times))]
+
+        # NOTE: 2023-10-31 15:00:10
+        # remove duplicates
+        # CAUTION: TriggerEvent objects are not hashable hence cannot use 
+        # set logic to achieve this
+        uniqueTrigs = list()
+
+        for k,t in enumerate(trigs):
+            if k == 0:
+                uniqueTrigs.append(t)
+            else:
+                if t not in uniqueTrigs:
+                    uniqueTrigs.append(t)
+                    
+        if len(uniqueTrigs) == 1:
+            return uniqueTrigs[0]
+        
+        else:
+            return uniqueTrigs
+        
+#         # if isinstance(digChannel, int):
+#         if len(digChannel) == 1:
+#             times = list()
+#             for epoch in self.epochs:
+#                 if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+#                     continue
+#                 
+#                 digPattern = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getEpochDigitalPattern(epoch, sweep))))
+#                 digChannelValue = digPattern[digChannel[0]]
+#                 
+#                 if digChannelValue == "*": # ⟹ pulse train
+#                     times.extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
+#                 
+#                 elif digChannelValue == 1: # ⟹ single TTL pulse ⇒ take the epoch's
+#                     # onset time as a trigger event; in theory, a device may 
+#                     # actually require a "ON" state during which it may perform
+#                     # some ciclic function etc;
+#                     # regardless, I think is OK to consider the onset time of
+#                     # of the epoch as the time of "OFF"-"ON" transition, and
+#                     # the time of the trigger.
+#                     
+#                     times.extend([self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)])
+#                     
+#                 else:
+#                     continue
+#                 
+#             # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> times: {times}")
+#             
+#             if len(times) == 0 and not enableEmptyEvent:
+#                 return
+#             
+#             trig = TriggerEvent(times=times, units = pq.s, labels = label, name=name,
+#                                 event_type = eventType)
+#         
+#             if isinstance(label, str) and len(label.strip()):
+#                 trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+# 
+#             return trig
+#         
+#         # elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+#         else:
+#             channel_times = [list()] * len(digChannel)
+#             
+#             # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> digChannel: {digChannel}")
+#             for epoch in self.epochs:
+#                 if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
+#                     continue
+#                 digPattern = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getEpochDigitalPattern(epoch, sweep))))
+#                 digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+#                 # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> epoch: {epoch.epochNumber}, digPattern: {digPattern}, digChannelValue: {digChannelValue}")
+#                 
+#                 # digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
+#                 # print(f"digChannelValue = {digChannelValue}" )
+#                 for k, chnl in enumerate(digChannel):
+#                     # print(f"k: {k} -> chnl: {chnl}")
+#                     # if chnl >= len(digChannelValue):
+#                     #     continue
+#                     # if digChannelValue[chnl] == "*":
+#                     if digChannelValue[k] == "*":
+#                         channel_times[k].extend([x.rescale(pq.s) for x in self.getEpochActualPulseTimes(epoch, sweep)])
+#                         
+#                     elif digChannelValue[k] == 1:
+#                         channel_times[k].extend([self.getEpochActualStartTime(epoch, sweep).rescale(pq.s)])
+#                         
+#             # print(f"{self.__class__.__name__}.getDigitalTriggerEvent(sweep={sweep}) -> channel_times: {channel_times}")
+#             trigs = [TriggerEvent(times=channel_times[k], units = pq.s, event_type = eventType, 
+#                                 name=name, labels = label) for k in range(len(channel_times))]
+# 
+#             # NOTE: 2023-10-31 15:00:10
+#             # remove duplicates
+#             # CAUTION: TriggerEvent objects are not hashable hence cannot use 
+#             # set logic to achieve this
+#             uniqueTrigs = list()
+# 
+#             for k,t in enumerate(trigs):
+#                 if k == 0:
+#                     uniqueTrigs.append(t)
+#                 else:
+#                     if t not in uniqueTrigs:
+#                         uniqueTrigs.append(t)
+#                         
+#             if len(uniqueTrigs) == 1:
+#                 return uniqueTrigs[0]
+#             
+#             else:
+#                 return uniqueTrigs
+            
     
     def getEpochDigitalTriggerEvent(self, epoch:typing.Union[ABFEpoch, str, int], sweep:int = 0, 
                              digChannel:typing.Union[int, typing.Sequence[int]] = 0,
@@ -4238,7 +4275,7 @@ class ABFOutputConfiguration:
                                 sweep:int = 0, 
                                 digChannel: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
                                 lastLevelOnly:bool=False,
-                                separateWavePerChannel:bool=False,
+                                separateWavePerChannel:bool=True,
                                 digOFF:typing.Optional[pq.Quantity]=None,
                                 digON:typing.Optional[pq.Quantity]=None,
                                 trainOFF:typing.Optional[pq.Quantity]=None,
@@ -4286,7 +4323,7 @@ class ABFOutputConfiguration:
             DAC output.
         
     
-    """
+        """
         if isinstance(epoch, (int, str)):
             e = self.getEpoch(epoch)
             if e is None:
@@ -4302,33 +4339,46 @@ class ABFOutputConfiguration:
 
         usedDigs = epoch.getUsedDigitalOutputChannels()
         
-        if isinstance(digChannel, int) and digChannel not in usedDigs:
-            return wave
+        if isinstance(digChannel, int):
+            if digChannel not in usedDigs:
+                return [np.array([])]
+                # raise ValueError(f"Invalid DIG channel index {digChannel}")
+            
+            digChannel = (digChannel,)
         
         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
             if any(v not in usedDigs for v in digChannel):
-                return wave
+                return [np.array([])]
+                # raise ValueError(f"Invalid DIG channel index {digChannel}")
             
         elif digChannel is None:
-            digChannel = usedDigs
+            digChannel = tuple(usedDigs)
             
-        if isinstance(digChannel, int):
-            wave = np.full([epochSamplesCount, 1], 0) * pq.V 
-            
-            digPattern = self.getEpochDigitalPattern(epoch, sweep)[digChannel // 4]
-            digChannelValue = tuple(reversed(digPattern))[digChannel]
+        else:
+            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
 
-            if digChannelValue == 1: # single TTL pulse (step-like)
+        digPattern = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getEpochDigitalPattern(epoch, sweep))))
+        digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+
+        waves = list()
+        
+        for k, chnl in enumerate(digChannel):
+            
+            wave = np.full([epochSamplesCount, 1], 0) * pq.V
+            
+            if digChannelValue[k] == 1:
                 if any(v is None for v in (digOFF, digON)):
-                    digOFF, digON = self.getDigitalPulseLogicLevels(digChannel)
-                if lastLevelOnly: 
+                    digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
+                
+                if lastLevelOnly:
                     wave[:] = digOFF
                 else:
                     wave[:] = digON
-                
-            elif digChannelValue == "*": # pulse train!
+                    
+            elif digChannelValue[k] == "*":
                 if any(v is None for v in (trainOFF, trainON)):
                     trainOFF, trainON = self.getDigitalTrainLogicLevels()
+
                 wave[:] = trainOFF
                 if not lastLevelOnly:
                     for pulse in range(pulseCount):
@@ -4336,41 +4386,13 @@ class ABFOutputConfiguration:
                         p2 = int(p1 + pulseSamples)
                         wave[p1:p2] = trainON
                         
-            return wave
-        
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            digChannelValue = [tuple(reversed(self.getEpochDigitalPattern(epoch, sweep)[chnl // 4]))[chnl] for chnl in digChannel]
-
-            waves = list()
+            waves.append(wave)
             
-            for k, chnl in enumerate(digChannel):
-                wave = np.full([epochSamplesCount, 1], 0) * pq.V
-                if digChannelValue[k] == 1:
-                    if any(v is None for v in (digOFF, digON)):
-                        digOFF, digON = self.getDigitalPulseLogicLevels(digChannel[k])
-                    
-                    if lastLevelOnly:
-                        wave[:] = digOFF
-                    else:
-                        wave[:] = digON
-                        
-                elif digChannelValue[k] == "*":
-                    if any(v is None for v in (trainOFF, trainON)):
-                        trainOFF, trainON = self.getDigitalTrainLogicLevels()
-                        off, on = self.getDigitalTrainLogicLevels()
-                    wave[:] = trainOFF
-                    if not lastLevelOnly:
-                        for pulse in range(pulseCount):
-                            p1 = int(pulsePeriod * pulse)
-                            p2 = int(p1 + pulseSamples)
-                            wave[p1:p2] = trainON
-                            
-                waves.append(wave)
-                
-            if not separateWavePerChannel:
-                waves = np.hstack(waves) * pq.V
-                
-            return waves
+        if not separateWavePerChannel:
+            waves = np.hstack(waves) * pq.V
+            
+        return waves
+            
                         
     def getPreviousSweepLastEpochLevel(self, sweep:int) -> pq.Quantity:
         # FIXME: 2023-09-18 23:34:27
@@ -4545,8 +4567,9 @@ class ABFOutputConfiguration:
         """Returns the digital pattern that WOULD be output by the epoch in a real experiment.
         This depends, simultaneously, on the following conditions:
         1) the DAC channel has digital outputs enabled
+        
         2) If alternative digital outputs are enabled in the protocol, this DAC
-            is one of DAC0 or DAC1
+            emits DIG outputs on the specified sweep.
             
         3) the DAC channel takes part in alternate digital outputs or not (this
             depends on the channel index, with DAC 0 and 1 being the only ones
@@ -4604,19 +4627,26 @@ class ABFOutputConfiguration:
                         # alternateDigitalPattern is disabled OR sweep number 
                         # is even
                         #
-                        dig_3_0 = epoch.getDigitalPattern(True)[0]
-                        dig_7_4 = epoch.getDigitalPattern(True)[1]
-                        # dig_3_0 = dig_7_4 = [0,0,0,0]
+                        
+                        # NOTE: 2024-10-20 10:42:42
+                        # retrieve the alternate digital pattern defined in
+                        # epoch, then:
+                        dig_3_0 = epoch.getDigitalPattern(True)[0] # select first bank
+                        dig_7_4 = epoch.getDigitalPattern(True)[1] # select second bank
                     else:
                         # this DAC has dig output enabled, hence during
                         # an experiment it will output the main digital pattern
                         # if either alternateDigitalPattern is disabled, OR
                         # sweep number is even
                         #
-                        dig_3_0 = epoch.getDigitalPattern(False)[0]
-                        dig_7_4 = epoch.getDigitalPattern(False)[1]
+                        
+                        # NOTE: 2024-10-20 10:43:38
+                        # retrieve the main digital pattern defined in epoch,
+                        # then:
+                        dig_3_0 = epoch.getDigitalPattern(False)[0] # select first bank
+                        dig_7_4 = epoch.getDigitalPattern(False)[1] # select second bank
                 else:
-                    dig_3_0 = dig_7_4 = [0,0,0,0]
+                    dig_3_0 = dig_7_4 = [0,0,0,0] # if not active DAC, return zeros
             else:
                 # For a DAC where dig output is DISabled, the DAC is simply
                 # a placeholder for the alternate digital output of the epoch, 
@@ -4939,8 +4969,11 @@ class ABFOutputConfiguration:
                 
         return waveform
     
+    # def getDigitalWaveform(self, sweep:int=0, 
+    #                        digChannel:int = 0,
+    #                        separateWavePerChannel:bool=False) -> neo.AnalogSignal:
     def getDigitalWaveform(self, sweep:int=0, 
-                           digChannel:int = 0,
+                           digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                            separateWavePerChannel:bool=False) -> neo.AnalogSignal:
         """Realizes the digital output waveform (pulses, trains) emitted when
         this DAC channel is active.
@@ -4954,36 +4987,90 @@ class ABFOutputConfiguration:
         # the digital output is ALWAYS in V
         # "high logic" means 5V on a background of 0 V
         # "low logic" means 0V on a background of 5V
-        assert digChannel in range(self.digitalOutputsCount), f"Invalid digital output channel {digChannel} for {self.digitalOutputsCount} channels "
-
-        digOFF, digON, trainOFF, trainON = self.getDigitalLogicLevels(digChannel)
         
-        waveform = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), digOFF),
+        #  NOTE: 2024-10-20 20:57:36
+        # digChannel is passed directly to, and checked inside of getEpochDigitalWaveform(…)
+        #
+#         usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in self.epochs]))
+#         
+#         if isinstance(digChannel, int):
+#             if digChannel not in usedDigs:
+#                 raise ValueError(f"Invalid DIG channel index {digChannel}")
+#             
+#             digChannel = (digChannel,)
+#             
+#         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+#             if all(v not in usedDigs for v in digChannel):
+#                 raise ValueError(f"Invalid DIG channel indexes {digChannel}")
+#             
+#             digChannel = tuple(sorted(set(digChannel)))
+#             
+#         elif digChannel is None:
+#             digChannel = tuple(sorted(set(usedDigs)))
+#             
+#         else:
+#             raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
+            
+        # assert digChannel in range(self.digitalOutputsCount), f"Invalid digital output channel {digChannel} for {self.digitalOutputsCount} channels "
+
+        
+        
+        # waveform = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
+        #                                     digOFF),
+        #                             units = pq.V, t_start = 0*pq.s,
+        #                             sampling_rate = self.samplingRate,
+        #                             name = f"DIG{digChannel}")
+        waveform = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
+                                            np.nan),
                                     units = pq.V, t_start = 0*pq.s,
                                     sampling_rate = self.samplingRate,
                                     name = f"DIG{digChannel}")
+        
+            
 
         t0 = t1 = self.holdingTime.rescale(pq.s)
         
         lastEpochNdx = 0
         
-        lastlevel = digOFF 
+        lastlevel = None 
+        
+        _digOFF_ = None
         
         for epoch in self.epochs:
+            # epochDIGs = epoch.getUsedDigitalOutputChannels()
             # print(f"{self.__class__.__name__}.getDigitalWaveform sweep {sweep}, digChannel {digChannel} in epoch {epoch.getEpochLetter}: digChannelValue {digChannelValue}")
             actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
             t1 = t0 + actualDuration
             tt = np.array([t0,t1])*pq.s
             ndx = waveform.time_index(tt)
             
-            wave = self.getEpochDigitalWaveform(epoch, sweep, digChannel,
-                                                separateWavePerChannel = separateWavePerChannel)
+            for k, chnl in enumerate(digChannel):
+                digOFF, digON, trainOFF, trainON = self.getDigitalLogicLevels(chnl)
+                wafevorm[np.isnan(waveform)] = digOFF
+                if lastlevel is None:
+                    lastlevel = digOFF * pq.V
+                    
+                if _digOFF_ is None:
+                    _digOFF_ = digOFF
+                    
+                waves = self.getEpochDigitalWaveform(epoch, sweep, chnl,
+                                                    separateWavePerChannel = separateWavePerChannel,
+                                                    digOFF = digOFF, digON = digON,
+                                                    trainOFF = trainOFF, trainON = trainON)
+
+                # wave = self.getEpochDigitalWaveform(epoch, sweep, digChannel,
+                #                                     separateWavePerChannel = separateWavePerChannel)
+                
+                if waves[0].size == 0:
+                    continue
+                
+                waveform[ndx[0]:ndx[1], k] = waves[0]
             
-            if wave.size == 0:
-                continue
-            
-            waveform[ndx[0]:ndx[1], 0] = wave
-            
+                if self.protocol.digitalUseLastEpochHolding:
+                    waveform[lastEpochNdx:, k] = lastLevel
+                else:
+                    waveform[lastEpochNdx:, k] = digOFF * pq.V
+                    
             t0 = t1
             
             lastEpochNdx = ndx[1]
@@ -4992,7 +5079,7 @@ class ABFOutputConfiguration:
         if self.protocol.digitalUseLastEpochHolding:
             waveform[lastEpochNdx:, 0] = lastLevel
         else:
-            waveform[lastEpochNdx:, 0] = digOFF * pq.V
+            waveform[lastEpochNdx:, 0] = _digOFF_ * pq.V
             
         return waveform
         
@@ -5248,7 +5335,7 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
     
     # check of this neo.Block was read from an ABF file
     assert sourcedFromABF(obj), "Object does not appear to have been sourced from an ABF file"
-    info_dict = getGeneratorInfo(obj)
+    info_dict = getAcquisitionInfo(obj)
         
     epochsDigitalPattern = dict()
     
@@ -5982,7 +6069,7 @@ def _(obj:pyabf.ABF) -> int:
 
 @getABFversion.register(neo.Block)
 def _(obj:neo.Block) -> int:
-    info_dict = getGeneratorInfo(obj)
+    info_dict = getAcquisitionInfo(obj)
     
     abf_version = info_dict.get("abf_version", None)
     assert isinstance(abf_version, float), "Object does not appear to be sourced from an ABF file"
@@ -6027,7 +6114,7 @@ def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
 @usedADCs.register(neo.Block)
 def _(obj:neo.Block, useQuantities:bool=True) -> dict:
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
-    info_dict = getGeneratorInfo(obj)
+    info_dict = getAcquisitionInfo(obj)
     return dict(map(lambda x: (x, (info_dict["listADCInfo"][x]["ADCChNames"].decode(),
                                    unitStrAsQuantity(info_dict["listADCInfo"][x]["ADCChUnits"].decode(), useQuantities))),
                     range(info_dict["sections"]["ADCSection"]["llNumEntries"])))
@@ -6052,7 +6139,7 @@ def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
 @usedDACs.register(neo.Block)
 def _(obj:neo.Block, useQuantities:bool=True) -> dict:
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
-    info_dict = getGeneratorInfo(obj)
+    info_dict = getAcquisitionInfo(obj)
     return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),
                     filter(lambda x: x["nWaveformEnable"] > 0 and x["nWaveformSource"] > 0, info_dict["listDACInfo"])))
     # return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),
