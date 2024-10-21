@@ -3113,36 +3113,8 @@ anything else       anything else       ❌
     @safeWrapper
     def resizeEvent(self, evt:QtGui.QResizeEvent):
         super().resizeEvent(evt)
-        leftLabelHeights = list()
-        # plotItems = tuple(filter(lambda x: x.isVisible(), self.axes))
-        # signalAxes = tuple(filter(lambda x: x.isVibible(), self.signalAxes))
+        # self._adjust_left_label_space_()
         
-        for plotItem in self.axes:
-            if plotItem.axes["left"]["item"].label and plotItem.axes["left"]["item"].label.isVisible():
-                plotItem.axes["left"]["item"].label.setTextWidth(2*plotItem.height()/3)
-                leftLabelHeights.append(plotItem.axes["left"]["item"].label.boundingRect().height())
-                
-        if len(leftLabelHeights):
-            maxSpace = max(leftLabelHeights)
-            # print(f"{self.__class__.__name__}.resizeEvent: maxSpace = {maxSpace}")
-            for k, plotItem in enumerate(self.axes):
-                labelItem = plotItem.axes["left"]["item"]
-                # code below adapted from PyQtGraph's AxisItem._updateWidth()
-                if not labelItem.style['showValues']:
-                    w = 0
-                elif labelItem.style['autoExpandTextSpace']:
-                    w = labelItem.textWidth
-                else:
-                    w = labelItem.style['tickTextWidth']
-                w += labelItem.style['tickTextOffset'][0] if labelItem.style['showValues'] else 0
-                w += max(0, labelItem.style['tickLength'])
-                w += maxSpace * 0.8  ## bounding rect is usually an overestimate
-                labelItem.setMaximumWidth(w)
-                labelItem.setMinimumWidth(w)
-                # print(f"{self.__class__.__name__}.resizeEvent: item {k}: w = {w}")
-                labelItem.picture = None
-                # labelItem.update()
-                
         # visibleAxes = tuple(filter(lambda x: x.isVisible(), self.axes))
         # if len(visibleAxes):
         #     signalsLayoutHeight = self.signalsLayout.boundingRect().height()
@@ -3150,8 +3122,6 @@ anything else       anything else       ❌
         #     for plotItem in visibleAxes:
         #         plotItem.vb.setFixedHeight(viewBoxHeight)
             
-
-                
     @safeWrapper
     def reportCursors(self):
         text = list()
@@ -9838,10 +9808,40 @@ signals in the signal collection.
         if plotItemName != plotItem.vb.name:
             self._register_plot_item_name_(plotItem, plotItemName)
 
-        plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
-                                                autoReduceTextSpace=False)
+        # plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
+        #                                         autoReduceTextSpace=False,
+        #                                         hideOverlappingLabels=True)
         plotItem.update()
         
+    @safeWrapper
+    def _adjust_left_label_space_(self):
+        leftLabelHeights = list()
+        
+        for plotItem in self.axes:
+            labelItem = plotItem.axes["left"]["item"].label
+            if labelItem and labelItem.isVisible():
+                labelItem.setTextWidth(2*plotItem.height()/3)
+                # leftLabelHeights.append(labelItem.boundingRect().height())
+                leftLabelHeights.append(labelItem.textWidth())
+
+        print(f"{self.__class__.__name__}._adjust_left_label_space_: leftLabelHeights = {leftLabelHeights}")
+                
+        if len(leftLabelHeights):
+            space = max(leftLabelHeights)
+            print(f"{self.__class__.__name__}._adjust_left_label_space_: space = {space}")
+            for k, plotItem in enumerate(self.axes):
+                labelItem = plotItem.axes["left"]["item"]
+                # code below adapted from PyQtGraph's AxisItem._updateWidth()
+                w = labelItem.textWidth() if labelItem.style['autoExpandTextSpace'] else labelItem.style['tickTextWidth'] if labelItem.style['showValues'] else 0
+                w += labelItem.style['tickTextOffset'][0] if labelItem.style['showValues'] else 0
+                w += max(0, labelItem.style['tickLength'])
+                w += space * 0.8  ## bounding rect is usually an overestimate
+                labelItem.setMaximumWidth(w)
+                labelItem.setMinimumWidth(w)
+                print(f"{self.__class__.__name__}._adjust_left_label_space_: item {k}: w = {w}")
+                labelItem.picture = None
+        
+    
     @safeWrapper
     def _plot_numeric_data_(self, plotItem: pg.PlotItem, x:np.ndarray, y:np.ndarray, 
                             xlabel:(str, type(None))=None, ylabel:(str, type(None))=None, 
@@ -9970,8 +9970,6 @@ signals in the signal collection.
             else:
                 xx = None
             
-            # print(f"{self.__class__.__name__}._plot_numeric_data_ y.ndim == 1; plotdataitem kwargs {kwargs}")
-            
             if reusePlotItems:
                 if len(plotDataItems):
                     if len(plotDataItems) > 1:
@@ -10006,13 +10004,10 @@ signals in the signal collection.
             for k in range(y.shape[1]):
                 y_ = np.atleast_1d(y[array_slice(y, {1:k})].squeeze())
                 
-                # print("y_.shape", y_.shape)
-                
                 if y_.ndim ==2 and x.shape[0] == y_.shape[1]:
                     y_ = y_.T
                     
                 if x is not None:
-                    # if x.ndim == 2 and x.shape[1] == y.shape[self.signalChannelAxis]:
                     if x.ndim == 2 and x.shape[1] == y.shape[1]:
                         x_ = np.atleast_1d(x[:,k].squeeze())
                         
@@ -10074,10 +10069,6 @@ signals in the signal collection.
                     else:
                         kwargs["symbolBrush"] = symbolBrush
                         
-                    # elif isinstance(symbolBrush, QtGui.QBrush):
-                    #     kwargs["symbolBrush"] = symbolBrush
-                        
-                        
                 if reusePlotItems:
                     if k < len(plotDataItems):
                         plotDataItems[k].clear()
@@ -10100,12 +10091,11 @@ signals in the signal collection.
                         plotItem.plot(y = yy, **kwargs)
         
         
-#         axisFm = QtGui.QFontMetrics(plotItem.axes["left"]["item"].font())
-#         ylabelLen = guiutils.get_text_width(ylabel, axisFm)
-#         
-#         if ylabelLen >=
-        
         plotItem.setLabels(bottom = [xlabel], left=[ylabel])
+        # textOption = plotItem.axes["left"]["item"].label.document().defaultTextOption()
+        # textOption.setWrapMode(QtGui.QTextOption.WordWrap)
+        # plotItem.axes["left"]["item"].label.document().setDefaultTextOption(textOption)
+        # plotItem.axes["left"]["item"].label.setTextWidth(2*plotItem.height()/3)
         
         if isinstance(title, str) and len(title.strip()):
             plotItem.setTitle(title)
@@ -10122,6 +10112,7 @@ signals in the signal collection.
                 plotItem.setLabel("left", lbl)
         
         plotItem.replot() # must be called NOW, and NOT earlier !
+        
         return plotItem
     
     def _remove_axes_(self, plotItem:pg.PlotItem):
@@ -10363,7 +10354,7 @@ signals in the signal collection.
                                                     maxTickLevel=2,
                                                     maxTextLevel=2)
             
-            # plotItem.axes["left"]["item"].setWidth(30)
+            plotItem.axes["left"]["item"].setWidth(40)
             
             if plotItem in (self._events_axis_, self._spiketrains_axis_):
                 plotItem.setVisible(False)
