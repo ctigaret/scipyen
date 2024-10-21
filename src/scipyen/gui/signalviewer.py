@@ -3111,6 +3111,48 @@ anything else       anything else       ❌
         self.addCursors(*where, cursorType=cursorType, xwindow = xwindow, ywindow = ywindow, labels = labels, axis=axis)
         
     @safeWrapper
+    def resizeEvent(self, evt:QtGui.QResizeEvent):
+        super().resizeEvent(evt)
+        leftLabelHeights = list()
+        # plotItems = tuple(filter(lambda x: x.isVisible(), self.axes))
+        # signalAxes = tuple(filter(lambda x: x.isVibible(), self.signalAxes))
+        
+        for plotItem in self.axes:
+            if plotItem.axes["left"]["item"].label and plotItem.axes["left"]["item"].label.isVisible():
+                plotItem.axes["left"]["item"].label.setTextWidth(2*plotItem.height()/3)
+                leftLabelHeights.append(plotItem.axes["left"]["item"].label.boundingRect().height())
+                
+        if len(leftLabelHeights):
+            maxSpace = max(leftLabelHeights)
+            # print(f"{self.__class__.__name__}.resizeEvent: maxSpace = {maxSpace}")
+            for k, plotItem in enumerate(self.axes):
+                labelItem = plotItem.axes["left"]["item"]
+                # code below adapted from PyQtGraph's AxisItem._updateWidth()
+                if not labelItem.style['showValues']:
+                    w = 0
+                elif labelItem.style['autoExpandTextSpace']:
+                    w = labelItem.textWidth
+                else:
+                    w = labelItem.style['tickTextWidth']
+                w += labelItem.style['tickTextOffset'][0] if labelItem.style['showValues'] else 0
+                w += max(0, labelItem.style['tickLength'])
+                w += maxSpace * 0.8  ## bounding rect is usually an overestimate
+                labelItem.setMaximumWidth(w)
+                labelItem.setMinimumWidth(w)
+                # print(f"{self.__class__.__name__}.resizeEvent: item {k}: w = {w}")
+                labelItem.picture = None
+                # labelItem.update()
+                
+        # visibleAxes = tuple(filter(lambda x: x.isVisible(), self.axes))
+        # if len(visibleAxes):
+        #     signalsLayoutHeight = self.signalsLayout.boundingRect().height()
+        #     viewBoxHeight = signalsLayoutHeight/len(self.axes)
+        #     for plotItem in visibleAxes:
+        #         plotItem.vb.setFixedHeight(viewBoxHeight)
+            
+
+                
+    @safeWrapper
     def reportCursors(self):
         text = list()
         crn = sorted([(c,n) for c,n in self._data_cursors_.items()], key = lambda x: x[0])
@@ -10057,6 +10099,12 @@ signals in the signal collection.
                     else:
                         plotItem.plot(y = yy, **kwargs)
         
+        
+#         axisFm = QtGui.QFontMetrics(plotItem.axes["left"]["item"].font())
+#         ylabelLen = guiutils.get_text_width(ylabel, axisFm)
+#         
+#         if ylabelLen >=
+        
         plotItem.setLabels(bottom = [xlabel], left=[ylabel])
         
         if isinstance(title, str) and len(title.strip()):
@@ -10086,7 +10134,11 @@ signals in the signal collection.
             # see NOTE: 2019-03-08 13:20:50
             self._cached_cursors_[k] = cursors
                             
-        # plotItem.vb.close()
+        # NOTE: 2024-10-21 17:49:20
+        # source of dangling references! — should've thought about it long ago
+        if plotItem in self._signal_axes_:
+            self._signal_axes_.remove(plotItem)
+            
         plotItem.close()
         self.signalsLayout.removeItem(plotItem)
         if self.currentAxis == plotItem:
@@ -10217,15 +10269,18 @@ signals in the signal collection.
         if len(self.signalAxes) < _n_signal_axes_:
             # NOTE: 2023-05-09 13:00:18 - create axes as necessary
             # there are fewer signal axes than needed - create here as necessary
-            
+            #
             for k, plotItem in enumerate(self.signalAxes):
-                # re-use & update existing PlotItem objects
+                # re-use & update existing PlotItem objects — just re-register
+                # under a new name
+                #
                 plotname = f"signal_axis_{k}"
                 self._register_plot_item_name_(plotItem, plotname)
                 plotItem.setVisible(False)
                 
             for k in range(len(self.signalAxes), _n_signal_axes_):
-                # create new PlotItem objects as necessary, add to layout
+                # create new PlotItem objects as necessary, add to self.signalsLayout
+                #
                 plotname = f"signal_axis_{k}"
                 plotItem = pg.PlotItem(name = plotname)
                 self.signalsLayout.addItem(plotItem, row=k, col=0)
@@ -10235,7 +10290,6 @@ signals in the signal collection.
                 plotItem.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
                 plotItem.setVisible(False)
                 self._signal_axes_.append(plotItem)
-                
                 
         elif len(self.signalAxes) > _n_signal_axes_:
             # more signal axes than necessary
@@ -10267,13 +10321,10 @@ signals in the signal collection.
             self._events_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
             if self._events_axis_.scene() is not None:
                 self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-                # self._events_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
         
         if self._events_axis_ not in self.signalsLayout.items:
             self.signalsLayout.addItem(self._events_axis_, row = _n_signal_axes_, col=0)
-            # self.signalsLayout.addItem(self._events_axis_, row=self._n_signal_axes_, col=0)
             self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-            # self._events_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
         
         # NOTE: 2023-01-17 10:45:24
         # add the spiketrains axis back to the layout (after creating it, if needed)
@@ -10284,15 +10335,10 @@ signals in the signal collection.
             self._spiketrains_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
             if self._spiketrains_axis_.scene() is not None:
                 self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-                # self._spiketrains_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
-                
-            
             
         if self._spiketrains_axis_ not in self.signalsLayout.items:
             self.signalsLayout.addItem(self._spiketrains_axis_, row = _n_signal_axes_ + 1, col = 0)
-            # self.signalsLayout.addItem(self._spiketrains_axis_, row = self._n_signal_axes_ + 1, col = 0)
             self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
-            # self._spiketrains_axis_.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
             
         # NOTE: 2023-06-02 12:57:26
         # now, remember the (new) _n_signal_axes_:
@@ -10307,21 +10353,19 @@ signals in the signal collection.
             
         if self.signalsLayout.scene() is not None:
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
-            
+        
         for plotItem in self.axes:
             self._clear_targets_overlay_(plotItem)
             self._clear_labels_overlay_(plotItem)
-            plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=False,
-                                                    autoReduceTextSpace=False,
+            plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=True,
+                                                    autoReduceTextSpace=True,
+                                                    hideOverlappingLabels=True,
                                                     maxTickLevel=2,
                                                     maxTextLevel=2)
             
-            plotItem.axes["left"]["item"].setWidth(60)
+            # plotItem.axes["left"]["item"].setWidth(30)
             
             if plotItem in (self._events_axis_, self._spiketrains_axis_):
-                # plotItem.showAxis("bottom", True)
-                #                  left  top    right  bottom             left  top    right  bottom
-                # plotItem.showAxes([True, False, False, True], showValues=[True, False, False, True])
                 plotItem.setVisible(False)
                 
         if len(self.axes):
@@ -10341,7 +10385,21 @@ signals in the signal collection.
             self.actionShow_X_grid.setEnabled(False)
             self.actionShow_Y_grid.setEnabled(False)
             
+        # visibleAxes = tuple(filter(lambda x: x.isVisible(), self.axes))
+        # if len(visibleAxes):
+        #     signalsLayoutHeight = self.signalsLayout.boundingRect().height()
+        #     viewBoxHeight = signalsLayoutHeight/len(self.axes)
+        #     for plotItem in visibleAxes:
+        #         plotItem.vb.setFixedHeight(viewBoxHeight)
         
+#         for ax in self.signalAxes:
+#             ndx = self.signalsLayout.itemIndex(ax)
+#             self.signalsLayout.layout.setRowStretchFactor(ndx,2)
+#             
+#         for ax in (self._events_axis_, self._spiketrains_axis_):
+#             ndx = self.signalsLayout.itemIndex(ax)
+#             self.signalsLayout.layout.setRowStretchFactor(ndx,1)
+            
     @Slot(object)
     @safeWrapper
     def _slot_mouseHoverInPlotItem(self, obj): 

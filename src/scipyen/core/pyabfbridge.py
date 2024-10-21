@@ -5035,7 +5035,7 @@ class ABFOutputConfiguration:
     
     def getDigitalWaveform(self, sweep:int=0, 
                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                           separateWavePerChannel:bool=False) -> neo.AnalogSignal:
+                           separateWavePerChannel:bool=True) -> neo.AnalogSignal:
         """Realizes the digital output waveform (pulses, trains) emitted when
         this DAC channel is active.
         
@@ -5070,13 +5070,13 @@ class ABFOutputConfiguration:
                                                 np.nan),
                                         units = pq.V, t_start = 0*pq.s,
                                         sampling_rate = self.samplingRate,
-                                        name = f"Digital Output Waveform for DAC {self.physicalIndex} ({self.name}) DIG {chnl}") for chnl in digChannel]
+                                        name = f"DIG {chnl} DAC {self.physicalIndex} ({self.name})") for chnl in digChannel]
         else:
             waveforms = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
                                                 np.nan),
                                         units = pq.V, t_start = 0*pq.s,
                                         sampling_rate = self.samplingRate,
-                                        name = f"Digital Output Waveform for DAC {self.physicalIndex} ({self.name})")
+                                        name = f"DIG Output DAC {self.physicalIndex} ({self.name})")
             
         t0 = t1 = self.holdingTime.rescale(pq.s)
         
