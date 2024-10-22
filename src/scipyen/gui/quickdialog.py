@@ -571,7 +571,10 @@ class QuickWidget(QtWidgets.QWidget):
     
 class QuickDialog(QtWidgets.QDialog):
     """From vigranumpy.pyqt.quickdialog"""
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, title:typing.Optional[str]=None, addStretch=True, addSpacing=True):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, 
+                 title:typing.Optional[str]=None, 
+                 addStretch=True, 
+                 addSpacing=True):
         QtWidgets.QDialog.__init__(self, parent)
 
         self.layout = QtWidgets.QVBoxLayout(self)

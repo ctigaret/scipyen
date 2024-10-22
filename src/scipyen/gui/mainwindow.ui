@@ -145,11 +145,13 @@
      <addaction name="actionChoose_code_editor"/>
      <addaction name="actionUse_system_s_default_code_editor"/>
     </widget>
-    <addaction name="actionGUI_Style"/>
     <addaction name="actionAuto_launch_Script_Manager"/>
     <addaction name="menuCode_editor"/>
     <addaction name="actionAuto_delete_viewer"/>
     <addaction name="actionSet_user_plugins_directory"/>
+    <addaction name="separator"/>
+    <addaction name="actionGUI_Style"/>
+    <addaction name="actionSet_Icon_Size"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -1371,6 +1373,14 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>About Qt</string>
+   </property>
+  </action>
+  <action name="actionSet_Icon_Size">
+   <property name="icon">
+    <iconset theme="image-resize-symbolic"/>
+   </property>
+   <property name="text">
+    <string>Set Icon Size</string>
    </property>
   </action>
  </widget>

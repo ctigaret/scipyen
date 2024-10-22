@@ -4810,6 +4810,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
         # elif hasQDarkTheme:
         #     self._available_Qt_style_names_.extend(f"Qt{v.capitalize()}" for v in qdarktheme.get_themes())
 
+        self.actionSet_Icon_Size.triggered.connect(self._slot_configureIconSize)
 
         self.actionGUI_Style.triggered.connect(self._slot_set_Application_style)
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
@@ -7377,7 +7378,7 @@ class ScipyenWindow(__QMainWindow__, __UI_MainWindow__, WorkspaceGuiMixin):
     @Slot(bool)
     def _slot_set_scriptManagerAutoLaunch(self, val):
         self.scriptManagerVisible = val
-
+        
     @Slot()
     @safeWrapper
     def _slot_registerPythonSource_(self):

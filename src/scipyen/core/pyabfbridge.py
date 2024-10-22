@@ -3716,7 +3716,11 @@ class ABFOutputConfiguration:
                              label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
                              name:typing.Optional[str] = None,
                              enableEmptyEvent:bool=True) -> typing.Union[TriggerEvent, typing.List[TriggerEvent]]:
-        """Trigger events from an individual Step or Pulse-type ABF Epoch.
+        """
+        TODO: Move this code to ABFProtocol, thus breaking the need to store
+        a reference to the protocol in this ABFOutputConfiguration instance.
+        
+        Trigger events from an individual Step or Pulse-type ABF Epoch.
         
         Parameters:
         ------------
@@ -4192,7 +4196,12 @@ class ABFOutputConfiguration:
 
     def getEpochAnalogWaveform(self, epoch:typing.Union[ABFEpoch, str, int], previousLevel:pq.Quantity, 
                       sweep:int = 0, lastLevelOnly:bool=False) -> pq.Quantity:
-        """Realizes the analog waveform associated with a single epoch.
+        """
+        TODO: Move this code to ABFProtocol, thus breaking the need to store
+        a reference to the protocol in this ABFOutputConfiguration instance.
+        
+    
+        Realizes the analog waveform associated with a single epoch.
         An 'epoch' is defined as a specific time interval in a sweep, during 
         which the DAC outputs a command signal waveform givemn the epoch's type
         (step, ramp, pulse, etc). This information is configured using the 
@@ -4207,11 +4216,12 @@ class ABFOutputConfiguration:
             
             epoch = e
             
+        if self.protocol:
+            isAlternateWaveform = self.alternateDACOutputStateEnabled and sweep % 2 > 0
+            
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
         actualLevel = epoch.firstLevel + sweep * epoch.deltaLevel
-        
-        # print(f"self.__class__.__name__}.epochAnalogWaveform epoch {epoch.epochNumber} ({epoch.getEpochLetter}) type {epoch.type} sample count {epochSamplesCount}")
         
         if epoch.type == ABFEpochType.Step:
             wave = actualLevel if lastLevelOnly else np.full([epochSamplesCount, 1], float(actualLevel)) * self.units
@@ -4272,7 +4282,6 @@ class ABFOutputConfiguration:
                 wave = actualLevel
             else:
                 wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
-                # waveform[ndx[0]:ndx[1],0] = previousLevel
                 
                 for pulse in range(pulseCount):
                     p1 = int(pulsePeriod * pulse)
@@ -4280,8 +4289,6 @@ class ABFOutputConfiguration:
                     p2 = int((p1+p3)/2)
                     wave[p1:p2] = previousLevel + levelDelta
                     wave[p2:p3] = previousLevel - levelDelta
-                    # waveform[p1:p2,0] = previousLevel + levelDelta
-                    # waveform[p2:p3,0] = previousLevel - levelDelta
             
         else:
             wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
@@ -4308,7 +4315,7 @@ class ABFOutputConfiguration:
         Named parameters:
         -----------------
         
-        sweep: the index of the AB sweep (digital outputs may be specific to the 
+        sweep: the index of the ABF sweep (digital outputs may be specific to the 
                 sweep index, when alternate digital patterns are enabled in the 
                 ABF protocol)
         
@@ -4466,7 +4473,7 @@ class ABFOutputConfiguration:
             prevLevel = self.dacHoldingLevel
             for s in range(sweep):
                 for e in self.epochs:
-                    prevLevel = self.epochAnalogWaveform(e, prevLevel, s, True)
+                    prevLevel = self.getEpochAnalogWaveform(e, prevLevel, s, True)
                     
             return prevLevel
         
@@ -4626,7 +4633,11 @@ class ABFOutputConfiguration:
     
     def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], 
                                sweep:int=0) ->tuple:
-        """Returns the digital pattern that WOULD be output by the epoch.
+        """
+        TODO: Move this code to ABFProtocol, thus breaking the need to store
+        a reference to the protocol in this ABFOutputConfiguration instance.
+        
+        Returns the digital pattern that WOULD be output by the epoch.
         
         This depends, simultaneously, on the following conditions:
         
@@ -4928,11 +4939,15 @@ class ABFOutputConfiguration:
     
     @property
     def alternateDigitalOutputStateEnabled(self) -> bool:
-        return self.protocol.alternateDigitalOutputStateEnabled
+        if self.protocol:
+            return self.protocol.alternateDigitalOutputStateEnabled
+        return False
     
     @property
     def alternateDACOutputStateEnabled(self) -> bool:
-        return self.protocol.alternateDACOutputStateEnabled
+        if self.protocol:
+            return self.protocol.alternateDACOutputStateEnabled
+        return False
         
     @property
     def holdingTime(self) -> pq.Quantity:
@@ -4940,7 +4955,8 @@ class ABFOutputConfiguration:
         This corresponds 1/64 samples of total samples in a sweep.
         This is protocol-specific.
     """
-        return self.protocol.holdingTime
+        if self.protocol:
+            return self.protocol.holdingTime
     
     def getAnalogWaveform(self, sweep:int=0) -> neo.AnalogSignal:
         return self.getCommandWaveform(sweep)
@@ -4948,24 +4964,37 @@ class ABFOutputConfiguration:
     def getCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
         """Generates an AnalogSignal representation of the command waveform.
         
-        When nAlternateDACOutputState is True, this waveform IS specific to the 
-        sweep number.
+        CAUTION: The `sweep` parameter is only used to get the epoch parameter 
+        values where these values vary from one sweep to another ("Delta level" 
+        and "Delta duration"), and not to establish if the DAC would emit a 
+        waveform for that particular sweep or not. 
+    
+        Whether a DAC emits an analog wavefomr on a particular sweep is determined
+        entirely by the protocol. The DAC only does what its Epochs "tell" it to do.
+        The protocol "tells" the DAC to emit a wavefomr or not, depending on the
+        protocols' alternateDACOutputStateEnabled and on the sweep number!
+    
+        Therefore, the wavefomr returned here reflects sweep-specific state of 
+        the epoch parametrs, and nothing else.
+    
+    
+    
+    
+    The analog waveform returned here is the one generated by
+        the Epchs in the DAC regardless 
      
         NOTE: DAC command waveforms and digital outputs are enabled only in 
         Episodic Stimulation type of experiments.
      
         """
-        if self.analogWaveformSource == ABFDACWaveformSource.none or (not self.analogWaveformEnabled and not self.alternateDACOutputStateEnabled):
+        if self.analogWaveformSource == ABFDACWaveformSource.none or not self.analogWaveformEnabled:
             # return empty signal (containing np.nan)
             return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), np.nan),
                                     units = self.units, t_start = 0*pq.s,
                                     sampling_rate = self.samplingRate,
                                     name = self.dacName)
         
-        # holdingLevel = float(self.dacHoldingLevel.magnitude)
-        
         if self.analogWaveformSource == ABFDACWaveformSource.epochs:
-            
             if len(self.epochs) == 0:
                 return neo.AnalogSignal(np.full((self.protocol.sweepSampleCount, 1), float(holdingLevel)),
                                         units = self.units, t_start = 0*pq.s,

@@ -507,6 +507,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                                        "vertical":QtGui.QColor(defaultCursorColors["vertical"]).darker().name(QtGui.QColor.HexArgb)})
     
     defaultCursorHoverColor = "red"
+    
+    defaultLeftAxisLabelSpace = 40
 
     def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", nAxes:typing.Optional[int] = None,*args, **kwargs):
         """SignalViewer constructor.
@@ -981,6 +983,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionViewFrame_Navigator.toggled.connect(self.slot_toggleNavigator)
         self.actionViewSignal_Selectors.toggled.connect(self.slot_toggleSelectors)
         
+        self.actionLeft_Axis_Spacer.triggered.connect(self._slot_configureLeftLabelSpace)
         
         # the actual layout of the plot items (pyqtgraph framework)
         # its "layout" is a QtWidgets.QGraphicsGridLayout
@@ -1107,6 +1110,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         
         self.mainToolBar.visibilityChanged.connect(self._slot_mainToolbarVisibilityChanged)
         
+        self.leftLabelSpace = self.defaultLeftAxisLabelSpace
+        
         # NOTE: 2024-03-03 23:02:33
         # QWidget does NOT have visibilityChanged signal
         # self.selectorsWidget.visibilityChanged.connect(self._slot_selectorsVisibilityChanged)
@@ -1207,6 +1212,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         sigBlock = QtCore.QSignalBlocker(self.actionIgnore_empty_spike_trains)
         self.actionIgnore_empty_spike_trains.setChecked(self._ignore_empty_spiketrains_)
         
+    @property
+    def leftLabelSpace(self) -> int:
+        return self._leftLabelSpace_
+    
+    @markConfigurable("LeftAxisLabelSpace", "qt")
+    @leftLabelSpace.setter
+    def leftLabelSpace(self, val:int):
+        self._leftLabelSpace_ = int(val)
+        for ax in self.axes:
+            ax.axes["left"]["item"].setWidth(self._leftLabelSpace_)
+            
     @property
     def cursorLabelPrecision(self):
         return self._cursorLabelPrecision_
@@ -3113,7 +3129,7 @@ anything else       anything else       ❌
     @safeWrapper
     def resizeEvent(self, evt:QtGui.QResizeEvent):
         super().resizeEvent(evt)
-        # self._adjust_left_label_space_()
+        self._adjust_left_label_space_()
         
         # visibleAxes = tuple(filter(lambda x: x.isVisible(), self.axes))
         # if len(visibleAxes):
@@ -8030,7 +8046,8 @@ signals in the signal collection.
         #     self._axes_X_view_ranges_[kax] = viewXrange
         #     offset, scale = self._calculate_new_X_offset_scale_(bounds, viewXrange)
         #     self._axes_X_view_offsets_scales_[kax] = (offset, scale)
-            
+        
+        self._adjust_left_label_space_()    
         self.sig_frameDisplayReady.emit()
         
     def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
@@ -9813,33 +9830,51 @@ signals in the signal collection.
         #                                         hideOverlappingLabels=True)
         plotItem.update()
         
+    @Slot()
+    def _slot_configureLeftLabelSpace(self):
+        val0 = self.leftLabelSpace
+        
+        dlg = qd.QuickDialog(self, "Space for vertical axes labels",
+                             False, False)
+        spinner = QtWidgets.QSpinBox(dlg)
+        spinner.valueChanged.connect(self._slot_setLeftLabelSpace)
+        spinner.setValue(val0)
+        dlg.addWidget(spinner)
+        dlg.resize(-1,-1)
+        if dlg.exec() > 0:
+            self.leftLabelSpace = spinner.value()
+        else:
+            self.leftLabelSpace = val0
+        
+    @Slot(int)
+    def _slot_setLeftLabelSpace(self, val:int):
+        self.leftLabelSpace = val
+        
     @safeWrapper
     def _adjust_left_label_space_(self):
-        leftLabelHeights = list()
+        leftAxisLabelSpaces = list()
         
         for plotItem in self.axes:
-            labelItem = plotItem.axes["left"]["item"].label
+            axisItem = plotItem.axes["left"]["item"]
+            labelItem = axisItem.label
             if labelItem and labelItem.isVisible():
-                labelItem.setTextWidth(2*plotItem.height()/3)
-                # leftLabelHeights.append(labelItem.boundingRect().height())
-                leftLabelHeights.append(labelItem.textWidth())
-
-        print(f"{self.__class__.__name__}._adjust_left_label_space_: leftLabelHeights = {leftLabelHeights}")
+                if labelItem.boundingRect().width() >= plotItem.height():
+                    labelItem.setTextWidth(plotItem.height())
+                else:
+                    labelItem.setTextWidth(-1)
+                labelSpace = labelItem.boundingRect().height() * 0.8
+            else:
+                labelSpace = 0
+            
+            labelSpace += axisItem.style["tickTextWidth"]
+            
+            if axisItem.style["showValues"]:
+                labelSpace += axisItem.style["tickTextOffset"][0]
                 
-        if len(leftLabelHeights):
-            space = max(leftLabelHeights)
-            print(f"{self.__class__.__name__}._adjust_left_label_space_: space = {space}")
-            for k, plotItem in enumerate(self.axes):
-                labelItem = plotItem.axes["left"]["item"]
-                # code below adapted from PyQtGraph's AxisItem._updateWidth()
-                w = labelItem.textWidth() if labelItem.style['autoExpandTextSpace'] else labelItem.style['tickTextWidth'] if labelItem.style['showValues'] else 0
-                w += labelItem.style['tickTextOffset'][0] if labelItem.style['showValues'] else 0
-                w += max(0, labelItem.style['tickLength'])
-                w += space * 0.8  ## bounding rect is usually an overestimate
-                labelItem.setMaximumWidth(w)
-                labelItem.setMinimumWidth(w)
-                print(f"{self.__class__.__name__}._adjust_left_label_space_: item {k}: w = {w}")
-                labelItem.picture = None
+            leftAxisLabelSpaces.append(labelSpace)
+                
+        if len(leftAxisLabelSpaces):
+            self.leftLabelSpace = max(leftAxisLabelSpaces)
         
     
     @safeWrapper
@@ -10274,7 +10309,7 @@ signals in the signal collection.
                 #
                 plotname = f"signal_axis_{k}"
                 plotItem = pg.PlotItem(name = plotname)
-                self.signalsLayout.addItem(plotItem, row=k, col=0)
+                self.signalsLayout.addItem(plotItem, row=k, col=1)
                 plotItem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
                 plotItem.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
                 plotItem.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
@@ -10348,13 +10383,18 @@ signals in the signal collection.
         for plotItem in self.axes:
             self._clear_targets_overlay_(plotItem)
             self._clear_labels_overlay_(plotItem)
+            
             plotItem.axes["left"]["item"].setStyle(autoExpandTextSpace=True,
                                                     autoReduceTextSpace=True,
                                                     hideOverlappingLabels=True,
                                                     maxTickLevel=2,
                                                     maxTextLevel=2)
             
-            plotItem.axes["left"]["item"].setWidth(40)
+            plotItem.axes["left"]["item"].setWidth(self.leftLabelSpace)
+            to = plotItem.axes["left"]["item"].label.document().defaultTextOption()
+            to.setWrapMode(QtGui.QTextOption.WordWrap)
+            to.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop)
+            plotItem.axes["left"]["item"].label.document().setDefaultTextOption(to)
             
             if plotItem in (self._events_axis_, self._spiketrains_axis_):
                 plotItem.setVisible(False)
@@ -10375,7 +10415,7 @@ signals in the signal collection.
             self.actionLink_X_axes.setEnabled(False)
             self.actionShow_X_grid.setEnabled(False)
             self.actionShow_Y_grid.setEnabled(False)
-            
+         
         # visibleAxes = tuple(filter(lambda x: x.isVisible(), self.axes))
         # if len(visibleAxes):
         #     signalsLayoutHeight = self.signalsLayout.boundingRect().height()
