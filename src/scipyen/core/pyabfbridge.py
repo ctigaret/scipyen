@@ -2526,6 +2526,222 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             chtype = "physical" if physical else "logical"
             raise ValueError(f"Invalid {chtype} DAC channel specified {dacChannel}")
+        
+    def getEpochDigitalPattern(self, dac:typing.Union[int, str], 
+                               epoch:typing.Union[int, str], sweep:int = 0) -> tuple:
+        """
+        Returns the digital pattern that WOULD be output by a dac during a specific epoch.
+        
+        This depends, simultaneously, on the following conditions:
+        
+        1) the DAC channel has digital outputs enabled
+        
+        2) If alternative digital outputs are enabled in the protocol, this DAC
+            emits DIG outputs on the specified sweep.
+            
+        3) the DAC channel takes part in alternate digital outputs or not (this
+            depends on the channel index, with DAC 0 and 1 being the only ones
+            used for alternate digital output during even- and odd-numbered sweeps)
+        
+        Returns:
+        --------
+        A 2-tuple[4-tuple[int]] corresponding to the two DIG output banks in the
+        order 3⋯0, 7⋯4
+        
+        dac: physical DAC channel index, or DAC name
+        epoch: ABFEpoch number or letter
+        sweep: int, default is 0
+        """
+        dac = self.getDAC(dac)
+        
+        isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+        
+        epoch = dac.getEpoch(epoch)
+        if epoch is None:
+            raise ValueError(f"Invalid epoch index or name {epoch} for {len(dac.epochs)} epochs defined for this DAC ({dac.physicalIndex}, {dac.name})")
+        
+        if self.alternateDigitalOutputStateEnabled:#  and dac.logicalIndex < 2: # dac emits the main pattern
+            if dac.digitalOutputEnabled:
+                if dac.physicalIndex == self.activeDACChannel:
+                    if isAlternateDigital:
+                        # this DAC has dig output enabled, hence during
+                        # an experiment it will output NOTHING if either 
+                        # alternateDigitalPattern is disabled OR sweep number 
+                        # is even
+                        #
+                        
+                        # NOTE: 2024-10-20 10:42:42
+                        # retrieve the alternate digital pattern defined in
+                        # epoch, then:
+                        dig_3_0 = epoch.getDigitalPattern(True)[0] # select first bank
+                        dig_7_4 = epoch.getDigitalPattern(True)[1] # select second bank
+                    else:
+                        # this DAC has dig output enabled, hence during
+                        # an experiment it will output the main digital pattern
+                        # if either alternateDigitalPattern is disabled, OR
+                        # sweep number is even
+                        #
+                        
+                        # NOTE: 2024-10-20 10:43:38
+                        # retrieve the main digital pattern defined in epoch,
+                        # then:
+                        dig_3_0 = epoch.getDigitalPattern(False)[0] # select first bank
+                        dig_7_4 = epoch.getDigitalPattern(False)[1] # select second bank
+                        
+                else:
+                        dig_3_0 = dig_7_4 = [0,0,0,0] # if not active DAC, return zeros
+            else:                
+                # For a DAC where dig output is DISabled, the DAC is simply
+                # a placeholder for the alternate digital output of the epoch, 
+                # (and these TTLs will be sent out) ONLY if alternateDigitalPattern
+                # is enabled AND sweep number is odd
+                #
+                # NOTE: 2023-10-04 09:07:42 - show what is actually sent out
+                # i.e., if digital output is DISABLED then show zeroes even if
+                # in the Clampex protocol editor we have a pattern entered here.
+                #
+                # This is because, when digital output is disabled for this DAC
+                # AND alternative digital output is enabled in the protocol, the
+                # digital pattern entered on this waveform tab in Clampex
+                # protocol editor is used as the alternative digital output for
+                # the DAC where digital output IS enabled.
+                #
+                # I guess this is was a GUI design decision taken the by Clampex
+                # authors n order to avoid adding another field to the GUI form.
+                #
+                # NOTE: 2023-10-04 09:12:29
+                # Also, the DAC where digital output patterns are enabled may NOT
+                # be the same as the DAC one is recording from! 
+                #
+                # So if you're using, say DAC1, to send commands to your cell 
+                # (where DAC1 should be paired with the ADCs coming from the second
+                # amplifier channel, in a MultiClamp device) it is perfectly OK to
+                # enable digital outputs in the DAC0 waveform tab: Clampex will
+                # still issue TTLs during the sweep, even if DAC0 does not send 
+                # any command waveforms.
+                #
+                #
+                # On the other hand, if DAC0 has waveforms disabled (in this example,
+                # DAC0 is NOT used in the experiment) AND alternate digital outputs
+                # is disabled in the protocol, then NO digital outputs are "linked"
+                # to this DAC0.
+                #
+                # That somewhat confuses things, because DIG channels and DAC
+                # channels are physically independent! The only logical "link"
+                # between them is the timings of the epochs.
+                # 
+                # Also, NOTE that in Clampex only one DAC can have digital outputs
+                # enabled.
+                #
+                
+                dig_3_0 = dig_7_4 = [0,0,0,0]
+                
+        else:
+            if dac.digitalOutputEnabled:
+                # if alternateDigitalPattern is not enabled, or the DAC channel
+                # is one of the channels NOT involved in alternate output
+                # (2, …) the channel will always output the main digital 
+                # pattern here
+                dig_3_0 = epoch.getDigitalPattern()[0]
+                dig_7_4 = epoch.getDigitalPattern()[1]
+            else:
+                dig_3_0 = dig_7_4 = [0,0,0,0]
+                
+        return dig_3_0, dig_7_4
+    
+    def getEpochDigitalWaveform(self, dac:typing.Union[int,str], 
+                                epoch:typing.Union[int,str],
+                                digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
+                                sweep:int,
+                                lastLevelOnly:bool = False,
+                                seprateWaves:bool=True,
+                                digOFF:typing.Optional[pq.Quantity] = None,
+                                digON:typing.Optional[pq.Quantity] = None,
+                                trainOFF:typing.Optional[pq.Quantity] = None,
+                                trainON:typong.Optional[pq.Quantity] = None,
+                                returnLevels:bool=False) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+        """Waveform with the TTL signals emitted by the epoch.
+        
+        Mandatory positional parameters:
+        --------------------------------
+        
+        epoch: the ABF epoch that is queried
+        
+        Named parameters:
+        -----------------
+        
+        sweep: the index of the ABF sweep (digital outputs may be specific to the 
+                sweep index, when alternate digital patterns are enabled in the 
+                ABF protocol)
+        
+                Default is 0 (first sweep)
+        
+        digChannel:default is None, meaning that the function returns a waveform
+            for each digital output channel that is active during this epoch
+            (and during the specified sweep)
+        
+        lastLevelOnly: default is False; when True, just generate a constant wave
+            with the value of the last digital logic level; that is, OFF for digital 
+            pulse or train. NOTE that the actual value of this level is either 0 V 
+            or 5 V, depending on the values of protocol.digitalHoldingValue(channel) 
+            and protocol.digitalTrainActiveLogic.
+        
+            See self.getDigitalLogicLevels, self.getDigitalPulseLogicLevels,
+            and self.getDigitalTrainLogicLevels
+        
+        separateWavePerChannel: default is False. 
+            When False, and more than one digChannel is queried, the function 
+            returns a Quantity array with one channel-specific waveform per
+            column.
+        
+            When True, the function returns a list of vector waveforms (one per 
+            channel)
+        
+        digOFF, digON, trainOFF, trainON: scalar Python Quantities representing
+            the logic levels for digital pulses and trains, respectively; when 
+            they are None (default) the function will query these values from the 
+            ABF protocol that associates this DAC output.
+        
+        returnLevels: default False; When True, returns the waves and the digOFF, 
+        digON, trainOFF and trainON logical levels
+        
+        Returns:
+        --------
+        waves, [digOFF, digON, trainOFF, trainON], where:
+        
+        waves: list of Python quantities (Quantity arrays) whith the digital waveforms
+        for each specified DIG channel are returned.
+        
+            The list contains:
+                • a single 1D Quantity array, when digChannel parameter is an int 
+                    (but see below)
+                • as many 1D Quantity arrays as DIG channel indexes specified in 
+                    digChannel parameter, and separateWavePerChannel is True
+                • a single 2D Quantity array with shape (N,M) where:
+                    ∘ N is the number of samples recorded by the epoch
+                    ∘ M is the number of DIG channels specified in digChannel
+        
+            The list is EMPTY when not all DIG channel indexes specified
+                    in the digChannel parameter are used by the epoch.
+        
+        digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values
+            of the logical levels for digital pulse and digital train.
+        
+            NOTE:
+            1. trainOFF and trainON are None when the epoch emits only digital pulses
+            2. digOFF and digON are None when the epoch emits only digital pulse trains
+            3. Within a given epoch, these levels are identical for all DIG channels.
+        
+        When not all DIG channel indexes are used by the epoch to emit digital signals
+        the function returns None
+    
+        """
+        pass
+        
+    
+    def getDigitalWaveform(self, dac:typing.Union[int, str], sweep:int = 0):
+        pass
+            
             
     def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
@@ -4631,161 +4847,162 @@ class ABFOutputConfiguration:
                 
         return ret
     
-    def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], 
-                               sweep:int=0) ->tuple:
-        """
-        TODO: Move this code to ABFProtocol, thus breaking the need to store
-        a reference to the protocol in this ABFOutputConfiguration instance.
-        
-        Returns the digital pattern that WOULD be output by the epoch.
-        
-        This depends, simultaneously, on the following conditions:
-        
-        1) the DAC channel has digital outputs enabled
-        
-        2) If alternative digital outputs are enabled in the protocol, this DAC
-            emits DIG outputs on the specified sweep.
-            
-        3) the DAC channel takes part in alternate digital outputs or not (this
-            depends on the channel index, with DAC 0 and 1 being the only ones
-            used for alternate digital output during even- and odd-numbered sweeps)
-        
-        Returns:
-        --------
-        A 2-tuple[4-tuple[int]] corresponding to the two DIG output banks in the
-        order 3⋯0, 7⋯4
-        
-        """
-        isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
-        
-        if isinstance(epoch, (int, str)):
-            e = self.getEpoch(epoch)
-            if e is None:
-                raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.dacChannel})")
-            
-            epoch = e
-            
-        elif not isinstance(epoch, ABFEpoch):
-            raise TypeError(f"Expecting an ABFEpoch, an int or a str (epoch 'name' e.g. 'A', 'B' or 'AB', etc); instead got {type(epoch).__name__}")
-        
-        if self.alternateDigitalOutputStateEnabled and self.logicalIndex < 2:
-            # NOTE: 2023-09-18 13:22:56
-            # When alternative digital outputs are used in an experiment,
-            # ONLY the first two DACs (0 and 1) take part in the alternative
-            # arangement of digital outputs, as follows:
-            #
-            # • The DAC where digital outputs are enabled sends TTLs during
-            #   even-numbered sweeps (0,2,4,…),
-            #
-            # • The "other" DAC (where digital outputs are NOT enabled) sends 
-            #   TTLs during odd-numbered sweeps (1,3,5,…)
-            #
-            # The alternate pattern is DEFINED in the protocol editor 
-            # in the "other" DAC channel (DAC1 if digital output is enabled
-            # on DAC0, or DAC0 if digital output is enabled on DAC1); this 
-            # pattern is stored internally in the ABF file as the "alternate"
-            # digital pattern (at a different address)
-            #
-            # NOTE: neither physical DAC channel actually sends out any TTL signals
-            # The association of a digital pattern with the GUI for the configuration
-            # of a particular DAC channel seems an arbitrary decision in Clampex,
-            # likely justified by the fact that the digital output (TTL) is
-            # associated logically with the command waveform (if any) sent out 
-            # by a physical DAC channel during a particular epoch; another
-            # possible reason is to avoid the Clampex GUI becoming more complex...
-            # 
-            #
-            if self.digitalOutputEnabled:
-                # for the DAC channel where digital output is enabled we write
-                # ONLY the main digital pattern of the epoch, and ONLY if 
-                # the sweep has an even number
-                #
-                # if self.logicalIndex == self.protocol.activeDACChannel:
-                if self.physicalIndex == self.protocol.activeDACChannel:
-                    if isAlternateDigital:
-                        # this DAC has dig output enabled, hence during
-                        # an experiment it will output NOTHING if either 
-                        # alternateDigitalPattern is disabled OR sweep number 
-                        # is even
-                        #
-                        
-                        # NOTE: 2024-10-20 10:42:42
-                        # retrieve the alternate digital pattern defined in
-                        # epoch, then:
-                        dig_3_0 = epoch.getDigitalPattern(True)[0] # select first bank
-                        dig_7_4 = epoch.getDigitalPattern(True)[1] # select second bank
-                    else:
-                        # this DAC has dig output enabled, hence during
-                        # an experiment it will output the main digital pattern
-                        # if either alternateDigitalPattern is disabled, OR
-                        # sweep number is even
-                        #
-                        
-                        # NOTE: 2024-10-20 10:43:38
-                        # retrieve the main digital pattern defined in epoch,
-                        # then:
-                        dig_3_0 = epoch.getDigitalPattern(False)[0] # select first bank
-                        dig_7_4 = epoch.getDigitalPattern(False)[1] # select second bank
-                else:
-                    dig_3_0 = dig_7_4 = [0,0,0,0] # if not active DAC, return zeros
-            else:
-                # For a DAC where dig output is DISabled, the DAC is simply
-                # a placeholder for the alternate digital output of the epoch, 
-                # (and these TTLs will be sent out) ONLY if alternateDigitalPattern
-                # is enabled AND sweep number is odd
-                #
-                # NOTE: 2023-10-04 09:07:42 - show what is actually sent out
-                # i.e., if digital output is DISABLED then show zeroes even if
-                # in the Clampex protocol editor we have a pattern entered here.
-                #
-                # This is because, when digital output is disabled for this DAC
-                # AND alternative digital output is enabled in the protocol, the
-                # digital pattern entered on this waveform tab in Clampex
-                # protocol editor is used as the alternative digital output for
-                # the DAC where digital output IS enabled.
-                #
-                # I guess this is was a GUI design decision taken the by Clampex
-                # authors n order to avoid adding another field to the GUI form.
-                #
-                # NOTE: 2023-10-04 09:12:29
-                # Also, the DAC where digital output patterns are enabled may NOT
-                # be the same as the DAC one is recording from! 
-                #
-                # So if you're using, say DAC1, to send commands to your cell 
-                # (where DAC1 should be paired with the ADCs coming from the second
-                # amplifier channel, in a MultiClamp device) it is perfectly OK to
-                # enable digital outputs in the DAC0 waveform tab: Clampex will
-                # still issue TTLs during the sweep, even if DAC0 does not send 
-                # any command waveforms.
-                #
-                #
-                # On the other hand, if DAC0 has waveforms disabled (in this example,
-                # DAC0 is NOT used in the experiment) AND alternate digital outputs
-                # is disabled in the protocol, then NO digital outputs are "linked"
-                # to this DAC0.
-                #
-                # That somewhat confuses things, because DIG channels and DAC
-                # channels are physically independent! The only logical "link"
-                # between them is the timings of the epochs.
-                # 
-                # Also, NOTE that in Clampex only one DAC can have digital outputs
-                # enabled.
-                #
-                
-                dig_3_0 = dig_7_4 = [0,0,0,0]
-                    
-        else:
-            if self.digitalOutputEnabled:
-                # if alternateDigitalPattern is not enabled, or the DAC channel
-                # is one of the channels NOT involved in alternate output
-                # (2, …) the channel will always output the main digital 
-                # pattern here
-                dig_3_0 = epoch.getDigitalPattern()[0]
-                dig_7_4 = epoch.getDigitalPattern()[1]
-            else:
-                dig_3_0 = dig_7_4 = [0,0,0,0]
-                
-        return dig_3_0, dig_7_4
+#     def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int], 
+#                                sweep:int=0) ->tuple:
+#         """
+#         TODO: Move this code to ABFProtocol, thus breaking the need to store
+#         a reference to the protocol in this ABFOutputConfiguration instance.
+#         
+#         Returns the digital pattern that WOULD be output by the epoch.
+#         
+#         This depends, simultaneously, on the following conditions:
+#         
+#         1) the DAC channel has digital outputs enabled
+#         
+#         2) If alternative digital outputs are enabled in the protocol, this DAC
+#             emits DIG outputs on the specified sweep.
+#             
+#         3) the DAC channel takes part in alternate digital outputs or not (this
+#             depends on the channel index, with DAC 0 and 1 being the only ones
+#             used for alternate digital output during even- and odd-numbered sweeps)
+#         
+#         Returns:
+#         --------
+#         A 2-tuple[4-tuple[int]] corresponding to the two DIG output banks in the
+#         order 3⋯0, 7⋯4
+#         
+#         """
+#         
+#         isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+#         
+#         if isinstance(epoch, (int, str)):
+#             e = self.getEpoch(epoch)
+#             if e is None:
+#                 raise ValueError(f"Invalid epoch index or name {epoch} for {len(self.epochs)} epochs defined for this DAC ({self.physicalIndex}, {self.name})")
+#             
+#             epoch = e
+#             
+#         elif not isinstance(epoch, ABFEpoch):
+#             raise TypeError(f"Expecting an ABFEpoch, an int or a str (epoch 'name' e.g. 'A', 'B' or 'AB', etc); instead got {type(epoch).__name__}")
+#         
+#         if self.alternateDigitalOutputStateEnabled and self.logicalIndex < 2:
+#             # NOTE: 2023-09-18 13:22:56
+#             # When alternative digital outputs are used in an experiment,
+#             # ONLY the first two DACs (0 and 1) take part in the alternative
+#             # arangement of digital outputs, as follows:
+#             #
+#             # • The DAC where digital outputs are enabled sends TTLs during
+#             #   even-numbered sweeps (0,2,4,…),
+#             #
+#             # • The "other" DAC (where digital outputs are NOT enabled) sends 
+#             #   TTLs during odd-numbered sweeps (1,3,5,…)
+#             #
+#             # The alternate pattern is DEFINED in the protocol editor 
+#             # in the "other" DAC channel (DAC1 if digital output is enabled
+#             # on DAC0, or DAC0 if digital output is enabled on DAC1); this 
+#             # pattern is stored internally in the ABF file as the "alternate"
+#             # digital pattern (at a different address)
+#             #
+#             # NOTE: neither physical DAC channel actually sends out any TTL signals
+#             # The association of a digital pattern with the GUI for the configuration
+#             # of a particular DAC channel seems an arbitrary decision in Clampex,
+#             # likely justified by the fact that the digital output (TTL) is
+#             # associated logically with the command waveform (if any) sent out 
+#             # by a physical DAC channel during a particular epoch; another
+#             # possible reason is to avoid the Clampex GUI becoming more complex...
+#             # 
+#             #
+#             if self.digitalOutputEnabled:
+#                 # for the DAC channel where digital output is enabled we write
+#                 # ONLY the main digital pattern of the epoch, and ONLY if 
+#                 # the sweep has an even number
+#                 #
+#                 # if self.logicalIndex == self.protocol.activeDACChannel:
+#                 if self.physicalIndex == self.protocol.activeDACChannel:
+#                     if isAlternateDigital:
+#                         # this DAC has dig output enabled, hence during
+#                         # an experiment it will output NOTHING if either 
+#                         # alternateDigitalPattern is disabled OR sweep number 
+#                         # is even
+#                         #
+#                         
+#                         # NOTE: 2024-10-20 10:42:42
+#                         # retrieve the alternate digital pattern defined in
+#                         # epoch, then:
+#                         dig_3_0 = epoch.getDigitalPattern(True)[0] # select first bank
+#                         dig_7_4 = epoch.getDigitalPattern(True)[1] # select second bank
+#                     else:
+#                         # this DAC has dig output enabled, hence during
+#                         # an experiment it will output the main digital pattern
+#                         # if either alternateDigitalPattern is disabled, OR
+#                         # sweep number is even
+#                         #
+#                         
+#                         # NOTE: 2024-10-20 10:43:38
+#                         # retrieve the main digital pattern defined in epoch,
+#                         # then:
+#                         dig_3_0 = epoch.getDigitalPattern(False)[0] # select first bank
+#                         dig_7_4 = epoch.getDigitalPattern(False)[1] # select second bank
+#                 else:
+#                     dig_3_0 = dig_7_4 = [0,0,0,0] # if not active DAC, return zeros
+#             else:
+#                 # For a DAC where dig output is DISabled, the DAC is simply
+#                 # a placeholder for the alternate digital output of the epoch, 
+#                 # (and these TTLs will be sent out) ONLY if alternateDigitalPattern
+#                 # is enabled AND sweep number is odd
+#                 #
+#                 # NOTE: 2023-10-04 09:07:42 - show what is actually sent out
+#                 # i.e., if digital output is DISABLED then show zeroes even if
+#                 # in the Clampex protocol editor we have a pattern entered here.
+#                 #
+#                 # This is because, when digital output is disabled for this DAC
+#                 # AND alternative digital output is enabled in the protocol, the
+#                 # digital pattern entered on this waveform tab in Clampex
+#                 # protocol editor is used as the alternative digital output for
+#                 # the DAC where digital output IS enabled.
+#                 #
+#                 # I guess this is was a GUI design decision taken the by Clampex
+#                 # authors n order to avoid adding another field to the GUI form.
+#                 #
+#                 # NOTE: 2023-10-04 09:12:29
+#                 # Also, the DAC where digital output patterns are enabled may NOT
+#                 # be the same as the DAC one is recording from! 
+#                 #
+#                 # So if you're using, say DAC1, to send commands to your cell 
+#                 # (where DAC1 should be paired with the ADCs coming from the second
+#                 # amplifier channel, in a MultiClamp device) it is perfectly OK to
+#                 # enable digital outputs in the DAC0 waveform tab: Clampex will
+#                 # still issue TTLs during the sweep, even if DAC0 does not send 
+#                 # any command waveforms.
+#                 #
+#                 #
+#                 # On the other hand, if DAC0 has waveforms disabled (in this example,
+#                 # DAC0 is NOT used in the experiment) AND alternate digital outputs
+#                 # is disabled in the protocol, then NO digital outputs are "linked"
+#                 # to this DAC0.
+#                 #
+#                 # That somewhat confuses things, because DIG channels and DAC
+#                 # channels are physically independent! The only logical "link"
+#                 # between them is the timings of the epochs.
+#                 # 
+#                 # Also, NOTE that in Clampex only one DAC can have digital outputs
+#                 # enabled.
+#                 #
+#                 
+#                 dig_3_0 = dig_7_4 = [0,0,0,0]
+#                     
+#         else:
+#             if self.digitalOutputEnabled:
+#                 # if alternateDigitalPattern is not enabled, or the DAC channel
+#                 # is one of the channels NOT involved in alternate output
+#                 # (2, …) the channel will always output the main digital 
+#                 # pattern here
+#                 dig_3_0 = epoch.getDigitalPattern()[0]
+#                 dig_7_4 = epoch.getDigitalPattern()[1]
+#             else:
+#                 dig_3_0 = dig_7_4 = [0,0,0,0]
+#                 
+#         return dig_3_0, dig_7_4
     
     @property
     def emulatesTTL(self)->bool:
