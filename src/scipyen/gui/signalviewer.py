@@ -545,6 +545,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._ignore_empty_spiketrains_ = True
         self._common_axes_X_padding_ = 0.
         self._leftLabelSpace_ = self.defaultLeftAxisLabelSpace
+        
+        # NOTE: 2024-10-23 11:41:02 TODO
+        # implement menu action in "Settings" menu
         self._leftLabelWrapMode_ = self.defaultLeftAxisLabelWrapMode
         # self._axes_range_changed_manually_ = list()
         
@@ -10448,8 +10451,6 @@ signals in the signal collection.
             # 
             plotItem.axes["left"]["item"].setWidth(self.leftLabelSpace)
             to = plotItem.axes["left"]["item"].label.document().defaultTextOption()
-            # to.setWrapMode(QtGui.QTextOption.WordWrap)
-            # to.setWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
             to.setWrapMode(getattr(QtGui.QTextOption, self.leftLabelWrapMode))
             to.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop)
             plotItem.axes["left"]["item"].label.document().setDefaultTextOption(to)
