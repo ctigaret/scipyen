@@ -1215,7 +1215,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         sigBlock = QtCore.QSignalBlocker(self.actionIgnore_empty_spike_trains)
         self.actionIgnore_empty_spike_trains.setChecked(self._ignore_empty_spiketrains_)
         
-    @prperty
+    @property
     def leftLabelWrapMode(self) -> str:
         return self._leftLabelWrapMode_
     
@@ -10450,7 +10450,7 @@ signals in the signal collection.
             to = plotItem.axes["left"]["item"].label.document().defaultTextOption()
             # to.setWrapMode(QtGui.QTextOption.WordWrap)
             # to.setWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
-            to.setWrapMode(getattr(QtGui.QTextOption, self.leftLabelWrapMode)
+            to.setWrapMode(getattr(QtGui.QTextOption, self.leftLabelWrapMode))
             to.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop)
             plotItem.axes["left"]["item"].label.document().setDefaultTextOption(to)
             
