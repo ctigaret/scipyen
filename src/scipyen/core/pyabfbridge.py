@@ -3937,10 +3937,10 @@ class ABFOutputConfiguration:
         
         # print(f"entity/epochs: {entity['epochs']}")
         
-        protocol = h5io.fromHDF5(entity["protocol"], cache)
+        # protocol = h5io.fromHDF5(entity["protocol"], cache)
         epochs = h5io.fromHDF5(entity["epochs"], cache)
         
-        return cls(obj=None, protocol=protocol, dacChannel=logicalIndex, 
+        return cls(obj=None, dacChannel=logicalIndex, 
                    physicalIndex = dacChannel, 
                    physical=True,
                    units=units,

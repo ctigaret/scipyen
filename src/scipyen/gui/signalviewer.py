@@ -509,6 +509,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultCursorHoverColor = "red"
     
     defaultLeftAxisLabelSpace = 40
+    
+    defaultLeftAxisLabelWrapMode = "WrapAtWordBoundaryOrAnywhere"
 
     def __init__(self, x: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, y: (neo.core.baseneo.BaseNeo, DataSignal, IrregularlySampledDataSignal, TriggerEvent, TriggerProtocol, vigra.filters.Kernel1D, np.ndarray, tuple, list, type(None)) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frameIndex:(int, tuple, list, range, slice, type(None)) = None, frameAxis:(int, type(None)) = None, signalIndex:(str, int, tuple, list, range, slice, type(None)) = None, signalChannelAxis:(int, type(None)) = None, signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None, irregularSignalChannelAxis:(int, type(None)) = None, irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None, separateSignalChannels:bool = False, singleFrame:bool=False, interval:(tuple, list) = None, channelIndex:object = None, currentFrame:(int, type(None)) = None, plotStyle: str = "plot", nAxes:typing.Optional[int] = None,*args, **kwargs):
         """SignalViewer constructor.
@@ -542,7 +544,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._show_legends_ = False
         self._ignore_empty_spiketrains_ = True
         self._common_axes_X_padding_ = 0.
-        
+        self._leftLabelSpace_ = self.defaultLeftAxisLabelSpace
+        self._leftLabelWrapMode_ = self.defaultLeftAxisLabelWrapMode
         # self._axes_range_changed_manually_ = list()
         
         # NOTE: 2023-01-04 22:06:48
@@ -1211,6 +1214,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._ignore_empty_spiketrains_ = value == True
         sigBlock = QtCore.QSignalBlocker(self.actionIgnore_empty_spike_trains)
         self.actionIgnore_empty_spike_trains.setChecked(self._ignore_empty_spiketrains_)
+        
+    @prperty
+    def leftLabelWrapMode(self) -> str:
+        return self._leftLabelWrapMode_
+    
+    @markConfigurable("LeftAxisLabelWrapMode", "qt")
+    @leftLabelWrapMode.setter
+    def leftLabelWrapMode(self, val:str):
+        if not isinstance(val, str):
+            raise TypeError(f"Expecting a str; instead got {type(val).__name__}")
+        if not hasattr(QtGui.QTextOption.WrapMode, val):
+            raise ValueError(f"Invalid wrap mode {val}")
+        
+        self._leftLabelWrapMode_ = val
         
     @property
     def leftLabelSpace(self) -> int:
@@ -3129,15 +3146,11 @@ anything else       anything else       ❌
     @safeWrapper
     def resizeEvent(self, evt:QtGui.QResizeEvent):
         super().resizeEvent(evt)
-        self._adjust_left_label_space_()
         
-        # visibleAxes = tuple(filter(lambda x: x.isVisible(), self.axes))
-        # if len(visibleAxes):
-        #     signalsLayoutHeight = self.signalsLayout.boundingRect().height()
-        #     viewBoxHeight = signalsLayoutHeight/len(self.axes)
-        #     for plotItem in visibleAxes:
-        #         plotItem.vb.setFixedHeight(viewBoxHeight)
-            
+        # NOTE: 2024-10-23 11:36:50 FIXME
+        # hold off this for now
+        # self._adjust_left_label_space_()
+        
     @safeWrapper
     def reportCursors(self):
         text = list()
@@ -8047,7 +8060,9 @@ signals in the signal collection.
         #     offset, scale = self._calculate_new_X_offset_scale_(bounds, viewXrange)
         #     self._axes_X_view_offsets_scales_[kax] = (offset, scale)
         
-        self._adjust_left_label_space_()    
+        # NOTE: 2024-10-23 11:36:50 FIXME
+        # hold off this for now
+        # self._adjust_left_label_space_()    
         self.sig_frameDisplayReady.emit()
         
     def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
@@ -9852,14 +9867,46 @@ signals in the signal collection.
         
     @safeWrapper
     def _adjust_left_label_space_(self):
+        # Try eliding the label text, move the full version to the tooltip. 
+        # QGraphicsTextItem does NOT contain API to do that, so I'd need to apply
+        # my own guiutils.get_elided_text() function.
+        #
+        # 😦 This quickly becomes more complicated than I thought, as this uses a 
+        # HTML-formatted string, thus requiring three operations: (1) strip off 
+        # the HTML tags, (2) create an elided text, (3) re-apply the HTMl tags 😦. 
+        #
+        # But❗...
+        #
+        # With the exceptions below, stripping off HTML tags might not necessary —
+        # one can access the plain text as AxisItem's `labelText` property. 
+        # HOWEVER:
+        # • the "units" might be dynamically created via autoSIPRefix* methods
+        #   of AxisItem
+        # • the are cases where I directly wrap the label text in HTML tags in
+        #   order to highlight the "active" plotItem
+        # for plotItem in self.axes:
+        #     axisItem = plotItem.axes["left"]["item"]    # a pg.AxisItem
+        #     labelItem = axisItem.label                  # a QGraphicsTextItem
+        #     if labelItem and labelItem.isVisible():
+        #         if labelItem.boundingRect().width() >= plotItem.height():
+        #             if len(labelItem.toolTip()) == 0:
+        #                 labelItem.setToolTip()
+
+
         leftAxisLabelSpaces = list()
-        
         for plotItem in self.axes:
-            axisItem = plotItem.axes["left"]["item"]
-            labelItem = axisItem.label
+            axisItem = plotItem.axes["left"]["item"]    # a pg.AxisItem
+            labelItem = axisItem.label                  # a QGraphicsTextItem
             if labelItem and labelItem.isVisible():
                 if labelItem.boundingRect().width() >= plotItem.height():
-                    labelItem.setTextWidth(plotItem.height())
+                    # Set a fixed "text width"¹ for the QGraphicsTextItem in 
+                    # order to fit the text, by trigger breaking up displayed 
+                    # text in several lines (usually, at word delimiters)
+                    #
+                    # NOTE: ¹ the QGraphicsTextItem is rotated 90° counter-clockwise
+                    # so its text width must fit in the actual plotItem's height
+                    #
+                    labelItem.setTextWidth(plotItem.height() * 0.8)
                 else:
                     labelItem.setTextWidth(-1)
                 labelSpace = labelItem.boundingRect().height() * 0.8
@@ -10390,9 +10437,20 @@ signals in the signal collection.
                                                     maxTickLevel=2,
                                                     maxTextLevel=2)
             
+            # NOTE: 2024-10-23 10:27:20
+            # Seemingly a good-ish solution to get the axes aligned on their
+            # left spines: reserve a fixed space for the left axis label; then, 
+            # when resizing, if the label needs word wrapping, we recalculate 
+            # this fixed space and re-apply - see _adjust_left_label_space_
+            #
+            # However, this may still allow some overlap between labels of adjacent
+            # axes
+            # 
             plotItem.axes["left"]["item"].setWidth(self.leftLabelSpace)
             to = plotItem.axes["left"]["item"].label.document().defaultTextOption()
-            to.setWrapMode(QtGui.QTextOption.WordWrap)
+            # to.setWrapMode(QtGui.QTextOption.WordWrap)
+            # to.setWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
+            to.setWrapMode(getattr(QtGui.QTextOption, self.leftLabelWrapMode)
             to.setAlignment(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop)
             plotItem.axes["left"]["item"].label.document().setDefaultTextOption(to)
             
