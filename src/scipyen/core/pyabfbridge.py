@@ -836,6 +836,15 @@ class ABFEpoch:
         self._pulseWidth_ = val
         
     @property
+    def dacIndex(self) -> int:
+        """Physical index of the DAC where this epoch was defined"""
+        return self._dacNum_
+    
+    @dacIndex.setter
+    def dacIndex(self, val:int):
+        self._dacNum_ = val
+        
+    @property
     def mainDigitalPattern(self) -> tuple:
         return self._mainDigitalPattern_
     
@@ -2085,8 +2094,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return self._hasAltDigOutState_
     
     @property
+    def alternateDigitalOutputsEnabled(self) -> bool:
+        """Alias to self.alternateDigitalOutputStateEnabled"""
+        return self._hasAltDigOutState_
+        
+    @property
     def alternateDACOutputStateEnabled(self) -> bool:
         return self._hasAltDacOutState_
+    
+    @property
+    def alternateWaveformsEnabled(self) -> bool:
+        """Alias to self.alternateDACOutputStateEnabled"""
+        return self._hasAltDacOutState_
+        
+        
     
     @property
     def sweepTimes(self) -> pq.Quantity:
@@ -2096,13 +2117,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                        dac:typing.Union[ABFOutputConfiguration, int, str],
                        epoch:typing.Optional[typing.Union[ABFEpoch, int, str]]=None) -> tuple:
         if isinstance(dac, (int, str)):
-            dac = self.getDaC(dac)
+            dac = self.getDAC(dac)
         if not isinstance(dac, ABFOutputConfiguration) or dac not in self._outputs_:
             raise TypeError(f"Invalid DAC {dac}")
         if epoch is not None:
             if isinstance(epoch, (int,str)):
                 epoch = dac.getEpoch(epoch)
-            if not isinstance(epoch, ABFEPoch) or epoch not in dac.epochs:
+            if not isinstance(epoch, ABFEpoch) or epoch not in dac.epochs:
                 raise ValueError(f"Invalid epoch specified {epoch} for DAC ({dac.physicalIindex} {dac.name}) with {len(dac.epochs)} epochs")
         
         return dac, epoch
@@ -2671,7 +2692,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         dac, epoch = self.check_DAC_Epoch(dac, epoch)
         if float(epoch.pulsePeriod) == 0.:
             return 0
-        return int(self.getEpochDuration(epoch,sweep)/epoch.pulsePeriod)
+        return int(self.getEpochDuration(dac, epoch, sweep)/epoch.pulsePeriod)
     
     def getEpochPulsePeriod(self, dac:typing.Union[ABFOutputConfiguration, int, str],
                                     epoch:typing.Union[ABFEpoch, int, str],
@@ -2692,12 +2713,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         dac, epoch = self.check_DAC_Epoch(dac, epoch)
 
         pc = self.getEpochPulseCount(dac, epoch, sweep)
-        pp = self.getEpochPulsePeriod(dac, epoch, sweep, samples)
+        pp = self.getEpochPulsePeriod(dac, epoch, samples)
         
         if pc == 0:
             return tuple()
 
-        # t0 = self.getEpochRecordingStartTimeActual(epoch, sweep)
         t0 = self.getEpochStart(dac, epoch, sweep, holding, fromRunStart, samples)
 
         ret = tuple(t0 + pp * p for p in range(pc))
@@ -2747,19 +2767,29 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 return prevLevel
             
         return digOFF * pq.V
+    
+    def getEpochUsedDigitalChannels(self, dac:typing.Union[ABFOutputConfiguration, int, str],
+                               epoch:typing.Union[ABFEpoch, int, str],
+                               sweep:int = 0) -> tuple:
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
+        isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+
 
     def getEpochDigitalPattern(self, dac:typing.Union[ABFOutputConfiguration, int, str],
                                epoch:typing.Union[ABFEpoch, int, str],
                                sweep:int = 0) -> tuple:
         """
-        Returns the digital pattern that WOULD be output by a dac during a specific epoch.
+        Returns the digital pattern that WOULD be output during an epoch.
         
-        This depends, simultaneously, on the following conditions:
+        This depends, simultaneously, on the following factors:
         
-        1) the DAC channel has digital outputs enabled
+        1) the DAC channel where the epoch is defined has digital outputs enabled
         
-        2) If alternative digital outputs are enabled in the protocol, this DAC
-            emits DIG outputs on the specified sweep.
+        2) the swep index. The relationhip is as 
+            follows:
+            • when Alternate Digital Outputs is enables in the protocoldepends on whether this DAC
+            is the one with the lowest index among those where epoch digital 
+            channels are active, and ).
             
         3) the DAC channel takes part in alternate digital outputs or not (this
             depends on the channel index, with DAC 0 and 1 being the only ones
@@ -2868,11 +2898,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     def getEpochDigitalWaveform(self, dac:typing.Union[ABFOutputConfiguration, int, str], 
                                 epoch:typing.Union[ABFEpoch, str, int],
-                                digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
                                 sweep:int = 0,
+                                digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
                                 lastLevelOnly:bool = False,
                                 separateWaves:bool = True,
-                                returnLevels:bool = False) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                                returnLevels:bool = False) -> typing.Sequence[pq.Quantity]:
         """Waveform with the TTL signals emitted by the epoch.
         
         Mandatory positional parameters:
@@ -2902,7 +2932,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             See self.getDigitalLogicLevels, self.getDigitalPulseLogicLevels,
             and self.getDigitalTrainLogicLevels
         
-        separateWavePerChannel: default is False. 
+        separateWaves: default is False. 
             When False, and more than one digChannel is queried, the function 
             returns a Quantity array with one channel-specific waveform per
             column.
@@ -2925,17 +2955,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
         waves: list of Python quantities (Quantity arrays) whith the digital waveforms
         for each specified DIG channel are returned.
         
-            The list contains:
-                • a single 1D Quantity array, when digChannel parameter is an int 
-                    (but see below)
-                • as many 1D Quantity arrays as DIG channel indexes specified in 
-                    digChannel parameter, and separateWavePerChannel is True
-                • a single 2D Quantity array with shape (N,M) where:
-                    ∘ N is the number of samples recorded by the epoch
-                    ∘ M is the number of DIG channels specified in digChannel
+            The `waves` list contains:
+            • when `digChannel` parameter is an int: a single 1D Quantity array
+        
+            • when `digChannel` is a sequence of int or None (implying ALL channels):
+                ∘ when `separateWaves` is True (the default): as many 1D Quantity 
+                        arrays as DIG channel indexes specified in `digChannel`
+        
+                ∘ when `seprateWaves` is False : a single 2D Quantity array with 
+                    shape (N,M) where:
+                    □ N is the number of samples recorded by the epoch
+                    □ M is the number of DIG channels specified in `digChannel`
         
             The list is EMPTY when not all DIG channel indexes specified
-                    in the digChannel parameter are used by the epoch.
+                    in the `digChannel` parameter are used by the epoch.
         
         digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values
             of the logical levels for digital pulse and digital train.
@@ -2953,19 +2986,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
-        pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
-        pulseSamples = self.getEpochPulseWidthSamples(epoch)
-        pulseCount = self.getEpochPulseCount(epoch)
+        pulsePeriod = self.getEpochPulsePeriod(dac, epoch, True)
+        # pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
+        pulseSamples = self.getEpochPulseWidth(dac, epoch, True)
+        # pulseSamples = self.getEpochPulseWidthSamples(epoch)
+        pulseCount = self.getEpochPulseCount(dac, epoch, sweep)
 
         usedDigs = epoch.digitalOutputChannels
         
         if len(usedDigs) == 0:
-            scipywarn(f"The epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) does NOT emit digital outputs")
+            scipywarn(f"The epoch {epoch.number} ({epoch.letter}) of DAC {dac.physicalIndex} ({dac.name}) does NOT emit digital outputs")
             return 
         
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
-                scipywarn(f"The DIG channel {digChannel} is not used in the epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) ")
+                scipywarn(f"The DIG channel {digChannel} is not used in the epoch {epoch.number} ({epoch.letter}) of DAC {dac.physicalIndex} ({dac.name}) ")
                 return 
                 # raise ValueError(f"Invalid DIG channel index {digChannel}")
             
@@ -2973,10 +3008,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
             if any(v not in usedDigs for v in digChannel):
-                scipywarn(f"Not all specified DIG channels {digChannel} are used by the epoch {epoch.number} ({epoch.letter}) of DAC {self.physicalIndex} ({self.name}) ")
+                scipywarn(f"Not all specified DIG channels {digChannel} are used by the epoch {epoch.number} ({epoch.letter}) of DAC {dac.physicalIndex} ({dac.name}) ")
                 return 
-            
-                # raise ValueError(f"Invalid DIG channel index {digChannel}")
             
         elif digChannel is None:
             digChannel = tuple(usedDigs.keys())
@@ -2997,7 +3030,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         digOFF = digON = trainOFF = trainON = None
         
         for k, chnl in enumerate(digChannel):
-            wave = np.full([epochSamplesCount, 1], 0) * self.units
+            wave = np.full([epochSamplesCount, 1], 0) * dac.units
             
             if digChannelValue[k] == 1: # emits pulse
                 digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
@@ -3016,7 +3049,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             waves.append(wave)
             
         if not separateWaves:
-            waves = [np.hstack(waves) * self.units]
+            waves = [np.hstack(waves) * dac.units]
             
         if returnLevels:
             return waves, digOFF, digON, trainOFF, trainON
@@ -3024,8 +3057,114 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return waves
         
     
-    def getDigitalWaveform(self, dac:typing.Union[int, str], sweep:int = 0):
-        pass
+    def getDigitalWaveform(self, dac:typing.Union[int, str], sweep:int = 0,
+                           digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                           separateWaves:bool=True) -> neo.AnalogSignal:
+        dac, _ = self.check_DAC_Epoch(dac, None)
+        
+        # NOTE: 2023-09-20 22:22:41
+        # the digital output is ALWAYS in V
+        # "high logic" means 5V on a background of 0 V
+        # "low logic" means 0V on a background of 5V
+        
+        usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in dac.epochs]))
+        
+        if isinstance(digChannel, int):
+            if digChannel not in usedDigs:
+                raise ValueError(f"Invalid DIG channel index {digChannel}")
+            
+            digChannel = (digChannel,)
+            
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            if all(v not in usedDigs for v in digChannel):
+                raise ValueError(f"Invalid DIG channel indexes {digChannel}")
+            
+            digChannel = tuple(sorted(set(digChannel)))
+            
+        elif digChannel is None:
+            digChannel = tuple(sorted(set(usedDigs)))
+            
+        else:
+            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
+            
+        if separateWaves:
+            waveforms = [neo.AnalogSignal(np.full((self.sweepSampleCount, 1), 
+                                                np.nan),
+                                        units = pq.V, t_start = 0*pq.s,
+                                        sampling_rate = self.samplingRate,
+                                        name = f"DIG {chnl} DAC {dac.physicalIndex} ({dac.name})") for chnl in digChannel]
+        else:
+            waveforms = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
+                                                np.nan),
+                                        units = pq.V, t_start = 0*pq.s,
+                                        sampling_rate = self.samplingRate,
+                                        name = f"DIG Output DAC {dac.physicalIndex} ({dac.name})")
+            
+        t0 = t1 = self.holdingTime.rescale(pq.s)
+        
+        offLevel = None
+        
+        if separateWaves:
+            lastEpochNdx = [0] * len(digChannel)
+            lastLevel = [None] * len(digChannel)
+        else:
+            lastEpochNdx = 0
+            lastLevel = None 
+        
+        for epoch in dac.epochs:
+            actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+            t1 = t0 + actualDuration
+            tt = np.array([t0,t1])*pq.s
+            
+            eWaves = self.getEpochDigitalWaveform(dac=dac, epoch=epoch, sweep=sweep, 
+                                                  digChannel=digChannel,
+                                                  separateWaves=separateWaves,
+                                                  returnLevels=True)
+            
+            t0 = t1
+            
+            if eWaves is None:
+                continue
+            
+            epochWaves, epoch_digOFF, epoch_digON, epoch_trainOFF, epoch_trainON = eWaves
+            offLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
+            
+            if lastLevel is None:
+                lastLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
+                
+            if separateWaves:
+                for k in range(len(epochWaves)):
+                    ndx = waveforms[k].time_index(tt)
+                    lastEpochNdx[k] = ndx[1]
+                    lastLevel[k] = epochWaves[k][-1]
+                    waveforms[k][ndx[0]:ndx[1], :] = epochWaves[k]
+                    
+            else:
+                ndx = waveforms.time_index(tt)
+                lastEpochNdx = ndx[1]
+                lastLevel = epochWaves[0][-1,:]
+                waveforms[ndx[0]:ndx[1], :] = epochWaves[0]
+                
+        if self.protocol.digitalUseLastEpochHolding:
+            if separateWaves:
+                for k in range(len(waveforms)):
+                    waveforms[k][lastEpochNdx[k]:, :] = lastLevel[k]
+            else:
+                 waveforms[lastEpochNdx:, :] = lastLevel
+        else:
+            if separateWaves:
+                for k in range(len(waveforms)):
+                    waveforms[k][lastEpochNdx[k]:, :] = offLevel
+            else:
+                waveforms[lastEpochNdx:, :] = offLevel
+                
+        if separateWaves:
+            for k in range(len(waveforms)):
+                waveforms[k][np.isnan(waveforms[k])] = offLevel
+        else:
+            waveforms[np.isnan(waveforms)] = offLevel
+            
+        return waveforms
             
             
     def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
@@ -3668,31 +3807,26 @@ class ABFOutputConfiguration:
         info_dict = getAcquisitionInfo(obj)
             
         digPatterns = getDIGPatterns(obj)
-        if self.logicalIndex in info_dict["dictEpochInfoPerDAC"]:
-            dacEpochDict = info_dict["dictEpochInfoPerDAC"][self.logicalIndex]
+        if self.physicalIndex in info_dict["dictEpochInfoPerDAC"]:
+            dacEpochDict = info_dict["dictEpochInfoPerDAC"][self.physicalIndex]
             epochs = list()
             samplingRate = float(info_dict["sampling_rate"]) * pq.Hz
             for epochNum, epochDict in dacEpochDict.items():
                 epoch = ABFEpoch()
                 epoch.number = epochNum
-                epoch.type = epochDict["nEpochType"]
+                epoch.type = ABFEpochType(epochDict["nEpochType"])
                 epoch.firstLevel = epochDict["fEpochInitLevel"] * self.units
                 epoch.deltaLevel = epochDict["fEpochLevelInc"] * self.units
                 epoch.firstDuration = (epochDict["lEpochInitDuration"] / samplingRate).rescale(pq.ms)
                 epoch.deltaDuration = (epochDict["lEpochDurationInc"] / samplingRate).rescale(pq.ms)
                 epoch.pulsePeriod = (epochDict["lEpochPulsePeriod"] / samplingRate).rescale(pq.ms)
                 epoch.pulseWidth = (epochDict["lEpochPulseWidth"] / samplingRate).rescale(pq.ms)
+                epoch.dacIndex = epochDict["nDACNum"]
                 epoch.mainDigitalPattern = digPatterns[epoch.number]["main"]
                 epoch.alternateDigitalPattern = digPatterns[epoch.number]["alternate"]
-
                 epochs.append(epoch)
             
             self._epochs_ = epochs
-            
-#         if isinstance(obj, pyabf.ABF):
-#             self._init_epochs_abf_(obj)
-#             
-#         elif isinstance(obj, neo.Block):
             
     @_init_epochs_.register(pyabf.ABF)
     def _(self, obj:pyabf.ABF):
@@ -3736,18 +3870,19 @@ class ABFOutputConfiguration:
                 # RESOLVED?: you DO NOT need this info here
                 
                 # NOTE: 2023-09-18 14:46:37 skip epochs NOT defined for this DAC
-                if epochDacNum != self.logicalIndex:
+                if epochDacNum != self.physicalIndex:
                     continue
 
                 epoch = ABFEpoch()
                 epoch.number = obj._epochPerDacSection.nEpochNum[i]
-                epoch.type = obj._epochPerDacSection.nEpochType[i]
+                epoch.type = ABFEpochType(obj._epochPerDacSection.nEpochType[i])
                 epoch.firstLevel = obj._epochPerDacSection.fEpochInitLevel[i] * self.units
                 epoch.deltaLevel = obj._epochPerDacSection.fEpochLevelInc[i] * self.units
                 epoch.firstDuration = (obj._epochPerDacSection.lEpochInitDuration[i] / samplingRate).rescale(pq.ms)
                 epoch.deltaDuration = (obj._epochPerDacSection.lEpochDurationInc[i] / samplingRate).rescale(pq.ms)
                 epoch.pulsePeriod = (obj._epochPerDacSection.lEpochPulsePeriod[i] / samplingRate).rescale(pq.ms)
                 epoch.pulseWidth = (obj._epochPerDacSection.lEpochPulseWidth[i] / samplingRate).rescale(pq.ms)
+                epoch.dacIndex = epochDacNum
                 epoch.mainDigitalPattern = digPatterns[epoch.number]["main"]
                 epoch.alternateDigitalPattern = digPatterns[epoch.number]["alternate"]
 
@@ -4719,7 +4854,7 @@ class ABFOutputConfiguration:
                                 sweep:int = 0, 
                                 digChannel: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
                                 lastLevelOnly:bool=False,
-                                separateWavePerChannel:bool=True,
+                                separateWaves:bool=True,
                                 digOFF:typing.Optional[pq.Quantity]=None,
                                 digON:typing.Optional[pq.Quantity]=None,
                                 trainOFF:typing.Optional[pq.Quantity]=None,
@@ -4754,7 +4889,7 @@ class ABFOutputConfiguration:
             See self.getDigitalLogicLevels, self.getDigitalPulseLogicLevels,
             and self.getDigitalTrainLogicLevels
         
-        separateWavePerChannel: default is False. 
+        separateWaves: default is False. 
             When False, and more than one digChannel is queried, the function 
             returns a Quantity array with one channel-specific waveform per
             column.
@@ -4781,7 +4916,7 @@ class ABFOutputConfiguration:
                 • a single 1D Quantity array, when digChannel parameter is an int 
                     (but see below)
                 • as many 1D Quantity arrays as DIG channel indexes specified in 
-                    digChannel parameter, and separateWavePerChannel is True
+                    digChannel parameter, and separateWaves is True
                 • a single 2D Quantity array with shape (N,M) where:
                     ∘ N is the number of samples recorded by the epoch
                     ∘ M is the number of DIG channels specified in digChannel
@@ -4873,7 +5008,7 @@ class ABFOutputConfiguration:
                         
             waves.append(wave)
             
-        if not separateWavePerChannel:
+        if not separateWaves:
             waves = [np.hstack(waves) * self.units]
             
         if returnLevels:
@@ -5426,7 +5561,7 @@ class ABFOutputConfiguration:
     
     def getDigitalWaveform(self, sweep:int=0, 
                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                           separateWavePerChannel:bool=True) -> neo.AnalogSignal:
+                           separateWaves:bool=True) -> neo.AnalogSignal:
         """Realizes the digital output waveform (pulses, trains) emitted when
         this DAC channel is active.
         
@@ -5456,7 +5591,7 @@ class ABFOutputConfiguration:
         else:
             raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
             
-        if separateWavePerChannel:
+        if separateWaves:
             waveforms = [neo.AnalogSignal(np.full((self.sweepSampleCount, 1), 
                                                 np.nan),
                                         units = pq.V, t_start = 0*pq.s,
@@ -5473,7 +5608,7 @@ class ABFOutputConfiguration:
         
         offLevel = None
         
-        if separateWavePerChannel:
+        if separateWaves:
             lastEpochNdx = [0] * len(digChannel)
             lastLevel = [None] * len(digChannel)
         else:
@@ -5486,7 +5621,7 @@ class ABFOutputConfiguration:
             tt = np.array([t0,t1])*pq.s
             
             eWaves = self.getEpochDigitalWaveform(epoch, sweep, digChannel,
-                                             separateWavePerChannel=separateWavePerChannel,
+                                             separateWaves=separateWaves,
                                              returnLevels=True)
             
             t0 = t1
@@ -5500,7 +5635,7 @@ class ABFOutputConfiguration:
             if lastLevel is None:
                 lastLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
                 
-            if separateWavePerChannel:
+            if separateWaves:
                 for k in range(len(epochWaves)):
                     ndx = waveforms[k].time_index(tt)
                     lastEpochNdx[k] = ndx[1]
@@ -5514,19 +5649,19 @@ class ABFOutputConfiguration:
                 waveforms[ndx[0]:ndx[1], :] = epochWaves[0]
                 
         if self.protocol.digitalUseLastEpochHolding:
-            if separateWavePerChannel:
+            if separateWaves:
                 for k in range(len(waveforms)):
                     waveforms[k][lastEpochNdx[k]:, :] = lastLevel[k]
             else:
                  waveforms[lastEpochNdx:, :] = lastLevel
         else:
-            if separateWavePerChannel:
+            if separateWaves:
                 for k in range(len(waveforms)):
                     waveforms[k][lastEpochNdx[k]:, :] = offLevel
             else:
                 waveforms[lastEpochNdx:, :] = offLevel
                 
-        if separateWavePerChannel:
+        if separateWaves:
             for k in range(len(waveforms)):
                 waveforms[k][np.isnan(waveforms[k])] = offLevel
         else:
@@ -5806,45 +5941,37 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
         epochNumber = epoch_info["nEpochNum"]
         if isinstance(epoch_num, int) and epoch_num != epochNumber:
             continue
-        d  = getSynchBitList(epoch_info["nDigitalValue"])
-        s  = getSynchBitList(epoch_info["nDigitalTrainValue"])
-        da = getAlternateBitList(epoch_info["nAlternateDigitalValue"])
-        sa = getAlternateBitList(epoch_info["nAlternateDigitalTrainValue"])
+        dpm  = getSynchBitList(epoch_info["nDigitalValue"])
+        dtm  = getSynchBitList(epoch_info["nDigitalTrainValue"])
+        dpa = getAlternateBitList(epoch_info["nAlternateDigitalValue"])
+        dta = getAlternateBitList(epoch_info["nAlternateDigitalTrainValue"])
         
-        digitalPattern = list()
+        digitalPatternMain = list()
+        digitalPatternAlternate = list()
         
         for k in banks: 
-            pattern = tuple(1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0 for i in range(len(d[k])))
+            patternMain = tuple(1 if dpm[k][i] and not dtm[k][i] else '*' if dtm[k][i] and not dpm[k][i] else 0 for i in range(len(dpm[k])))
+            patternAlt  = tuple(1 if dpa[k][i] and not dta[k][i] else '*' if dta[k][i] and not dpa[k][i] else 0 for i in range(len(dpa[k])))
                 
             if wrap:
                 if not reverse_banks:
-                    pattern = tuple(reversed(pattern))
+                    patternMain = tuple(reversed(patternMain))
+                    patternAlt = tuple(reversed(patternAlt))
 
-                digitalPattern.extend(pattern)
+                digitalPatternMain.extend(patternMain)
+                digitalPatternAlternate.extend(pattern)
                 
                 if pack_str:
-                    digitalPattern = "".join(map(str, digitalPattern))
+                    digitalPatternMain = "".join(map(str, digitalPatternMain))
+                    digitalPatternAlternate = "".join(map(str, digitalPatternAlternate))
             else:
-                digitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
+                digitalPatternMain.append("".join(map(str, patternMain)) if pack_str else patternMain)
+                digitalPatternAlternate.append("".join(map(str, patternAlt)) if pack_str else patternAlt)
                 
-        digitalPattern = tuple(digitalPattern)
+        digitalPatternMain = tuple(digitalPatternMain)
+        digitalPatternAlternate = tuple(digitalPatternAlternate)
                     
-        alternateDigitalPattern = list()
-
-        for k in banks:
-            pattern = tuple(1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0 for i in range(len(da[k])))
-            if wrap:
-                if not reverse_banks:
-                    pattern = tuple(reversed(pattern))
-                alternateDigitalPattern.extend(pattern)
-                if pack_str:
-                    alternateDigitalPattern = "".join(map(str, alternateDigitalPattern))
-            else:
-                alternateDigitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
-                
-        alternateDigitalPattern = tuple(alternateDigitalPattern)
-        
-        epochsDigitalPattern[epochNumber] = {"main": digitalPattern, "alternate": alternateDigitalPattern}
+        epochsDigitalPattern[epochNumber] = {"main": digitalPatternMain, "alternate": digitalPatternAlternate}
                 
     return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
 
@@ -5888,14 +6015,6 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
     with open(abf.abfFilePath, 'rb') as fb:
         epochSection = abf._epochSection
         nEpochs = epochSection._entryCount
-        # epochNumbers = [None] * nEpochs
-        # epochDigital = [None] * nEpochs
-        # epochDigitalStarred = [None] * nEpochs
-        
-        # NOTE: When these are populated, then abf._protocolSection.nAlternateDigitalOutputState
-        # SHOULD be 1 (but we don't check for this here)
-        # epochDigitalAlt = [None] * nEpochs
-        # epochDigitalStarredAlt = [None] * nEpochs
         
         nSynchDIGBits = abf._protocolSection.nDigitizerSynchDigitalOuts
         nAlternateDIGBits = abf._protocolSection.nDigitizerTotalDigitalOuts - nSynchDIGBits
@@ -5906,17 +6025,18 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
         getAlternateBitList = partial(valToBitList, bitCount = nAlternateDIGBits,
                                       as_bool = True)
         
-        
         # TODO: 2023-09-07 10:18:14
         # use THIS in our own ABFEpoch class; might want to augment neo.io.rawio.axonrawio
         # OR write a new axon raw io class...
         for i in range(nEpochs):
             fb.seek(epochSection._byteStart + i * epochSection._entrySize)
+            # NOTE: 2024-10-23 17:34:09
+            # these MUST be executed in the order BELOW:
             epochNumber = readInt16(fb)
-            epochDig = readInt16(fb) # reads the step digital pattern (0s and 1s, for ditigal steps)
-            epochDigS = readInt16(fb) # reads the starred digital pattern (for digital pulse trains)
-            epochDig_alt = readInt16(fb) # reads the alternative step digital pattern
-            epochDigS_alt = readInt16(fb) # reads the alternative digital pulse trains
+            epochDigPM  = readInt16(fb) # reads the main "pulse" ("steps") digital pattern (0s and 1s, for ditigal steps)
+            epochDigTM  = readInt16(fb) # reads the main "train" ("pulses", "starred") digital pattern (for digital pulse trains)
+            epochDigPA  = readInt16(fb) # reads the alternative "pulse" digital pattern
+            epochDigTA  = readInt16(fb) # reads the alternative "train" digital patter
             
             if isinstance(epoch_num, int) and epoch_num != epochNUumber:
                 # skip if requesting for a specific epoch
@@ -5925,53 +6045,42 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
             epochDict = dict()
             
             # each of these is a list of two lists (DIG bank 3-0 and DIG bank 7-4)
-            d = getSynchBitList(epochDig)           # steps
-            s = getSynchBitList(epochDigS)          # pulses (starred)
-            da = getAlternateBitList(epochDig_alt)  # alternative steps
-            sa = getAlternateBitList(epochDigS_alt) # alternative pulses
+            dpm = getSynchBitList(epochDigPM)       # main steps
+            dtm = getSynchBitList(epochDigTM)       # main train (starred)
+            dpa = getAlternateBitList(epochDigPA)   # alternative steps
+            dta = getAlternateBitList(epochDigTA)   # alternative train (starred)
             
             
-            digitalPattern = list()
+            digitalPatternMain = list()
+            digitalPatternAlternate = list()
             
             # for k in range(2): # two banks
             for k in banks: 
-                pattern = tuple(1 if d[k][i] and not s[k][i] else '*' if s[k][i] and not d[k][i] else 0 for i in range(len(d[k])))
+                patternMain = tuple(1 if dpm[k][i] and not dtm[k][i] else '*' if dtm[k][i] and not dpm[k][i] else 0 for i in range(len(dpm[k])))
+                patternAlt  = tuple(1 if dpa[k][i] and not dta[k][i] else '*' if dta[k][i] and not dpa[k][i] else 0 for i in range(len(dpa[k])))
                     
                 if wrap:
                     if not reverse_banks:
-                        pattern = tuple(reversed(pattern))
+                        patternMain = tuple(reversed(patternMain))
+                        patternAlt = tuple(reversed(patternAlt))
 
-                    digitalPattern.extend(pattern)
-
-                    if pack_str:
-                        digitalPattern = "".join(map(str, digitalPattern))
-                else:
-                    digitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
-                    
-            digitalPattern = tuple(digitalPattern)
-                    
-            alternateDigitalPattern = list()
-
-            for k in banks:
-                pattern = tuple(1 if da[k][i] and not sa[k][i] else '*' if sa[k][i] and not da[k][i] else 0 for i in range(len(da[k])))
-                    
-                if wrap:
-                    if not reverse_banks:
-                        pattern = tuple(reversed(pattern))
-
-                    alternateDigitalPattern.extend(pattern)
+                    digitalPatternMain.extend(patternMain)
+                    digitalPatternAlternate.extend(patternAlt)
 
                     if pack_str:
-                        alternateDigitalPattern = "".join(map(str, alternateDigitalPattern))
+                        digitalPatternMain = "".join(map(str, digitalPatternMain))
+                        digitalPatternAlternate = "".join(map(str, digitalPatternAlternate))
                 else:
-                    alternateDigitalPattern.append("".join(map(str, pattern)) if pack_str else pattern)
+                    digitalPatternMain.append("".join(map(str, patternMain)) if pack_str else patternMain)
+                    digitalPatternAlternate.append("".join(map(str, patternAlt)) if pack_str else patternAlt)
                     
-            alternateDigitalPattern = tuple(alternateDigitalPattern)
-                
-            epochsDigitalPattern[epochNumber] = {"main": digitalPattern, "alternate": alternateDigitalPattern}
+            digitalPatternMain = tuple(digitalPatternMain)
+            digitalPatternAlternate = tuple(digitalPatternAlternate)
+            
+            epochsDigitalPattern[epochNumber] = {"main": digitalPatternMain, "alternate": alternateDigitalPattern}
                     
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
-        
+                    
 @singledispatch
 def getABFEpochTable(o, sweep:typing.Optional[int]=None,
                       dacChannel:typing.Optional[int] = None,
