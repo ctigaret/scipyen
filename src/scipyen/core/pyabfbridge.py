@@ -5333,7 +5333,7 @@ class ABFOutputConfiguration:
     #     return self._isActiveDACChannel_
     
     @property
-    def digitalOutputEnabled(self) -> bool:
+    def digitalOutputsEnabled(self) -> bool:
         """True if any epoch defined in this DAC emits digital pulses or trains"""
         # NOTE: 2023-10-18 09:57:46
         # This is NOT an intrinsic variable in Clampex, but is used here to
