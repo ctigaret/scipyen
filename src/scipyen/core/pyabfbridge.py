@@ -485,6 +485,7 @@ import pandas as pd
 import quantities as pq
 import neo
 from dataclasses import MISSING
+from collections import namedtuple
 
 from core import quantities as scq
 from core import datatypes, strutils, utilities
@@ -509,6 +510,8 @@ ABF = pyabf.ABF
 
 # This is 8 for DigiData 1550 series, and 4 for DigiData 1440 series
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
+
+DigitalPattern = namedtuple("DigitalPattern", ["main", "alternate"], module=__name__)
 
 # These two will be (properly) redefined further below
 class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
@@ -555,10 +558,10 @@ class ABFEpoch:
                  levelDelta: typing.Optional[pq.Quantity] = None,
                  duration: pq.Quantity = 0 * pq.ms,
                  durationDelta: pq.Quantity = 0* pq.ms,
-                 mainDigitalPattern: typing.Sequence = (tuple(), tuple()),
-                 alternateDigitalPattern: typing.Sequence = (tuple(), tuple()),
-                 useAltPattern: bool=False,
-                 altDIGOutState: bool = False,
+                 # mainDigitalPattern: typing.Sequence = (tuple(), tuple()),
+                 # alternateDigitalPattern: typing.Sequence = (tuple(), tuple()),
+                 # useAltPattern: bool=False,
+                 # altDIGOutState: bool = False,
                  pulsePeriod: pq.Quantity = np.nan * pq.ms,
                  pulseWidth: pq.Quantity = np.nan * pq.ms,
                  dacNum: int = -1):
@@ -568,28 +571,28 @@ class ABFEpoch:
         self._levelDelta_ = levelDelta # -1 * pq.dimensionless
         self._duration_ = duration
         self._durationDelta_ = durationDelta
-        self._mainDigitalPattern_ = mainDigitalPattern
-        self._alternateDigitalPattern_ = alternateDigitalPattern
-        self._useAltPattern_ = useAltPattern
-        self._altDIGOutState_ = altDIGOutState
+        # self._mainDigitalPattern_ = mainDigitalPattern
+        # self._alternateDigitalPattern_ = alternateDigitalPattern
+        # self._useAltPattern_ = useAltPattern
+        # self._altDIGOutState_ = altDIGOutState
         self._pulsePeriod_ = pulsePeriod
         self._pulseWidth_ = pulseWidth
         self._dacNum_ = dacNum
         
-    @classmethod
-    def _check_dig_pattern_args_(cls, val):
-        if isinstance(val, str):
-            # eval it then keep fingers crossed
-            try:
-                val = eval(val)
-            except:
-                traceback.print_exc()
-                return (tuple(), tuple())
-                
-        if isinstance(val, (tuple, list)) and all(isinstance(x, (tuple, list)) and all(isinstance(v, (int, str)) for v in x) for x in val):
-            return tuple(tuple(x) for x in val)
-
-        return (tuple(), tuple())
+#     @classmethod
+#     def _check_dig_pattern_args_(cls, val):
+#         if isinstance(val, str):
+#             # eval it then keep fingers crossed
+#             try:
+#                 val = eval(val)
+#             except:
+#                 traceback.print_exc()
+#                 return (tuple(), tuple())
+#                 
+#         if isinstance(val, (tuple, list)) and all(isinstance(x, (tuple, list)) and all(isinstance(v, (int, str)) for v in x) for x in val):
+#             return tuple(tuple(x) for x in val)
+# 
+#         return (tuple(), tuple())
         
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
@@ -656,22 +659,26 @@ class ABFEpoch:
         #
         # NOTE: 2024-07-19 23:35:19 fixed in class method _check_dig_pattern_args_(…)
         
-        mainDigitalPattern = cls._check_dig_pattern_args_(attrs["mainDigitalPattern"])
+        # mainDigitalPattern = cls._check_dig_pattern_args_(attrs["mainDigitalPattern"])
         # print(f"\tmainDigitalPattern = {mainDigitalPattern} ({type(mainDigitalPattern).__name__})")
         
-        alternateDigitalPattern = cls._check_dig_pattern_args_(attrs["alternateDigitalPattern"])
+        # alternateDigitalPattern = cls._check_dig_pattern_args_(attrs["alternateDigitalPattern"])
         # print(f"\talternateDigitalPattern = {alternateDigitalPattern} ({type(alternateDigitalPattern).__name__})")
-        useAltPattern = attrs.get("useAltPattern", None)
-        altDIGOutState = attrs.get("altDIGOutState", None)
+        # useAltPattern = attrs.get("useAltPattern", None)
+        # altDIGOutState = attrs.get("altDIGOutState", None)
         pulsePeriod = attrs.get("pulsePeriod", None)
         pulseWidth = attrs.get("pulseWidth", None)
         dacNum = attrs.get("dacNum", None)
         
         return cls(epochNumber, epochType, firstLevel, deltaLevel, 
                    firstDuration, deltaDuration, 
-                   mainDigitalPattern, alternateDigitalPattern, useAltPattern, altDIGOutState,
                    pulsePeriod, pulseWidth, dacNum)
         
+#         return cls(epochNumber, epochType, firstLevel, deltaLevel, 
+#                    firstDuration, deltaDuration, 
+#                    mainDigitalPattern, alternateDigitalPattern, useAltPattern, altDIGOutState,
+#                    pulsePeriod, pulseWidth, dacNum)
+#         
     def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({super().__repr__()}) Epoch {self.epochNumber} (\'{self.letter}\'), type: {self.epochType.name}"
         
@@ -747,7 +754,6 @@ class ABFEpoch:
     
     @type.setter
     def type(self, val:typing.Union[ABFEpochType, str, int]):
-        
         if isinstance(val, ABFEpochType):
             self._epochType_ = val
             
@@ -844,320 +850,320 @@ class ABFEpoch:
     def dacIndex(self, val:int):
         self._dacNum_ = val
         
-    @property
-    def mainDigitalPattern(self) -> tuple:
-        return self._mainDigitalPattern_
+#     @property
+#     def mainDigitalPattern(self) -> tuple:
+#         return self._mainDigitalPattern_
+#     
+#     @mainDigitalPattern.setter
+#     def mainDigitalPattern(self, val:tuple):
+#         # TODO: 2023-09-14 15:55:11
+#         # check the argument
+#         self._mainDigitalPattern_ = self._check_dig_pattern_args_(val)
+#         
+#     @property
+#     def useAltPattern(self) -> bool:
+#         return self._useAltPattern_
+#     
+#     @useAltPattern.setter
+#     def useAltPattern(self, val:bool):
+#         self._useAltPattern_ = vall==True
+#         
+#     @property
+#     def altDIGOutState(self) -> bool:
+#         return self._altDIGOutState_
+#     
+#     @altDIGOutState.setter
+#     def altDIGOutState(selv, val:bool):
+#         self._altDIGOutState_ = val == True
+#         
+#     @property
+#     def alternateDigitalPattern(self) -> tuple:
+#         return self._alternateDigitalPattern_
     
-    @mainDigitalPattern.setter
-    def mainDigitalPattern(self, val:tuple):
-        # TODO: 2023-09-14 15:55:11
-        # check the argument
-        self._mainDigitalPattern_ = self._check_dig_pattern_args_(val)
+    # @alternateDigitalPattern.setter
+    # def alternateDigitalPattern(self, val:tuple):
+    #     # TODO: 2023-09-14 15:55:58
+    #     # check the argument
+    #     self._alternateDigitalPattern_ = self._check_dig_pattern_args_(val)
         
-    @property
-    def useAltPattern(self) -> bool:
-        return self._useAltPattern_
+    # def getDigitalPattern(self, alternate:bool=False) -> tuple:
+    #     return self.alternateDigitalPattern if alternate else self.mainDigitalPattern
     
-    @useAltPattern.setter
-    def useAltPattern(self, val:bool):
-        self._useAltPattern_ = vall==True
-        
-    @property
-    def altDIGOutState(self) -> bool:
-        return self._altDIGOutState_
-    
-    @altDIGOutState.setter
-    def altDIGOutState(selv, val:bool):
-        self._altDIGOutState_ = val == True
-        
-    @property
-    def alternateDigitalPattern(self) -> tuple:
-        return self._alternateDigitalPattern_
-    
-    @alternateDigitalPattern.setter
-    def alternateDigitalPattern(self, val:tuple):
-        # TODO: 2023-09-14 15:55:58
-        # check the argument
-        self._alternateDigitalPattern_ = self._check_dig_pattern_args_(val)
-        
-    def getDigitalPattern(self, alternate:bool=False) -> tuple:
-        return self.alternateDigitalPattern if alternate else self.mainDigitalPattern
-    
-    def getUsedDigitalOutputChannels(self, alternate:typing.Optional[bool]=None,
-                                  trains:typing.Optional[bool] = None) -> list:
-        """Indices of DIG channels that emit TTL trains OR TTL pulses
-        
-        For a more specific query (i.e. pulse v train output) see
-        getPulseDigitalOutputChannels and getTrainDigitalOutputChannels.
-        
-        Parameters:
-        ===========
-        alternate: default is None: 
-        
-            When None, returns a list of all digital output indices
-            used in this epoch.
-        
-            When False, returns the indices of the digital output channels
-            used for the main pattern.
-    
-            When True, returns the indices of the digital output channels
-            used for the alternate pattern.
-        
-            When None, the only accepted value is "all". In this case, the function
-            return a list of digital channel indices used in both main and alternate patterns
-            (WARNING: these are not necessarily unique)
-        
-            This is useful to test if there is the epochs associates any digital
-            output at all.
-            
-            Another possible test, specific for a digial channel is the
-            'hasDigital...' family of methods.
-    
-        
-        """
-        if isinstance(alternate, bool):
-            p = self.getDigitalPattern(alternate)
-            
-            # if isinstance(trains, str) and trains.lower() == "all":
-            if trains is None:
-                return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                    filter(lambda i: i[1] != 0, 
-                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))]))
-            elif isinstance(trains, bool):
-                val = "*" if trains else 1
-                return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                    filter(lambda i: i[1] == val, 
-                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))]))
-            else:
-                raise ValueError(f"'trains' expected to be a bool or None; instead, got {trains}")
-            
-        # elif isinstance(alternate, str) and alternate.lower() == "all":
-        elif alternate is None or (isinstance(alternate, str) and alternate.lower() == "all"):
-            p = self.getDigitalPattern(False)
-            pa = self.getDigitalPattern(True)
-            
-            # if isinstance(trains, str) and trains.lower() == "all":
-            if trains is None:
-                return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                    filter(lambda i: i[1] != 0, 
-                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))])) \
-                    + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
-                                                                    filter(lambda i: i[1] != 0, 
-                                                                        enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
-            elif isinstance(trains, bool):
-                val = "*" if trains else 1
-                return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                    filter(lambda i: i[1] == val,
-                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))])) \
-                    + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
-                                                                    filter(lambda i: i[1] == val, 
-                                                                        enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
-            else:
-                raise ValueError(f"'trains' expected to be a bool or None; instead, got {trains}")
-            
-        else:
-            raise ValueError(f"Invalid 'alternate' specification {alternate}; expecting a bool or None")
-            
-        
-    def getPulseDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
-        """Indices of DIG channel that emit a digital pulse.
-        Parameters:
-        ===========
-        alternate: when True, the alternate digital pattern will be queried.
-
-            When a str, the only accepted value is "all". In this case, the function
-            return a list of digital channel indices used in both main and alternate patterns
-            (WARNING: these are not necessarily unique)
-            This is useful to test if there is a digital output at all associated with
-            the epoch.
-            
-            Another possible test, specific for a digial channel is the
-            'hasDigital...' family of methods.
-        
-        """
-        if isinstance(alternate, bool):
-            p = self.getDigitalPattern(alternate)
-            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                filter(lambda i: i[1] == 1, 
-                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))]))
-        
-        elif isinstance(alternate, str) and alternate.lower() == "all":
-            p = self.getDigitalPattern(False)
-            pa = self.getDigitalPattern(True)
-            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                filter(lambda i: i[1] == 1, 
-                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))])) \
-                   + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
-                                                                 filter(lambda i: i[1] == 1, 
-                                                                        enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
-        else:
-            raise ValueError(f"Invalid 'alternate' specification {alternate}")
-            
-    def getTrainDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
-        """Indices of DIG channels that emit trains of digital TTL pulses.
-        Parameters:
-        ===========
-        alternate: when True, the alternate digital pattern will be queried.
-
-            When a str, the only accepted value is "all". In this case, the function
-            return a list of digital channel indices used in both main and alternate patterns
-            (WARNING: these are not necessarily unique)
-            This is useful to test if there is a digital output at all associated with
-            the epoch.
-            
-            Another possible test, specific for a digial channel is the
-            'hasDigital...' family of methods.
-        
-        """
-        if isinstance(alternate, bool):
-            p = self.getDigitalPattern(alternate)
-            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] == '*', enumerate(reversed(p[k]))))) for k in range(len(p))]))
-
-        elif isinstance(alternate, str) and alternate.lower() == "all":
-            p = self.getDigitalPattern(False)
-            pa = self.getDigitalPattern(True)
-            return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
-                                                                filter(lambda i: i[1] == '*', 
-                                                                       enumerate(reversed(p[k]))))) for k in range(len(p))])) \
-                   + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
-                                                                 filter(lambda i: i[1] == '*', 
-                                                                        enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
-
-        else:
-            raise ValueError(f"Invalid 'alternate' specification {alternate}")
-        
-    
-    def hasDigitalOutput(self, digChannel: typing.Union[int, str] = 0, 
-                         alternate:typing.Union[bool, str]=False) -> bool:
-        """
-        Checks the epochs defines an output on the specified digital channel.
-        
-        For a more atomic test, see self.hasDigitalPulse and self.hasDigitalTrain.
-        
-        This is useful to determine if the Pulse... properties of the epoch are
-        related to any digital pattern defined in the epoch, or just to the 
-        associated DAC waveform.
-        
-        Parameters:
-        ===========
-        digChannel: int in the range(8) (maximum number of digital channels)
-                    or the string "any" -> returns True if ANY of the digital
-                    channels is emitting a train or a pulse
-        
-        alternate: bool, default False; when True, the function will test the 
-                    alternate digital pattern
-        
-                    str ("all") the function will test if the epochs emits a
-                    digital pattern at all
+#     def getUsedDigitalOutputChannels(self, alternate:typing.Optional[bool]=None,
+#                                   trains:typing.Optional[bool] = None) -> list:
+#         """Indices of DIG channels that emit TTL trains OR TTL pulses
+#         
+#         For a more specific query (i.e. pulse v train output) see
+#         getPulseDigitalOutputChannels and getTrainDigitalOutputChannels.
+#         
+#         Parameters:
+#         ===========
+#         alternate: default is None: 
+#         
+#             When None, returns a list of all digital output indices
+#             used in this epoch.
+#         
+#             When False, returns the indices of the digital output channels
+#             used for the main pattern.
+#     
+#             When True, returns the indices of the digital output channels
+#             used for the alternate pattern.
+#         
+#             When None, the only accepted value is "all". In this case, the function
+#             return a list of digital channel indices used in both main and alternate patterns
+#             (WARNING: these are not necessarily unique)
+#         
+#             This is useful to test if there is the epochs associates any digital
+#             output at all.
+#             
+#             Another possible test, specific for a digial channel is the
+#             'hasDigital...' family of methods.
+#     
+#         
+#         """
+#         if isinstance(alternate, bool):
+#             p = self.getDigitalPattern(alternate)
+#             
+#             # if isinstance(trains, str) and trains.lower() == "all":
+#             if trains is None:
+#                 return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+#                                                                     filter(lambda i: i[1] != 0, 
+#                                                                         enumerate(reversed(p[k]))))) for k in range(len(p))]))
+#             elif isinstance(trains, bool):
+#                 val = "*" if trains else 1
+#                 return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+#                                                                     filter(lambda i: i[1] == val, 
+#                                                                         enumerate(reversed(p[k]))))) for k in range(len(p))]))
+#             else:
+#                 raise ValueError(f"'trains' expected to be a bool or None; instead, got {trains}")
+#             
+#         # elif isinstance(alternate, str) and alternate.lower() == "all":
+#         elif alternate is None or (isinstance(alternate, str) and alternate.lower() == "all"):
+#             p = self.getDigitalPattern(False)
+#             pa = self.getDigitalPattern(True)
+#             
+#             # if isinstance(trains, str) and trains.lower() == "all":
+#             if trains is None:
+#                 return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+#                                                                     filter(lambda i: i[1] != 0, 
+#                                                                         enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+#                     + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+#                                                                     filter(lambda i: i[1] != 0, 
+#                                                                         enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+#             elif isinstance(trains, bool):
+#                 val = "*" if trains else 1
+#                 return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+#                                                                     filter(lambda i: i[1] == val,
+#                                                                         enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+#                     + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+#                                                                     filter(lambda i: i[1] == val, 
+#                                                                         enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+#             else:
+#                 raise ValueError(f"'trains' expected to be a bool or None; instead, got {trains}")
+#             
+#         else:
+#             raise ValueError(f"Invalid 'alternate' specification {alternate}; expecting a bool or None")
+#             
+#         
+#     def getPulseDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
+#         """Indices of DIG channel that emit a digital pulse.
+#         Parameters:
+#         ===========
+#         alternate: when True, the alternate digital pattern will be queried.
+# 
+#             When a str, the only accepted value is "all". In this case, the function
+#             return a list of digital channel indices used in both main and alternate patterns
+#             (WARNING: these are not necessarily unique)
+#             This is useful to test if there is a digital output at all associated with
+#             the epoch.
+#             
+#             Another possible test, specific for a digial channel is the
+#             'hasDigital...' family of methods.
+#         
+#         """
+#         if isinstance(alternate, bool):
+#             p = self.getDigitalPattern(alternate)
+#             return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+#                                                                 filter(lambda i: i[1] == 1, 
+#                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))]))
+#         
+#         elif isinstance(alternate, str) and alternate.lower() == "all":
+#             p = self.getDigitalPattern(False)
+#             pa = self.getDigitalPattern(True)
+#             return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+#                                                                 filter(lambda i: i[1] == 1, 
+#                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+#                    + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+#                                                                  filter(lambda i: i[1] == 1, 
+#                                                                         enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+#         else:
+#             raise ValueError(f"Invalid 'alternate' specification {alternate}")
+#             
+#     def getTrainDigitalOutputChannels(self, alternate:typing.Union[bool, str]=False) -> list:
+#         """Indices of DIG channels that emit trains of digital TTL pulses.
+#         Parameters:
+#         ===========
+#         alternate: when True, the alternate digital pattern will be queried.
+# 
+#             When a str, the only accepted value is "all". In this case, the function
+#             return a list of digital channel indices used in both main and alternate patterns
+#             (WARNING: these are not necessarily unique)
+#             This is useful to test if there is a digital output at all associated with
+#             the epoch.
+#             
+#             Another possible test, specific for a digial channel is the
+#             'hasDigital...' family of methods.
+#         
+#         """
+#         if isinstance(alternate, bool):
+#             p = self.getDigitalPattern(alternate)
+#             return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), filter(lambda i: i[1] == '*', enumerate(reversed(p[k]))))) for k in range(len(p))]))
+# 
+#         elif isinstance(alternate, str) and alternate.lower() == "all":
+#             p = self.getDigitalPattern(False)
+#             pa = self.getDigitalPattern(True)
+#             return list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(p[k]), 
+#                                                                 filter(lambda i: i[1] == '*', 
+#                                                                        enumerate(reversed(p[k]))))) for k in range(len(p))])) \
+#                    + list(itertools.chain.from_iterable([list(map(lambda v: v[0] + k * len(pa[k]), 
+#                                                                  filter(lambda i: i[1] == '*', 
+#                                                                         enumerate(reversed(pa[k]))))) for k in range(len(pa))]))
+# 
+#         else:
+#             raise ValueError(f"Invalid 'alternate' specification {alternate}")
+#         
+#     
+#     def hasDigitalOutput(self, digChannel: typing.Union[int, str] = 0, 
+#                          alternate:typing.Union[bool, str]=False) -> bool:
+#         """
+#         Checks the epochs defines an output on the specified digital channel.
+#         
+#         For a more atomic test, see self.hasDigitalPulse and self.hasDigitalTrain.
+#         
+#         This is useful to determine if the Pulse... properties of the epoch are
+#         related to any digital pattern defined in the epoch, or just to the 
+#         associated DAC waveform.
+#         
+#         Parameters:
+#         ===========
+#         digChannel: int in the range(8) (maximum number of digital channels)
+#                     or the string "any" -> returns True if ANY of the digital
+#                     channels is emitting a train or a pulse
+#         
+#         alternate: bool, default False; when True, the function will test the 
+#                     alternate digital pattern
+#         
+#                     str ("all") the function will test if the epochs emits a
+#                     digital pattern at all
+#                 
+#         
+#         
+#         """
+#         if isinstance(alternate, bool):
+#             p = self.getDigitalPattern(alternate)
+#             
+#             if isinstance(digChannel, int):
+#                 if digChannel in range(len(p[0])):
+#                     return p[0][-digChannel-1] != 0
+#                 
+#                 elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+#                     return p[1][-len(p[0])+digChannel-1] != 0
+#                 
+#                 else:
+#                     return False
+#                 
+#             elif isinstance(digChannel, str) and digChannel.lower() == "any":
+#                 return any(v != 0 for v in itertools.chain.from_iterable(p))
+#             
+#         elif isinstance(alternate, str):
+#             if alternate.lower() == "all":
+#                 p = self.getDigitalPattern(False)
+#                 pa = self.getDigitalPattern(True)
+#                 
+#                 if isinstance(digChannel, int):
+#                     if digChannel in range(len(p[0])):
+#                         return p[0][-digChannel-1] != 0 or pa[0][-digChannel-1] != 0
+#                     
+#                     elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+#                         return p[1][-digChannel-1] != 0 or pa[1][-digChannel-1] != 0
+#                     
+#                     else:
+#                         return False
+#                         
+#                 elif isinstance(digChannel, str) and digChannel.lower() == "any":
+#                     return any(v != 0 for v in itertools.chain.from_iterable(p+pa))
+#                 
+#             elif alternate.lower() in ("main", "alt"):
+#                 alt = alternate.lower() == "alt"
+#                 p = self.getDigitalPattern(alternate)
+#                 if isinstance(digChannel, int):
+#                     if digChannel in range(len(p[0])):
+#                         return p[0][-digChannel-1] != 0
+#                     
+#                     elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
+#                         return p[1][-digChannel-1] != 0
+#                     
+#                     else:
+#                         return False
+#                         
+#                 elif isinstance(digChannel, str) and digChannel.lower() == "any":
+#                     return any(v != 0 for v in itertools.chain.from_iterable(p))
                 
+#     def hasDigitalPulse(self, digChannel:int = 0, alternate:bool=False) -> bool:
+#         """
+#         Checks if there is a pulse output (1) on the specified digital channel
+#         
+#         Parameters:
+#         ===========
+#         digChannel: int in the range(8) (maximum number of digital channels)
+#         alternate: when True, the function will test the alternate digital pattern
+#         
+#         """
+#         p = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getDigitalPattern(alternate))))
+# 
+#         if digChannel in range(len(p)):
+#             return p[digChannel] == 1
+#         
+#         return False
         
+#     def hasDigitalTrain(self, digChannel:int = 0, alternate:bool=False) -> bool:
+#         """
+#         Returns if there is a train output ('*') on the specified digital channel
+#         
+#         Parameters:
+#         ===========
+#         digChannel: int in the range(8) (maximum number of digital channels)
+#         alternate: when True, the function will test the alternate digital pattern
+#         
+#         """
+#         p = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getDigitalPattern(alternate))))
+#         
+#         if digChannel in range(len(p)):
+#             return p[digChannel] == '*'
+#         
+#         return False
         
-        """
-        if isinstance(alternate, bool):
-            p = self.getDigitalPattern(alternate)
-            
-            if isinstance(digChannel, int):
-                if digChannel in range(len(p[0])):
-                    return p[0][-digChannel-1] != 0
-                
-                elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
-                    return p[1][-len(p[0])+digChannel-1] != 0
-                
-                else:
-                    return False
-                
-            elif isinstance(digChannel, str) and digChannel.lower() == "any":
-                return any(v != 0 for v in itertools.chain.from_iterable(p))
-            
-        elif isinstance(alternate, str):
-            if alternate.lower() == "all":
-                p = self.getDigitalPattern(False)
-                pa = self.getDigitalPattern(True)
-                
-                if isinstance(digChannel, int):
-                    if digChannel in range(len(p[0])):
-                        return p[0][-digChannel-1] != 0 or pa[0][-digChannel-1] != 0
-                    
-                    elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
-                        return p[1][-digChannel-1] != 0 or pa[1][-digChannel-1] != 0
-                    
-                    else:
-                        return False
-                        
-                elif isinstance(digChannel, str) and digChannel.lower() == "any":
-                    return any(v != 0 for v in itertools.chain.from_iterable(p+pa))
-                
-            elif alternate.lower() in ("main", "alt"):
-                alt = alternate.lower() == "alt"
-                p = self.getDigitalPattern(alternate)
-                if isinstance(digChannel, int):
-                    if digChannel in range(len(p[0])):
-                        return p[0][-digChannel-1] != 0
-                    
-                    elif len(p) == 2 and digChannel in range(len(p[0]), len(p[1])):
-                        return p[1][-digChannel-1] != 0
-                    
-                    else:
-                        return False
-                        
-                elif isinstance(digChannel, str) and digChannel.lower() == "any":
-                    return any(v != 0 for v in itertools.chain.from_iterable(p))
-                
-    def hasDigitalPulse(self, digChannel:int = 0, alternate:bool=False) -> bool:
-        """
-        Checks if there is a pulse output (1) on the specified digital channel
-        
-        Parameters:
-        ===========
-        digChannel: int in the range(8) (maximum number of digital channels)
-        alternate: when True, the function will test the alternate digital pattern
-        
-        """
-        p = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getDigitalPattern(alternate))))
-
-        if digChannel in range(len(p)):
-            return p[digChannel] == 1
-        
-        return False
-        
-    def hasDigitalTrain(self, digChannel:int = 0, alternate:bool=False) -> bool:
-        """
-        Returns if there is a train output ('*') on the specified digital channel
-        
-        Parameters:
-        ===========
-        digChannel: int in the range(8) (maximum number of digital channels)
-        alternate: when True, the function will test the alternate digital pattern
-        
-        """
-        p = tuple(itertools.chain.from_iterable(map(lambda x: reversed(x), self.getDigitalPattern(alternate))))
-        
-        if digChannel in range(len(p)):
-            return p[digChannel] == '*'
-        
-        return False
-        
-    @property
-    def digitalOutputChannels(self):
-        """Returns a dictionary mapping key:int ↦ nested dict, where
-            key = index of digital channel used (0-7)
-            nested dict: a mapping of key:str ↦ 2-tuple[bool] as follows
-            "pulse" ↦ pulse emission in (main, alternate) pattern
-            "train" ↦ train emission in (main, alternate) pattern
-        
-        This mapping is empty if the epoch does not emit any digital signal.
-        
-        See also:
-        self.hasDigitalPulse
-        self.hasDigitalTrain
-        self.hasDigitalOutput
-        self.getPulseDigitalOutputChannels
-        self.getTrainDigitalOutputChannels
-        selg.getDigitalPattern
-        
-        """
-        return dict((channel, {"pulse": (self.hasDigitalPulse(channel, False), self.hasDigitalPulse(channel, True)),
-                               "train": (self.hasDigitalTrain(channel, False), self.hasDigitalTrain(channel, True))}) for channel in self.getUsedDigitalOutputChannels())
+#     @property
+#     def digitalOutputChannels(self):
+#         """Returns a dictionary mapping key:int ↦ nested dict, where
+#             key = index of digital channel used (0-7)
+#             nested dict: a mapping of key:str ↦ 2-tuple[bool] as follows
+#             "pulse" ↦ pulse emission in (main, alternate) pattern
+#             "train" ↦ train emission in (main, alternate) pattern
+#         
+#         This mapping is empty if the epoch does not emit any digital signal.
+#         
+#         See also:
+#         self.hasDigitalPulse
+#         self.hasDigitalTrain
+#         self.hasDigitalOutput
+#         self.getPulseDigitalOutputChannels
+#         self.getTrainDigitalOutputChannels
+#         selg.getDigitalPattern
+#         
+#         """
+#         return dict((channel, {"pulse": (self.hasDigitalPulse(channel, False), self.hasDigitalPulse(channel, True)),
+#                                "train": (self.hasDigitalTrain(channel, False), self.hasDigitalTrain(channel, True))}) for channel in self.getUsedDigitalOutputChannels())
         
 
 class ABFProtocol(ElectrophysiologyProtocol):
@@ -1197,8 +1203,24 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             # ### BEGIN digital outputs information
             # NOTE: further info indirectly via self._outputs_
-            self._nDigitalOutputs_ = obj._dacSection._entryCount
+            
+            # total number of physical DAC channels available with digital outputs
+            # NOTE: 2024-10-24 22:40:56 FIXME redundant info:
+            # _nDigitalOutputs_ is the same as nDACChannels: same source, same value
+            # self._nDigitalOutputs_ = obj._dacSection._entryCount
+            
+            # total number of DIG "outputs" available; these would typically be 
+            # 2 * self._nDigitalOutputs_ because each of those can emit either:
+            # • a single pulse ("step mode"), when its byte value resolves to '1',
+            # or
+            # • a train of pulses ("pulse mode"), when its byte value resolves to '*'
             self._nTotalDigitalOutputs_ = obj._protocolSection.nDigitizerTotalDigitalOuts
+            
+            # not sure what this is, my guess is that it represents how many of 
+            # the DIG channels can emit trains ?
+            # from what I gathered so far:
+            # _protocolSection.nDigitizerTotalDigitalOuts = _dacSection._entryCount + _protocolSection.nDigitizerSynchDigitalOuts
+            # 
             self._nSynchronizedDigitalOutputs_ = obj._protocolSection.nDigitizerSynchDigitalOuts
             self._hasAltDigOutState_ = bool(obj._protocolSection.nAlternateDigitalOutputState)
             self._digTrainActiveHi_ = bool(obj._protocolSection.nDigitalTrainActiveLogic)
@@ -1206,6 +1228,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
             digHolds = list(map(bool, obj._epochSection.nEpochDigitalOutput)) # 3,2,1,0,7,6,5,4
             self._digHoldingValue_ = list(reversed(digHolds[0:4])) + list(reversed(digHolds[4:]))
             self._digUseLastEpochHolding_ = bool(obj._protocolSection.nDigitalInterEpisode)
+            
+            # NOTE: 2024-10-24 22:02:03 WARNING new API
+            # digitalPattern stored at protocol level, by emitting epoch
+            self._epochsDigitalPatterns_ = getDIGPatterns(obj)
+            
+            #
             # ### END   digital outputs information
             
             # NOTE: 2024-03-08 22:32:29
@@ -1250,8 +1278,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # ### END   DAC outputs information
             
             # ### BEGIN digital outputs information
+            #
             # NOTE: further info indirectly via self._outputs_
-            self._nDigitalOutputs_ = info_dict["sections"]["DACSection"]["llNumEntries"]
+            
+            # NOTE: 2024-10-24 22:40:56 FIXME redundant info:
+            # _nDigitalOutputs_ is the same as nDACChannels: same source, same value
+            # self._nDigitalOutputs_ = info_dict["sections"]["DACSection"]["llNumEntries"]
             self._nTotalDigitalOutputs_ = info_dict["protocol"]["nDigitizerTotalDigitalOuts"]
             self._nSynchronizedDigitalOutputs_ = info_dict["protocol"]["nDigitizerSynchDigitalOuts"]
             self._hasAltDigOutState_ = bool(info_dict["protocol"]["nAlternateDigitalOutputState"])
@@ -1261,9 +1293,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # allow the use of blocks read from ABF before 2023-09-20 23:26:08
             digHolds = info_dict["sections"]["EpochSection"].get("nEpochDigitalOutput", None) # 3,2,1,0,7,6,5,4
     
-            if isinstance(digHolds, list) and len(digHolds) == self._nDigitalOutputs_:
+            # if isinstance(digHolds, list) and len(digHolds) == self._nDigitalOutputs_:
+            if isinstance(digHolds, list) and len(digHolds) == self._nDACChannels_:
                 digHolds = list(map(bool, digHolds))
-                if self._nDigitalOutputs_ == 8:
+                # if self._nDigitalOutputs_ == 8:
+                if self._nDACChannels_ == 8:
                     digHolds = list(reversed(digHolds[:4])) + list(reversed(digHolds[4:]))
                     
                 else:
@@ -1272,9 +1306,16 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 self._digHoldingValue_ = digHolds
                 
             else:
-                self._digHoldingValue_ = [False] * self._nDigitalOutputs_
+                # self._digHoldingValue_ = [False] * self._nDigitalOutputs_
+                self._digHoldingValue_ = [False] * self._nDACChannels_
                 
             self._digUseLastEpochHolding_ = bool(info_dict["protocol"]["nDigitalInterEpisode"])
+            
+            # NOTE: 2024-10-24 22:02:03 WARNING new API
+            # digitalPattern stored at protocol level, by emitting epoch
+            self._epochsDigitalPatterns_ = getDIGPatterns(obj)
+            
+            #
             # ### END   digital outputs information
             
             # NOTE: 2024-03-08 22:33:34 see NOTE: 2024-03-08 22:32:29
@@ -1310,7 +1351,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._activeDACChannel_ = kwargs.get("activeDACChannel", 0)
             self._hasAltDacOutState_ = kwargs.get("hasAltDacOutState", False)
             
-            self._nDigitalOutputs_ = kwargs.get("nDigitalOutputs", 0)
+            # self._nDigitalOutputs_ = kwargs.get("nDigitalOutputs", 0)
             self._nTotalDigitalOutputs_ = kwargs.get("nTotalDigitalOutputs", 0)
             self._nSynchronizedDigitalOutputs_ = kwargs.get("nSynchronizedDigitalOutputs", 0)
             self._hasAltDigOutState_ = kwargs.get("hasAltDigOutState", False)
@@ -1480,10 +1521,23 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         
         attrs = dict()
+#         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
+#                   "_hasAltDacOutState_", "_hasAltDigOutState_",
+#                   "_nDigitalOutputs_", "_nTotalDigitalOutputs_",
+#                   "_nSynchronizedDigitalOutputs_", "_digTrainActiveHi_",
+#                   "_digHolding_", "_digHoldingValue_","_digUseLastEpochHolding_",
+#                   "_acquisitionMode_", "_nSweeps_", "_nRuns_", "_nTrials_",
+#                   "_nTotalDataPoints_", "_nDataPointsPerSweep_",
+#                   "_samplingRate_", "_sweepInterval_", 
+#                   "_averaging_", "_averageWeighting_", 
+#                   "_protocolFile_","_sourceHash_", "_sourceId_", 
+#                   "_fileOrigin_",
+#                   ):
+#             
         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
                   "_hasAltDacOutState_", "_hasAltDigOutState_",
-                  "_nDigitalOutputs_", "_nTotalDigitalOutputs_",
-                  "_nSynchronizedDigitalOutputs_", "_digTrainActiveHi_",
+                  "_nTotalDigitalOutputs_", "_nSynchronizedDigitalOutputs_", 
+                  "_digTrainActiveHi_",
                   "_digHolding_", "_digHoldingValue_","_digUseLastEpochHolding_",
                   "_acquisitionMode_", "_nSweeps_", "_nRuns_", "_nTrials_",
                   "_nTotalDataPoints_", "_nDataPointsPerSweep_",
@@ -1551,10 +1605,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
         kargs = dict()
             
+        # for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
+        #           "_hasAltDacOutState_", "_hasAltDigOutState_",
+        #           "_nDigitalOutputs_", "_nTotalDigitalOutputs_",
+        #           "_nSynchronizedDigitalOutputs_", "_digTrainActiveHi_",
+        #           "_digHolding_", "_digHoldingValue_","_digUseLastEpochHolding_",
+        #           "_acquisitionMode_", "_nSweeps_", "_nRuns_", "_nTrials_",
+        #           "_nTotalDataPoints_", "_nDataPointsPerSweep_",
+        #           "_samplingRate_", "_sweepInterval_", 
+        #           "_averaging_", "_averageWeighting_", 
+        #           "_protocolFile_","_sourceHash_", "_sourceId_", "_fileOrigin_",
+        #           ):
         for n in ("_nADCChannels_", "_nDACChannels_", "_activeDACChannel_",
                   "_hasAltDacOutState_", "_hasAltDigOutState_",
-                  "_nDigitalOutputs_", "_nTotalDigitalOutputs_",
-                  "_nSynchronizedDigitalOutputs_", "_digTrainActiveHi_",
+                  "_nTotalDigitalOutputs_", "_nSynchronizedDigitalOutputs_", 
+                  "_digTrainActiveHi_",
                   "_digHolding_", "_digHoldingValue_","_digUseLastEpochHolding_",
                   "_acquisitionMode_", "_nSweeps_", "_nRuns_", "_nTrials_",
                   "_nTotalDataPoints_", "_nDataPointsPerSweep_",
@@ -1670,6 +1735,16 @@ class ABFProtocol(ElectrophysiologyProtocol):
     @property
     def dacUnits(self):
         return tuple(o.units for o in self.outputs)
+
+    @property
+    def digitalPatterns(self):
+        return self._epochsDigitalPatterns_
+    
+    @digitalPatterns.setter
+    def digitalPatterns(self, val:dict):
+        if isinstance(val, dict):
+            if all(isinstance(key, int) and key >=0 and key < self.nDACChannels for key in val.keys()):
+                self._epochsDigitalPatterns_ = val
     
     @property
     def physicalDACIndexes(self):
@@ -1973,9 +2048,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def nOutputChannels(self) -> int:
         return self.nDACChannels
     
-    @property
-    def nDigitalOutputs(self)->int:
-        return self._nDigitalOutputs_
+    # @property
+    # def nDigitalOutputs(self)->int:
+    #     return self._nDigitalOutputs_
     
     @property
     def nSychronizedDigitalOutChannels(self) -> int:
@@ -3822,8 +3897,8 @@ class ABFOutputConfiguration:
                 epoch.pulsePeriod = (epochDict["lEpochPulsePeriod"] / samplingRate).rescale(pq.ms)
                 epoch.pulseWidth = (epochDict["lEpochPulseWidth"] / samplingRate).rescale(pq.ms)
                 epoch.dacIndex = epochDict["nDACNum"]
-                epoch.mainDigitalPattern = digPatterns[epoch.number]["main"]
-                epoch.alternateDigitalPattern = digPatterns[epoch.number]["alternate"]
+                # epoch.mainDigitalPattern = digPatterns[epoch.number]["main"]
+                # epoch.alternateDigitalPattern = digPatterns[epoch.number]["alternate"]
                 epochs.append(epoch)
             
             self._epochs_ = epochs
@@ -3860,7 +3935,7 @@ class ABFOutputConfiguration:
 #                 self._epochs_.clear()
                 
         elif abfVer == 2:
-            digPatterns = getDIGPatterns(obj)
+            # digPatterns = getDIGPatterns(obj)
             samplingRate = float(obj.dataRate) * pq.Hz
             # the epoch table is stored in _epochPerDacSection
             for i, epochDacNum in enumerate(obj._epochPerDacSection.nDACNum):
@@ -3883,8 +3958,8 @@ class ABFOutputConfiguration:
                 epoch.pulsePeriod = (obj._epochPerDacSection.lEpochPulsePeriod[i] / samplingRate).rescale(pq.ms)
                 epoch.pulseWidth = (obj._epochPerDacSection.lEpochPulseWidth[i] / samplingRate).rescale(pq.ms)
                 epoch.dacIndex = epochDacNum
-                epoch.mainDigitalPattern = digPatterns[epoch.number]["main"]
-                epoch.alternateDigitalPattern = digPatterns[epoch.number]["alternate"]
+                # epoch.mainDigitalPattern = digPatterns[epoch.number]["main"]
+                # epoch.alternateDigitalPattern = digPatterns[epoch.number]["alternate"]
 
                 epochs.append(epoch)
                 
@@ -5824,7 +5899,7 @@ def readInt16(fb):
 
 def readStruct(fb, structFormat, seek=False, cleanStrings=True):
     # NOTE: 2024-10-24 15:55:01
-    # oroginal code by Scott Harden https://github.com/swharden/pyABF
+    # original code by Scott Harden https://github.com/swharden/pyABF
     import struct
     if seek:
         fb.seek(seek)
@@ -5838,6 +5913,8 @@ def readStruct(fb, structFormat, seek=False, cleanStrings=True):
         #     if type(values[i]) == type(b''):
         #         values[i] = values[i].decode("ascii", errors='ignore').strip()
 
+    if len(values) == 1:
+        return values[0]
     return values
     
 def valToBitList(value:int, bitCount:int = DIGITAL_OUTPUT_COUNT, 
@@ -6098,7 +6175,8 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
             digitalPatternMain = tuple(digitalPatternMain)
             digitalPatternAlternate = tuple(digitalPatternAlternate)
             
-            epochsDigitalPattern[epochNumber] = {"main": digitalPatternMain, "alternate": alternateDigitalPattern}
+            # epochsDigitalPattern[epochNumber] = {"main": digitalPatternMain, "alternate": alternateDigitalPattern}
+            epochsDigitalPattern[epochNumber] = DigitalPattern(digitalPatternMain, alternateDigitalPattern)
                     
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
                     
