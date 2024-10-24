@@ -5815,10 +5815,30 @@ def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dic
     
 def readInt16(fb):
     """"""
+    # NOTE: 2024-10-24 15:40:12
+    # this should be Little-endian as it is generated on a IBM PC
     bytes = fb.read(2)
     values = struct.unpack("h", bytes) # ⇐ this is a tuple! first element is what we need
     # print(f"abfReader.readInt16 bytes = {bytes}, values = {values}")
     return values[0]
+
+def readStruct(fb, structFormat, seek=False, cleanStrings=True):
+    # NOTE: 2024-10-24 15:55:01
+    # oroginal code by Scott Harden https://github.com/swharden/pyABF
+    import struct
+    if seek:
+        fb.seek(seek)
+    vSize = struct.calcsize(structFormat)
+    bString = fb.read(vSize)
+    values = struct.unpack(structFormat, bString)
+    
+    if cleanStrings:
+        values = tuple(map(lambda x: x.decode("ascii", errors="ignore").strip if isinstance(x, bytes) else x, values))
+        # for i in range(len(values)):
+        #     if type(values[i]) == type(b''):
+        #         values[i] = values[i].decode("ascii", errors='ignore').strip()
+
+    return values
     
 def valToBitList(value:int, bitCount:int = DIGITAL_OUTPUT_COUNT, 
                  reverse:bool = False, breakout:bool = True, as_bool:bool=False):
