@@ -5814,6 +5814,7 @@ def getABFsection(abf:pyabf.ABF, sectionType:typing.Optional[str] = None) -> dic
     return datatypes.inspect_members(s, lambda x: not any(f(x) for f in reject_funcs) and not isinstance(x, property) and not isinstance(x, io.BufferedReader))
     
 def readInt16(fb):
+    """"""
     bytes = fb.read(2)
     values = struct.unpack("h", bytes) # ⇐ this is a tuple! first element is what we need
     # print(f"abfReader.readInt16 bytes = {bytes}, values = {values}")
