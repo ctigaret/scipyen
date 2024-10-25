@@ -127,7 +127,7 @@ def lettersToOrdinal(x:str):
     
     l = list(string.ascii_lowercase)
     
-    ll = list(itertools.product(l,l))
+    ll = list(map(lambda k: "".join(k), itertools.product(l,l)))
     
     l.extend(ll)
     
