@@ -2007,10 +2007,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def _check_DAC_Epoch_(self, 
                        dac:typing.Union[ABFOutputConfiguration, int, str],
                        epoch:typing.Optional[typing.Union[ABFEpoch, int, str]]=None) -> tuple:
-        if isinstance(dac, (int, str)):
-            dac = self.getDAC(dac)
-        if not isinstance(dac, ABFOutputConfiguration) or dac not in self._outputs_:
-            raise TypeError(f"Invalid DAC {dac}")
+        if dac is None:
+            dac = self.activeDACOutput
+        else:
+            if isinstance(dac, (int, str)):
+                dac = self.getDAC(dac)
+            if not isinstance(dac, ABFOutputConfiguration) or dac not in self._outputs_:
+                raise TypeError(f"Invalid DAC {dac}")
+            
         if epoch is not None:
             if isinstance(epoch, (int,str)):
                 epoch = dac.getEpoch(epoch)
@@ -2714,6 +2718,43 @@ class ABFProtocol(ElectrophysiologyProtocol):
         pattern = self.getDigitalPattern(sweep, epoch)
         
         return tuple(k for k in range(len(pattern)) if pattern[k] != 0)
+    
+    @property
+    def epochsWithDigitalOutput(self) -> tuple:
+        """A tuple of all ABFEpoch numbers where a digital output is defined"""
+        return tuple(map(lambda x: x[0], 
+                         filter(lambda x: not all (x_ ==0 for x_ in x[1]),
+                                map(lambda i: (i[0], tuple(itertools.chain.from_iterable(i[1].main + i[1].alternate))), 
+                                    self.digitalPatterns.items()))))
+                                
+    def getDACsForEpoch(self, epoch:typing.Union[ABFEpoch, str, int]) -> tuple:
+        """A tuple of DAC physical indexes where the epoch is defined.
+        
+        Parameters:
+        -----------
+        epoch: ABFEpoch, str (epoch letter(s)) or int (epoch number)
+        
+        CAUTION: is `epoch` is an ABFEpoch, all of its parameters will be compared
+        to those of the epochs in every DAC. This may not be always useful. 
+        
+        If the intention is only to obtain the DAC indexes where an epoch with a 
+        given number or letter(s) is defined, then pass that number or letter(s)
+        as `epoch` parameter.
+        
+        """
+        if isinstance(epoch, ABFEpoch):
+            return tuple(dac.physicalIndex for dac in self.DACs if epoch in dac.epochs)
+        
+        elif isinstance(epoch, int):
+            # No not check against len(dac.epochs), because this iss irrelevant
+            return tuple(dac.physicalIndex for dac in self.DACs if epoch in (tuple(e.number for e in dac.epochs)))
+        
+        elif isinstance(epoch, str):
+            return tuple(dac.physicalIndex for dac in self.DACs if epoch in (tuple(e.letter for e in dac.epochs)))
+        
+        else:
+            raise TypeError(f"Expecting an ABFEpoch, int or str; instead, got a {type(epoch).__name__}")
+            
         
     def getDigitalPattern(self, sweep:int = 0, 
                           epoch:typing.Optional[typing.Union[ABFEpoch, int, str]] = None,
@@ -2830,26 +2871,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
                        includeDigitalPattern:bool=True) -> pd.DataFrame:
         """Returns the table of ABFEpochs defined for a specific DAC.
         
-        The contents of the table reflect the Epochs' behaviour during the 
-        specified sweep, and therefore may be different from the table in 
-        Clampex Waveform tab of the Protocol Editor dialog. 
-    
-        In particular, when "Alternate Digital Outputs" is enabled in the protocol, 
-        the digital patterns shown here are the ones that would be emitted by an 
-        ABF epoch during the specified sweep: the "main" patterns are emitted on 
-        even-indexed sweeps (0, 2, 4, …) whereas the "alternate" DIG patterns are
-        emitted on oddindexed sweeps (1, 3, 5, …).
-     
-        These patterns are independent of the DAC channel specified in the `dac`
-        parameter. In Clampex the Waveform tabs for distinct DAC channels
-        are used to define the "main" and "alternate" digital outputs. The only 
-        reason to logically associate a DAC with a digital pattern seems to be
-        the determination of the duration of a TTL step (or frequency of a TTL 
-        train) based on the epoch's parameters first duration, delta duration, 
-        pulse width and pulse frequency, which are specified in the Waveform tab
-        for a given DAC channel.
-        
-        This is because
         
         Parameters:
         ----------
@@ -2862,22 +2883,61 @@ class ABFProtocol(ElectrophysiologyProtocol):
         -------
         A Pandas DataFrame
         
-        """
-        if dac is None:
-            dac = self.activeDACOutput
-        # else:
-        #     dac, _ = self._check_DAC_Epoch_(dac, None)
+        NOTE: 
+        -----
+        The contents of the table reflect the Epochs' behaviour during the 
+        specified sweep, and therefore may be different from the table in 
+        Clampex Waveform tab of the Protocol Editor dialog. 
+    
+        In particular, when "Alternate Digital Outputs" is enabled in the protocol, 
+        the digital patterns shown here are the ones that would be emitted by an 
+        ABF epoch during the specified sweep: the "main" patterns are emitted on 
+        even-indexed sweeps (0, 2, 4, …) whereas the "alternate" DIG patterns are
+        emitted on oddindexed sweeps (1, 3, 5, …).
+     
+        These patterns are independent of the DAC channel specified in the `dac`
+        parameter. However, the realization of the TTL signals emitted by these
+        patterns does depend on the ABFEpoch parameters first & delta durations,
+        and pulse width & frequency, which are specific to the DAC where the epoch 
+        emitting a digital pattwern was defined.
         
-        altDac = None
+        In Clampex, the Waveform tabs for distinct DAC channels are used to define 
+        the "main" and "alternate" digital outputs. Although one can define such
+        patterns in more than one DAC Channel tab, only two of these will be used
+        to emit alternative digital (TTL) signals: DAC Channel 0 and 1.
+        
+        The "main" pattern of digital TTL signals is always the one defined in an
+        ABEpoch in the DAC where "Digital Outputs" checkbox is ON (hereafter 
+        called the "active" DAC). The "alternate" pattern of digital TTL signals 
+        is the one defined in its counterpart (1 if active DAC is 0 and 0 if 
+        active DAC is 1). Digital patterns defined on higher index DACs seem to 
+        be ignored in this case.
+        
+        This logic of delivering alternative TTL signals seems to break down
+        when the "Digital Outputs" checkbox is defined on a higher DAC index than
+        0 or 1 (even if the same epoch number is configured to deliver a digital
+        pattern). IN this case, patterns defined in either channels 0 or 1 are
+        being delievered alternatively, but on the DIG channel(s) specified in 
+        DAC 0. Not sure if this is a bug or design feature.
+        
+        It is therefore best to avoid these ambiguities and, when alternative
+        digital outputs are required, define these on DAC 0 or 1 and leave other
+        DACs without digital patterns ()
+        
+        """
+        
+        dac, _= self._check_DAC_Epoch_(dac, None)
+        
+        # a tuple of ABFEpoch numbers where digital outputs are defined:
+        digEpochs = self.epochsWithDigitalOutput
         
         if self.alternateDigitalOutputsEnabled:
             # NOTE: 2024-10-27 15:53:06
             # use the active DAC to get the epoch parameters for the main DIG
             # and the next DAC to get epoch params for the alt DIG
-            digEpochs = tuple(filter(lambda x: not all (x_ ==0 for x_ in x[1]), map(lambda i: (i[0],tuple(itertools.chain.from_iterable(i[1].main + i[1].alternate))), protocol.digitalPatterns.items())))
+
+            isAlternateDigital = False
             
-            
-            queryAltDac = False
             if dac.physicalIndex == self.activeDACChannel:
                 if sweep % 2 > 0: 
                     # odd sweep -> must query alternate DIG pattern, NOT for the 
@@ -2894,12 +2954,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     # If there is no other DAC where this epoch is defined, this
                     # means there is no alternate DIG pattern emitted.
                     
-                    queryAltDac = True
+                    isAlternateDigital = True
                     
-                    for epoch in dac.epochs:
-                        
-                    
-        
         if includeDigitalPattern:
             rowIndex = ["Type", "First Level", "Delta Level",
                         "First Duration", "First Duration (Samples)",
@@ -2924,55 +2980,85 @@ class ABFProtocol(ElectrophysiologyProtocol):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
         
         for i, epoch in enumerate(dac.epochs):
-            if includeDigitalPattern:
-                if queryAltDac:
+            epochDigPattern = self.getDigitalPattern(sweep, epoch.epochNumber,
+                                                        natural=False, separateBanks=True)
+            
+            if isAlternateDigital and epoch.number in digEpochs:
+                digDACs = self.getDACsForEpoch(epoch.number)
+                if len(digDACs) > 1:
+                    assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
+                    thisDacNdx = digDACs.index(dac.physicalIndex)
+                
+                    if thisDacNdx == 0: # get the next one up
+                        myDac = self.getDAC(digDACs[thisDacNdx+1])
+                    else: 
+                        myDac = self.getDAC(digDACs[0]) # get the first one!
+                        # myDac = self.getDAC(digDACs[thisDacNdx-1]) # get the next one down
+                        
+                    myEpoch = myDac.getEpoch(epoch.number)
                     
-                epochDigPattern = self.getDigitalPattern(sweep, epoch.epochNumber,
-                                                         natural=False, separateBanks=True)
-                epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
-                            epoch.firstDuration, scq.nSamples(epoch.firstDuration, self.samplingRate),
-                            epoch.deltaDuration, scq.nSamples(epoch.deltaDuration, self.samplingRate),
-                            self.getEpochDuration(dac, epoch, sweep, samples = False),
-                            self.getEpochDuration(dac, epoch, sweep, samples = True),
+                else:
+                    myDac = dac
+                    myEpoch = epoch
+                    
+            else:
+                myDac = dac
+                myEpoch = epoch
+                
+            if includeDigitalPattern:
+                epValues = [myEpoch.typeName, myEpoch.firstLevel, 
+                            myEpoch.deltaLevel, myEpoch.firstDuration, 
+                            scq.nSamples(myEpoch.firstDuration, self.samplingRate),
+                            myEpoch.deltaDuration, 
+                            scq.nSamples(myEpoch.deltaDuration, self.samplingRate),
+                            self.getEpochDuration(myDac, myEpoch, sweep, samples = False),
+                            self.getEpochDuration(myDac, myEpoch, sweep, samples = True),
                             "".join(map(str, epochDigPattern[0])), 
                             "".join(map(str, epochDigPattern[1])),
-                            epoch.pulseFrequency,
-                            epoch.pulsePeriod, scq.nSamples(epoch.pulsePeriod, self.samplingRate),
-                            epoch.pulseWidth, scq.nSamples(epoch.pulseWidth, self.samplingRate),
-                            # epoch.pulsePeriod, self.getEpochPulsePeriodSamples(epoch),
-                            # epoch.pulseWidth, self.getEpochPulseWidthSamples(epoch),
-                            self.getEpochPulseCount(dac, epoch, sweep)]
+                            myEpoch.pulseFrequency, myEpoch.pulsePeriod, 
+                            scq.nSamples(myEpoch.pulsePeriod, self.samplingRate),
+                            myEpoch.pulseWidth, 
+                            scq.nSamples(myEpoch.pulseWidth, self.samplingRate),
+                            self.getEpochPulseCount(myDac, myEpoch, sweep)]
+            
             else:
-                epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
-                            epoch.firstDuration, scq.nSamples(epoch.firstDuration, self.samplingRate),
-                            epoch.deltaDuration, scq.nSamples(epoch.deltaDuration, self.samplingRate),
-                            self.getEpochDuration(dac, epoch, sweep, samples = False),
-                            self.getEpochDuration(dac, epoch, sweep, samples=True),
-                            epoch.pulseFrequency,
-                            epoch.pulsePeriod, scq.nSamples(epoch.pulsePeriod, self.samplingRate),
-                            epoch.pulseWidth, scq.nSamples(epoch.pulseWidth, self.samplingRate),
-                            # epoch.pulsePeriod, self.getEpochPulsePeriod(dac,epoch),
-                            # epoch.pulseWidth, self.getEpochPulseWidthSamples(epoch),
-                            self.getEpochPulseCount(dac, epoch, sweep)]
-                    
+                epValues = [myEpoch.typeName, myEpoch.firstLevel, 
+                            myEpoch.deltaLevel, myEpoch.firstDuration, 
+                            scq.nSamples(myEpoch.firstDuration, self.samplingRate),
+                            myEpoch.deltaDuration, 
+                            scq.nSamples(myEpoch.deltaDuration, self.samplingRate),
+                            self.getEpochDuration(myDac, myEpoch, sweep, samples = False),
+                            self.getEpochDuration(myDac, myEpoch, sweep, samples = True),
+                            myEpoch.pulseFrequency, myEpoch.pulsePeriod, 
+                            scq.nSamples(myEpoch.pulsePeriod, self.samplingRate),
+                            myEpoch.pulseWidth, 
+                            scq.nSamples(myEpoch.pulseWidth, self.samplingRate),
+                            self.getEpochPulseCount(myDac, myEpoch, sweep)]
+            
             epochData[epoch.letter] = epValues
             
         return pd.DataFrame(epochData, index = rowIndex)
         
-    
-    def getDigitalWaveform(self, dac:typing.Union[int, str], sweep:int = 0,
+    # TODO 2024-10-27 21:51:48 finalize this!!!
+    def getDigitalWaveform(self, sweep:int = 0,
+                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                            separateWaves:bool=True) -> neo.AnalogSignal:
-        """TTL weaveforms for the given sweep"""
+        """TTL weaveforms for the given sweep.
+        See NOTE in the dicstrong for self.getEpochsTable(…)"""
         dac, _ = self._check_DAC_Epoch_(dac, None)
         
+        # a tuple of ABFEpoch numbers where digital outputs are defined:
+        digEpochs = self.epochsWithDigitalOutput
         
+        usedDigs = tuple(itertools, chain.from_iterable(self.getUsedDigitalChannels(sweep, e) for e in digEpochs))
+     
         # NOTE: 2023-09-20 22:22:41
         # the digital output is ALWAYS in V
         # "high logic" means 5V on a background of 0 V
         # "low logic" means 0V on a background of 5V
         
-        usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in dac.epochs]))
+        # usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in dac.epochs]))
         
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
@@ -4137,9 +4223,9 @@ class ABFOutputConfiguration:
         if isinstance(val, (tuple, list)) and all(isinstance(v, ABFEpoch) for v in val):
             self._epochs_[:] = val[:]
     
-    def getEpochsWithDigitalOutput(self) -> typing.List[ABFEpoch]:
-        """List of ABF Epochs emitting digital signals (TTLs)"""
-        return [e for e in self.epochs if len(e.getUsedDigitalOutputChannels())]
+    # def getEpochsWithDigitalOutput(self) -> typing.List[ABFEpoch]:
+    #     """List of ABF Epochs emitting digital signals (TTLs)"""
+    #     return [e for e in self.epochs if len(e.getUsedDigitalOutputChannels())]
     
     def getEpochsWithTTLWaveforms(self, sweep:int = 0,
                                   indexes: bool=False,
@@ -5749,6 +5835,7 @@ class ABFOutputConfiguration:
         return epoch.epochType == ABFEpochType.Pulse and epoch.firstLevel != 0 and \
             epoch.deltaLevel == 0 and epoch.deltaDuration == 0 and len(self.getUsedDigitalChannels(sweep, epoch)) == 0
     
+# ### BEGIN module-level functions
         
 def getEpochNumberFromLetter(x:str) -> int:
     """The inverse function of getEpochLetter()"""
@@ -6836,6 +6923,7 @@ def _(obj, channel:int) -> bool:
     
     channelEpochInfoPerDac = epochInfoPerDAC[channel]
     
+# ### END module-level functions
     
         
     
