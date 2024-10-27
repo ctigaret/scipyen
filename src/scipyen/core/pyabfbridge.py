@@ -1172,6 +1172,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
         • When "Alternative Waveforms" is enabled, only TWO DACs will emit analog
         waveforms, on alternative sweeps ()
     """
+    # BUG: 2024-10-27 09:47:18 - probably related to Clampex
+    # When Alternate Digital Outputs is enabled in the protocol, setting a digital 
+    # pattern in a second DAC channel with index > 2, and setting the Digital Outputs
+    # flag ON on that DAC channel seems to mess up the allocation of the DIG bits 
+    # to a DIG channel: both the main and alternate digital patterns are emitted
+    # by the same DIG channel, when they should be emitted on the DIG channel
+    # indicated in the pattern.
+    
+    # WORKAROUND: when alternate digital outputs are needed, use only DAC Channels
+    # 0 and 1 for recording and for setting up the alternative digital patterns.
+    #
+    # These two DACs should be used anyway, by default, in electrophysiology as they
+    # are typically used to send out command signals to the cells via the amplifier
+    # channels "1" and "2", respectively. This mst be reflected in the LabBench.
+    
     # TODO 2024-07-19 13:19:40 FIXME URGENTLY
     # implement code related to pyabf stimulusFilefolder & stimulusWaveformFromFile
     # 
@@ -1799,232 +1814,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     @property
     def activeDACChannel(self) -> int:
         """Index of the "active" DAC channel as reported in the ABF file protocol.
-        
-        This can be somewhat confusing — a DAC channel is `active` in a given 
-        protocol if:
-        
-        • it has "Digital Outputs" enabled in the corresponding 'Channel #' 
-            sub-tab of the "Waveform" tab in Clampex protocol editor; 
-        
-        OR:
-        • when no DAC is sending digital output, it is the channel with the 
-            highest index that sends out analog waveforms
-        
-        NOTE 1:
-        ∘ when "Alternate Digital Outputs" is DISABLED in the "Waveform" tab:
-            ⋆ the "active" DAC is the only DAC that associates digital output in
-                the protocol
-    
-            ⋆ the digital pattern defined in an epoch under this DAC's "Channel #"
-            sub-tab will be sent out with every sweep;
-    
-            ⋆ the pattern will be emitted on the digital channel index
-            corresponding to the actual index of the bit (highest on the left)
-            in the DIG channels bank; e.g., for the top bank (3-0):
-    
-            0001 → emits a TTL PULSE on DIG0 
-            000* → emits a TTL TRAIN on DIG0
-            0010 → emits a TTL PULSE on DIG1
-            00*0 → emits a TTL TRAIN on DIG1
-    
-        ∘ when "Alternate Digital Outputs" is ENABLED in the "Waveform" tab:
-            ⋆ this DAC will send the pattern defined under this DAC's
-                "Channel #" sub-tab, ONLY during even-numbered sweeps 
-                (0, 2, 4, ...); this is the MAIN digital pattern
-    
-            ⋆ the "alternative" pattern needs to be defined in ANOTHER DAC
-                sub-tab and will be emitted during odd-numbered sweeps
-                (1, 3, 5, ...); this is the ALTERNATIVE digital pattern
-    
-            ⋆ there can be only one alternate DIG pattern defined in any 
-                other DAC;     
-        
-        ∘ when two DACs are used to configure alternate digital patterns (see above)
-            the "active" DAC is the one where "Analog waveform" is enabled in the
-            corresponding "Channel #" sub-tab.
-        
-            CAUTION: This means that one can record using DAC0, yet the actual
-            "active" DAC may be DAC1. This is important when constructing a
-            RecordingSource (see ephys module) — one needs to specify the actual 
-            DAC used for recording (DAC0 in this example) instead of the "active"
-            DAC (DAC1 in this example).
-            
-        WARNING: In a two-pathways experiment, the MAIN and ALTERNATE patterns
-        should use bits corresponding to distinct DIG channels.
-        
-        NOTE: The association between the alternate DIG pattern and a particular DAC
-        is only for GUI purposes - it does NOT engage the "other" DAC in any way
-        (the "other" DAC may still be used for other purposes e.g. sending out
-        analog DAC command waveforms during its epochs)
-        
-        Works for most cases where a single DAC (0 or 1) is used , but currently
-        meaningless when no analog or digital commands are sent at all or with
-        atypical connections and DAC configurations (see comments in the code)
-        
-        
-        When DIG channels are off in all DACs, this method return 0.
-        
-        NOTE: DAC channels have identical physical and logical indices. WARNING:
-        This is in contrast to the ADC channels, where the ADCs logical indices 
-        may differ from the physical ones (depending on which ADCs are actually 
-        used, in the protocol, to record the data).
-        
-        
         """
-        # NOTE: 2023-10-09 13:31:58
-        # Beyond DAC1, the active DAC index returns the highest DAC index in use.
-        # HOWEVER, it appears that the highest value returned here is 3 (as if there 
-        # were a maximum of 4 DACs - from 0 to 3 - this may be a limitation in my 
-        # simulations)
-        #
-        # This is either not very useful or I fail to understand this:
-        # 
-        # Two identical protocols except for the DAC used report the same number:
-        # protocol 1: alternateDigitalOutputStateEnabled True
-        #             DAC0 analogWaveformEnabled True, digitalOutputEnabled True
-        #             DAC1 analogWaveformEnabled False, digitalOutputEnabled False, but enabled on Channel #0
-        #             
-        # protocol 2: alternateDigitalOutputStateEnabled True
-        #             DAC0 analogWaveformEnabled False, digitalOutputEnabled True
-        #             DAC1 analogWaveformEnabled True, digitalOutputEnabled False, but enabled on Channel #0
-        # 
-        # both report self._activeDACChannel_ 0 (in pyabf this is regardless of sweep)
-        
-        # However: if alternateDigitalOutputStateEnabled is False AND 
-        #     both analogWaveformEnabled and digitalOutputEnabled are enabled in 
-        #     the same DAC then activeDACChannelIndex is the index of said DAC output.
-        #
-        #
-        # NOTE: DIG OUT CAN ONLY BE ENABLED ON A SINGLE DAC!
-        #
-        # protocol with:
-        #               DAC0:   DAC1:       Alt wave    Alt Dig     Returns:
-        #   analog      1       1           0           1           0
-        #   digital     1       0
-        #
-        #   analog      1       1           0           1           1
-        #   digital     0       1
-        #
-        #   analog      0       1           0           1           1                              
-        #   digital     0       1
-        #
-        #   analog      1       0           0           1           1                              
-        #   digital     0       1
-        #
-        #   analog      0       1           0           1           0                           
-        #   digital     1       0
-        #
-        #   analog      1       1           1           1           0         
-        #   digital     1       0
-        #
-        #   analog      1       1           1           1           1
-        #   digital     0       1
-        #
-        #   analog      0       1           1¹          1           1                           
-        #   digital     0       1
-        #
-        #   analog      1       0           1¹          1           1                              
-        #   digital     0       1
-        #
-        #   analog      0       1           1¹          1           0                           
-        #   digital     1       0
-        #
-        #   analog      1       1           1           0           0         
-        #   digital     1       0
-        #
-        #   analog      1       1           1           0           1
-        #   digital     0       1
-        #
-        #   analog      0       1           1¹          0           1
-        #   digital     0       1
-        #
-        #   analog      1       0           1¹          0           1                              
-        #   digital     0       1
-        #
-        #   analog      0       1           1¹          0           0                           
-        #   digital     1       0
-        #
-        #   analog      1       1           1           0           ?0         
-        #   digital     1       0
-        #
-        #   analog      1       1           1           0           ?1
-        #   digital     0       1
-        #
-        #   analog      0       1           1¹          0           ?1
-        #   digital     0       1
-        #
-        #   analog      1       0           1¹          0           ?1                              
-        #   digital     0       1
-        #
-        #   analog      0       1           1¹          0           0                           
-        #   digital     1       0
-        #
-        #
-        #   analog      1       1           0           0           0                           
-        #   digital     0       0
-        #
-        #   analog      1       1           1           0           0
-        #   digital     0       0
-        #
-        #   analog      1       0           0¹          0           0
-        #   digital     0       0
-        #
-        #   analog      0       1           0¹          0           0! ???
-        #   digital     0       0
-        #
-        #   analog      0       1           1¹          0           0!
-        #   digital     0       0
-        #
-        #   analog      0       0           1¹          0           0!
-        #   digital     0       0
-        #
-        #               DAC2    DAC3
-        #   analog      1       0           1¹          1           2
-        #   digital     1       0
-        #
-        #   analog      0       1           1¹          1           3
-        #   digital     0       1
-        #
-        #   analog      0       1           1¹          1           3
-        #   digital     0       0
-        #
-        #   analog      1       1           1           1           3!
-        #   digital     0       0
-        #
-        #   analog      1       1           0           1           3!
-        #   digital     0       0
-        #
-        #               DAC3    DAC4
-        #   analog      1       1           0           1           3!
-        #   digital     0       0
-        #
-        #   analog      0       1           0           1           3!
-        #   digital     0       0
-        #
-        #                       DAC5
-        #   analog      0       1           0           1           3!
-        #   digital     0       0
-        #
-        #               DAC2    DAC>2
-        #   analog      1       1           0           1           3!
-        #   digital     0       0
-        #
-        #               DAC2    DAC5
-        #   analog      1       1           0           1           2 AHA!
-        #   digital     1       0
-        #
-        # ¹ irrelevant here
-        #
-        
-        #   
-        
-        # BUG: 2023-10-15 23:38:59 code with circular dependency
-        # # NOTE: 2023-10-15 21:56:55
-        # # this can have AT MOST one element
-#         digSendingDacs = list(c for c in range(self.nDACChannels) if self.getDAC(c).digitalOutputEnabled)
-#         
-#         if len(digSendingDacs): 
-#             return digSendingDacs[-1]
         
         return self._activeDACChannel_
     
@@ -3035,12 +2825,80 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             return (0,) * self.nDIGChannels
         
-    def getEpochsTable(self, dac:typing.Union[int, str], /, sweep:int = 0,
-                       includeDigitalPattern:bool=True):
-        dac, _ = self._check_DAC_Epoch_(dac, None)
+    def getEpochsTable(self, sweep:int = 0,
+                       dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
+                       includeDigitalPattern:bool=True) -> pd.DataFrame:
+        """Returns the table of ABFEpochs defined for a specific DAC.
         
-        if sweep not in range(self.nSweeps):
-            raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
+        The contents of the table reflect the Epochs' behaviour during the 
+        specified sweep, and therefore may be different from the table in 
+        Clampex Waveform tab of the Protocol Editor dialog. 
+    
+        In particular, when "Alternate Digital Outputs" is enabled in the protocol, 
+        the digital patterns shown here are the ones that would be emitted by an 
+        ABF epoch during the specified sweep: the "main" patterns are emitted on 
+        even-indexed sweeps (0, 2, 4, …) whereas the "alternate" DIG patterns are
+        emitted on oddindexed sweeps (1, 3, 5, …).
+     
+        These patterns are independent of the DAC channel specified in the `dac`
+        parameter. In Clampex the Waveform tabs for distinct DAC channels
+        are used to define the "main" and "alternate" digital outputs. The only 
+        reason to logically associate a DAC with a digital pattern seems to be
+        the determination of the duration of a TTL step (or frequency of a TTL 
+        train) based on the epoch's parameters first duration, delta duration, 
+        pulse width and pulse frequency, which are specified in the Waveform tab
+        for a given DAC channel.
+        
+        This is because
+        
+        Parameters:
+        ----------
+        sweep: int, the 0-based index of the sweep. Optional, default is the 
+            activeDACChannel of the protocol.
+        dac: the DAC channel where the Epochs table is queried
+        includeDigitalPattern:bool. Optional, default is True
+        
+        Returns:
+        -------
+        A Pandas DataFrame
+        
+        """
+        if dac is None:
+            dac = self.activeDACOutput
+        # else:
+        #     dac, _ = self._check_DAC_Epoch_(dac, None)
+        
+        altDac = None
+        
+        if self.alternateDigitalOutputsEnabled:
+            # NOTE: 2024-10-27 15:53:06
+            # use the active DAC to get the epoch parameters for the main DIG
+            # and the next DAC to get epoch params for the alt DIG
+            digEpochs = tuple(filter(lambda x: not all (x_ ==0 for x_ in x[1]), map(lambda i: (i[0],tuple(itertools.chain.from_iterable(i[1].main + i[1].alternate))), protocol.digitalPatterns.items())))
+            
+            
+            queryAltDac = False
+            if dac.physicalIndex == self.activeDACChannel:
+                if sweep % 2 > 0: 
+                    # odd sweep -> must query alternate DIG pattern, NOT for the 
+                    # active DAC, but for the DAC where the alternative pattern is 
+                    # defined; this is because that DAC might have defined different  
+                    # values for the relevant epoch parameters: 
+                    # first duration, delta duration, pulse width & frequency
+                    #
+                    # If the "active" DAC index is 0 then the "alternate" DAC 
+                    # index is that of the next higher index DAC where
+                    # this epoch is defined, else, it is that of the higher 
+                    # previous DAC index where the epoch is defined.
+                    #
+                    # If there is no other DAC where this epoch is defined, this
+                    # means there is no alternate DIG pattern emitted.
+                    
+                    queryAltDac = True
+                    
+                    for epoch in dac.epochs:
+                        
+                    
         
         if includeDigitalPattern:
             rowIndex = ["Type", "First Level", "Delta Level",
@@ -3062,8 +2920,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 
         epochData = dict()
         
+        if sweep not in range(self.nSweeps):
+            raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
+        
         for i, epoch in enumerate(dac.epochs):
             if includeDigitalPattern:
+                if queryAltDac:
+                    
                 epochDigPattern = self.getDigitalPattern(sweep, epoch.epochNumber,
                                                          natural=False, separateBanks=True)
                 epValues = [epoch.typeName, epoch.firstLevel, epoch.deltaLevel,
@@ -3097,7 +2960,118 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return pd.DataFrame(epochData, index = rowIndex)
         
     
-    def getDigitalWaveform(self, dac, epoch:typing.Union[ABFEpoch, str, int], /, 
+    def getDigitalWaveform(self, dac:typing.Union[int, str], sweep:int = 0,
+                           digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                           separateWaves:bool=True) -> neo.AnalogSignal:
+        """TTL weaveforms for the given sweep"""
+        dac, _ = self._check_DAC_Epoch_(dac, None)
+        
+        
+        # NOTE: 2023-09-20 22:22:41
+        # the digital output is ALWAYS in V
+        # "high logic" means 5V on a background of 0 V
+        # "low logic" means 0V on a background of 5V
+        
+        usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in dac.epochs]))
+        
+        if isinstance(digChannel, int):
+            if digChannel not in usedDigs:
+                raise ValueError(f"Invalid DIG channel index {digChannel}")
+            
+            digChannel = (digChannel,)
+            
+        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            if all(v not in usedDigs for v in digChannel):
+                raise ValueError(f"Invalid DIG channel indexes {digChannel}")
+            
+            digChannel = tuple(sorted(set(digChannel)))
+            
+        elif digChannel is None:
+            digChannel = tuple(sorted(set(usedDigs)))
+            
+        else:
+            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
+            
+        if separateWaves:
+            waveforms = [neo.AnalogSignal(np.full((self.sweepSampleCount, 1), 
+                                                np.nan),
+                                        units = pq.V, t_start = 0*pq.s,
+                                        sampling_rate = self.samplingRate,
+                                        name = f"DIG {chnl} DAC {dac.physicalIndex} ({dac.name})") for chnl in digChannel]
+        else:
+            waveforms = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
+                                                np.nan),
+                                        units = pq.V, t_start = 0*pq.s,
+                                        sampling_rate = self.samplingRate,
+                                        name = f"DIG Output DAC {dac.physicalIndex} ({dac.name})")
+            
+        t0 = t1 = self.holdingTime.rescale(pq.s)
+        
+        offLevel = None
+        
+        if separateWaves:
+            lastEpochNdx = [0] * len(digChannel)
+            lastLevel = [None] * len(digChannel)
+        else:
+            lastEpochNdx = 0
+            lastLevel = None 
+        
+        for epoch in dac.epochs:
+            actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+            t1 = t0 + actualDuration
+            tt = np.array([t0,t1])*pq.s
+            
+            eWaves = self.getEpochDigitalWaveform(dac=dac, epoch=epoch, sweep=sweep, 
+                                                  digChannel=digChannel,
+                                                  separateWaves=separateWaves,
+                                                  returnLevels=True)
+            
+            t0 = t1
+            
+            if eWaves is None:
+                continue
+            
+            epochWaves, epoch_digOFF, epoch_digON, epoch_trainOFF, epoch_trainON = eWaves
+            offLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
+            
+            if lastLevel is None:
+                lastLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
+                
+            if separateWaves:
+                for k in range(len(epochWaves)):
+                    ndx = waveforms[k].time_index(tt)
+                    lastEpochNdx[k] = ndx[1]
+                    lastLevel[k] = epochWaves[k][-1]
+                    waveforms[k][ndx[0]:ndx[1], :] = epochWaves[k]
+                    
+            else:
+                ndx = waveforms.time_index(tt)
+                lastEpochNdx = ndx[1]
+                lastLevel = epochWaves[0][-1,:]
+                waveforms[ndx[0]:ndx[1], :] = epochWaves[0]
+                
+        if self.protocol.digitalUseLastEpochHolding:
+            if separateWaves:
+                for k in range(len(waveforms)):
+                    waveforms[k][lastEpochNdx[k]:, :] = lastLevel[k]
+            else:
+                 waveforms[lastEpochNdx:, :] = lastLevel
+        else:
+            if separateWaves:
+                for k in range(len(waveforms)):
+                    waveforms[k][lastEpochNdx[k]:, :] = offLevel
+            else:
+                waveforms[lastEpochNdx:, :] = offLevel
+                
+        if separateWaves:
+            for k in range(len(waveforms)):
+                waveforms[k][np.isnan(waveforms[k])] = offLevel
+        else:
+            waveforms[np.isnan(waveforms)] = offLevel
+            
+        return waveforms
+            
+    def getEpochDigitalWaveform(self, dac, epoch:typing.Union[ABFEpoch, str, int], /, 
                            sweep:int = 0, 
                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None, 
                            lastLevelOnly:bool = False,
@@ -3259,117 +3233,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         return waves
         
-    
-    def getDigitalWaveform(self, dac:typing.Union[int, str], sweep:int = 0,
-                           digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                           separateWaves:bool=True) -> neo.AnalogSignal:
-        dac, _ = self._check_DAC_Epoch_(dac, None)
-        
-        # NOTE: 2023-09-20 22:22:41
-        # the digital output is ALWAYS in V
-        # "high logic" means 5V on a background of 0 V
-        # "low logic" means 0V on a background of 5V
-        
-        usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in dac.epochs]))
-        
-        if isinstance(digChannel, int):
-            if digChannel not in usedDigs:
-                raise ValueError(f"Invalid DIG channel index {digChannel}")
-            
-            digChannel = (digChannel,)
-            
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            if all(v not in usedDigs for v in digChannel):
-                raise ValueError(f"Invalid DIG channel indexes {digChannel}")
-            
-            digChannel = tuple(sorted(set(digChannel)))
-            
-        elif digChannel is None:
-            digChannel = tuple(sorted(set(usedDigs)))
-            
-        else:
-            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
-            
-        if separateWaves:
-            waveforms = [neo.AnalogSignal(np.full((self.sweepSampleCount, 1), 
-                                                np.nan),
-                                        units = pq.V, t_start = 0*pq.s,
-                                        sampling_rate = self.samplingRate,
-                                        name = f"DIG {chnl} DAC {dac.physicalIndex} ({dac.name})") for chnl in digChannel]
-        else:
-            waveforms = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
-                                                np.nan),
-                                        units = pq.V, t_start = 0*pq.s,
-                                        sampling_rate = self.samplingRate,
-                                        name = f"DIG Output DAC {dac.physicalIndex} ({dac.name})")
-            
-        t0 = t1 = self.holdingTime.rescale(pq.s)
-        
-        offLevel = None
-        
-        if separateWaves:
-            lastEpochNdx = [0] * len(digChannel)
-            lastLevel = [None] * len(digChannel)
-        else:
-            lastEpochNdx = 0
-            lastLevel = None 
-        
-        for epoch in dac.epochs:
-            actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
-            t1 = t0 + actualDuration
-            tt = np.array([t0,t1])*pq.s
-            
-            eWaves = self.getEpochDigitalWaveform(dac=dac, epoch=epoch, sweep=sweep, 
-                                                  digChannel=digChannel,
-                                                  separateWaves=separateWaves,
-                                                  returnLevels=True)
-            
-            t0 = t1
-            
-            if eWaves is None:
-                continue
-            
-            epochWaves, epoch_digOFF, epoch_digON, epoch_trainOFF, epoch_trainON = eWaves
-            offLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
-            
-            if lastLevel is None:
-                lastLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
-                
-            if separateWaves:
-                for k in range(len(epochWaves)):
-                    ndx = waveforms[k].time_index(tt)
-                    lastEpochNdx[k] = ndx[1]
-                    lastLevel[k] = epochWaves[k][-1]
-                    waveforms[k][ndx[0]:ndx[1], :] = epochWaves[k]
-                    
-            else:
-                ndx = waveforms.time_index(tt)
-                lastEpochNdx = ndx[1]
-                lastLevel = epochWaves[0][-1,:]
-                waveforms[ndx[0]:ndx[1], :] = epochWaves[0]
-                
-        if self.protocol.digitalUseLastEpochHolding:
-            if separateWaves:
-                for k in range(len(waveforms)):
-                    waveforms[k][lastEpochNdx[k]:, :] = lastLevel[k]
-            else:
-                 waveforms[lastEpochNdx:, :] = lastLevel
-        else:
-            if separateWaves:
-                for k in range(len(waveforms)):
-                    waveforms[k][lastEpochNdx[k]:, :] = offLevel
-            else:
-                waveforms[lastEpochNdx:, :] = offLevel
-                
-        if separateWaves:
-            for k in range(len(waveforms)):
-                waveforms[k][np.isnan(waveforms[k])] = offLevel
-        else:
-            waveforms[np.isnan(waveforms)] = offLevel
-            
-        return waveforms
-            
-            
     def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
         """Calls self.getDAC(…)
@@ -5536,25 +5399,25 @@ class ABFOutputConfiguration:
     # def isactiveDACChannel(self) -> bool:
     #     return self._isActiveDACChannel_
     
-    @property
-    def digitalOutputsEnabled(self) -> bool:
-        """True if any epoch defined in this DAC emits digital pulses or trains"""
-        # NOTE: 2023-10-18 09:57:46
-        # This is NOT an intrinsic variable in Clampex, but is used here to
-        # help identify if this DAC associates the main digital output pattern
-        
-        # In Clampex, only one DAC can associate DIG out; however, when alternate
-        # digital output is enabled in the protocol, the alternative dig out 
-        # pattern can only be defined on another DAC's GUI in the Waveforms tab 
-        # of the Clampex protocol editor.
-        
-        # I think this is unfortunate, as it may confuse one into thinkng that
-        # this "other" DAC emits dig out on alternate sweeps, when in fact it 
-        # doesn't
-        # 
-        return len(tuple(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate=False) for e in self.epochs]))) > 0
-        # pass
-        # return self._digOutEnabled_
+#     @property
+#     def digitalOutputsEnabled(self) -> bool:
+#         """True if any epoch defined in this DAC emits digital pulses or trains"""
+#         # NOTE: 2023-10-18 09:57:46
+#         # This is NOT an intrinsic variable in Clampex, but is used here to
+#         # help identify if this DAC associates the main digital output pattern
+#         
+#         # In Clampex, only one DAC can associate DIG out; however, when alternate
+#         # digital output is enabled in the protocol, the alternative dig out 
+#         # pattern can only be defined on another DAC's GUI in the Waveforms tab 
+#         # of the Clampex protocol editor.
+#         
+#         # I think this is unfortunate, as it may confuse one into thinkng that
+#         # this "other" DAC emits dig out on alternate sweeps, when in fact it 
+#         # doesn't
+#         # 
+#         return len(tuple(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate=False) for e in self.epochs]))) > 0
+#         # pass
+#         # return self._digOutEnabled_
     
     def getChannelIndex(self, physical:bool=False):
         return self.physicalIndex if physical else self.logicalIndex
