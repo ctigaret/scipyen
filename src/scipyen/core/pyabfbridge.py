@@ -511,7 +511,7 @@ ABF = pyabf.ABF
 # This is 8 for DigiData 1550 series, and 4 for DigiData 1440 series
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
 
-DigitalPattern = namedtuple("DigitalPattern", ["main", "alternate"], module=__name__)
+ABFDigitalPattern = namedtuple("ABFDigitalPattern", ["main", "alternate"], module=__name__)
 
 # These two will be (properly) redefined further below
 class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
@@ -827,10 +827,24 @@ class ABFEpoch:
         self._pulsePeriod_ = val
         
     @property
-    def pulseFrequency(self):
+    def trainPeriod(self):
+        """Alias to pulsePeriod"""
+        return self.pulsePeriod
+    
+    @trainPeriod.setter
+    def trainPeriod(self, value):
+        self.pulsePeriod = value
+        
+    @property
+    def pulseFrequency(self) -> pq.Quantity:
         if float(self.pulsePeriod) == 0.:
             return 0*pq.Hz
         return (1/self.pulsePeriod).rescale(pq.Hz)
+        
+    @property
+    def trainRate(self) -> pq.Quantity:
+        """Alias to pulseFrequency"""
+        return self.pulseFrequency
         
     @property
     def pulseWidth(self):
@@ -2040,7 +2054,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         """
         
-        return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
+        return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([self.getUsedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
+        # return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([self.getUsedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
     def getClampMode(self, 
                      adc:typing.Union[int, str, ABFInputConfiguration] = 0,
@@ -2665,7 +2680,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
     
     def getUsedDigitalChannels(self, sweep:int = 0,
                                epoch:typing.Optional[typing.Union[ABFEpoch, int, str]] = None,
-                               letters:bool=False) -> tuple[int]:
+                               letters:bool=False,
+                               alternate:typing.Optional[bool]=None,
+                               trains:typing.Optional[bool]=None,
+                               ) -> tuple[int]:
         """Reports DIG chanel usage in a specified sweep
     
         Parameters:
@@ -2682,7 +2700,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
         letters:bool, default is False. Used when `epoch` parameter is None.
                 When True, the epochs are reported by their letter; otherwise, 
                 they are reported by their number in the epochs table.
+        
+        alternate: bool. Optional, default is None.
+            When None, report digital channels used in either "main" or "alternate"
+            pattern.
+        
+            When True, report only digital channels used in the "alternate" pattern.
+            When False, report only digital channels used in the "main" pattern.
             
+        trains:bool. Optional, default is None.
+            When None, reports the used digital channels regardless configured 
+            to emit either a step (a.k.a single pulse) or a train (pulse train)
+        
+            When True, report only digital channels emitting a pulse train.
+            When False, report only digital channels emitting a step (single pulse)
+        
        
         Returns:
         --------
@@ -2706,18 +2738,29 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
         
+        if isinstance(trains, bool):
+            comparator = lambda x: x == "*" if trains else 1
+        else:
+            comparator = lambda x: x != 0
+        
         if epoch is None:
             ret = dict()
             for e in self.digitalPatterns:
-                pattern = self.getDigitalPattern(sweep, e)
+                pattern = self.getDigitalPattern(sweep, e, alternate=alternate) # uses natural=True and separateBanks = False
                 key = getEpochLetter(e) if letters else e
-                ret[key] = tuple(k for k in range(len(pattern)) if pattern[k] != 0)
+                if isinstance(alternate, str) and alternate=="all":
+                    ret[key] = ABFDigitalPattern(*tuple(map(lambda x: tuple(k for k in range(len(x)) if comparator(x[k])), pattern)))
+                else:
+                    ret[key] = tuple(k for k in range(len(pattern)) if comparator(pattern[k]))
             
             return ret
         
-        pattern = self.getDigitalPattern(sweep, epoch)
+        pattern = self.getDigitalPattern(sweep, epoch, alternate=alternate) # uses natural=True and separateBanks = False
         
-        return tuple(k for k in range(len(pattern)) if pattern[k] != 0)
+        if isinstance(alternate, str) and alternate=="all":
+            return ABFDigitalPattern(*tuple(map(lambda x: tuple(k for k in range(len(x)) if comparator(x[k])), pattern)))
+            
+        return tuple(k for k in range(len(pattern)) if comparator(pattern[k]))
     
     @property
     def epochsWithDigitalOutput(self) -> tuple:
@@ -2759,7 +2802,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getDigitalPattern(self, sweep:int = 0, 
                           epoch:typing.Optional[typing.Union[ABFEpoch, int, str]] = None,
                           natural:bool=True, separateBanks:bool=False,
-                          letters:bool=False) -> tuple:
+                          letters:bool=False,
+                          alternate:typing.Optional[typing.Union[bool, str]]=None) -> tuple:
         """
         Digital pattern that WOULD be output by an epoch during a given sweep.
         
@@ -2794,6 +2838,34 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 When True, the epochs are reported by their letter; otherwise, 
                 they are reported by their number in the epochs table.
             
+        alternate: bool or str. Optional, default is None.
+            When None, report either the "main" or "alternate" pattern, depending
+            on which of these would be emitted during the specified sweep.
+        
+            When True, report only the "alternate" pattern.
+            When False, report only the "main" pattern.
+        
+            When a str, the only acceptable value is "all" (case-insensitive), to
+            returns both the "main" and "alternate" patterns wrapped in a 
+            ABFDigitalPattern object (a named tuple with two fields: "main" and "alternate")
+            as follows:
+        
+        
+            separateBanks:
+            True            ⇒ the "main" and "alternate" fields of the 
+                            ABFDigitalPattern are each a pair of 4-tuples
+        
+            False           ⇒ the "main" and "alternate" fields of the 
+                            ABFDigitalPattern are each a tuple of all digital
+                            channels in the pattern (8, in Clampex 11.+)
+        
+            
+            
+        NOTE: Passing:
+        `natural=False, separateBanks=False, alternate = "all", trains=None` 
+        is the same as querying the mapping of the digital patterns directly:
+        
+         `self.digitalPatterns[epoch.number]`
         
         Returns:
         --------
@@ -2834,8 +2906,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             for e in self.digitalPatterns:
                 key = getEpochLetter(e) if letters else e
                 ret[key] = self.getDigitalPattern(sweep, e, natural-natural,
-                                                separateBanks = separateBanks)
-                
+                                                separateBanks = separateBanks,
+                                                trains=trains, alternate=alternate)
             return ret
         
         elif isinstance(epoch, str):
@@ -2847,22 +2919,49 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             raise TypeError("Expecting an ABFEpoch, int or str; got ")
         
-        isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
-        
-        src = "alternate" if isAlternateDigital else "main"
+        if alternate is None:
+            isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+            src = "alternate" if isAlternateDigital else "main"
+            
+        elif isinstance(alternate, bool):
+            src = "alternate" if alternate else "main"
+            
+        elif isinstance(alternate, str):
+            if alternate.lower() != "all":
+                raise ValueError(f"Invalid value for the 'alternate' parameter ({alternate})")
+            src = "all"
         
         if epochNum in self.digitalPatterns:
             if natural:
-                ret = tuple(map(lambda x: tuple(reversed(x)), getattr(self.digitalPatterns[epochNum], src)))
+                if src == "all":
+                    # just reverse the bank tuples, but keep their order intact:
+                    ret = ABFDigitalPattern(*tuple(map(lambda x: tuple(map(lambda x_: tuple(reversed(x_)), x)), self.digitalPatterns[epochNum])))
+                else:
+                    # get the relevant bank tuples for "main" of "alternate", reversed
+                    ret = tuple(map(lambda x: tuple(reversed(x)), getattr(self.digitalPatterns[epochNum], src)))
             else:
-                ret = getattr(self.digitalPatterns[epochNum],src)
+                if src == "all":
+                    # just get it as it is
+                    ret = self.digitalPatterns[epochNum]
+                else:
+                    # get the relevant bank tuples for "main" of "alternate"
+                    ret = getattr(self.digitalPatterns[epochNum],src)
                 
             if separateBanks:
                 return ret
+            
+            if src == "all":
+                return ABFDigitalPattern(*tuple(map(lambda x: tuple(itertools.chain.from_iterable(x)), ret)))
+            
             return tuple(itertools.chain.from_iterable(ret))
+        
         else:
-            if separate:
-                return (0,) * self.nDIGChannels//2, (0,) * self.nDIGChannels//2
+            if separateBanks:
+                if src == "all":
+                    pattern = ((((0,) * (self.nDIGChannels//2), ) * 2, ) * 2)
+                    return ABFDigitalPattern(*pattern)
+                
+                return (0,) * (self.nDIGChannels//2), (0,) * (self.nDIGChannels//2)
             
             return (0,) * self.nDIGChannels
         
@@ -3045,7 +3144,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                            separateWaves:bool=True) -> neo.AnalogSignal:
         """TTL weaveforms for the given sweep.
-        See NOTE in the dicstrong for self.getEpochsTable(…)"""
+        See NOTE in the docstring for self.getEpochsTable(…)"""
         dac, _ = self._check_DAC_Epoch_(dac, None)
         
         # a tuple of ABFEpoch numbers where digital outputs are defined:
@@ -3250,12 +3349,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
         actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
         pulsePeriod = self.getEpochPulsePeriod(dac, epoch, True)
-        # pulsePeriod = self.getEpochPulsePeriodSamples(epoch)
         pulseSamples = self.getEpochPulseWidth(dac, epoch, True)
-        # pulseSamples = self.getEpochPulseWidthSamples(epoch)
         pulseCount = self.getEpochPulseCount(dac, epoch, sweep)
 
-        usedDigs = epoch.digitalOutputChannels
+        # usedDigs = epoch.digitalOutputChannels
+        self.getUsedDigitalOutputChannels
+        usedDigs = self.getUsedDigitalChannels(sweep, epoch)
         
         if len(usedDigs) == 0:
             scipywarn(f"The epoch {epoch.number} ({epoch.letter}) of DAC {dac.physicalIndex} ({dac.name}) does NOT emit digital outputs")
@@ -6161,7 +6260,7 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
         digitalPatternAlternate = tuple(digitalPatternAlternate)
                     
         # epochsDigitalPattern[epochNumber] = {"main": digitalPatternMain, "alternate": digitalPatternAlternate}
-        epochsDigitalPattern[epochNumber] = DigitalPattern(digitalPatternMain, digitalPatternAlternate)
+        epochsDigitalPattern[epochNumber] = ABFDigitalPattern(digitalPatternMain, digitalPatternAlternate)
                 
     return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
 
@@ -6268,7 +6367,7 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
             digitalPatternAlternate = tuple(digitalPatternAlternate)
             
             # epochsDigitalPattern[epochNumber] = {"main": digitalPatternMain, "alternate": alternateDigitalPattern}
-            epochsDigitalPattern[epochNumber] = DigitalPattern(digitalPatternMain, digitalPatternAlternate)
+            epochsDigitalPattern[epochNumber] = ABFDigitalPattern(digitalPatternMain, digitalPatternAlternate)
                     
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
                     
