@@ -2144,7 +2144,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         the pathways are stimulated, in each sweep.
         
         For each sweep in the protocol, returns a tuple with the indices of the 
-        pathways that have been stimulated (in the `pathways` sequence), ordered
+        pathways that have been stimulated (in the 'pathways' sequence), ordered
         by the temporal order of the stimulation in each sweep.
         
         This works on ABFEpoch epochs, defined in the specified DAC, that emit 
@@ -2159,7 +2159,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         dac: a DAC channel configuration of this protocol, an int (physical index)
             or str (name of the DAC channel), or None (default)
         
-            When None, `dac` is the active DAC channel of the protocol.
+            When None, 'dac' is the active DAC channel of the protocol.
         
             WARNING: When a protocol uses alternative digital outputs, this DAC 
             should be the "active" DAC of the protocol; for generality, we allow
@@ -2192,18 +2192,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Returns:
         -------
         A tuple of 2-tuples, eacb containing:
-            sweep index, tuple of indexes in the `pathways` sequence (when the 
+            sweep index, tuple of indexes in the 'pathways' sequence (when the 
                 'indices' parameter is True), or tuple of pathways (when 'indices'
                 is False) that have been stimulated in that sweep.
         
-        NOTE: Depending on the value of the `byFirstStimulus` parameter (see above)
+        NOTE: Depending on the value of the 'byFirstStimulus' parameter (see above)
             the tuple of pathway indexes contains:
         
-            • `byFirstStimulus` True: the stimulated pathway indexes in the order
+            • 'byFirstStimulus' True: the stimulated pathway indexes in the order
                 of the occurrence of their FIRST stimulation in the given sweep
                 — this is the default;
         
-            • `byFirstStimulus` False: the indexes of the stimulated pathways in 
+            • 'byFirstStimulus' False: the indexes of the stimulated pathways in 
                 the order they occur accross all epochs that trigger their stimulation,
                 in the given sweep.
         
@@ -2225,14 +2225,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 path 0 (DIG 0)  __________________
                 path 1 (DIG 1)  ______|_|_________
         
-            `byFirstStimulus`:          the function returns:
+            'byFirstStimulus':          the function returns:
         -------------------------------------------------------------------
             True                        ((0, (0,)), (1, (1,)))
             False                       ((0, (0,)), (1, (1,)))
         
             NOTE: In this example there is one epoch triggering a pathway in 
                 all sweeps, but the epochs uses a TTL train instead of a pulse;
-                the value of `byFirstStimulus` is irrelevant;
+                the value of 'byFirstStimulus' is irrelevant;
                 each epoch appear to be triggered once, but in reality it is 
                 stimulated twice per epoch (via a TTL train)
         
@@ -2256,13 +2256,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 path 0 (DIG 0)  ________|_________
                 path 1 (DIG 1)  ______|___________
         
-            `byFirstStimulus`:          the function returns:
+            'byFirstStimulus':          the function returns:
         -------------------------------------------------------------------
             True                        ((0, (0, 1)), (1, (1, 0)))
             False                       ((0, (0, 1)), (1, (1, 0)))
         
             NOTE: In this example there is one epoch triggering each pathway in 
-                all sweeps, therefore the value of `byFirstStimulus` is irrelevant.
+                all sweeps, therefore the value of 'byFirstStimulus' is irrelevant.
         
         Example 3 (contrived): the same source as in Example 1, but the protocol 
             stimulates the pathways according to the following scheme:
@@ -2277,18 +2277,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 path 0 (DIG 0)  ________|_|_______
                 path 1 (DIG 1)  ______|___________
         
-            `byFirstStimulus`:          the function returns:
+            'byFirstStimulus':          the function returns:
         -------------------------------------------------------------------
             True                        ((0, (0, 1)), (1, (1, 0)))
             False                       ((0, (0, 1, 1, 0)), (1, (1, 0, 0)))
 
-            I.e., when `byFirstStimulus` is True the pathway stimulations are
+            I.e., when 'byFirstStimulus' is True the pathway stimulations are
             returned in the order of their first stimulation (in sweep 0,
             pathway 0 is the first pathway that is being stimulated, whereas in 
             sweep 1 it is the second pathway — pathway 1 — that is stimulated,
             even if both pathways are also stimulated several times later).
         
-            When `byFirstStimulus` is False, the function returns the full 
+            When 'byFirstStimulus' is False, the function returns the full 
             stimulation sequence of the pathways in the sweep.
         
         Example 4: Same recording source as above, but the protocol defines a single
@@ -2308,13 +2308,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
             assert dac.protocol == self, "The specified DAC channel configuration does not belong to this protocol"
             
         else:
-            raise TypeError(f"`dac` expected an ABFOutputConfiguration, and int, or a string (name); instad, ot {type(dac).__name__} ")
+            raise TypeError(f"'dac' expected an ABFOutputConfiguration, and int, or a string (name); instad, ot {type(dac).__name__} ")
             
         if len(pathways) == 0:
-            raise ValueError("`pathways` is an empty sequence")
+            raise ValueError("'pathways' is an empty sequence")
         
         if not all(isinstance(v, self.SynapticPathway) for v in pathways):
-            raise TypeError("`pathways` expected to be a sequence of ephys.SynapticPathway objects")
+            raise TypeError("'pathways' expected to be a sequence of ephys.SynapticPathway objects")
         
         pathways = utilities.unique(pathways, idcheck=False)
         # pathways = utilities.unique([p for p in pathways if p.stimulus.dig])
@@ -2384,7 +2384,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             When an int, it represents the index (physical or logical) of the ADC.
             When a str, it represents the name of the ADC.
         
-        physical: bool; flag to indicate if `adcChannel`, when an int, represents
+        physical: bool; flag to indicate if 'adcChannel', when an int, represents
             the physical channel index.
             
             Default is True.
@@ -2443,7 +2443,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             When an int, it represents the index (physical or logical) of the DAC.
             When a str, it represents the name of the DAC.
         
-        physical: bool; flag to indicate if `dacChannel`, when an int, represents
+        physical: bool; flag to indicate if 'dacChannel', when an int, represents
             the physical channel index.
             
             Default is True.
@@ -2511,8 +2511,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def getDigitalLogicLevels(self, digChannel:int = 0, 
                               trains:typing.Optional[bool]=None) -> typing.Tuple[pq.Quantity]:
         """Returns:
-        (digOFF, digON) when `trains` is False, or
-        (trainOFF, trainON) when `trains` is True, or
+        (digOFF, digON) when 'trains' is False, or
+        (trainOFF, trainON) when 'trains' is True, or
         (digOFF, digON, trainOFF, trainON) in any other case
     
         See also:
@@ -2725,7 +2725,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 Optional, default is None, in which case returns the digital 
                 patterns for all epochs, during the specified sweep.
         
-        letters:bool, default is False. Used when `epoch` parameter is None.
+        letters:bool, default is False. Used when 'epoch' parameter is None.
                 When True, the epochs are reported by their letter; otherwise, 
                 they are reported by their number in the epochs table.
         
@@ -2747,11 +2747,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Returns:
         --------
         
-        When `epoch` is specified and not None return a tuple (posssibly empty)
+        When 'epoch' is specified and not None return a tuple (posssibly empty)
         with the indexes of the DIG channels emitting signals during the specified
         sweep, in that epoch.
         
-        When `epoch` is None, returns a mapping:
+        When 'epoch' is None, returns a mapping:
         
         letters:            returned mapping:
         ------------------------------------------------------------------------
@@ -2811,12 +2811,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
         -----------
         epoch: ABFEpoch, str (epoch letter(s)) or int (epoch number)
         
-        CAUTION: is `epoch` is an ABFEpoch, all of its parameters will be compared
+        CAUTION: is 'epoch' is an ABFEpoch, all of its parameters will be compared
         to those of the epochs in every DAC. This may not be always useful. 
         
         If the intention is only to obtain the DAC indexes where an epoch with a 
         given number or letter(s) is defined, then pass that number or letter(s)
-        as `epoch` parameter.
+        as 'epoch' parameter.
         
         """
         if isinstance(epoch, ABFEpoch):
@@ -2907,7 +2907,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 each bank of 4 DIG channels;
                 default is False;
         
-        letters:bool, default is False. Used when `epoch` parameter is None.
+        letters:bool, default is False. Used when 'epoch' parameter is None.
                 When True, the epochs are reported by their letter; otherwise, 
                 they are reported by their number in the epochs table.
             
@@ -2942,7 +2942,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Returns:
         --------
         
-        When `epoch` is specified and not None, returns a tuple with the digital
+        When 'epoch' is specified and not None, returns a tuple with the digital
         but pattern as in the table below:
         
         separateBanks       natural         returns
@@ -2961,7 +2961,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         True                True            An 8-tuple[int] corresponding to the 
                                             DIG channels in the order 0 ⋯ 7
             
-        When `epoch` is None, returns a mapping:
+        When 'epoch' is None, returns a mapping:
         
         letters:            returned mapping:
         ------------------------------------------------------------------------
@@ -3065,7 +3065,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         even-indexed sweeps (0, 2, 4, …) whereas the "alternate" DIG patterns are
         emitted on oddindexed sweeps (1, 3, 5, …).
      
-        These patterns are independent of the DAC channel specified in the `dac`
+        These patterns are independent of the DAC channel specified in the 'dac'
         parameter. However, the realization of the TTL signals emitted by these
         patterns does depend on the ABFEpoch parameters first & delta durations,
         and pulse width & frequency, which are specific to the DAC where the epoch 
@@ -3176,6 +3176,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
             else:
                 myDac = dac
                 myEpoch = epoch
+            # myDac = dac
+            # myEpoch = epoch
+            
+            print(f"{self.__class__.__name__}.getEpochTable: active DAC is {self.activeDACChannel}; myDac is {myDac.physicalIndex}")
                 
             if includeDigitalPattern:
                 epValues = [myEpoch.typeName, myEpoch.firstLevel, 
@@ -3349,12 +3353,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
         sweep: the index of the ABF sweep (digital outputs may be specific to the 
                 sweep index, when alternate digital patterns are enabled in the 
                 ABF protocol)
-        
                 Default is 0 (first sweep)
         
-        digChannel:default is None, meaning that the function returns a waveform
-            for each digital output channel that is active during this epoch
-            (and during the specified sweep)
+        digChannel:int, Sequence[int] default is None, 
+            When None, the function returns a waveform for each digital output 
+            channel that is active during this epoch (and during the specified 
+            sweep). The waveforms may be returned as individual waveforms or as 
+            column vectors of a 2D Quantity array — see 'separateWaves' parameter, 
+            below.
         
         lastLevelOnly: default is False; when True, just generate a constant wave
             with the value of the last digital logic level; that is, OFF for digital 
@@ -3366,6 +3372,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             and self.getDigitalTrainLogicLevels
         
         separateWaves: default is False. 
+            This parameter is ignored when a single DIG channel is queried.
             When False, and more than one digChannel is queried, the function 
             returns a Quantity array with one channel-specific waveform per
             column.
@@ -3388,20 +3395,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
         waves: list of Python quantities (Quantity arrays) whith the digital waveforms
         for each specified DIG channel are returned.
         
-            The `waves` list contains:
-            • when `digChannel` parameter is an int: a single 1D Quantity array
+            The 'waves' list contains:
+            • when 'digChannel' parameter is an int: a single 1D Quantity array
         
-            • when `digChannel` is a sequence of int or None (implying ALL channels):
-                ∘ when `separateWaves` is True (the default): as many 1D Quantity 
-                        arrays as DIG channel indexes specified in `digChannel`
+            • when 'digChannel' is a sequence of int or None (implying ALL channels):
+                ∘ when 'separateWaves' is True (the default): as many 1D Quantity 
+                        arrays as DIG channel indexes specified in 'digChannel'
         
-                ∘ when `seprateWaves` is False : a single 2D Quantity array with 
+                ∘ when 'separateWaves' is False : a single 2D Quantity array with 
                     shape (N,M) where:
                     □ N is the number of samples recorded by the epoch
-                    □ M is the number of DIG channels specified in `digChannel`
+                    □ M is the number of DIG channels specified in 'digChannel'
         
             The list is EMPTY when not all DIG channel indexes specified
-                    in the `digChannel` parameter are used by the epoch.
+                    in the 'digChannel' parameter are used by the epoch.
         
         digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values
             of the logical levels for digital pulse and digital train.
@@ -3539,14 +3546,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         """
         if not isinstance(digChannel, int):
-            raise TypeError(f"`digChannel` expected an int; instead got {type(digChannel).__name__} ")
+            raise TypeError(f"'digChannel' expected an int; instead got {type(digChannel).__name__} ")
         if digChannel < 0 or digChannel >= self.nDIGChannels:
-            raise ValueError(f"Invalid `digChannel` ({digChannel}); expecting a value in {range(self.nDIGChannels)}")
+            raise ValueError(f"Invalid 'digChannel' ({digChannel}); expecting a value in {range(self.nDIGChannels)}")
         
         if isinstance(dac, (int, str)):
             dac = self.getDAC(dac, physical=physical)
         elif not isinstance(dac, ABFOutputConfiguration):
-            raise TypeError(f"`dac` expected an ABFOutputConfiguration, a str (DAC name) or int (DAC index); instead, got {type(dac).__name__}")
+            raise TypeError(f"'dac' expected an ABFOutputConfiguration, a str (DAC name) or int (DAC index); instead, got {type(dac).__name__}")
         
         return tuple(filter(lambda x: len(x[1]), ((k, dac.getEpochsForDigitalChannel(digChannel, k, indexes = epochIndexes, train=train)) for k in range(self.nSweeps))))
         
@@ -5200,7 +5207,7 @@ class ABFOutputConfiguration:
 #     
 #         Returns:
 #         --------
-#         A list of epochs (or their indexes in the epochs table if `indexes` is True)
+#         A list of epochs (or their indexes in the epochs table if 'indexes' is True)
 #         where digChannel is set (i.e., non-zero).
 #     
 #         The list may be empty is none of the epochs define a digital pattern for 
@@ -5252,7 +5259,7 @@ class ABFOutputConfiguration:
 #                             digPattern = list(reversed(epoch.getDigitalPattern(isAlternateDigital)[1]))
 #                             digChannel -= 4
 #                         else:
-#                             raise ValueError(f"Expecting a digital channel index (`digChannel`) in the interval [0 ⋯ 8); instead, got {digChannel}")
+#                             raise ValueError(f"Expecting a digital channel index ('digChannel') in the interval [0 ⋯ 8); instead, got {digChannel}")
 #             else:
 #                 if self.digitalOutputEnabled:
 #                     if digChannel in range(4):
@@ -5261,7 +5268,7 @@ class ABFOutputConfiguration:
 #                         digPattern = list(reversed(epoch.getDigitalPattern()[1]))
 #                         digChannel -= 4
 #                     else:
-#                         raise ValueError(f"Expecting a digital channel index (`digChannel`) in the interval [0 ⋯ 8); instead, got {digChannel}")
+#                         raise ValueError(f"Expecting a digital channel index ('digChannel') in the interval [0 ⋯ 8); instead, got {digChannel}")
 #                     
 #             if digChannel < len(digPattern) and (digPattern[digChannel] != 0 if train is None else digPattern[digChannel] == '*' if train is True else digPattern[digChannel] == 1):
 #                 if indexes:
@@ -5551,9 +5558,9 @@ class ABFOutputConfiguration:
     #     and stays the same throughout the lifetime of the object"""
     #     return self.protocol.nDigitalOutputs
     
-    def getDigitalOutputs(self, alternate:typing.Optional[bool]=None,
-                       trains:typing.Optional[bool]=None) -> set:
-        return set(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate, trains) for e in self.epochs]))
+    # def getDigitalOutputs(self, alternate:typing.Optional[bool]=None,
+    #                    trains:typing.Optional[bool]=None) -> set:
+    #     return set(itertools.chain.from_iterable([e.getUsedDigitalOutputChannels(alternate, trains) for e in self.epochs]))
         
         # return self._digitalOutputs_
     
@@ -5591,7 +5598,7 @@ class ABFOutputConfiguration:
     def getCommandWaveform(self, sweep:int=0) -> neo.AnalogSignal: 
         """Generates an AnalogSignal representation of the command waveform.
         
-        CAUTION: The `sweep` parameter is only used to get the epoch parameter 
+        CAUTION: The 'sweep' parameter is only used to get the epoch parameter 
         values where these values vary from one sweep to another ("Delta level" 
         and "Delta duration"), and not to establish if the DAC would emit a 
         waveform for that particular sweep or not. 
@@ -5689,115 +5696,115 @@ class ABFOutputConfiguration:
                 
         return waveform
     
-    def getDigitalWaveform(self, sweep:int=0, 
-                           digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                           separateWaves:bool=True) -> neo.AnalogSignal:
-        """Realizes the digital output waveform (pulses, trains) emitted when
-        this DAC channel is active.
-        
-        """
-        # NOTE: 2023-09-20 22:22:41
-        # the digital output is ALWAYS in V
-        # "high logic" means 5V on a background of 0 V
-        # "low logic" means 0V on a background of 5V
-        
-        usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in self.epochs]))
-        
-        if isinstance(digChannel, int):
-            if digChannel not in usedDigs:
-                raise ValueError(f"Invalid DIG channel index {digChannel}")
-            
-            digChannel = (digChannel,)
-            
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            if all(v not in usedDigs for v in digChannel):
-                raise ValueError(f"Invalid DIG channel indexes {digChannel}")
-            
-            digChannel = tuple(sorted(set(digChannel)))
-            
-        elif digChannel is None:
-            digChannel = tuple(sorted(set(usedDigs)))
-            
-        else:
-            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
-            
-        if separateWaves:
-            waveforms = [neo.AnalogSignal(np.full((self.sweepSampleCount, 1), 
-                                                np.nan),
-                                        units = pq.V, t_start = 0*pq.s,
-                                        sampling_rate = self.samplingRate,
-                                        name = f"DIG {chnl} DAC {self.physicalIndex} ({self.name})") for chnl in digChannel]
-        else:
-            waveforms = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
-                                                np.nan),
-                                        units = pq.V, t_start = 0*pq.s,
-                                        sampling_rate = self.samplingRate,
-                                        name = f"DIG Output DAC {self.physicalIndex} ({self.name})")
-            
-        t0 = t1 = self.holdingTime.rescale(pq.s)
-        
-        offLevel = None
-        
-        if separateWaves:
-            lastEpochNdx = [0] * len(digChannel)
-            lastLevel = [None] * len(digChannel)
-        else:
-            lastEpochNdx = 0
-            lastLevel = None 
-        
-        for epoch in self.epochs:
-            actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
-            t1 = t0 + actualDuration
-            tt = np.array([t0,t1])*pq.s
-            
-            eWaves = self.getEpochDigitalWaveform(epoch, sweep, digChannel,
-                                             separateWaves=separateWaves,
-                                             returnLevels=True)
-            
-            t0 = t1
-            
-            if eWaves is None:
-                continue
-            
-            epochWaves, epoch_digOFF, epoch_digON, epoch_trainOFF, epoch_trainON = eWaves
-            offLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
-            
-            if lastLevel is None:
-                lastLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
-                
-            if separateWaves:
-                for k in range(len(epochWaves)):
-                    ndx = waveforms[k].time_index(tt)
-                    lastEpochNdx[k] = ndx[1]
-                    lastLevel[k] = epochWaves[k][-1]
-                    waveforms[k][ndx[0]:ndx[1], :] = epochWaves[k]
-                    
-            else:
-                ndx = waveforms.time_index(tt)
-                lastEpochNdx = ndx[1]
-                lastLevel = epochWaves[0][-1,:]
-                waveforms[ndx[0]:ndx[1], :] = epochWaves[0]
-                
-        if self.protocol.digitalUseLastEpochHolding:
-            if separateWaves:
-                for k in range(len(waveforms)):
-                    waveforms[k][lastEpochNdx[k]:, :] = lastLevel[k]
-            else:
-                 waveforms[lastEpochNdx:, :] = lastLevel
-        else:
-            if separateWaves:
-                for k in range(len(waveforms)):
-                    waveforms[k][lastEpochNdx[k]:, :] = offLevel
-            else:
-                waveforms[lastEpochNdx:, :] = offLevel
-                
-        if separateWaves:
-            for k in range(len(waveforms)):
-                waveforms[k][np.isnan(waveforms[k])] = offLevel
-        else:
-            waveforms[np.isnan(waveforms)] = offLevel
-            
-        return waveforms
+#     def getDigitalWaveform(self, sweep:int=0, 
+#                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+#                            separateWaves:bool=True) -> neo.AnalogSignal:
+#         """Realizes the digital output waveform (pulses, trains) emitted when
+#         this DAC channel is active.
+#         
+#         """
+#         # NOTE: 2023-09-20 22:22:41
+#         # the digital output is ALWAYS in V
+#         # "high logic" means 5V on a background of 0 V
+#         # "low logic" means 0V on a background of 5V
+#         
+#         usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in self.epochs]))
+#         
+#         if isinstance(digChannel, int):
+#             if digChannel not in usedDigs:
+#                 raise ValueError(f"Invalid DIG channel index {digChannel}")
+#             
+#             digChannel = (digChannel,)
+#             
+#         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+#             if all(v not in usedDigs for v in digChannel):
+#                 raise ValueError(f"Invalid DIG channel indexes {digChannel}")
+#             
+#             digChannel = tuple(sorted(set(digChannel)))
+#             
+#         elif digChannel is None:
+#             digChannel = tuple(sorted(set(usedDigs)))
+#             
+#         else:
+#             raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
+#             
+#         if separateWaves:
+#             waveforms = [neo.AnalogSignal(np.full((self.sweepSampleCount, 1), 
+#                                                 np.nan),
+#                                         units = pq.V, t_start = 0*pq.s,
+#                                         sampling_rate = self.samplingRate,
+#                                         name = f"DIG {chnl} DAC {self.physicalIndex} ({self.name})") for chnl in digChannel]
+#         else:
+#             waveforms = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
+#                                                 np.nan),
+#                                         units = pq.V, t_start = 0*pq.s,
+#                                         sampling_rate = self.samplingRate,
+#                                         name = f"DIG Output DAC {self.physicalIndex} ({self.name})")
+#             
+#         t0 = t1 = self.holdingTime.rescale(pq.s)
+#         
+#         offLevel = None
+#         
+#         if separateWaves:
+#             lastEpochNdx = [0] * len(digChannel)
+#             lastLevel = [None] * len(digChannel)
+#         else:
+#             lastEpochNdx = 0
+#             lastLevel = None 
+#         
+#         for epoch in self.epochs:
+#             actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
+#             t1 = t0 + actualDuration
+#             tt = np.array([t0,t1])*pq.s
+#             
+#             eWaves = self.getEpochDigitalWaveform(epoch, sweep, digChannel,
+#                                              separateWaves=separateWaves,
+#                                              returnLevels=True)
+#             
+#             t0 = t1
+#             
+#             if eWaves is None:
+#                 continue
+#             
+#             epochWaves, epoch_digOFF, epoch_digON, epoch_trainOFF, epoch_trainON = eWaves
+#             offLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
+#             
+#             if lastLevel is None:
+#                 lastLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
+#                 
+#             if separateWaves:
+#                 for k in range(len(epochWaves)):
+#                     ndx = waveforms[k].time_index(tt)
+#                     lastEpochNdx[k] = ndx[1]
+#                     lastLevel[k] = epochWaves[k][-1]
+#                     waveforms[k][ndx[0]:ndx[1], :] = epochWaves[k]
+#                     
+#             else:
+#                 ndx = waveforms.time_index(tt)
+#                 lastEpochNdx = ndx[1]
+#                 lastLevel = epochWaves[0][-1,:]
+#                 waveforms[ndx[0]:ndx[1], :] = epochWaves[0]
+#                 
+#         if self.protocol.digitalUseLastEpochHolding:
+#             if separateWaves:
+#                 for k in range(len(waveforms)):
+#                     waveforms[k][lastEpochNdx[k]:, :] = lastLevel[k]
+#             else:
+#                  waveforms[lastEpochNdx:, :] = lastLevel
+#         else:
+#             if separateWaves:
+#                 for k in range(len(waveforms)):
+#                     waveforms[k][lastEpochNdx[k]:, :] = offLevel
+#             else:
+#                 waveforms[lastEpochNdx:, :] = offLevel
+#                 
+#         if separateWaves:
+#             for k in range(len(waveforms)):
+#                 waveforms[k][np.isnan(waveforms[k])] = offLevel
+#         else:
+#             waveforms[np.isnan(waveforms)] = offLevel
+#             
+#         return waveforms
     
     def getEpochEmulatesTTL(dac, epoch, /, sweep:int=0) -> bool:
         """True when epoch type is ABFEpochType.Pulse and meets the conditions below:
@@ -6371,7 +6378,7 @@ def _(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None) -> pd.
                               epoch.durationDelta/x.sampleRateHz * 1000 * pq.ms, # delta duration (time units)
                               epoch.getDigitalPattern()[:4], # first 4 digital channels
                               epoch.getDigitalPattern()[4:], # last 4 digital channels
-                              epoch.pulsePeriod,        # train period (samples`)
+                              epoch.pulsePeriod,        # train period (samples')
                               epoch.pulseWidth,         # pulse width (samples)
                               epoch.pulsePeriod/x.sampleRateHz * 1000 * pq.ms, # train period (time units)
                               epoch.pulseWidth/x.sampleRateHz * 1000 * pq.ms], # pulse width (time units)
