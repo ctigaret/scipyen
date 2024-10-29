@@ -3316,29 +3316,59 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # "active DAC"). This DAC is unique (i.e. only one DAC can have Digital 
         # Outputs enabled).
         #
+        # In the explanation below, 
+        #   • the "main" digital bit pattern is the one defined in the "active" 
+        #       DAC — the DAC channel where Digital Outputs are enabled — and is 
+        #       NORMALLY emitted on even sweeps (0, 2, 4, …)
+        #   • the "alternate" digital bit pattern is the one defined on an additional
+        #       DAC — and is NORMALLY emitted on odd sweeps (1, 3, 5, …)
+        #
         # When alternateDigitalOutputsEnabled is True:
         # • When Digital Outputs are enabled on a higher DAC (i.e., the active
         #   DAC index > 1):
         #
-        #   ∘ When neither DAC0, DAC1 define a DIG pattern-containing epoch, NO
+        #   ∘ If no other DAC defines a DIG pattern-containing epoch, NO
         #       waveform is emitted at all
         #
-        #   ∘ When only one of DAC0/DAC1 has DIG pattern-containing epoch, a 
+        #   ∘ If only one of DAC0/DAC1 has DIG pattern-containing epoch, a 
+        #       digital waveform is generates on only ONE of the sweeps, with NO
+        #       alternative :
         #
-        # DAC w/:   waveform    with bit pattern    and timings     no DIG waveform     
-        # DIG       on sweep    from DAC:           from DAC:       waveform on
-        # epoch                                                     sweep index:
-        # ----------------------------------------------------------------------
-        # DAC0      even        DAC0                DAC0            odd
-        #           (0,2,4,…)                                       (1,3,5,…)
+        # active    DAC w/:   waveform    with bit pattern      and timings     no DIG waveform  
+        # DAC:      DIG       emitted     (incl. DIG channel)   from DAC:       waveform emitted
+        # (e.g.)    epoch     on sweep:   from DAC:                             on sweep:
+        # --------------------------------------------------------------------------------------
+        # DAC4      DAC0      even        DAC0                  DAC0            odd
+        # "main"    "alt"     (0,2,4,…)                         (1,3,5,…)
+        #                                                                       (old "alt" is muted)
         #
-        # DAC1      odd         DAC1                DAC1            even
-        #           (1,3,5,…)                                       (0,2,4,…)
+        # DAC0      DAC4      even        DAC0                  activeDAC       odd
+        # "main"    "alt"                 "main" used                           ("alt" is muted)
+        #                                  
+        # => DAC0 takes precedence over activeDAC for emitting pattern on 0ᵗʰ sweep (0,2,4,…)
+        #   while 1ˢᵗ sweep is muted
+        # --------------------------------------------------------------------------------------
+        # DAC4      DAC1      odd         DAC1                  activeDAC(!)    even
+        # "main"    "alt"     (1,3,5,…)                         (0,2,4,…)
+        #                                                                       ("main" is muted)
+        #
+        # DAC1      DAC4      odd         DAC1                  DAC1                even
+        # --------------------------------------------------------------------------------------
+        #
+        #   ∘ when both DAC0 and DAC1 emit DIGs (in addition to DAC4):
+        # DAC4      DAC0      even        DAC0=DAC1             DAC0
+        #           DAC1      odd         DAC0=DAC1             DAC0
         # ----------------------------------------------------------------------
-        # When both DAC0 and DAC1 emit DIGs and DIG outputs enabled on higher DAC => waveforms on both sweeps, but:
-        # sweep index:  use bit pattern     use timing      "main" or "alternate"
-        #               from DAC:           from DAC:
+        # DAC0      DAC1      even        DAC0                  DAC0
+        #           DACX      odd         DAC1                  DAC1
+        #
+        # DAC1      DAC0      even        DAC0                  DAC0
+        #           DACX      odd         DAC1                  DAC1
+        #
+        # => all DACs > 1 are ignored !
         # ----------------------------------------------------------------------
+        # 
+        #
         
         dac, _= self._check_DAC_Epoch_(dac, None)
         
