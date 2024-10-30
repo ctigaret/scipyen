@@ -3256,63 +3256,64 @@ class ABFProtocol(ElectrophysiologyProtocol):
         ----------
         sweep: int, the 0-based index of the sweep. Optional, default is the 
             activeDACChannel of the protocol.
-        dac: the DAC channel where the Epochs table is queried
-        includeDigitalPattern:bool. Optional, default is True
+        
+        dac: the DAC channel (or DAC channel name, or DAC channel physical index)
+            for which the Epochs table is queried. Optional, default is None.
+        
+            When 'dac' is None, the method returns the Epochs table reflecting 
+            the epoch parameters that would be output during the specified sweep.
+        
+            In any other case, the method returns the Epochs table AS DEFINED in
+            the protocol editor dialog "Waveform" tab for the specified DAC channel
+            (thus, irrespective of the sweep index).
+        
+        includeDigitalPattern:bool. Optional, default is True. 
+            When True, the Digital bit patterns for DIG channel banks 3-0 and 7-4
+            are output as in the Clampex's Waveform tab of the protocol editor.
+            Otherwise, they are omitted.
         
         Returns:
-        -------
-        A Pandas DataFrame
+        --------
+        A Pandas DataFrame with a layout similar to the Clampex's Waveform tab,
+        augmented with the following rows:
         
-        NOTE: 
-        -----
-        The contents of the table reflect the Epochs' behaviour during the 
-        specified sweep, and therefore may be different from the table in 
-        Clampex Waveform tab of the Protocol Editor dialog. 
-    
-        In particular, when "Alternate Digital Outputs" is enabled in the protocol, 
-        the digital patterns shown here are the ones that would be emitted by an 
-        ABF epoch during the specified sweep: the "main" patterns are emitted on 
-        even-indexed sweeps (0, 2, 4, …) whereas the "alternate" DIG patterns are
-        emitted on oddindexed sweeps (1, 3, 5, …).
-     
-        These patterns are independent of the DAC channel specified in the 'dac'
-        parameter. However, the realization of the TTL signals emitted by these
-        patterns does depend on the ABFEpoch parameters first & delta durations,
-        and pulse width & frequency, which are specific to the DAC where the epoch 
-        emitting a digital pattwern was defined.
+        First Duration (samples)¹
+        Delta Duration (samples)¹ ²
+        Train Period (samples)¹ ³
+        Pulse Width (samples)¹
         
-        In Clampex, the Waveform tabs for distinct DAC channels are used to define 
-        the "main" and "alternate" digital outputs. Although one can define such
-        patterns in more than one DAC Channel tab, only two of these will be used
-        to emit alternative digital (TTL) signals: DAC Channel 0 and 1.
+        Currently not shown:
+        Sample rate (Fast vs Slow)
+        Final duration — this is only shown, in Clampex, when Delta Duration (ms) > 0
+            and there are more than one sweep "emitting" (or "using") this Epoch.
+            The final duration is calculated regardless of whether the Epoch emits
+            a DIG signal or analog waveform.
         
-        The "main" pattern of digital TTL signals is always the one defined in an
-        ABEpoch in the DAC where "Digital Outputs" checkbox is ON (hereafter 
-        called the "active" DAC). The "alternate" pattern of digital TTL signals 
-        is the one defined in its counterpart (1 if active DAC is 0 and 0 if 
-        active DAC is 1). Digital patterns defined on higher index DACs seem to 
-        be ignored in this case.
+        ¹ In Clampex, these are shown as additional information below the Epochs table
+        ² In Clampex, this is only shown when Delta Duration (ms) > 0
+        ³ In Clampex, this is reported on the same line as Train rate, albeit
+                inappropriately called "rate".
         
-        This logic of delivering alternative TTL signals seems to break down
-        when the "Digital Outputs" checkbox is defined on a higher DAC index than
-        0 or 1 (even if the same epoch number is configured to deliver a digital
-        pattern). In this case, patterns defined in either channels 0 or 1 are
-        being delievered alternatively, but on the DIG channel(s) specified in 
-        DAC 0. Not sure if this is a bug or design feature.
-        
-        It is therefore best to avoid these ambiguities and, when alternative
-        digital outputs are required, define these on DAC 0 or 1 and leave other
-        DACs without digital patterns ()
         
         """
+        # NOTE: 2024-10-30 21:30:47
+        # looks OK now
+        #
+        # NOTE: 2024-10-30 21:31:01 TODO:
+        # 1) factor in the situation where delta duration > 0
+        # 2) use same logic for generating epoch (and sweep) -specific digital
+        # waveform (self.getEpochDigitalWaveform)
+        #   in this respect, consider factoring the logic out to a common instance
+        #   method
+        
         actualOutput = dac is None
             
-        dac, _= self._check_DAC_Epoch_(dac, None)
+        dac, _= self._check_DAC_Epoch_(dac, None) # when dac is None, dac is set to active DAC
         
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
         
-        # isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+        hoDACActive = self.activeDACChannel not in (0,1)
         
         if self.alternateDigitalOutputsEnabled:
             # NOTE: 2024-10-27 15:53:06
@@ -3321,8 +3322,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
             isAlternateDigital = False
             
-            if dac.physicalIndex == self.activeDACChannel:
-                if sweep % 2 > 0: 
+            # if dac.physicalIndex == self.activeDACChannel:
+            if actualOutput:
+                if hoDACActive:
+                    # when active DAC is a HO DAC the "main" pattern (def'ed on 
+                    # the HO DAC) is ignored; instead, the "alt" pattern is used
+                    # but with timings of DAC0 for even sweeps and those of DAC1
+                    # on odd sweeps.
+                    # If neither DAC0 nor DAC1 defined digital bit patterns, then
+                    # no DIG pattern is emitted.
+                    isAlternateDigital =  True # force the use of the "alt" pattern
+                                               # sort out timings below 
+                else:
                     # odd sweep -> must query alternate DIG pattern, NOT for the 
                     # active DAC, but for the DAC where the alternative pattern is 
                     # defined; this is because that DAC might have defined different  
@@ -3336,15 +3347,16 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     #
                     # If there is no other DAC where this epoch is defined, this
                     # means there is no alternate DIG pattern emitted.
-                    
-                    isAlternateDigital = True
+                    isAlternateDigital =  sweep % 2 > 0
+            else:
+                isAlternateDigital = dac.physicalIndex != self.activeDACChannel
                     
         if includeDigitalPattern:
             rowIndex = ["Type", "First Level", "Delta Level",
                         "First Duration", "First Duration (Samples)",
                         "Delta Duration", "Delta Duration (Samples)",
                         "Actual Duration", "Actual Duration (Samples)",
-                        "Digital Pattern #3-0", "Digital Pattern #7-4", 
+                        "Digital Pattern (#3-0)", "Digital Pattern (#7-4)", 
                         "Train Rate", "Train Period", "Train Period (Samples)",
                         "Pulse Width", "Pulse Width (Samples)",
                         "Pulse Count"]
@@ -3362,6 +3374,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
         
+        print(f"{self.__class__.__name__}.getEpochsTable: isAlternateDigital = {isAlternateDigital}")
+        
         for i, epoch in enumerate(dac.epochs):
             epochDigPattern = self.getDigitalPattern(epoch.epochNumber,
                                                      alternate=isAlternateDigital,
@@ -3369,25 +3383,27 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             if actualOutput:
                 if self.alternateDigitalOutputsEnabled and epoch.number in digEpochs:
-                        # get the actual dac where the alternative digital bit pattern was defined:
+                    # get the actual dac where the alternative digital bit pattern was defined:
                     digDACs = self.getDACsForEpoch(epoch.number)
+                    print(f"{self.__class__.__name__}.getEpochsTable: digDACs = {digDACs}")
                     if len(digDACs) > 1:
                         assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
                         thisDacNdx = digDACs.index(dac.physicalIndex)
-                        print(f"{self.__class__.__name__}.getEpochsTable: thisDacNdx = {thisDacNdx}")
+                        print(f"{self.__class__.__name__}.getEpochsTable: thisDacNdx ({dac.physicalIndex}) = {thisDacNdx}")
 
                         if self.activeDACChannel == 0:
                             myDac = self.getDAC(1 if isAlternateDigital else 0)
                         elif self.activeDACChannel == 1:
                             myDac = self.getDAC(0 if isAlternateDigital else 1)
                         else:
-                            # myDac = self.getDAC(digDACs[0] if isAlternateDigital else self.activeDACChannel) # get the first one!
-                            myDac = self.getDAC(digDACs[thisDacNdx-1] if isAlternateDigital else self.activeDACChannel) # get the first one!
-                        # if thisDacNdx == 0: # get the next one up
-                        #     myDac = self.getDAC(digDACs[thisDacNdx+1])
-                        # else: 
-                        #     myDac = self.getDAC(digDACs[0]) # get the first one!
-                            # myDac = self.getDAC(digDACs[thisDacNdx-1]) # get the next one down
+                            assert hoDACActive, f"Active DAC index expected to be > 1; got {self.activeDACChannel}"
+                            # activeDAC is a HO DAC
+                            if sweep % 2 == 0 and 0 in digDACs: # "even" sweeps => query DAC0
+                                myDac = self.getDAC(0)
+                            elif sweep % 2 > 0 and 1 in digDACs: # "odd" sweeps => query DAC1
+                                myDac = self.getDAC(1)
+                            else:
+                                continue
                             
                         # to report correct temporal params for epoch in DAC, given sweep index    
                         myEpoch = myDac.getEpoch(epoch.number)
@@ -6486,143 +6502,143 @@ def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
                     
         return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
                     
-@singledispatch
-def getABFEpochTable(o, sweep:typing.Optional[int]=None,
-                      dacChannel:typing.Optional[int] = None,
-                      as_dataFrame:bool=False, allTables:bool=False) -> list:
-    raise NotImplementedError(f"This function does not support {type(o).__name__} objects")
-
-@getABFEpochTable.register(pyabf.ABF)
-def _(x:pyabf.ABF, sweep:typing.Optional[int]=None,
-                      dacChannel:typing.Optional[int] = None,
-                      as_dataFrame:bool=False, allTables:bool=False) -> list:
-    if not isinstance(x, pyabf.ABF):
-        raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
+# @singledispatch
+# def getABFEpochTable(o, sweep:typing.Optional[int]=None,
+#                       dacChannel:typing.Optional[int] = None,
+#                       as_dataFrame:bool=False, allTables:bool=False) -> list:
+#     raise NotImplementedError(f"This function does not support {type(o).__name__} objects")
+# 
+# @getABFEpochTable.register(pyabf.ABF)
+# def _(x:pyabf.ABF, sweep:typing.Optional[int]=None,
+#                       dacChannel:typing.Optional[int] = None,
+#                       as_dataFrame:bool=False, allTables:bool=False) -> list:
+#     if not isinstance(x, pyabf.ABF):
+#         raise TypeError(f"Expecting a pyabf.ABF object; got {type(x).__name__} instead")
+#     
+#     sweepTables = list()
+#     
+#     if isinstance(sweep, int):
+#         if sweep < 0 or sweep >= x.sweepCount:
+#             raise ValueError(f"Invalid sweep {sweep} for {x.sweepCount} sweeps")
+#         
+#         x.setSweep(sweep)
+#         # NOTE: 2022-03-04 15:30:22
+#         # only return the epoch tables that actually contain any non-OFF epochs (filtered here)
+#         if isinstance(dacChannel, int):
+#             if dacChannel not in x._dacSection.nDACNum:
+#                 raise ValueError(f"Invalid DAC channel index (dacChannel) {dacChannel}; current DAC channel indices are {x._dacSection.nDACNum}")
+#             
+#             etables = [pyabf.waveform.EpochTable(x, dacChannel)] # WARNING: 2023-09-06 23:36:28 may be an empty EpochTable
+#         else:
+#             if allTables:
+#                 etables = list(pyabf.waveform.EpochTable(x, c) for c in x._dacSection.nDACNum)
+#                 # etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
+#             else:
+#                 etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+#             
+#         if as_dataFrame:
+#             etables = [epochTable2DF(e, x) for e in etables]
+#             
+#         sweepTables.append(etables)
+#     
+#     else:
+#         for sweep in range(x.sweepCount):
+#             x.setSweep(sweep)
+#             if isinstance(dacChannel, int):
+#                 if dacChannel not in x._dacSection.nDACNum:
+#                     raise ValueError(f"Invalid DAC channel index (dacChannel) {dacChannel}; current DAC channel indices are {x._dacSection.nDACNum}")
+#                 
+#                 etables = [pyabf.waveform.EpochTable(x, dacChannel)] # WARNING: 2023-09-06 23:36:28 may be an empty EpochTable
+#             else:
+#                 if allTables:
+#                     etables = list(pyabf.waveform.EpochTable(x, c) for c in x._dacSection.nDACNum)
+#                 else:
+#                     etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
+#                 
+#             if as_dataFrame:
+#                 etables = [epochTable2DF(e, x) for e in etables]
+#                 
+#             sweepTables.append(etables)
+#             
+#     return sweepTables
+# 
+# @getABFEpochTable.register(neo.Block)
+# def _(x:neo.Block, sweep:typing.Optional[int]=None,
+#                       dacChannel:typing.Optional[int] = None,
+#                       as_dataFrame:bool=False, allTables:bool=False) -> list:
+#     pass
     
-    sweepTables = list()
-    
-    if isinstance(sweep, int):
-        if sweep < 0 or sweep >= x.sweepCount:
-            raise ValueError(f"Invalid sweep {sweep} for {x.sweepCount} sweeps")
-        
-        x.setSweep(sweep)
-        # NOTE: 2022-03-04 15:30:22
-        # only return the epoch tables that actually contain any non-OFF epochs (filtered here)
-        if isinstance(dacChannel, int):
-            if dacChannel not in x._dacSection.nDACNum:
-                raise ValueError(f"Invalid DAC channel index (dacChannel) {dacChannel}; current DAC channel indices are {x._dacSection.nDACNum}")
-            
-            etables = [pyabf.waveform.EpochTable(x, dacChannel)] # WARNING: 2023-09-06 23:36:28 may be an empty EpochTable
-        else:
-            if allTables:
-                etables = list(pyabf.waveform.EpochTable(x, c) for c in x._dacSection.nDACNum)
-                # etables = list(pyabf.waveform.EpochTable(x, c) for c in x.channelList)
-            else:
-                etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
-            
-        if as_dataFrame:
-            etables = [epochTable2DF(e, x) for e in etables]
-            
-        sweepTables.append(etables)
-    
-    else:
-        for sweep in range(x.sweepCount):
-            x.setSweep(sweep)
-            if isinstance(dacChannel, int):
-                if dacChannel not in x._dacSection.nDACNum:
-                    raise ValueError(f"Invalid DAC channel index (dacChannel) {dacChannel}; current DAC channel indices are {x._dacSection.nDACNum}")
-                
-                etables = [pyabf.waveform.EpochTable(x, dacChannel)] # WARNING: 2023-09-06 23:36:28 may be an empty EpochTable
-            else:
-                if allTables:
-                    etables = list(pyabf.waveform.EpochTable(x, c) for c in x._dacSection.nDACNum)
-                else:
-                    etables = list(filter(lambda e: len(e.epochs) > 0, (pyabf.waveform.EpochTable(x, c) for c in x.channelList)))
-                
-            if as_dataFrame:
-                etables = [epochTable2DF(e, x) for e in etables]
-                
-            sweepTables.append(etables)
-            
-    return sweepTables
-
-@getABFEpochTable.register(neo.Block)
-def _(x:neo.Block, sweep:typing.Optional[int]=None,
-                      dacChannel:typing.Optional[int] = None,
-                      as_dataFrame:bool=False, allTables:bool=False) -> list:
-    pass
-    
-@singledispatch
-def epochTable2DF(obj, src) -> pd.DataFrame:
-    """Returns a pandas.DataFrame with the data from the epoch table 'x'
-    """
-    raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
-
-# def _(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None):
-@epochTable2DF.register(pyabf.waveform.EpochTable)
-def _(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None) -> pd.DataFrame:
-    # if not isinstance(x, pyabf.waveform.EpochTable):
-    #     raise TypeError(f"Expecting an EpochTable; got {type(x).__name__} instead")
-
-    # NOTE: 2022-03-04 15:38:31
-    # code below adapted from pyabf.waveform.EpochTable.text
-    #
-    
-    rowIndex = ["Type", "First Level", "Delta Level", "First Duration (points)", "Delta Duration (points)",
-                "First duration (ms)", "Delta Duration (ms)",
-                "Digital Pattern #3-0", "Digital Pattern #7-4", 
-                "Train Period (points)", "Pulse Width (points)",
-                "Train Period (ms)", "Pulse Width (ms)"]
-    
-    # prepare lists to hold values for each epoch
-    
-    # NOTE: 2022-03-04 16:05:20 
-    # skip "Off" epochs
-    epochs = [e for e in x.epochs if e.typeName != "Off"]
-    
-    if len(epochs):
-        epochCount = len(epochs)
-        epochLetters = [''] * epochCount
-        
-        epochData = dict()
-        
-        for i, epoch in enumerate(epochs):
-            assert isinstance(epoch, pyabf.waveform.Epoch)
-            
-            if isinstance(abf, pyabf.ABF):
-                # adcName, adcUnits = abf._getAdcNameAndUnits(x.channel)
-                dacName, dacUnits = abf._getDacNameAndUnits(x.channel)
-                
-            else:
-                dacName = dacUnits = None
-                
-            dacLevel = epoch.level*scq.unitQuantityFromNameOrSymbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.level
-            dacLevelDelta = epoch.levelDelta*scq.unitQuantityFromNameOrSymbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.levelDelta
-
-            epValues = np.array([epoch.epochTypeStr,    # str description of epoch type (as per Clampex e.g Step, Pulse, etc)                            
-                              dacLevel,                 # "first" DAC level -> quantity; CAUTION units depen on Clampex and whether its telegraphs were OK
-                              dacLevelDelta,            # "delta" DAC level: level change with each sweep in the run; quantity, see above
-                              epoch.duration,           # "first" duration (samples)
-                              epoch.durationDelta,      # "delta" duration (samples)
-                              epoch.duration/x.sampleRateHz * 1000 * pq.ms, # first duration (time units)
-                              epoch.durationDelta/x.sampleRateHz * 1000 * pq.ms, # delta duration (time units)
-                              epoch.getDigitalPattern()[:4], # first 4 digital channels
-                              epoch.getDigitalPattern()[4:], # last 4 digital channels
-                              epoch.pulsePeriod,        # train period (samples')
-                              epoch.pulseWidth,         # pulse width (samples)
-                              epoch.pulsePeriod/x.sampleRateHz * 1000 * pq.ms, # train period (time units)
-                              epoch.pulseWidth/x.sampleRateHz * 1000 * pq.ms], # pulse width (time units)
-                              dtype=object)
-            
-            epochData[epoch.getEpochLetter] = epValues
-            
-        #colIndex = epochLetters
-        
-        return pd.DataFrame(epochData, index = rowIndex)
-    
-@epochTable2DF.register(ABFEpoch)
-def _(x:ABFEpoch, _=None) -> pd.DataFrame:
-    return x.toDataFrame()
+# @singledispatch
+# def epochTable2DF(obj, src) -> pd.DataFrame:
+#     """Returns a pandas.DataFrame with the data from the epoch table 'x'
+#     """
+#     raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
+# 
+# # def _(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None):
+# @epochTable2DF.register(pyabf.waveform.EpochTable)
+# def _(x:pyabf.waveform.EpochTable, abf:typing.Optional[pyabf.ABF] = None) -> pd.DataFrame:
+#     # if not isinstance(x, pyabf.waveform.EpochTable):
+#     #     raise TypeError(f"Expecting an EpochTable; got {type(x).__name__} instead")
+# 
+#     # NOTE: 2022-03-04 15:38:31
+#     # code below adapted from pyabf.waveform.EpochTable.text
+#     #
+#     
+#     rowIndex = ["Type", "First Level", "Delta Level", "First Duration (points)", "Delta Duration (points)",
+#                 "First duration (ms)", "Delta Duration (ms)",
+#                 "Digital Pattern #3-0", "Digital Pattern #7-4", 
+#                 "Train Period (points)", "Pulse Width (points)",
+#                 "Train Period (ms)", "Pulse Width (ms)"]
+#     
+#     # prepare lists to hold values for each epoch
+#     
+#     # NOTE: 2022-03-04 16:05:20 
+#     # skip "Off" epochs
+#     epochs = [e for e in x.epochs if e.typeName != "Off"]
+#     
+#     if len(epochs):
+#         epochCount = len(epochs)
+#         epochLetters = [''] * epochCount
+#         
+#         epochData = dict()
+#         
+#         for i, epoch in enumerate(epochs):
+#             assert isinstance(epoch, pyabf.waveform.Epoch)
+#             
+#             if isinstance(abf, pyabf.ABF):
+#                 # adcName, adcUnits = abf._getAdcNameAndUnits(x.channel)
+#                 dacName, dacUnits = abf._getDacNameAndUnits(x.channel)
+#                 
+#             else:
+#                 dacName = dacUnits = None
+#                 
+#             dacLevel = epoch.level*scq.unitQuantityFromNameOrSymbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.level
+#             dacLevelDelta = epoch.levelDelta*scq.unitQuantityFromNameOrSymbol(dacUnits) if isinstance(dacUnits, str) and len(dacUnits.strip()) else epoch.levelDelta
+# 
+#             epValues = np.array([epoch.epochTypeStr,    # str description of epoch type (as per Clampex e.g Step, Pulse, etc)                            
+#                               dacLevel,                 # "first" DAC level -> quantity; CAUTION units depen on Clampex and whether its telegraphs were OK
+#                               dacLevelDelta,            # "delta" DAC level: level change with each sweep in the run; quantity, see above
+#                               epoch.duration,           # "first" duration (samples)
+#                               epoch.durationDelta,      # "delta" duration (samples)
+#                               epoch.duration/x.sampleRateHz * 1000 * pq.ms, # first duration (time units)
+#                               epoch.durationDelta/x.sampleRateHz * 1000 * pq.ms, # delta duration (time units)
+#                               epoch.getDigitalPattern()[:4], # first 4 digital channels
+#                               epoch.getDigitalPattern()[4:], # last 4 digital channels
+#                               epoch.pulsePeriod,        # train period (samples')
+#                               epoch.pulseWidth,         # pulse width (samples)
+#                               epoch.pulsePeriod/x.sampleRateHz * 1000 * pq.ms, # train period (time units)
+#                               epoch.pulseWidth/x.sampleRateHz * 1000 * pq.ms], # pulse width (time units)
+#                               dtype=object)
+#             
+#             epochData[epoch.getEpochLetter] = epValues
+#             
+#         #colIndex = epochLetters
+#         
+#         return pd.DataFrame(epochData, index = rowIndex)
+#     
+# @epochTable2DF.register(ABFEpoch)
+# def _(x:ABFEpoch, _=None) -> pd.DataFrame:
+#     return x.toDataFrame()
     
 @singledispatch
 def getABFHoldDelay(obj):
@@ -6696,333 +6712,333 @@ def getActiveDACChannel(obj) -> int:
     """
     raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
             
-@getActiveDACChannel.register(pyabf.ABF)
-def _(abf:pyabf.ABF) -> int:
-    return abf._protocolSection.nActiveDACChannel
+# @getActiveDACChannel.register(pyabf.ABF)
+# def _(abf:pyabf.ABF) -> int:
+#     return abf._protocolSection.nActiveDACChannel
+#     
+# @getActiveDACChannel.register(neo.Block)
+# def _(data:neo.Block) -> int:
+#     try:
+#         isAxon = data.annotations.get("software", None) == "Axon"
+#         if not isAxon:
+#             raise NotImplementedError("This function suypports only data recorded with Axon software")
+#         isABF2 = data.annotations["fFileSignature"].decode() == "ABF2"
+#         if not isABF2:
+#             raise NotImplementedError("This function only supports ABF2 version")
+#         
+#         return data.annotations["protocol"]["nActiveDACChannel"]
+#     except:
+#         traceback.print_exc()
+#         raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
+#     
     
-@getActiveDACChannel.register(neo.Block)
-def _(data:neo.Block) -> int:
-    try:
-        isAxon = data.annotations.get("software", None) == "Axon"
-        if not isAxon:
-            raise NotImplementedError("This function suypports only data recorded with Axon software")
-        isABF2 = data.annotations["fFileSignature"].decode() == "ABF2"
-        if not isABF2:
-            raise NotImplementedError("This function only supports ABF2 version")
-        
-        return data.annotations["protocol"]["nActiveDACChannel"]
-    except:
-        traceback.print_exc()
-        raise RuntimeError(f"The {type(data).__name__} data {data.name} does not seem to have been generated from readind an ABF file")
-    
-    
-@singledispatch
-def getDACCommandWaveforms(obj, 
-                        sweep:typing.Optional[int] = None,
-                        adcChannel:typing.Optional[typing.Union[int, str]] = None,
-                        dacChannel:typing.Optional[typing.Union[int, str]]=None,
-                        absoluteTime:bool=False) -> dict:
-    """Retrieves the waveforms of the command (DAC) signal.
-    
-    Returns one waveform per sweep (i.e., per neo.Segment) unless segmentIndex
-    if specified, and has a valid int value.
-
-    WARNING: Only works with a neo.Block generated from an Axon ABF file.
-    
-    The function first tries to create a pyabf.ABF object using the Axon (ABF)
-    file as indicated in the 'file_origin' attribute of 'data'. 
-
-    When this fails (usually because the original ABF file cannot be found) the 
-    function will fallback on using information contained in the 'annotations' 
-    attribute and the properties on the analog signals contained in the data.
-    
-    This is OK ONLY if the data was obtained by reading the ABF file using
-    neo.io module via Scipyen's pictio module functions.
-    
-    CAUTION: Using synthetic data (e.g. neo.Block created manually) or data
-    augmented manually (such as by adding manually-created segments and/or signals)
-    will most likely result in an Exception being raised.
-    
-    """
-    raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
-
-@getDACCommandWaveforms.register(pyabf.ABF)
-def _(abf: pyabf.ABF, 
-      sweep:typing.Optional[int] = None,
-      adcChannel:typing.Optional[typing.Union[int, str]] = None,
-      dacChannel:typing.Optional[typing.Union[int, str]] = None,
-      absoluteTime:bool=False) -> dict:
-    """Retrieves the waveforms of the command (DAC) signal."""
-    
-    # NOTE: 2023-08-28 15:31:13
-    # each ADC input channels in Clampex is associated with one DAC output
-    # for the most complete configuration, IN0 and IN1 are typically associated with OUT0
-    # IN2 and IN3 are associated with OUT1, etc; here, IN0 and IN2 are the 
-    # primary input channels from the amplifierl; IN1 and IN3 are the secondary
-    # inputs from the amplifier
-    
-    def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
-        x_units = scq.unitQuantityFromNameOrSymbol(abf.sweepUnitsX)
-        x = abf.sweepX
-        y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
-        y_units = scq.unitQuantityFromNameOrSymbol(y_units_str) if isinstance(y_units_str, str) else pq.dimensionless
-        abfChannel = abf.sweepChannel # the current channel in the ABF, set when calling abf.setSweep(…)
-        
-        # NOTE: 2023-08-28 15:09:15
-        # the command waveform for this sweep
-        # WARNING: this can be manually overwritten; in this case, all bets are off
-        #
-        # NOTE: when not overwritten, sweepC delegates to stimulus.dacWaveform
-        # in turn this checks if a waveform is enabled, or if the waveform is
-        # defined in a file;
-        #
-        # the variables nWaveformEnable and nWaveformSource are defined in 
-        #   header (for ABF1)
-        #   dac section (for ABF2)
-        #
-        # nWaveformEnable →   0 (disabled); 
-        #                     1 (enabled)
-        #
-        # nWaveformSource →   0 (no waveform); 
-        #                     1 (defined in the epoch table)
-        #                     2 (defined in a separate file)
-        #
-        # if neither, then this will return a synthetic array filled with the 
-        # holding values - not sure we want this, because, in effect, THERE IS NO
-        # command waveform on that channel... But this information is not available
-        # until one calls sweepC for that channel - so there is no way of knowing this beforehand
-        #
-        # So, instead of calling accessing sweepC (however convenient this may be)
-        # we may want to directly run the actual stimulus code instead
-        # (or call sweepC but then check the 'text' property of the correspdonding
-        # stimulus, which has been updated while calling sweepC) - IMO the design
-        # of pyabf is not ideal...
-            
-        y = abf.sweepC 
-        
-        stimObj = abf.stimulusByChannel[abfChannel]
-        
-        if stimObj.text == "DAC waveform is not enabled":
-            # NOTE: 2023-09-02 22:41:41
-            # this happens when there is no Epoch defined in the Epoch Table
-            # for the given ADC/DAC channels combination
-            y_name += " (disabled)"
-            
-        elif stimObj.text == "DAC waveform is controlled by custom file":
-            y_name += " from file" # TODO 2023-08-31 15:29:15 FIXME get the name of the stimulus file
-        # y_label = abf.sweepLabelC
-        sampling_rate = abf.sampleRate * pq.Hz
-        
-        return neo.AnalogSignal(y, units = y_units, 
-                                t_start = x[0] * x_units,
-                                sampling_rate = abf.sampleRate * pq.Hz,
-                                name = y_name)
-        
-    if isinstance(sweep, int):
-        if sweep not in range(abf.sweepCount):
-            raise ValueError(f"Invalid sweep {sweep} for {abf.sweepCount} sweeps")
-        
-    elif sweep is not None:
-        raise TypeError(f"Expecting sweep an int in range {abf.sweepCount} or None; instead, got {type(sweep).__name__}")
-    
-    ADCs = usedADCs(abf)
-    ADCnames = tuple(x[0] for x in ADCs.values())
-    DACs = usedDACs(abf)
-    DACnames = tuple(x[0] for x in DACs.values())
-    
-    if isinstance(adcChannel, int):
-        # if adcChannel not in range(len(abf.adcNames)) :
-        if adcChannel not in ADCs.keys() :
-            raise ValueError(f"Invalid ADC channel {adcChannel} for ADC channels {tuple(ADCs.keys())}")
-        
-    elif isinstance(adcChannel, str):
-        if adcChannel not in ADCnames:
-            raise ValueError(f"ADC channel {adcChannel} not found; current ADC channels are {ADCnames}")
-        
-        adcChannel = ADCs[ADCnames.index(adcChannel)]
-        
-    elif adcChannel is not None:
-        raise TypeError(f"adcChannel expected to be an int in {tuple(ADCs.keys())}, a string in {ADCnames}, or None; instead, got {type(adcChannel).__name__}")
-        
-    if isinstance(dacChannel, int):
-        if dacChannel not in tuple(DACs.keys()):
-            raise ValueError(f"Invalid ADAC channel {dacChannel} for DAC channels {tuple(DACs.keys())}")
-        
-    elif isinstance(dacChannel, str):
-        if dacChannel not in DACnames:
-            raise ValueError(f"DAC channel {dacChannel} not found; current DAC channels are {DACnames}")
-        
-        dacChannel = DACs[DACnames.index(dacChannel)]
-        
-    elif dacChannel is not None:
-        raise TypeError(f"dacChannel expected to be an int in {tuple(DACs.keys())},a string in {DACnames}, or None; instead, got {type(dacChannel).__name__}")
-    
-    # ret = list()
-    ret = dict()
-    
-    if not isinstance(sweep, int):
-        for s in range(abf.sweepCount):
-            if not isinstance(adcChannel, int):
-                adcChannelWaves = dict()
-                # for chnl in range(len(abf.adcNames)):
-                for chnl in ADCs:
-                    abf.setSweep(s, chnl, absoluteTime)
-                    if not isinstance(dacChannel, int):
-                        dacChannelWaves = dict()
-                        # for dacChnl in range(len(abf.dacNames)):
-                        for dacChnl in DACs:
-                            dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
-                                            
-                    else:
-                        dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
-                        
-                    adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][0]}"] = dacChannelWaves
-            else:
-                abf.setSweep(s, adcChannel, absoluteTime)
-                if not isinstance(dacChannel, int):
-                    dacChannelWaves = dict()
-                    for dacChnl in range(len(abf.dacNames)):
-                        dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
-                                        
-                else:
-                    dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
-                    
-                adcChannelWaves = {f"ADC_{adcChannel}_{ADCs[adcChannel][0]}": dacChannelWaves}
-                    
-            ret[f"sweep_{s}"] = adcChannelWaves
-            
-    else:
-        if not isinstance(adcChannel, int):
-            adcChannelWaves = dict()
-            # for adcChnl in range(len(abf.adcNames)):
-            for adcChnl in ADCs:
-                abf.setSweep(sweep, adcChnl, absoluteTime)
-                if not isinstance(dacChannel, int):
-                    dacChannelWaves = dict()
-                    for dacChnl in DACs:
-                        dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
-                                        
-                else:
-                    dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
-                    
-                adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][0]}"] = dacChannelWaves
-                
-        else:
-            abf.setSweep(sweep, adcChannel, absoluteTime)
-            if not isinstance(dacChannel, int):
-                # for dacChnl in range(abf._dacSection._entryCount):
-                dacChannelWaves = dict()
-                # for dacChnl in range(len(abf.dacNames)):
-                for dacChnl in DACs:
-                    dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
-                                    
-            else:
-                dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
-                
-            adcChannelWaves[f"ADC_{adcChannel}_{ADCs[adcChannel][0]}"] = dacChannelWaves
-            
-        ret[f"sweep_{sweep}"] = adcChannelWaves
-        
-    return ret
-            
-@getDACCommandWaveforms.register(neo.Block)
-def _(data:neo.Block,
-      sweep:typing.Optional[int] = None,
-      adcChannel:typing.Optional[typing.Union[int, str]] = None,
-      dacChannel:typing.Optional[typing.Union[int, str]]=None,
-      absoluteTime:bool=False) -> dict:
-
-    def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
-        x_units = scq.unitQuantityFromNameOrSymbol(abf.sweepUnitsX)
-        x = abf.sweepX
-        y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
-        y_units = scq.unitQuantityFromNameOrSymbol(y_units_str)
-        y = abf.sweepC # the command waveform for this sweep
-        # y_label = abf.sweepLabelC
-        sampling_rate = abf.sampleRate * pq.Hz
-        
-        return neo.AnalogSignal(y, units = y_units, 
-                                t_start = x[0] * x_units,
-                                sampling_rate = abf.sampleRate * pq.Hz,
-                                name = y_name)
-        
-    sweepCount = data.annotations["lActualEpisodes"]
-    
-    # NOTE: 2023-08-30 12:15:16
-    # just make sure no segments have been added/removed to the block after it 
-    # has been read from its original ABF file
-    if sweepCount != len(data.segments):
-        raise RuntimeError(f"The number of segments ({len(data.segments)}) in the 'data' {data.name} is different from what ABF header reports ({sweepCount})")
-    
-    if isinstance(sweep, int):
-        if sweep not in range(sweepCount):
-            raise ValueError(f"Invalid sweep {sweep} for {sweepCount} sweeps")
-        
-    elif sweep is not None:
-        raise TypeError(f"Expecting sweep an int in range {sweepCount} or None; instead, got {type(sweep).__name__}")
-    
-    # NOTE: 2023-08-30 12:56:11
-    # number of ADC channels in the file is found in ADCSection.llNumEntries
-    # NOTE: these are the ADC channels USED in the file, NOT ADC channels
-    # available on the DAQ device!!!
-    #
-    # names and units of the ADC channels are placed by AxonRawIO into listADCInfo
-    # (which therefore has same length as the number of ADC channels used in the
-    # ABF file)
-    #
-    # it is therefore easy to figure out names & units (+ scaling etc) ONLY for
-    # those ADC channels that have been used to record data
-    
-    adcCount = data.annotations["sections"]["ADCSection"]["llNumEntries"]
-    
-    adcNames = [i["ADCChNames"].decode() for i in data.annotations["listADCInfo"]]
-    
-    if isinstance(adcChannel, int):
-        if adcChannel not in range(adcCount):
-            raise ValueError(f"Invalid ADC channel {adcChannel} for {adcCount} ADC channels")
-    
-    elif isinstance(adcChannel, str):
-        if adcChannel not in adcNames:
-            raise ValueError(f"ADC channel {adcChannel} not found; current ADC channels are {adcNames}")
-        
-        adcChannel = adcNames.index(adcChannel)
-        
-    elif adcChannel is not None:
-        raise TypeError(f"adcChannel expected to be an int in range 0 ... {adcCount}, a string in {adcNames}, or None; instead, got {type(adcChannel).__name__}")
-
-    # NOTE: 2023-08-30 12:56:26
-    # For DAC channels the situation is different: we have to dig out which of these
-    # are actually used in the file/experiment, using the epoch info.
-    #
-    # the actual DAC used in each protocol epoch is contained in the 'dictEpochInfoPerDAC'
-    # of the annotations.
-    #
-    # Structure of the dictEpochInfoPerDAC:
-    #
-    # dictEpochInfoPerDAC maps int keys (DAC number) with a nested dict
-    #   the nested dict maps  key (Epoch number) to a sub-nested dict of fields
-    #
-    # Only the used DACs are included in dictEpochInfoPerDAC.
-    #
-    # So, if the Outputs tab of the protocol editor uses DAC channels 0 and 1 (e.g. 
-    # "Cmd 0" and "Cmd 1")then the dictEpochInfoPerDAC will contain only two
-    # key → value pairs, with keys (int) 0 and 1, each mapped to a sub-nested dict
-    # of epochs describing the parameters sent to the corresponding DAC (0 or 1)
-    #
-    # Now, whether each DAC is used to send a command waveform to the electrode
-    # is configured separately, in the "Epochs" tab of the protocol editor; this 
-    # information is given in the 'listDACInfo'
-    #
-    # listDACInfo is a list of dicts, expected to be ordered by the DAC output channel
-    #
-    # CAUTION: 2023-08-30 14:15:11
-    # this is where pyabf bridge may be supplying redundant information
-    #
-    usedDacCount = len(data.annotations["dictEpochInfoPerDAC"])
-    
-    usedDACIndices = list(data.annotations["dictEpochInfoPerDAC"].keys())
-    
-    # if dacChannel
+# @singledispatch
+# def getDACCommandWaveforms(obj, 
+#                         sweep:typing.Optional[int] = None,
+#                         adcChannel:typing.Optional[typing.Union[int, str]] = None,
+#                         dacChannel:typing.Optional[typing.Union[int, str]]=None,
+#                         absoluteTime:bool=False) -> dict:
+#     """Retrieves the waveforms of the command (DAC) signal.
+#     
+#     Returns one waveform per sweep (i.e., per neo.Segment) unless segmentIndex
+#     if specified, and has a valid int value.
+# 
+#     WARNING: Only works with a neo.Block generated from an Axon ABF file.
+#     
+#     The function first tries to create a pyabf.ABF object using the Axon (ABF)
+#     file as indicated in the 'file_origin' attribute of 'data'. 
+# 
+#     When this fails (usually because the original ABF file cannot be found) the 
+#     function will fallback on using information contained in the 'annotations' 
+#     attribute and the properties on the analog signals contained in the data.
+#     
+#     This is OK ONLY if the data was obtained by reading the ABF file using
+#     neo.io module via Scipyen's pictio module functions.
+#     
+#     CAUTION: Using synthetic data (e.g. neo.Block created manually) or data
+#     augmented manually (such as by adding manually-created segments and/or signals)
+#     will most likely result in an Exception being raised.
+#     
+#     """
+#     raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
+# 
+# @getDACCommandWaveforms.register(pyabf.ABF)
+# def _(abf: pyabf.ABF, 
+#       sweep:typing.Optional[int] = None,
+#       adcChannel:typing.Optional[typing.Union[int, str]] = None,
+#       dacChannel:typing.Optional[typing.Union[int, str]] = None,
+#       absoluteTime:bool=False) -> dict:
+#     """Retrieves the waveforms of the command (DAC) signal."""
+#     
+#     # NOTE: 2023-08-28 15:31:13
+#     # each ADC input channels in Clampex is associated with one DAC output
+#     # for the most complete configuration, IN0 and IN1 are typically associated with OUT0
+#     # IN2 and IN3 are associated with OUT1, etc; here, IN0 and IN2 are the 
+#     # primary input channels from the amplifierl; IN1 and IN3 are the secondary
+#     # inputs from the amplifier
+#     
+#     def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
+#         x_units = scq.unitQuantityFromNameOrSymbol(abf.sweepUnitsX)
+#         x = abf.sweepX
+#         y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
+#         y_units = scq.unitQuantityFromNameOrSymbol(y_units_str) if isinstance(y_units_str, str) else pq.dimensionless
+#         abfChannel = abf.sweepChannel # the current channel in the ABF, set when calling abf.setSweep(…)
+#         
+#         # NOTE: 2023-08-28 15:09:15
+#         # the command waveform for this sweep
+#         # WARNING: this can be manually overwritten; in this case, all bets are off
+#         #
+#         # NOTE: when not overwritten, sweepC delegates to stimulus.dacWaveform
+#         # in turn this checks if a waveform is enabled, or if the waveform is
+#         # defined in a file;
+#         #
+#         # the variables nWaveformEnable and nWaveformSource are defined in 
+#         #   header (for ABF1)
+#         #   dac section (for ABF2)
+#         #
+#         # nWaveformEnable →   0 (disabled); 
+#         #                     1 (enabled)
+#         #
+#         # nWaveformSource →   0 (no waveform); 
+#         #                     1 (defined in the epoch table)
+#         #                     2 (defined in a separate file)
+#         #
+#         # if neither, then this will return a synthetic array filled with the 
+#         # holding values - not sure we want this, because, in effect, THERE IS NO
+#         # command waveform on that channel... But this information is not available
+#         # until one calls sweepC for that channel - so there is no way of knowing this beforehand
+#         #
+#         # So, instead of calling accessing sweepC (however convenient this may be)
+#         # we may want to directly run the actual stimulus code instead
+#         # (or call sweepC but then check the 'text' property of the correspdonding
+#         # stimulus, which has been updated while calling sweepC) - IMO the design
+#         # of pyabf is not ideal...
+#             
+#         y = abf.sweepC 
+#         
+#         stimObj = abf.stimulusByChannel[abfChannel]
+#         
+#         if stimObj.text == "DAC waveform is not enabled":
+#             # NOTE: 2023-09-02 22:41:41
+#             # this happens when there is no Epoch defined in the Epoch Table
+#             # for the given ADC/DAC channels combination
+#             y_name += " (disabled)"
+#             
+#         elif stimObj.text == "DAC waveform is controlled by custom file":
+#             y_name += " from file" # TODO 2023-08-31 15:29:15 FIXME get the name of the stimulus file
+#         # y_label = abf.sweepLabelC
+#         sampling_rate = abf.sampleRate * pq.Hz
+#         
+#         return neo.AnalogSignal(y, units = y_units, 
+#                                 t_start = x[0] * x_units,
+#                                 sampling_rate = abf.sampleRate * pq.Hz,
+#                                 name = y_name)
+#         
+#     if isinstance(sweep, int):
+#         if sweep not in range(abf.sweepCount):
+#             raise ValueError(f"Invalid sweep {sweep} for {abf.sweepCount} sweeps")
+#         
+#     elif sweep is not None:
+#         raise TypeError(f"Expecting sweep an int in range {abf.sweepCount} or None; instead, got {type(sweep).__name__}")
+#     
+#     ADCs = usedADCs(abf)
+#     ADCnames = tuple(x[0] for x in ADCs.values())
+#     DACs = usedDACs(abf)
+#     DACnames = tuple(x[0] for x in DACs.values())
+#     
+#     if isinstance(adcChannel, int):
+#         # if adcChannel not in range(len(abf.adcNames)) :
+#         if adcChannel not in ADCs.keys() :
+#             raise ValueError(f"Invalid ADC channel {adcChannel} for ADC channels {tuple(ADCs.keys())}")
+#         
+#     elif isinstance(adcChannel, str):
+#         if adcChannel not in ADCnames:
+#             raise ValueError(f"ADC channel {adcChannel} not found; current ADC channels are {ADCnames}")
+#         
+#         adcChannel = ADCs[ADCnames.index(adcChannel)]
+#         
+#     elif adcChannel is not None:
+#         raise TypeError(f"adcChannel expected to be an int in {tuple(ADCs.keys())}, a string in {ADCnames}, or None; instead, got {type(adcChannel).__name__}")
+#         
+#     if isinstance(dacChannel, int):
+#         if dacChannel not in tuple(DACs.keys()):
+#             raise ValueError(f"Invalid ADAC channel {dacChannel} for DAC channels {tuple(DACs.keys())}")
+#         
+#     elif isinstance(dacChannel, str):
+#         if dacChannel not in DACnames:
+#             raise ValueError(f"DAC channel {dacChannel} not found; current DAC channels are {DACnames}")
+#         
+#         dacChannel = DACs[DACnames.index(dacChannel)]
+#         
+#     elif dacChannel is not None:
+#         raise TypeError(f"dacChannel expected to be an int in {tuple(DACs.keys())},a string in {DACnames}, or None; instead, got {type(dacChannel).__name__}")
+#     
+#     # ret = list()
+#     ret = dict()
+#     
+#     if not isinstance(sweep, int):
+#         for s in range(abf.sweepCount):
+#             if not isinstance(adcChannel, int):
+#                 adcChannelWaves = dict()
+#                 # for chnl in range(len(abf.adcNames)):
+#                 for chnl in ADCs:
+#                     abf.setSweep(s, chnl, absoluteTime)
+#                     if not isinstance(dacChannel, int):
+#                         dacChannelWaves = dict()
+#                         # for dacChnl in range(len(abf.dacNames)):
+#                         for dacChnl in DACs:
+#                             dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
+#                                             
+#                     else:
+#                         dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
+#                         
+#                     adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][0]}"] = dacChannelWaves
+#             else:
+#                 abf.setSweep(s, adcChannel, absoluteTime)
+#                 if not isinstance(dacChannel, int):
+#                     dacChannelWaves = dict()
+#                     for dacChnl in range(len(abf.dacNames)):
+#                         dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
+#                                         
+#                 else:
+#                     dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
+#                     
+#                 adcChannelWaves = {f"ADC_{adcChannel}_{ADCs[adcChannel][0]}": dacChannelWaves}
+#                     
+#             ret[f"sweep_{s}"] = adcChannelWaves
+#             
+#     else:
+#         if not isinstance(adcChannel, int):
+#             adcChannelWaves = dict()
+#             # for adcChnl in range(len(abf.adcNames)):
+#             for adcChnl in ADCs:
+#                 abf.setSweep(sweep, adcChnl, absoluteTime)
+#                 if not isinstance(dacChannel, int):
+#                     dacChannelWaves = dict()
+#                     for dacChnl in DACs:
+#                         dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
+#                                         
+#                 else:
+#                     dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
+#                     
+#                 adcChannelWaves[f"ADC_{chnl}_{ADCs[chnl][0]}"] = dacChannelWaves
+#                 
+#         else:
+#             abf.setSweep(sweep, adcChannel, absoluteTime)
+#             if not isinstance(dacChannel, int):
+#                 # for dacChnl in range(abf._dacSection._entryCount):
+#                 dacChannelWaves = dict()
+#                 # for dacChnl in range(len(abf.dacNames)):
+#                 for dacChnl in DACs:
+#                     dacChannelWaves[f"DAC_{dacChnl}_{DACs[dacChnl][0]}"] = __f__(abf, dacChnl)
+#                                     
+#             else:
+#                 dacChannelWaves = {f"DAC_{dacChannel}_{DACs[dacChannel][0]}": __f__(abf, dacChannel)}
+#                 
+#             adcChannelWaves[f"ADC_{adcChannel}_{ADCs[adcChannel][0]}"] = dacChannelWaves
+#             
+#         ret[f"sweep_{sweep}"] = adcChannelWaves
+#         
+#     return ret
+#             
+# @getDACCommandWaveforms.register(neo.Block)
+# def _(data:neo.Block,
+#       sweep:typing.Optional[int] = None,
+#       adcChannel:typing.Optional[typing.Union[int, str]] = None,
+#       dacChannel:typing.Optional[typing.Union[int, str]]=None,
+#       absoluteTime:bool=False) -> dict:
+# 
+#     def __f__(a_:abf, dacIndex:int) -> neo.AnalogSignal:
+#         x_units = scq.unitQuantityFromNameOrSymbol(abf.sweepUnitsX)
+#         x = abf.sweepX
+#         y_name, y_units_str = abf._getDacNameAndUnits(dacIndex)
+#         y_units = scq.unitQuantityFromNameOrSymbol(y_units_str)
+#         y = abf.sweepC # the command waveform for this sweep
+#         # y_label = abf.sweepLabelC
+#         sampling_rate = abf.sampleRate * pq.Hz
+#         
+#         return neo.AnalogSignal(y, units = y_units, 
+#                                 t_start = x[0] * x_units,
+#                                 sampling_rate = abf.sampleRate * pq.Hz,
+#                                 name = y_name)
+#         
+#     sweepCount = data.annotations["lActualEpisodes"]
+#     
+#     # NOTE: 2023-08-30 12:15:16
+#     # just make sure no segments have been added/removed to the block after it 
+#     # has been read from its original ABF file
+#     if sweepCount != len(data.segments):
+#         raise RuntimeError(f"The number of segments ({len(data.segments)}) in the 'data' {data.name} is different from what ABF header reports ({sweepCount})")
+#     
+#     if isinstance(sweep, int):
+#         if sweep not in range(sweepCount):
+#             raise ValueError(f"Invalid sweep {sweep} for {sweepCount} sweeps")
+#         
+#     elif sweep is not None:
+#         raise TypeError(f"Expecting sweep an int in range {sweepCount} or None; instead, got {type(sweep).__name__}")
+#     
+#     # NOTE: 2023-08-30 12:56:11
+#     # number of ADC channels in the file is found in ADCSection.llNumEntries
+#     # NOTE: these are the ADC channels USED in the file, NOT ADC channels
+#     # available on the DAQ device!!!
+#     #
+#     # names and units of the ADC channels are placed by AxonRawIO into listADCInfo
+#     # (which therefore has same length as the number of ADC channels used in the
+#     # ABF file)
+#     #
+#     # it is therefore easy to figure out names & units (+ scaling etc) ONLY for
+#     # those ADC channels that have been used to record data
+#     
+#     adcCount = data.annotations["sections"]["ADCSection"]["llNumEntries"]
+#     
+#     adcNames = [i["ADCChNames"].decode() for i in data.annotations["listADCInfo"]]
+#     
+#     if isinstance(adcChannel, int):
+#         if adcChannel not in range(adcCount):
+#             raise ValueError(f"Invalid ADC channel {adcChannel} for {adcCount} ADC channels")
+#     
+#     elif isinstance(adcChannel, str):
+#         if adcChannel not in adcNames:
+#             raise ValueError(f"ADC channel {adcChannel} not found; current ADC channels are {adcNames}")
+#         
+#         adcChannel = adcNames.index(adcChannel)
+#         
+#     elif adcChannel is not None:
+#         raise TypeError(f"adcChannel expected to be an int in range 0 ... {adcCount}, a string in {adcNames}, or None; instead, got {type(adcChannel).__name__}")
+# 
+#     # NOTE: 2023-08-30 12:56:26
+#     # For DAC channels the situation is different: we have to dig out which of these
+#     # are actually used in the file/experiment, using the epoch info.
+#     #
+#     # the actual DAC used in each protocol epoch is contained in the 'dictEpochInfoPerDAC'
+#     # of the annotations.
+#     #
+#     # Structure of the dictEpochInfoPerDAC:
+#     #
+#     # dictEpochInfoPerDAC maps int keys (DAC number) with a nested dict
+#     #   the nested dict maps  key (Epoch number) to a sub-nested dict of fields
+#     #
+#     # Only the used DACs are included in dictEpochInfoPerDAC.
+#     #
+#     # So, if the Outputs tab of the protocol editor uses DAC channels 0 and 1 (e.g. 
+#     # "Cmd 0" and "Cmd 1")then the dictEpochInfoPerDAC will contain only two
+#     # key → value pairs, with keys (int) 0 and 1, each mapped to a sub-nested dict
+#     # of epochs describing the parameters sent to the corresponding DAC (0 or 1)
+#     #
+#     # Now, whether each DAC is used to send a command waveform to the electrode
+#     # is configured separately, in the "Epochs" tab of the protocol editor; this 
+#     # information is given in the 'listDACInfo'
+#     #
+#     # listDACInfo is a list of dicts, expected to be ordered by the DAC output channel
+#     #
+#     # CAUTION: 2023-08-30 14:15:11
+#     # this is where pyabf bridge may be supplying redundant information
+#     #
+#     usedDacCount = len(data.annotations["dictEpochInfoPerDAC"])
+#     
+#     usedDACIndices = list(data.annotations["dictEpochInfoPerDAC"].keys())
+#     
+#     # if dacChannel
     
 @singledispatch
 def getABFversion(obj) -> int:
