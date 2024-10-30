@@ -3252,7 +3252,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
                        includeDigitalPattern:bool=True) -> pd.DataFrame:
         """Returns the table of ABFEpochs defined for a specific DAC.
         
-        
         Parameters:
         ----------
         sweep: int, the 0-based index of the sweep. Optional, default is the 
@@ -3306,74 +3305,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
         DACs without digital patterns ()
         
         """
-        
-        # FIXME 2024-10-29 11:24:47 ISSUES:
-        # the reported table looks correct, but not the generated waveform:
-        # 
-        # When alternateDigitalOutputsEnabled is False => the same digital 
-        # waveform is emitted in every sweep, and this waveform is defined by 
-        # DIG patterns in epochs on the DAC with Digital Outputs enabled (the 
-        # "active DAC"). This DAC is unique (i.e. only one DAC can have Digital 
-        # Outputs enabled).
-        #
-        # In the explanation below, 
-        #   • the "main" digital bit pattern is the one defined in the "active" 
-        #       DAC — the DAC channel where Digital Outputs are enabled — and is 
-        #       NORMALLY emitted on even sweeps (0, 2, 4, …)
-        #   • the "alternate" digital bit pattern is the one defined on an additional
-        #       DAC — and is NORMALLY emitted on odd sweeps (1, 3, 5, …)
-        #
-        # When alternateDigitalOutputsEnabled is True:
-        # • When Digital Outputs are enabled on a higher DAC (i.e., the active
-        #   DAC index > 1):
-        #
-        #   ∘ If no other DAC defines a DIG pattern-containing epoch, NO
-        #       waveform is emitted at all
-        #
-        #   ∘ If only one of DAC0/DAC1 has DIG pattern-containing epoch, a 
-        #       digital waveform is generates on only ONE of the sweeps, with NO
-        #       alternative :
-        #
-        # active    DAC w/:   waveform    with bit pattern      and timings     no DIG waveform  
-        # DAC:      DIG       emitted     (incl. DIG channel)   from DAC:       waveform emitted
-        # (e.g.)    epoch     on sweep:   from DAC:                             on sweep:
-        # --------------------------------------------------------------------------------------
-        # DAC4      DAC0      even        DAC0                  DAC0            odd
-        # "main"    "alt"     (0,2,4,…)                         (1,3,5,…)
-        #                                                                       (old "alt" is muted)
-        #
-        # DAC0      DAC4      even        DAC0                  activeDAC       odd
-        # "main"    "alt"                 "main" used                           ("alt" is muted)
-        #                                  
-        # => DAC0 takes precedence over activeDAC for emitting pattern on 0ᵗʰ sweep (0,2,4,…)
-        #   while 1ˢᵗ sweep is muted
-        # --------------------------------------------------------------------------------------
-        # DAC4      DAC1      odd         DAC1                  activeDAC(!)    even
-        # "main"    "alt"     (1,3,5,…)                         (0,2,4,…)
-        #                                                                       ("main" is muted)
-        #
-        # DAC1      DAC4      odd         DAC1                  DAC1                even
-        # --------------------------------------------------------------------------------------
-        #
-        #   ∘ when both DAC0 and DAC1 emit DIGs (in addition to DAC4):
-        # DAC4      DAC0      even        DAC0=DAC1             DAC0
-        #           DAC1      odd         DAC0=DAC1             DAC0
-        # ----------------------------------------------------------------------
-        # DAC0      DAC1      even        DAC0                  DAC0
-        #           DACX      odd         DAC1                  DAC1
-        #
-        # DAC1      DAC0      even        DAC0                  DAC0
-        #           DACX      odd         DAC1                  DAC1
-        #
-        # => all DACs > 1 are ignored !
-        # ----------------------------------------------------------------------
-        # 
-        #
-        
+        actualOutput = dac is None
+            
         dac, _= self._check_DAC_Epoch_(dac, None)
         
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
+        
+        # isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
         
         if self.alternateDigitalOutputsEnabled:
             # NOTE: 2024-10-27 15:53:06
@@ -3427,42 +3366,46 @@ class ABFProtocol(ElectrophysiologyProtocol):
             epochDigPattern = self.getDigitalPattern(epoch.epochNumber,
                                                      alternate=isAlternateDigital,
                                                      natural=False, separateBanks=True)
+            
+            if actualOutput:
+                if self.alternateDigitalOutputsEnabled and epoch.number in digEpochs:
+                        # get the actual dac where the alternative digital bit pattern was defined:
+                    digDACs = self.getDACsForEpoch(epoch.number)
+                    if len(digDACs) > 1:
+                        assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
+                        thisDacNdx = digDACs.index(dac.physicalIndex)
+                        print(f"{self.__class__.__name__}.getEpochsTable: thisDacNdx = {thisDacNdx}")
 
-            if self.alternateDigitalOutputsEnabled and epoch.number in digEpochs:
-                    # get the actual dac where the alternative digital bit pattern was defined:
-                digDACs = self.getDACsForEpoch(epoch.number)
-                if len(digDACs) > 1:
-                    assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
-                    thisDacNdx = digDACs.index(dac.physicalIndex)
-                    print(f"{self.__class__.__name__}.getEpochsTable: thisDacNdx = {thisDacNdx}")
-
-                    if self.activeDACChannel == 0:
-                        myDac = self.getDAC(1 if isAlternateDigital else 0)
-                    elif self.activeDACChannel == 1:
-                        myDac = self.getDAC(0 if isAlternateDigital else 1)
-                    else:
-                        # myDac = self.getDAC(digDACs[0] if isAlternateDigital else self.activeDACChannel) # get the first one!
-                        myDac = self.getDAC(digDACs[thisDacNdx-1] if isAlternateDigital else self.activeDACChannel) # get the first one!
-                    # if thisDacNdx == 0: # get the next one up
-                    #     myDac = self.getDAC(digDACs[thisDacNdx+1])
-                    # else: 
-                    #     myDac = self.getDAC(digDACs[0]) # get the first one!
-                        # myDac = self.getDAC(digDACs[thisDacNdx-1]) # get the next one down
+                        if self.activeDACChannel == 0:
+                            myDac = self.getDAC(1 if isAlternateDigital else 0)
+                        elif self.activeDACChannel == 1:
+                            myDac = self.getDAC(0 if isAlternateDigital else 1)
+                        else:
+                            # myDac = self.getDAC(digDACs[0] if isAlternateDigital else self.activeDACChannel) # get the first one!
+                            myDac = self.getDAC(digDACs[thisDacNdx-1] if isAlternateDigital else self.activeDACChannel) # get the first one!
+                        # if thisDacNdx == 0: # get the next one up
+                        #     myDac = self.getDAC(digDACs[thisDacNdx+1])
+                        # else: 
+                        #     myDac = self.getDAC(digDACs[0]) # get the first one!
+                            # myDac = self.getDAC(digDACs[thisDacNdx-1]) # get the next one down
+                            
+                        # to report correct temporal params for epoch in DAC, given sweep index    
+                        myEpoch = myDac.getEpoch(epoch.number)
                         
-                    # to report correct temporal params for epoch in DAC, given sweep index    
-                    myEpoch = myDac.getEpoch(epoch.number)
-                    
+                    else:
+                        myDac = dac
+                        myEpoch = epoch
+                        
                 else:
                     myDac = dac
                     myEpoch = epoch
-                    
             else:
+                # OK here: shows the Epoch table AS DEFINED in Clampex, regardless 
+                # of the sweep
                 myDac = dac
                 myEpoch = epoch
-            # myDac = dac
-            # myEpoch = epoch
             
-            print(f"{self.__class__.__name__}.getEpochsTable: active DAC is {self.activeDACChannel}; myDac is {myDac.physicalIndex}")
+            print(f"{self.__class__.__name__}.getEpochsTable: active DAC is {self.activeDACChannel}; myDac is {myDac.physicalIndex}; showing actual output: {actualOutput}")
                 
             if includeDigitalPattern:
                 epValues = [myEpoch.typeName, myEpoch.firstLevel, 
@@ -3749,7 +3692,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # trick to avoid calling getDigitalPattern twice - see docstring for 
         # self.getUsedDigitalChannels() - the trick is that getDigitalPattern
         # now accepts a digital but pattern tuple (with some caveats!)
-        digPattern = self.getDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
+        # digPattern = self.getDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
+        digPattern = self.getDigitalPattern(myEpoch) # either main or alternate, depending on the sweep
         usedDigs = self.getUsedDigitalChannels(digPattern)
         
         if len(usedDigs) == 0:
@@ -6302,7 +6246,7 @@ def bitListToString(bits:list, star:bool=False):
     return ret
         
 @singledispatch
-def getDIGPatterns(o, reverse_banks:bool=False, wrap:bool=False, 
+def getDIGPatterns(o:typing.Union[neo.Block, pyabf.ABF], reverse_banks:bool=False, wrap:bool=False, 
                    pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
     """Access the digital patterns of bit flags associated with the Epochs.
 
@@ -6323,7 +6267,7 @@ def getDIGPatterns(o, reverse_banks:bool=False, wrap:bool=False,
 
     Each pattern is a 4-tuple (for ABF1) or a pair of 4-tuples (for ABF2), 
     where a 4-tuple represents the bit value (0 or 1, or '*' for pulse train) 
-    for the corresponding DIG channel index
+    for the corresponding DIG channel index.
 
     NOTE: Below, the number of DIG channels (and banks) depends on the ditigizer:
 
@@ -6331,6 +6275,9 @@ def getDIGPatterns(o, reverse_banks:bool=False, wrap:bool=False,
     
     DigiData 1550 series: DIG channels ((3, 2, 1, 0) , (7, 6, 5, 4)) i.e. two 
                         banks of 4 bits
+    
+    NOTE: In the ABF file metadata thse bit patterns are stored as 8 bytes (one 
+    byte per DIG channnel) for the main, and 8 bytes for the alternate pattern
 
     Parameters:
     ===========
@@ -6397,8 +6344,8 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
         epochNumber = epoch_info["nEpochNum"]
         if isinstance(epoch_num, int) and epoch_num != epochNumber:
             continue
-        dpm  = getSynchBitList(epoch_info["nDigitalValue"])
-        dtm  = getSynchBitList(epoch_info["nDigitalTrainValue"])
+        dpm = getSynchBitList(epoch_info["nDigitalValue"])
+        dtm = getSynchBitList(epoch_info["nDigitalTrainValue"])
         dpa = getAlternateBitList(epoch_info["nAlternateDigitalValue"])
         dta = getAlternateBitList(epoch_info["nAlternateDigitalTrainValue"])
         
