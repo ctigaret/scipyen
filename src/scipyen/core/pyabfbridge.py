@@ -3356,25 +3356,27 @@ class ABFProtocol(ElectrophysiologyProtocol):
                         "First Duration", "First Duration (Samples)",
                         "Delta Duration", "Delta Duration (Samples)",
                         "Actual Duration", "Actual Duration (Samples)",
+                        "Final Duration", "Final Duration (Samples)",
                         "Digital Pattern (#3-0)", "Digital Pattern (#7-4)", 
                         "Train Rate", "Train Period", "Train Period (Samples)",
                         "Pulse Width", "Pulse Width (Samples)",
-                        "Pulse Count"]
+                        "Pulse Count", "Final Pulse Count"]
         else:
             rowIndex = ["Type", "First Level", "Delta Level",
                         "First Duration", "First Duration (Samples)",
                         "Delta Duration", "Delta Duration (Samples)",
                         "Actual Duration", "Actual Duration (Samples)",
+                        "Final Duration", "Final Duration (Samples)",
                         "Train Rate", "Train Period", "Train Period (Samples)",
                         "Pulse Width", "Pulse Width (Samples)",
-                        "Pulse Count"]
+                        "Pulse Count", "Final Pulse Count"]
                 
         epochData = dict()
         
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
         
-        print(f"{self.__class__.__name__}.getEpochsTable: isAlternateDigital = {isAlternateDigital}")
+        # print(f"{self.__class__.__name__}.getEpochsTable: isAlternateDigital = {isAlternateDigital}")
         
         for i, epoch in enumerate(dac.epochs):
             epochDigPattern = self.getDigitalPattern(epoch.epochNumber,
@@ -3385,11 +3387,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 if self.alternateDigitalOutputsEnabled and epoch.number in digEpochs:
                     # get the actual dac where the alternative digital bit pattern was defined:
                     digDACs = self.getDACsForEpoch(epoch.number)
-                    print(f"{self.__class__.__name__}.getEpochsTable: digDACs = {digDACs}")
+                    # print(f"{self.__class__.__name__}.getEpochsTable: digDACs = {digDACs}")
                     if len(digDACs) > 1:
                         assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
                         thisDacNdx = digDACs.index(dac.physicalIndex)
-                        print(f"{self.__class__.__name__}.getEpochsTable: thisDacNdx ({dac.physicalIndex}) = {thisDacNdx}")
+                        # print(f"{self.__class__.__name__}.getEpochsTable: thisDacNdx ({dac.physicalIndex}) = {thisDacNdx}")
 
                         if self.activeDACChannel == 0:
                             myDac = self.getDAC(1 if isAlternateDigital else 0)
@@ -3421,37 +3423,54 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 myDac = dac
                 myEpoch = epoch
             
-            print(f"{self.__class__.__name__}.getEpochsTable: active DAC is {self.activeDACChannel}; myDac is {myDac.physicalIndex}; showing actual output: {actualOutput}")
-                
+            # print(f"{self.__class__.__name__}.getEpochsTable: active DAC is {self.activeDACChannel}; myDac is {myDac.physicalIndex}; showing actual output: {actualOutput}")
+
+            duration = self.getEpochDuration(myDac, myEpoch, sweep, samples = False)
+            durationSamples = scq.nSamples(duration, self.samplingRate)
+            
+            deltaDuration = self.getEpochDeltaDuration(myDac, myEpoch)
+            deltaDurationSamples = scq.nSamples(deltaDuration, self.samplingRate)
+            
+            finalDuration = self.getEpochDuration(myDac, myEpoch, self.nSweeps-1, samples = False)
+            finalDurationSamples = scq.nSamples(finalDuration, self.samplingRate)
+            
+            pulsePeriod = self.getEpochPulsePeriod(myDac, myEpoch, sweep)
+            pulePeriodSamples = scq.nSamples(pulsePeriod, self.samplingRate)
+            
+            pulseCount = 0 if pulsePeriod == 0. else duration/pulsePeriod
+            finalPulseCount = 0 if pulsePeriod == 0. else finalDuration/pulsePeriod
+            
             if includeDigitalPattern:
                 epValues = [myEpoch.typeName, myEpoch.firstLevel, 
                             myEpoch.deltaLevel, myEpoch.firstDuration, 
                             scq.nSamples(myEpoch.firstDuration, self.samplingRate),
-                            myEpoch.deltaDuration, 
-                            scq.nSamples(myEpoch.deltaDuration, self.samplingRate),
-                            self.getEpochDuration(myDac, myEpoch, sweep, samples = False),
-                            self.getEpochDuration(myDac, myEpoch, sweep, samples = True),
+                            deltaDuration, deltaDurationSamples,
+                            duration, durationSamples,
+                            finalDuration, finalDurationSamples,
                             "".join(map(str, epochDigPattern[0])), 
                             "".join(map(str, epochDigPattern[1])),
-                            myEpoch.pulseFrequency, myEpoch.pulsePeriod, 
-                            scq.nSamples(myEpoch.pulsePeriod, self.samplingRate),
+                            myEpoch.pulseFrequency, 
+                            pulsePeriod, pulsePeriodSamples,
                             myEpoch.pulseWidth, 
                             scq.nSamples(myEpoch.pulseWidth, self.samplingRate),
-                            self.getEpochPulseCount(myDac, myEpoch, sweep)]
+                            pulseCount,
+                            finalPulseCount,
+                            ]
             
             else:
                 epValues = [myEpoch.typeName, myEpoch.firstLevel, 
                             myEpoch.deltaLevel, myEpoch.firstDuration, 
                             scq.nSamples(myEpoch.firstDuration, self.samplingRate),
-                            myEpoch.deltaDuration, 
-                            scq.nSamples(myEpoch.deltaDuration, self.samplingRate),
-                            self.getEpochDuration(myDac, myEpoch, sweep, samples = False),
-                            self.getEpochDuration(myDac, myEpoch, sweep, samples = True),
-                            myEpoch.pulseFrequency, myEpoch.pulsePeriod, 
-                            scq.nSamples(myEpoch.pulsePeriod, self.samplingRate),
+                            deltaDuration, deltaDurationSamples,
+                            duration, durationSamples,
+                            finalDuration, finalDurationSamples,
+                            myEpoch.pulseFrequency, 
+                            pulsePeriod, pulsePeriodSamples,
                             myEpoch.pulseWidth, 
                             scq.nSamples(myEpoch.pulseWidth, self.samplingRate),
-                            self.getEpochPulseCount(myDac, myEpoch, sweep)]
+                            pulseCount,
+                            finalPulseCount,
+                            ]
             
             epochData[epoch.letter] = epValues
             
