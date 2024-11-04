@@ -3,7 +3,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-# TODO: 2022-10-06 11:24:20
+# TODO: inject special attribute "scipyen_workspace" to save/restore a whole
+# bunch of variables in the workspace wrapped as a dict (or types.SimpleNamespace?)
+#
+# work with pictio, to determine:
+# • which variables to save (certainly leave out the hidden ones, module and 
+# functions, GUI  objects, and certainly those objects where toHDF5/fromHDF5 are 
+# not defined)
+#
+# • to restore those variables DIRECTLY in the user's namespace
+
+# TODO: 2022-10-06 11:24:20 - NOTE much of this below accomplished by now
 # • a LOT of code refactoring on the reading side
 # • deal with neo DataObject array_annotations (how ?!?)
 # • what to do with references to segment, unit, in neo.DataObject/Container ?

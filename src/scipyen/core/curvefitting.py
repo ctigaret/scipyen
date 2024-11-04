@@ -1060,8 +1060,8 @@ def fit_nsfa(data, p0, **kwargs):
                      
 def fit_model(data, func, p0, *args, **kwargs):
     """Generic fitting function.
-    Applies scipy.optimize.least_squares using cost function to calculate the
-    residuals between the model function in `func` and `data`.
+    Applies scipy.optimize.least_squares to minimize the residuals between the 
+    model function `func` and measurements in `data`.
     
     Positional parameters:
     =====================
@@ -1124,7 +1124,7 @@ def fit_model(data, func, p0, *args, **kwargs):
         Fit             ↦ the fit result output by scipy.optimize.least_squares
         Coefficients    ↦ a tuple with fitted model parameter values
         Rsq             ↦ R² correlation coefficient between the fitted curve 
-                         and the `data` (sort of goodness-of-fit)
+                         and the `data`
     
     
     """
