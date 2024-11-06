@@ -3281,16 +3281,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Delta Duration (samples)¹ ²
         Train Period (samples)¹ ³
         Pulse Width (samples)¹
-        
+        Final Duration²
+        Final Duration (Samples)²
+        Pulse Count
+        Final Pulse Count — same as Pulse Count if Delta Duration == 0, else
+            this is the pulse count emitted during the last sweep that uses the
+            pulse-emitting Epoch.
         Currently not shown:
         Sample rate (Fast vs Slow)
-        Final duration — this is only shown, in Clampex, when Delta Duration (ms) > 0
-            and there are more than one sweep "emitting" (or "using") this Epoch.
-            The final duration is calculated regardless of whether the Epoch emits
-            a DIG signal or analog waveform.
         
         ¹ In Clampex, these are shown as additional information below the Epochs table
-        ² In Clampex, this is only shown when Delta Duration (ms) > 0
+        ² In Clampex, this is only shown when Delta Duration (ms) > 0, and there
+            are more than one sweep using this Epoch
         ³ In Clampex, this is reported on the same line as Train rate, albeit
                 inappropriately called "rate".
         
@@ -3300,7 +3302,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # looks OK now
         #
         # NOTE: 2024-10-30 21:31:01 TODO:
-        # 1) factor in the situation where delta duration > 0
         # 2) use same logic for generating epoch (and sweep) -specific digital
         # waveform (self.getEpochDigitalWaveform)
         #   in this respect, consider factoring the logic out to a common instance
@@ -3313,6 +3314,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
         
+        # HO DAC is a "high-order" DAC: a DAC with index > 1
         hoDACActive = self.activeDACChannel not in (0,1)
         
         if self.alternateDigitalOutputsEnabled:
@@ -3350,7 +3352,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     isAlternateDigital =  sweep % 2 > 0
             else:
                 isAlternateDigital = dac.physicalIndex != self.activeDACChannel
-                    
+          
+        # ### BEGIN set up row labels for output data frame
         if includeDigitalPattern:
             rowIndex = ["Type", "First Level", "Delta Level",
                         "First Duration", "First Duration (Samples)",
@@ -3370,6 +3373,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                         "Train Rate", "Train Period", "Train Period (Samples)",
                         "Pulse Width", "Pulse Width (Samples)",
                         "Pulse Count", "Final Pulse Count"]
+        # ### END set up row labels for output data frame
                 
         epochData = dict()
         
@@ -3434,11 +3438,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             finalDuration = self.getEpochDuration(myDac, myEpoch, self.nSweeps-1, samples = False)
             finalDurationSamples = scq.nSamples(finalDuration, self.samplingRate)
             
-            pulsePeriod = self.getEpochPulsePeriod(myDac, myEpoch, sweep)
-            pulePeriodSamples = scq.nSamples(pulsePeriod, self.samplingRate)
+            pulsePeriod = self.getEpochPulsePeriod(myDac, myEpoch)
+            pulsePeriodSamples = scq.nSamples(pulsePeriod, self.samplingRate)
             
-            pulseCount = 0 if pulsePeriod == 0. else duration/pulsePeriod
-            finalPulseCount = 0 if pulsePeriod == 0. else finalDuration/pulsePeriod
+            pulseCount = 0 if pulsePeriod == 0. else int(duration/pulsePeriod)
+            finalPulseCount = 0 if pulsePeriod == 0. else int(finalDuration/pulsePeriod)
             
             if includeDigitalPattern:
                 epValues = [myEpoch.typeName, myEpoch.firstLevel, 
@@ -3686,43 +3690,80 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
         
+        actualOutput = dac is None
+            
         dac, epoch = self._check_DAC_Epoch_(dac, epoch)
         
-        digEpochs = self.epochsWithDigitalOutput
+        # digEpochs = self.epochsWithDigitalOutput
+        
+        hoDACActive = self.activeDACChannel not in (0,1)
         
         if self.alternateDigitalOutputsEnabled:
             isAlternateDigital = False
-            if dac.physicalIndex == self.activeDACChannel:
-                if sweep % 2 > 0:
+            if actualOutput:
+                if hoDACActive:
                     isAlternateDigital = True
-                    
-        if isAlternateDigital and epoch.number in digEpochs:
-            digDACs = self.getDACsForEpoch(epoch.number)
-            if len(digDACs) > 1:
-                assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
-                thisDacNdx = digDACs.index(dac.physicalIndex)
-                
-                if thisDacNdx == 0: # get the next one up
-                    myDac = self.getDAC(digDACs[thisDacNdx+1])
                 else:
-                    myDac = self.getDAC(digDACs[0]) # get the first one!
+                    isAlternateDigital =  sweep % 2 > 0
+            else:
+                isAlternateDigital = dac.physicalIndex != self.activeDACChannel
+                 
+        
+        digOFF = digON = trainOFF = trainON = None
+        
+        # if epoch.number in digEpochs:
+        if actualOutput:
+            if self.alternateDigitalOutputsEnabled:
+                digDACs = self.getDACsForEpoch(epoch.number)
+                if len(digDACs) > 1:
+                    assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
+                    thisDacNdx = digDACs.index(dac.physicalIndex)
+                    if self.activeDACChannel == 0:
+                        myDac = self.getDAC(1 if isAlternateDigital else 0)
+                    elif self.activeDACChannel == 1:
+                        myDac = self.getDAC(0 if isAlternateDigital else 1)
+                    else:
+                        assert hoDACActive, f"Active DAC index expected to be > 1; got {self.activeDACChannel}"
+                        # activeDAC is a HO DAC
+                        if sweep % 2 == 0 and 0 in digDACs: # "even" sweeps => query DAC0
+                            myDac = self.getDAC(0)
+                        elif sweep % 2 > 0 and 1 in digDACs: # "odd" sweeps => query DAC1
+                            myDac = self.getDAC(1)
+                        else:
+                            myDac = dac
+                            # continue
+                        
+                    # to report correct temporal params for epoch in DAC, given sweep index    
+                    myEpoch = myDac.getEpoch(epoch.number)
                     
-                # to report correct temporal params for epoch in DAC, given sweep index
-                myEpoch = myDac.getEpoch(epoch.number)
-                
+                else:
+                    myDac = dac
+                    myEpoch = epoch
+                    
             else:
                 myDac = dac
                 myEpoch = epoch
         else:
+            # OK here: shows the Epoch table AS DEFINED in Clampex, regardless 
+            # of the sweep
             myDac = dac
             myEpoch = epoch
+            
+        duration = self.getEpochDuration(myDac, myEpoch, sweep, samples = False)
+        durationSamples = scq.nSamples(duration, self.samplingRate)
         
-        actualDuration = myEpoch.firstDuration + sweep * myEpoch.deltaDuration
-        epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
-        pulsePeriod = self.getEpochPulsePeriod(myDac, myEpoch, True)
-        pulseSamples = self.getEpochPulseWidth(myDac, myEpoch, True)
-        pulseCount = self.getEpochPulseCount(myDac, myEpoch, sweep)
-
+        deltaDuration = self.getEpochDeltaDuration(myDac, myEpoch)
+        deltaDurationSamples = scq.nSamples(deltaDuration, self.samplingRate)
+        
+        finalDuration = self.getEpochDuration(myDac, myEpoch, self.nSweeps-1, samples = False)
+        finalDurationSamples = scq.nSamples(finalDuration, self.samplingRate)
+        
+        pulsePeriod = self.getEpochPulsePeriod(myDac, myEpoch)
+        pulsePeriodSamples = scq.nSamples(pulsePeriod, self.samplingRate)
+        
+        pulseCount = 0 if pulsePeriod == 0. else int(duration/pulsePeriod)
+        finalPulseCount = 0 if pulsePeriod == 0. else int(finalDuration/pulsePeriod)
+            
         # NOTE: 2024-10-28 17:28:04
         # trick to avoid calling getDigitalPattern twice - see docstring for 
         # self.getUsedDigitalChannels() - the trick is that getDigitalPattern
@@ -3730,55 +3771,62 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # digPattern = self.getDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
         digPattern = self.getDigitalPattern(myEpoch) # either main or alternate, depending on the sweep
         usedDigs = self.getUsedDigitalChannels(digPattern)
-        
-        if len(usedDigs) == 0:
-            scipywarn(f"The epoch {myEpoch.number} ({myEpoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) does NOT emit digital signals")
-            return 
+                
+        # if len(usedDigs) == 0:
+        #     scipywarn(f"The epoch {myEpoch.number} ({myEpoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) does NOT emit digital signals")
+        #     return 
         
         if isinstance(digChannel, int):
-            if digChannel not in usedDigs:
-                scipywarn(f"The DIG channel {digChannel} is not used in the epoch {myEpoch.number} ({epoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) ")
-                return 
+            # if digChannel not in usedDigs:
+            #     scipywarn(f"The DIG channel {digChannel} is not used in the epoch {myEpoch.number} ({epoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) ")
+            #     return 
             digChannel = (digChannel,)
         
-        elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            if any(v not in usedDigs for v in digChannel):
-                scipywarn(f"Not all specified DIG channels {digChannel} are used by the epoch {myEpoch.number} ({myEpoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) ")
-                return 
+        # elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+            # if any(v not in usedDigs for v in digChannel):
+            #     scipywarn(f"Not all specified DIG channels {digChannel} are used by the epoch {myEpoch.number} ({myEpoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) ")
+            #     return 
+            
             
         elif digChannel is None:
             digChannel = usedDigs
             
         else:
             raise TypeError(f"Expecting digChannel an int or a sequence of int; instead got {digChannel}")
-
-        digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+    
         
-        if lastLevelOnly:
-            return tuple(map(lambda k, chnl: self.getDigitalLogicLevels(chnl, lambda k: True if digChannelValue[k] == "*" else False if digChannelValue[k]==1 else None)[0] , digChannel))
-        
-        waves = list()
-        
-        digOFF = digON = trainOFF = trainON = None
-        
-        for k, chnl in enumerate(digChannel):
-            wave = np.full([epochSamplesCount, 1], 0) * myDac.units
-            
-            if digChannelValue[k] == 1: # emits pulse (a.k.a step)
-                digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
+        if len(digChannel) == 0:
+            if lastLevelOnly:
+                return tuple(map(lambda k, chnl: self.getDigitalLogicLevels(chnl, None)[0] , digChannel))
                 
-                wave[:] = digON
+            waves = [np.full([durationSamples, 1], 0) * myDac.units for k in range(len(digChannel))]
+            
+        else:
+            digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+            if lastLevelOnly:
+                return tuple(map(lambda k, chnl: self.getDigitalLogicLevels(chnl, lambda k: True if digChannelValue[k] == "*" else False if digChannelValue[k]==1 else None)[0] , digChannel))
+            
+            waves = list()
+            
+            for k, chnl in enumerate(digChannel):
+                wave = np.full([durationSamples, 1], 0) * myDac.units
+                
+                if digChannelValue[k] == 1: # emits pulse (a.k.a step)
+                    digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
                     
-            elif digChannelValue[k] == "*": # emits train
-                trainOFF, trainON = self.getDigitalTrainLogicLevels()
-
-                wave[:] = trainOFF
-                for pulse in range(pulseCount):
-                    p1 = int(pulsePeriod * pulse)
-                    p2 = int(p1 + pulseSamples)
-                    wave[p1:p2] = trainON
+                    wave[:] = digON
                         
-            waves.append(wave)
+                elif digChannelValue[k] == "*": # emits train
+                    trainOFF, trainON = self.getDigitalTrainLogicLevels()
+
+                    wave[:] = trainOFF
+                    
+                    for pulse in range(pulseCount):
+                        p1 = int(pulsePeriod * pulse)
+                        p2 = int(p1 + pulseSamples)
+                        wave[p1:p2] = trainON
+                            
+                waves.append(wave)
             
         if not separateWaves:
             waves = [np.hstack(waves) * myDac.units]
@@ -3787,6 +3835,79 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return tuple(waves), digOFF, digON, trainOFF, trainON
         
         return tuple(waves)
+            
+            
+            
+#         actualDuration = myEpoch.firstDuration + sweep * myEpoch.deltaDuration
+#         epochSamplesCount = scq.nSamples(actualDuration, self.samplingRate)
+#         pulsePeriod = self.getEpochPulsePeriod(myDac, myEpoch, True)
+#         pulseSamples = self.getEpochPulseWidth(myDac, myEpoch, True)
+#         pulseCount = self.getEpochPulseCount(myDac, myEpoch, sweep)
+# 
+#         # NOTE: 2024-10-28 17:28:04
+#         # trick to avoid calling getDigitalPattern twice - see docstring for 
+#         # self.getUsedDigitalChannels() - the trick is that getDigitalPattern
+#         # now accepts a digital but pattern tuple (with some caveats!)
+#         # digPattern = self.getDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
+#         digPattern = self.getDigitalPattern(myEpoch) # either main or alternate, depending on the sweep
+#         usedDigs = self.getUsedDigitalChannels(digPattern)
+#         
+#         if len(usedDigs) == 0:
+#             scipywarn(f"The epoch {myEpoch.number} ({myEpoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) does NOT emit digital signals")
+#             return 
+#         
+#         if isinstance(digChannel, int):
+#             if digChannel not in usedDigs:
+#                 scipywarn(f"The DIG channel {digChannel} is not used in the epoch {myEpoch.number} ({epoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) ")
+#                 return 
+#             digChannel = (digChannel,)
+#         
+#         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
+#             if any(v not in usedDigs for v in digChannel):
+#                 scipywarn(f"Not all specified DIG channels {digChannel} are used by the epoch {myEpoch.number} ({myEpoch.letter}) of DAC {myDac.physicalIndex} ({myDac.name}) ")
+#                 return 
+#             
+#         elif digChannel is None:
+#             digChannel = usedDigs
+#             
+#         else:
+#             raise TypeError(f"Expecting digChannel an int or a sequence of int; instead got {digChannel}")
+
+        # digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+        
+#         if lastLevelOnly:
+#             return tuple(map(lambda k, chnl: self.getDigitalLogicLevels(chnl, lambda k: True if digChannelValue[k] == "*" else False if digChannelValue[k]==1 else None)[0] , digChannel))
+#         
+#         waves = list()
+#         
+#         digOFF = digON = trainOFF = trainON = None
+#         
+#         for k, chnl in enumerate(digChannel):
+#             wave = np.full([epochSamplesCount, 1], 0) * myDac.units
+#             
+#             if digChannelValue[k] == 1: # emits pulse (a.k.a step)
+#                 digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
+#                 
+#                 wave[:] = digON
+#                     
+#             elif digChannelValue[k] == "*": # emits train
+#                 trainOFF, trainON = self.getDigitalTrainLogicLevels()
+# 
+#                 wave[:] = trainOFF
+#                 for pulse in range(pulseCount):
+#                     p1 = int(pulsePeriod * pulse)
+#                     p2 = int(p1 + pulseSamples)
+#                     wave[p1:p2] = trainON
+#                         
+#             waves.append(wave)
+#             
+#         if not separateWaves:
+#             waves = [np.hstack(waves) * myDac.units]
+#             
+#         if returnLevels:
+#             return tuple(waves), digOFF, digON, trainOFF, trainON
+#         
+#         return tuple(waves)
         
     def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:
