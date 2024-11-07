@@ -2483,8 +2483,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if alternate is None:
             # BUG: 2024-11-07 17:13:35 FIXME
             # what is pattern, here ?!?
-            print(f"{self.__class__.__name__}.getEpochDigitalPattern: pattern = {pattern} for alternate = {alternate}")
-            return ABFDigitalPattern(*tuple(map(lambda x: tuple(k for k in range(len(x)) if comparator(x[k])), pattern)))
+            # print(f"{self.__class__.__name__}.getEpochDigitalPattern: pattern = {pattern} for alternate = {alternate}")
+            if isinstance(pattern, ABFDigitalPattern):
+                return ABFDigitalPattern(*tuple(map(lambda x: tuple(k for k in range(len(x)) if comparator(x[k])), pattern)))
+            return tuple(k for k in range(len(pattern)) if comparator(pattern[k]))
             
         return tuple(k for k in range(len(pattern)) if comparator(pattern[k]))
     
@@ -3257,7 +3259,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
         
-        usedDigs = tuple(itertools.chain.from_iterable(self.getUsedDigitalChannels(sweep, e) for e in digEpochs))
+        usedDigs = tuple(itertools.chain.from_iterable(map(lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x, (self.getUsedDigitalChannels(sweep, e) for e in digEpochs))))
+
      
         # NOTE: 2023-09-20 22:22:41
         # the digital output is ALWAYS in V
@@ -3265,6 +3268,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # "low logic" means 0V on a background of 5V
         
         # usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in dac.epochs]))
+        # print(f"{self.__class__.__name__}.getDigitalWaveform: supplied digChannel = {digChannel}")
+        # print(f"{self.__class__.__name__}.getDigitalWaveform: usedDigs = {usedDigs}")
         
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
@@ -3273,8 +3278,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             digChannel = (digChannel,)
             
         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            if all(v not in usedDigs for v in digChannel):
-                raise ValueError(f"Invalid DIG channel indexes {digChannel}")
+            # if all(v not in usedDigs for v in digChannel):
+            #     raise ValueError(f"Invalid DIG channel indexes {digChannel}")
             
             digChannel = tuple(sorted(set(digChannel)))
             
@@ -3307,6 +3312,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             lastEpochNdx = 0
             lastLevel = None 
+            
+        # print(f"{self.__class__.__name__}.getDigitalWaveform: digChannel = {digChannel}")
         
         for epoch in myDac.epochs:
             actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
@@ -3344,7 +3351,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 lastLevel = epochWaves[0][-1,:]
                 waveforms[ndx[0]:ndx[1], :] = epochWaves[0]
                 
-        if self.protocol.digitalUseLastEpochHolding:
+        if self.digitalUseLastEpochHolding:
             if separateWaves:
                 for k in range(len(waveforms)):
                     waveforms[k][lastEpochNdx[k]:, :] = lastLevel[k]
@@ -3556,6 +3563,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         elif digChannel is None:
             digChannel = usedDigs
             
+        elif isinstance(digChannel, (tuple, int)) and all(isinstance(v, int) for v in digChannel) :
+            digChannel = tuple(sorted(set(digChannel)))
         else:
             raise TypeError(f"Expecting digChannel an int or a sequence of int; instead got {digChannel}")
         
