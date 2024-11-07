@@ -409,6 +409,9 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         NOTE: 2022-03-14 21:47:39 CMT
         Fixes crashes with long list display until the qtconsole 5.3.0 comes to
         life
+        NOTE: 2024-11-07 08:04:14
+        This is hisoric, consider reverting to the qtconsole code (i.e., remove
+        this method override).
         """
         text = self._pending_insert_text
         self._pending_insert_text = []
@@ -445,10 +448,6 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     @Slot()
     def slot_clearConsole(self):
         self.clear()
-        # cursor = self._control.textCursor()
-        # cursor.beginEditBlock()
-        # cursor.insertText('\n')
-        # cursor.endEditBlock()
         
         
     @safeWrapper
