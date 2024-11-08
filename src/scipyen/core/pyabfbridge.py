@@ -3467,6 +3467,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         isAlternateWaveform = False
         
         if self.alternateWaveformsEnabled:
+            # NOTE: 2024-11-08 15:04:54
+            # if there is only one DAC emitting analogwaveform, then use that 
+            # DAC's waveform on even sweeps (0,2,4,…) and nothing on odd sweeps
+            # (1,3,5,…)
+            # if there are two DACs emitting waveforms then use the 
             pass # TODO 2024-11-08 12:24:18 finalize me!
     
             
