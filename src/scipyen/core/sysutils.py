@@ -114,7 +114,19 @@ def is_kde_x11():
     if platform.system() != "Linux":
         return False
     
-    return get_desktop("session") == "x11" and get_desktop() == "KDE"
+    return get_desktop("session").lower() == "x11" and get_desktop() == "KDE"
+
+def is_kde_wayland():
+    if platform.system() != "Linux":
+        return False
+    
+    return get_desktop("session").lower() == "wayland" and get_desktop() == "KDE"
+
+def is_kde():
+    if platform.system() != "Linux":
+        return False
+    
+    return get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "KDE"
 
 def adapt_ui_path(module_path, uifile):
     """failed attempt to reorganize the UI files in the bundle"""

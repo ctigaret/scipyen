@@ -929,6 +929,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # • a train of pulses ("pulse mode"), when its byte value resolves to '*'
             self._nTotalDigitalOutputs_ = obj._protocolSection.nDigitizerTotalDigitalOuts
             
+            self._nDigitalEnable_ = obj._protocolSection.nDigitalEnable
+            
             # not sure what this is, my guess is that it represents how many of 
             # the DIG channels can emit trains ?
             # from what I gathered so far:
@@ -998,6 +1000,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             # _nDigitalOutputs_ is the same as nDACChannels: same source, same value
             # self._nDigitalOutputs_ = info_dict["sections"]["DACSection"]["llNumEntries"]
             self._nTotalDigitalOutputs_ = info_dict["protocol"]["nDigitizerTotalDigitalOuts"]
+            self._nDigitalEnable_ = info_dict["protocol"]["nDigitalEnable"]
             self._nSynchronizedDigitalOutputs_ = info_dict["protocol"]["nDigitizerSynchDigitalOuts"]
             self._hasAltDigOutState_ = bool(info_dict["protocol"]["nAlternateDigitalOutputState"])
             self._digTrainActiveHi_ = bool(info_dict["protocol"]["nDigitalTrainActiveLogic"])
@@ -1066,6 +1069,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             # self._nDigitalOutputs_ = kwargs.get("nDigitalOutputs", 0)
             self._nTotalDigitalOutputs_ = kwargs.get("nTotalDigitalOutputs", 0)
+            self._nDigitalEnable_ = kwargs.get("nDigitalEnable", 0)
             self._nSynchronizedDigitalOutputs_ = kwargs.get("nSynchronizedDigitalOutputs", 0)
             self._hasAltDigOutState_ = kwargs.get("hasAltDigOutState", False)
             self._digTrainActiveHi_ = kwargs.get("digTrainActiveHi", True)
@@ -1364,7 +1368,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
             o.protocol = ret
             
         return ret
-            
     
     def is_identical_except_digital(self, other):
         if not isinstance(other, self.__class__):
@@ -1484,10 +1487,31 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """Alias to operationMode"""
         return self._acquisitionMode_
     
+    # NOTE: 2024-11-08 12:25:51
+    # this property is removed, being made obsolete by self.getDACsWithDigitalOutput
+#     @property
+#     def digitalOutputDACs(self) -> tuple:
+#         """DAC channels where digital output is configured"""
+#         if not self.digitalOutputEnabled:
+#             return tuple()
+#         
+#         dp = self.digitalPatterns
+#         
+#         if len(dp) == 0:
+#             return tuple()
+#         
+#         for sweep in range(self.nSweeps):
+#             
+#         
+#         return tuple(filter(lambda x: x.digitalOutputEnabled, self.DACs))
+    
     @property
-    def digitalOutputDACs(self) -> tuple:
-        """DAC channels where digital output is configured"""
-        return tuple(filter(lambda x: x.digitalOutputEnabled, self.DACs))
+    def digitalOutputEnabled(self) -> bool:
+        return self._nDigitalEnable_ == 1
+    
+    @digitalOutputEnabled.setter
+    def digitalOutputEnabled(self, val:bool):
+        self._nDigitalEnable_ = 1 if val else 0
     
     @property
     def operationMode(self) -> ABFAcquisitionMode:
@@ -1689,6 +1713,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
     @property
     def alternateDACOutputStateEnabled(self) -> bool:
+        """This property is True if protocol emits alternate command waveforms.
+    
+        The command waveforms are analog signals sent to the recorded source via
+        the amplifier. They are "synthesized" by the acquisition software as 
+        digital signals which are then converted to analog form by the DAQ device
+        and sent to the amplifier via DAC outputs.
+        
+        When the protocol is configured to emit alternate command waveforms,
+        these waveforms are sent via the DAC here they are defined, on alternate
+        sweeps: waveform from the active DAC is emitted during even-indexed sweeps
+        (0,2,4,… ) whereas the waveform from the "alternative" DAC is emitted 
+        during odd-indexed sweeps( 1,3,5, …)
+        
+        """
         return self._hasAltDacOutState_
     
     @property
@@ -1696,8 +1734,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """Alias to self.alternateDACOutputStateEnabled"""
         return self._hasAltDacOutState_
         
-        
-    
     @property
     def sweepTimes(self) -> pq.Quantity:
         return np.array(list(map(self.getSweepTime, range(self.nSweeps)))) * pq.s
@@ -2467,7 +2503,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 ret = dict()
                 for e in self.digitalPatterns:
                     pattern = self.getEpochDigitalPattern(e, alternate=alternate) # uses natural=True and separateBanks = False
-                    # pattern = self.getDigitalPattern(sweep, e, alternate=alternate) # uses natural=True and separateBanks = False
                     key = getEpochLetter(e) if letters else e
                     # if isinstance(alternate, str) and alternate=="all":
                     if alternate is None:
@@ -2479,11 +2514,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             pattern = self.getEpochDigitalPattern(epoch, alternate=alternate) # uses natural=True and separateBanks = False
             
-        # if isinstance(alternate, str) and alternate=="all":
         if alternate is None:
-            # BUG: 2024-11-07 17:13:35 FIXME
-            # what is pattern, here ?!?
-            # print(f"{self.__class__.__name__}.getEpochDigitalPattern: pattern = {pattern} for alternate = {alternate}")
             if isinstance(pattern, ABFDigitalPattern):
                 return ABFDigitalPattern(*tuple(map(lambda x: tuple(k for k in range(len(x)) if comparator(x[k])), pattern)))
             return tuple(k for k in range(len(pattern)) if comparator(pattern[k]))
@@ -2507,7 +2538,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 ret.add(dac)
         return sorted(list(ret))
         
-                                
     def getDACsForEpoch(self, epoch:typing.Union[ABFEpoch, str, int]) -> tuple:
         """A tuple of DAC physical indexes where the epoch is defined.
         
@@ -2536,212 +2566,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             raise TypeError(f"Expecting an ABFEpoch, int or str; instead, got a {type(epoch).__name__}")
             
-        
-#     def getDigitalPattern_old(self, sweep:int = 0, 
-#                           epoch:typing.Optional[typing.Union[ABFEpoch, int, str]] = None,
-#                           natural:bool=True, separateBanks:bool=False,
-#                           letters:bool=False,
-#                           alternate:typing.Optional[typing.Union[bool, str]]=None) -> tuple:
-#         """
-#         Queries the digital pattern defined in an ABFEpoch.
-#         
-#         A digital pattern is a sequence of 0, 1, or '*' where the position of 
-#         each element corresponds to the index of a DIG output channel. 
-#         
-#         The meaning of these values is given below:
-#         
-#         Element     Logical state of the                Effect:
-#         value:      DIG channel during the epoch:
-#         ------------------------------------------------------------------
-#         0   (int)   Low (OFF)                           No output
-#         1   (int)   High (ON)                           A "step" output¹
-#         '*' (str)   Mutiple OFF↔ON                      A "train" of pulses
-#                     transitions
-#             
-#         ¹ When an epoch emits a "step" on a DIG channel this can be seen as a 
-#         single pulse if the getDigitalHoldingValue() returns True for that DIG 
-#         channel.
-#         
-#         Digidata DAQ boards 1440 and 1550 series provide 8 digital output channels.
-#         
-#         In Clampex v 11.+ (possibly in Clampex 10, too) these digital output 
-#         channels are accesses via two banks, corresponding to two digital bit 
-#         patterns in each epoch inside the Waveform tabs: 
-#         
-#         Digital bit pattern #3-0
-#         Digital bit pattern #7-4
-#         
-#         Buy default all entries are 0, but they can be set to 1 or '*' (see above)
-#         when the Epoch type is set anything other than "Off".
-#         
-#         The digital bit pattern corresponds to the way the DIG output are stored
-#         in the protocol, and can be relatively hard to work with, directly.
-#         
-#         When Alternate Digital Outputs is enabled in the protocol, one can configure
-#         two digital bit patterns for the same epoch. The "main" pattern is specified
-#         in the Waveform tab for the DAC channel where "Digital Outputs" is enabled,
-#         whereas the "alternate" pattern is specified in the Waveform tab for a 
-#         distinct DAC channel. See self.getEpochstable(…) for details.
-#         
-#         By default, this method reports the digital bit pattern AS IT WOULD BE
-#         used during the specified sweep (i.e., when self.alternateDigitalOutputsEnabled
-#         is True, it returns the "main" or the "alternate" pattern, depending
-#         on the sweep). The returned digital bit pattern is reversed and unpacked, 
-#         such that for any given epoch it will return a tuple of 8 values representing
-#         the DIG channel indexes in "natural" order, i.e., #0-7, as a single bank.
-#         
-#         This behaviour can be fine-tuned using the parameters below.
-#         
-#         Parameters:
-#         -----------
-#         sweep: int, in the semi-open interval [0, nSweeps); 
-#                 default is 0
-#         
-#         epoch: and ABFEpoch object, an int (epoch number) or a str (epoch "letter")
-#                 Index of the ABFEpoch where the pattern is queried.
-#         
-#                 Optional, default is None, in which case returns the digital 
-#                 patterns for all epochs, during the specified sweep.
-#         
-#         natural: bool, whether to return the pattern in the "natural" (i.e., 
-#             increasing) order of the DIG channel indexes — i.e. 0 ⋯ 7
-#                 default is True;
-#     
-#         separateBanks:bool, whether to return the pattern as two tuples, one for 
-#                 each bank of 4 DIG channels;
-#                 default is False;
-#         
-#         letters:bool, default is False. Used when 'epoch' parameter is None.
-#                 When True, the epochs are reported by their letter; otherwise, 
-#                 they are reported by their number in the epochs table.
-#             
-#         alternate: bool or str. Optional, default is None.
-#             When None, report either the "main" or "alternate" pattern, depending
-#             on which of these would be emitted during the specified sweep.
-#         
-#             When True, report only the "alternate" pattern.
-#             When False, report only the "main" pattern.
-#         
-#             When a str, the only acceptable value is "all" (case-insensitive), to
-#             returns both the "main" and "alternate" patterns wrapped in a 
-#             ABFDigitalPattern¹ object as follows:
-#         
-#             separateBanks:
-#             True            ⇒ the "main" and "alternate" fields of the 
-#                             ABFDigitalPattern are each a pair of 4-tuples
-#         
-#             False           ⇒ the "main" and "alternate" fields of the 
-#                             ABFDigitalPattern are each a tuple of all digital
-#                             channels in the pattern (8, in Clampex 11.+)
-#         
-#         NOTE: Passing:
-#         `natural=False, separateBanks=False, alternate = "all", trains=None` 
-#         is the same as querying the mapping of the digital patterns directly:
-#         
-#         `self.digitalPatterns[epoch.number]`
-#         
-#         ¹ An ABFDigitalPattern object is a named tuple with two fields: 
-#             "main" and "alternate", each being a tuple (bit pattern, or DIG index)
-#         
-#         Returns:
-#         --------
-#         
-#         When 'epoch' is specified and not None, returns a tuple with the digital
-#         but pattern as in the table below:
-#         
-#         separateBanks       natural         returns
-#         ------------------------------------------------------------------------
-#         True                False           A 2-tuple[4-tuple[int]] corresponding
-#                                             to the two DIG output banks in the
-#                                             order 3⋯0, 7⋯4.
-#             
-#         True                True            A 2-tuple[4-tuple[int]] corresponding
-#                                             to the two DIG output banks in the
-#                                             order 0⋯3, 4⋯7.
-#             
-#         False               False           An 8-tuple[int] corresponding to the 
-#                                             DIG channels in the order 7 ⋯ 0
-#             
-#         True                True            An 8-tuple[int] corresponding to the 
-#                                             DIG channels in the order 0 ⋯ 7
-#             
-#         When 'epoch' is None, returns a mapping:
-#         
-#         letters:            returned mapping:
-#         ------------------------------------------------------------------------
-#         False               epoch_number ↦ a tuple as in the table above
-#         True                epoch_letter ↦ a tuple as in the table above
-#             
-#         """
-#         if sweep not in range(self.nSweeps):
-#             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
-#         
-#         isAlternateDigital = self.alternateDigitalOutputsEnabled and sweep % 2 > 0
-#         
-#         if epoch is None:
-#             ret = dict()
-#             for e in self.digitalPatterns:
-#                 key = getEpochLetter(e) if letters else e
-#                 ret[key] = self.getDigitalPattern(sweep, e, natural-natural,
-#                                                 separateBanks = separateBanks,
-#                                                 alternate=alternate)
-#             return ret
-#         
-#         elif isinstance(epoch, str):
-#             epochNum = getEpochNumberFromLetter(epoch)
-#         elif isinstance(epoch, int):
-#             epochNum = epoch
-#         elif isinstance(epoch, ABFEpoch):
-#             epochNum = epoch.number
-#         else:
-#             raise TypeError("Expecting an ABFEpoch, int or str; got ")
-#         
-#         if alternate is None:
-#             isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
-#             src = "alternate" if isAlternateDigital else "main"
-#             
-#         elif isinstance(alternate, bool):
-#             src = "alternate" if alternate else "main"
-#             
-#         elif isinstance(alternate, str):
-#             if alternate.lower() != "all":
-#                 raise ValueError(f"Invalid value for the 'alternate' parameter ({alternate})")
-#             src = "all"
-#         
-#         if epochNum in self.digitalPatterns:
-#             if natural:
-#                 if src == "all":
-#                     # just reverse the bank tuples, but keep their order intact:
-#                     ret = ABFDigitalPattern(*tuple(map(lambda x: tuple(map(lambda x_: tuple(reversed(x_)), x)), self.digitalPatterns[epochNum])))
-#                 else:
-#                     # get the relevant bank tuples for "main" of "alternate", reversed
-#                     ret = tuple(map(lambda x: tuple(reversed(x)), getattr(self.digitalPatterns[epochNum], src)))
-#             else:
-#                 if src == "all":
-#                     # just get it as it is
-#                     ret = self.digitalPatterns[epochNum]
-#                 else:
-#                     # get the relevant bank tuples for "main" of "alternate"
-#                     ret = getattr(self.digitalPatterns[epochNum],src)
-#                 
-#             if separateBanks:
-#                 return ret
-#             
-#             if src == "all":
-#                 return ABFDigitalPattern(*tuple(map(lambda x: tuple(itertools.chain.from_iterable(x)), ret)))
-#             
-#             return tuple(itertools.chain.from_iterable(ret))
-#         
-#         else:
-#             if separateBanks:
-#                 if src == "all":
-#                     pattern = ((((0,) * (self.nDIGChannels//2), ) * 2, ) * 2)
-#                     return ABFDigitalPattern(*pattern)
-#                 
-#                 return (0,) * (self.nDIGChannels//2), (0,) * (self.nDIGChannels//2)
-#             
-#             return (0,) * self.nDIGChannels
-        
     def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, int, str, typing.Sequence],
                           /, 
                           alternate: typing.Optional[bool] = None,
@@ -3052,7 +2876,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if actualOutput:
             outputNdx = f"(as output in sweep {sweep})"
         else:
-            outputNdx = f"(as defined in DAC{dac.physicalIndex})"
+            outputNdx = f"(as defined in DAC #{dac.physicalIndex})"
             
         if includeDigitalPattern:
             rowIndex = ["Type", "First Level", "Delta Level",
@@ -3184,7 +3008,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
         return pd.DataFrame(epochData, index = rowIndex)
         
-    # TODO 2024-10-27 21:51:48 finalize this!!!
     def getDigitalWaveform(self, sweep:int = 0,
                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
@@ -3267,7 +3090,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # "high logic" means 5V on a background of 0 V
         # "low logic" means 0V on a background of 5V
         
-        # usedDigs = list(itertools.chain.from_iterable([epoch.getUsedDigitalOutputChannels() for epoch in dac.epochs]))
         # print(f"{self.__class__.__name__}.getDigitalWaveform: supplied digChannel = {digChannel}")
         # print(f"{self.__class__.__name__}.getDigitalWaveform: usedDigs = {usedDigs}")
         
@@ -3278,9 +3100,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
             digChannel = (digChannel,)
             
         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
-            # if all(v not in usedDigs for v in digChannel):
-            #     raise ValueError(f"Invalid DIG channel indexes {digChannel}")
-            
             digChannel = tuple(sorted(set(digChannel)))
             
         elif digChannel is None:
@@ -3294,13 +3113,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                                 np.nan),
                                         units = pq.V, t_start = 0*pq.s,
                                         sampling_rate = self.samplingRate,
-                                        name = f"DIG {chnl} DAC {dac.physicalIndex} ({dac.name})") for chnl in digChannel]
+                                        name = f"DIG {chnl}", DAC = {dac.name: dac.physicalIndex}) for chnl in digChannel]
+                                        # name = f"DIG {chnl} DAC {dac.physicalIndex} ({dac.name})") for chnl in digChannel]
         else:
             waveforms = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
                                                 np.nan),
                                         units = pq.V, t_start = 0*pq.s,
                                         sampling_rate = self.samplingRate,
-                                        name = f"DIG Output DAC {dac.physicalIndex} ({dac.name})")
+                                        name = f"DIG {digChannel}", DAC = {dac.name: dac.physicalIndex})
+                                        # name = f"DIG Output DAC {dac.physicalIndex} ({dac.name})")
             
         t0 = t1 = self.holdingTime.rescale(pq.s)
         
@@ -3628,6 +3449,26 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return waves, digOFF, digON, trainOFF, trainON
         
         return waves
+    
+    # TODO: 2024-11-08 12:24:36
+    # finalize this !!!
+    def getCommandWaveform(self, sweep:int, /,
+                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
+                           ):
+        if sweep not in range(self.nSweeps):
+            raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
+        
+        actualOutput = dac is None
+            
+        dac, _ = self._check_DAC_Epoch_(dac, None)
+        
+        hoDACActive = self.activeDACChannel not in (0,1)
+        
+        isAlternateWaveform = False
+        
+        if self.alternateWaveformsEnabled:
+            pass # TODO 2024-11-08 12:24:18 finalize me!
+    
             
     def outputConfiguration(self, index:typing.Optional[typing.Union[int, str]] = None, 
                             physical:bool=False) -> ABFOutputConfiguration:

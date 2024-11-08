@@ -246,6 +246,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # menu bar of any ScipyenViewer window is shown in the global menu (top of
         # Desktop) upon its first initialization.
         #
+        # TODO: 2024-11-08 09:44:18 Check under GNOME (any) version
+        #
         # If the window is then closed (but neither its Qt/C++ side is deleted, 
         # nor its Python/sip wrapper binding - i.e., the symbol to which this 
         # sip wrapper is bound remains in scope) the window's menu is taken out 
@@ -262,7 +264,11 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # if not QtWidgets.qApp.testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
         if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
             # if "startplasma" in sysutils.get_desktop() or "KDE" in sysutils.get_desktop("desktop"):
-            if sysutils.is_kde_x11() and has_qdbus:
+            # if sysutils.is_kde_x11() and has_qdbus:
+            # NOTE: 2024-11-08 09:44:58
+            # accomodate wayland sessions (eveb when run with QT_QPA_PLATFORM=xcb,
+            # the session reported by QApplication is wayland if the WM is using wayland)
+            if sysutils.is_kde() and has_qdbus:
                 appMenuServiceNames = list(name for name in QtDBus.QDBusConnection.sessionBus().interface().registeredServiceNames().value() if "AppMenu" in name)
                 
                 if len(appMenuServiceNames):
