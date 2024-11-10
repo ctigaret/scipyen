@@ -3513,6 +3513,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
         are enabled, only two sweep "prototypes" are shown, unless there is at 
         least one epoch with delta duration or delta level != 0.
         
+        BUG: 2024-11-10 01:12:24 FIXME
+        When alternate ouytuts are all disabled, the display is messed up, see 
+        BUG: 2024-11-10 01:12:01 FIXME
+        
         """
         from core import neoutils
         ret = neo.Block(name=f"{self.name} Waveforms")
@@ -3641,6 +3645,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
             NOTE: This parameter is only used when Alternate Waveforms is DISabled!
         
+            BUG: 2024-11-10 01:12:01 FIXME
+            this messes up things!
         Returns:
         --------
         
