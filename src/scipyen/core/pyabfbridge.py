@@ -2774,7 +2774,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
             return (0,) * self.nDIGChannels
         
-    def getEpochTriggers(self, epoch:typing.Union[ABFEpoch, str, int], /, 
+    def getEpochDigitalTriggers(self, epoch:typing.Union[ABFEpoch, str, int], /, 
                              sweep:int = 0, 
                              dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]] = None,
                              digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
@@ -2964,8 +2964,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         digPattern = self.getEpochDigitalPattern(myEpoch, isAlternateDigital) # either main or alternate, depending on the sweep
         usedDigs = self.getUsedDigitalChannels(digPattern)
         
-        # useAnalog=False
-        
         if isinstance(digChannel, int):
             digChannel = (digChannel,)
         
@@ -2975,17 +2973,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         elif isinstance(digChannel, (tuple, int)) and all(isinstance(v, int) for v in digChannel) :
             digChannel = tuple(sorted(set(digChannel)))
             
-#         elif digChannel is MISSING:
-#             useAnalog=True
-#                 
-            
         else:
             raise TypeError(f"Unexpected digChannel specification {digChannel}")
         
         # print(f"{self.__class__.__name__}.getEpochTriggers: epoch = {myEpoch}, dac = {myDac}, sweep = {sweep}, pulseCount = {pulseCount}, digChannel = {digChannel}")
-        # if useAnalog:
-        #     raise NotImplementedError("Parsing the analog waveform not yet implemented")
-        
+
         if len(digChannel) == 0:
             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
         
@@ -3015,17 +3007,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     if trig not in trigs:
                         trigs.append(trig)
             
-#             uniqueTrigs = list()
-#             
-#             for k,t in enumerate(trigs):
-#                 if k == 0:
-#                     uniqueTrigs.append(t)
-#                 else:
-#                     if t not in uniqueTrigs:
-#                         uniqueTrigs.append(t)
-                        
             if len(trigs):
-                return trigs[0] if len(trigs)>1 else trigs
+                return (trigs[0] if len(trigs) == 1 else trigs)
             
             else:
                 return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
@@ -3037,16 +3020,99 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
                             name:typing.Optional[str] = None,
                             enableEmptyEvent:bool=True):
-        """Returns TriggerEvent encoded as analog step or pulse waveforms"""
+        """Returns TriggerEvent encoded as analog step or pulse waveforms
+        WARNING: Do not use yet
+        """
+        # TODO: 2024-11-10 21:08:23
+        # finalize this!!!
+        if sweep not in range(self.nSweeps):
+            raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
+        
+        actualOutput = dac is None
+            
+        dac, _ = self._check_DAC_Epoch_(dac, None)
+        
+        digDACs = self.getDACsWithDigitalOutput()
+        
+        if len(digDACs) == 0 or dac.physicalIndex not in digDACs:
+            return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+        
         pass
-        
-        
-    def getTriggers(self, sweep:int = 0,
+    
+    def getDigitalTriggers(self, sweep:int = 0,
                     dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                     digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                    ) -> typing.Sequence:
-        """Trigger events emitted by the epochs in this DAC
-        WARNING Do not use yet.
+                    byDigIndex:bool=False,
+                    relativeToRunStart:typing.Optional[bool]=True,
+                    useHoldingTime:bool=True) -> typing.Sequence:
+        """Trigger events emitted by the epochs in this DAC.
+        The method considers that there is one TriggerEvent for each DIG 
+        channel that emits a TTL while this DAC is "live"¹, across all the 
+        DAC's Epochs. This is because each DIG channel normally controls 
+        exactly ONE device (hence distinct DIG channels control distinct
+        devices).
+    
+        However, if there is more than one Epoch emitting TTL on the SAME DIG
+        channel then these events will be "merged".
+        
+        Parameters:
+        -----------
+        sweep: sweep index, in the half-open interval [0, nSweeps)
+        
+        dac: DAC channel, DAC physical index or DAC name; optional, default is 
+            None, in which case the DAC that is "live"¹ during the specified
+            sweep is used. 
+    
+            See also self.getDigitalWaveform and self.getCommandWaveform
+        
+        digChannel: index of the DIG channel to be inspected for trigger events,
+            or None (default) in which case the method returns a TriggerEvent
+            for each DIG channel used to send TTLs
+        
+        byDigIndex: flag indicating whether the TriggerEvent objects should be
+            packed in a mapping according to the index iof the DIG channel that
+            emits them. Default is False
+        
+        relativeToRunStart: ternary flag indicating whether the TriggerEvent objects
+            should have time stamps that are relative to the start of the Run.
+            When True, then the time stamps will be adjusted to include the 
+            inter-sweep interval.
+            When False, the time stamps are adjusted to reflect the cummulative
+            duration of the previous sweeps, exlcluding the inter-sweep interval.
+            When None, then the time stamps are relative to the sweep start.
+        
+            Optional; default is True
+        
+            This is useful for the analysis of repetitive peri-trigger features 
+            in a multi-sweep recording, where each sweep record starts at increasing 
+            times (including the inter-sweep interval).
+        
+        useHoldingTime: flag to indicate whether the TriggerEvent time stamps are
+            to be corrected for the "idle" holding period at the sweep start²
+            (hence they will appear delayed with respect to the Epochs' timings,
+            but correctly synchronized with the recording events they triggered).
+        
+            Optional, default is True (i.e. shift the time stamps by the first
+            holding period, in each sweep).
+        
+        NOTE:
+        ¹ A DAC is "live" when its Epoch configurations are used to emit DIG or
+            analog command waveforms. When Alternative Waveforms or Alternative
+            Digital Outputs are enabled in the protocol, the physical index of 
+            the "live" DAC depends on which sweep index is queried.
+        
+            The word "live" is a misnomer, because the actual recording uses the
+            same physical DAC in all sweeps; yet I use it to indicate the fact
+            that in Clampex the actual waveform(s) emitted by the recording
+            DAC on alternate sweeps can only be "configured" on distinct DAC 
+            indexes in the Clampex Protocol Editor GUI, resulting in sweep-specific
+            command or digital waveforms...
+        
+        ² In episodic mode, Clampex uses two "idle" time periods of 1/64 of the 
+            total sweep samples, one at the start and one at end of each sweep. 
+            See Clampex manual for details.
+        
+            
         """
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
@@ -3065,6 +3131,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         hoDACActive = self.activeDACChannel not in (0,1)
         
         isAlternateDigital = False
+        
         if self.alternateDigitalOutputsEnabled:
             if actualOutput:
                 if hoDACActive:
@@ -3110,7 +3177,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
-                return list()
+                # none opf the specified digChannels is in use => return 
+                # empty trigger event or None
+                return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+            
             digChannel = (digChannel,)
             
         elif isinstance(digChannel, (list, tuple)) and all(isinstance(v, int) for v in digChannel):
@@ -3120,13 +3190,46 @@ class ABFProtocol(ElectrophysiologyProtocol):
             digChannel = tuple(sorted(set(usedDigs)))
             
         else:
-            raise TypeError(f"expecting digChannel an int or sequence of int; instead got {digChannel}")
+            raise TypeError(f"Expecting digChannel an int or sequence of int; instead got {digChannel}")
             
-        trigs = list()
+        t0 = t1 = self.holdingTime.rescale(pq.s)
+        shift = 0 if not isinstance(relativeToRunStart, bool) else self.sweepInterval if relativeToRunStart else self.sweepDuration
+        shift *= sweep
+        if useHoldingTime:
+            shift += self.holdingTime
+            
+        triggers = dict() # mapping DIG_index ↦ TriggerEvent
         for epoch in myDac.epochs:
             if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
-                if enableEmptyEvent:
-                    trigs.append(TriggerEvent(event_type = eventType, name=name, labels = label))
+                continue
+            # collect as mapping DIG index ↦ trigger event for all non-empty trigger events
+            # in the epoch
+            epoch_triggers = dict(filter(lambda x: len(x[1]), map(lambda x: (x, self.getEpochDigitalTriggers(epoch, sweep, myDac,digChannel=x)), digChannel)))
+            
+            # if DIG index in triggers, then "concatenate"; else, just enter in triggers
+            
+            for digIndex, epoch_trigger in epoch_triggers.items():
+                # adjust times for sweep start
+                if isinstance(relativeToRunStart, bool):
+                    epoch_trigger.relative=False
+                    epoch_trigger.shift(shift)
+                    
+                if digIndex not in triggers:
+                    triggers[digIndex] = epoch_trigger
+                else:
+                    if triggers[digIndex].type != epoch_trigger.type:
+                        scipywarn(f"In ABFEpoch {epoch.number} ('{epoch.letter}'), for DIG {digIndex}: concatenating TriggerEvents of distinct types: {triggers[digIndex].type} and {epoch_trigger.type}; new TriggerEvent will have {triggers[digIndex].type}")
+                    time_units = triggers[digIndex].times.units
+                    new_times  = np.hstack((triggers[digIndex].times, epoch_trigger.times)) * time_units
+                    new_labels = np.hstack((triggers[digIndex].labels, epoch_trigger.labels))
+                    triggers[digIndex] = TriggerEvent(new_times, units = time_units, labels=new_labels, name = triggers[digIndex].name)
+                    
+        if byDigIndex:
+            return triggers
+        else:
+            triggers = tuple(triggers.values())
+            return triggers[0] if len(triggers) == 1 else triggers if len(triggers) > 1 else None
+        
             
             
     def getEpochsTable(self, sweep:int = 0, /,
@@ -3418,6 +3521,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         hoDACActive = self.activeDACChannel not in (0,1)
         
         isAlternateDigital = False
+        
         if self.alternateDigitalOutputsEnabled:
             if actualOutput:
                 if hoDACActive:
