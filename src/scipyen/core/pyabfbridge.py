@@ -2804,10 +2804,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Pulse Width (samples)¹
         Final Duration²
         Final Duration (Samples)²
-        Pulse Count
+        Pulse Count⁴
         Final Pulse Count — same as Pulse Count if Delta Duration == 0, else
             this is the pulse count emitted during the last sweep that uses the
             pulse-emitting Epoch.
+        
         Currently not shown:
         Sample rate (Fast vs Slow)
         
@@ -2815,8 +2816,21 @@ class ABFProtocol(ElectrophysiologyProtocol):
         ² In Clampex, this is only shown when Delta Duration (ms) > 0, and there
             are more than one sweep using this Epoch
         ³ In Clampex, this is reported on the same line as Train rate, albeit
-                inappropriately called "rate".
+            inappropriately called "rate".
+        ⁴ In Clampex, when the result of dividing the Epoch's duration by the 
+            train period is a rational, non-integer number, the pulse count reported
+            in the Epochs table will be smaller than the number of pulses shown 
+            in the Waveform Preview. I suspect the reason behind this may be that, 
+            for waveform display, they could be using the ceiling of the result 
+            of this division, whereas in the Epochs table the result of the division
+            might be simply casted to an int — bug or feature ?!?
+            
+            In this method I use the np.ceil(duration/train_period) cast to int,
+            for consistency wiyth the waveform preview.
         
+            CAUTION/TODO: 2024-11-10 10:14:34
+            This needs to be confirmed with actual recordings of outputs when
+            running a protocol that generates such conditions.
         
         """
         # NOTE: 2024-10-30 21:30:47
@@ -2969,8 +2983,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             pulsePeriod = self.getEpochPulsePeriod(myEpoch, myDac)
             pulsePeriodSamples = scq.nSamples(pulsePeriod, self.samplingRate)
             
-            pulseCount = 0 if pulsePeriod == 0. else int(duration/pulsePeriod)
-            finalPulseCount = 0 if pulsePeriod == 0. else int(finalDuration/pulsePeriod)
+            pulseCount = 0 if pulsePeriod == 0. else int(np.ceil(duration/pulsePeriod))
+            finalPulseCount = 0 if pulsePeriod == 0. else int(np.ceil(finalDuration/pulsePeriod))
             
             if includeDigitalPattern:
                 epValues = [myEpoch.typeName, myEpoch.firstLevel, 
@@ -3384,8 +3398,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         pulsePeriodSamples = self.getEpochPulsePeriod(myEpoch, myDac, True)
         pulseWidthSamples = self.getEpochPulseWidth(myEpoch, myDac, True)    
         
-        pulseCount = 0 if pulsePeriodSamples == 0. else int(durationSamples/pulsePeriodSamples)
-        finalPulseCount = 0 if pulsePeriodSamples == 0. else int(finalDurationSamples/pulsePeriodSamples)
+        pulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(durationSamples/pulsePeriodSamples))
+        finalPulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(finalDurationSamples/pulsePeriodSamples))
         
         
         # NOTE: 2024-10-28 17:28:04
@@ -3581,13 +3595,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
     def getAnalogWaveform(self, sweep:int=0, 
                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                          ignoreWaveformEnabled:bool=False) -> neo.AnalogSignal:
+                          ignoreIsWaveformEnabled:bool=False) -> neo.AnalogSignal:
         """Alias to self.getCommandWaveform"""
-        return self.getCommandWaveform(sweep, dac, ignoreWaveformEnabled=ignoreWaveformEnabled)
+        return self.getCommandWaveform(sweep, dac, ignoreIsWaveformEnabled=ignoreIsWaveformEnabled)
     
     def getCommandWaveform(self, sweep:int = 0,
                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                           ignoreWaveformEnabled:bool=False) -> neo.AnalogSignal:
+                           ignoreIsWaveformEnabled:bool=False) -> neo.AnalogSignal:
         """Generates an AnalogSignal representation of a DAC command waveform.
         
         DAC command waveforms (and digital outputs) are enabled only in 
@@ -3637,7 +3651,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                         used to generate a collection of AnalogSignal objects
                         for any sweep index passed to the method
         
-        ignoreWaveformEnabled: default: False
+        ignoreIsWaveformEnabled: default: False
             When True, and a DAC is specified, its command waveform will be 
             generated even if it wouold not normally be output during an actual
             trial (useful to inspect what command waveform the epochs in the DAC
@@ -3731,7 +3745,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                             sampling_rate = self.samplingRate,
                                             name = dac.name)
                 
-                # Find out where is this dac's physical index among analogDACs.
+                # Find out where if this dac's physical index is among analogDACs.
                 dacNdx = dNdx.index(dac.physicalIndex)
                 if dacNdx == 0:
                     # this DAC has the lowest physical index => emit waveform
@@ -3764,9 +3778,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                             sampling_rate = self.samplingRate,
                                             name = dac.name)
             else:
-                if ignoreWaveformEnabled:
+                # return self.getDACCommandWaveform(dac, sweep)
+                if ignoreIsWaveformEnabled:
                     return self.getDACCommandWaveform(dac, sweep)
                 else:
+                    if dac.analogWaveformEnabled:
+                        return self.getDACCommandWaveform(dac, sweep)
+                    
                     return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
                                             units = dac.units, t_start = 0*pq.s,
                                             sampling_rate = self.samplingRate,
