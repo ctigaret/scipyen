@@ -2520,6 +2520,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @singledispatchmethod
     def addDataFrame(self, obj):
         """Adds a new data frame to the displayed data.
+        Do not confuse with pandas.DataFrame objects!
 Automatically displays the last data frame.
 The following table shows what this method supports:
     

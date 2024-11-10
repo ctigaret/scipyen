@@ -3471,6 +3471,28 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return waves
     
     def waveformPreview(self, concatenated:bool=False):
+        """Generates a waveform preview, Clampex-style.
+        Returns a neo.Block with output waveforms per sweep, for all DAC and DIG
+        channels in the protocol, taking into account which waveform is generated
+        in what sweep (when alternative analog or digital outputs are enabled).
+        This is similar to Clampex's default "Sweeps Display" mode in Waveform
+        Preview.
+        
+        When the optional 'concatenated' parameter is set to True, the neo.Block
+        has only one segment with the per-sweep waveforms concatenated.
+        
+        NOTE: This is the same as Clampex's "Continuous Display" mode in the 
+        Waveform Preview, and similar to the "Concatenated Display" mode. 
+    
+        The main differences to Clampex Waveform Preview are:
+        • in "Concatenated Display" mode, the last sweep is indicated by a 
+            horizontal double-headed arrow beneath the time axis.
+        • in all display modes, in Clampex, the time boundaries of the sweeps and 
+            the Wave Start and Wave End are indicated by vertical bars (corresponding
+            to the protocol's holding time intervals after the sweep start and 
+            before the sweep end).
+        
+        """
         from core import neoutils
         ret = neo.Block(name=f"{self.name} Waveforms")
         if self.alternateWaveformsEnabled or self.alternateDigitalOutputsEnabled:
@@ -3494,8 +3516,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 analogWaveforms = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
                 digitalWaveforms = [self.getDigitalWaveform(sweep, digChannel=d, 
                                                             asSignals=True, separateWaves=False) for d in range(self.nDIGChannels)]
-                # for sig in analogWaveforms + digitalWaveforms:
-                #     segment.analogsignals.append(sig)
                     
                 segment.analogsignals += analogWaveforms + digitalWaveforms
                 ret.segments.append(segment)
@@ -3522,19 +3542,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
                         
             segment.analogsignals += analogWaveforms + digitalWaveforms
             ret.segments.append(segment)
+            
         return ret
             
     def getAnalogWaveform(self, sweep:int=0, 
                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                           ) -> neo.AnalogSignal:
-                          # actualOutput:bool=True) -> neo.AnalogSignal:
         """Alias to self.getCommandWaveform"""
         return self.getCommandWaveform(sweep, dac)
     
     def getCommandWaveform(self, sweep:int = 0,
                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                            ) -> neo.AnalogSignal:
-                           # actualOutput:bool=True) -> neo.AnalogSignal:
         """Generates an AnalogSignal representation of a DAC command waveform.
         
         DAC command waveforms (and digital outputs) are enabled only in 
