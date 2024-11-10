@@ -789,7 +789,6 @@ class FileStatChecker(QtCore.QObject):
                 if inspect.isfunction(self._callback_) or inspect.ismethod(self._callback_):
                     self._callback_(self._filePath_)
             
-    
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     """Mixin type for windows that need to be aware of Scipyen's main workspace.
     
@@ -1131,8 +1130,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         toolbars = tuple(p[0] for p in inspect.getmembers_static(self, lambda x: isinstance(x, (QtWidgets.QToolBar, QtWidgets.QToolButton))))
         for t in toolbars:
             getattr(self,t).setIconSize(QtCore.QSize(val, val))
-            
-            
 
     @property
     def appWindow(self):

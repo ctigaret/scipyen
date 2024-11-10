@@ -46,15 +46,18 @@ else:
 os.environ["QT_API"] = "pyqt5"
 os.environ["PYQTGRAPH_QT_LIB"] = "PyQt5"
 
-# NOTE: 2024-05-04 10:14:08
-# forcing xcb platform when running on Wayland, in Linux, because we want to
-# restore window sizes and positions from Scipyen.conf (Wayland does not allow
-# an application 'client' to control window position)
 if sys.platform == "linux":
+    # NOTE: 2024-05-04 10:14:08
+    # forcing xcb platform when running on Wayland, in Linux, because we want to
+    # restore window sizes and positions from Scipyen.conf (Wayland does not allow
+    # an application 'client' to control window position)
+    # NOTE: 2024-11-09 21:03:16
+    # code below introuced to allow positoning of windows based on saved geometry(ies)
+    # which doesn't work on wayland
     if os.getenv("XDG_SESSION_TYPE", None) == "wayland":
-        # print("In a wayland session")
         os.environ["QT_QPA_PLATFORM"]="xcb"
-        # import pywayland
+    # if os.getenv("XDG_SESSION_TYPE", None) == "wayland":
+    #     os.environ["QT_QPA_PLATFORM"]="wayland"
         
     new_xdg_data_dirs = [os.path.join(os.environ["HOME"], ".local", "share")]
 

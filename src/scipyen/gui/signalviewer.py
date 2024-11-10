@@ -8855,7 +8855,11 @@ signals in the signal collection.
             self.plotTitleLabel.setText(plotTitle, color = "#000000")
                 
         if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
-            self.docTitle = seg_name
+            cached_title = getattr(self, "_cached_title", None)
+            if not isinstance(cached_title, str) or len(cached_title.strip()) == 0:
+                self.docTitle = seg_name
+            else:
+                self.docTitle = cached_title
             
         self.currentFrameAnnotations = {type(obj).__name__ : obj.annotations}
         

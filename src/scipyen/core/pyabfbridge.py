@@ -3090,6 +3090,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         usedDigs = tuple(itertools.chain.from_iterable(map(lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x, (self.getUsedDigitalChannels(sweep, e) for e in digEpochs))))
 
+        # print(f"{self.__class__.__name__}.getDigitalWaveform(sweep = {sweep}, dac = {dac}, digChannel = {digChannel})")
      
         # NOTE: 2023-09-20 22:22:41
         # the digital output is ALWAYS in V
@@ -3101,7 +3102,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
-                raise ValueError(f"Invalid DIG channel index {digChannel}")
+                digOFF, digON = self.getDigitalPulseLogicLevels(digChannel)
+                return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), 
+                                                digOFF),
+                                        units = pq.V, t_start = 0*pq.s,
+                                        sampling_rate = self.samplingRate,
+                                        name = f"DIG {digChannel}", DAC = {dac.name: dac.physicalIndex})
+                # raise ValueError(f"Invalid DIG channel index {digChannel}")
             
             digChannel = (digChannel,)
             
@@ -3120,14 +3127,13 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                         units = pq.V, t_start = 0*pq.s,
                                         sampling_rate = self.samplingRate,
                                         name = f"DIG {chnl}", DAC = {dac.name: dac.physicalIndex}) for chnl in digChannel]
-                                        # name = f"DIG {chnl} DAC {dac.physicalIndex} ({dac.name})") for chnl in digChannel]
         else:
+            chnlname = lambda x: x if len(x) > 1 else x[0]
             waveforms = neo.AnalogSignal(np.full((self.sweepSampleCount, len(digChannel)), 
                                                 np.nan),
                                         units = pq.V, t_start = 0*pq.s,
                                         sampling_rate = self.samplingRate,
-                                        name = f"DIG {digChannel}", DAC = {dac.name: dac.physicalIndex})
-                                        # name = f"DIG Output DAC {dac.physicalIndex} ({dac.name})")
+                                        name = f"DIG {chnlname(digChannel)}", DAC = {dac.name: dac.physicalIndex})
             
         t0 = t1 = self.holdingTime.rescale(pq.s)
         
@@ -3162,6 +3168,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             epochWaves, epoch_digOFF, epoch_digON, epoch_trainOFF, epoch_trainON = eWaves
             offLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
             
+            # print(f"{self.__class__.__name__}.getDigitalWaveform: offLevel = {offLevel}")
+            
+            if isinstance(epochWaves, np.ndarray):
+                epochWaves = (epochWaves, )
+            
             if lastLevel is None:
                 lastLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
                 
@@ -3187,13 +3198,16 @@ class ABFProtocol(ElectrophysiologyProtocol):
         else:
             if separateWaves:
                 for k in range(len(waveforms)):
-                    waveforms[k][lastEpochNdx[k]:, :] = offLevel
+                    waveforms[k][lastEpochNdx[k]:, :] = offLevel #* waveforms[k].units
             else:
-                waveforms[lastEpochNdx:, :] = offLevel
+                waveforms[lastEpochNdx:, :] = offLevel #* waveforms.units
                 
         if separateWaves:
             for k in range(len(waveforms)):
                 waveforms[k][np.isnan(waveforms[k])] = offLevel
+                
+            if len(waveforms) > 1:
+                return waveforms[0]
         else:
             waveforms[np.isnan(waveforms)] = offLevel
             
@@ -3275,8 +3289,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
             When 'normalized' is True, the waveform data will be dimensionless.
         
-        returnLevels: default False; When True, returns the waves and the digOFF, 
-        digON, trainOFF and trainON logical levels
+        returnLevels: default False; When True, returns the waves and the 
+            digOFF, digON, trainOFF and trainON logical levels
         
         Returns:
         --------
@@ -3326,6 +3340,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 isAlternateDigital = dac.physicalIndex != self.activeDACChannel
         
         digOFF = digON = trainOFF = trainON = None # to return None if needed
+        trainOFF, trainON = self.getDigitalTrainLogicLevels()
+
         
         if actualOutput:
             if self.alternateDigitalOutputsEnabled:
@@ -3409,19 +3425,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
             waves = list()
             
             for k, chnl in enumerate(digChannel):
-                wave = np.full([durationSamples, 1], 0) * pq.V
+                digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
+
+                wave = np.full([durationSamples, 1], digOFF) * pq.V
                 
                 if digChannelValue[k] == 1: # emits pulse (a.k.a step)
-                    digOFF, digON = self.getDigitalPulseLogicLevels(chnl)
-                    
                     wave[:] = digON
                     
                     if normalized:
                         wave = wave / digON # normalize to 0⋯1 => dimensionless
                         
                 elif digChannelValue[k] == "*": # emits train
-                    trainOFF, trainON = self.getDigitalTrainLogicLevels()
-
                     wave[:] = trainOFF
                     
                     for pulse in range(pulseCount):
@@ -3431,7 +3445,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                         
                     if normalized:
                         wave = wave/trainON # normalize to 0⋯1 => dimensionless
-                            
+                        
                 waves.append(wave)
                 
         if not separateWaves:
@@ -3456,15 +3470,71 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         return waves
     
+    def waveformPreview(self, concatenated:bool=False):
+        from core import neoutils
+        ret = neo.Block(name=f"{self.name} Waveforms")
+        if self.alternateWaveformsEnabled or self.alternateDigitalOutputsEnabled:
+            if self.nSweeps % 2 == 1:
+                if any(any(e.deltaDuration > 0 or e.deltaLevel > 0 for e in d.epochs) for d in self.DACs):
+                    maxSweeps = self.nSweeps
+                else:
+                    maxSweeps = 2
+            else:
+                maxSweeps = 2
+                
+        else:
+            maxSweeps = 1
+            
+        if maxSweeps == 1:
+            concatenated=False
+            
+        if not concatenated:
+            for sweep in range(maxSweeps):
+                segment = neo.Segment(name=f"Sweep {sweep} of {maxSweeps} sweeps")
+                analogWaveforms = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
+                digitalWaveforms = [self.getDigitalWaveform(sweep, digChannel=d, 
+                                                            asSignals=True, separateWaves=False) for d in range(self.nDIGChannels)]
+                # for sig in analogWaveforms + digitalWaveforms:
+                #     segment.analogsignals.append(sig)
+                    
+                segment.analogsignals += analogWaveforms + digitalWaveforms
+                ret.segments.append(segment)
+        else:
+            # segment = neo.Segment(name=f"Sweeps {tuple(range(maxSweeps))} of {maxSweeps} sweeps")
+            segment = neo.Segment(name=f"Concatenated sweeps")
+            analogWaveforms = list()
+            digitalWaveforms = list()
+            for sweep in range(maxSweeps):
+                sweepAnalogs = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
+                sweepDigital = [self.getDigitalWaveform(sweep, digChannel=d, 
+                                                            asSignals=True, separateWaves=False) for d in range(self.nDIGChannels)]
+                if sweep == 0:
+                    analogWaveforms.extend(sweepAnalogs)
+                    digitalWaveforms.extend(sweepDigital)
+                else:
+                    for k,sig in enumerate(sweepAnalogs):
+                        sig.t_start = self.sweepInterval * sweep
+                        analogWaveforms[k] = neoutils.concatenate_signals(analogWaveforms[k], sig, axis=0, name=analogWaveforms[k].name)
+                        
+                    for k, sig in enumerate(sweepDigital):
+                        sig.t_start = self.sweepInterval * sweep
+                        digitalWaveforms[k] = neoutils.concatenate_signals(digitalWaveforms[k], sig, axis=0, name = digitalWaveforms[k].name)
+                        
+            segment.analogsignals += analogWaveforms + digitalWaveforms
+            ret.segments.append(segment)
+        return ret
+            
     def getAnalogWaveform(self, sweep:int=0, 
                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                          actualOutput:bool=True) -> neo.AnalogSignal:
+                          ) -> neo.AnalogSignal:
+                          # actualOutput:bool=True) -> neo.AnalogSignal:
         """Alias to self.getCommandWaveform"""
         return self.getCommandWaveform(sweep, dac)
     
     def getCommandWaveform(self, sweep:int = 0,
                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                           actualOutput:bool=True) -> neo.AnalogSignal:
+                           ) -> neo.AnalogSignal:
+                           # actualOutput:bool=True) -> neo.AnalogSignal:
         """Generates an AnalogSignal representation of a DAC command waveform.
         
         DAC command waveforms (and digital outputs) are enabled only in 
@@ -3529,7 +3599,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # logic to follow here
         #
         # 1) when no DAC is specified
-        # 1.1) get the DACs where analog waveform is enabled
+        # 1.1) get the DACs where analog waveform is enabled, given the sweep
         # 1.1) if alternate waveform is enabled:
         # 1.1.1) if there is more than one DAC with analog waveform enabled:
         # 1.1.1.1) sweep with even index (0,2,4,…) => use the the DAC with the lowest index, that also emits analog waveform
@@ -3541,14 +3611,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # In all cases, the sweep number will help determine actual epoch durations
         # & start times, taking into account the values of delta duration parameters.
         
-        # actualOutput = dac is None
+        actualOutput = dac is None
             
         dac, _ = self._check_DAC_Epoch_(dac, None)
         
-        # hoDACActive = self.activeDACChannel not in (0,1)
-        
         analogDACs = tuple(d for d in self.DACs if d.analogWaveformEnabled)
-        print(f"{self.__class__.__name__}.getCommandWaveform: {len(analogDACs)} analogDACs")
         
         if len(analogDACs) == 0:
             return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
@@ -3557,98 +3624,84 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                     name = dac.name)
         
         if actualOutput:
-            if dac is None:
-                # NOTE: 2024-11-08 15:04:54
-                # if there is only one DAC emitting analog waveform, then use that 
-                # DAC's waveform on even sweeps (0,2,4,…) and nothing on odd sweeps
-                # (1,3,5,…)
-                # if there are two DACs emitting waveforms then use the first DAC
-                # for even sweeps, and next DAC up in the odd sweeps
-                if self.alternateWaveformsEnabled:
-                    if sweep % 2 == 0: # even-indexed sweep
-                        return self.getDACCommandWaveform(analogDACs[0], sweep)
-                    else: # odd-indexed sweeps
-                        if len(analogDACs) > 1:
-                            return self.getDACCommandWaveform(analogDACs[1], sweep)
-                        else:
-                            return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
-                                                    units = dac.units, t_start = 0*pq.s,
-                                                    sampling_rate = self.samplingRate,
-                                                    name = dac.name)
-                        
-                else:
-                    return tuple(lambda x: self.getDACCommandWaveform(d, sweep), analogDACs)
+            # NOTE: 2024-11-08 15:04:54
+            # if there is only one DAC emitting analog waveform, then use that 
+            # DAC's waveform on even sweeps (0,2,4,…) and nothing on odd sweeps
+            # (1,3,5,…)
+            # if there are two DACs emitting waveforms then use the first DAC
+            # for even sweeps, and next DAC up in the odd sweeps
+            if self.alternateWaveformsEnabled:
+                if sweep % 2 == 0: # even-indexed sweep
+                    return self.getDACCommandWaveform(analogDACs[0], sweep)
+                else: # odd-indexed sweeps
+                    if len(analogDACs) > 1:
+                        return self.getDACCommandWaveform(analogDACs[1], sweep)
+                    else:
+                        return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                                                units = dac.units, t_start = 0*pq.s,
+                                                sampling_rate = self.samplingRate,
+                                                name = dac.name)
                     
             else:
-                # NOTE: 2024-11-09 13:28:41
-                # A DAC is specified. However, if the protocol uses alternate
-                # waveforms, then check to see if this DAC would emit on the specified
-                # sweep.
-                # 
-                # By definition, the DAC would emit on the even sweep indices if the
-                # DAC is has the lowest physical index among the analogDACs
-                #
-                # Otherwise, if the DAC has the second highest
-                # physical index then it would emit on odd sweeps.
-                #
-                        
-                if self.alternateWaveformsEnabled:
-                    dNdx = tuple(d.physicalIndex for d in analogDACs)
-                    if dac.physicalIndex not in dNdx:
-                        # dac not found in analog DACs
-                        return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
-                                                units = dac.units, t_start = 0*pq.s,
-                                                sampling_rate = self.samplingRate,
-                                                name = dac.name)
+                return tuple(lambda x: self.getDACCommandWaveform(d, sweep), analogDACs)
+            # if dac is None:
                     
-                    # Find out where is this dac's physical index among analogDACs.
-                    dacNdx = dNdx.index(dac.physicalIndex)
-                    
-                    # myDac = analogDACs[dacNdx] # this IS same as dac!!!
-                    
-                    if dacNdx == 0:
-                        # this DAC has the lowest physical index => emit waveform
-                        # if sweep is even, else emit empty waveform
-                        if sweep % 2 == 0:
-                            return self.getDACCommandWaveform(dac, sweep)
-                            # myDac = analogDACs[dacNdx] # dealt with further below
-                        else:
-                            # emit empty waveform
-                            return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
-                                                    units = dac.units, t_start = 0*pq.s,
-                                                    sampling_rate = self.samplingRate,
-                                                    name = dac.name)
-                    elif dacNdx == 1:
-                        # this DAC is the next highest => emit waveform if the 
-                        # sweep is odd else emit empty waveform
-                        if sweep % 2 == 1:
-                            return self.getDACCommandWaveform(dac, sweep)
-                            # myDac = analogDACs[dacNdx] # dealt with further below
-                        else:
-                            return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
-                                                    units = dac.units, t_start = 0*pq.s,
-                                                    sampling_rate = self.samplingRate,
-                                                    name = dac.name)
-                            
-                    else:
-                        # in case there are multiple analog emitting DACs, and
-                        # this DAC has a higher index than the first two => 
-                        # return empty wave:
-                        return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
-                                                units = dac.units, t_start = 0*pq.s,
-                                                sampling_rate = self.samplingRate,
-                                                name = dac.name)
-                else:
-                    return self.getDACCommandWaveform(dac, sweep)
-                    # myDac = dac
         else:
-            return self.getDACCommandWaveform(dac, sweep)
-            # myDac = dac
-            
-#         if isinstance(myDac, ABFOutputConfiguration):
-#             return self.getDACCommandWaveform(myDac, sweep)
-#                 
-#         return tuple(lambda x: self.getDACCommandWaveform(d, sweep), myDac)
+            # NOTE: 2024-11-09 13:28:41
+            # A DAC is specified. However, if the protocol uses alternate
+            # waveforms, then check to see if this DAC would emit on the specified
+            # sweep.
+            # 
+            # By definition, the DAC would emit on the even sweep indices if the
+            # DAC is has the lowest physical index among the analogDACs
+            #
+            # Otherwise, if the DAC has the second highest
+            # physical index then it would emit on odd sweeps.
+            #
+                    
+            if self.alternateWaveformsEnabled:
+                dNdx = tuple(d.physicalIndex for d in analogDACs)
+                if dac.physicalIndex not in dNdx:
+                    # dac not found in analog DACs
+                    return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                                            units = dac.units, t_start = 0*pq.s,
+                                            sampling_rate = self.samplingRate,
+                                            name = dac.name)
+                
+                # Find out where is this dac's physical index among analogDACs.
+                dacNdx = dNdx.index(dac.physicalIndex)
+                if dacNdx == 0:
+                    # this DAC has the lowest physical index => emit waveform
+                    # if sweep is even, else emit empty waveform
+                    if sweep % 2 == 0:
+                        return self.getDACCommandWaveform(dac, sweep)
+                    else:
+                        # emit empty waveform
+                        return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                                                units = dac.units, t_start = 0*pq.s,
+                                                sampling_rate = self.samplingRate,
+                                                name = dac.name)
+                elif dacNdx == 1:
+                    # this DAC is the next highest => emit waveform if the 
+                    # sweep is odd else emit empty waveform
+                    if sweep % 2 == 1:
+                        return self.getDACCommandWaveform(dac, sweep)
+                    else:
+                        return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                                                units = dac.units, t_start = 0*pq.s,
+                                                sampling_rate = self.samplingRate,
+                                                name = dac.name)
+                        
+                else:
+                    # in case there are multiple analog emitting DACs, and
+                    # this DAC has a higher index than the first two => 
+                    # return empty wave:
+                    return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                                            units = dac.units, t_start = 0*pq.s,
+                                            sampling_rate = self.samplingRate,
+                                            name = dac.name)
+            else:
+                return self.getDACCommandWaveform(dac, sweep)
             
     def getDACCommandWaveform(self, dac, sweep):
         """Returns the analog waveform emitted by the DAC on a given sweep.
@@ -3660,6 +3713,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         durations and levels of the Epochs defined for the DAC.
         
         """
+        dac, _ = self._check_DAC_Epoch_(dac, None)
         if sweep > 0 and dac.returnToHold:
             previousLevel = self.getPreviousSweepLastEpochLevel(dac,sweep)
         else:

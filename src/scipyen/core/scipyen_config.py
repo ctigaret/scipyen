@@ -856,10 +856,6 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
         qtcfg.update(getattr(win, "_qtcfg", Bunch()))
         qtcfg.update(getattr(win, "_ownqtcfg", Bunch()))
     
-    # print(f"\tsyncQtSettings {win.__class__.__name__}, {win.windowTitle()}:\n\t{qtcfg}")
-    # if save:
-    #     print(f"\n\tsyncQtSettings {win.__class__.__name__}, {win.windowTitle()}:")
-
     for confname, getset in qtcfg.items():
         # NOTE: 2021-08-28 21:59:43
         # val, below, can be a function, or the value of a property
@@ -907,7 +903,6 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
             default = val
             
             newval = loadQSettingsKey(qsettings, gname, key_prefix, confname, default)
-            # print(f"group {gname} key_prefix {key_prefix} confname {confname} newval {newval}")
             
             # NOTE: 2023-09-18 11:38:33
             # Compensate for the situation where the window position or geometry
@@ -965,16 +960,11 @@ def syncQtSettings(qsettings:QSettings, win:typing.Union[QMainWindow, QWidget, F
                         newval = value_type(newval)
                     
                 except:
-                    # warnings.warn(f"Cannot cast {type(newval).__name__} to {value_type.__name__}; reverting to default", category=RuntimeWarning)
                     newval = default
                 
-                # if settername == "autoRemoveViewers":
-                #     print(f"{win.__class__.__name__} syncQtSettings: settername = {settername},  newval = {newval}")
-                #print("\t\tsetter win.%s = %s" % (settername, newval))
                 setattr(win, settername, newval)
                 
             elif setter is not None:
-                #print("\t\tsetter win.%s(%s)" % (settername, newval))
                 setter = getattr(win, settername)
                 setter(newval)
                 
