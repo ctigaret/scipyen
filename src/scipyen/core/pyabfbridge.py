@@ -2855,8 +2855,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         Returns:
         ========
         
-        A TriggerEvent object, which may be empty, or None - see 
-        'enableEmptyEvent' parameter, above.
+        A TriggerEvent object, or a sequence of TriggerEvents, or None.
         
         NOTE 1: Digital signals (triggers) are emitted during epochs defined on 
         the "active" DAC
@@ -2894,9 +2893,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         dac, epoch = self._check_DAC_Epoch_(dac, epoch)
         
         hoDACActive = self.activeDACChannel not in (0,1)
-        
-        # if epoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
-        #     return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
         
         isAlternateDigital = False
         if self.alternateDigitalOutputsEnabled:
@@ -2947,8 +2943,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
             
         if myEpoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
-        # if myEpoch.type.value <= 0:
-        #     return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
             
         durationSamples = self.getEpochDuration(myEpoch, myDac, sweep, samples = True)
         deltaDurationSamples = self.getEpochDeltaDuration(myEpoch, myDac, samples=True)
@@ -2970,7 +2964,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         digPattern = self.getEpochDigitalPattern(myEpoch, isAlternateDigital) # either main or alternate, depending on the sweep
         usedDigs = self.getUsedDigitalChannels(digPattern)
         
-        useAnalog=False
+        # useAnalog=False
         
         if isinstance(digChannel, int):
             digChannel = (digChannel,)
@@ -2981,19 +2975,20 @@ class ABFProtocol(ElectrophysiologyProtocol):
         elif isinstance(digChannel, (tuple, int)) and all(isinstance(v, int) for v in digChannel) :
             digChannel = tuple(sorted(set(digChannel)))
             
-        elif digChannel is MISSING:
-            useAnalog=True
-                
+#         elif digChannel is MISSING:
+#             useAnalog=True
+#                 
             
         else:
             raise TypeError(f"Unexpected digChannel specification {digChannel}")
         
         # print(f"{self.__class__.__name__}.getEpochTriggers: epoch = {myEpoch}, dac = {myDac}, sweep = {sweep}, pulseCount = {pulseCount}, digChannel = {digChannel}")
-        if useAnalog:
-            raise NotImplementedError("Parsing the analog waveform not yet implemented")
+        # if useAnalog:
+        #     raise NotImplementedError("Parsing the analog waveform not yet implemented")
         
         if len(digChannel) == 0:
             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+        
         else:
             trigs = list()
             digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
@@ -3005,31 +3000,46 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     tt = self.getEpochPulseTimes(epoch, myDac, sweep)
                     if len(tt):
                         times = [x.rescale(pq.s) for x in tt]
+                        
+                if len(times):
+                    trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
+                                    name=name, labels = label)
+                else:
+                    trig = TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
 
-                trig = TriggerEvent(times=times, units = pq.s, event_type = eventType, 
-                                    name=name, labels = label) if enableEmptyEvent else None
-                
                 if isinstance(trig, TriggerEvent) and trig.size > 0:
                     # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__ 
                     if isinstance(label, str) and len(label.strip()):
                         trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
                         
-                    trigs.append(trig)
+                    if trig not in trigs:
+                        trigs.append(trig)
             
-            uniqueTrigs = list()
-            
-            for k,t in enumerate(trigs):
-                if k == 0:
-                    uniqueTrigs.append(t)
-                else:
-                    if t not in uniqueTrigs:
-                        uniqueTrigs.append(t)
+#             uniqueTrigs = list()
+#             
+#             for k,t in enumerate(trigs):
+#                 if k == 0:
+#                     uniqueTrigs.append(t)
+#                 else:
+#                     if t not in uniqueTrigs:
+#                         uniqueTrigs.append(t)
                         
-            if len(uniqueTrigs) == 1:
-                return uniqueTrigs[0]
+            if len(trigs):
+                return trigs[0] if len(trigs)>1 else trigs
             
             else:
-                return uniqueTrigs
+                return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
+            
+    def getEpochDACTriggers(self, epoch:typing.Union[ABFEpoch, str, int], /, 
+                            sweep:int=0, 
+                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]] = None,
+                            eventType:typing.Optional[TriggerEventType] = TriggerEventType.presynaptic,
+                            label:typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+                            name:typing.Optional[str] = None,
+                            enableEmptyEvent:bool=True):
+        """Returns TriggerEvent encoded as analog step or pulse waveforms"""
+        pass
+        
         
     def getTriggers(self, sweep:int = 0,
                     dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
