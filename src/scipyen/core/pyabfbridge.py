@@ -3019,10 +3019,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         """TTL waveforms for the given sweep.
         See NOTE in the docstring for self.getEpochsTable(…)
         """
-        # TODO: 2024-11-08 22:13:06
-        # currently, all waveforms start at 0 so they can all be plotted 
-        # with the same time base
-        # provide for the contigency where all sweeps need to be shown as concatenated
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
         
@@ -3470,7 +3466,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
         
         return waves
     
-    def waveformPreview(self, concatenated:bool=False):
+    def waveformPreview(self, continuous:typing.Optional[bool]=None):
         """Generates a waveform preview, Clampex-style.
         Returns a neo.Block with output waveforms per sweep, for all DAC and DIG
         channels in the protocol, taking into account which waveform is generated
@@ -3478,19 +3474,44 @@ class ABFProtocol(ElectrophysiologyProtocol):
         This is similar to Clampex's default "Sweeps Display" mode in Waveform
         Preview.
         
-        When the optional 'concatenated' parameter is set to True, the neo.Block
-        has only one segment with the per-sweep waveforms concatenated.
+        When the optional 'continuous' parameter is set to a bool, the neo.Block
+        has only one segment with the per-sweep waveforms continuous.
+
+        By default, 'continuous' is None.
         
+        When 'continuous' is True: the corresponding waveforms across ALL sweeps
+        are concatenated, discarding the inter-sweep interval.
+    
         NOTE: This is the same as Clampex's "Continuous Display" mode in the 
         Waveform Preview, and similar to the "Concatenated Display" mode. 
     
-        The main differences to Clampex Waveform Preview are:
-        • in "Concatenated Display" mode, the last sweep is indicated by a 
-            horizontal double-headed arrow beneath the time axis.
+        When 'continuous' is False, the inter-sweep interval is taken into account.
+        Therefore the waveform preview shows the actual time-course of the waveforms
+        during a trial.
+        
+        The main differences to Clampex Waveform Preview are in the cases where
+        either Alternate Waveforms or Alternate Digital Output are enabled in the
+        protocol:
+        
+        • in "Sweeps Display" mode, Clampex actually plots waveforms for ALL sweeps,
+         (with the waveforms of the "first" swep in the alternative mode plotted 
+          in red, and those of the "second" sweep, in black)
+        
+        • in "Concatenated Display" mode, Clampex disregards the inter-sweep interval.
+        
         • in all display modes, in Clampex, the time boundaries of the sweeps and 
             the Wave Start and Wave End are indicated by vertical bars (corresponding
             to the protocol's holding time intervals after the sweep start and 
             before the sweep end).
+        
+        NOTE: Multiple sweeps are displayed only when at least one of the following
+        conditions are met:
+        • either Alternate Waveforms or Alternate Digital Outputs are enabled
+        • there is at least one epoch with delta duration or delta level != 0
+        
+        Furthermore, when either Alternate Waveforms or Alternate Digital Outputs
+        are enabled, only two sweep "prototypes" are shown, unless there is at 
+        least one epoch with delta duration or delta level != 0.
         
         """
         from core import neoutils
@@ -3504,24 +3525,18 @@ class ABFProtocol(ElectrophysiologyProtocol):
             else:
                 maxSweeps = 2
                 
-        else:
+        elif any(any(e.deltaDuration > 0 or e.deltaLevel > 0 for e in d.epochs) for d in self.DACs):
+            maxSweeps = self.nSweeps
+        else: 
             maxSweeps = 1
             
         if maxSweeps == 1:
-            concatenated=False
+            continuous=None
             
-        if not concatenated:
-            for sweep in range(maxSweeps):
-                segment = neo.Segment(name=f"Sweep {sweep} of {maxSweeps} sweeps")
-                analogWaveforms = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
-                digitalWaveforms = [self.getDigitalWaveform(sweep, digChannel=d, 
-                                                            asSignals=True, separateWaves=False) for d in range(self.nDIGChannels)]
-                    
-                segment.analogsignals += analogWaveforms + digitalWaveforms
-                ret.segments.append(segment)
-        else:
+        if isinstance(continuous, bool):
             # segment = neo.Segment(name=f"Sweeps {tuple(range(maxSweeps))} of {maxSweeps} sweeps")
-            segment = neo.Segment(name=f"Concatenated sweeps")
+            pfx = "Continuous" if continuous else "Concatenated"
+            segment = neo.Segment(name=f"{pfx} sweeps")
             analogWaveforms = list()
             digitalWaveforms = list()
             for sweep in range(maxSweeps):
@@ -3532,28 +3547,43 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     analogWaveforms.extend(sweepAnalogs)
                     digitalWaveforms.extend(sweepDigital)
                 else:
+                    new_t_start = self.sweepInterval * sweep
                     for k,sig in enumerate(sweepAnalogs):
-                        sig.t_start = self.sweepInterval * sweep
-                        analogWaveforms[k] = neoutils.concatenate_signals(analogWaveforms[k], sig, axis=0, name=analogWaveforms[k].name)
+                        sig.t_start = new_t_start
+                        analogWaveforms[k] = neoutils.concatenate_signals(analogWaveforms[k], sig, axis=0, 
+                                                                          name=analogWaveforms[k].name,
+                                                                          force_contiguous = continuous)
                         
                     for k, sig in enumerate(sweepDigital):
-                        sig.t_start = self.sweepInterval * sweep
-                        digitalWaveforms[k] = neoutils.concatenate_signals(digitalWaveforms[k], sig, axis=0, name = digitalWaveforms[k].name)
+                        sig.t_start = new_t_start
+                        digitalWaveforms[k] = neoutils.concatenate_signals(digitalWaveforms[k], sig, axis=0, 
+                                                                           name = digitalWaveforms[k].name,
+                                                                          force_contiguous = continuous)
                         
             segment.analogsignals += analogWaveforms + digitalWaveforms
             ret.segments.append(segment)
+            
+        else:
+            for sweep in range(maxSweeps):
+                segment = neo.Segment(name=f"Sweep {sweep} of {maxSweeps} sweeps")
+                analogWaveforms = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
+                digitalWaveforms = [self.getDigitalWaveform(sweep, digChannel=d, 
+                                                            asSignals=True, separateWaves=False) for d in range(self.nDIGChannels)]
+                    
+                segment.analogsignals += analogWaveforms + digitalWaveforms
+                ret.segments.append(segment)
             
         return ret
             
     def getAnalogWaveform(self, sweep:int=0, 
                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                          ) -> neo.AnalogSignal:
+                          ignoreWaveformEnabled:bool=False) -> neo.AnalogSignal:
         """Alias to self.getCommandWaveform"""
-        return self.getCommandWaveform(sweep, dac)
+        return self.getCommandWaveform(sweep, dac, ignoreWaveformEnabled=ignoreWaveformEnabled)
     
     def getCommandWaveform(self, sweep:int = 0,
                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                           ) -> neo.AnalogSignal:
+                           ignoreWaveformEnabled:bool=False) -> neo.AnalogSignal:
         """Generates an AnalogSignal representation of a DAC command waveform.
         
         DAC command waveforms (and digital outputs) are enabled only in 
@@ -3602,7 +3632,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     ▷ Otherwise, alll DACs with Analog Waveform enabled will be 
                         used to generate a collection of AnalogSignal objects
                         for any sweep index passed to the method
-            
+        
+        ignoreWaveformEnabled: default: False
+            When True, and a DAC is specified, its command waveform will be 
+            generated even if it wouold not normally be output during an actual
+            trial (useful to inspect what command waveform the epochs in the DAC
+            are configured to generate IF Analog Waveform ws enabled on this DAC)
+        
+            NOTE: This parameter is only used when Alternate Waveforms is DISabled!
+        
         Returns:
         --------
         
@@ -3720,8 +3758,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                             sampling_rate = self.samplingRate,
                                             name = dac.name)
             else:
-                return self.getDACCommandWaveform(dac, sweep)
-            
+                if ignoreWaveformEnabled:
+                    return self.getDACCommandWaveform(dac, sweep)
+                else:
+                    return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                                            units = dac.units, t_start = 0*pq.s,
+                                            sampling_rate = self.samplingRate,
+                                            name = dac.name)
+                
     def getDACCommandWaveform(self, dac, sweep):
         """Returns the analog waveform emitted by the DAC on a given sweep.
         This returns the output as defined in the Epochs table, i.e., regardless
@@ -3814,7 +3858,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if lastLevelOnly:
                 wave = actualLevel
             else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * dac.units
                 
                 for pulse in range(pulseCount):
                     p1 = int(pulsePeriod * pulse)
@@ -3829,7 +3873,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if lastLevelOnly:
                 wave = actualLevel
             else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * dac.units
                             
                 for pulse in range(pulseCount):
                     p1 = int(pulsePeriod * pulse)
@@ -3846,7 +3890,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 pulseCount = self.getEpochPulseCount(epoch, dac, sweep)
                 levelDelta = float(actualLevel) - float(previousLevel)
                 values = np.linspace(0, 2*pulseCount*np.pi, epochSamplesCount) + np.pi
-                cosines = (np.cos(values) * levelDelta / 2 + levelDelta/2 ) * self.units + previousLevel
+                cosines = (np.cos(values) * levelDelta / 2 + levelDelta/2 ) * dac.units + previousLevel
                 wave = cosines[:, np.newaxis]
             
         elif epoch.type == ABFEpochType.Biphasic:
@@ -3858,7 +3902,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             if lastLevelOnly:
                 wave = actualLevel
             else:
-                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * self.units
+                wave = np.full([epochSamplesCount, 1], float(previousLevel)) * dac.units
                 
                 for pulse in range(pulseCount):
                     p1 = int(pulsePeriod * pulse)
